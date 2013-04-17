@@ -29,7 +29,6 @@
 #include "GenClosure.h"
 #include "GenFunc.h"
 #include "GenInit.h"
-#include "GenLValue.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenTuple.h"
@@ -281,7 +280,6 @@ namespace {
     }
 
     void visitRequalifyExpr(RequalifyExpr *E) {
-      emitRequalify(IGF, E, Out);
     }
 
     void visitTupleExpr(TupleExpr *E) {

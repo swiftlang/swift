@@ -87,20 +87,6 @@ namespace {
   };
 }  // end anonymous namespace.
 
-namespace {
-  class PhysicalStructMember : public PhysicalPathComponent {
-    const StructFieldInfo &Field;
-
-  public:
-    PhysicalStructMember(const StructFieldInfo &field) : Field(field) {}
-
-    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
-      Address project = Field.projectAddress(IGF, addr);
-      return OwnedAddress(project, addr.getOwner());
-    }
-  };
-}
-
 static void emitValueConstructor(IRGenModule &IGM,
                                  llvm::Function *fn,
                                  ConstructorDecl *ctor) {
@@ -143,17 +129,6 @@ static void emitValueConstructor(IRGenModule &IGM,
   IGF.emitConstructorBody(ctor);
 }
 
-static unsigned getFieldIndex(StructDecl *baseStruct, VarDecl *target) {
-  // FIXME: This is an ugly hack.
-  unsigned index = 0;
-  for (Decl *member : baseStruct->getMembers()) {
-    if (member == target) return index;
-    if (auto var = dyn_cast<VarDecl>(member))
-      if (!var->isProperty())
-        ++index;
-  }
-  llvm_unreachable("didn't find field in type!");
-}
 
 OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,

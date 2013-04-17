@@ -129,20 +129,6 @@ void swift::irgen::emitTupleLiteral(IRGenFunction &IGF, TupleExpr *E,
     IGF.emitRValue(elt, explosion);
 }
 
-namespace {
-  class TupleElement : public PhysicalPathComponent {
-    const TupleFieldInfo &Field;
-
-  public:
-    TupleElement(const TupleFieldInfo &field) : Field(field) {}
-
-    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress addr) const {
-      Address project = Field.projectAddress(IGF, addr);
-      return OwnedAddress(project, addr.getOwner());
-    }
-  };
-}
-
 void swift::irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                                     CanType tupleType,
                                                     Explosion &tuple,

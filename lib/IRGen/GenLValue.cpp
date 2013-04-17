@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenLValue.h"
-
 #include "llvm/IR/Function.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -97,36 +95,6 @@ void IRGenFunction::emitLoad(const LValue &lvalue, const TypeInfo &type,
   }
 
   return type.load(*this, address, explosion);
-}
-
-/// Emit a load from the given l-value as an initializer.
-void swift::irgen::emitLoadAsInit(IRGenFunction &IGF, const LValue &lvalue,
-                                  Address dest, const TypeInfo &destTI) {
-  OwnedAddress baseAddress;
-
-  for (auto i = lvalue.begin(), e = lvalue.end(); i != e; ) {
-    const PathComponent &component = *i++;
-
-    // If this is a physical component, just compute it relative to the
-    // previous component.  The address is initialized on the first pass,
-    // but that's okay, because the first component should never care.
-    if (component.isPhysical()) {
-      baseAddress = component.asPhysical().offset(IGF, baseAddress);
-      continue;
-    }
-
-    // If this is the last component, load it and return that as the result.
-    if (i == e)
-      return component.asLogical().loadMaterialized(IGF, baseAddress, dest,
-                                                    ConsumeValues);
-
-    // Otherwise, load and materialize the result into memory.
-    baseAddress = component.asLogical().loadAndMaterialize(IGF, NotOnHeap,
-                                                           baseAddress,
-                                                           ConsumeValues);
-  }
-
-  return destTI.initializeWithCopy(IGF, dest, baseAddress);  
 }
 
 namespace {
@@ -418,34 +386,6 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
     llvm::StructType::get(IGM.getLLVMContext(), elts, /*packed*/ false);
   return new HeapLValueTypeInfo(pairTy, IGM.getPointerSize() * 2,
                                 IGM.getPointerAlignment());
-}
-
-/// Emit a change in the qualification of an l-value.  The only change
-/// that we need to handle here explicitly is the shift of a heap
-/// l-value to a non-heap l-value.
-void swift::irgen::emitRequalify(IRGenFunction &IGF, RequalifyExpr *E,
-                                 Explosion &explosion) {
-  abort();
-  
-  
-  LValueType *srcType = E->getSubExpr()->getType()->castTo<LValueType>();
-  LValueType::Qual srcQs = srcType->getQualifiers();
-  LValueType::Qual destQs = E->getType()->castTo<LValueType>()->getQualifiers();
-
-  // If we're losing heap-qualification, this involves a representation change.
-  if (srcQs.isHeap() && !destQs.isHeap()) {
-   
-    // Otherwise, emit as a heap l-value and project out the reference.
-    Explosion subExplosion(explosion.getKind());
-    IGF.emitRValue(E->getSubExpr(), subExplosion);
-    subExplosion.transferInto(explosion, 1);
-    subExplosion.ignoreAndDestroy(IGF, 1);
-    return;
-  }
-
-  // Otherwise, it doesn't, and we can just emit the underlying
-  // expression directly.
-  return IGF.emitRValue(E->getSubExpr(), explosion);
 }
 
 /// Must accesses to the given variable be performed as a
@@ -962,24 +902,6 @@ namespace {
     }
   };
 }
-
-template <class T>
-static LValue emitAnyMemberRefLValue(IRGenFunction &IGF, T *E) {
-  VarDecl *var = cast<VarDecl>(E->getDecl());
-  Type baseType = E->getBase()->getType();
-  if (!baseType->is<LValueType>()) {
-    if (!isVarAccessLogical(IGF, var)) {
-      return emitPhysicalClassMemberLValue(IGF, E);
-     }
-  }
-}
-
-/// Emit an l-value which accesses a member out of a generic type.
-LValue irgen::emitGenericMemberRefLValue(IRGenFunction &IGF,
-                                         GenericMemberRefExpr *E) {
-  return emitAnyMemberRefLValue(IGF, E);
-}
-
 /// Emit a reference to a global variable.
 LValue IRGenFunction::getGlobal(VarDecl *var) {
   // If we need to access this variable logically, use a
@@ -1002,18 +924,3 @@ LValue IRGenFunction::getGlobal(VarDecl *var) {
   return emitAddressLValue(addr);
 }
 
-
-/// Emit an expression which accesses a member out of a generic type.
-void irgen::emitGenericMemberRef(IRGenFunction &IGF,
-                                 GenericMemberRefExpr *E,
-                                 Explosion &out) {
-  // The l-value case should have been weeded out.
-  assert(!E->getType()->is<LValueType>());
-
-  // The remaining case is to construct an implicit closure.
-  // Just refuse to do this for now.
-  assert(E->getType()->is<AnyFunctionType>());
-  IGF.unimplemented(E->getLoc(),
-              "forming implicit closure over generic member reference");
-  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);  
-}
