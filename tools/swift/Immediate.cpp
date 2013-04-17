@@ -179,7 +179,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
                                  irgen::Options &Options,
-                                 SILModule *SILMod,
                                  bool IsREPL = true) {
   // IRGen the modules this module depends on.
   for (auto ModPair : TU->getImportedModules()) {
@@ -230,12 +229,13 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
     // Recursively IRGen imported modules.
     IRGenImportedModules(SubTU, Module, CmdLine, ImportedModules, InitFns,
-                         Options, SILMod);
+                         Options);
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
     performCaptureAnalysis(SubTU);
-    performIRGeneration(Options, &SubModule, SubTU, SILMod);
+    llvm::OwningPtr<SILModule> SILMod(performSILGeneration(SubTU));
+    performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
 
     if (TU->Ctx.hadError())
       return true;
@@ -292,7 +292,7 @@ void swift::RunImmediately(irgen::Options &Options,
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   if (IRGenImportedModules(TU, Module, CmdLine, ImportedModules, InitFns, Options,
-                           SILMod, /*IsREPL*/false))
+                           /*IsREPL*/false))
     return;
 
   llvm::PassManagerBuilder PMBuilder;
