@@ -46,9 +46,6 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
-  /// Emit an erasure expression into an explosion.
-  void emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out);
-
   /// Emit the metadata and witness table initialization for an allocated
   /// existential container.
   Address emitExistentialContainerInit(IRGenFunction &IGF,
@@ -72,15 +69,6 @@ namespace irgen {
   Address emitExistentialProjection(IRGenFunction &IGF,
                                     Address base,
                                     CanType baseTy);
-
-  /// Emit an erasure expression as an initializer of memory.
-  void emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
-                         Address addr, const TypeInfo &addrTI);
-
-  /// Emit an existential member reference into an explosion.
-  void emitExistentialMemberRef(IRGenFunction &IGF, ExistentialMemberRefExpr *E,
-                                Explosion &out);
-
   /// Emit an existential member reference as an l-value.
   LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                         ExistentialMemberRefExpr *E);
@@ -88,10 +76,6 @@ namespace irgen {
   /// Emit an existential subscript reference as an l-value.
   LValue emitExistentialSubscriptLValue(IRGenFunction &IGF,
                                         ExistentialSubscriptExpr *E);
-
-  /// Emit an archetype member reference into an explosion.
-  void emitArchetypeMemberRef(IRGenFunction &IGF, ArchetypeMemberRefExpr *E,
-                              Explosion &out);
 
   /// Emit an archetype member reference as an l-value.
   LValue emitArchetypeMemberRefLValue(IRGenFunction &IGF,

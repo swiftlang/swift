@@ -287,12 +287,8 @@ void Initialization::markInitialized(IRGenFunction &IGF,
 /// Emit an expression as an initializer for the given location.
 void Initialization::emitInit(IRGenFunction &IGF, InitializedObject object,
                               Address addr, Expr *E, const TypeInfo &type) {
-  IGF.emitRValueAsInit(E, addr, type);
-
-  // Mark as initialized.  This assumes that calls to
-  // TypeInfo::initialize are atomic w.r.t. exceptions and
-  // other control flow.
-  markInitialized(IGF, object);
+  abort();
+ 
 }
 
 /// Emit an r-value directly into memory as an initialization.

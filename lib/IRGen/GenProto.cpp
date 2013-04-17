@@ -215,9 +215,10 @@ namespace {
 
     unsigned getNumTables() const { return NumTables; }
 
+    /*
     friend bool operator==(ExistentialLayout a, ExistentialLayout b) {
       return a.NumTables == b.NumTables;
-    }
+    }*/
 
     /// Given the offset of the buffer within an existential type.
     Size getBufferOffset(IRGenModule &IGM) const {
@@ -3417,175 +3418,6 @@ Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
   }
 }
 
-/// Emit an erasure expression as an initializer for the given memory.
-void irgen::emitErasureAsInit(IRGenFunction &IGF, ErasureExpr *E,
-                              Address dest, const TypeInfo &rawTI) {
-  auto &destTI = rawTI.as<ExistentialTypeInfo>();
-  ExistentialLayout destLayout = destTI.getLayout();
-  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
-  assert(destEntries.size() == E->getConformances().size());
-
-  CanType srcType = E->getSubExpr()->getType()->getCanonicalType();
-  if (srcType->isExistentialType()) {
-    // Special case: we're converting from an existential type to another
-    // existential type in some trivial manner (e.g., to an inherited protocol).
-    auto &srcTI = IGF.getFragileTypeInfo(srcType).as<ExistentialTypeInfo>();
-
-    Address src;
-
-    // If the layouts are equivalent, we can evaluate in-place and
-    // then modify the witness table.  Regardless of the other
-    // decisions we make, we won't need to touch the buffer.
-    auto srcLayout = srcTI.getLayout();
-    bool evaluateInPlace = (srcLayout == destLayout);
-    if (evaluateInPlace) {
-      auto srcPtrTy = srcTI.getStorageType()->getPointerTo();
-      src = IGF.Builder.CreateBitCast(dest, srcPtrTy);
-      IGF.emitRValueAsInit(E->getSubExpr(), src, srcTI);
-
-    // Otherwise we'll need to evaluate to a different place and then
-    // 'take' the buffer.
-    } else {
-      // We can use createAlloca instead of TypeInfo::allocate because
-      // existentials are always fixed in layout.
-      src = IGF.createAlloca(srcTI.getStorageType(), srcTI.StorageAlignment,
-                             "erasure.temp");
-      IGF.emitRValueAsInit(E->getSubExpr(), src, srcTI);
-
-      // Take the data out of the other buffer (by memcpy'ing it).
-      // ErasureExpr never implies a transformation of the *value*,
-      // just of the *witnesses*.
-      Address destBuffer = destLayout.projectExistentialBuffer(IGF, dest);
-      Address srcBuffer = srcLayout.projectExistentialBuffer(IGF, src);
-      IGF.emitMemCpy(destBuffer, srcBuffer, getFixedBufferSize(IGF.IGM));
-
-      // Copy the metadata as well.
-      Address destMetadataSlot = destLayout.projectMetadataRef(IGF, dest);
-      IGF.Builder.CreateStore(srcLayout.loadMetadataRef(IGF, dest),
-                              destMetadataSlot);
-    }
-
-    // Okay, the buffer on dest has been meaningfully filled in.
-    // Fill in the witnesses.
-
-    // If we're erasing *all* protocols, we're done.
-    if (destEntries.empty())
-      return;
-
-    // Okay, so we're erasing to a non-trivial set of protocols.
-
-    // First, find all the destination tables.  We can't write these
-    // into dest immediately because later fetches of protocols might
-    // give us trouble.
-    SmallVector<llvm::Value*, 4> destTables;
-    for (auto &entry : destTI.getProtocols()) {
-      auto table = srcTI.findWitnessTable(IGF, src, entry.getProtocol());
-      destTables.push_back(table);
-    }
-
-    // Now write those into the destination.
-    for (unsigned i = 0, e = destTables.size(); i != e; ++i) {
-      Address destSlot = destLayout.projectWitnessTable(IGF, dest, i);
-      IGF.Builder.CreateStore(destTables[i], destSlot);
-    }
-    return;
-  }
-
-  // We're converting from a concrete type to an existential type.
-  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
-
-  // First, write out the metadata and witness tables.
-  
-  llvm::Value *metadata = nullptr;
-  FixedPacking packing = (FixedPacking) -1;
-  llvm::Value *wtable = nullptr;
-  emitProtocolWitnessTables(IGF,
-                            dest,
-                            destTI,
-                            srcType,
-                            E->getConformances(),
-                            metadata,
-                            packing,
-                            wtable);
-
-  // Finally, evaluate into the buffer.
-
-  // If the type is provably empty, just emit the operand as ignored.
-  if (srcTI.isEmpty(ResilienceScope::Local)) {
-    assert(packing == FixedPacking::OffsetZero);
-    return;
-  }
-
-  // Otherwise, allocate if necessary.
-
-  // Project down to the destination fixed-size buffer.
-  Address buffer = destLayout.projectExistentialBuffer(IGF, dest);
-
-  Address object;
-  bool hasDeallocCleanup;
-
-  // If we're using a witness-table to do this, we need to emit a
-  // value-witness call to allocate the fixed-size buffer.
-  if (wtable) {
-    object = Address(emitAllocateBufferCall(IGF, wtable, metadata, buffer),
-                     Alignment(1));
-
-    hasDeallocCleanup = true;
-    IGF.pushFullExprCleanup<DeallocateBuffer>(buffer, wtable, metadata);
-
-  // Otherwise, allocate using what we know statically about the type.
-  } else {
-    object = emitAllocateBuffer(IGF, buffer, packing, srcTI);
-
-    hasDeallocCleanup = !isNeverAllocated(packing);
-    if (hasDeallocCleanup)
-      IGF.pushFullExprCleanup<DeallocateConcreteBuffer>(buffer, packing, srcTI);
-  }
-
-  // Remember where the cleanup was.
-  CleanupsDepth deallocCleanup;
-  if (hasDeallocCleanup) deallocCleanup = IGF.getCleanupsDepth();
-
-  // Emit the object in-place.
-  IGF.emitRValueAsInit(E->getSubExpr(), object, srcTI);
-
-  // Deactivate the dealloc cleanup.
-  if (hasDeallocCleanup) {
-    IGF.setCleanupState(deallocCleanup, CleanupState::Dead);
-  }
-}
-
-/// Emit an expression which erases the concrete type of its value and
-/// replaces it with a generic type.
-void irgen::emitErasure(IRGenFunction &IGF, ErasureExpr *E, Explosion &out) {
-  const ExistentialTypeInfo &protoTI =
-    IGF.getFragileTypeInfo(E->getType()).as<ExistentialTypeInfo>();
-
-  // Create a temporary of the appropriate type.
-  Address temp = protoTI.allocate(IGF);
-
-  // Initialize the temporary.
-  emitErasureAsInit(IGF, E, temp, protoTI);
-
-  // Add that as something to destroy.
-  IGF.enterDestroyCleanup(temp, protoTI, out);
-}
-
-/// Emit an expression which accesses a member out of an existential type.
-void irgen::emitExistentialMemberRef(IRGenFunction &IGF,
-                                     ExistentialMemberRefExpr *E,
-                                     Explosion &out) {
-  // The l-value case should have been weeded out.
-  assert(!E->getType()->is<LValueType>());
-
-  // The remaining case is to construct an implicit closure.
-  // Just refuse to do this for now.
-  assert(E->getType()->is<AnyFunctionType>());
-  IGF.unimplemented(E->getLoc(),
-              "forming implicit closure over existential member reference");
-  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);
-}
-
 /// Emit an expression which accesses a member out of an existential type.
 LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
                                              ExistentialMemberRefExpr *E) {
@@ -3880,20 +3712,7 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
                         1, 1, ExtraData::Metatype);
 }
 
-/// Emit an expression which accesses a member out of an archetype.
-void irgen::emitArchetypeMemberRef(IRGenFunction &IGF,
-                                   ArchetypeMemberRefExpr *E,
-                                   Explosion &out) {
-  // The l-value case should have been weeded out.
-  assert(!E->getType()->is<LValueType>());
 
-  // The remaining case is to construct an implicit closure.
-  // Just refuse to do this for now.
-  assert(E->getType()->is<AnyFunctionType>());
-  IGF.unimplemented(E->getLoc(),
-              "forming implicit closure over existential member reference");
-  IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), out);
-}
 
 /// Emit an expression which accesses a member out of an archetype.
 LValue irgen::emitArchetypeMemberRefLValue(IRGenFunction &IGF,

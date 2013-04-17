@@ -67,19 +67,6 @@ static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
   return llvm::ConstantInt::get(IGF.IGM.Int32Ty, E->getValue());
 }
 
-/// Emit an string literal expression.
-static void emitStringLiteralExpr(IRGenFunction &IGF,
-                                  StringLiteralExpr *E, 
-                                  Explosion &out) {
-  // Type of the expression should be either a lone RawPointer or a
-  // (RawPointer, Int64) tuple.
-  bool includeSize = !E->getType()->is<BuiltinRawPointerType>();
-  if (includeSize)
-    assert(E->getType()->is<TupleType>());
-
-  emitStringLiteral(IGF, E->getValue(), includeSize, out);
-}
-
 static LValue emitDeclRefLValue(IRGenFunction &IGF, ValueDecl *D, Type Ty) {
   switch (D->getKind()) {
 #define VALUE_DECL(id, parent)
@@ -135,21 +122,12 @@ static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc
   case DeclKind::Func:
     return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
-  case DeclKind::OneOfElement: {
-    IGF.unimplemented(Loc, "uncurried reference to oneof");
-    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(Ty), explosion);
-    return;
-  }
-
+  case DeclKind::OneOfElement:
   case DeclKind::Subscript:
     llvm_unreachable("subscript decl cannot be referenced");
 
-  case DeclKind::Constructor: {
-    IGF.unimplemented(Loc, "uncurried reference to constructor");
-    IGF.emitFakeExplosion(IGF.getFragileTypeInfo(Ty), explosion);
-    return;
-  }
-  case DeclKind::Destructor:
+  case DeclKind::Constructor:
+    case DeclKind::Destructor:
     llvm_unreachable("destructor decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
@@ -278,15 +256,13 @@ namespace {
     }
 
     void visitTupleExpr(TupleExpr *E) {
-      emitTupleLiteral(IGF, E, Out);
-    }
+     }
 
     void visitSubscriptExpr(SubscriptExpr *E) {
      }
     
     void visitTupleShuffleExpr(TupleShuffleExpr *E) {
-      emitTupleShuffle(IGF, E, Out);
-    }
+     }
 
     /// Metatypes are always compatible up the inheritance hierarchy.
     void visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
@@ -296,11 +272,8 @@ namespace {
       IGF.emitRValue(E->getSubExpr(), Out);
     }
     void visitErasureExpr(ErasureExpr *E) {
-      emitErasure(IGF, E, Out);
-    }
+     }
     void visitSpecializeExpr(SpecializeExpr *E) {
-      IGF.unimplemented(E->getLoc(), "specialize expressions");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
     }
     void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
       Explosion subResult(ExplosionKind::Maximal);
@@ -345,11 +318,9 @@ namespace {
     }
 
     void visitScalarToTupleExpr(ScalarToTupleExpr *E) {
-      emitScalarToTuple(IGF, E, Out);
     }
     void visitTupleElementExpr(TupleElementExpr *E) {
-      emitTupleElement(IGF, E, Out);
-    }
+     }
 
     void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
       IGF.emitRValue(E->getRHS(), Out);
@@ -408,8 +379,7 @@ namespace {
       Out.addUnmanaged(emitCharacterLiteralExpr(IGF, E));
     }
     void visitStringLiteralExpr(StringLiteralExpr *E) {
-      emitStringLiteralExpr(IGF, E, Out);
-    }
+     }
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
       visit(E->getSemanticExpr());
     }
@@ -424,20 +394,11 @@ namespace {
       emitDeclRef(IGF, E->getThis(), E->getType(), E->getLoc(), Out);
     }
     void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
-      IGF.unimplemented(E->getLoc(), "uncurried reference to constructor");
-      IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
       return;
     }
     
     void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
       // FIXME: For delegating value constructors, we want to emitRValueAsInit
-      // 'this' in place with the result of the subexpression.
-      if (!E->getThis()->getType()->hasReferenceSemantics()) {
-        IGF.unimplemented(E->getLoc(), "delegating value constructor");
-        IGF.emitFakeExplosion(IGF.getFragileTypeInfo(E->getType()), Out);
-        return;
-      }
-      
       // FIXME: We should conditionalize the 'this' rebinding below on the
       // ObjC-ness of the called constructor. Swift constructors should never
       // rebind 'this'.
@@ -518,55 +479,6 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   RValueEmitter(*this, explosion).visit(E);
 }
 
-namespace {
-  /// A visitor for emitting a value into memory.  Like r-value
-  /// emission, this can actually emit an l-value, with the result
-  /// that the address (and possibly the owner) of the l-value are
-  /// stored.
-  class RValueInitEmitter : public irgen::ExprVisitor<RValueInitEmitter> {
-    IRGenFunction &IGF;
-    const TypeInfo &AddrTI;
-    Address Addr;
-
-  public:
-    RValueInitEmitter(IRGenFunction &IGF, const TypeInfo &addrTI, Address addr)
-      : IGF(IGF), AddrTI(addrTI), Addr(addr) {}
-
-    void visitExpr(Expr *E) {
-      // The default behavior is to emit as an explosion and then
-      // initialize from that.
-      Explosion explosion(ExplosionKind::Maximal);
-      IGF.emitRValue(E, explosion);
-      AddrTI.initialize(IGF, explosion, Addr);
-    }
-
-    void visitApplyExpr(ApplyExpr *E) {
-      emitApplyExprToMemory(IGF, E, Addr, AddrTI);
-    }
-
-    void visitLoadExpr(LoadExpr *E) {
-    }
-
-    void visitErasureExpr(ErasureExpr *E) {
-      emitErasureAsInit(IGF, E, Addr, AddrTI);
-    }
-
-    // TODO: Implement some other interesting cases that could
-    // benefit from this:
-    //   TupleExpr
-    //   TupleShuffleExpr
-  };
-}
-
-/// Emit the given expression as the initializer for an object at the
-/// given address.  A FullExpr has already been pushed, and a cleanup
-/// for the address will be activated immediately after completion.
-void IRGenFunction::emitRValueAsInit(Expr *E, Address addr,
-                                     const TypeInfo &addrTI) {
-  assert(0);
-  RValueInitEmitter(*this, addrTI, addr).visit(E);
-}
-
 /// Emit a fake l-value which obeys the given specification.  This
 /// should only ever be used for error recovery.
 LValue IRGenFunction::emitFakeLValue(Type type) {
@@ -579,6 +491,7 @@ LValue IRGenFunction::emitFakeLValue(Type type) {
                                         IGM.RefCountedNull));
 }
 
+
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {
   ExplosionSchema schema(explosion.getKind());
   type.getSchema(schema);
@@ -589,7 +502,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion
     } else {
       elementType = element.getScalarType();
     }
-
+    
     explosion.addUnmanaged(llvm::UndefValue::get(elementType));
   }
 }
