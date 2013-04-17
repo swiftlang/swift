@@ -66,7 +66,6 @@ namespace swift {
   class DoWhileStmt;
 
 namespace irgen {
-  class Condition;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class FunctionRef;
@@ -354,9 +353,7 @@ public:
   llvm::Value *emitIsSubtype(llvm::Value *from,
                              CanType toType);
 
-  llvm::Value *emitAsPrimitiveScalar(Expr *E);
-
-  void emitLoad(const LValue &lvalue, const TypeInfo &type,
+   void emitLoad(const LValue &lvalue, const TypeInfo &type,
                 Explosion &explosion);
   void emitAssign(Expr *E, const LValue &lvalue, const TypeInfo &type);
   void emitAssign(Explosion &explosion, const LValue &lvalue,
@@ -365,8 +362,6 @@ public:
   OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
 
   void emitNullaryCall(llvm::Value *fn, CanType resultType, Explosion &result);
-
-  Condition emitCondition(Expr *E, bool hasFalseCode, bool invertValue = false);
 
 //--- Declaration emission -----------------------------------------------------
 public:

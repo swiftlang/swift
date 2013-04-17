@@ -24,7 +24,6 @@
 #include "llvm/IR/Function.h"
 
 #include "ASTVisitor.h"
-#include "Condition.h"
 #include "GenArray.h"
 #include "GenClass.h"
 #include "GenClosure.h"
@@ -160,19 +159,6 @@ static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc
     llvm_unreachable("destructor decl cannot be referenced");
   }
   llvm_unreachable("bad decl kind");
-}
-
-/// Emit the given expression, which must have primitive scalar type,
-/// as that primitive scalar value.  This is just a convenience method
-/// for not needing to construct and destroy an Explosion.
-llvm::Value *IRGenFunction::emitAsPrimitiveScalar(Expr *E) {
-  assert(0);
-  Explosion explosion(ExplosionKind::Minimal);
-  emitRValue(E, explosion);
-
-  llvm::Value *result = explosion.claimUnmanagedNext();
-  assert(explosion.empty());
-  return result;
 }
 
 /// Emit a rvalue-to-lvalue conversion.
@@ -543,64 +529,7 @@ namespace {
     }
     
     void visitIfExpr(IfExpr *E) {
-      // Emit the condition.
-      Condition cond = IGF.emitCondition(E->getCondExpr(),
-                                         /*hasFalse=*/ true);
-      
-      // Emit the branches.
-      Explosion thenResult(Out.getKind()),
-                elseResult(Out.getKind());
-      const TypeInfo &ti = IGF.getFragileTypeInfo(E->getType());
-      
-      llvm::BasicBlock *thenPred, *elsePred;
-      
-      if (cond.hasTrue()) {
-        cond.enterTrue(IGF);
-        IGF.emitRValue(E->getThenExpr(), thenResult);
-        thenPred = IGF.Builder.GetInsertBlock();
-        cond.exitTrue(IGF);
-      }
-      
-      if (cond.hasFalse()) {
-        cond.enterFalse(IGF);
-        IGF.emitRValue(E->getElseExpr(), elseResult);
-        elsePred = IGF.Builder.GetInsertBlock();
-        cond.exitFalse(IGF);
-      }
-      
-      cond.complete(IGF);
-      
-      // Join the results of the branches.
-      
-      // If only one branch was valid, use the result from that branch.
-      if (cond.hasTrue() && !cond.hasFalse()) {
-        ti.reexplode(IGF, thenResult, Out);
-        return;
-      }
-      
-      if (cond.hasFalse() && !cond.hasTrue()) {
-        ti.reexplode(IGF, elseResult, Out);
-        return;
-      }
-      
-      // Otherwise, phi the results from both branches.
-      assert(thenResult.size() == elseResult.size()
-             && "mismatched explosion sizes in branches of if expr");
-      
-      Explosion phiResult(Out.getKind());
-      while (!thenResult.empty()) {
-        // Strip cleanups from the incoming values. We'll introduce new cleanups
-        // on the phi-ed values by TypeInfo::manage-ing them.
-        llvm::Value *thenVal = thenResult.forwardNext(IGF);
-        llvm::Value *elseVal = elseResult.forwardNext(IGF);
-        assert(thenVal->getType() == elseVal->getType()
-               && "mismatched explosion types in branches of if expr");
-        llvm::PHINode *phi = IGF.Builder.CreatePHI(thenVal->getType(), 2);
-        phi->addIncoming(thenVal, thenPred);
-        phi->addIncoming(elseVal, elsePred);
-        phiResult.addUnmanaged(phi);
-      }
-      ti.manage(IGF, phiResult, Out);
+      abort();
     }
   };
 }
