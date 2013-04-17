@@ -436,16 +436,6 @@ namespace {
 
 #define FOR_MEMBER_KIND(KIND)                                              \
     void visit##KIND##MemberRefExpr(KIND##MemberRefExpr *E) {              \
-      if (isLValueMember(E->getDecl())) {                                  \
-      }                                                                    \
-      if (isTypeMember(E->getDecl())) {                                    \
-        auto type = cast<TypeDecl>(E->getDecl())->getDeclaredType()        \
-          ->getCanonicalType();                                            \
-        return emitMetaTypeRef(IGF, type, Out);                            \
-      }                                                                    \
-                                                                           \
-      assert(!E->getType()->is<LValueType>());                             \
-      emit##KIND##MemberRef(IGF, E, Out);                                  \
     }                                                                      \
     void visit##KIND##SubscriptExpr(KIND##SubscriptExpr *E) {              \
      }
