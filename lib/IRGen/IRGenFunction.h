@@ -365,17 +365,14 @@ public:
 
 //--- Declaration emission -----------------------------------------------------
 public:
-  void emitLocal(Decl *D);
   LValue getGlobal(VarDecl *D);
   OwnedAddress getLocalVar(VarDecl *D);
   void setLocalVar(VarDecl *D, OwnedAddress addr);
-  void emitPatternBindingDecl(PatternBindingDecl *D);
 
   llvm::Value *getLocalFuncData(FuncDecl *fn);
   IRGenFunction *getLocalFuncDefiner(FuncDecl *func);
   void setLocalFuncData(FuncDecl *fn, llvm::Value *data,
                         IRGenFunction *definingIGF);
-  void emitLocalFunction(FuncDecl *func);
 
   llvm::Function *getAddrOfLocalFunction(FunctionRef func);
 

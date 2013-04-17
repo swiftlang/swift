@@ -1502,49 +1502,6 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   }
 }
 
-void IRGenFunction::emitLocal(Decl *D) {
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Subscript:
-  case DeclKind::TopLevelCode:
-  case DeclKind::Protocol:
-  case DeclKind::Extension:
-  case DeclKind::OneOfElement:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-    llvm_unreachable("declaration cannot appear in local scope");
-
-  case DeclKind::OneOf:
-    return IGM.emitOneOfDecl(cast<OneOfDecl>(D));
-
-  case DeclKind::Struct:
-    return IGM.emitStructDecl(cast<StructDecl>(D));
-
-  case DeclKind::Class:
-    return IGM.emitClassDecl(cast<ClassDecl>(D));
-
-  case DeclKind::TypeAlias:
-    // no IR generation support required.
-    return;
-
-  case DeclKind::Var:
-    // We handle these in pattern-binding.
-    return;
-
-  case DeclKind::Func:
-    emitLocalFunction(cast<FuncDecl>(D));
-    return;
-
-  case DeclKind::PatternBinding:
-    emitPatternBindingDecl(cast<PatternBindingDecl>(D));
-    return;      
-  }
-  llvm_unreachable("bad declaration kind!");
-}
-
 OwnedAddress IRGenFunction::getLocalVar(VarDecl *D) {
   auto I = Locals.find(D);
   assert(I != Locals.end() && "no entry in local map!");

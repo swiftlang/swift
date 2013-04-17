@@ -301,16 +301,6 @@ void irgen::emitClosure(IRGenFunction &IGF, CapturingExpr *E, Explosion &out) {
   out.add(data);
 }
 
-/// Emit a function declaration, starting at the given uncurry level.
-void IRGenFunction::emitLocalFunction(FuncDecl *func) {
-  assert(func->getBody() && "local function without a body!");
-
-  // Emit the data for a closure.  No need to emit a function body yet.
-  ManagedValue data = emitClosureData(*this, func->getBody());
-
-  // Just let the cleanup be bound in the current scope.
-  setLocalFuncData(func, data.getValue(), this);
-}
 
 /// Get or create a definition for the given local function, emitting
 /// it if necessary.  The IGF doesn't need to be for the function

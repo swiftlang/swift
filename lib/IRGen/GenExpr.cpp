@@ -586,6 +586,7 @@ namespace {
 /// for the address will be activated immediately after completion.
 void IRGenFunction::emitRValueAsInit(Expr *E, Address addr,
                                      const TypeInfo &addrTI) {
+  assert(0);
   RValueInitEmitter(*this, addrTI, addr).visit(E);
 }
 
