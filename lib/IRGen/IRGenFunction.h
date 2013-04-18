@@ -356,8 +356,6 @@ public:
   void setLocalFuncData(FuncDecl *fn, llvm::Value *data,
                         IRGenFunction *definingIGF);
 
-  llvm::Function *getAddrOfLocalFunction(FunctionRef func);
-
   void bindArchetype(ArchetypeType *type,
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);

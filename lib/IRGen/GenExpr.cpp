@@ -24,7 +24,6 @@
 #include "llvm/IR/Function.h"
 
 #include "ASTVisitor.h"
-#include "GenArray.h"
 #include "GenClass.h"
 #include "GenClosure.h"
 #include "GenFunc.h"

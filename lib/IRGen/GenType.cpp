@@ -343,7 +343,7 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   case TypeKind::PolymorphicFunction:
     return convertFunctionType(cast<AnyFunctionType>(ty));
   case TypeKind::Array:
-    return convertArrayType(cast<ArrayType>(ty));
+    llvm_unreachable("array types should be lowered by SILGen");
   case TypeKind::Protocol:
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:

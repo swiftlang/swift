@@ -70,7 +70,6 @@ class TypeConverter {
   const TypeInfo *convertClassType(ClassDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
-  const TypeInfo *convertArrayType(ArrayType *T);
   const TypeInfo *convertLValueType(LValueType *T);
   const TypeInfo *convertMetaTypeType(MetaTypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);

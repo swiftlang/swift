@@ -1,5 +1,4 @@
 add_swift_library(swiftIRGen
-  GenArray.cpp
   GenClass.cpp
   GenClosure.cpp
   GenControl.cpp

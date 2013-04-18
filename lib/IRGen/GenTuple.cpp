@@ -29,7 +29,6 @@
 #include "llvm/IR/DerivedTypes.h"
 
 #include "ASTVisitor.h"
-#include "GenArray.h"
 #include "GenHeap.h"
 #include "GenInit.h"
 #include "GenSequential.h"
