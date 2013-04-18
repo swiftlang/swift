@@ -34,7 +34,6 @@
 #include "GenTuple.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "Explosion.h"
 #include "TypeInfo.h"
 
@@ -65,36 +64,6 @@ static llvm::Value *emitCharacterLiteralExpr(IRGenFunction &IGF,
                                              CharacterLiteralExpr *E) {
   assert(E->getType()->is<BuiltinIntegerType>());
   return llvm::ConstantInt::get(IGF.IGM.Int32Ty, E->getValue());
-}
-
-static LValue emitDeclRefLValue(IRGenFunction &IGF, ValueDecl *D, Type Ty) {
-  switch (D->getKind()) {
-#define VALUE_DECL(id, parent)
-#define DECL(id, parent) case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-    llvm_unreachable("decl is not a value decl");
-
-  case DeclKind::TypeAlias:
-  case DeclKind::OneOf:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::Protocol:
-  case DeclKind::Func:
-  case DeclKind::OneOfElement:
-    llvm_unreachable("decl cannot be emitted as an l-value");
-
-  case DeclKind::Var:
-
-  case DeclKind::Subscript:
-    llvm_unreachable("subscript decl cannot be referenced");
-
-  case DeclKind::Constructor:
-    llvm_unreachable("constructor decl cannot be referenced");
-
-  case DeclKind::Destructor:
-    llvm_unreachable("destructor decl cannot be referenced");
-  }
-  llvm_unreachable("bad decl kind");
 }
 
 /// Emit a declaration reference as an exploded r-value.
@@ -412,10 +381,7 @@ namespace {
       if (!E->getSubExpr()->getType()->isEqual(E->getThis()->getType()))
         newThis = IGF.emitUnconditionalDowncast(newThis, thisTy);
 
-      // Reassign 'this' with the result.
-      LValue thisLV = emitDeclRefLValue(IGF, E->getThis(),
-                                        E->getThis()->getTypeOfReference());
-      OwnedAddress addr;
+       OwnedAddress addr;
       
       Explosion newThisE(IGF.CurExplosionLevel);
       newThisE.addUnmanaged(newThis);

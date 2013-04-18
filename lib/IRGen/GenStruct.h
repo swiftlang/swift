@@ -23,7 +23,6 @@ namespace swift {
   class CanType;
 
 namespace irgen {
-  class LValue;
   class IRGenFunction;
   class OwnedAddress;
   class Explosion;
@@ -37,10 +36,6 @@ namespace irgen {
                                                 Explosion &base,
                                                 unsigned fieldNo,
                                                 Explosion &out);
-
-  LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
-  LValue emitPhysicalStructMemberLValue(IRGenFunction &IGF,
-                                        GenericMemberRefExpr *E);
 
 } // end namespace irgen
 } // end namespace swift

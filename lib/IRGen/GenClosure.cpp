@@ -31,7 +31,6 @@
 #include "FunctionRef.h"
 #include "GenHeap.h"
 #include "GenInit.h"
-#include "LValue.h"
 #include "TypeInfo.h"
 
 using namespace swift;

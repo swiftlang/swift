@@ -41,7 +41,6 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
-#include "LValue.h"
 #include "TypeInfo.h"
 
 using namespace swift;

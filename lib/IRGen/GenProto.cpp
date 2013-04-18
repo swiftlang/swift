@@ -49,7 +49,6 @@
 #include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "NecessaryBindings.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
@@ -3586,7 +3585,6 @@ irgen::prepareExistentialMemberRefCall(IRGenFunction &IGF,
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // The base of an existential member reference is always an l-value.
-  LValue lvalue;
   Address existAddr;
 
   // Load the witness table.

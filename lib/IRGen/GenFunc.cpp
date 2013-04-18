@@ -84,7 +84,6 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
-#include "LValue.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "Scope.h"

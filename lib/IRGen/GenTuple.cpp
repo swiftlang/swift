@@ -36,7 +36,6 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "Explosion.h"
 
 #include "GenTuple.h"

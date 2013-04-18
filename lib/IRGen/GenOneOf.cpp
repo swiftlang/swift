@@ -36,7 +36,6 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "ScalarTypeInfo.h"
 
 using namespace swift;

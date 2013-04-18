@@ -31,7 +31,6 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
-#include "LValue.h"
 #include "Explosion.h"
 
 using namespace swift;

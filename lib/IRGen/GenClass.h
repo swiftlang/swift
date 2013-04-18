@@ -35,7 +35,6 @@ namespace irgen {
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
-  class LValue;
   class OwnedAddress;
 
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,

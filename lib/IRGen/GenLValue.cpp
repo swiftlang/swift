@@ -33,7 +33,6 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "FormalType.h"
-#include "LValue.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 

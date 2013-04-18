@@ -42,7 +42,6 @@ namespace irgen {
   class CallEmission;
   class IRGenFunction;
   class IRGenModule;
-  class LValue;
   class TypeInfo;
   enum class ValueWitness : unsigned;
 

@@ -40,7 +40,6 @@
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "LValue.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
 #include "GenInit.h"
