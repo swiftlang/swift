@@ -1191,7 +1191,9 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   bool Invalid = false;
 
   if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
-    diagnose(Tok, diag::expected_separator, ",");
+    SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+    diagnose(Tok, diag::expected_separator, ",")
+      << Diagnostic::FixIt::makeInsertion(InsertLoc, ",");
     Invalid |= true;
   }
 

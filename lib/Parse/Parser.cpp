@@ -315,9 +315,9 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   bool Invalid = false;
   while (true) {
     while (Tok.is(SeparatorK)) {
-      // FIXME: Add a fixit to remove optional separators
       diagnose(Tok, diag::unexpected_separator,
-               SeparatorK == tok::comma ? "," : ";");
+               SeparatorK == tok::comma ? "," : ";")
+        << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -334,8 +334,10 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     if (consumeIf(SeparatorK))
       continue;
     if (!OptionalSep) {
-      diagnose(Tok, diag::expected_separator,
-               SeparatorK == tok::comma ? "," : ";");
+      SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+      StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
+      diagnose(Tok, diag::expected_separator, Separator)
+        << Diagnostic::FixIt::makeInsertion(InsertLoc, Separator);
       Invalid = true;
     }
     // If we haven't made progress, skip ahead

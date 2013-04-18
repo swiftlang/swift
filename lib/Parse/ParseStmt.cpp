@@ -192,10 +192,10 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
     if (!previousHadSemi && !Tok.isAtStartOfLine()) {
-      // FIXME: Fix-It here to add the ';'.
       SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
                                                               PreviousLoc);
-      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi);
+      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+        << Diagnostic::FixIt::makeInsertion(EndOfPreviousLoc, ";");
       // FIXME: Add semicolon to the AST?
     }
 
