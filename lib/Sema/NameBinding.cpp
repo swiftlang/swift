@@ -295,7 +295,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*IsTypeLookup*/true);
 
     if (Globals.Results.size() > 1) {
-      diagnose(Loc, diag::abiguous_type_base, Name)
+      diagnose(Loc, diag::ambiguous_type_base, Name)
         << SourceRange(Loc, Components.back().Loc);
       for (auto Result : Globals.Results) {
         if (Globals.Results[0].hasValueDecl())

@@ -774,7 +774,7 @@ NOTE(invalid_redecl_prev,sema_nb,none,
 
 ERROR(no_module_or_type,sema_nb,none,
       "no such module or type", ())
-ERROR(abiguous_type_base,sema_nb,none,
+ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type look up in this context", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
       "%0 is not a member type of %1", (Identifier, Identifier))

@@ -212,7 +212,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
 
         // FIXME: We need to centralize ambiguity checking
         if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
-          diagnose(Loc, diag::abiguous_type_base, Name)
+          diagnose(Loc, diag::ambiguous_type_base, Name)
             << SourceRange(Loc, Components.back().Loc);
           for (auto Result : Globals.Results) {
             if (Globals.Results[0].hasValueDecl())
