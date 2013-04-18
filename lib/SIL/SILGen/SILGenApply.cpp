@@ -322,7 +322,7 @@ public:
 } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
-                                       SILValue Fn,
+                                       ManagedValue Fn,
                                        ArrayRef<ManagedValue> Args) {
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
@@ -339,7 +339,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                         return v.forwardArgument(*this, Loc);
                                       });
     argsWithReturn.push_back(buffer);
-    B.createApply(Loc, Fn, SGM.Types.getEmptyTupleType(),
+    B.createApply(Loc, Fn.forward(*this), SGM.Types.getEmptyTupleType(),
                   argsWithReturn);
 
     return emitManagedRValueWithCleanup(buffer);
@@ -351,7 +351,8 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                         return v.forwardArgument(*this, Loc);
                                       });
 
-    SILValue result = B.createApply(Loc, Fn, resultTI.getLoweredType(),
+    SILValue result = B.createApply(Loc, Fn.forward(*this),
+                                    resultTI.getLoweredType(),
                                     fwdArgs);
     return resultTy->is<LValueType>()
       ? ManagedValue(result, ManagedValue::LValue)
@@ -475,7 +476,7 @@ namespace {
         
       // Emit the uncurried call.
       ManagedValue result = gen.emitApply(uncurriedLoc,
-                                          calleeValue.forward(gen),
+                                          calleeValue,
                                           args);
       
       // If there are remaining call sites, apply them to the result function.
@@ -483,7 +484,7 @@ namespace {
         args.clear();
         SILLocation loc = site.loc;
         std::move(site).emit(gen, args);
-        result = gen.emitApply(loc, result.forward(gen), args);
+        result = gen.emitApply(loc, result, args);
       }
       
       return result;
@@ -541,7 +542,7 @@ RValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
 /// (which represents the retain count), a base pointer to some elements, and a
 /// length.
-ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
+ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
                                             SILValue BasePtr,
                                             SILValue Length,
                                             Expr *ArrayInjectionFunction) {
@@ -560,9 +561,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
   RValue InjectionArgs(injectionArgsTy);
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(BasePtr, ManagedValue::Unmanaged)));
-  // FIXME: ObjectPtr ought to have a cleanup on it.
-  InjectionArgs.addElement(RValue(*this,
-                                ManagedValue(ObjectPtr, ManagedValue::Unmanaged)));
+  InjectionArgs.addElement(RValue(*this, ObjectPtr));
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(Length, ManagedValue::Unmanaged)));
   

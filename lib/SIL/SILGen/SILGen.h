@@ -466,7 +466,7 @@ public:
   RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
   RValue visitIfExpr(IfExpr *E, SGFContext C);
 
-  ManagedValue emitArrayInjectionCall(SILValue ObjectPtr,
+  ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,
                                       Expr *ArrayInjectionFunction);
@@ -537,7 +537,7 @@ public:
   
   RValue emitApplyExpr(ApplyExpr *e);
 
-  ManagedValue emitApply(SILLocation Loc, SILValue Fn,
+  ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
                          ArrayRef<ManagedValue> Args);
 
   //===--------------------------------------------------------------------===//

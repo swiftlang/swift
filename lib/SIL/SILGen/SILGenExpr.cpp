@@ -523,8 +523,10 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
                                                   gen.getLoweredType(baseTy),
                                                   numEltsVal);
-  
-  SILValue objectPtr(allocArray, 0);
+  // The first result is the owning ObjectPointer for the array.
+  ManagedValue objectPtr
+    = gen.emitManagedRValueWithCleanup(SILValue(allocArray, 0));
+  // The second result is a RawPointer to the base address of the array.
   SILValue basePtr(allocArray, 1);
 
   for (size_t i = 0, size = elements.size(); i < size; ++i) {
@@ -1084,7 +1086,9 @@ RValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
                                             getLoweredType(E->getElementType()),
                                             NumElements);
 
-  SILValue ObjectPtr(AllocArray, 0), BasePtr(AllocArray, 1);
+  ManagedValue ObjectPtr
+    = emitManagedRValueWithCleanup(SILValue(AllocArray, 0));
+  SILValue BasePtr(AllocArray, 1);
 
   // FIXME: We need to initialize the elements of the array that are now
   // allocated.
