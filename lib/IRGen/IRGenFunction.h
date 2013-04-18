@@ -42,7 +42,6 @@ namespace swift {
   class ConstructorDecl;
   class ContinueStmt;
   class Decl;
-  class Expr;
   class ExtensionDecl;
   class FallthroughStmt;
   class ForEachStmt;
@@ -289,7 +288,6 @@ private:
 
 //--- Reference-counting methods -----------------------------------------------
 public:
-  ManagedValue emitAlloc(const HeapLayout &layout, const llvm::Twine &name);
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name);
   CleanupsDepth pushDeallocCleanup(llvm::Value *allocation,

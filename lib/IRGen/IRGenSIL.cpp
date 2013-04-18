@@ -1216,11 +1216,7 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   llvm::Value *lengthValue = lengthEx.claimUnmanagedNext();
   HeapArrayInfo arrayInfo(*this, i->getElementType()->getCanonicalType());
   Address ptr;
-  llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this,
-                                                  lengthValue,
-                                                  ptr,
-                                                  nullptr,
-                                                  "");
+  llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this, lengthValue, ptr, "");
   Explosion boxEx(CurExplosionLevel);
   boxEx.addUnmanaged(box);
   newLoweredExplosion(boxValue, boxEx);

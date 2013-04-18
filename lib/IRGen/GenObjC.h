@@ -23,7 +23,6 @@ namespace llvm {
 
 namespace swift {
   class CanType;
-  class Expr;
   class FuncDecl;
   class Substitution;
 

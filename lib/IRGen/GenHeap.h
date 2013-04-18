@@ -91,13 +91,7 @@ public:
   llvm::Value *emitUnmanagedAlloc(IRGenFunction &IGF,
                                   llvm::Value *length,
                                   Address &beginPtr,
-                                  Expr *init,
                                   const llvm::Twine &name) const;
-
-  /// Allocate the array with a release cleanup.
-  ManagedValue emitAlloc(IRGenFunction &IGF, llvm::Value *length,
-                         Address &beginPtr,
-                         Expr *init, const llvm::Twine &name) const;
 
 private:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;

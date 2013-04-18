@@ -21,7 +21,6 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallingConv.h"

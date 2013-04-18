@@ -17,7 +17,6 @@
 
 #include "llvm/IR/Function.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"

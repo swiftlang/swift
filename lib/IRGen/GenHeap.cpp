@@ -487,9 +487,7 @@ llvm::Value *HeapArrayInfo::getBeginPointer(IRGenFunction &IGF,
 llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
                                                llvm::Value *length,
                                                Address &begin,
-                                               Expr *init,
-                                               const llvm::Twine &name) const
-{
+                                               const llvm::Twine &name) const {
   Layout layout = getLayout(IGF);
 
   llvm::Constant *metadata = getPrivateMetadata(IGF.IGM);
@@ -515,39 +513,22 @@ llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
   llvm::Value *beginPtr = getBeginPointer(IGF, layout, alloc);
   begin = ElementTI.getAddressForPointer(beginPtr);
 
-  // If we don't have an initializer, just zero-initialize and
-  // immediately enter a release cleanup.
-  if (!init) {
-    llvm::Value *sizeToMemset = IGF.Builder.CreateSub(size, layout.HeaderSize);
+  // Zero-initialize and immediately enter a release cleanup.
+  llvm::Value *sizeToMemset = IGF.Builder.CreateSub(size, layout.HeaderSize);
 
-    Alignment arrayAlignment = layout.BestStaticAlignment;
-    if (auto offset = dyn_cast<llvm::ConstantInt>(layout.HeaderSize))
-      arrayAlignment =
-        arrayAlignment.alignmentAtOffset(Size(offset->getZExtValue()));
+  Alignment arrayAlignment = layout.BestStaticAlignment;
+  if (auto offset = dyn_cast<llvm::ConstantInt>(layout.HeaderSize))
+    arrayAlignment =
+      arrayAlignment.alignmentAtOffset(Size(offset->getZExtValue()));
 
-    IGF.Builder.CreateMemSet(
-                     IGF.Builder.CreateBitCast(beginPtr, IGF.IGM.Int8PtrTy),
-                             llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
-                             sizeToMemset,
-                             arrayAlignment.getValue(),
-                             /*volatile*/ false);
-
-  // Otherwise, repeatedly evaluate the initializer into successive
-  // elements, with a cleanup around to deallocate the object if necessary.
-  } else {
-    llvm_unreachable("unimplemented: array alloc with nontrivial initializer");
-  }
+  IGF.Builder.CreateMemSet(
+                   IGF.Builder.CreateBitCast(beginPtr, IGF.IGM.Int8PtrTy),
+                           llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
+                           sizeToMemset,
+                           arrayAlignment.getValue(),
+                           /*volatile*/ false);
 
   return alloc;
-}
-
-ManagedValue HeapArrayInfo::emitAlloc(IRGenFunction &IGF,
-                                      llvm::Value *length,
-                                      Address &begin,
-                                      Expr *init,
-                                      const llvm::Twine &name) const {
-  llvm::Value *alloc = emitUnmanagedAlloc(IGF, length, begin, init, name);
-  return IGF.enterReleaseCleanup(alloc);
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
@@ -557,12 +538,6 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
   llvm::Value *align = layout.emitAlign(*this);
 
   return emitAllocObjectCall(metadata, size, align, name);
-}
-
-ManagedValue IRGenFunction::emitAlloc(const HeapLayout &layout,
-                                      const llvm::Twine &name) {
-  llvm::Value *alloc = emitUnmanagedAlloc(layout, name);
-  return enterReleaseCleanup(alloc);
 }
 
 namespace {

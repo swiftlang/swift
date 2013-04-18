@@ -16,7 +16,6 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #include "ASTVisitor.h"

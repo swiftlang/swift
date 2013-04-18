@@ -27,7 +27,6 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
