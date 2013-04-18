@@ -22,7 +22,6 @@
 #include "llvm/IR/DerivedTypes.h"
 
 #include "Address.h"
-#include "CallEmission.h"
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenType.h"

@@ -89,7 +89,6 @@ static void emitDeclRef(IRGenFunction &IGF, ValueDecl *D, Type Ty, SourceLoc Loc
   case DeclKind::Var:
  
   case DeclKind::Func:
-    return emitRValueForFunction(IGF, cast<FuncDecl>(D), explosion);
 
   case DeclKind::OneOfElement:
   case DeclKind::Subscript:

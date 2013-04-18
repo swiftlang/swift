@@ -22,7 +22,6 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Optional.h"
 #include "ASTVisitor.h"
-#include "CallEmission.h"
 #include "GenClass.h"
 #include "GenInit.h"
 #include "GenPoly.h"

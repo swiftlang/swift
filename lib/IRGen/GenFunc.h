@@ -30,15 +30,9 @@ namespace swift {
 namespace irgen {
   class Address;
   class Alignment;
-  class CallEmission;
   class Explosion;
   class IRGenFunction;
   class TypeInfo;
-
-  /// Emit an r-value reference to a function.
-  void emitRValueForFunction(IRGenFunction &IGF, FuncDecl *Fn,
-                             Explosion &explosion);
-
   /// Return the natural level at which to uncurry this function.  This
   /// is the number of additional parameter clauses that are uncurried
   /// in the function body.
