@@ -63,11 +63,6 @@ llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
   
 }
 
-void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
-  assert(0);
-}
-
-
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {
   ExplosionSchema schema(explosion.getKind());

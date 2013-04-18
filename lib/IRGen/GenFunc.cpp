@@ -1796,7 +1796,7 @@ void CallEmission::addArg(Expr *arg) {
       emitPolymorphicArguments(IGF, polyFn, substInputType, subs, argE);
     }
   } else {
-    IGF.emitRValue(arg, argE);
+    abort();
   }
 
   addArg(argE);

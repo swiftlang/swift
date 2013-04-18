@@ -313,7 +313,6 @@ public:
 
   void emitInit(Expr *E, Address address, const TypeInfo &type);
 
-  void emitRValue(Expr *E, Explosion &explosion);
   void emitRValueAsUnsubstituted(Expr *E, CanType destType,
                                  ArrayRef<Substitution> subs,
                                  Explosion &explosion);

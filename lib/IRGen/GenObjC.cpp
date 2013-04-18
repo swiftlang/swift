@@ -473,11 +473,7 @@ namespace {
     }
 
     llvm::Value *emitGetMetatype(Expr *base) {
-      Explosion temp(ExplosionKind::Maximal);
-      IGF.emitRValue(base, temp);
-      auto value = temp.claimNext().getValue(); // let the cleanup happen
-      auto baseType = base->getType()->getCanonicalType();
-      return emitHeapMetadataRefForHeapObject(IGF, value, baseType);
+      abort();
     }
 
     /// Special-case explicit .metatype expressions.
@@ -503,12 +499,7 @@ namespace {
     /// In the fallback case, emit as a swift metatype and remap it to
     /// an ObjC class type.
     llvm::Value *visitExpr(Expr *E) {
-      Explosion temp(ExplosionKind::Maximal);
-      IGF.emitRValue(E, temp);
-      assert(temp.size() == 1);
-      llvm::Value *metatype = temp.claimUnmanagedNext();
-      return emitClassHeapMetadataRefForMetatype(IGF, metatype,
-                                                 getInstanceType(E));
+      abort();
     }
 
     /// Given an expression of metatype type, return the instance
@@ -649,7 +640,7 @@ static const OwnershipConventions &setOwnershipConventions(Callee &callee,
 static void emitSelfArgument(IRGenFunction &IGF, bool isInstanceMethod,
                              Expr *self, Explosion &selfValues) {
   if (isInstanceMethod) {
-    IGF.emitRValue(self, selfValues);
+    abort();
   } else {
     emitObjCClassRValue(IGF, self, selfValues);
   }

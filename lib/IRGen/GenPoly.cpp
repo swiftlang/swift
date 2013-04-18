@@ -730,18 +730,7 @@ namespace {
     // TODO: shuffles?
 
     void visitExpr(Expr *E) {
-      CanType substTy = E->getType()->getCanonicalType();
-
-      // TODO: when we're converting to an abstracted function, try to
-      // emit a direct-call thunk.
-
-      // Go ahead and emit to an explosion.
-      Explosion temp(Out.getKind());
-      IGF.emitRValue(E, temp);
-
-      // Re-emit under substitution.
-      reemitAsUnsubstituted(IGF, ExpectedTy, substTy, Substitutions,
-                            temp, Out);
+      abort();
     }
   };
 
@@ -822,7 +811,7 @@ static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
                                 Explosion &out) {
   // If the expected type isn't dependent, just use the normal emitter.
   if (!isDependentType(expectedType))
-    return IGF.emitRValue(E, out);
+    abort();
 
   // It's fairly common to be targetting an archetype.  Filter that
   // out here.  This is also useful because it removes the need for
@@ -849,13 +838,8 @@ static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
 void IRGenFunction::emitRValueAsUnsubstituted(Expr *E, CanType expectedType,
                                               ArrayRef<Substitution> subs,
                                               Explosion &out) {
-  // It's sometimes convenient to call this method even if we might
-  // not have substitutions active.  Just defer to the normal path in
-  // that case.
-  if (expectedType == E->getType()->getCanonicalType()) {
-    assert(expectedType == E->getType()->getCanonicalType());
-    return emitRValue(E, out);
-  }
+  abort();
+ 
 
   emitAsUnsubstituted(*this, E, expectedType, subs, out);
 }
@@ -867,18 +851,7 @@ static void emitSupertoArchetypeCastParameters(IRGenFunction &IGF,
                                                CanType destType,
                                                llvm::Value* &src,
                                                llvm::Value* &destMetadata) {
-  // Emit the expression.
-  Explosion subResult(ExplosionKind::Maximal);
-  IGF.emitRValue(srcExpr, subResult);
-  ManagedValue val = subResult.claimNext();
-  src = val.getValue();
-  if (src->getType() != IGF.IGM.Int8PtrTy)
-    src = IGF.Builder.CreateBitCast(src, IGF.IGM.Int8PtrTy);
-  
-  // Retrieve the metadata.
-  destMetadata = emitTypeMetadataRef(IGF, destType);
-  if (destMetadata->getType() != IGF.IGM.Int8PtrTy)
-    destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
+  abort();
 }
 
 void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
