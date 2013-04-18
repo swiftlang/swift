@@ -258,6 +258,12 @@ typedef size_t stride;
 
 } // end namespace value_witness_types
 
+/// A standard routine, suitable for placement in the value witness
+/// table, for copying an opaque POD object.
+extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
+                                      OpaqueValue *src,
+                                      const Metadata *self);
+
 #define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
   MACRO(destroyBuffer) \
   MACRO(initializeBufferWithCopyOfBuffer) \

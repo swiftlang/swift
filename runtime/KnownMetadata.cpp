@@ -16,8 +16,16 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Alloc.h"
+#include <string.h>
 
 using namespace swift;
+
+/// Copy a value from one object to another based on the size in the
+/// given type metadata.
+OpaqueValue *swift::swift_copyPOD(OpaqueValue *dest, OpaqueValue *src,
+                                  const Metadata *type) {
+  return (OpaqueValue*) memcpy(dest, src, type->getValueWitnesses()->size);
+}
 
 /// A function which helpfully does nothing.
 static void doNothing(void *ptr, const void *self) {}
