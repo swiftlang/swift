@@ -39,29 +39,6 @@ enum class AbstractionDifference : bool {
   Explosion
 };
 
-/// Emit the given expression as a temporary, casting the address to
-/// the given pointer type at the last minute.
-static void emitAsCastTemporary(IRGenFunction &IGF, Expr *E,
-                                llvm::PointerType *castTy,
-                                Explosion &out) {
-  auto &actualTI = IGF.getFragileTypeInfo(E->getType());
-
-  // Set up the temporary.
-  Initialization init;
-  auto object = init.getObjectForTemporary();
-  auto cleanup = init.registerObject(IGF, object, NotOnHeap, actualTI);
-  auto addr = init.emitLocalAllocation(IGF, object, NotOnHeap, actualTI,
-                                       "substitution.temp").getAddress();
-
-  // Initialize into it.
-  init.emitInit(IGF, object, addr, E, actualTI);
-
-  // Cast to the expected pointer type.
-  addr = IGF.Builder.CreateBitCast(addr, castTy, "temp.cast");
-
-  // Add that to the output explosion.
-  out.add(ManagedValue(addr.getAddress(), cleanup));
-}
 
 /// Answer the differs-by-abstraction question for the given
 /// function types.  See the comment below.
@@ -690,169 +667,6 @@ void irgen::reemitAsSubstituted(IRGenFunction &IGF,
   ReemitAsSubstituted(IGF, subs, in, out).visit(origTy, substTy);
 }
 
-static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
-                                CanType expectedType,
-                                ArrayRef<Substitution> subs,
-                                Explosion &out);
-
-namespace {
-  /// A visitor for emitting a value under substitution rules.
-  ///
-  /// Invariants:
-  ///  - Substitutions(ExpectedTy) == E->getType().
-  class EmitRValueAsUnsubstituted
-      : public irgen::ExprVisitor<EmitRValueAsUnsubstituted> {
-    typedef irgen::ExprVisitor<EmitRValueAsUnsubstituted> super;
-
-    IRGenFunction &IGF;
-    CanType ExpectedTy;
-    ArrayRef<Substitution> Substitutions;
-    Explosion &Out;
-  public:
-    EmitRValueAsUnsubstituted(IRGenFunction &IGF, CanType expected,
-                              ArrayRef<Substitution> subs, Explosion &out)
-      : IGF(IGF), ExpectedTy(expected), Substitutions(subs), Out(out) {}
-
-    void visitTupleExpr(TupleExpr *E) {
-      // The only way that the substituted type can be a tuple when
-      // the abstracted type isn't is when the abstracted type is an
-      // archetype, which is filtered out already.  Otherwise, we're
-      // much down to passing these things indirectly.
-      auto expectedTuple = cast<TupleType>(ExpectedTy);
-      assert(expectedTuple->getFields().size() == E->getElements().size());
-      for (unsigned i = 0, e = expectedTuple->getFields().size(); i != e; ++i) {
-        emitAsUnsubstituted(IGF, E->getElements()[i],
-                            CanType(expectedTuple->getElementType(i)),
-                            Substitutions, Out);
-      }
-    }
-
-    // TODO: shuffles?
-
-    void visitExpr(Expr *E) {
-      abort();
-    }
-  };
-
-  /// The definition of "dependence" that we care about is "can it be
-  /// a legitimate target of a substitution"?
-  struct IsDependent : irgen::TypeVisitor<IsDependent, bool> {
-    llvm::SmallPtrSet<ArchetypeType*, 4> BoundTypes;
-
-    bool visitBuiltinType(BuiltinType *T) { return false; }
-    bool visitNominalType(NominalType *T) { return false; }
-    bool visitModuleType(ModuleType *T) { return false; }
-
-    // FIXME: Some of these are actually rigid and therefore can't be
-    // substituted.
-    bool visitArchetypeType(ArchetypeType *T) {
-      return !BoundTypes.count(T);
-    }
-
-    bool visitArrayType(ArrayType *T) {
-      return visit(CanType(T->getBaseType()));
-    }
-
-    bool visitBoundGenericType(BoundGenericType *T) {
-      for (Type arg : T->getGenericArgs())
-        if (visit(CanType(arg)))
-          return true;
-      return false;
-    }
-
-    bool visitFunctionType(FunctionType *T) {
-      return visit(CanType(T->getInput())) || visit(CanType(T->getResult()));
-    }
-
-    bool visitLValueType(LValueType *T) {
-      return visit(CanType(T->getObjectType()));
-    }
-
-    bool visitMetaTypeType(MetaTypeType *T) {
-      return visit(CanType(T->getInstanceType()));
-    }
-
-    bool visitPolymorphicFunctionType(PolymorphicFunctionType *T) {
-      for (auto &param : T->getGenericParams().getParams()) {
-        auto type = param.getAsTypeParam()->getUnderlyingType();
-        BoundTypes.insert(type->castTo<ArchetypeType>());
-      }
-      return visit(CanType(T->getInput())) || visit(CanType(T->getResult()));
-    }
-
-    // Can this become dependent due to constraints?
-    bool visitProtocolCompositionType(ProtocolCompositionType *T) {
-      return false;
-    }
-
-    bool visitTupleType(TupleType *T) {
-      for (auto &elt : T->getFields())
-        if (visit(CanType(elt.getType())))
-          return true;
-      return false;
-    }
-  };
-}
-
-/// Is the given type dependent?
-///
-/// This really ought to be provided efficiently by every type,
-/// but it isn't, and it's not clear that our definition here
-/// isn't idiosyncratic.
-static bool isDependentType(CanType type) {
-  return IsDependent().visit(type);
-}
-
-/// A helper routine that does some quick, common filtering before
-/// falling back to the general emitter.
-static void emitAsUnsubstituted(IRGenFunction &IGF, Expr *E,
-                                CanType expectedType,
-                                ArrayRef<Substitution> subs,
-                                Explosion &out) {
-  // If the expected type isn't dependent, just use the normal emitter.
-  if (!isDependentType(expectedType))
-    abort();
-
-  // It's fairly common to be targetting an archetype.  Filter that
-  // out here.  This is also useful because it removes the need for
-  // some of the specialized emitters to worry about things like
-  // abstracting an entire tuple as a unit.
-  if (isa<ArchetypeType>(expectedType)) {
-    return emitAsCastTemporary(IGF, E, IGF.IGM.OpaquePtrTy, out);
-  }
-
-  // Otherwise, use the specialized emitter.
-  EmitRValueAsUnsubstituted(IGF, expectedType, subs, out).visit(E);
-}
-
-/// Emit an expression as an r-value, producing a value as if the
-/// given type substitutions had never been applied.
-///
-/// For example, given an expression of type (Int, Float), an expected
-/// type (T,U), and a set of substitutions which include T=>Int and
-/// U=>Float, produce an exploded value which can serve as a (T,U).
-///
-/// \param expectedType - the "unsubstituted type" of the expression.
-///   The substitutions should translate this to the actual type of the
-///   expression
-void IRGenFunction::emitRValueAsUnsubstituted(Expr *E, CanType expectedType,
-                                              ArrayRef<Substitution> subs,
-                                              Explosion &out) {
-  abort();
- 
-
-  emitAsUnsubstituted(*this, E, expectedType, subs, out);
-}
-
-/// Get the source instance and destination type metadata for super-to-archetype
-/// casts.
-static void emitSupertoArchetypeCastParameters(IRGenFunction &IGF,
-                                               Expr *srcExpr,
-                                               CanType destType,
-                                               llvm::Value* &src,
-                                               llvm::Value* &destMetadata) {
-  abort();
-}
 
 void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
                                                    CanType destType,
@@ -895,9 +709,11 @@ void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
 
   // Emit the expression and retrieve the metadata.
   llvm::Value *superObject, *metadataRef;
+
+  // FIXME: rdar://13681541 - this code is dynamically dead, but doesn't appear
+  // that it should be.
+  abort();
   
-  emitSupertoArchetypeCastParameters(*this, E, destType,
-                                     superObject, metadataRef);
 
   {
     // Call the (unconditional) dynamic cast.

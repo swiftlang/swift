@@ -313,10 +313,6 @@ public:
 
   void emitInit(Expr *E, Address address, const TypeInfo &type);
 
-  void emitRValueAsUnsubstituted(Expr *E, CanType destType,
-                                 ArrayRef<Substitution> subs,
-                                 Explosion &explosion);
-
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
   void emitSupertoArchetypeConversion(Explosion &input,

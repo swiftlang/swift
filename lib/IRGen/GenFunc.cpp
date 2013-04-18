@@ -1768,38 +1768,7 @@ void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
 /// Evaluate the given expression as a new set of arguments to the
 /// function.
 void CallEmission::addArg(Expr *arg) {
-  // If we're calling something with polymorphic type, we'd better have
-  // substitutions.
-  auto subs = getSubstitutions();
-  assert(!subs.empty() || !isa<PolymorphicFunctionType>(CurOrigType));
-
-  Explosion argE(CurCallee.getExplosionLevel());
-
-  // If we have substitutions, then (1) it's possible for this to
-  // be a polymorphic function type that we need to expand and
-  // (2) we might need to evaluate the r-value differently.
-  if (!subs.empty()) {
-    CanType origInputType;
-    auto fnType = dyn_cast<AnyFunctionType>(CurOrigType);
-    if (fnType) {
-      origInputType = CanType(fnType->getInput());
-    } else {
-      assert(isa<ArchetypeType>(CurOrigType));
-      origInputType = CurOrigType;
-    }
-
-    IGF.emitRValueAsUnsubstituted(arg, origInputType, subs, argE);
-
-    // FIXME: this doesn't handle instantiating at a generic type.
-    if (auto polyFn = dyn_cast_or_null<PolymorphicFunctionType>(fnType)) {
-      auto substInputType = arg->getType()->getCanonicalType();
-      emitPolymorphicArguments(IGF, polyFn, substInputType, subs, argE);
-    }
-  } else {
-    abort();
-  }
-
-  addArg(argE);
+  abort();
 }
 
 /// Load from the given address to produce an argument.
