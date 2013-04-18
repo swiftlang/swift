@@ -49,6 +49,14 @@ inline IsPOD_t &operator&=(IsPOD_t &l, IsPOD_t r) {
   return (l = (l & r));
 }
 
+enum IsFixedSize_t : bool { IsNotFixedSize, IsFixedSize };
+inline IsFixedSize_t operator&(IsFixedSize_t l, IsFixedSize_t r) {
+  return IsFixedSize_t(unsigned(l) & unsigned(r));
+}
+inline IsFixedSize_t &operator&=(IsFixedSize_t &l, IsFixedSize_t r) {
+  return (l = (l & r));
+}
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -59,9 +67,14 @@ class TypeInfo {
   mutable const TypeInfo *NextConverted;
 
 protected:
-  TypeInfo(llvm::Type *Type, Size S, Alignment A, IsPOD_t pod)
-    : NextConverted(0), StorageType(Type), StorageSize(S),
-      StorageAlignment(A), POD(pod) {}
+  TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod, IsFixedSize_t fixed)
+    : NextConverted(0), StorageType(Type), StorageAlignment(A),
+      POD(pod), Fixed(fixed) {}
+
+  /// Change the minimum alignment of a stored value of this type.
+  void setStorageAlignment(Alignment alignment) {
+    StorageAlignment = alignment;
+  }
 
 public:
   virtual ~TypeInfo() = default;
@@ -77,11 +90,6 @@ public:
   llvm::Type *StorageType;
 
 private:
-  /// The storage size of this type in bytes.  This may be zero even
-  /// for well-formed and complete types, such as a trivial oneof or
-  /// tuple.
-  Size StorageSize;
-
   /// The storage alignment of this type in bytes.  This is never zero
   /// for a completely-converted type.
   Alignment StorageAlignment;
@@ -89,12 +97,10 @@ private:
   /// Whether this type is known to be POD.
   unsigned POD : 1;
 
-public:
-  void completeFixed(Size size, Alignment alignment) {
-    StorageSize = size;
-    StorageAlignment = alignment;
-  }
+  /// Whether this type is known to be fixed in size.
+  unsigned Fixed : 1;
 
+public:
   /// Sets whether this type is POD.  Should only be called during
   /// completion of a forward-declaration.
   void setPOD(IsPOD_t isPOD) { POD = unsigned(isPOD); }
@@ -102,34 +108,24 @@ public:
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
-  /// Whether this type is known to be empty within the given
-  /// resilience scope.
-  bool isEmpty(ResilienceScope Scope) const { return StorageSize.isZero(); }
+  /// Whether this type is known to be empty.
+  bool isKnownEmpty() const;
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
   IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
 
+  /// Whether this type is known to be fixed-size in the local
+  /// resilience domain.  If true, this TypeInfo can be cast to
+  /// FixedTypeInfo.
+  IsFixedSize_t isFixedSize() const {
+    return IsFixedSize_t(Fixed);
+  }
+
   llvm::Type *getStorageType() const { return StorageType; }
-
-  Size getFixedSize() const {
-    return StorageSize;
-  }
-
-  Alignment getFixedAlignment() const {
-    return StorageAlignment;
-  }
 
   Alignment getBestKnownAlignment() const {
     return StorageAlignment;
-  }
-
-  /// Returns the (assumed fixed) stride of the storage for this
-  /// object.  The stride is the storage size rounded up to the
-  /// alignment; its practical use is that, in an array, it is the
-  /// offset from the size of one element to the offset of the next.
-  Size getFixedStride() const {
-    return StorageSize.roundUpToAlignment(StorageAlignment);
   }
 
   /// Given a generic pointer to this type, produce an Address for it.

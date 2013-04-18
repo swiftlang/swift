@@ -289,13 +289,12 @@ namespace {
     /// the runtime always provides an entry for such a type;  right
     /// now, that mapping is as one of the integer types.
     llvm::Value *visitOpaqueType(CanType type) {
-      IRGenModule &IGM = IGF.IGM;
-      const TypeInfo &opaqueTI = IGM.getFragileTypeInfo(type);
+      auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getFragileTypeInfo(type));
       assert(opaqueTI.getFixedSize() ==
              Size(opaqueTI.getFixedAlignment().getValue()));
       assert(opaqueTI.getFixedSize().isPowerOf2());
       auto numBits = 8 * opaqueTI.getFixedSize().getValue();
-      auto intTy = BuiltinIntegerType::get(numBits, IGM.Context);
+      auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
       return emitDirectMetadataRef(CanType(intTy));
     }
 

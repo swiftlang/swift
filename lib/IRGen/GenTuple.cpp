@@ -59,8 +59,8 @@ namespace {
   };
 
   /// Layout information for tuple types.
-  class TupleTypeInfo :
-    public SequentialTypeInfo<TupleTypeInfo, TupleFieldInfo> {
+  class TupleTypeInfo : // FIXME: FixedTypeInfo as base is a lie
+    public SequentialTypeInfo<TupleTypeInfo, FixedTypeInfo, TupleFieldInfo> {
   public:
     TupleTypeInfo(llvm::Type *T, unsigned numFields)
       : SequentialTypeInfo(T, numFields) {

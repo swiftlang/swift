@@ -230,6 +230,8 @@ public:
   llvm::Constant *getSlowAllocFn();
   llvm::Constant *getSlowRawDeallocFn();
 
+  llvm::Constant *getCopyPODFn();
+
   llvm::Constant *getDynamicCastClassFn();
   llvm::Constant *getDynamicCastClassUnconditionalFn();
   llvm::Constant *getDynamicCastFn();
@@ -274,6 +276,7 @@ private:
   llvm::Constant *DynamicCastClassUnconditionalFn = nullptr;
   llvm::Constant *DynamicCastFn = nullptr;
   llvm::Constant *DynamicCastUnconditionalFn = nullptr;
+  llvm::Constant *CopyPODFn = nullptr;
   llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;
   llvm::Constant *GetMetatypeMetadataFn = nullptr;
@@ -319,6 +322,8 @@ public:
                                       unsigned uncurryLevel,
                                       ExtraData data,
                                       llvm::AttributeSet &attrs);
+
+  llvm::Constant *getSize(Size size);
 
   FormalType getTypeOfGetter(ValueDecl *D);
   FormalType getTypeOfSetter(ValueDecl *D);

@@ -51,8 +51,8 @@ namespace {
   };
 
   /// Layout information for struct types.
-  class StructTypeInfo :
-    public SequentialTypeInfo<StructTypeInfo, StructFieldInfo> {
+  class StructTypeInfo : // FIXME: FixedTypeInfo as the base class is a lie.
+    public SequentialTypeInfo<StructTypeInfo, FixedTypeInfo, StructFieldInfo> {
   public:
     StructTypeInfo(llvm::Type *T, unsigned numFields)
       : SequentialTypeInfo(T, numFields) {

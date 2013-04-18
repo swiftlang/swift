@@ -49,6 +49,13 @@ Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   return Address(ptr, StorageAlignment);
 }
 
+/// Whether this type is known to be empty.
+bool TypeInfo::isKnownEmpty() const {
+  if (auto fixed = dyn_cast<FixedTypeInfo>(this))
+    return fixed->isKnownEmpty();
+  return false;
+}
+
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.

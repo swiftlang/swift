@@ -470,8 +470,8 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
     Address addr;
     
     // If the variable is empty, don't actually emit it; just return undef.
-    // FIXME: fragility?  global destructors?
-    if (type.isEmpty(ResilienceScope::Local)) {
+    // FIXME: global destructors?
+    if (type.isKnownEmpty()) {
       auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
       addr = Address(undef, Alignment(1));
     } else {
@@ -1214,13 +1214,13 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   
   Explosion lengthEx = getLoweredExplosion(i->getNumElements());
   llvm::Value *lengthValue = lengthEx.claimUnmanagedNext();
-  ArrayHeapLayout layout(*this, i->getElementType()->getCanonicalType());
+  HeapArrayInfo arrayInfo(*this, i->getElementType()->getCanonicalType());
   Address ptr;
-  llvm::Value *box = layout.emitUnmanagedAlloc(*this,
-                                             lengthValue,
-                                             ptr,
-                                             nullptr,
-                                             "");
+  llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this,
+                                                  lengthValue,
+                                                  ptr,
+                                                  nullptr,
+                                                  "");
   Explosion boxEx(CurExplosionLevel);
   boxEx.addUnmanaged(box);
   newLoweredExplosion(boxValue, boxEx);

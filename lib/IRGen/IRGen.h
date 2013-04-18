@@ -155,6 +155,7 @@ public:
   bool isZero() const { return Value == 0; }
 
   Alignment alignmentAtOffset(Size S) const;
+  Size asSize() const;
 
   explicit operator bool() const { return Value != 0; }
 
@@ -244,6 +245,11 @@ inline Alignment Alignment::alignmentAtOffset(Size S) const {
   if (V < getValue())
     return Alignment(static_cast<Alignment::int_type>(V));
   return *this;
+}
+
+/// Get this alignment asx a Size value.
+inline Size Alignment::asSize() const {
+  return Size(getValue());
 }
 
 } // end namespace irgen

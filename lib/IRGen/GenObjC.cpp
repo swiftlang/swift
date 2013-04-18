@@ -29,7 +29,6 @@
 #include "CallEmission.h"
 #include "Cleanup.h"
 #include "Explosion.h"
-#include "FixedTypeInfo.h"
 #include "FormalType.h"
 #include "FunctionRef.h"
 #include "GenClass.h"

@@ -54,10 +54,6 @@ public:
 
   unsigned getExplosionSize(ExplosionKind kind) const { return 1; }
 
-  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src) const {
-    IGF.emitMemCpy(dest, src, this->Base::getFixedSize());
-  }
-
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
     Initialization init;

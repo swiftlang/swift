@@ -95,8 +95,8 @@ public:
 };
 
 /// A metaprogrammed TypeInfo implementation for sequential types.
-template <class Impl, class FieldImpl_>
-class SequentialTypeInfo : public FixedTypeInfo { // FIXME: not true!
+template <class Impl, class Base, class FieldImpl_>
+class SequentialTypeInfo : public Base {
 public:
   typedef FieldImpl_ FieldImpl;
 
@@ -116,8 +116,8 @@ private:
 
 protected:
   SequentialTypeInfo(llvm::Type *ty, unsigned numFields)
-    : FixedTypeInfo(ty, Size(0), Alignment(0), IsPOD), NumFields(numFields) {
-    assert(!isComplete());
+    : Base(ty, Size(0), Alignment(0), IsPOD), NumFields(numFields) {
+    assert(!this->isComplete());
   }
 
 public:
@@ -208,8 +208,10 @@ public:
   void initializeWithCopy(IRGenFunction &IGF, Address dest,
                           Address src) const {
     // If we're POD, use the generic routine.
-    if (isPOD(ResilienceScope::Local))
-      return FixedTypeInfo::initializeWithCopy(IGF, dest, src);
+    if (this->isPOD(ResilienceScope::Local) && Base::isFixedSize()) {
+      return cast<FixedTypeInfo>(this)->
+               FixedTypeInfo::initializeWithCopy(IGF, dest, src);
+    }
 
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
@@ -343,7 +345,7 @@ public:
       minimalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Minimal);
       fieldInfo.MinimalEnd = minimalExplosionSize;
 
-      bool isEmpty = fieldTI.isEmpty(ResilienceScope::Local);
+      bool isEmpty = fieldTI.isKnownEmpty();
       fieldInfo.IsEmpty = isEmpty;
     }
 

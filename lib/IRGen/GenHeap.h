@@ -47,34 +47,45 @@ public:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
 };
 
-/// The heap-layout of an array.
-class ArrayHeapLayout {
+/// A class to manage allocating a reference-counted array on the heap.
+class HeapArrayInfo {
   const TypeInfo &ElementTI;
-  Size HeaderSize;
-  Alignment Align;
   NecessaryBindings Bindings;
 
 public:
-  ArrayHeapLayout(IRGenFunction &IGF, CanType T);
+  HeapArrayInfo(IRGenFunction &IGF, CanType T);
 
   const TypeInfo &getElementTypeInfo() const { return ElementTI; }
 
-  /// Returns the size required by this array.
-  Size getHeaderSize() const { return HeaderSize; }
+  struct Layout {
+    /// The offset from the allocation to the first element.
+    llvm::Value *HeaderSize;
 
-  /// Returns the alignment required by this array.
-  Alignment getAlignment() const { return Align; }
+    /// The alignment requirement for the array allocation.
+    llvm::Value *AllocAlign;
+
+    /// The most aggressive statically-known alignment
+    /// requirement for the total allocation.
+    Alignment BestStaticAlignment;
+  };
+
+  /// Compute layout for this heap array.  The result is local to a
+  /// particular IGF.
+  Layout getLayout(IRGenFunction &IGF) const;
 
   /// Returns the size required by the given length.  If 'canOverflow',
   /// perform overflow checks and produce (size_t) -1 on overflow.
-  llvm::Value *getAllocationSize(IRGenFunction &IGF, llvm::Value *&length,
+  llvm::Value *getAllocationSize(IRGenFunction &IGF, const Layout &layout,
+                                 llvm::Value *&length,
                                  bool canOverflow, bool updateLength) const;
 
   /// Derive a pointer to the length field of the given allocation.
-  Address getLengthPointer(IRGenFunction &IGF, llvm::Value *alloc) const;
+  Address getLengthPointer(IRGenFunction &IGF, const Layout &layout,
+                           llvm::Value *alloc) const;
 
   /// Derive a pointer to the first element of the given allocation.
-  llvm::Value *getBeginPointer(IRGenFunction &IGF, llvm::Value *alloc) const;
+  llvm::Value *getBeginPointer(IRGenFunction &IGF, const Layout &layout,
+                               llvm::Value *alloc) const;
 
   /// Allocate the array without a cleanup.
   llvm::Value *emitUnmanagedAlloc(IRGenFunction &IGF,

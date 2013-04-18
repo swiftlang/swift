@@ -392,9 +392,11 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
     } else {
       const TypeInfo &eltTI = getFragileTypeInfo(eltType->getCanonicalType());
       assert(eltTI.isComplete());
+
+      auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
       storageType = eltTI.StorageType;
-      oneofTI->StorageSize = eltTI.StorageSize;
-      oneofTI->StorageAlignment = eltTI.StorageAlignment;
+      oneofTI->completeFixed(fixedEltTI.getFixedSize(),
+                             fixedEltTI.getFixedAlignment());
       oneofTI->Singleton = &eltTI;
       oneofTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
     }
@@ -445,13 +447,16 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
     // zero-size data.
     const TypeInfo &eltTInfo = getFragileTypeInfo(eltType->getCanonicalType());
     assert(eltTInfo.isComplete());
-    if (eltTInfo.isEmpty(ResilienceScope::Local)) continue;
+    if (eltTInfo.isKnownEmpty()) continue;
+
+    auto &fixedEltTI = cast<FixedTypeInfo>(eltTInfo);
 
     // The required payload size is the amount of padding needed to
     // get up to the element's alignment, plus the actual size.
-    Size eltPayloadSize = eltTInfo.StorageSize;
-    if (eltTInfo.StorageAlignment.getValue() > discriminatorSize.getValue())
-      eltPayloadSize += Size(eltTInfo.StorageAlignment.getValue()
+    Size eltPayloadSize = fixedEltTI.getFixedSize();
+    if (fixedEltTI.getFixedAlignment().getValue()
+          > discriminatorSize.getValue())
+      eltPayloadSize += Size(fixedEltTI.getFixedAlignment().getValue()
                                - discriminatorSize.getValue());
 
     payloadSize = std::max(payloadSize, eltPayloadSize);
@@ -459,8 +464,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
     isPOD &= eltTInfo.isPOD(ResilienceScope::Local);
   }
 
-  convertedTI->StorageSize = discriminatorSize + payloadSize;
-  convertedTI->StorageAlignment = storageAlignment;
+  convertedTI->completeFixed(discriminatorSize + payloadSize, storageAlignment);
   convertedTI->setPOD(isPOD);
 
   // Add the payload to the body if necessary.

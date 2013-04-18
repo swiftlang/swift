@@ -160,10 +160,10 @@ OwnedAddress Initialization::emitVariable(IRGenFunction &IGF, VarDecl *var,
 Address IRGenModule::emitGlobalVariable(VarDecl *var,
                                         const TypeInfo &type) {
   // If the variable is empty, don't actually emit it; just return undef.
-  // FIXME: fragility?  global destructors?
-  if (type.isEmpty(ResilienceScope::Local)) {
+  // FIXME: global destructors?
+  if (type.isKnownEmpty()) {
     auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
-    return Address(undef, Alignment(1));
+    return type.getAddressForPointer(undef);
   }
   
   /// Get the global variable.
@@ -182,9 +182,9 @@ OwnedAddress Initialization::emitGlobalVariable(IRGenFunction &IGF,
                                                 const TypeInfo &type) {
   // If the variable is empty, don't actually emit it; just return undef.
   // FIXME: fragility?  global destructors?
-  if (type.isEmpty(ResilienceScope::Local)) {
+  if (type.isKnownEmpty()) {
     auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
-    auto addr = Address(undef, Alignment(1));
+    auto addr = type.getAddressForPointer(undef);
     return OwnedAddress(addr, IGF.IGM.RefCountedNull);
   }
 
@@ -222,7 +222,7 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
                                      OnHeap_t onHeap,
                                      const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
-  if (isEmpty(ResilienceScope::Local)) {
+  if (isKnownEmpty()) {
     OwnedAddress addr = createEmptyAlloca(IGF.IGM, *this);
     init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
@@ -307,8 +307,7 @@ void Initialization::emitZeroInit(IRGenFunction &IGF, InitializedObject object,
   markInitialized(IGF, object);
 
   // No work is necessary if the type is empty or the address is global.
-  if (type.isEmpty(ResilienceScope::Local) ||
-      isa<llvm::Constant>(addr.getAddress()))
+  if (type.isKnownEmpty() || isa<llvm::Constant>(addr.getAddress()))
     return;
 
   ExplosionSchema schema(ExplosionKind::Maximal);

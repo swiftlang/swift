@@ -286,6 +286,17 @@ llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   return SlowRawDeallocFn;
 }
 
+llvm::Constant *IRGenModule::getCopyPODFn() {
+  if (CopyPODFn) return CopyPODFn;
+
+  /// void *swift_copyPOD(void *dest, void *src, Metadata *self);
+  llvm::Type *types[] = { OpaquePtrTy, OpaquePtrTy,  };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(OpaquePtrTy, types, false);
+  CopyPODFn = createRuntimeFunction(*this, "swift_copyPOD", fnType);
+  return CopyPODFn;
+}
+
 llvm::Constant *IRGenModule::getDynamicCastClassFn() {
   if (DynamicCastClassFn) return DynamicCastClassFn;
 
@@ -496,6 +507,10 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
                                                   OpaquePtrTy->getElementType());
   }
   return ObjCEmptyVTablePtr;
+}
+
+llvm::Constant *IRGenModule::getSize(Size size) {
+  return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

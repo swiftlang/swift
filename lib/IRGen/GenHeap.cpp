@@ -43,10 +43,6 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
   return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
 }
 
-static llvm::ConstantInt *getSize(IRGenFunction &IGF, Size value) {
-  return llvm::ConstantInt::get(IGF.IGM.SizeTy, value.getValue());
-}
-
 static llvm::ConstantInt *getSize(IRGenFunction &IGF,
                                   const llvm::APInt &value) {
   return cast<llvm::ConstantInt>(llvm::ConstantInt::get(IGF.IGM.SizeTy, value));
@@ -169,35 +165,69 @@ static void bindNecessaryBindings(IRGenFunction &IGF,
   bindings.restore(IGF, bindingsBuffer);
 }
 
-/// Lay out an array on the heap.
-ArrayHeapLayout::ArrayHeapLayout(IRGenFunction &IGF, CanType T)
-  : ElementTI(IGF.getFragileTypeInfo(T)), Bindings(IGF.IGM, T) {
+/// Compute the basic information for how to lay out a heap array.
+HeapArrayInfo::HeapArrayInfo(IRGenFunction &IGF, CanType T)
+  : ElementTI(IGF.getFragileTypeInfo(T)), Bindings(IGF.IGM, T) {}
 
-  // Add the heap header.
-  Size size(0);
-  Alignment align(1);
+/// Lay out the allocation in this IGF.
+HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {
+  // Start with the heap header.
+  Size headerSize(0);
+  Alignment headerAlign(1);
   SmallVector<llvm::Type*, 4> fields;
-  addHeapHeaderToLayout(IGF.IGM, size, align, fields);
-  assert((size % align).isZero());
-  assert(align >= IGF.IGM.getPointerAlignment());
+  addHeapHeaderToLayout(IGF.IGM, headerSize, headerAlign, fields);
+  assert((headerSize % headerAlign).isZero());
+  assert(headerAlign >= IGF.IGM.getPointerAlignment());
 
   // Add the length field.
-  size += IGF.IGM.getPointerSize();
-  assert(size == getArrayHeapHeaderSize(IGF.IGM));
+  headerSize += IGF.IGM.getPointerSize();
+  assert(headerSize == getArrayHeapHeaderSize(IGF.IGM));
 
   // Add the necessary bindings size.
-  size += Bindings.getBufferSize(IGF.IGM);
+  headerSize += Bindings.getBufferSize(IGF.IGM);
 
-  // Update the required alignment.
-  if (ElementTI.getFixedAlignment() > align)
-    align = ElementTI.getFixedAlignment();
+  // The easy case is when we know the layout of the element.
+  if (auto fixedElementTI = dyn_cast<FixedTypeInfo>(&ElementTI)) {
+    // Update the required alignment.
+    if (fixedElementTI->getFixedAlignment() > headerAlign)
+      headerAlign = fixedElementTI->getFixedAlignment();
 
-  // Round the size up to the alignment of the element type.
-  // FIXME: resilient types.
-  size = size.roundUpToAlignment(ElementTI.getFixedAlignment());
+    // Round the size up to the alignment of the element type.
+    // FIXME: resilient types.
+    headerSize = headerSize.roundUpToAlignment(
+                                        fixedElementTI->getFixedAlignment());
 
-  HeaderSize = size;
-  Align = align;
+    return {
+      IGF.IGM.getSize(headerSize),
+      IGF.IGM.getSize(headerAlign.asSize()),
+      headerAlign
+    };
+  }
+
+  // Otherwise, we need to do this computation at runtime.
+
+  // Read the alignment of the element type.
+  llvm::Value *eltAlign = ElementTI.getAlignment(IGF);
+
+  // Round the header size up to the element alignment.
+  llvm::Value *headerSizeV = IGF.IGM.getSize(headerSize);
+
+  // mask = alignment - 1
+  // headerSize = (headerSize + mask) & ~mask
+  auto eltAlignMask = IGF.Builder.CreateSub(eltAlign, IGF.IGM.getSize(Size(1)));
+  headerSizeV = IGF.Builder.CreateAdd(headerSizeV, eltAlignMask);
+  llvm::Value *eltAlignMaskInverted = IGF.Builder.CreateNot(eltAlignMask);
+  headerSizeV = IGF.Builder.CreateAnd(headerSizeV, eltAlignMaskInverted,
+                                      "array-header-size");
+
+  // allocAlign = max(headerAlign, alignment)
+  llvm::Value *headerAlignV = IGF.IGM.getSize(headerAlign.asSize());
+  llvm::Value *overaligned =
+    IGF.Builder.CreateICmpUGT(eltAlign, headerAlignV, "overaligned");
+  llvm::Value *allocAlign =
+    IGF.Builder.CreateSelect(overaligned, eltAlign, headerAlignV);
+
+  return { headerSizeV, allocAlign, headerAlign };
 }
 
 /// Destroy all the elements of an array.
@@ -252,7 +282,7 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Constant *
 createArrayDtorFn(IRGenModule &IGM,
-                  const ArrayHeapLayout &layout,
+                  const HeapArrayInfo &arrayInfo,
                   const NecessaryBindings &bindings) {
   llvm::Function *fn =
     llvm::Function::Create(IGM.DeallocatingDtorTy,
@@ -262,20 +292,26 @@ createArrayDtorFn(IRGenModule &IGM,
   IRGenFunction IGF(IGM, CanType(), llvm::ArrayRef<Pattern*>(),
                     ExplosionKind::Minimal, 0, fn, Prologue::Bare);
 
+  // Bind the necessary archetypes.  This is required before we can
+  // lay out the array in this IGF.
   llvm::Value *header = fn->arg_begin();
-  Address lengthPtr = layout.getLengthPointer(IGF, header);
+  bindNecessaryBindings(IGF, bindings,
+                        Address(header, IGM.getPointerAlignment()));
+
+  auto layout = arrayInfo.getLayout(IGF);
+
+  Address lengthPtr = arrayInfo.getLengthPointer(IGF, layout, header);
   llvm::Value *length = IGF.Builder.CreateLoad(lengthPtr, "length");
 
-  // Bind the necessary archetypes.
-  bindNecessaryBindings(IGF, bindings, Address(header, layout.getAlignment()));
+  auto &eltTI = arrayInfo.getElementTypeInfo();
 
   // If the layout isn't known to be POD, we actually have to do work here.
-  if (!layout.getElementTypeInfo().isPOD(ResilienceScope::Local)) {
-    llvm::Value *elementSize = layout.getElementTypeInfo().getStride(IGF);
+  if (!eltTI.isPOD(ResilienceScope::Local)) {
+    llvm::Value *elementSize = eltTI.getStride(IGF);
 
-    llvm::Value *begin = layout.getBeginPointer(IGF, header);
+    llvm::Value *begin = arrayInfo.getBeginPointer(IGF, layout, header);
     llvm::Value *end;
-    if (layout.getElementTypeInfo().StorageType->isSized()) {
+    if (isa<FixedTypeInfo>(eltTI)) {
       end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
     } else {
       end = IGF.Builder.CreateBitCast(begin, IGF.IGM.Int8PtrTy);
@@ -284,16 +320,17 @@ createArrayDtorFn(IRGenModule &IGM,
       end = IGF.Builder.CreateBitCast(end, begin->getType());
     }
 
-    emitArrayDestroy(IGF, begin, end, layout.getElementTypeInfo(), elementSize);
+    emitArrayDestroy(IGF, begin, end, eltTI, elementSize);
   }
 
-  llvm::Value *size = layout.getAllocationSize(IGF, length, false, false);
+  llvm::Value *size =
+    arrayInfo.getAllocationSize(IGF, layout, length, false, false);
   IGF.Builder.CreateRet(size);
 
   return fn;
 }
 
-llvm::Constant *ArrayHeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
+llvm::Constant *HeapArrayInfo::getPrivateMetadata(IRGenModule &IGM) const {
   return buildPrivateMetadata(IGM, createArrayDtorFn(IGM, *this, Bindings),
                               MetadataKind::HeapArray);
 }
@@ -327,15 +364,17 @@ static llvm::Value *checkOverflow(IRGenFunction &IGF,
 ///   this is false for computations involving a known-good length
 /// \param updateLength - whether to update the 'length' parameter
 ///   with the proper length, i.e. the length as a size_t
-llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
-                                                llvm::Value *&length,
-                                                bool canOverflow,
-                                                bool updateLength) const {
+llvm::Value *HeapArrayInfo::getAllocationSize(IRGenFunction &IGF,
+                                              const Layout &layout,
+                                              llvm::Value *&length,
+                                              bool canOverflow,
+                                              bool updateLength) const {
   // We're computing HeaderSize + length * sizeof(element).
 
   // Easy case: the length is a static constant.
   llvm::ConstantInt *clength = dyn_cast<llvm::ConstantInt>(length);
-  if (clength && ElementTI.StorageType->isSized()) {
+  if (clength && ElementTI.isFixedSize()) {
+    auto &fixedElementTI = cast<FixedTypeInfo>(ElementTI);
     unsigned sizeWidth = IGF.IGM.SizeTy->getBitWidth();
 
     // Get the length to size_t, making sure it isn't too large.
@@ -352,13 +391,16 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
     bool overflow = false;
 
     // Scale the length by the element stride.
-    llvm::APInt elementStride(sizeWidth, ElementTI.getFixedStride().getValue());
+    llvm::APInt elementStride(sizeWidth,
+                              fixedElementTI.getFixedStride().getValue());
     assert(elementStride);
     auto scaledLength = lenval.umul_ov(elementStride, overflow);
     if (overflow) return getSizeMax(IGF);
 
     // Add the header size in.
-    llvm::APInt headerSize(sizeWidth, HeaderSize.getValue());
+    assert(isa<llvm::ConstantInt>(layout.HeaderSize) &&
+           "fixed-size array element type without constant header size?");
+    auto &headerSize = cast<llvm::ConstantInt>(layout.HeaderSize)->getValue();
     auto lengthWithHeader = scaledLength.uadd_ov(headerSize, overflow);
     if (overflow) return getSizeMax(IGF);
 
@@ -396,9 +438,8 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
 
   // If the element size is known to be zero, we don't need to do
   // anything further.
-  llvm::Value *headerSize = getSize(IGF, HeaderSize);
-  if (ElementTI.isEmpty(ResilienceScope::Local))
-    return headerSize;
+  if (ElementTI.isKnownEmpty())
+    return layout.HeaderSize;
 
   llvm::Value *size = properLength;
 
@@ -414,17 +455,18 @@ llvm::Value *ArrayHeapLayout::getAllocationSize(IRGenFunction &IGF,
   // Increase that by the header size, saturating at SIZE_MAX.
   if (canOverflow) {
     size = checkOverflow(IGF, llvm::Intrinsic::uadd_with_overflow,
-                         size, headerSize);
+                         size, layout.HeaderSize);
   } else {
-    size = IGF.Builder.CreateAdd(size, headerSize);
+    size = IGF.Builder.CreateAdd(size, layout.HeaderSize);
   }
 
   return size;
 }
 
 /// Returns a pointer to the 'length' field of an array allocation.
-Address ArrayHeapLayout::getLengthPointer(IRGenFunction &IGF,
-                                          llvm::Value *alloc) const {
+Address HeapArrayInfo::getLengthPointer(IRGenFunction &IGF,
+                                        const Layout &layout,
+                                        llvm::Value *alloc) const {
   assert(alloc->getType() == IGF.IGM.RefCountedPtrTy);
   llvm::Value *addr = IGF.Builder.CreateConstInBoundsGEP1_32(alloc, 1);
   addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.SizeTy->getPointerTo());
@@ -432,25 +474,27 @@ Address ArrayHeapLayout::getLengthPointer(IRGenFunction &IGF,
   return Address(addr, IGF.IGM.getPointerAlignment());
 }
 
-llvm::Value *ArrayHeapLayout::getBeginPointer(IRGenFunction &IGF,
-                                              llvm::Value *alloc) const {
+llvm::Value *HeapArrayInfo::getBeginPointer(IRGenFunction &IGF,
+                                            const Layout &layout,
+                                            llvm::Value *alloc) const {
   assert(alloc->getType() == IGF.IGM.RefCountedPtrTy);
   alloc = IGF.Builder.CreateBitCast(alloc, IGF.IGM.Int8PtrTy);
-  llvm::Value *begin =
-    IGF.Builder.CreateConstInBoundsGEP1_32(alloc, HeaderSize.getValue());
+  llvm::Value *begin = IGF.Builder.CreateInBoundsGEP(alloc, layout.HeaderSize);
   return IGF.Builder.CreateBitCast(begin,
                                  ElementTI.getStorageType()->getPointerTo());
 }
 
-llvm::Value *ArrayHeapLayout::emitUnmanagedAlloc(IRGenFunction &IGF,
-                                                 llvm::Value *length,
-                                                 Address &begin,
-                                                 Expr *init,
-                                                 const llvm::Twine &name) const
+llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
+                                               llvm::Value *length,
+                                               Address &begin,
+                                               Expr *init,
+                                               const llvm::Twine &name) const
 {
+  Layout layout = getLayout(IGF);
+
   llvm::Constant *metadata = getPrivateMetadata(IGF.IGM);
-  llvm::Value *size = getAllocationSize(IGF, length, true, true);
-  llvm::Value *align = getSize(IGF, Size(Align.getValue()));
+  llvm::Value *size = getAllocationSize(IGF, layout, length, true, true);
+  llvm::Value *align = layout.AllocAlign;
 
   // Perform the allocation.
   llvm::Value *alloc =
@@ -458,24 +502,34 @@ llvm::Value *ArrayHeapLayout::emitUnmanagedAlloc(IRGenFunction &IGF,
 
   if (!Bindings.empty()) {
     Address bindingsBuffer =
-      projectBindingsBuffer(IGF, Address(alloc, getAlignment()));
+      projectBindingsBuffer(IGF, Address(alloc, layout.BestStaticAlignment));
     Bindings.save(IGF, bindingsBuffer);
   }
 
+  // Store the length pointer to the array.
+  Address lengthPtr = getLengthPointer(IGF, layout, alloc);
+  // FIXME: storing the actual length here doesn't seem to work.
+  IGF.Builder.CreateStore(IGF.IGM.getSize(Size(0)), lengthPtr);
+
   // Find the begin pointer.
-  llvm::Value *beginPtr = getBeginPointer(IGF, alloc);
+  llvm::Value *beginPtr = getBeginPointer(IGF, layout, alloc);
   begin = ElementTI.getAddressForPointer(beginPtr);
 
   // If we don't have an initializer, just zero-initialize and
   // immediately enter a release cleanup.
   if (!init) {
-    llvm::Value *sizeToMemset =
-      IGF.Builder.CreateSub(size, getSize(IGF, HeaderSize));
+    llvm::Value *sizeToMemset = IGF.Builder.CreateSub(size, layout.HeaderSize);
+
+    Alignment arrayAlignment = layout.BestStaticAlignment;
+    if (auto offset = dyn_cast<llvm::ConstantInt>(layout.HeaderSize))
+      arrayAlignment =
+        arrayAlignment.alignmentAtOffset(Size(offset->getZExtValue()));
+
     IGF.Builder.CreateMemSet(
                      IGF.Builder.CreateBitCast(beginPtr, IGF.IGM.Int8PtrTy),
                              llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0),
                              sizeToMemset,
-                             Align.alignmentAtOffset(HeaderSize).getValue(),
+                             arrayAlignment.getValue(),
                              /*volatile*/ false);
 
   // Otherwise, repeatedly evaluate the initializer into successive
@@ -487,11 +541,11 @@ llvm::Value *ArrayHeapLayout::emitUnmanagedAlloc(IRGenFunction &IGF,
   return alloc;
 }
 
-ManagedValue ArrayHeapLayout::emitAlloc(IRGenFunction &IGF,
-                                        llvm::Value *length,
-                                        Address &begin,
-                                        Expr *init,
-                                        const llvm::Twine &name) const {
+ManagedValue HeapArrayInfo::emitAlloc(IRGenFunction &IGF,
+                                      llvm::Value *length,
+                                      Address &begin,
+                                      Expr *init,
+                                      const llvm::Twine &name) const {
   llvm::Value *alloc = emitUnmanagedAlloc(IGF, length, begin, init, name);
   return IGF.enterReleaseCleanup(alloc);
 }
