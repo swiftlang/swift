@@ -317,10 +317,6 @@ public:
   /// using a runtime-checked cast.
   void emitSupertoArchetypeConversion(Explosion &input,
                                     CanType destType, Address outputArchetype);
-  /// \brief Convert the given expression to the given destination archetype,
-  /// using a runtime-checked cast.
-  void emitSupertoArchetypeConversion(Expr *E, CanType destType,
-                                      Explosion &explosion);
 
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
