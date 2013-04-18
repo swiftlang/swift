@@ -87,23 +87,6 @@ namespace irgen {
                               CanType substResultType,
                               ArrayRef<Substitution> subs,
                               Explosion &out);
-
-  /// Emit an existential member reference as a callee.
-  CallEmission prepareExistentialMemberRefCall(IRGenFunction &IGF,
-                                        ExistentialMemberRefExpr *E,
-                                        CanType substResultType,
-                                        ArrayRef<Substitution> subs,
-                                        ExplosionKind maxExplosionLevel,
-                                        unsigned maxUncurry);
-
-  /// Emit an existential member reference as a callee.
-  CallEmission prepareArchetypeMemberRefCall(IRGenFunction &IGF,
-                                      ArchetypeMemberRefExpr *E,
-                                      CanType substResultType,
-                                      ArrayRef<Substitution> subs,
-                                      ExplosionKind maxExplosionLevel,
-                                      unsigned maxUncurry);
-
   /// Determine the natural limits on how we can call the given
   /// protocol member function.
   AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);
