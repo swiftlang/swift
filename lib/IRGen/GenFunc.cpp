@@ -1765,12 +1765,6 @@ void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
   addArg(argE);
 }
 
-/// Evaluate the given expression as a new set of arguments to the
-/// function.
-void CallEmission::addArg(Expr *arg) {
-  abort();
-}
-
 /// Load from the given address to produce an argument.
 void CallEmission::addMaterializedArg(Address substAddr, bool asTake) {
   // If we're calling something with polymorphic type, we'd better have

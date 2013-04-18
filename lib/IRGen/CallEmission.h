@@ -113,10 +113,6 @@ public:
   /// substitutions.
   void addSubstitutedArg(CanType substInputType, Explosion &arg);
 
-  /// Add a new set of arguments to the function by evaluating an argument
-  /// expression.
-  void addArg(Expr *arg);
-
   /// Add a new set of arguments to the function from an explosion containing
   /// unmanaged values.
   void addUnmanagedArg(Explosion &arg);

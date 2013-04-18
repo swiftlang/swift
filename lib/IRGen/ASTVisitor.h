@@ -62,12 +62,6 @@ public:
   }
 };  
   
-template<typename ImplClass, typename ExprRetTy = void>
-using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy>;
-
-template<typename ImplClass, typename StmtRetTy = void>
-using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy>;
-
 template<typename ImplClass, typename DeclRetTy = void>
 using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy>;
 
