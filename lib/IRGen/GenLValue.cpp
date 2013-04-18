@@ -39,43 +39,7 @@
 
 using namespace swift;
 using namespace irgen;
-
-void PathComponent::_anchor() {}
-void PhysicalPathComponent::_anchor() {}
-
-namespace {
-  /// A path component with a fixed address.
-  class FixedAddress : public PhysicalPathComponent {
-    OwnedAddress Addr;
-
-  public:
-    FixedAddress(OwnedAddress addr) : Addr(addr) {}
-
-    OwnedAddress offset(IRGenFunction &IGF, OwnedAddress base) const {
-      assert(!base.isValid());
-      return Addr;
-    }
-  };
-}
-
-/// Create an l-value which resolves exactly to the given address.
-LValue IRGenFunction::emitAddressLValue(OwnedAddress address) {
-  LValue lvalue;
-  lvalue.add<FixedAddress>(address);
-  return lvalue;
-}
-
-
                            
-/// Given an l-value which is known to be physical, load from it.
-OwnedAddress IRGenFunction::emitAddressForPhysicalLValue(const LValue &lvalue) {
-  OwnedAddress address;
-  for (auto &component : lvalue) {
-    address = component.asPhysical().offset(*this, address);
-  }
-  return address;
-}
-
 /// Convert an l-value type.  For non-heap l-values, this is always
 /// just a bare pointer.  For heap l-values, this is a pair of a bare
 /// pointer with an object reference.

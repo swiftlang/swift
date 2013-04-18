@@ -415,7 +415,7 @@ namespace {
       // Reassign 'this' with the result.
       LValue thisLV = emitDeclRefLValue(IGF, E->getThis(),
                                         E->getThis()->getTypeOfReference());
-      OwnedAddress addr = IGF.emitAddressForPhysicalLValue(thisLV);
+      OwnedAddress addr;
       
       Explosion newThisE(IGF.CurExplosionLevel);
       newThisE.addUnmanaged(newThis);

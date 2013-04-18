@@ -31,31 +31,7 @@ namespace irgen {
   class IRGenFunction;
   class RValue;
 
-class PhysicalPathComponent;
 
-/// An enumeration indicating whether to "preserve" a value or "consume" it.
-enum ShouldPreserveValues : bool {
-  ConsumeValues = false,
-  PreserveValues = true
-};
-
-/// An l-value path component represents a chunk of the access path to
-/// an object.  Path components may be either "physical" or "logical".
-/// A physical path involves elementary address manipulations; these
-/// address manipulations may be in some way dynamic, but they are
-/// ultimately just pointer arithmetic.  A logical path requires
-/// getter/setter logic.
-///
-/// This divide between physical/logical is closely related to the
-/// fragile/resilient split, with two primary differences:
-///   - Any sort of implementation can be fragile.  For example, a
-///     computed field can still be fragile, meaning that it is known
-///     to be implemented with a getter/setter.  The known
-///     implementation must be a direct offset in order to qualify as
-///     physical.
-///   - A path component's implementation can be resilient and yet
-///     still qualify for physical access if we are in a privileged
-///     component.
 class PathComponent {
   friend class LValue;
   unsigned AllocatedSize : 31;
@@ -83,35 +59,7 @@ public:
   bool isPhysical() const { return IsPhysical; }
   bool isLogical() const { return !IsPhysical; }
 
-  // These are implemented inline after the respective class declarations.
-
-  PhysicalPathComponent &asPhysical();
-  const PhysicalPathComponent &asPhysical() const;
-};
-
-/// An abstract class for "physical" path components, i.e. path
-/// components that can be accessed as address manipulations.  See the
-/// comment for PathComponent for more information.
-class PhysicalPathComponent : public PathComponent {
-  virtual void _anchor();
-
-protected:
-  PhysicalPathComponent() : PathComponent(true) {}
-
-public:
-  virtual OwnedAddress offset(IRGenFunction &IGF,
-                              OwnedAddress base) const = 0;
-};
-
-inline PhysicalPathComponent &PathComponent::asPhysical() {
-  assert(isPhysical());
-  return static_cast<PhysicalPathComponent&>(*this);
-}
-inline const PhysicalPathComponent &PathComponent::asPhysical() const {
-  assert(isPhysical());
-  return static_cast<const PhysicalPathComponent&>(*this);
-}
-
+ };
 
 /// An l-value represents a reference to storage holding a value
 /// of a type, as opposed to an r-value, which is an actual value

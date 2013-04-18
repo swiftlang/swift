@@ -43,10 +43,6 @@ namespace irgen {
                                                  CanType baseType,
                                                  VarDecl *field);
 
-  LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF, MemberRefExpr *E);
-  LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                       GenericMemberRefExpr *E);
-
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
 

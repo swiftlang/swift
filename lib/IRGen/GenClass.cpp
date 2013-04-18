@@ -427,31 +427,6 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   llvm_unreachable("bad field-access strategy");
 }
 
-static LValue emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            Expr *baseE,
-                                            VarDecl *field) {
-  Explosion explosion(ExplosionKind::Maximal);
-  // FIXME: Can we avoid the retain/release here in some cases?
-  IGF.emitRValue(baseE, explosion);
-  ManagedValue baseVal = explosion.claimNext();
-  llvm::Value *base = baseVal.getValue();
-  auto baseType = baseE->getType()->getCanonicalType();
-  OwnedAddress addr
-    = projectPhysicalClassMemberAddress(IGF, base, baseType, field);
-  return IGF.emitAddressLValue(addr);
-}
-
-LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            MemberRefExpr *E) {
-  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
-                                         E->getDecl());
-}
-
-LValue irgen::emitPhysicalClassMemberLValue(IRGenFunction &IGF,
-                                            GenericMemberRefExpr *E) {
-  return ::emitPhysicalClassMemberLValue(IGF, E->getBase(),
-                                         cast<VarDecl>(E->getDecl()));
-}
 
 namespace {
   class ClassDestroyCleanup : public Cleanup {

@@ -314,8 +314,6 @@ public:
 
   void emitInit(Expr *E, Address address, const TypeInfo &type);
 
-  LValue emitAddressLValue(OwnedAddress addr);
-  OwnedAddress emitAddressForPhysicalLValue(const LValue &lvalue);
   void emitRValue(Expr *E, Explosion &explosion);
   void emitRValueAsUnsubstituted(Expr *E, CanType destType,
                                  ArrayRef<Substitution> subs,
