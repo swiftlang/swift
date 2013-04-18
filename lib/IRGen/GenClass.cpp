@@ -43,7 +43,6 @@
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
 #include "GenInit.h"
-#include "Scope.h"
 #include "Cleanup.h"
 
 

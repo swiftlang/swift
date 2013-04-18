@@ -64,17 +64,6 @@ public:
   }
 };
 
-/// A FullExpr is a RAII object recording that a full-expression has
-/// been entered.  A full-expression is essentially a very small scope
-/// for the temporaries in an expression, with the added complexity
-/// that (eventually, very likely) we have to deal with expressions
-/// that are only conditionally evaluated.
-class FullExpr : private Scope {
-public:
-  explicit FullExpr(IRGenFunction &IGF) : Scope(IGF) {}
-  using Scope::pop;
-};
-
 } // end namespace irgen
 } // end namespace swift
 

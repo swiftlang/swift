@@ -86,8 +86,6 @@
 #include "Linking.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
-#include "Scope.h"
-
 #include "GenFunc.h"
 
 using namespace swift;

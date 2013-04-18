@@ -27,7 +27,6 @@
 #include "GenTuple.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Scope.h"
 #include "FixedTypeInfo.h"
 
 #include "GenInit.h"

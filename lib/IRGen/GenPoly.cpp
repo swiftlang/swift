@@ -948,26 +948,3 @@ void IRGenFunction::emitSupertoArchetypeConversion(Expr *E, CanType destType,
   addr = Builder.CreateBitCast(addr, IGM.OpaquePtrTy, "temp.cast");
   explosion.add(ManagedValue(addr.getAddress(), cleanup));
 }
-
-void IRGenFunction::emitSuperIsArchetype(Expr *E, CanType destType,
-                                         Explosion &explosion) {
-  assert(destType->is<ArchetypeType>() && "expected archetype type");
-
-  // Emit the expression and retrieve the metadata.
-  llvm::Value *superObject, *metadataRef;
-  
-  emitSupertoArchetypeCastParameters(*this, E, destType,
-                                     superObject, metadataRef);
-  // Call the checked dynamic cast.
-  auto call
-    = Builder.CreateCall2(IGM.getDynamicCastFn(),
-                          superObject, metadataRef);
-  // FIXME: Eventually, we may want to throw.
-  call->setDoesNotThrow();
-
-  // Compare the result to null.
-  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::Predicate::ICMP_NE,
-                                call,
-                                llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
-  explosion.addUnmanaged(result);
-}

@@ -21,7 +21,6 @@
 #include "Cleanup.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Scope.h"
 
 using namespace swift;
 using namespace irgen;
