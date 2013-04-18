@@ -280,8 +280,15 @@ void Lexer::skipSlashStarComment() {
       
       // Otherwise, we have an unterminated /* comment.
       --CurPtr;
-      diagnose(CurPtr-(CurPtr[-1] == '\n'),
-               diag::lex_unterminated_block_comment);
+
+      // Count how many levels deep we are.
+      llvm::SmallString<8> Terminator("*/");
+      while (--Depth != 0)
+        Terminator += "*/";
+
+      const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
+      diagnose(EOL, diag::lex_unterminated_block_comment)
+        << Diagnostic::FixIt::makeInsertion(getSourceLoc(EOL), Terminator);
       diagnose(StartPtr, diag::lex_comment_start);
       return;
     }
@@ -1054,7 +1061,8 @@ Restart:
     if (BufferStart != BufferEnd && CurPtr[-2] != '\n' && CurPtr[-2] != '\r') {
       // While we are not C, we should not ignore the strong Unix command-line
       // tool conventions that motivate this warning.
-      diagnose(CurPtr-1, diag::lex_missing_newline_eof);
+      diagnose(CurPtr-1, diag::lex_missing_newline_eof)
+        << Diagnostic::FixIt::makeInsertion(getSourceLoc(CurPtr-1), "\n");
     }
     return formToken(tok::eof, TokStart);
 
