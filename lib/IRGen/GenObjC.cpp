@@ -450,64 +450,6 @@ namespace {
 #undef FOREACH_FAMILY
   };
 
-  /// A CRTP class for emitting an expression as an ObjC class
-  /// reference.
-  class ObjCClassEmitter
-      : public irgen::ExprVisitor<ObjCClassEmitter, llvm::Value*> {
-    IRGenFunction &IGF;
-    typedef irgen::ExprVisitor<ObjCClassEmitter,llvm::Value*> super;
-  public:
-    ObjCClassEmitter(IRGenFunction &IGF) : IGF(IGF) {}
-
-    llvm::Value *visit(Expr *E) {
-      assert(E->getType()->is<MetaTypeType>());
-      assert(E->getType()->castTo<MetaTypeType>()->getInstanceType()
-                         ->getClassOrBoundGenericClass() != nullptr);
-      return super::visit(E);
-    }
-
-    /// Look through metatype conversions.
-    llvm::Value *visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
-      return visit(E->getSubExpr());
-    }
-
-    llvm::Value *emitGetMetatype(Expr *base) {
-      abort();
-    }
-
-    /// Special-case explicit .metatype expressions.
-    llvm::Value *visitMetatypeExpr(MetatypeExpr *E) {
-      // If there's a base, we need to evaluate it and then grab the
-      // ObjC class for that.
-      if (Expr *base = E->getBase()) {
-        return emitGetMetatype(base);
-      }
-
-      // Otherwise, we need to emit a class reference.
-      return emitClassHeapMetadataRef(IGF, getInstanceType(E));
-    }
-
-    /// Special-case direct type references.
-    llvm::Value *visitDeclRefExpr(DeclRefExpr *E) {
-      assert(isa<TypeDecl>(E->getDecl()));
-      auto typeDecl = cast<TypeDecl>(E->getDecl());
-      auto type = typeDecl->getDeclaredType()->getCanonicalType();
-      return emitClassHeapMetadataRef(IGF, type);
-    }
-
-    /// In the fallback case, emit as a swift metatype and remap it to
-    /// an ObjC class type.
-    llvm::Value *visitExpr(Expr *E) {
-      abort();
-    }
-
-    /// Given an expression of metatype type, return the instance
-    /// type of the metatype.
-    static CanType getInstanceType(Expr *E) {
-      auto type = E->getType()->getCanonicalType();
-      return CanType(cast<MetaTypeType>(type)->getInstanceType());
-    }
-  };
 
   /// Ownership conventions derived from a Clang method declaration.
   class ObjCMethodConventions : public OwnershipConventions {
@@ -601,12 +543,6 @@ namespace {
   };
 }
 
-/// Emit the given expression (of class-metatype type) as an
-/// Objective-C class reference.
-static void emitObjCClassRValue(IRGenFunction &IGF, Expr *E, Explosion &out) {
-  out.addUnmanaged(ObjCClassEmitter(IGF).visit(E));
-}
-
 /// Try to find a clang method declaration for the given function.
 static clang::ObjCMethodDecl *findClangMethod(ValueDecl *method) {
   if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
@@ -636,14 +572,6 @@ static const OwnershipConventions &setOwnershipConventions(Callee &callee,
   return callee.getOwnershipConventions();
 }
 
-static void emitSelfArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                             Expr *self, Explosion &selfValues) {
-  if (isInstanceMethod) {
-    abort();
-  } else {
-    emitObjCClassRValue(IGF, self, selfValues);
-  }
-}
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               ManagedValue selfValue, Explosion &selfValues,
@@ -685,17 +613,6 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   // Pass a pointer to the objc_super struct to the messenger.
   // Project the ownership semantics of 'self' to the super argument.
   selfValues.add({super.getAddress(), selfValue.getCleanup()});
-}
-
-static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                              Expr *self, Explosion &selfValues,
-                              CanType searchClass) {
-  // Generate the 'self' receiver.
-  Explosion selfValueTmp(ExplosionKind::Minimal);
-  emitSelfArgument(IGF, isInstanceMethod, self, selfValueTmp);
-  ManagedValue selfValue = selfValueTmp.claimNext();
-
-  emitSuperArgument(IGF, isInstanceMethod, selfValue, selfValues, searchClass);
 }
 
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
@@ -798,63 +715,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   
   // Add that to the emission.
   emission.addArg(args);
-}
-
-/// Prepare a call using ObjC method dispatch.
-CallEmission irgen::prepareObjCMethodCall(IRGenFunction &IGF,
-                                          ValueDecl *method,
-                                          Expr *self,
-                                          CanType substResultType,
-                                          ArrayRef<Substitution> subs,
-                                          ExplosionKind maxExplosion,
-                                          unsigned maxUncurry,
-                                          CanType searchType) {
-  CallEmission emission = prepareObjCMethodRootCall(IGF, method,
-                                                    substResultType,
-                                                    subs, maxExplosion,
-                                                    maxUncurry,
-                                                    bool(searchType));
-  // Compute the selector.
-  Selector selector(method);
-
-  // Emit the self or super argument.
-  Explosion selfValues(ExplosionKind::Minimal);
-  
-  // super.constructor references an instance method (even though the
-  // decl is really a 'static' member).
-  bool isInstanceMethod
-    = isa<ConstructorDecl>(method) || method->isInstanceMember();
-  
-  if (searchType) {
-    emitSuperArgument(IGF, isInstanceMethod, self, selfValues,
-                      searchType);
-  } else {
-    emitSelfArgument(IGF, isInstanceMethod, self, selfValues);
-  }
-  assert(selfValues.size() == 1);
-
-  // Add the selector value.
-  auto selectorRef = IGF.IGM.getAddrOfObjCSelectorRef(selector.str());
-  llvm::Value *selectorV;
-  if (IGF.IGM.Opts.UseJIT) {
-    // When generating JIT'd code, we need to call sel_registerName() to force
-    // the runtime to unique the selector.
-    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
-                                               IGF.IGM.getPointerAlignment()));
-    selectorV = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                       selectorV);
-  } else {
-    // When generating statically-compiled code, just build a reference to
-    // the selector.
-    selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
-                                               IGF.IGM.getPointerAlignment()));
-  }
-  selfValues.addUnmanaged(selectorV);
-
-  // Add that to the emission.
-  emission.addArg(selfValues);
-
-  return emission;
 }
 
 /// Can we use the given method directly as the IMPL of an Objective-C

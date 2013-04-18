@@ -51,15 +51,6 @@ namespace irgen {
                                           ValueDecl *method,
                                           ManagedValue self,
                                           CanType searchType);
-  
-  CallEmission prepareObjCMethodCall(IRGenFunction &IGF,
-                                     ValueDecl *method,
-                                     Expr *self,
-                                     CanType substResultType,
-                                     llvm::ArrayRef<Substitution> subs,
-                                     ExplosionKind bestExplosion,
-                                     unsigned bestUncurry,
-                                     CanType /*nullable*/ searchClass);
 
   /// Reclaim an autoreleased return value.
   llvm::Value *emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
