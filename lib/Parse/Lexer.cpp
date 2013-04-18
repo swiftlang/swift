@@ -192,6 +192,20 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//
 
+static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
+  assert(Ptr && "invalid source location");
+  assert(*Ptr == '\0' && "not an embedded null");
+
+  if (!Diags)
+    return;
+
+  SourceLoc NulLoc = Lexer::getSourceLoc(Ptr);
+  SourceLoc NulEndLoc = Lexer::getSourceLoc(Ptr+1);
+  Diags->diagnose(NulLoc, diag::lex_nul_character)
+    << Diagnostic::FixIt::makeDeletion(DiagnosticInfo::Range(NulLoc,
+                                                             NulEndLoc));
+}
+
 /// skipSlashSlashComment - Skip to the end of the line of a // comment.
 void Lexer::skipSlashSlashComment() {
   assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
@@ -214,7 +228,7 @@ void Lexer::skipSlashSlashComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != BufferEnd) {
-        diagnose(CurPtr-1, diag::lex_nul_character);
+        diagnoseEmbeddedNul(Diags, CurPtr-1);
         break;
       }
         
@@ -274,7 +288,7 @@ void Lexer::skipSlashStarComment() {
       // If this is a random nul character in the middle of a buffer, skip it as
       // whitespace.
       if (CurPtr-1 != BufferEnd) {
-        diagnose(CurPtr-1, diag::lex_nul_character);
+        diagnoseEmbeddedNul(Diags, CurPtr-1);
         break;
       }
       
@@ -1053,7 +1067,7 @@ Restart:
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
     if (CurPtr-1 != BufferEnd) {
-      diagnose(CurPtr-1, diag::lex_nul_character);
+      diagnoseEmbeddedNul(Diags, CurPtr-1);
       goto Restart;
     }
 
