@@ -360,14 +360,71 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 }
 
 namespace {
+  class CallSite {
+  public:
+    enum class Kind {
+      Expr,
+      Value
+    };
+
+    const Kind kind;
+    SILLocation loc;
+
+  private:
+    union {
+      Expr *expr;
+      RValue value;
+    };
+    
+  public:
+    CallSite(ApplyExpr *apply)
+      : kind(Kind::Expr), loc(apply), expr(apply->getArg()) {}
+    
+    CallSite(SILLocation loc, Expr *expr)
+      : kind(Kind::Expr), loc(loc), expr(expr) {}
+    
+    CallSite(SILLocation loc, RValue &&value)
+      : kind(Kind::Value), loc(loc), value(std::move(value)) {}
+    
+    ~CallSite() {
+      switch (kind) {
+      case Kind::Expr:
+        return;
+      case Kind::Value:
+        value.~RValue();
+        return;
+      }
+    }
+    
+    CallSite(CallSite &&o) : kind(o.kind), loc(o.loc) {
+      switch (kind) {
+      case Kind::Expr:
+        expr = o.expr;
+        return;
+      case Kind::Value:
+        ::new (&value) RValue(std::move(o.value));
+        return;
+      }
+    }
+    
+    void emit(SILGenFunction &gen, SmallVectorImpl<ManagedValue> &args) && {
+      switch (kind) {
+      case Kind::Expr:
+        gen.visit(expr).getAll(args);
+        return;
+
+      case Kind::Value:
+        std::move(value).getAll(args);
+        return;
+      }
+    }
+  };
+  
   class CallEmission {
     SILGenFunction &gen;
     
-    // FIXME: Need to fix emitApplyArgument to preserve cleanups and emit into
-    // a ManagedValue vector instead of SILValue. We shouldn't forward until the
-    // final apply is emitted.
-    SmallVector<ManagedValue, 8> uncurriedArgs;
-    std::vector<SmallVector<ManagedValue, 2>> extraArgs;
+    std::vector<CallSite> uncurriedSites;
+    std::vector<CallSite> extraSites;
     Callee callee;
     unsigned uncurries;
     bool applied;
@@ -380,23 +437,26 @@ namespace {
         applied(false)
     {}
     
-    void addArgs(RValue &&args) {
+    void addCallSite(CallSite &&site) {
       assert(!applied && "already applied!");
 
       // Append to the main argument list if we have uncurry levels remaining.
       if (uncurries > 0) {
         --uncurries;
-        std::move(args).getAll(uncurriedArgs);
+        uncurriedSites.push_back(std::move(site));
         return;
       }
       
       // Otherwise, apply these arguments to the result of the previous call.
-      extraArgs.emplace_back();
-      std::move(args).getAll(extraArgs.back());
+      extraSites.push_back(std::move(site));
     }
     
-    // FIXME: Tie argument clauses to more specific expr nodes.
-    ManagedValue apply(SILLocation loc) {
+    template<typename...T>
+    void addCallSite(T &&...args) {
+      addCallSite(CallSite{std::forward<T>(args)...});
+    }
+    
+    ManagedValue apply() {
       assert(!applied && "already applied!");
       
       applied = true;
@@ -404,14 +464,25 @@ namespace {
       // Get the callee value at the needed uncurry level.
       unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
       ManagedValue calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
-
+      
+      // Collect the arguments to the uncurried call.
+      SmallVector<ManagedValue, 4> args;
+      SILLocation uncurriedLoc;
+      for (auto &site : uncurriedSites) {
+        uncurriedLoc = site.loc;
+        std::move(site).emit(gen, args);
+      }
+        
       // Emit the uncurried call.
-      ManagedValue result = gen.emitApply(loc,
+      ManagedValue result = gen.emitApply(uncurriedLoc,
                                           calleeValue.forward(gen),
-                                          uncurriedArgs);
+                                          args);
       
       // If there are remaining call sites, apply them to the result function.
-      for (ArrayRef<ManagedValue> args : extraArgs) {
+      for (auto &site : extraSites) {
+        args.clear();
+        SILLocation loc = site.loc;
+        std::move(site).emit(gen, args);
         result = gen.emitApply(loc, result.forward(gen), args);
       }
       
@@ -423,8 +494,8 @@ namespace {
     // Movable, but not copyable.
     CallEmission(CallEmission &&e)
       : gen(e.gen),
-        uncurriedArgs(e.uncurriedArgs),
-        extraArgs(std::move(e.extraArgs)),
+        uncurriedSites(std::move(e.uncurriedSites)),
+        extraSites(std::move(e.extraSites)),
         callee(std::move(e.callee)),
         uncurries(e.uncurries),
         applied(e.applied) {
@@ -450,21 +521,21 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   CallEmission emission(gen, apply.getCallee());
   
   // Apply 'this' if provided.
-  if (apply.thisParam) {
-    emission.addArgs(std::move(apply.thisParam));
-  }
+  if (apply.thisParam)
+    emission.addCallSite(SILLocation(), std::move(apply.thisParam));
+
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
        site != end;
        ++site) {
-    emission.addArgs(gen.visit((*site)->getArg()));
+    emission.addCallSite(*site);
   }
   
   return emission;
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
-  return RValue(*this, prepareApplyExpr(*this, e).apply(e));
+  return RValue(*this, prepareApplyExpr(*this, e).apply());
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
@@ -495,8 +566,8 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(SILValue ObjectPtr,
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(Length, ManagedValue::Unmanaged)));
   
-  emission.addArgs(std::move(InjectionArgs));
-  return emission.apply(SILLocation());
+  emission.addCallSite(SILLocation(), std::move(InjectionArgs));
+  return emission.apply();
 }
 
 /// Emit a call to a getter and materialize its result.
@@ -507,14 +578,14 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
   CallEmission emission(*this, getter);
   // This ->
   if (thisValue)
-    emission.addArgs(std::move(thisValue));
+    emission.addCallSite(loc, std::move(thisValue));
   // Index ->
   if (subscripts)
-    emission.addArgs(std::move(subscripts));
+    emission.addCallSite(loc, std::move(subscripts));
   // () ->
-  emission.addArgs(emitEmptyTupleRValue(loc));
+  emission.addCallSite(loc, emitEmptyTupleRValue(loc));
   // T
-  ManagedValue result = emission.apply(loc);
+  ManagedValue result = emission.apply();
   return emitMaterialize(loc, result);
 }
 
@@ -526,12 +597,12 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
   CallEmission emission(*this, setter);
   // This ->
   if (thisValue)
-    emission.addArgs(std::move(thisValue));
+    emission.addCallSite(loc, std::move(thisValue));
   // Index ->
   if (subscripts)
-    emission.addArgs(std::move(subscripts));
+    emission.addCallSite(loc, std::move(subscripts));
   // T ->
-  emission.addArgs(std::move(setValue));
+  emission.addCallSite(loc, std::move(setValue));
   // ()
-  emission.apply(loc);
+  emission.apply();
 }

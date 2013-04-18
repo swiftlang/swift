@@ -199,11 +199,15 @@ public:
       type(rv.type),
       elementsToBeAdded(rv.elementsToBeAdded)
   {
+    assert((rv.isComplete() || rv.isUsed())
+           && "moving rvalue that wasn't complete?!");
     rv.elementsToBeAdded = Used;
   }
   RValue &operator=(RValue &&rv) {
     assert(isUsed() && "reassigning an unused rvalue?!");
     
+    assert((rv.isComplete() || rv.isUsed())
+           && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
     elementOffsets = std::move(rv.elementOffsets);
     type = rv.type;
