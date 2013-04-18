@@ -3420,23 +3420,6 @@ Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
   }
 }
 
-/// Emit an expression which accesses a member out of an existential type.
-LValue irgen::emitExistentialMemberRefLValue(IRGenFunction &IGF,
-                                             ExistentialMemberRefExpr *E) {
-
-  IGF.unimplemented(E->getLoc(),
-                    "using existential member reference as l-value");
-  return IGF.emitFakeLValue(E->getType());
-}
-
-/// Emit an expression which accesses a subscript out of an existential type.
-LValue irgen::emitExistentialSubscriptLValue(IRGenFunction &IGF,
-                                             ExistentialSubscriptExpr *E) {
-  IGF.unimplemented(E->getLoc(),
-                    "using existential subscript as l-value");
-  return IGF.emitFakeLValue(E->getType());
-}
-
 /// Emit a callee for a protocol method.
 ///
 /// \param fn - the protocol member being called
@@ -3714,21 +3697,6 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
                         1, 1, ExtraData::Metatype);
 }
 
-
-
-/// Emit an expression which accesses a member out of an archetype.
-LValue irgen::emitArchetypeMemberRefLValue(IRGenFunction &IGF,
-                                           ArchetypeMemberRefExpr *E) {
-  IGF.unimplemented(E->getLoc(), "l-value member reference into archetype");
-  return IGF.emitFakeLValue(E->getType());
-}
-
-/// Emit an expression which accesses a subscript out of an archetype.
-LValue irgen::emitArchetypeSubscriptLValue(IRGenFunction &IGF,
-                                           ArchetypeSubscriptExpr *E) {
-  IGF.unimplemented(E->getLoc(), "l-value subscript into archetype");
-  return IGF.emitFakeLValue(E->getType());
-}
 
 /// Emit a projection from an existential container to its concrete value
 /// buffer.

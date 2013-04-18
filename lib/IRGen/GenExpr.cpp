@@ -469,16 +469,6 @@ void IRGenFunction::emitRValue(Expr *E, Explosion &explosion) {
   RValueEmitter(*this, explosion).visit(E);
 }
 
-/// Emit a fake l-value which obeys the given specification.  This
-/// should only ever be used for error recovery.
-LValue IRGenFunction::emitFakeLValue(Type type) {
-  Type objTy = type->castTo<LValueType>()->getObjectType();
-  const TypeInfo &lvalueInfo = getFragileTypeInfo(objTy);
-  llvm::Value *fakeAddr =
-    llvm::UndefValue::get(lvalueInfo.getStorageType()->getPointerTo());
-  return emitAddressLValue(OwnedAddress(lvalueInfo.getAddressForPointer(fakeAddr),
-                                        IGM.RefCountedNull));
-}
 
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {

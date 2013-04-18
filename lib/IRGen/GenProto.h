@@ -69,21 +69,6 @@ namespace irgen {
   Address emitExistentialProjection(IRGenFunction &IGF,
                                     Address base,
                                     CanType baseTy);
-  /// Emit an existential member reference as an l-value.
-  LValue emitExistentialMemberRefLValue(IRGenFunction &IGF,
-                                        ExistentialMemberRefExpr *E);
-
-  /// Emit an existential subscript reference as an l-value.
-  LValue emitExistentialSubscriptLValue(IRGenFunction &IGF,
-                                        ExistentialSubscriptExpr *E);
-
-  /// Emit an archetype member reference as an l-value.
-  LValue emitArchetypeMemberRefLValue(IRGenFunction &IGF,
-                                      ArchetypeMemberRefExpr *E);
-
-  /// Emit an archetype subscript reference as an l-value.
-  LValue emitArchetypeSubscriptLValue(IRGenFunction &IGF,
-                                      ArchetypeSubscriptExpr *E);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.

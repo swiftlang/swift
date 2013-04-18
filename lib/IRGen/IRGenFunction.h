@@ -311,7 +311,6 @@ public:
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
-  LValue emitFakeLValue(Type type);
 
   void emitInit(Expr *E, Address address, const TypeInfo &type);
 
