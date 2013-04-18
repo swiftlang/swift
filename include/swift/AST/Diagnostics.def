@@ -657,9 +657,6 @@ WARNING(float_literal_overflow,literal_parsing,none,
 WARNING(float_literal_underflow,literal_parsing,none,
         "floating point constant underflowed to %0", (StringRef))
 
-ERROR(string_interpolation_extra,literal_parsing,none,
-      "extra tokens after interpolated string expression", ())
-      
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1095,7 +1092,7 @@ ERROR(incompatible_assoc,sema_tce,none,
 ERROR(address_of_rvalue,sema_tce,none,
       "cannot apply '&' to non-lvalue of type %0", (Type))
 ERROR(address_of_address,sema_tce,none,
-      "cannot apply '&' to a an '&' expression", ())
+      "cannot apply '&' to an '&' expression", ())
 ERROR(no_subscript_declaration,sema_tce,none,
       "type %0 cannot be subscripted", (Type))
 ERROR(subscript_overload_fail,sema_tce,none,

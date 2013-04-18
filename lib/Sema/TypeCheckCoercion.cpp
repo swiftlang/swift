@@ -175,6 +175,13 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
         *Diag << R;
       return *this;
     }
+    
+    /// \brief Add a fix-it to the diagnostic.
+    CoerceDiagnostic &operator<<(Diagnostic::FixIt F) {
+      if (Diag)
+        *Diag << F;
+      return *this;
+    }
   };
   
   /// diagnose - Diagnose a problem encountered during type coercion.
@@ -572,7 +579,8 @@ public:
         // The code would have type-checked without '&'; tell the user that the
         // '&' is extraneous and type-check as if it weren't there.
         diagnose(E->getLoc(), diag::explicit_lvalue)
-          << E->getSubExpr()->getSourceRange();
+          << E->getSubExpr()->getSourceRange()
+          << Diagnostic::FixIt::makeDeletion(SourceRange(E->getLoc()));
         return coerceToType(E->getSubExpr(), DestTy, CC, Flags);
       }
 
@@ -2183,11 +2191,12 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
       if (QualifiersOkay) {
         // If we weren't actually allowed to make this binding, complain
-        // (build build the ASTs anyway).
+        // (but build the ASTs anyway).
         if (!AddressAllowed) {
           TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
                       SrcLT->getObjectType())
-            << E->getSourceRange();
+            << E->getSourceRange()
+            << Diagnostic::FixIt::makeInsertion(E->getLoc(), "&");
         }
 
         if (SrcLT->getQualifiers() < DestLT->getQualifiers())

@@ -1278,7 +1278,8 @@ public:
       if (auto *AddrOf = dyn_cast<AddressOfExpr>(
                            E->getSubExpr()->getSemanticsProvidingExpr()))
         TC.diagnose(E->getLoc(), diag::address_of_address)
-          << AddrOf->getSourceRange();
+          << AddrOf->getSourceRange()
+          << Diagnostic::FixIt::makeDeletion(SourceRange(E->getLoc()));
       
       E->setType(E->getSubExpr()->getType());
       return E;

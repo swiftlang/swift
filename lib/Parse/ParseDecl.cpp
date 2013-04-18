@@ -49,7 +49,8 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   SmallVector<ExprStmtOrDecl, 128> Items;
 
   if (Tok.is(tok::r_brace)) {
-    diagnose(Tok.getLoc(), diag::extra_rbrace);
+    diagnose(Tok.getLoc(), diag::extra_rbrace)
+      << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
     consumeToken();
   }
   
@@ -1055,7 +1056,9 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
 
     // Reject 'static' functions at global scope.
     if (!HasContainerType) {
-      diagnose(Tok, diag::static_func_decl_global_scope);
+      diagnose(Tok, diag::static_func_decl_global_scope)
+        << Diagnostic::FixIt::makeDeletion(Diagnostic::Range(StaticLoc,
+                                                             Tok.getLoc()));
       StaticLoc = SourceLoc();
     }
   }
@@ -2020,6 +2023,7 @@ OperatorDecl *Parser::parseDeclInfixOperator(SourceLoc OperatorLoc,
       }
       bool error = Tok.getText().getAsInteger(0, precedence);
       assert(!error && "integer literal precedence did not parse as integer?!");
+      (void)error;
       
       PrecedenceValueLoc = consumeToken();
       continue;

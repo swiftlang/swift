@@ -113,7 +113,8 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
 
 bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (Tok.is(tok::semi)) {
-    diagnose(Tok.getLoc(), diag::illegal_semi_stmt);
+    diagnose(Tok.getLoc(), diag::illegal_semi_stmt)
+      << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
     consumeToken();
     return true;
   } else if (isStartOfStmtOtherThanAssignment(Tok)) {

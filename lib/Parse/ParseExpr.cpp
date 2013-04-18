@@ -174,12 +174,6 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
   if (Tok.is(tok::kw_new))
     return parseExprNew();
   
-  // For recovery purposes, accept an oper_binary here.
-  if (Tok.is(tok::oper_binary)) {
-    diagnose(Tok.getLoc(), diag::expected_prefix_operator);
-    Tok.setKind(tok::oper_prefix);
-  }
-
   if (Tok.is(tok::amp_prefix)) {
     SourceLoc Loc = consumeToken(tok::amp_prefix);
 
@@ -188,12 +182,29 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     return 0;
   }
 
-  // If the next token is not an operator, just parse this as expr-postfix.
-  if (Tok.isNot(tok::oper_prefix))
+  Expr *Operator;
+  switch (Tok.getKind()) {
+  default:
+    // If the next token is not an operator, just parse this as expr-postfix.
     return parseExprPostfix(Message);
+  case tok::oper_prefix:
+    Operator = parseExprOperator();
+    break;
+  case tok::oper_binary: {
+    // For recovery purposes, accept an oper_binary here.
+    SourceLoc OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
+    Tok.setKind(tok::oper_prefix);
+    Operator = parseExprOperator();
 
-  // Parse the operator.
-  Expr *Operator = parseExprOperator();
+    assert(OperEndLoc != Tok.getLoc() && "binary operator with no spaces?");
+    diagnose(PreviousLoc, diag::expected_prefix_operator)
+      << Diagnostic::FixIt::makeDeletion(Diagnostic::Range(OperEndLoc,
+                                                           Tok.getLoc()));
+    break;
+  }
+  case tok::oper_postfix:
+    llvm_unreachable("oper_postfix should not appear here");
+  }
 
   if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
     return new (Context) PrefixUnaryExpr(Operator, SubExpr);
@@ -709,8 +720,7 @@ Expr *Parser::parseExprStringLiteral() {
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
         
-        if (!Tok.is(tok::eof))
-          diagnose(Tok, diag::string_interpolation_extra);
+        assert(Tok.is(tok::eof) && "segment did not end at close paren");
       }
       break;
     }
