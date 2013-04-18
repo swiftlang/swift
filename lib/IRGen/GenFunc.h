@@ -39,15 +39,6 @@ namespace irgen {
   void emitRValueForFunction(IRGenFunction &IGF, FuncDecl *Fn,
                              Explosion &explosion);
 
-  /// Emit the result of a function call as an r-value.
-  void emitApplyExpr(IRGenFunction &IGF, ApplyExpr *apply,
-                     Explosion &explosion);
-
-  /// Initialize a location in memory with the result of a function
-  /// call.
-  void emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *apply,
-                             Address addr, const TypeInfo &type);
-
   /// Return the natural level at which to uncurry this function.  This
   /// is the number of additional parameter clauses that are uncurried
   /// in the function body.

@@ -1219,12 +1219,6 @@ namespace {
     ArrayRef<CallSite> getCallSites() const {
       return CallSites;
     }
-
-    CallEmission prepareCall(IRGenFunction &IGF,
-                             unsigned numExtraArgs = 0,
-                             ExplosionKind maxExplosion
-                               = ExplosionKind::Maximal);
-
     bool trySpecializeToExplosion(IRGenFunction &IGF, Explosion &out);
     bool trySpecializeToMemory(IRGenFunction &IGF,
                                Address resultAddr,
@@ -1883,22 +1877,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
-/// Prepare a CallEmission for this callee source.  All the arguments
-/// will have been streamed into it.
-CallEmission CalleeSource::prepareCall(IRGenFunction &IGF,
-                                       unsigned numExtraArgs,
-                                       ExplosionKind maxExplosion) {
-  // Prepare the root.
-  unsigned numArgs = getCallSites().size() + numExtraArgs;
-  CallEmission emission = prepareRootCall(IGF, numArgs, maxExplosion);
-
-  // Collect call sites.
-  for (auto site : getCallSites())
-    emission.addArg(site.getArg());
-
-  return emission;
-}
-
 /// Prepare a CallEmission for the root callee, i.e. the one that's
 /// not necessarily indirect.
 CallEmission CalleeSource::prepareRootCall(IRGenFunction &IGF,
@@ -2126,15 +2104,6 @@ CalleeSource CalleeSource::decompose(Expr *E) {
   return source;
 }
 
-/// Emit an expression as a callee.
-CallEmission irgen::prepareCall(IRGenFunction &IGF, Expr *fn,
-                                ExplosionKind bestExplosion,
-                                unsigned numExtraArgs,
-                                CanType substResultType) {
-  CalleeSource source = CalleeSource::decompose(fn);
-  source.setSubstResultType(substResultType);
-  return source.prepareCall(IGF, numExtraArgs, bestExplosion);
-}
 
 /// Emit the unsubstituted result of this call into the given explosion.
 /// The unsubstituted result must be naturally returned directly.
@@ -2872,43 +2841,6 @@ void CallEmission::addMaterializedArg(Address substAddr, bool asTake) {
   addArg(argE);
 }
 
-/// Create a CallEmission for an arbitrary expression.
-/// Note that this currently bypasses specialization and builtin
-/// emission, so don't attempt to emit such things.
-CallEmission CallEmission::forExpr(IRGenFunction &IGF, Expr *E,
-                                   ExplosionKind outputLevel,
-                                   unsigned numExtraArgs) {
-  CalleeSource source = CalleeSource::decompose(E);
-  return source.prepareCall(IGF, numExtraArgs, outputLevel);
-}
-
-/// Emit a call for its exploded results.
-void irgen::emitApplyExpr(IRGenFunction &IGF, ApplyExpr *E, Explosion &out) {
-  CalleeSource source = CalleeSource::decompose(E);
-  if (source.trySpecializeToExplosion(IGF, out))
-    return;
-
-  CallEmission emission = source.prepareCall(IGF, 0, out.getKind());
-  emission.emitToExplosion(out);
-}
-
-/// Emit a call as the initializer for an object in memory.
-static void emitCalleeToMemory(IRGenFunction &IGF, CalleeSource &source,
-                               Address addr, const TypeInfo &substResultTI) {
-  CallEmission emission = source.prepareCall(IGF, 0, ExplosionKind::Maximal);
-  emission.emitToMemory(addr, substResultTI);
-}
-
-/// Emit a call as the initializer for an object in memory.
-void irgen::emitApplyExprToMemory(IRGenFunction &IGF, ApplyExpr *E,
-                                  Address resultAddress,
-                                  const TypeInfo &substResultTI) {
-  CalleeSource source = CalleeSource::decompose(E);
-  if (source.trySpecializeToMemory(IGF, resultAddress, substResultTI))
-    return;
-
-  emitCalleeToMemory(IGF, source, resultAddress, substResultTI);
-}
 
 /// Emit a nullary call to the given monomorphic function, using the
 /// standard calling-convention and so on, and explode the result.

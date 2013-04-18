@@ -95,10 +95,6 @@ public:
   Callee &getMutableCallee() { return CurCallee; }
   const Callee &getCallee() const { return CurCallee; }
 
-  static CallEmission forExpr(IRGenFunction &IGF, Expr *fn,
-                              ExplosionKind outputLevel,
-                              unsigned numArgs);
-
   ExplosionKind getCurExplosionLevel() const {
     if (RemainingArgsForCallee > 0)
       return getCallee().getExplosionLevel();
@@ -135,14 +131,6 @@ public:
   void invalidate();
 };
 
-/// Emit an expression as a callee.
-///
-/// \param numArgs - the number of arg clauses which will be added
-///   to the emitter
-CallEmission prepareCall(IRGenFunction &IGF, Expr *fn,
-                         ExplosionKind bestLevel,
-                         unsigned numArgs,
-                         CanType substResultType);
 
 }
 }

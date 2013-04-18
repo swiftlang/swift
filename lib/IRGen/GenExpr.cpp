@@ -318,8 +318,7 @@ namespace {
     }
 
     void visitNewArrayExpr(NewArrayExpr *E) {
-      emitNewArrayExpr(IGF, E, Out);
-    }
+     }
 
     void visitMetatypeExpr(MetatypeExpr *E) {
       // If we have a base, we have to evaluate it.
@@ -333,8 +332,7 @@ namespace {
     }
 
     void visitApplyExpr(ApplyExpr *E) {
-      emitApplyExpr(IGF, E, Out);
-    }
+     }
 
     void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
       Out.addUnmanaged(emitIntegerLiteralExpr(IGF, E));

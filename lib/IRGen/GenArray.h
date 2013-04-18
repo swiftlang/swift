@@ -36,17 +36,7 @@ namespace irgen {
   class ManagedValue;
   class TypeInfo;
 
-  /// Emit an r-value reference to a function.
-  void emitNewArrayExpr(IRGenFunction &IGF, NewArrayExpr *E,
-                        Explosion &explosion);
-
-  void emitArrayInjectionCall(IRGenFunction &IGF, ManagedValue alloc,
-                              Address begin, CanType sliceTy,
-                              Expr *injectionFn,
-                              llvm::Value *length, Explosion &out);
-
-
-} // end namespace irgen
+ } // end namespace irgen
 } // end namespace swift
 
 #endif
