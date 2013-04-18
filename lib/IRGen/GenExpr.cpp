@@ -25,7 +25,6 @@
 
 #include "ASTVisitor.h"
 #include "GenClass.h"
-#include "GenClosure.h"
 #include "GenFunc.h"
 #include "GenInit.h"
 #include "GenMeta.h"
@@ -407,8 +406,7 @@ namespace {
 #undef FOR_MEMBER_KIND
 
     void visitCapturingExpr(CapturingExpr *E) {
-      emitClosure(IGF, E, Out);
-    }
+     }
 
     void visitModuleExpr(ModuleExpr *E) {
       // Nothing to do: modules have no runtime representation.
