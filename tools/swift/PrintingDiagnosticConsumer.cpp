@@ -62,7 +62,7 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
   for (DiagnosticInfo::Range R : Info.Ranges)
     Ranges.push_back(getRawRange(SM, R));
 
-  // Translate fixits.
+  // Translate fix-its.
   SmallVector<llvm::SMFixIt, 2> FixIts;
   for (DiagnosticInfo::FixIt F : Info.FixIts)
     FixIts.push_back(getRawFixIt(SM, F));

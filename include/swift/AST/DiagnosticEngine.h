@@ -242,7 +242,7 @@ namespace swift {
     /// \sa DiagnosticInfo::Range
     InFlightDiagnostic &operator<<(Diagnostic::Range R);
 
-    /// \brief Add a fixit to the currently-active diagnostic.
+    /// \brief Add a fix-it to the currently-active diagnostic.
     ///
     /// \sa DiagnosticInfo::FixIt
     InFlightDiagnostic &operator<<(Diagnostic::FixIt F);
