@@ -23,14 +23,12 @@ using namespace swift;
 static void doNothing(void *ptr, const void *self) {}
 
 /// A projectBuffer implementation which just reinterprets the buffer.
-static OpaqueValue *projectBuffer(ValueBuffer *dest,
-                                  const ValueWitnessTable *self) {
+static OpaqueValue *projectBuffer(ValueBuffer *dest, const Metadata *self) {
   return reinterpret_cast<OpaqueValue*>(dest);
 }
 
 /// A function which does a naive copy.
-template <class T> static T *copy(T *dest, T *src,
-                                  const ValueWitnessTable *self) {
+template <class T> static T *copy(T *dest, T *src, const Metadata *self) {
   *dest = *src;
   return dest;
 }
@@ -38,7 +36,7 @@ template <class T> static T *copy(T *dest, T *src,
 // Work around a Xcode 4.5 bug (rdar://12288058) by explicitly
 // instantiating this function template at the types we'll need.
 #define INSTANTIATE(TYPE) \
-  template TYPE *copy<TYPE>(TYPE*, TYPE*, const ValueWitnessTable*);
+  template TYPE *copy<TYPE>(TYPE*, TYPE*, const Metadata*);
 INSTANTIATE(uint8_t);
 INSTANTIATE(uint16_t);
 INSTANTIATE(uint32_t);
@@ -73,21 +71,20 @@ const ValueWitnessTable swift::_TWVBi64_ = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
 /// pointer and then assigning it.
 static HeapObject **initWithRetain(HeapObject **dest,
                                    HeapObject **src,
-                                   const ValueWitnessTable *self) {
+                                   const Metadata *self) {
   *dest = swift_retain(*src);
   return dest;
 }
 
 /// A function to destroy a buffer/variable by releasing the value in it.
-static void destroyWithRelease(HeapObject **var,
-                               const ValueWitnessTable *self) {
+static void destroyWithRelease(HeapObject **var, const Metadata *self) {
   swift_release(*var);
 }
 
 /// A function to assign to a variable by copying from an existing one.
 static HeapObject **assignWithRetain(HeapObject **dest,
                                      HeapObject **src,
-                                     const ValueWitnessTable *self) {
+                                     const Metadata *self) {
   HeapObject *newValue = swift_retain(*src);
   swift_release(*dest);
   *dest = newValue;
@@ -97,7 +94,7 @@ static HeapObject **assignWithRetain(HeapObject **dest,
 /// A function to assign to a variable by taking from an existing one.
 static HeapObject **assignWithoutRetain(HeapObject **dest,
                                         HeapObject **src,
-                                        const ValueWitnessTable *self) {
+                                        const Metadata *self) {
   HeapObject *newValue = *src;
   swift_release(*dest);
   *dest = newValue;
@@ -135,20 +132,19 @@ extern "C" void objc_release(void *);
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
 static void **initWithObjCRetain(void **dest, void **src,
-                                 const ValueWitnessTable *self) {
+                                 const Metadata *self) {
   *dest = objc_retain(*src);
   return dest;
 }
 
 /// A function to destroy a buffer/variable by releasing the value in it.
-static void destroyWithObjCRelease(void **var,
-                                   const ValueWitnessTable *self) {
+static void destroyWithObjCRelease(void **var, const Metadata *self) {
   objc_release(*var);
 }
 
 /// A function to assign to a variable by copying from an existing one.
 static void **assignWithObjCRetain(void **dest, void **src,
-                                   const ValueWitnessTable *self) {
+                                   const Metadata *self) {
   void *newValue = objc_retain(*src);
   objc_release(*dest);
   *dest = newValue;
@@ -157,7 +153,7 @@ static void **assignWithObjCRetain(void **dest, void **src,
 
 /// A function to assign to a variable by taking from an existing one.
 static void **assignWithoutObjCRetain(void **dest, void **src,
-                                      const ValueWitnessTable *self) {
+                                      const Metadata *self) {
   void *newValue = *src;
   objc_release(*dest);
   *dest = newValue;
@@ -196,26 +192,26 @@ namespace {
 static_assert(sizeof(Function) <= sizeof(ValueBuffer),
               "function values don't fit inline in a value buffer");
 
-static void function_destroy(Function *fn, const ValueWitnessTable *self) {
+static void function_destroy(Function *fn, const Metadata *self) {
   swift_release(fn->Data);
 }
 
 static Function *function_initWithRetain(Function *dest, Function *src,
-                                         const ValueWitnessTable *self) {
+                                         const Metadata *self) {
   dest->FnPtr = src->FnPtr;
   dest->Data = swift_retain(src->Data);
   return dest;
 }
 
 static Function *function_initWithoutRetain(Function *dest, Function *src,
-                                            const ValueWitnessTable *self) {
+                                            const Metadata *self) {
   dest->FnPtr = src->FnPtr;
   dest->Data = src->Data;
   return dest;
 }
 
 static Function *function_assignWithRetain(Function *dest, Function *src,
-                                           const ValueWitnessTable *self) {
+                                           const Metadata *self) {
   dest->FnPtr = src->FnPtr;
   if (dest->Data != src->Data) {
     HeapObject *oldData = dest->Data;
@@ -226,7 +222,7 @@ static Function *function_assignWithRetain(Function *dest, Function *src,
 }
 
 static Function *function_assignWithoutRetain(Function *dest, Function *src,
-                                              const ValueWitnessTable *self) {
+                                              const Metadata *self) {
   dest->FnPtr = src->FnPtr;
   HeapObject *oldData = dest->Data;
   dest->Data = src->Data;
