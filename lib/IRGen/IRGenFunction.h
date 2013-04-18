@@ -311,8 +311,6 @@ public:
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
 
-  void emitInit(Expr *E, Address address, const TypeInfo &type);
-
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
   void emitSupertoArchetypeConversion(Explosion &input,

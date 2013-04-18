@@ -93,39 +93,26 @@ public:
     return InitializedObject(reinterpret_cast<void*>(1));
   }
 
-  /// Create a variable.  The abstract object for the variable is the
-  /// one returned by getObjectForDecl(var).
-  /// 
+  /// Create a local variable.
+  ///
   /// Precondition: the abstract object has been registered
   ///   with this Initialization, but is not marked as allocated
   ///   or initialized.
   /// Postcondition: the abstract object will have been marked as
   ///   allocated, but not marked as initialized.
-  OwnedAddress emitVariable(IRGenFunction &IGF, VarDecl *var,
-                            const TypeInfo &type);
-
-  /// Create a local variable.
-  ///
-  /// Same pre/postconditions as emitVariable.
   OwnedAddress emitLocalAllocation(IRGenFunction &IGF, InitializedObject object,
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 
   /// Create a global variable.
   ///
-  /// Same pre/postconditions as emitVariable.
+  /// Precondition: the abstract object has been registered
+  ///   with this Initialization, but is not marked as allocated
+  ///   or initialized.
+  /// Postcondition: the abstract object will have been marked as
+  ///   allocated, but not marked as initialized.
   OwnedAddress emitGlobalVariable(IRGenFunction &IGF, VarDecl *var,
                                   const TypeInfo &type);
-
-  /// Emit an initializer into the given address.
-  ///
-  /// Precondition: the object has been marked as allocated at the
-  ///   given address.
-  /// Postcondition: the object will have been marked as initialized.
-  void emitInit(IRGenFunction &IGF, InitializedObject object, Address address,
-                Expr *init, const TypeInfo &type);
-  void emitZeroInit(IRGenFunction &IGF, InitializedObject object,
-                    Address address, const TypeInfo &type);
 
   /// Add an object that is going to be initialized; use the
   /// appropriate destroy cleanup for the given type.

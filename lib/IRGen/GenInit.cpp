@@ -81,11 +81,6 @@ void IRGenFunction::enterDestroyCleanup(Address addr,
   destroy.setAddress(OwnedAddress(addr, IGM.RefCountedNull));
 }
 
-/// Should the given variable be allocated on the heap?
-static OnHeap_t isOnHeap(VarDecl *var) {
-  return (var->hasFixedLifetime() ? NotOnHeap : OnHeap);
-}
-
 /// Register an object with the initialization process.
 CleanupsDepth Initialization::registerObject(IRGenFunction &IGF,
                                              InitializedObject object,
@@ -140,20 +135,6 @@ void Initialization::markAllocated(IRGenFunction &IGF,
       static_cast<UnboundDestroy&>(IGF.findCleanup(record.DestroyCleanup));
     destroy.setAddress(address);
   }
-}
-
-/// Create a variable in the current scope.  Equivalent to either
-/// emitLocalVariable or emitGlobalVariable, depending.
-OwnedAddress Initialization::emitVariable(IRGenFunction &IGF, VarDecl *var,
-                                          const TypeInfo &type) {
-  if (!var->getDeclContext()->isLocalContext())
-    return emitGlobalVariable(IGF, var, type);
-
-  OwnedAddress addr =
-    emitLocalAllocation(IGF, getObjectForDecl(var), isOnHeap(var), type,
-                        var->getName().str());
-  IGF.setLocalVar(var, addr);
-  return addr;
 }
 
 /// Emit a global variable.
@@ -282,55 +263,3 @@ void Initialization::markInitialized(IRGenFunction &IGF,
   // Activate the destroy cleanup.
   maybeSetCleanupState(IGF, it->second.DestroyCleanup, CleanupState::Active);
 }
-
-/// Emit an expression as an initializer for the given location.
-void Initialization::emitInit(IRGenFunction &IGF, InitializedObject object,
-                              Address addr, Expr *E, const TypeInfo &type) {
-  abort();
- 
-}
-
-/// Emit an r-value directly into memory as an initialization.
-/// Enable a cleanup for it as soon as it's complete.
-void IRGenFunction::emitInit(Expr *E, Address addr, const TypeInfo &type) {
-  Initialization I;
-  auto object = I.getObjectForTemporary();
-  I.registerObjectWithoutDestroy(object);
-  I.emitInit(*this, object, addr, E, type);
-}
-
-/// Zero-initialize the given memory location.
-void Initialization::emitZeroInit(IRGenFunction &IGF, InitializedObject object,
-                                  Address addr, const TypeInfo &type) {
-  // Zero-initialization always has trivial outwards control flow; go
-  // ahead and immediately switch the cleanups.
-  markInitialized(IGF, object);
-
-  // No work is necessary if the type is empty or the address is global.
-  if (type.isKnownEmpty() || isa<llvm::Constant>(addr.getAddress()))
-    return;
-
-  ExplosionSchema schema(ExplosionKind::Maximal);
-  type.getSchema(schema);
-
-  // Try to fill the value in with stores if that doesn't make for a
-  // ridiculous amount of IR.  This is impossible if the schema
-  // contains an aggregate;  otherwise, 4 is just a number.
-  if (!schema.containsAggregate() && schema.size() <= 4) {
-    Explosion explosion(schema.getKind());
-    for (auto elt : schema) {
-      explosion.addUnmanaged(llvm::Constant::getNullValue(elt.getScalarType()));
-    }
-    type.initialize(IGF, explosion, addr);
-    return;
-  }
-
-  // Otherwise, just do a memset.
-  IGF.Builder.CreateMemSet(IGF.Builder.CreateBitCast(addr.getAddress(),
-                                                     IGF.IGM.Int8PtrTy),
-                           IGF.Builder.getInt8(0),
-                           type.getSize(IGF),
-                           addr.getAlignment().getValue(),
-                           /*volatile*/ false);
-}
-
