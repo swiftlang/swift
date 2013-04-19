@@ -330,12 +330,9 @@ function(handle_swift_sources sourcesvar externalvar target)
 endfunction()
 
 # Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
-# should be placed.
-if(XCODE)
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_BUILD_TYPE}")
-else()
-  set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib")
-endif()
+# should be placed. Note that $CMAKE_CFG_INTDIR expands to "." for
+# single-configuration builds.
+set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 
 # Add a new Swift library.
 #
@@ -404,9 +401,13 @@ macro(add_swift_library name)
     # /usr/lib if Swift is installed in /usr.
     set_target_properties(${name} PROPERTIES
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
-      LIBRARY_OUTPUT_DIRECTORY_DEBUG ${SWIFTLIB_DIR}/swift
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift
-      ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${SWIFTLIB_DIR}/swift)
+      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/swift)
+    foreach(config ${CMAKE_CONFIGURATION_TYPES})
+      string(TOUPPER ${config} config)
+      set_target_properties(${name} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY_${config} ${SWIFTLIB_DIR}/swift
+        ARCHIVE_OUTPUT_DIRECTORY_${config} ${SWIFTLIB_DIR}/swift)
+    endforeach()
 
     install(TARGETS ${name}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift
