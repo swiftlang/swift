@@ -113,17 +113,10 @@ public:
   /// substitutions.
   void addSubstitutedArg(CanType substInputType, Explosion &arg);
 
-  /// Add a new set of arguments to the function from an explosion containing
-  /// unmanaged values.
-  void addUnmanagedArg(Explosion &arg);
-
-  void addMaterializedArg(Address substValue, bool asTake);
-  void addEmptyArg();
 
   void emitToMemory(Address addr, const TypeInfo &substResultTI);
   void emitToExplosion(Explosion &out);
-  void emitVoid();
-  
+   
   void invalidate();
 };
 

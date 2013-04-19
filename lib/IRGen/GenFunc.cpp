@@ -1352,12 +1352,6 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   llvm_unreachable("bad difference kind");
 }
 
-/// Emit a call, whose result is known to be void.
-void CallEmission::emitVoid() {
-  Explosion out(getCallee().getExplosionLevel());
-  emitToExplosion(out);
-}
-
 /// Emit the result of this call to an explosion.
 void CallEmission::emitToExplosion(Explosion &out) {
   assert(RemainingArgsForCallee == 0);
@@ -1547,12 +1541,6 @@ void CallEmission::forceCallee() {
   CurCallee = emitIndirectCallee(IGF, fnPtr, dataPtr,
                                  CurCallee.getSubstitutions(),
                                  CurOrigType, substResultType);
-}
-
-/// Add a new, empty argument to the function.
-void CallEmission::addEmptyArg() {
-  Explosion temp(getCurExplosionLevel());
-  addArg(temp);
 }
 
 /// Does the given convention grow clauses left-to-right?
@@ -1749,47 +1737,6 @@ void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
   addArg(argE);
 }
 
-/// Load from the given address to produce an argument.
-void CallEmission::addMaterializedArg(Address substAddr, bool asTake) {
-  // If we're calling something with polymorphic type, we'd better have
-  // substitutions.
-  auto subs = getSubstitutions();
-  (void)subs;
-  assert(subs.empty() && "can't handle substituted dematerialization now!");
-
-  auto fnType = cast<FunctionType>(CurOrigType);
-  auto &argTI = IGF.getFragileTypeInfo(fnType->getInput());
-
-  Explosion argE(CurCallee.getExplosionLevel());
-  if (asTake) {
-    argTI.loadAsTake(IGF, substAddr, argE);
-  } else {
-    argTI.load(IGF, substAddr, argE);
-  }
-  addArg(argE);
-}
-
-
-/// Emit a nullary call to the given monomorphic function, using the
-/// standard calling-convention and so on, and explode the result.
-void IRGenFunction::emitNullaryCall(llvm::Value *fnPtr,
-                                    CanType resultType,
-                                    Explosion &resultExplosion) {
-  CanType formalType = CanType(TupleType::getEmpty(IGM.Context));
-  formalType = CanType(FunctionType::get(formalType, resultType, IGM.Context));
-
-  Callee callee =
-    Callee::forKnownFunction(AbstractCC::Freestanding,
-                             formalType, resultType,
-                             ArrayRef<Substitution>(),
-                             fnPtr, ManagedValue(nullptr),
-                             resultExplosion.getKind(),
-                             /*uncurry level*/ 0);
-
-  CallEmission emission(*this, callee);
-  emission.addEmptyArg();
-  emission.emitToExplosion(resultExplosion);
-}
 
 /// Initialize an Explosion with the parameters of the current
 /// function.  All of the objects will be added unmanaged.  This is
@@ -1799,95 +1746,6 @@ Explosion IRGenFunction::collectParameters() {
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
     params.addUnmanaged(i);
   return params;
-}
-
-OwnedAddress IRGenFunction::getAddrForParameter(VarDecl *param,
-                                                Explosion &paramValues) {
-  const TypeInfo &paramType = IGM.getFragileTypeInfo(param->getType());
-
-  ExplosionSchema paramSchema(paramValues.getKind());
-  paramType.getSchema(paramSchema);
-
-  Twine name = param->getName().str();
-
-  // If the parameter is byref, the next parameter is the value we
-  // should use.
-  if (param->getType()->is<LValueType>()) {
-    llvm::Value *addr = paramValues.claimUnmanagedNext();
-    addr->setName(name);
-
-    llvm::Value *owner = IGM.RefCountedNull;
-    if (param->getType()->castTo<LValueType>()->isHeap()) {
-      owner = paramValues.claimUnmanagedNext();
-      owner->setName(name + ".owner");
-      enterReleaseCleanup(owner);
-    }
-
-    return OwnedAddress(paramType.getAddressForPointer(addr), owner);
-  }
-
-  OnHeap_t onHeap = param->hasFixedLifetime() ? NotOnHeap : OnHeap;
-
-  // If the schema contains a single aggregate, assume we can
-  // just treat the next parameter as that type.
-  if (paramSchema.size() == 1 && paramSchema.begin()->isAggregate()) {
-    llvm::Value *addr = paramValues.claimUnmanagedNext();
-    addr->setName(name);
-    addr = Builder.CreateBitCast(addr,
-                    paramSchema.begin()->getAggregateType()->getPointerTo());
-    Address paramAddr = paramType.getAddressForPointer(addr);
-
-    // If we don't locally need the variable on the heap, just use the
-    // original address.
-    if (!onHeap) {
-      // Enter a cleanup to destroy the element.
-      if (!paramType.isPOD(ResilienceScope::Local))
-        enterDestroyCleanup(paramAddr, paramType);
-
-      return OwnedAddress(paramAddr, IGM.RefCountedNull);
-    }
-
-    // Otherwise, we have to move it to the heap.
-    Initialization paramInit;
-    InitializedObject paramObj = paramInit.getObjectForDecl(param);
-    paramInit.registerObject(*this, paramObj, OnHeap, paramType);
-
-    OwnedAddress paramHeapAddr =
-      paramInit.emitLocalAllocation(*this, paramObj, OnHeap, paramType,
-                                    name + ".heap");
-
-    // Do a 'take' initialization to directly transfer responsibility.
-    paramType.initializeWithTake(*this, paramHeapAddr, paramAddr);
-    paramInit.markInitialized(*this, paramObj);
-
-    return paramHeapAddr;
-  }
-
-  // Otherwise, make an alloca and load into it.
-  Initialization paramInit;
-  InitializedObject paramObj = paramInit.getObjectForDecl(param);
-  paramInit.registerObject(*this, paramObj, onHeap, paramType);
-
-  OwnedAddress paramAddr =
-    paramInit.emitLocalAllocation(*this, paramObj, onHeap, paramType,
-                                  name + ".addr");
-
-  // FIXME: This way of getting a list of arguments claimed by storeExplosion
-  // is really ugly.
-  auto storedStart = paramValues.begin();
-
-  paramType.initialize(*this, paramValues, paramAddr);
-  paramInit.markInitialized(*this, paramObj);
-
-  // Set names for argument(s)
-  for (auto i = storedStart, e = paramValues.begin(); i != e; ++i) {
-    if (e - storedStart == 1)
-      i->getValue()->setName(name);
-    else
-      i->getValue()->setName(name + "." + Twine(i - storedStart));
-  }
-
-  return paramAddr;
 }
 
 namespace {

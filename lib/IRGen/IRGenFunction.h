@@ -307,10 +307,6 @@ public:
                                          CanType toType);
   
 
-  OwnedAddress getAddrForParameter(VarDecl *param, Explosion &paramValues);
-
-  void emitNullaryCall(llvm::Value *fn, CanType resultType, Explosion &result);
-
 //--- Declaration emission -----------------------------------------------------
 public:
 

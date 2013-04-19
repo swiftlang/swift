@@ -77,11 +77,7 @@ class Initialization {
   llvm::DenseMap<void *, ValueRecord> Records;
 
 public:
-  /// Create an object reference for the given local declaration.
-  InitializedObject getObjectForDecl(ValueDecl *value) {
-    return InitializedObject(value);
-  }
-  
+ 
   /// Create an object reference for the given SIL value.
   InitializedObject getObjectForValue(SILValue v) {
     return InitializedObject(v.getOpaqueValue());
