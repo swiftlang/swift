@@ -100,16 +100,6 @@ public:
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 
-  /// Create a global variable.
-  ///
-  /// Precondition: the abstract object has been registered
-  ///   with this Initialization, but is not marked as allocated
-  ///   or initialized.
-  /// Postcondition: the abstract object will have been marked as
-  ///   allocated, but not marked as initialized.
-  OwnedAddress emitGlobalVariable(IRGenFunction &IGF, VarDecl *var,
-                                  const TypeInfo &type);
-
   /// Add an object that is going to be initialized; use the
   /// appropriate destroy cleanup for the given type.
   CleanupsDepth registerObject(IRGenFunction &IGF, InitializedObject object,

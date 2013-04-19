@@ -359,6 +359,22 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
   llvm_unreachable("bad type kind");
 }
 
+/// Convert an l-value type.  For non-heap l-values, this is always
+/// just a bare pointer.  For heap l-values, this is a pair of a bare
+/// pointer with an object reference.
+const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
+  const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
+  llvm::PointerType *referenceType = objectTI.StorageType->getPointerTo();
+  
+  // If it's not a heap l-value, just use the reference type as a
+  // primitive pointer.
+  assert(!T->isHeap());
+  
+  return createPrimitive(referenceType, IGM.getPointerSize(),
+                         IGM.getPointerAlignment());
+}
+
+
 const TypeInfo *TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
   assert(decl->getGenericParams());
 

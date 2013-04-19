@@ -6,7 +6,6 @@ add_swift_library(swiftIRGen
   GenFunc.cpp
   GenHeap.cpp
   GenInit.cpp
-  GenLValue.cpp
   GenMeta.cpp
   GenObjC.cpp
   GenOneOf.cpp

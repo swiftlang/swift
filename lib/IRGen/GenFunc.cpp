@@ -1748,44 +1748,12 @@ Explosion IRGenFunction::collectParameters() {
   return params;
 }
 
-namespace {
-  /// A recursive emitter for parameter patterns.
-  class ParamPatternEmitter :
-      public irgen::PatternVisitor<ParamPatternEmitter> {
-    IRGenFunction &IGF;
-    Explosion &Args;
-
-  public:
-    ParamPatternEmitter(IRGenFunction &IGF, Explosion &args)
-      : IGF(IGF), Args(args) {}
-
-    void visitTuplePattern(TuplePattern *tuple) {
-      for (auto &field : tuple->getFields())
-        visit(field.getPattern());
-    }
-
-    void visitNamedPattern(NamedPattern *pattern) {
-
-    }
-
-    void visitAnyPattern(AnyPattern *pattern) {
-      unsigned numIgnored =
-        IGF.IGM.getExplosionSize(pattern->getType()->getCanonicalType(),
-                                 Args.getKind());
-      Args.claim(numIgnored);
-    }
-  };
-}
-
 /// Emit a specific parameter clause.
 static void emitParameterClause(IRGenFunction &IGF, AnyFunctionType *fnType,
                                 Pattern *param, Explosion &args) {
   assert(param->getType()->getUnlabeledType(IGF.IGM.Context)
          ->isEqual(fnType->getInput()->getUnlabeledType(IGF.IGM.Context)));
-
-  // Emit the pattern.
-  ParamPatternEmitter(IGF, args).visit(param);
-
+  
   // If the function type at this level is polymorphic, bind all the
   // archetypes.
   if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType))
