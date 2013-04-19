@@ -1503,47 +1503,6 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   }
 }
 
-OwnedAddress IRGenFunction::getLocalVar(VarDecl *D) {
-  auto I = Locals.find(D);
-  assert(I != Locals.end() && "no entry in local map!");
-  return I->second.Var.Addr;
-}
-
-void IRGenFunction::setLocalVar(VarDecl *D, OwnedAddress addr) {
-  assert(!Locals.count(D));
-
-  LocalEntry entry;
-  entry.Var.Addr = addr;
-  Locals.insert(std::make_pair(D, entry));
-}
-
-llvm::Value *IRGenFunction::getLocalFuncData(FuncDecl *D) {
-  auto I = Locals.find(D);
-  assert(I != Locals.end() && "no entry in local map!");
-  return I->second.Func.Data;
-}
-
-IRGenFunction *IRGenFunction::getLocalFuncDefiner(FuncDecl *D) {
-  auto I = Locals.find(D);
-  assert(I != Locals.end() && "no entry in local map!");
-  return I->second.Func.Definer;
-}
-
-/// Set all the information required in order to emit references to
-/// the given function.
-///
-/// \param data - the data pointer to use for the function
-/// \param definer - the IGF for the function which originally defined
-///   the local function
-void IRGenFunction::setLocalFuncData(FuncDecl *D, llvm::Value *data,
-                                     IRGenFunction *definer) {
-  assert(!Locals.count(D));
-
-  LocalEntry entry;
-  entry.Func.Data = data;
-  entry.Func.Definer = definer;
-  Locals.insert(std::make_pair(D, entry));
-}
 
 /// Create an allocation on the stack.
 Address IRGenFunction::createAlloca(llvm::Type *type,

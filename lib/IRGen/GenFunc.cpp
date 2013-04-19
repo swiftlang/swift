@@ -715,21 +715,6 @@ static AbstractCallee getAbstractDirectCallee(ValueDecl *val,
   return AbstractCallee(convention, level, minUncurry, maxUncurry, extraData);
 }
 
-/// Construct the best known limits on how we can call the given function.
-AbstractCallee AbstractCallee::forDirectFunction(IRGenFunction &IGF,
-                                                 ValueDecl *val) {
-  bool isLocal = val->getDeclContext()->isLocalContext();
-  if (!isLocal) return forDirectGlobalFunction(IGF.IGM, val);
-
-  auto extraData = ExtraData::None;
-  if (FuncDecl *fn = dyn_cast<FuncDecl>(val)) {
-    if (isLocal && !isa<llvm::ConstantPointerNull>(IGF.getLocalFuncData(fn)))
-      extraData = ExtraData::Retainable;
-  }
-
-  return getAbstractDirectCallee(val, ExplosionKind::Maximal, extraData);
-}
-
 /// Construct the best known limits on how we can call the given
 /// global function.
 AbstractCallee AbstractCallee::forDirectGlobalFunction(IRGenModule &IGM,
@@ -1922,11 +1907,7 @@ namespace {
     }
 
     void visitNamedPattern(NamedPattern *pattern) {
-      VarDecl *decl = pattern->getDecl();
-      OwnedAddress addr = IGF.getAddrForParameter(decl, Args);
 
-      // FIXME: heap byrefs.
-      IGF.setLocalVar(decl, addr);
     }
 
     void visitAnyPattern(AnyPattern *pattern) {

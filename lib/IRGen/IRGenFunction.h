@@ -313,33 +313,14 @@ public:
 
 //--- Declaration emission -----------------------------------------------------
 public:
-  OwnedAddress getLocalVar(VarDecl *D);
-  void setLocalVar(VarDecl *D, OwnedAddress addr);
-
-  llvm::Value *getLocalFuncData(FuncDecl *fn);
-  IRGenFunction *getLocalFuncDefiner(FuncDecl *func);
-  void setLocalFuncData(FuncDecl *fn, llvm::Value *data,
-                        IRGenFunction *definingIGF);
 
   void bindArchetype(ArchetypeType *type,
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);
 
 private:
-  union LocalEntry {
-    struct {
-      OwnedAddress Addr;
-    } Var;
-    struct {
-      llvm::Value *Data;
-      IRGenFunction *Definer;
-    } Func;
 
-    LocalEntry() {}
-  };
-  llvm::DenseMap<Decl*, LocalEntry> Locals;
-
-//--- Global context emission --------------------------------------------------
+  //--- Global context emission --------------------------------------------------
 public:
   void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
 private:
