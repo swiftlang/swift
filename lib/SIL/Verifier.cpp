@@ -382,7 +382,16 @@ public:
     require(!RI->getOperand().getType().isAddress(),
             "Operand of retain must not be address");
     require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of dealloc_ref must be reference type");
+            "Operand of retain must be reference type");
+  }
+  void checkRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
+    require(!RI->getOperand().getType().isAddress(),
+            "Operand of retain_autoreleased must not be address");
+    require(RI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of retain_autoreleased must be reference type");
+    require(isa<ApplyInst>(RI->getOperand()),
+            "Operand of retain_autoreleased must be the return value of "
+            "an apply instruction");
   }
   void checkReleaseInst(ReleaseInst *RI) {
     require(!RI->getOperand().getType().isAddress(),
@@ -778,6 +787,25 @@ public:
           instResultType.dump(););
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
+  }
+  
+  void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
+    DEBUG(RI->print(llvm::dbgs()));
+    
+    SILFunctionTypeInfo *ti =
+    F.getLoweredType().getFunctionTypeInfo();
+    SILType functionResultType = ti->getResultType();
+    SILType instResultType = RI->getReturnValue().getType();
+    DEBUG(llvm::dbgs() << "function return type: ";
+          functionResultType.dump();
+          llvm::dbgs() << "return inst type: ";
+          instResultType.dump(););
+    require(functionResultType == instResultType,
+            "return value type does not match return type of function");
+    require(!instResultType.isAddress(),
+            "autoreleased return value cannot be an address");
+    require(instResultType.hasReferenceSemantics(),
+            "autoreleased return value must be a reference type");
   }
   
   void checkBranchInst(BranchInst *BI) {

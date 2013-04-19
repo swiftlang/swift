@@ -1121,6 +1121,40 @@ public:
   }
 };
   
+/// RetainAutoreleasedInst - Take ownership of the autoreleased return value of
+/// an ObjC method.
+class RetainAutoreleasedInst : public SILInstruction {
+  enum { Reference };
+  FixedOperandList<1> Operands;
+public:
+  RetainAutoreleasedInst(SILLocation Loc, SILValue Operand);
+  
+  SILValue getOperand() const { return Operands[Reference].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::RetainAutoreleasedInst;
+  }
+};
+
+/// ReleaseInst - Decrease the retain count of a value, and dealloc the value
+/// if its retain count is zero.
+class ReleaseInst : public SILInstruction {
+  enum { Reference };
+  FixedOperandList<1> Operands;
+public:
+  ReleaseInst(SILLocation Loc, SILValue Operand);
+  
+  SILValue getOperand() const { return Operands[Reference].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ReleaseInst;
+  }
+};
+
 /// DeinitExistentialInst - Given an address of an existential that has been
 /// partially initialized with an InitExistentialInst but whose value buffer
 /// has not been initialized, deinitializes the existential and deallocates
@@ -1139,23 +1173,6 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DeinitExistentialInst;
-  }
-};
-
-/// ReleaseInst - Decrease the retain count of a value, and dealloc the value
-/// if its retain count is zero.
-class ReleaseInst : public SILInstruction {
-  enum { Reference };
-  FixedOperandList<1> Operands;
-public:
-  ReleaseInst(SILLocation Loc, SILValue Operand);
-  
-  SILValue getOperand() const { return Operands[Reference].get(); }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ReleaseInst;
   }
 };
 
@@ -1340,6 +1357,23 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ReturnInst;
+  }
+};
+
+/// AutoreleaseReturnInst - Transfer ownership of a value to an ObjC
+/// autorelease pool, and then return the value.
+class AutoreleaseReturnInst : public TermInst {
+  enum { ReturnValue };
+  FixedOperandList<1> Operands;
+public:
+  AutoreleaseReturnInst(SILLocation Loc, SILValue Operand);
+  
+  SILValue getReturnValue() const { return Operands[ReturnValue].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AutoreleaseReturnInst;
   }
 };
 

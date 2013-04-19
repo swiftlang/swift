@@ -488,6 +488,9 @@ public:
   void visitRetainInst(RetainInst *RI) {
     OS << "retain " << getID(RI->getOperand());
   }
+  void visitRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
+    OS << "retain_autoreleased " << getID(RI->getOperand());
+  }
   void visitReleaseInst(ReleaseInst *RI) {
     OS << "release " << getID(RI->getOperand());
   }
@@ -518,6 +521,10 @@ public:
 
   void visitReturnInst(ReturnInst *RI) {
     OS << "return " << '(' << getID(RI->getReturnValue()) << ')';
+  }
+  
+  void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
+    OS << "autorelease_return " << '(' << getID(RI->getReturnValue()) << ')';
   }
 
   void printBranchArgs(OperandValueArrayRef args) {

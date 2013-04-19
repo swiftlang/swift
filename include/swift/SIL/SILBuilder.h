@@ -359,6 +359,9 @@ public:
     if (!isa<ConstantRefInst>(Operand))
       insert(new ReleaseInst(Loc, Operand));
   }
+  void createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
+    insert(new RetainAutoreleasedInst(Loc, Operand));
+  }
   DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
                                    SILValue operand) {
     return insert(new DeallocVarInst(loc, allocKind, operand));
@@ -394,6 +397,11 @@ public:
 
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {
     return insertTerminator(new ReturnInst(Loc, ReturnValue));
+  }
+
+  AutoreleaseReturnInst *createAutoreleaseReturn(SILLocation Loc,
+                                                 SILValue ReturnValue) {
+    return insertTerminator(new AutoreleaseReturnInst(Loc, ReturnValue));
   }
   
   CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,

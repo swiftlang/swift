@@ -557,6 +557,12 @@ RetainInst::RetainInst(SILLocation Loc, SILValue Operand)
     Operands(this, Operand) {
 }
 
+RetainAutoreleasedInst::RetainAutoreleasedInst(SILLocation Loc,
+                                               SILValue Operand)
+  : SILInstruction(ValueKind::RetainAutoreleasedInst, Loc, Operand.getType()),
+    Operands(this, Operand) {
+}
+
 ReleaseInst::ReleaseInst(SILLocation Loc, SILValue Operand)
   : SILInstruction(ValueKind::ReleaseInst, Loc), Operands(this, Operand) {
 }
@@ -611,6 +617,12 @@ UnreachableInst::UnreachableInst(SILFunction &F)
 
 ReturnInst::ReturnInst(SILLocation Loc, SILValue ReturnValue)
   : TermInst(ValueKind::ReturnInst, Loc),
+    Operands(this, ReturnValue) {
+}
+
+AutoreleaseReturnInst::AutoreleaseReturnInst(SILLocation Loc,
+                                              SILValue ReturnValue)
+  : TermInst(ValueKind::AutoreleaseReturnInst, Loc),
     Operands(this, ReturnValue) {
 }
 
