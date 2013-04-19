@@ -946,7 +946,6 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
       HasGetSet = true;
     }
 
-    Type Ty;
     NullablePtr<Expr> Init;
     if (Tok.is(tok::equal)) {
       SourceLoc EqualLoc = consumeToken(tok::equal);
@@ -965,6 +964,11 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
         diagnose(EqualLoc, diag::disallowed_init);
         isInvalid = true;
       }
+    }
+    else if (!HasGetSet) {
+      // Synthesize an initializer to be used in case the var is a value type
+      // Init = new CallExpr::CallExpr(Expr *fn, Expr *arg, Type ty = Type())
+
     }
 
     addVarsToScope(pattern.get(), Decls, Attributes);
