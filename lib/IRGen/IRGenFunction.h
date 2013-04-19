@@ -35,35 +35,22 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class AssignStmt;
-  class BraceStmt;
-  class BreakStmt;
   class ClassDecl;
   class ConstructorDecl;
-  class ContinueStmt;
   class Decl;
   class ExtensionDecl;
-  class FallthroughStmt;
-  class ForEachStmt;
-  class ForStmt;
   class FuncDecl;
-  class IfStmt;
   class OneOfElementDecl;
   class OneOfType;
   template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;
-  class ReturnStmt;
   class SourceLoc;
-  class Stmt;
   class StructType;
   class Substitution;
-  class SwitchStmt;
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
-  class WhileStmt;
-  class DoWhileStmt;
 
 namespace irgen {
   class Explosion;

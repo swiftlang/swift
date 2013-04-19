@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/IRGen/Options.h"
 #include "llvm/IR/Constants.h"

@@ -268,9 +268,8 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
 }
 
 void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
-  Decl *decl;
   for (auto element : body->getElements()) {
-    decl = element.dyn_cast<Decl*>();
+    Decl *decl = element.dyn_cast<Decl*>();
     if (!decl)
       break;
     switch (decl->getKind()) {
