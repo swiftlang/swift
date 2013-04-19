@@ -359,7 +359,7 @@ static Type getStrippedType(ASTContext &context, Type type,
     return type;
 
   case TypeKind::NameAlias:
-    if (TypeAliasDecl *D = cast<NameAliasType>(type)->getDecl()) {
+    if (TypeAliasDecl *D = cast<NameAliasType>(type.getPointer())->getDecl()) {
       Type UnderlingTy = getStrippedType(context, D->getUnderlyingType(),
                                          stripLabels, stripDefaultArgs);
       if (UnderlingTy.getPointer() != D->getUnderlyingType().getPointer())
@@ -369,7 +369,7 @@ static Type getStrippedType(ASTContext &context, Type type,
     return type;
       
   case TypeKind::Identifier: {
-    IdentifierType *IdentTy = cast<IdentifierType>(type);
+    IdentifierType *IdentTy = cast<IdentifierType>(type.getPointer());
     if (IdentTy->isMapped()) {
       Type MappedTy = getStrippedType(context, IdentTy->getMappedType(),
                                       stripLabels, stripDefaultArgs);
@@ -380,7 +380,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
   
   case TypeKind::Paren: {
-    ParenType *ParenTy = cast<ParenType>(type);
+    ParenType *ParenTy = cast<ParenType>(type.getPointer());
     Type UnderlyingTy = getStrippedType(context, ParenTy->getUnderlyingType(),
                                         stripLabels, stripDefaultArgs);
     if (UnderlyingTy.getPointer() != ParenTy->getUnderlyingType().getPointer())
@@ -389,7 +389,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
       
   case TypeKind::Tuple: {
-    TupleType *TupleTy = cast<TupleType>(type);
+    TupleType *TupleTy = cast<TupleType>(type.getPointer());
     llvm::SmallVector<TupleTypeElt, 4> Elements;
     bool Rebuild = false;
     unsigned Idx = 0;
@@ -437,7 +437,7 @@ static Type getStrippedType(ASTContext &context, Type type,
       
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
-    AnyFunctionType *FunctionTy = cast<AnyFunctionType>(type);
+    AnyFunctionType *FunctionTy = cast<AnyFunctionType>(type.getPointer());
     Type InputTy = getStrippedType(context, FunctionTy->getInput(),
                                    stripLabels, stripDefaultArgs);
     Type ResultTy = getStrippedType(context, FunctionTy->getResult(),
@@ -459,7 +459,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
       
   case TypeKind::Array: {
-    ArrayType *ArrayTy = cast<ArrayType>(type);
+    ArrayType *ArrayTy = cast<ArrayType>(type.getPointer());
     Type BaseTy = getStrippedType(context, ArrayTy->getBaseType(),
                                   stripLabels, stripDefaultArgs);
     if (BaseTy.getPointer() != ArrayTy->getBaseType().getPointer())
@@ -469,7 +469,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
 
   case TypeKind::ArraySlice: {
-    ArraySliceType *sliceTy = cast<ArraySliceType>(type);
+    ArraySliceType *sliceTy = cast<ArraySliceType>(type.getPointer());
     Type baseTy = getStrippedType(context, sliceTy->getBaseType(),
                                   stripLabels, stripDefaultArgs);
     if (baseTy.getPointer() != sliceTy->getBaseType().getPointer()) {
@@ -483,7 +483,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
       
   case TypeKind::LValue: {
-    LValueType *LValueTy = cast<LValueType>(type);
+    LValueType *LValueTy = cast<LValueType>(type.getPointer());
     Type ObjectTy = getStrippedType(context, LValueTy->getObjectType(),
                                     stripLabels, stripDefaultArgs);
     if (ObjectTy.getPointer() != LValueTy->getObjectType().getPointer())
@@ -492,7 +492,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   }
       
   case TypeKind::Substituted: {
-    SubstitutedType *SubstTy = cast<SubstitutedType>(type);
+    SubstitutedType *SubstTy = cast<SubstitutedType>(type.getPointer());
     Type NewSubstTy = getStrippedType(context, SubstTy->getReplacementType(),
                                       stripLabels, stripDefaultArgs);
     if (NewSubstTy.getPointer() != SubstTy->getReplacementType().getPointer())
