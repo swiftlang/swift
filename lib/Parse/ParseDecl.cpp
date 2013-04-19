@@ -965,11 +965,6 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
         isInvalid = true;
       }
     }
-    else if (!HasGetSet) {
-      // Synthesize an initializer to be used in case the var is a value type
-      // Init = new CallExpr::CallExpr(Expr *fn, Expr *arg, Type ty = Type())
-
-    }
 
     addVarsToScope(pattern.get(), Decls, Attributes);
 
