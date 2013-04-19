@@ -1400,18 +1400,6 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
                                        PD_HasContainerType);
   }
 
-  // FIXME: Need better handling for implicit constructors.
-  // FIXME: The parser should *not* be doing this.
-  Identifier ConstructID = Context.getIdentifier("constructor");
-  VarDecl *ThisDecl
-    = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
-                            Type(), SD);
-  ConstructorDecl *ValueCD = 
-      new (Context) ConstructorDecl(ConstructID, StructLoc, nullptr, ThisDecl,
-                                    nullptr, SD);
-  MemberDecls.push_back(ValueCD);
-  ThisDecl->setDeclContext(ValueCD);
-
   SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
   ScopeInfo.addToScope(SD);
 

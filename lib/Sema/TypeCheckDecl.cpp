@@ -380,23 +380,22 @@ public:
       validateAttributes(SD);
     }
 
-    ConstructorDecl *ValueCD = cast<ConstructorDecl>(SD->getMembers().back());
-
     for (Decl *Member : SD->getMembers()) {
-      if (Member != ValueCD)
-        visit(Member);
+      visit(Member);
     }
 
     if (!IsSecondPass) {
-      // FIXME: This is a bit of a hack.
+      // Determine the type of the implicit constructor.
       SmallVector<TuplePatternElt, 8> PatternElts;
       SmallVector<TupleTypeElt, 8> TupleElts;
+      SmallVector<VarDecl *, 8> AllArgs;
       for (Decl *Member : SD->getMembers()) {
         if (VarDecl *VarD = dyn_cast<VarDecl>(Member)) {
           if (!VarD->isProperty()) {
             VarDecl *ArgD = new (TC.Context) VarDecl(SD->getLoc(),
                                                      VarD->getName(),
-                                                     Type(), ValueCD);
+                                                     VarD->getType(), SD);
+            AllArgs.push_back(ArgD);
             Pattern *P = new (TC.Context) NamedPattern(ArgD);
             TypeLoc Ty = TypeLoc::withoutLoc(VarD->getType());
             P = new (TC.Context) TypedPattern(P, Ty);
@@ -406,12 +405,64 @@ public:
           }
         }
       }
-      TuplePattern *TP = TuplePattern::create(TC.Context, SD->getLoc(),
-                                              PatternElts, SD->getLoc());
-      ValueCD->setArguments(TP);
-    }
+      Type paramTy = TupleType::get(TupleElts, TC.Context);
+      
+      // Check whether there is a constructor with the same parameter type.
+      bool FoundConstructor = false;
+      for (auto member : SD->getMembers()) {
+        auto ctor = dyn_cast<ConstructorDecl>(member);
+        if (!ctor)
+          continue;
+        
+        auto ctorFnTy = ctor->getType()->getAs<AnyFunctionType>();
+        if (!ctorFnTy)
+          continue;
+        
+        ctorFnTy = ctorFnTy->getResult()->getAs<AnyFunctionType>();
+        if (!ctorFnTy)
+          continue;
 
-    visit(ValueCD);
+        // Check whether we have the same parameters, ignoring any
+        // default arguments.
+        if (ctorFnTy->getInput()->getWithoutDefaultArgs(TC.Context)
+              ->isEqual(paramTy)) {
+          FoundConstructor = true;
+          break;
+        }
+      }
+      
+      // If we didn't find such a constructor, add the implicit one.
+      if (!FoundConstructor) {
+        // Create the implicit constructor.
+        auto constructorID = TC.Context.getIdentifier("constructor");
+        VarDecl *thisDecl
+          = new (TC.Context) VarDecl(SourceLoc(), 
+                                     TC.Context.getIdentifier("this"),
+                                     Type(), SD);
+        ConstructorDecl *ctor = 
+          new (TC.Context) ConstructorDecl(constructorID, SD->getLoc(), nullptr, 
+                                           thisDecl, nullptr, SD);
+        thisDecl->setDeclContext(ctor);
+        for (auto var : AllArgs)
+          var->setDeclContext(ctor);
+        
+        // Set its arguments.        
+        auto pattern = TuplePattern::create(TC.Context, SD->getLoc(),
+                                            PatternElts, SD->getLoc());
+        ctor->setArguments(pattern);
+
+        // Add the implicit constructor to the list of members.
+        // FIXME: Painfully inefficient to do the copy here.
+        SmallVector<Decl *, 4> members(SD->getMembers().begin(),
+                                       SD->getMembers().end());
+        members.push_back(ctor);
+        SD->setMembers(TC.Context.AllocateCopy(members),
+                       SD->getBraces());
+        
+        // Type-check the constructor declaration.
+        visit(ctor);
+      }
+    }
 
     if (!IsFirstPass)
       checkExplicitConformance(SD, SD->getDeclaredType(),

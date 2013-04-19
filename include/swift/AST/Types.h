@@ -242,6 +242,9 @@ public:
   /// the result would be the (parenthesized) type ((int, int)).
   Type getUnlabeledType(ASTContext &Context);
 
+  /// \brief Retrieve the type without any default arguments.
+  Type getWithoutDefaultArgs(ASTContext &Context);
+
   /// getRValueType - For an lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
