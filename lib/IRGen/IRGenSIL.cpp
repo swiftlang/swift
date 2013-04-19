@@ -297,13 +297,16 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
       return;
 
     case DeclKind::OneOf:
-      return IGM.emitOneOfDecl(cast<OneOfDecl>(decl));
-      
+      IGM.emitOneOfDecl(cast<OneOfDecl>(decl));
+      break;
+
     case DeclKind::Struct:
-      return IGM.emitStructDecl(cast<StructDecl>(decl));
-      
+      IGM.emitStructDecl(cast<StructDecl>(decl));
+      break;
+
     case DeclKind::Class:
-      return IGM.emitClassDecl(cast<ClassDecl>(decl));
+      IGM.emitClassDecl(cast<ClassDecl>(decl));
+      break;
     }
   }
 }
