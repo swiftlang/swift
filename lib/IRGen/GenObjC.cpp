@@ -544,6 +544,7 @@ namespace {
 }
 
 /// Try to find a clang method declaration for the given function.
+/// FIXME: Should do the same for C functions that take ObjC pointer args.
 static clang::ObjCMethodDecl *findClangMethod(ValueDecl *method) {
   if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
     if (auto decl = methodFn->getClangDecl())
@@ -574,13 +575,14 @@ static const OwnershipConventions &setOwnershipConventions(Callee &callee,
 
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
-                              ManagedValue selfValue, Explosion &selfValues,
+                              llvm::Value *selfValue,
+                              Explosion &selfValues,
                               CanType searchClass) {
   // Allocate an objc_super struct.
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
                                    "objc_super");
-  llvm::Value *self = IGF.Builder.CreateBitCast(selfValue.getValue(),
+  llvm::Value *self = IGF.Builder.CreateBitCast(selfValue,
                                                 IGF.IGM.ObjCPtrTy);
   
   // Generate the search class object reference.
@@ -612,7 +614,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   
   // Pass a pointer to the objc_super struct to the messenger.
   // Project the ownership semantics of 'self' to the super argument.
-  selfValues.add({super.getAddress(), selfValue.getCleanup()});
+  selfValues.addUnmanaged(super.getAddress());
 }
 
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
@@ -675,7 +677,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
 void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                CallEmission &emission,
                                                ValueDecl *method,
-                                               ManagedValue self,
+                                               llvm::Value *self,
                                                CanType searchType) {
   // Compute the selector.
   Selector selector(method);
@@ -691,7 +693,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
     emitSuperArgument(IGF, isInstanceMethod, self, args,
                       searchType);
   } else {
-    args.add(self);
+    args.addUnmanaged(self);
   }
   assert(args.size() == 1);
   

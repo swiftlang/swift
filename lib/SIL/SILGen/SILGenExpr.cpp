@@ -18,6 +18,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "Condition.h"
 #include "Initialization.h"
+#include "OwnershipConventions.h"
 #include "LValue.h"
 #include "RValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -105,7 +106,9 @@ SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
 }
 
 SILValue SILGenFunction::emitGlobalConstantRef(SILLocation loc,
-                                            SILConstant constant) {
+                                               SILConstant constant) {
+  assert(!LocalConstants.count(constant) &&
+         "emitting ref to local constant without context?!");
   return B.createConstantRef(loc, constant, SGM.getConstantType(constant));
 }
 
@@ -191,9 +194,10 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
 
     // If it's a property, invoke its getter.
     if (var->isProperty()) {
-      ManagedValue get = emitConstantRef(loc,
-                                  SILConstant(decl, SILConstant::Kind::Getter));
-      return ManagedValue(emitGetProperty(loc, get, RValue(), RValue()).address,
+      SILConstant getter(decl, SILConstant::Kind::Getter);
+      return ManagedValue(emitGetProperty(loc, getter, {},
+                                      RValue(), RValue(),
+                                      var->getType()->getRValueType()).address,
                           ManagedValue::LValue);
     }
     
@@ -649,56 +653,16 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   RValue base = gen.visit(e->getBase());
   // Get the getter function, which will have type This -> () -> T.
   // The type will be a polymorphic function if the This type is generic.
-  ManagedValue getter = gen.emitSpecializedPropertyConstantRef(e,
-                                        e->getBase(),
-                                        /*subscriptExpr=*/nullptr,
-                                        SILConstant(e->getDecl(),
-                                                    SILConstant::Kind::Getter),
-                                        substitutions);
+  SILConstant get(e->getDecl(), SILConstant::Kind::Getter);
+  
   // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, getter,
-                                             std::move(base), RValue());
+  Materialize propTemp = gen.emitGetProperty(e, get, substitutions,
+                                             std::move(base), RValue(),
+                                             e->getType()->getRValueType());
   return ManagedValue(propTemp.address, ManagedValue::LValue);
 }
 
 } // end anonymous namespace
-
-ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
-                                          Expr *expr, Expr *baseExpr,
-                                          Expr /*nullable*/ *subscriptExpr,
-                                          SILConstant constant,
-                                          ArrayRef<Substitution> substitutions)
-{
-  // Get the accessor function. The type will be a polymorphic function if
-  // the This type is generic.
-  ManagedValue method(emitGlobalConstantRef(expr, constant),
-                      ManagedValue::Unmanaged);
-  // If there are substitutions, specialize the generic getter.
-  if (!substitutions.empty()) {
-    assert(method.getType().is<PolymorphicFunctionType>() &&
-           "generic getter is not of a poly function type");
-    TypeConverter &tc = SGM.Types;
-    Type propType;
-    if (subscriptExpr) {
-      propType = tc.getSubscriptPropertyType(constant.kind,
-                                            subscriptExpr->getType(),
-                                            expr->getType()->getRValueType());
-    } else {
-      propType = tc.getPropertyType(constant.kind,
-                                   expr->getType()->getRValueType());
-    }
-    propType = tc.getMethodTypeInContext(baseExpr->getType()->getRValueType(),
-                                        propType);
-    SILType lPropType = getLoweredLoadableType(getThinFunctionType(propType),
-                                               method.getType().getUncurryLevel());
-    method = ManagedValue(B.createSpecialize(expr, method.getUnmanagedValue(),
-                                             substitutions, lPropType),
-                          ManagedValue::Unmanaged);
-  }
-  assert(method.getType().is<FunctionType>() &&
-         "getter is not of a concrete function type");
-  return method;
-}
 
 ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                            SILValue thisValue,
@@ -867,18 +831,15 @@ ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
   RValue base = gen.visit(e->getBase());
   
   // Get the getter function, which will have type This -> Index -> () -> T.
-  ManagedValue getter = gen.emitSpecializedPropertyConstantRef(
-                                    e, e->getBase(), e->getIndex(),
-                                    SILConstant(sd, SILConstant::Kind::Getter),
-                                    substitutions);
+  SILConstant get(sd, SILConstant::Kind::Getter);
 
   // Evaluate the index.
   RValue index = gen.visit(e->getIndex());
   
   // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, getter,
-                                             std::move(base),
-                                             std::move(index));
+  Materialize propTemp = gen.emitGetProperty(e, get, substitutions,
+                                             std::move(base), std::move(index),
+                                             e->getType()->getRValueType());
   return ManagedValue(propTemp.address, ManagedValue::LValue);
 }
 

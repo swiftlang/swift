@@ -91,6 +91,9 @@ public:
 
   LogicalPathComponent &asLogical();
   const LogicalPathComponent &asLogical() const;
+  
+  /// Returns the type of the value addressed by the component.
+  virtual Type getObjectType() const = 0;
 };
 
 /// An abstract class for "physical" path components, i.e. path
@@ -152,6 +155,7 @@ inline const LogicalPathComponent &PathComponent::asLogical() const {
 /// of the type.
 class LValue {
   DiverseList<PathComponent, 128> Path;
+  Type ObjectType;
 
 public:
   LValue() = default;
@@ -174,6 +178,7 @@ public:
     T &component = Path.add<T>(std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T);
     assert(component.allocated_size() == sizeof(T));
+    ObjectType = component.getObjectType();
     return component;
   }
 
@@ -182,6 +187,7 @@ public:
     T &component = Path.addWithExtra<T>(extraSize, std::forward<A>(args)...);
     component.AllocatedSize = sizeof(T) + extraSize;
     assert(component.allocated_size() == sizeof(T) + extraSize);
+    ObjectType = component.getObjectType();
     return component;
   }
 
@@ -192,6 +198,9 @@ public:
   iterator end() { return Path.end(); }
   const_iterator begin() const { return Path.begin(); }
   const_iterator end() const { return Path.end(); }
+  
+  /// Returns the type of the value addressed by the LValue.
+  Type getObjectType() const { return ObjectType; }
 };
   
 /// Writeback - Represents a writeback of a temporary value to a logical

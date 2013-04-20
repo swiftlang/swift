@@ -97,9 +97,21 @@ public:
   
   /// Forward this value as an argument.
   SILValue forwardArgument(SILGenFunction &gen, SILLocation loc) {
-    // Forward loadable values.
+    // Forward the value.
     SILValue v = forward(gen);
     // Thicken thin function values.
+    // FIXME: Swift type-checking should do this.
+    if (v.getType().is<AnyFunctionType>() &&
+        v.getType().castTo<AnyFunctionType>()->isThin()) {
+      v = gen.emitThickenFunction(loc, v);
+    }
+    return v;
+  }
+  
+  /// Get this value as an argument without forwarding its cleanup.
+  SILValue getArgumentValue(SILGenFunction &gen, SILLocation loc) {
+    SILValue v = getValue();
+    // Thicken thin function value.
     // FIXME: Swift type-checking should do this.
     if (v.getType().is<AnyFunctionType>() &&
         v.getType().castTo<AnyFunctionType>()->isThin()) {

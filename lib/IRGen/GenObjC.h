@@ -48,7 +48,7 @@ namespace irgen {
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                           CallEmission &emission,
                                           ValueDecl *method,
-                                          ManagedValue self,
+                                          llvm::Value *self,
                                           CanType searchType);
 
   /// Reclaim an autoreleased return value.

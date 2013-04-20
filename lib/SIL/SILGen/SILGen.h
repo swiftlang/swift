@@ -34,6 +34,7 @@ namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
   class Initialization;
+  class OwnershipConventions;
   struct Writeback;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
@@ -501,11 +502,14 @@ public:
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   Materialize emitGetProperty(SILLocation loc,
-                              ManagedValue getter,
+                              SILConstant getter,
+                              ArrayRef<Substitution> substitutions,
                               RValue &&optionalthisValue,
-                              RValue &&optionalSubscripts);
+                              RValue &&optionalSubscripts,
+                              Type resultType);
   void emitSetProperty(SILLocation loc,
-                       ManagedValue setter,
+                       SILConstant setter,
+                       ArrayRef<Substitution> substitutions,
                        RValue &&optionalThisValue,
                        RValue &&optionalSubscripts,
                        RValue &&value);
@@ -516,10 +520,12 @@ public:
                           LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
-  ManagedValue emitSpecializedPropertyConstantRef(Expr *expr, Expr *baseExpr,
-                                            Expr /*nullable*/ *subscriptExpr,
-                                            SILConstant constant,
-                                            ArrayRef<Substitution> substs);
+  ManagedValue emitSpecializedPropertyConstantRef(
+                                          SILLocation loc,
+                                          SILConstant constant,
+                                          ArrayRef<Substitution> substitutions,
+                                          Type substPropertyType);
+
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,
                              SILConstant methodConstant,
@@ -538,7 +544,8 @@ public:
   RValue emitApplyExpr(ApplyExpr *e);
 
   ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
-                         ArrayRef<ManagedValue> Args);
+                         ArrayRef<ManagedValue> Args,
+                         OwnershipConventions const &Ownership);
 
   //===--------------------------------------------------------------------===//
   // Declarations

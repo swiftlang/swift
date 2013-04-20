@@ -1,1 +1,2 @@
 module ansible { header "Ansible.h" }
+module gizmo { header "Gizmo.h" }

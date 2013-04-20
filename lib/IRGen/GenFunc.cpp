@@ -1227,14 +1227,6 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   llvm::Value *result = call.getInstruction();
   if (result->getType()->isVoidTy()) return;
 
-  // If the callee has non-standard conventions, we may need to
-  // reclaim an autoreleased result.
-  if (getCallee().hasOwnershipConventions() &&
-      getCallee().getOwnershipConventions()
-                 .isResultAutoreleased(IGF.IGM, getCallee())) {
-    result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
-  }
-
   // Extract out the scalar results.
   auto &origResultTI = IGF.getFragileTypeInfo(CurOrigType);
   extractScalarResults(IGF, result, origResultTI, out);
@@ -1647,51 +1639,13 @@ void CallEmission::addArg(Explosion &arg) {
     addByvalArgumentAttributes(IGF.IGM, Attrs, byval.first+targetIndex,
                                byval.second);
 
-  // The argument index of the first value in this explosion, for
-  // the purposes of the ownership conventions.
-  bool hasAbnormalOwnership = getCallee().hasOwnershipConventions();
-  unsigned firstArgIndex = unsigned(Args.size() - LastArgWritten);
-  SmallVector<unsigned, 8> consumedArgs;
-  const unsigned *nextConsumedArg = nullptr;
-  if (hasAbnormalOwnership && !arg.empty()) {
-    getCallee().getOwnershipConventions()
-               .getConsumedArgs(IGF.IGM, getCallee(), consumedArgs);
-
-    // We're going to scan forward through this list.  Add a
-    // terminator that we'll never reach.
-    consumedArgs.push_back(~0U);
-
-    // Start the scan, and scan past indexes that are lower than we
-    // care about.
-    nextConsumedArg = &consumedArgs[0];
-    while (*nextConsumedArg < firstArgIndex) {
-      assert(nextConsumedArg[0] < nextConsumedArg[1]);
-      ++nextConsumedArg;
-    }
-  }
-
   auto argIterator = Args.begin() + targetIndex;
   auto values = arg.claimAll();
   for (unsigned i = 0, e = values.size(); i != e; ++i) {
     auto value = values[i];
     // The default rule is that arguments are consumed, in which case
     // we need to deactivate cleanups when making the call.
-    if (!hasAbnormalOwnership) {
-      *argIterator++ = value.split(Cleanups);
-
-    // If we're not using the default rule, but the next argument is
-    // marked as consumed, advance and consume it.
-    } else if (*nextConsumedArg == firstArgIndex + i) {
-      *argIterator++ = value.split(Cleanups);
-
-      assert(nextConsumedArg[0] < nextConsumedArg[1]);
-      nextConsumedArg++;
-
-    // Otherwise, don't collect the cleanup.
-    } else {
-      assert(nextConsumedArg[0] > firstArgIndex + i);
-      *argIterator++ = value.getValue();
-    }
+    *argIterator++ = value.split(Cleanups);
   }
 
   LastArgWritten = newLastArgWritten;

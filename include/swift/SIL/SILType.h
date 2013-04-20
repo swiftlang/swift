@@ -402,6 +402,15 @@ public:
     return getInputTypes().back();
   }
   
+  /// Returns the list of input types, excluding the indirect return argument,
+  /// if any.
+  ArrayRef<SILType> getInputTypesWithoutIndirectReturnType() const {
+    auto inputs = getInputTypes();
+    return hasIndirectReturn()
+      ? inputs.slice(0, inputs.size() - 1)
+      : inputs;
+  }
+  
   /// Get the uncurry level of this type.
   unsigned getUncurryLevel() const {
     return uncurryCount - 1;

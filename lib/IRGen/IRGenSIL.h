@@ -471,13 +471,6 @@ public:
     return getLoweredValue(v).getExplosionKind();
   }
   
-  /// Add LLVM values managed by cleanups lowered from a SIL value to an
-  /// explosion.
-  /// FIXME: This is used to lower ApplyInsts that call foreign methods with
-  /// non-standard ownership conventions. In normal circumstances SIL values
-  /// should not be managed.
-  void getLoweredManagedExplosion(SILValue v, Explosion &out);
-
   LoweredBB &getLoweredBB(SILBasicBlock *bb) {
     auto foundBB = loweredBBs.find(bb);
     assert(foundBB != loweredBBs.end() && "no llvm bb for sil bb?!");
@@ -534,6 +527,7 @@ public:
 
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
+  void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
   void visitDeallocVarInst(DeallocVarInst *i);
   //void visitDeallocRefInst(DeallocRefInst *i);
 

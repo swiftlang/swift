@@ -102,13 +102,6 @@ ExplosionKind LoweredValue::getExplosionKind() const {
   }
 }
 
-void IRGenSILFunction::getLoweredManagedExplosion(SILValue v,
-                                                  Explosion &out) {
-  Explosion unmanaged = getLoweredExplosion(v);
-  TypeInfo const &ti = IGM.getFragileTypeInfo(v.getType().getSwiftType());
-  ti.manage(*this, unmanaged, out);
-}
-
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    CanType t,
                                    ExplosionKind explosionLevel,
@@ -618,12 +611,9 @@ void IRGenSILFunction::visitAssociatedMetatypeInst(
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
                               Explosion &args,
-                              SILValue newArg,
-                              bool managed) {
+                              SILValue newArg) {
   if (newArg.getType().isAddress()) {
     args.addUnmanaged(IGF.getLoweredAddress(newArg).getAddress());
-  } else if (managed) {
-    IGF.getLoweredManagedExplosion(newArg, args);
   } else {
     IGF.getLoweredExplosion(newArg, args);
   }
@@ -789,7 +779,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   }
   
   for (SILValue arg : argValues)
-    emitApplyArgument(IGF, args, arg, /*managed*/ false);
+    emitApplyArgument(IGF, args, arg);
   
   if (indirectResult.isValid()) {
     emitBuiltinCall(IGF, builtin, args, nullptr, indirectResult, substitutions);
@@ -827,8 +817,8 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   unsigned arg = 0;
   auto uncurriedInputEnds = ti->getUncurriedInputEnds();
   
-  // FIXME: We create a cleanups scope and managed explosions so that
-  // CallEmission can handle foreign calls with non-standard ownership.
+  // FIXME: We'd like to kill Scope, but it controls the caching of calculated
+  // metadata values.
   Scope callScope(*this);
   
   // ObjC message sends need special handling for the 'this' argument. It may
@@ -838,14 +828,14 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     assert(uncurriedInputEnds[0] == 1 &&
            "more than one this argument for an objc call?!");
     SILValue thisValue = i->getArguments()[0];
-    ManagedValue selfArg;
+    llvm::Value *selfArg;
     // Convert a metatype 'this' argument to the ObjC Class pointer.
     if (thisValue.getType().is<MetaTypeType>()) {
-      selfArg = ManagedValue(getObjCClassForValue(*this, thisValue));
+      selfArg = getObjCClassForValue(*this, thisValue);
     } else {
       Explosion selfExplosion(getExplosionKind(thisValue));
-      getLoweredManagedExplosion(thisValue, selfExplosion);
-      selfArg = selfExplosion.claimNext();
+      getLoweredExplosion(thisValue, selfExplosion);
+      selfArg = selfExplosion.claimUnmanagedNext();
     }
 
     addObjCMethodCallImplicitArguments(*this, emission,
@@ -862,8 +852,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
              [&](unsigned inputCount) {
                Explosion curryArgs(CurExplosionLevel);
                for (; arg < inputCount; ++arg) {
-                 emitApplyArgument(*this, curryArgs, i->getArguments()[arg],
-                                   /*managed*/true);
+                 emitApplyArgument(*this, curryArgs, i->getArguments()[arg]);
                }
                emission.addSubstitutedArg(CanType(calleeTy->getInput()),
                                           curryArgs);
@@ -927,7 +916,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     unsigned from = ti->getUncurriedInputBegins()[uncurryLevel],
       to = ti->getUncurriedInputEnds()[uncurryLevel];
     for (SILValue arg : i->getArguments().slice(from, to - from)) {
-      emitApplyArgument(*this, args, arg, /*managed*/false);
+      emitApplyArgument(*this, args, arg);
       argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
     }
   }
@@ -1135,6 +1124,13 @@ void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   TypeInfo const &ti = getFragileTypeInfo(
                                       i->getOperand().getType().getSwiftType());
   ti.release(*this, lowered);
+}
+
+void IRGenSILFunction::visitRetainAutoreleasedInst(
+                                             swift::RetainAutoreleasedInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  llvm::Value *value = lowered.claimUnmanagedNext();
+  emitObjCRetainAutoreleasedReturnValue(*this, value);
 }
 
 void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {

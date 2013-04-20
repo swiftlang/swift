@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "OwnershipConventions.h"
 #include "RValue.h"
+#include "swift/Basic/Range.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -44,16 +46,19 @@ private:
   std::vector<Substitution> substitutions;
   SILType specializedType;
   SpecializeExpr *specializeLoc = nullptr;
+  OwnershipConventions ownership;
   
 public:
-  Callee(ManagedValue genericValue)
+  Callee(ManagedValue genericValue, OwnershipConventions &&ownership)
     : kind(Kind::GenericValue), genericValue(genericValue),
-      specializedType(genericValue.getType())
+      specializedType(genericValue.getType()),
+      ownership(std::move(ownership))
   {}
   
   Callee(SILGenFunction &gen, SILConstant standaloneFunction)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
-      specializedType(gen.SGM.getConstantType(standaloneFunction))
+      specializedType(gen.SGM.getConstantType(standaloneFunction)),
+      ownership(OwnershipConventions::get(gen, standaloneFunction))
   {}
   
   Callee(Callee &&) = default;
@@ -125,6 +130,11 @@ public:
     
     return mv;
   }
+  
+  OwnershipConventions const &getOwnershipConventions() const {
+    // FIXME: May need to adjust ownership conventions with uncurry level?
+    return ownership;
+  }
 };
   
 /// An ASTVisitor for building SIL function calls.
@@ -146,11 +156,11 @@ public:
     : gen(gen), sideEffect(nullptr), callDepth(0)
   {}
   
-  void setCallee(ManagedValue theCallee) {
+  void setCallee(ManagedValue theCallee, OwnershipConventions &&ownership) {
     assert((thisParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
     assert(!callee && "already set callee!");
-    callee.emplace(theCallee);
+    callee.emplace(theCallee, std::move(ownership));
   }
   
   void setCallee(SILConstant standaloneCallee) {
@@ -173,7 +183,8 @@ public:
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
-    setCallee(gen.visit(e).getAsSingleValue(gen));
+    ManagedValue fn = gen.visit(e).getAsSingleValue(gen);
+    setCallee(fn, OwnershipConventions::getDefault(fn.getType()));
   }
   
   /// Add a call site to the curry.
@@ -201,8 +212,7 @@ public:
     // If this is a non-extension class method, emit class_method to
     // dynamically dispatch the call.
     // FIXME: Or if it's an ObjC method. Extension methods on classes will
-    // hopefully become dynamically dispatched too--SIL should be ignorant of
-    // ObjC-ness.
+    // hopefully become dynamically dispatched too.
     if (auto *fe = dyn_cast<FuncDecl>(e->getDecl())) {
       if (isa<ClassDecl>(fe->getDeclContext()) || fe->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
@@ -210,12 +220,12 @@ public:
         setThisParam(gen.visit(thisCallSite->getArg()));
         SILConstant constant(fe);
         
-        setCallee(ManagedValue(
-                   gen.B.createClassMethod(thisCallSite,
-                                           thisParam.peekScalarValue(),
-                                           constant,
-                                           gen.SGM.getConstantType(constant)),
-                   ManagedValue::Unmanaged));
+        SILValue classMethod = gen.B.createClassMethod(thisCallSite,
+                                             thisParam.peekScalarValue(),
+                                             constant,
+                                             gen.SGM.getConstantType(constant));
+        setCallee(ManagedValue(classMethod, ManagedValue::Unmanaged),
+                  OwnershipConventions::get(gen, constant));
         // setThisParam bumps the callDepth, but we aren't really past the
         // 'this' call depth in this case.
         --callDepth;
@@ -228,16 +238,17 @@ public:
     SILConstant constant(e->getDecl());
 
     // Obtain a reference for a local closure.
-    if (gen.LocalConstants.count(constant))
-      setCallee(gen.emitReferenceToDecl(e, e->getDecl()));
+    if (gen.LocalConstants.count(constant)) {
+      ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
+      setCallee(localFn,
+                OwnershipConventions::getDefault(localFn.getType()));
+    }
     // Otherwise, stash the SILConstant.
     else
       setCallee(constant);
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
-    setCallee(ManagedValue(gen.emitGlobalConstantRef(e,
-                    SILConstant(e->getDecl(), SILConstant::Kind::Initializer)),
-                  ManagedValue::Unmanaged));
+    setCallee(SILConstant(e->getDecl(), SILConstant::Kind::Initializer));
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -255,14 +266,18 @@ public:
                      existential.getCleanup());
     
     setThisParam(RValue(gen, projection));
-    setCallee(ManagedValue(gen.emitProtocolMethod(e, existential.getValue()),
-                           ManagedValue::Unmanaged));
+    ManagedValue protoMethod(gen.emitProtocolMethod(e, existential.getValue()),
+                             ManagedValue::Unmanaged);
+    setCallee(protoMethod,
+              OwnershipConventions::getDefault(protoMethod.getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
-    setCallee(ManagedValue(gen.emitArchetypeMethod(e,
-                                                   thisParam.peekScalarValue()),
-                           ManagedValue::Unmanaged));
+    ManagedValue archeMethod(
+                      gen.emitArchetypeMethod(e, thisParam.peekScalarValue()),
+                      ManagedValue::Unmanaged);
+    setCallee(archeMethod,
+              OwnershipConventions::getDefault(archeMethod.getType()));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     visit(e->getSubExpr());
@@ -308,9 +323,11 @@ public:
                                            constantThisTy);
     
     setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
-    setCallee(ManagedValue(gen.B.createSuperMethod(apply, super.getValue(),
-                                 constant, constantTy),
-                           ManagedValue::Unmanaged));
+    
+    SILValue superMethod = gen.B.createSuperMethod(apply, super.getValue(),
+                                                   constant, constantTy);
+    setCallee(ManagedValue(superMethod, ManagedValue::Unmanaged),
+              OwnershipConventions::get(gen, constant));
   }
   
   Callee getCallee() {
@@ -323,37 +340,65 @@ public:
 
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ManagedValue Fn,
-                                       ArrayRef<ManagedValue> Args) {
+                                       ArrayRef<ManagedValue> Args,
+                                       OwnershipConventions const &Ownership) {
+  // Conditionally consume the cleanup on an input value.
+  auto forwardIfConsumed = [&](ManagedValue v, bool consumed) -> SILValue {
+    return consumed
+      ? v.forwardArgument(*this, Loc)
+      : v.getArgumentValue(*this, Loc);
+  };
+  
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
   TypeLoweringInfo const &resultTI = getTypeLoweringInfo(resultTy);
+  
+  // Get the callee value.
+  SILValue fnValue = Ownership.isCalleeConsumed()
+    ? Fn.forward(*this)
+    : Fn.getValue();
+  
+  // Gather the arguments.
+  SmallVector<SILValue, 4> argValues;
+  for (size_t i = 0; i < Args.size(); ++i)
+    argValues.push_back(
+                  forwardIfConsumed(Args[i], Ownership.isArgumentConsumed(i)));
   
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
     // FIXME: Should pass down SGFContext so we can emit into an initialization.
     SILValue buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
-    auto argsWithReturn
-      = map<SmallVector<SILValue, 4>>(Args,
-                                      [&](ManagedValue v) {
-                                        return v.forwardArgument(*this, Loc);
-                                      });
-    argsWithReturn.push_back(buffer);
-    B.createApply(Loc, Fn.forward(*this), SGM.Types.getEmptyTupleType(),
-                  argsWithReturn);
+    argValues.push_back(buffer);
+    B.createApply(Loc, fnValue, SGM.Types.getEmptyTupleType(),
+                  argValues);
 
+    /// FIXME: Can ObjC/C functions return types SIL considers address-only?
+    /// Do we need to copy here if the return value is Unretained?
     return emitManagedRValueWithCleanup(buffer);
   } else {
     // Receive the result by value.
-    auto fwdArgs
-      = map<SmallVector<SILValue, 4>>(Args,
-                                      [&](ManagedValue v) {
-                                        return v.forwardArgument(*this, Loc);
-                                      });
-
-    SILValue result = B.createApply(Loc, Fn.forward(*this),
+    SILValue result = B.createApply(Loc, fnValue,
                                     resultTI.getLoweredType(),
-                                    fwdArgs);
+                                    argValues);
+    
+    // Take ownership of the return value, if necessary.
+    switch (Ownership.getReturn()) {
+    case OwnershipConventions::Return::Retained:
+      // Already retained.
+      break;
+
+    case OwnershipConventions::Return::Autoreleased:
+      // Autoreleased. Retain using retain_autoreleased.
+      B.createRetainAutoreleased(Loc, result);
+      break;
+        
+    case OwnershipConventions::Return::Unretained:
+      // Unretained. Retain the value.
+      emitRetainRValue(Loc, result);
+      break;
+    }
+    
     return resultTy->is<LValueType>()
       ? ManagedValue(result, ManagedValue::LValue)
       : emitManagedRValueWithCleanup(result);
@@ -475,16 +520,16 @@ namespace {
       }
         
       // Emit the uncurried call.
-      ManagedValue result = gen.emitApply(uncurriedLoc,
-                                          calleeValue,
-                                          args);
+      ManagedValue result = gen.emitApply(uncurriedLoc, calleeValue, args,
+                                          callee.getOwnershipConventions());
       
       // If there are remaining call sites, apply them to the result function.
       for (auto &site : extraSites) {
         args.clear();
         SILLocation loc = site.loc;
         std::move(site).emit(gen, args);
-        result = gen.emitApply(loc, result, args);
+        result = gen.emitApply(loc, result, args,
+                               callee.getOwnershipConventions());
       }
       
       return result;
@@ -569,12 +614,68 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   return emission.apply();
 }
 
+ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
+                                          SILLocation loc,
+                                          SILConstant constant,
+                                          ArrayRef<Substitution> substitutions,
+                                          Type substPropertyType)
+{
+  // If the accessor is a local constant, use it.
+  // FIXME: Can local properties ever be generic?
+  if (LocalConstants.count(constant)) {
+    SILValue v = LocalConstants[constant];
+    emitRetainRValue(loc, v);
+    return emitManagedRValueWithCleanup(v);
+  }
+  
+  // Get the accessor function. The type will be a polymorphic function if
+  // the This type is generic.
+  SILValue method = emitGlobalConstantRef(loc, constant);
+  
+  // If there are substitutions, specialize the generic getter.
+  // FIXME: Generic subscript operator could add another layer of
+  // substitutions.
+  if (!substitutions.empty()) {
+    assert(method.getType().is<PolymorphicFunctionType>() &&
+           "generic getter is not of a poly function type");
+    substPropertyType = getThinFunctionType(substPropertyType);
+    SILType loweredPropertyType = getLoweredLoadableType(substPropertyType,
+                                                         constant.uncurryLevel);
+    
+    method = B.createSpecialize(loc, method, substitutions,
+                                loweredPropertyType);
+  }
+  assert(method.getType().is<FunctionType>() &&
+         "getter is not of a concrete function type");
+  return ManagedValue(method, ManagedValue::Unmanaged);
+}
+
 /// Emit a call to a getter and materialize its result.
 Materialize SILGenFunction::emitGetProperty(SILLocation loc,
-                                            ManagedValue getter,
+                                            SILConstant get,
+                                            ArrayRef<Substitution> substitutions,
                                             RValue &&thisValue,
-                                            RValue &&subscripts) {
-  CallEmission emission(*this, getter);
+                                            RValue &&subscripts,
+                                            Type resultType) {
+  // Derive the specialized type of the accessor.
+  auto &tc = SGM.Types;
+  Type propType;
+  if (subscripts)
+    propType = tc.getSubscriptPropertyType(SILConstant::Kind::Getter,
+                                           subscripts.getType(),
+                                           resultType);
+  else
+    propType = tc.getPropertyType(SILConstant::Kind::Getter, resultType);
+  if (thisValue)
+    propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
+                                         propType);
+  
+  ManagedValue getter = emitSpecializedPropertyConstantRef(loc, get,
+                                                           substitutions,
+                                                           propType);
+  
+  CallEmission emission(*this, Callee(getter,
+                                      OwnershipConventions::get(*this, get)));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));
@@ -589,11 +690,31 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
 }
 
 void SILGenFunction::emitSetProperty(SILLocation loc,
-                                     ManagedValue setter,
+                                     SILConstant set,
+                                     ArrayRef<Substitution> substitutions,
                                      RValue &&thisValue,
                                      RValue &&subscripts,
                                      RValue &&setValue) {
-  CallEmission emission(*this, setter);
+  // Derive the specialized type of the accessor.
+  auto &tc = SGM.Types;
+  Type propType;
+  if (subscripts)
+    propType = tc.getSubscriptPropertyType(SILConstant::Kind::Setter,
+                                           subscripts.getType(),
+                                           setValue.getType());
+  else
+    propType = tc.getPropertyType(SILConstant::Kind::Setter,
+                                  setValue.getType());
+  if (thisValue)
+    propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
+                                         propType);
+
+  ManagedValue setter = emitSpecializedPropertyConstantRef(loc, set,
+                                                           substitutions,
+                                                           propType);
+
+  CallEmission emission(*this, Callee(setter,
+                                      OwnershipConventions::get(*this, set)));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));

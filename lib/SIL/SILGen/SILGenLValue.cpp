@@ -40,6 +40,10 @@ namespace {
       assert(!base && "var component must be root of lvalue path");
       return address;
     }
+    
+    Type getObjectType() const override {
+      return address.getType().getSwiftRValueType();
+    }
   };
   
   class RefElementComponent : public PhysicalPathComponent {
@@ -57,6 +61,10 @@ namespace {
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
       return gen.B.createRefElementAddr(loc, base, field, type);
+    }
+    
+    Type getObjectType() const override {
+      return type.getSwiftRValueType();
     }
   };
   
@@ -78,6 +86,10 @@ namespace {
              "can't get element from address of ref type");
       return gen.B.createElementAddr(loc, base, elementIndex, type);
     }
+    
+    Type getObjectType() const override {
+      return type.getSwiftRValueType();
+    }
   };
 
   class RefComponent : public PhysicalPathComponent {
@@ -93,82 +105,106 @@ namespace {
       assert(!base && "ref component must be root of lvalue path");
       return value;
     }
+
+    Type getObjectType() const override {
+      return value.getType().getSwiftRValueType();
+    }
   };
   
   class GetterSetterComponent : public LogicalPathComponent {
-    SILValue getter;
-    SILValue setter;
+    SILConstant getter;
+    SILConstant setter;
+    std::vector<Substitution> substitutions;
     Expr *subscriptExpr;
+    Type substType;
     
-    /// Returns a pair of RValues holding the base (retained if necessary) and
-    /// subscript arguments to an accessor, in that order.
-    std::pair<RValue, RValue>
-    prepareAccessorArgs(SILGenFunction &gen, SILLocation loc,
-                             SILValue accessor, SILValue base) const
+    struct AccessorArgs {
+      RValue base;
+      RValue subscripts;
+    };
+    
+    /// Returns a tuple of RValues holding the accessor value, base (retained if
+    /// necessary), and subscript arguments, in that order.
+    AccessorArgs
+    prepareAccessorArgs(SILGenFunction &gen,
+                        SILLocation loc,
+                        SILValue base) const
     {
       assert((!base || (base.getType().isAddress() ^
                         base.getType().hasReferenceSemantics())) &&
              "base of getter/setter component must be invalid, lvalue, or "
              "of reference type");
       
-      gen.B.createRetain(loc, accessor);
-      
-      RValue baseRV, subscriptsRV;
-      
+      AccessorArgs result;      
       if (base) {
         if (base.getType().hasReferenceSemantics()) {
           gen.B.createRetain(loc, base);
-          baseRV = RValue(gen, gen.emitManagedRValueWithCleanup(base));
+          result.base = RValue(gen, gen.emitManagedRValueWithCleanup(base));
         } else {
-          baseRV = RValue(gen, ManagedValue(base, ManagedValue::LValue));
+          result.base = RValue(gen, ManagedValue(base, ManagedValue::LValue));
         }
       }
       
       if (subscriptExpr)
-        subscriptsRV = gen.visit(subscriptExpr);
+        result.subscripts = gen.visit(subscriptExpr);
       
-      return {std::move(baseRV), std::move(subscriptsRV)};
+      return result;
     }
     
   public:
-    GetterSetterComponent(SILValue getter, SILValue setter)
-      : getter(getter), setter(setter), subscriptExpr(nullptr)
+    GetterSetterComponent(SILConstant getter, SILConstant setter,
+                          ArrayRef<Substitution> substitutions,
+                          Type substType)
+      : getter(getter), setter(setter), substitutions(substitutions.begin(),
+                                                      substitutions.end()),
+        subscriptExpr(nullptr),
+        substType(substType)
     {
-      assert(getter && setter &&
+      assert(!getter.isNull() && !setter.isNull() &&
              "settable lvalue must have both getter and setter");
     }
 
-    GetterSetterComponent(SILValue getter, SILValue setter,
-                          Expr *subscriptExpr)
-      : getter(getter), setter(setter), subscriptExpr(subscriptExpr)
+    GetterSetterComponent(SILConstant getter, SILConstant setter,
+                          ArrayRef<Substitution> substitutions,
+                          Expr *subscriptExpr,
+                          Type substType)
+      : getter(getter), setter(setter), substitutions(substitutions.begin(),
+                                                      substitutions.end()),
+        subscriptExpr(subscriptExpr),
+        substType(substType)
     {
-      assert(getter && setter &&
+      assert(!getter.isNull() && !setter.isNull() &&
              "settable lvalue must have both getter and setter");
     }
     
     void storeRValue(SILGenFunction &gen, SILLocation loc,
                      RValue &&rvalue, SILValue base) const override
     {
-      auto baseAndSubscripts
-        = prepareAccessorArgs(gen, loc, setter, base);
+      auto args
+        = prepareAccessorArgs(gen, loc, base);
       
       return gen.emitSetProperty(loc,
-                                 gen.emitManagedRValueWithCleanup(setter),
-                                 std::move(baseAndSubscripts.first),
-                                 std::move(baseAndSubscripts.second),
+                                 setter, substitutions,
+                                 std::move(args.base),
+                                 std::move(args.subscripts),
                                  std::move(rvalue));
     }
     
     Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
                                    SILValue base) const override
     {
-      auto baseAndSubscripts
-        = prepareAccessorArgs(gen, loc, getter, base);
+      auto args
+        = prepareAccessorArgs(gen, loc, base);
       
       return gen.emitGetProperty(loc,
-                                 gen.emitManagedRValueWithCleanup(getter),
-                                 std::move(baseAndSubscripts.first),
-                                 std::move(baseAndSubscripts.second));
+                                 getter, substitutions,
+                                 std::move(args.base),
+                                 std::move(args.subscripts),
+                                 substType);
+    }
+    
+    Type getObjectType() const override {
+      return substType;
     }
   };
 }
@@ -196,11 +232,10 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
-      SILValue get = gen.emitUnmanagedConstantRef(e,
-                                  SILConstant(var, SILConstant::Kind::Getter));
-      SILValue set = gen.emitUnmanagedConstantRef(e,
-                                  SILConstant(var, SILConstant::Kind::Setter));
-      lv.add<GetterSetterComponent>(get, set);
+      lv.add<GetterSetterComponent>(SILConstant(var, SILConstant::Kind::Getter),
+                                    SILConstant(var, SILConstant::Kind::Setter),
+                                    ArrayRef<Substitution>{},
+                                    e->getType()->getRValueType());
       return ::std::move(lv);
     }
   }
@@ -253,15 +288,10 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   }
   
   // Otherwise, use the property accessors.
-  ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                   /*subscriptExpr=*/nullptr,
-                                   SILConstant(decl, SILConstant::Kind::Getter),
-                                   substitutions);
-  ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                   /*subscriptExpr=*/nullptr,
-                                   SILConstant(decl, SILConstant::Kind::Setter),
-                                   substitutions);
-  lv.add<GetterSetterComponent>(get.getValue(), set.getValue());
+  lv.add<GetterSetterComponent>(SILConstant(decl, SILConstant::Kind::Getter),
+                                SILConstant(decl, SILConstant::Kind::Setter),
+                                substitutions,
+                                e->getType()->getRValueType());
   return ::std::move(lv);
 }
   
@@ -272,16 +302,11 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
                             ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
   SubscriptDecl *sd = e->getDecl();
-  ManagedValue get = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                     e->getIndex(),
-                                     SILConstant(sd, SILConstant::Kind::Getter),
-                                     substitutions);
-  ManagedValue set = gen.emitSpecializedPropertyConstantRef(e, e->getBase(),
-                                     e->getIndex(),
-                                     SILConstant(sd, SILConstant::Kind::Setter),
-                                     substitutions);
-  lv.add<GetterSetterComponent>(get.getValue(), set.getValue(),
-                                e->getIndex());
+  lv.add<GetterSetterComponent>(SILConstant(sd, SILConstant::Kind::Getter),
+                                SILConstant(sd, SILConstant::Kind::Setter),
+                                substitutions,
+                                e->getIndex(),
+                                e->getType()->getRValueType());
   return ::std::move(lv);
 }
   
