@@ -407,8 +407,8 @@ public:
   REPLInput(REPLEnvironment &env)
     : StackTrace(*this), Env(env), Autoindent(true)
   {
-    // Only show colors if both stderr and stdout are displayed.
-    ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+    // Only show colors if both stderr and stdout have colors.
+    ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     
     // Make sure the terminal color gets restored when the REPL is quit.
     if (ShowColors)

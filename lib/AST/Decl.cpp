@@ -1013,7 +1013,7 @@ namespace {
     PrintDecl(raw_ostream &os, unsigned indent)
       : OS(os), Indent(indent), ShowColors(false) {
       if (&os == &llvm::errs() || &os == &llvm::outs())
-	ShowColors = llvm::errs().is_displayed() && llvm::outs().is_displayed();
+	ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
     
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
