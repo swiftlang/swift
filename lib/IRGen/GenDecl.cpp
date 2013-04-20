@@ -251,7 +251,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   fn->setAttributes(attrs);
 
   IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
-    .emitGlobalTopLevel(tunit, SILMod);
+    .emitGlobalTopLevel(tunit, SILMod, StartElem);
   
   for (auto &cf : *SILMod) {
     SILConstant c = cf.first;

@@ -374,7 +374,8 @@ public:
   /// declarations in the given translation unit along with the toplevel
   /// of the given SILModule.
   void emitGlobalTopLevel(TranslationUnit *TU,
-                          SILModule *SILMod);
+                          SILModule *SILMod,
+                          unsigned startElem);
   
   /// Generate local decls in the given function body. This skips VarDecls and
   /// other locals that are consumed by SIL.

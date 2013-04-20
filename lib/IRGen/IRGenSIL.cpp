@@ -305,7 +305,8 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
 }
 
 void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
-                                          SILModule *SILMod) {
+                                          SILModule *SILMod,
+                                          unsigned startElem) {
   // Emit the toplevel function.
   emitSILFunction(SILConstant(),
                   SILMod->getTopLevelFunction());
@@ -316,8 +317,7 @@ void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
     IGM.emitGlobalVariable(global, ti);
   }
   
-  // FIXME: should support nonzero StartElems for interactive contexts.
-  IRGenFunction::emitGlobalTopLevel(TU, 0);
+  IRGenFunction::emitGlobalTopLevel(TU, startElem);
 }
 
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
