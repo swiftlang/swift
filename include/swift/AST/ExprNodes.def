@@ -128,7 +128,6 @@ ABSTRACT_EXPR(ExplicitCast, Expr)
   EXPR_RANGE(ExplicitCast, Coerce, UncheckedSuperToArchetype)
 EXPR(If, Expr)
 EXPR(IsSubtype, Expr)
-EXPR(SuperIsArchetype, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

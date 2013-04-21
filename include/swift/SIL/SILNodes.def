@@ -113,6 +113,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ArchetypeToSuperInst, ConversionInst)
     VALUE_RANGE(ConversionInst, ConvertFunctionInst, ArchetypeToSuperInst)
   INST(SuperToArchetypeInst, SILInstruction)
+  INST(IsaInst, SILInstruction)
 
   // SIL-only instructions that don't have an AST analog.
   INST(IndexAddrInst, SILInstruction)

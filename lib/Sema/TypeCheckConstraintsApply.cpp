@@ -1085,29 +1085,13 @@ namespace {
     }
     
     Expr *visitIsSubtypeExpr(IsSubtypeExpr *expr) {
-      auto &C = cs.getASTContext();
-      
       expr->setType(simplifyType(expr->getType()));
       
       Expr *sub = cs.getTypeChecker().convertToRValue(expr->getSubExpr());
       if (!sub) return nullptr;
       expr->setSubExpr(sub);
-      
-      // If the destination type is an archetype, this is a super-is-archetype
-      // query.
-      if (expr->getTypeLoc().getType()->is<ArchetypeType>()) {
-        auto *sisa = new (C) SuperIsArchetypeExpr(expr->getSubExpr(),
-                                                  expr->getLoc(),
-                                                  expr->getTypeLoc());
-        sisa->setType(expr->getType());
-        return sisa;
-      }
-      
+
       return expr;
-    }
-    
-    Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
     }
   };
 }

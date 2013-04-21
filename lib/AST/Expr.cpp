@@ -909,13 +909,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
-    printCommon(E, "super_is_archetype_expr") << ' ';
-    E->getTypeLoc().getType()->print(OS);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
 };
 
 } // end anonymous namespace.

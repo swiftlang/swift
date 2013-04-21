@@ -504,13 +504,11 @@ RValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
 
 RValue SILGenFunction::visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C)
 {
-  llvm_unreachable("not implemented");
-}
-
-RValue SILGenFunction::visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E,
-                                                       SGFContext C)
-{
-  llvm_unreachable("not implemented");
+  ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
+  SILValue res = B.createIsa(E, base.getValue(),
+                             getLoweredType(E->getTypeLoc().getType()),
+                             getLoweredLoadableType(E->getType()));
+  return RValue(*this, emitManagedRValueWithCleanup(res));
 }
 
 RValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {

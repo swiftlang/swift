@@ -1260,12 +1260,6 @@ public:
     return E;
   }
 
-  Expr *visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
-    // The type of the expr is always Bool.
-    assert(!E->getType()->isUnresolvedType() &&"Type always Bool");
-    return E;
-  }
-  
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     assert(!E->getType()->isUnresolvedType());
     // Implicit conversions have been fully checked.

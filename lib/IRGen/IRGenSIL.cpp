@@ -1271,6 +1271,33 @@ void IRGenSILFunction::visitSuperToArchetypeInst(swift::SuperToArchetypeInst *i)
                    archetype);
 }
 
+void IRGenSILFunction::visitIsaInst(swift::IsaInst *i) {
+  // Emit the value we're testing.
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *fromValue = from.claimNext();
+  fromValue = Builder.CreateBitCast(fromValue, IGM.Int8PtrTy);
+
+  // Emit the metadata of the type we're testing against.
+  CanType toType = i->getTestType().getSwiftRValueType();
+  Explosion metadata(ExplosionKind::Minimal);
+  emitMetaTypeRef(*this, toType, metadata);
+  llvm::Value *metadataValue = metadata.claimNext();
+  metadataValue = Builder.CreateBitCast(metadataValue, IGM.Int8PtrTy);
+  
+  // Perform a checked cast.
+  auto call = Builder.CreateCall2(IGM.getDynamicCastClassFn(),
+                                  fromValue, metadataValue);
+  call->setDoesNotThrow();
+  
+  // Check that the result isn't null.
+  llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
+                           call, llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+  
+  Explosion out(CurExplosionLevel);
+  out.add(result);
+  newLoweredExplosion(SILValue(i, 0), out);
+}
+
 void IRGenSILFunction::visitCoerceInst(swift::CoerceInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   newLoweredExplosion(SILValue(i, 0), from);

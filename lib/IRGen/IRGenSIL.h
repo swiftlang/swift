@@ -529,6 +529,7 @@ public:
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
   void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
+  void visitIsaInst(IsaInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIntegerValueInst(IntegerValueInst *i);

@@ -2233,36 +2233,6 @@ public:
   }
 };
   
-/// \brief Represents a runtime type check query against an archetype, 'a is T'
-/// where 'T' is an archetype and 'a' is a value of a base class constraint type
-/// of 'T'. Evaluates to true if 'a' is of the type and 'a as! T' would succeed,
-/// false otherwise.
-class SuperIsArchetypeExpr : public Expr {
-  Expr *SubExpr;
-  TypeLoc Type;
-  SourceLoc IsLoc;
-
-public:
-  SuperIsArchetypeExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : Expr(ExprKind::SuperIsArchetype), SubExpr(sub), Type(type), IsLoc(isLoc)
-  {}
-  
-  Expr *getSubExpr() const { return SubExpr; }
-  TypeLoc &getTypeLoc() { return Type; }
-  TypeLoc getTypeLoc() const { return Type; }
-  
-  void setSubExpr(Expr *E) { SubExpr = E; }
-  
-  SourceLoc getLoc() const { return IsLoc; }
-  SourceRange getSourceRange() const {
-    return {SubExpr->getStartLoc(), Type.getSourceRange().End};
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SuperIsArchetype;
-  }
-};
-  
 /// \brief Represents the rebinding of 'this' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to
 /// 'this', and the expression returns void.

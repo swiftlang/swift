@@ -917,9 +917,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return tyDecl->getDeclaredType();
     }
 
-    Type visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

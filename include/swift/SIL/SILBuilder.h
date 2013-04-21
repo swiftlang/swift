@@ -184,7 +184,6 @@ public:
                                          F));
   }
 
-
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new ConvertFunctionInst(Loc, Op, Ty));
@@ -227,6 +226,13 @@ public:
                                                SILValue SrcBase,
                                                SILValue DestArchetypeAddr) {
     return insert(new SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
+  }
+  
+  IsaInst *createIsa(SILLocation Loc,
+                     SILValue Operand,
+                     SILType TestType,
+                     SILType ResultType) {
+    return insert(new IsaInst(Loc, Operand, TestType, ResultType));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
@@ -385,7 +391,6 @@ public:
   IntegerValueInst *createIntegerValueInst(uint64_t Val, SILType Ty) {
     return insert(new IntegerValueInst(Val, Ty));
   }
-
 
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods

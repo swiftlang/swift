@@ -555,10 +555,6 @@ public:
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
 
-  CoercedResult visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E) {
-    llvm_unreachable("This node doesn't exist for unresolved types");
-  }
-  
   CoercedResult visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     llvm_unreachable("This node doesn't exist for unresolved types");
   }

@@ -431,7 +431,6 @@ public:
   RValue visitUncheckedSuperToArchetypeExpr(
                                 UncheckedSuperToArchetypeExpr *E, SGFContext C);
   RValue visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C);
-  RValue visitSuperIsArchetypeExpr(SuperIsArchetypeExpr *E, SGFContext C);
   RValue visitParenExpr(ParenExpr *E, SGFContext C);
   RValue visitTupleExpr(TupleExpr *E, SGFContext C);
   RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);

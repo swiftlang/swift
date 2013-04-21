@@ -627,7 +627,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// DowncastInst - Perform a checked conversion of a class instance to a
+/// DowncastInst - Perform an unchecked conversion of a class instance to a
 /// subclass type.
 class DowncastInst
   : public UnaryInstructionBase<ValueKind::DowncastInst, ConversionInst>
@@ -702,6 +702,19 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SuperToArchetypeInst;
   }
+};
+  
+/// IsaInst - Perform a runtime check of a class instance's type.
+class IsaInst : public UnaryInstructionBase<ValueKind::IsaInst> {
+  SILType TestType;
+public:
+  IsaInst(SILLocation Loc,
+          SILValue Operand,
+          SILType TestTy,
+          SILType BoolTy)
+    : UnaryInstructionBase(Loc, Operand, BoolTy), TestType(TestTy) {}
+  
+  SILType getTestType() const { return TestType; }
 };
 
 /// StructInst - Represents a constructed tuple.

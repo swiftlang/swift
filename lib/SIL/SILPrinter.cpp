@@ -394,6 +394,10 @@ public:
     OS << "super_to_archetype " << getID(I->getSrcBase()) << " to "
        << getID(I->getDestArchetypeAddress());
   }
+  
+  void visitIsaInst(IsaInst *I) {
+    OS << "isa " << getID(I->getOperand()) << ", $" << I->getTestType();
+  }
 
   void visitStructInst(StructInst *TI) {
     OS << "struct $";
