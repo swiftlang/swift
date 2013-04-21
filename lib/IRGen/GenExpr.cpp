@@ -74,6 +74,6 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion
       elementType = element.getScalarType();
     }
     
-    explosion.addUnmanaged(llvm::UndefValue::get(elementType));
+    explosion.add(llvm::UndefValue::get(elementType));
   }
 }

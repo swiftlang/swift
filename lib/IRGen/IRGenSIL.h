@@ -222,18 +222,9 @@ public:
   
   LoweredValue(Explosion &e)
     : kind(Kind::Explosion),
-      explosion{e.getKind(), {}}
-  {
-    e.claimUnmanaged(e.size(), explosion.values);
-  }
-  
-  /// This is a hack to kill off cleanups emitted by some IRGen infrastructure.
-  /// SIL code should always have memory management within it explicitly lowered.
-  LoweredValue(Explosion &e, IRGenFunction &IGF)
-    : kind(Kind::Explosion),
-      explosion{e.getKind(), {}}
-  {
-    e.forward(IGF, e.size(), explosion.values);
+      explosion{e.getKind(), {}} {
+    auto Elts = e.claimAll();
+    explosion.values.append(Elts.begin(), Elts.end());
   }
   
   LoweredValue(LoweredValue &&lv)
@@ -403,7 +394,7 @@ public:
   /// cleanups on the input Explosion if necessary.
   void newLoweredExplosion(SILValue v, Explosion &e, IRGenFunction &IGF) {
     assert(!v.getType().isAddress() && "explosion for address value?!");
-    newLoweredValue(v, LoweredValue(e, IGF));
+    newLoweredValue(v, LoweredValue(e));
   }
   
   /// Create a new StaticFunction corresponding to the given SIL value.

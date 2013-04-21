@@ -584,7 +584,7 @@ void IRGenFunction::emitRetainCall(llvm::Value *value) {
 /// the explosion.
 void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
   if (doesNotRequireRefCounting(value)) {
-    out.addUnmanaged(value);
+    out.add(value);
     return;
   }
 

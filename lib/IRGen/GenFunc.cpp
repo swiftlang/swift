@@ -226,7 +226,7 @@ namespace {
     /// Set this result so that it carries a single directly-returned
     /// maximally-fragile value without management.
     void setAsSingleDirectUnmanagedFragileValue(llvm::Value *value) {
-      initForDirectValues(ExplosionKind::Maximal).addUnmanaged(value);
+      initForDirectValues(ExplosionKind::Maximal).add(value);
     }
 
     void setAsIndirectAddress(Address address) {
@@ -245,7 +245,7 @@ namespace {
       assert(isDirect());
       Explosion &values = getDirectValues();
       assert(values.size() == 2);
-      llvm::Value *fn = values.claimUnmanagedNext();
+      llvm::Value *fn = values.claimNext();
       llvm::Value *data = values.claimNext();
       return Callee::forIndirectCall(origFormalType, substResultType, subs,
                                      fn, data);
@@ -384,7 +384,7 @@ namespace {
     static void doLoad(IRGenFunction &IGF, Address address, Explosion &e) {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
-      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
+      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
       // Load the data.
       Address dataAddr = projectData(IGF, address);
@@ -399,11 +399,11 @@ namespace {
                                 Explosion &e) {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
-      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
+      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
       
       // Load the data.
       Address dataAddr = projectData(IGF, address);
-      e.addUnmanaged(IGF.Builder.CreateLoad(dataAddr));
+      e.add(IGF.Builder.CreateLoad(dataAddr));
     }
     
     void loadUnmanaged(IRGenFunction &IGF, Address address,
@@ -414,7 +414,7 @@ namespace {
     static void doLoadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) {
       // Load the function.
       Address fnAddr = projectFunction(IGF, addr);
-      e.addUnmanaged(IGF.Builder.CreateLoad(fnAddr));
+      e.add(IGF.Builder.CreateLoad(fnAddr));
 
       // Load the data.
       Address dataAddr = projectData(IGF, addr);
@@ -428,21 +428,21 @@ namespace {
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimUnmanagedNext(), fnAddr);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       // Store the data pointer.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitAssignRetained(e.forwardNext(IGF), dataAddr);
+      IGF.emitAssignRetained(e.claimNext(), dataAddr);
     }
 
     void initialize(IRGenFunction &IGF, Explosion &e, Address address) const {
       // Store the function pointer.
       Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimUnmanagedNext(), fnAddr);
+      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       // Store the data pointer, transferring the +1.
       Address dataAddr = projectData(IGF, address);
-      IGF.emitInitializeRetained(e.forwardNext(IGF), dataAddr);
+      IGF.emitInitializeRetained(e.claimNext(), dataAddr);
     }
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
@@ -452,16 +452,16 @@ namespace {
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
-      dest.add(src.claimUnmanagedNext());
+      dest.add(src.claimNext());
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
-      e.claimUnmanagedNext();
+      e.claimNext();
       IGF.emitRetainCall(e.claimNext());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
-      e.claimUnmanagedNext();
+      e.claimNext();
       IGF.emitRelease(e.claimNext());
     }
     
@@ -775,11 +775,11 @@ static void extractUnmanagedScalarResults(IRGenFunction &IGF,
         = dyn_cast<llvm::StructType>(call->getType())) {
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
       llvm::Value *scalar = IGF.Builder.CreateExtractValue(call, i);
-      out.addUnmanaged(scalar);
+      out.add(scalar);
     }
   } else {
     assert(!call->getType()->isVoidTy());
-    out.addUnmanaged(call);
+    out.add(call);
   }
 }
 
@@ -814,20 +814,20 @@ static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                             Explosion &result,
                             Explosion &args,
                             llvm::Instruction::CastOps opcode) {
-  llvm::Value *input = args.claimUnmanagedNext();
+  llvm::Value *input = args.claimNext();
   Type DestType = fn->getType()->castTo<AnyFunctionType>()->getResult();
   llvm::Type *destTy = IGF.IGM.getFragileTypeInfo(DestType).getStorageType();
   assert(args.empty() && "wrong operands to cast operation");
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
-  result.addUnmanaged(output);
+  result.add(output);
 }
 
 static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                                Explosion &result,
                                Explosion &args,
                                llvm::CmpInst::Predicate pred) {
-  llvm::Value *lhs = args.claimUnmanagedNext();
-  llvm::Value *rhs = args.claimUnmanagedNext();
+  llvm::Value *lhs = args.claimNext();
+  llvm::Value *rhs = args.claimNext();
   
   llvm::Value *v;
   if (lhs->getType()->isFPOrFPVectorTy())
@@ -835,7 +835,7 @@ static void emitCompareBuiltin(IRGenFunction &IGF, FuncDecl *fn,
   else
     v = IGF.Builder.CreateICmp(pred, lhs, rhs);
   
-  result.addUnmanaged(v);
+  result.add(v);
 }
 
 /// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
@@ -871,7 +871,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    out->addUnmanaged(valueTI.getSize(IGF));
+    out->add(valueTI.getSize(IGF));
     return;
   }
 
@@ -879,7 +879,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    out->addUnmanaged(valueTI.getStride(IGF));
+    out->add(valueTI.getStride(IGF));
     return;
   }
 
@@ -887,16 +887,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    out->addUnmanaged(valueTI.getAlignment(IGF));
+    out->add(valueTI.getAlignment(IGF));
     return;
   }
   
   // addressof expects an lvalue argument.
   if (BuiltinName == "addressof") {
-    llvm::Value *address = args.claimUnmanagedNext();
+    llvm::Value *address = args.claimNext();
     llvm::Value *value = IGF.Builder.CreateBitCast(address,
                                                    IGF.IGM.Int8PtrTy);
-    out->addUnmanaged(value);
+    out->add(value);
     return;
   }
 
@@ -913,7 +913,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     llvm::FunctionType *FT = F->getFunctionType();
     SmallVector<llvm::Value*, 8> IRArgs;
     for (unsigned i = 0, e = FT->getNumParams(); i != e; ++i)
-      IRArgs.push_back(args.claimUnmanagedNext());
+      IRArgs.push_back(args.claimNext());
     llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
 
     if (TheCall->getType()->isVoidTy())
@@ -931,10 +931,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   
 #define BUILTIN_BINARY_OPERATION(id, name, overload) \
   if (BuiltinName == name) { \
-    llvm::Value *lhs = args.claimUnmanagedNext(); \
-    llvm::Value *rhs = args.claimUnmanagedNext(); \
+    llvm::Value *lhs = args.claimNext(); \
+    llvm::Value *rhs = args.claimNext(); \
     llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
-    return out->addUnmanaged(v); \
+    return out->add(v); \
   }
 
 #define BUILTIN_BINARY_PREDICATE(id, name, overload) \
@@ -944,20 +944,20 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 #include "swift/AST/Builtins.def"
 
   if (BuiltinName == "fneg") {
-    llvm::Value *rhs = args.claimUnmanagedNext();
+    llvm::Value *rhs = args.claimNext();
     llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
     llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
-    return out->addUnmanaged(v);
+    return out->add(v);
   }
   
   if (BuiltinName == "gep") {
-    llvm::Value *lhs = args.claimUnmanagedNext();
-    llvm::Value *rhs = args.claimUnmanagedNext();
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
     assert(args.empty() && "wrong operands to gep operation");
     
     // We don't expose a non-inbounds GEP operation.
     llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
-    return out->addUnmanaged(gep);
+    return out->add(gep);
   }
 
   if (BuiltinName == "load" || BuiltinName == "move") {
@@ -967,7 +967,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
     // Treat the raw pointer as a physical l-value of that type.
     // FIXME: remapping
-    llvm::Value *addrValue = args.claimUnmanagedNext();
+    llvm::Value *addrValue = args.claimNext();
     Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
 
     // Handle the result being naturally in memory.
@@ -989,11 +989,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
     // Skip the metatype if it has a non-trivial representation.
     if (!IGF.IGM.hasTrivialMetatype(valueTy))
-      args.claimUnmanagedNext();
+      args.claimNext();
 
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
 
-    llvm::Value *addrValue = args.claimUnmanagedNext();
+    llvm::Value *addrValue = args.claimNext();
     Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
     valueTI.destroy(IGF, addr);
 
@@ -1033,16 +1033,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
 
   if (BuiltinName == "allocRaw") {
-    auto size = args.claimUnmanagedNext();
-    auto align = args.claimUnmanagedNext();
+    auto size = args.claimNext();
+    auto align = args.claimNext();
     auto alloc = IGF.emitAllocRawCall(size, align, "builtin-allocRaw");
-    out->addUnmanaged(alloc);
+    out->add(alloc);
     return;
   }
 
   if (BuiltinName == "deallocRaw") {
-    auto pointer = args.claimUnmanagedNext();
-    auto size = args.claimUnmanagedNext();
+    auto pointer = args.claimNext();
+    auto size = args.claimNext();
     IGF.emitDeallocRawCall(pointer, size);
     
     voidResult = true;
@@ -1063,27 +1063,27 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
 
     if (BuiltinName == "castToObjectPointer") {
       // Just bitcast and rebuild the cleanup.
-      llvm::Value *value = args.forwardNext(IGF);
+      llvm::Value *value = args.claimNext();
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
       out->add(value);
     } else if (BuiltinName == "castFromObjectPointer") {
       // Just bitcast and rebuild the cleanup.
-      llvm::Value *value = args.forwardNext(IGF);
+      llvm::Value *value = args.claimNext();
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
       out->add(value);
     } else if (BuiltinName == "bridgeToRawPointer") {
       // Bitcast and immediately release the operand.
       // FIXME: Should annotate the ownership semantics of this builtin
       // so that SILGen can emit the release and expose it to ARC optimization
-      llvm::Value *value = args.forwardNext(IGF);
+      llvm::Value *value = args.claimNext();
       IGF.emitRelease(value);
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
-      out->addUnmanaged(value);
+      out->add(value);
     } else if (BuiltinName == "bridgeFromRawPointer") {
       // Bitcast, and immediately retain (and introduce a release cleanup).
       // FIXME: Should annotate the ownership semantics of this builtin
       // so that SILGen can emit the retain and expose it to ARC optimization
-      llvm::Value *value = args.claimUnmanagedNext();
+      llvm::Value *value = args.claimNext();
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
       IGF.emitRetain(value, *out);
     }
@@ -1126,9 +1126,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
 
-    auto pointer = args.claimUnmanagedNext();
-    auto cmp = args.claimUnmanagedNext();
-    auto newval = args.claimUnmanagedNext();
+    auto pointer = args.claimNext();
+    auto cmp = args.claimNext();
+    auto newval = args.claimNext();
 
     llvm::Type *origTy = cmp->getType();
     if (origTy->isPointerTy()) {
@@ -1146,7 +1146,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     if (origTy->isPointerTy())
       value = IGF.Builder.CreateIntToPtr(value, origTy);
 
-    out->addUnmanaged(value);
+    out->add(value);
     return;
   }
   
@@ -1185,8 +1185,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
     assert(BuiltinName.empty() && "Mismatch with sema");
     
-    auto pointer = args.claimUnmanagedNext();
-    auto val = args.claimUnmanagedNext();
+    auto pointer = args.claimNext();
+    auto val = args.claimNext();
 
     // Handle atomic ops on pointers by casting to intptr_t.
     llvm::Type *origTy = val->getType();
@@ -1203,7 +1203,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     if (origTy->isPointerTy())
       value = IGF.Builder.CreateIntToPtr(value, origTy);
 
-    out->addUnmanaged(value);
+    out->add(value);
     return;
   }
 
@@ -1501,7 +1501,7 @@ void CallEmission::forceCallee() {
   }
 
   // Grab the values.
-  llvm::Value *fnPtr = fn.claimUnmanagedNext();
+  llvm::Value *fnPtr = fn.claimNext();
   llvm::Value *dataPtr = fn.claimNext();
 
   // Set up for an indirect call.
@@ -1544,7 +1544,7 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
     ti.initialize(IGF, in, addr.getAddress());
      
     newByvals.push_back({out.size(), addr.getAlignment()});
-    out.addUnmanaged(addr.getAddress().getAddress());
+    out.add(addr.getAddress().getAddress());
   } else {
     ti.reexplode(IGF, in, out);
   }
@@ -1665,7 +1665,7 @@ void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
 Explosion IRGenFunction::collectParameters() {
   Explosion params(CurExplosionLevel);
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
-    params.addUnmanaged(i);
+    params.add(i);
   return params;
 }
 
@@ -1739,7 +1739,7 @@ void IRGenFunction::emitPrologue() {
     resultType.getSchema(resultSchema);
 
     if (resultSchema.requiresIndirectResult()) {
-      ReturnSlot = resultType.getAddressForPointer(values.claimUnmanagedNext());
+      ReturnSlot = resultType.getAddressForPointer(values.claimNext());
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
@@ -1753,7 +1753,7 @@ void IRGenFunction::emitPrologue() {
   emitParameterClauses(*this, CurFuncType, params, values);
 
   if (CurPrologue == Prologue::StandardWithContext) {
-    ContextPtr = values.claimUnmanagedNext();
+    ContextPtr = values.claimNext();
     ContextPtr->setName(".context");
   }
 
@@ -1859,13 +1859,13 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
   if (result.size() == 0) {
     Builder.CreateRetVoid();
   } else if (result.size() == 1) {
-    Builder.CreateRet(result.forwardNext(*this));
+    Builder.CreateRet(result.claimNext());
   } else {
     assert(cast<llvm::StructType>(CurFn->getReturnType())->getNumElements()
              == result.size());
     llvm::Value *resultAgg = llvm::UndefValue::get(CurFn->getReturnType());
     for (unsigned i = 0, e = result.size(); i != e; ++i) {
-      llvm::Value *elt = result.forwardNext(*this);
+      llvm::Value *elt = result.claimNext();
       resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
     }
     Builder.CreateRet(resultAgg);
@@ -1961,12 +1961,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     subIGF.emitRelease(rawData);
   }
   
-  llvm::SmallVector<llvm::Value*, 8> args;
-  params.forward(subIGF, params.size(), args);
-
   llvm::CallSite callSite = subIGF.emitInvoke(fnPtr->getCallingConv(),
-                                              fnPtr,
-                                              args,
+                                              fnPtr, params.claimAll(),
                                               fnPtr->getAttributes());
   llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
   call->setTailCall();
@@ -2013,8 +2009,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               layout);
   llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
                                                           IGF.IGM.Int8PtrTy);
-  out.addUnmanaged(forwarderValue);
-  out.addUnmanaged(data);
+  out.add(forwarderValue);
+  out.add(data);
 }
 
 /// Fetch the declaration of the given block-to-
@@ -2051,7 +2047,7 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
                               Explosion &swiftClosure,
                               Explosion &outBlock) {
   // Get the function pointer as an i8*.
-  llvm::Value *fn = swiftClosure.claimUnmanagedNext();
+  llvm::Value *fn = swiftClosure.claimNext();
   fn = IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy);
 
   // Get the context pointer as a %swift.refcounted*.

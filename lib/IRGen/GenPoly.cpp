@@ -481,7 +481,7 @@ namespace {
         assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
-          Out.addUnmanaged(emitTypeMetadataRef(IGF, substInstanceTy));
+          Out.add(emitTypeMetadataRef(IGF, substInstanceTy));
         return;
       }
 
@@ -624,7 +624,7 @@ namespace {
         assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
-          In.ignoreUnmanaged(1);
+          In.markClaimed(1);
         return;
       }
 
@@ -664,7 +664,7 @@ void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
                                                    Address outputArchetype) {
   assert(destType->is<ArchetypeType>() && "expected archetype type");
   
-  llvm::Value *superObject = input.forwardNext(*this);
+  llvm::Value *superObject = input.claimNext();
   superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
   
   // Retrieve the metadata.

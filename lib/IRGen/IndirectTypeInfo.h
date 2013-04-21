@@ -67,7 +67,7 @@ public:
     
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
-    out.addUnmanaged(dest.getAddress());
+    out.add(dest.getAddress());
   }
   
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
@@ -100,7 +100,7 @@ public:
 
   void initialize(IRGenFunction &IGF, Explosion &in, Address dest) const {
     // Take ownership of the temporary and memcpy it into place.
-    Address src = asDerived().Derived::getAddressForPointer(in.forwardNext(IGF));
+    Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
     asDerived().Derived::initializeWithTake(IGF, dest, src);
   }
 
@@ -115,8 +115,8 @@ public:
   }
   
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    Address obj = asDerived().Derived::getAddressForPointer(in.claimUnmanagedNext());
-    out.addUnmanaged(obj.getAddress());
+    Address obj = asDerived().Derived::getAddressForPointer(in.claimNext());
+    out.add(obj.getAddress());
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {

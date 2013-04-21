@@ -524,7 +524,7 @@ void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
 
   // Otherwise, emit a metadata reference.
   llvm::Value *metadata = emitTypeMetadataRef(IGF, type);
-  explosion.addUnmanaged(metadata);
+  explosion.add(metadata);
 }
 
 /*****************************************************************************/

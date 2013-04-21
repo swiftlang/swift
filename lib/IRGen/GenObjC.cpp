@@ -599,7 +599,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   
   // Pass a pointer to the objc_super struct to the messenger.
   // Project the ownership semantics of 'self' to the super argument.
-  selfValues.addUnmanaged(super.getAddress());
+  selfValues.add(super.getAddress());
 }
 
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
@@ -676,7 +676,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
     emitSuperArgument(IGF, isInstanceMethod, self, args,
                       searchType);
   } else {
-    args.addUnmanaged(self);
+    args.add(self);
   }
   assert(args.size() == 1);
   
@@ -696,7 +696,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
     selectorV = IGF.Builder.CreateLoad(Address(selectorRef,
                                                IGF.IGM.getPointerAlignment()));
   }
-  args.addUnmanaged(selectorV);
+  args.add(selectorV);
   
   // Add that to the emission.
   emission.addArg(args);
@@ -770,7 +770,7 @@ namespace {
       visitAnyClassType(type->getDecl());
     }
     void visitAnyClassType(ClassDecl *theClass) {
-      auto param = Params.claimUnmanagedNext();
+      auto param = Params.claimNext();
       if (shouldRetainNextParam()) {
         Args.push_back(IGF.emitBestRetainCall(param, theClass));
       } else {
@@ -785,7 +785,7 @@ namespace {
       if (requiresExternalByvalArgument(IGF.IGM, CanType(type))) {
         // If the argument was passed byval in the C calling convention,
         // reexplode it.
-        llvm::Value *addrValue = Params.claimUnmanagedNext();
+        llvm::Value *addrValue = Params.claimNext();
         llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
         unsigned align = alignConstant
           ? alignConstant->getUniqueInteger().getZExtValue()
@@ -793,15 +793,15 @@ namespace {
         Address addr(addrValue, Alignment(align));
         Explosion loaded(IGF.CurExplosionLevel);
         ti.load(IGF, addr, loaded);
-        unsigned width = ti.getExplosionSize(IGF.CurExplosionLevel);
-        loaded.forward(IGF, width, Args);
+        auto Vals = loaded.claim(ti.getExplosionSize(IGF.CurExplosionLevel));
+        Args.append(Vals.begin(), Vals.end());
         NextParamIndex += 1;
       } else {
-        unsigned width = ti.getExplosionSize(IGF.CurExplosionLevel);
         Explosion copied(IGF.CurExplosionLevel);
         ti.copy(IGF, Params, copied);
-        copied.forward(IGF, width, Args);
-        NextParamIndex += width;
+        auto vals = copied.claim(ti.getExplosionSize(IGF.CurExplosionLevel));
+        Args.append(vals.begin(), vals.end());
+        NextParamIndex += vals.size();
       }
     }
 
@@ -863,7 +863,7 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
     // Remember the out-pointer.
     if (sig.IsIndirectReturn) {
       // TODO: remap return values?
-      args.push_back(params.claimUnmanagedNext());
+      args.push_back(params.claimNext());
     }
 
     auto fnType = cast<AnyFunctionType>(origFormalType);
@@ -969,12 +969,12 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
     // - indirect return (if any)
     Address indirectReturn;
     if (requiresExternalIndirectResult(IGM, propTy)) {
-      indirectReturn = Address(params.claimUnmanagedNext(), align);
+      indirectReturn = Address(params.claimNext(), align);
     }
     // - self (passed in at +0)
-    llvm::Value *thisValue = params.forwardNext(IGF);
+    llvm::Value *thisValue = params.claimNext();
     // - _cmd
-    params.claimUnmanagedNext();
+    params.claimNext();
     
     // Load the physical ivar.
     OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
@@ -1054,9 +1054,9 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
 
     // Pick out the arguments:
     // - self (passed in at +0)
-    llvm::Value *thisValue = params.forwardNext(IGF);
+    llvm::Value *thisValue = params.claimNext();
     // - _cmd
-    params.claimUnmanagedNext();
+    params.claimNext();
     // - value (passed in at +0) -- we'll deal with that below.
     
     // Project the physical ivar.
@@ -1068,7 +1068,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
     if (requiresExternalByvalArgument(IGM, propTy)) {
       // If the argument was passed byval in the C calling convention,
       // assign it (with copy so that we retain it) into the ivar.
-      llvm::Value *value = params.claimUnmanagedNext();
+      llvm::Value *value = params.claimNext();
       Address valueAddr(value, align);
       ti.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
     } else {

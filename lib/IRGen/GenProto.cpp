@@ -2227,7 +2227,7 @@ namespace {
         IGF.getFragileTypeInfo(argSites.back().getSigResultType());
       llvm::Value *sigResultAddr = nullptr;
       if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult()) {
-        sigResultAddr = sigParams.claimUnmanagedNext();
+        sigResultAddr = sigParams.claimNext();
       }
 
       // Collect the parameter clauses and bind polymorphic parameters.
@@ -2292,7 +2292,7 @@ namespace {
 
           // It's an l-value, so the next value is the address.  Cast to T*.
 
-          auto sigThisValue = sigClause.claimUnmanagedNext();
+          auto sigThisValue = sigClause.claimNext();
           auto implPtrTy = implTI.getStorageType()->getPointerTo();
           sigThisValue = IGF.Builder.CreateBitCast(sigThisValue, implPtrTy);
           auto sigThis = implTI.getAddressForPointer(sigThisValue);
@@ -2966,7 +2966,7 @@ namespace {
                                                 /*suppress cast*/ true);
 
       case SourceKind::GenericLValueMetadata: {
-        llvm::Value *metatype = in.claimUnmanagedNext();
+        llvm::Value *metatype = in.claimNext();
         metatype->setName("This");
 
         // Mark this as the cached metatype for the l-value's object type.
@@ -3015,7 +3015,7 @@ void EmitPolymorphicParameters::emit(Explosion &in) {
 
     // Otherwise, it's just next in line.
     } else {
-      metadata = in.claimUnmanagedNext();
+      metadata = in.claimNext();
     }
 
     // Collect all the witness tables.
@@ -3035,7 +3035,7 @@ void EmitPolymorphicParameters::emit(Explosion &in) {
 
       // Otherwise, it's just next in line.
       } else {
-        wtable = in.claimUnmanagedNext();
+        wtable = in.claimNext();
       }
       wtables.push_back(wtable);
     }
@@ -3218,7 +3218,7 @@ namespace {
       case SourceKind::GenericLValueMetadata: {
         CanType argTy = stripLabel(substInputType);
         CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
-        out.addUnmanaged(emitTypeMetadataRef(IGF, objTy));
+        out.add(emitTypeMetadataRef(IGF, objTy));
         return;
       }
       }
@@ -3262,7 +3262,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
 
     // Add the metadata reference unelss it's fulfilled.
     if (!Fulfillments.count(FulfillmentKey(archetype, nullptr))) {
-      out.addUnmanaged(emitTypeMetadataRef(IGF, argType));
+      out.add(emitTypeMetadataRef(IGF, argType));
     }
 
     // Nothing else to do if there aren't any protocols to witness.
@@ -3287,7 +3287,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
         ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
         auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
         wtable = path.apply(IGF, wtable);
-        out.addUnmanaged(wtable);
+        out.add(wtable);
         continue;
       }
 
@@ -3296,7 +3296,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       auto &confI = protoI.getConformance(IGF.IGM, argType, argTI, protocol,
                                           *sub.Conformance[i]);
       llvm::Value *wtable = confI.getTable(IGF);
-      out.addUnmanaged(wtable);
+      out.add(wtable);
     }
   }
 }
@@ -3540,8 +3540,8 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
   witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);
   
   // Build the value.
-  out.addUnmanaged(witness);
-  out.addUnmanaged(metadata);
+  out.add(witness);
+  out.add(metadata);
 }
 
 void

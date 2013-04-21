@@ -93,11 +93,6 @@ public:
     Values.push_back(value);
   }
 
-  /// Add an unmanaged value to the end of this exploded r-value.
-  void addUnmanaged(llvm::Value *value) {
-    add(value);
-  }
-
   void add(llvm::ArrayRef<llvm::Value*> values) {
 #ifndef NDEBUG
     for (auto value : values)
@@ -126,35 +121,11 @@ public:
     other.add(claim(n));
   }
 
-  /// The next N values are being ignored; ensure they are destroyed.
-  void ignoreAndDestroy(IRGenFunction &IGF, unsigned n) {
-    // For now, just leave their cleanups active.
-    markClaimed(n);
-  }
-
-  /// The next N values are being ignored.  They are all unmanaged.
-  void ignoreUnmanaged(unsigned n) {
-    assert(NextValue + n <= Values.size());
-    markClaimed(n);
-  }
 
   /// The next N values have been claimed in some indirect way (e.g.
   /// using getRange() and the like); just give up on them.
   void markClaimed(unsigned n) {
     assert(NextValue + n <= Values.size());
-    NextValue += n;
-  }
-
-  /// Claim a value which is known to have no management.
-  llvm::Value *claimUnmanagedNext() {
-    assert(NextValue < Values.size());
-    return Values[NextValue++];
-  }
-
-  /// Claim a series of values which are known to have no management.
-  void claimUnmanaged(unsigned n, llvm::SmallVectorImpl<llvm::Value *> &out) {
-    assert(NextValue + n <= Values.size());
-    out.append(begin(), begin()+n);
     NextValue += n;
   }
 
@@ -178,23 +149,6 @@ public:
   /// The caller becomes responsible for managing the cleanups.
   llvm::ArrayRef<llvm::Value*> claimAll() {
     return claim(size());
-  }
-
-  /// Forward the next value in this explosion, deactivating its
-  /// cleanup if present.
-  llvm::Value *forwardNext(IRGenFunction &IGF) {
-    assert(NextValue < Values.size());
-    return Values[NextValue++];
-  }
-
-  /// Forward a series of values out of this explosion.
-  void forward(IRGenFunction &IGF, unsigned n,
-               llvm::SmallVectorImpl<llvm::Value *> &out) {
-    // FIXME: replace with claim()
-    assert(NextValue + n <= Values.size());
-
-    out.append(begin(), begin()+n);
-    NextValue += n;
   }
 
   // These are all kindof questionable.

@@ -153,7 +153,7 @@ void swift::irgen::emitStringLiteral(IRGenFunction &IGF,
                                      bool includeSize,
                                      Explosion &out) {
   auto ptr = IGF.IGM.getAddrOfGlobalString(string);
-  out.addUnmanaged(ptr);
+  out.add(ptr);
   if (includeSize)
-    out.addUnmanaged(IGF.Builder.getInt64(string.size()));
+    out.add(IGF.Builder.getInt64(string.size()));
 }

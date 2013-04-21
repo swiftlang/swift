@@ -146,7 +146,7 @@ namespace {
                                    OneOfElementDecl *elt,
                                    Explosion &params) const {
       // FIXME
-      params.ignoreAndDestroy(IGF, params.size());
+      params.markClaimed(params.size());
       IGF.Builder.CreateRetVoid();
     }
   };
@@ -257,7 +257,7 @@ namespace {
       Singleton->getSchema(schema);
       if (schema.requiresIndirectResult()) {
         Address returnSlot =
-          Singleton->getAddressForPointer(params.claimUnmanagedNext());
+          Singleton->getAddressForPointer(params.claimNext());
         initialize(IGF, params, returnSlot);
         IGF.Builder.CreateRetVoid();
       } else {
