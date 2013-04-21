@@ -132,36 +132,6 @@ llvm::CallSite IRGenFunction::emitInvoke(llvm::CallingConv::ID convention,
 //******************************** CLEANUPS **********************************//
 //****************************************************************************//
 
-/// The outflows of a cleanup are branches that terminate after the
-/// cleanup.  For example, if there are four cleanups on the stack:
-///    top -> A | B | C | D | bottom
-/// and we branch to a JumpDest at depth D, then cleanups A and B
-/// get fallthrough outflows to that label and cleanup C gets
-/// a branch-out outflow.
-class swift::irgen::CleanupOutflows {
-public:
-  CleanupOutflows() : NextOutflowLabel(0) {}
-
-  struct Outflow {
-    llvm::ConstantInt *DestLabel;
-    llvm::BasicBlock *DestBlock;
-  };
-  llvm::SmallVector<Outflow, 4> Outflows;
-
-  /// A label larger than any of the branches out of this scope.
-  unsigned NextOutflowLabel;
-
-  void add(llvm::ConstantInt *destLabel, llvm::BasicBlock *destBlock) {
-    Outflow outflow = { destLabel, destBlock };
-    Outflows.push_back(outflow);
-  }
-};
-
-static CleanupOutflows *getOrCreateOutflows(Cleanup &cleanup) {
-  CleanupOutflows *outs = cleanup.getOutflows();
-  if (!outs) cleanup.setOutflows(outs = new CleanupOutflows());
-  return outs;
-}
 
 /// The control of a cleanup is the information dynamically recording
 /// whether or not the cleanup is active.
@@ -282,95 +252,6 @@ static void transitionControlToFlag(IRGenFunction &IGF, Cleanup &cleanup) {
     setFlagNow(IGF, flag, isActiveNow);
 }
 
-namespace {
-  /// A CleanupBuffer is a location to which to temporarily copy a
-  /// cleanup.
-  class CleanupBuffer {
-    llvm::SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void*)> Data;
-
-  public:
-    CleanupBuffer(const Cleanup &cleanup) {
-      size_t size = cleanup.allocated_size();
-      Data.set_size(size);
-      memcpy(Data.data(), reinterpret_cast<const void*>(&cleanup), size);
-    }
-
-    Cleanup &getCopy() { return *reinterpret_cast<Cleanup*>(Data.data()); }
-  };
-}
-
-/// Get or create a normal entry block on the given cleanup.
-static llvm::BasicBlock *
-getOrCreateNormalEntryBlock(IRGenFunction &IGF, Cleanup &cleanup) {
-  llvm::BasicBlock *block = cleanup.getNormalEntryBlock();
-  if (block) return block;
-
-  block = IGF.createBasicBlock("cleanup");
-  cleanup.setNormalEntryBlock(block);
-  return block;
-}
-
-/// Given that we're routing fallthrough for a cleanup that just got
-/// popped, find the cleanup that we should head towards.
-static Cleanup &getNextCleanupForFallthrough(DiverseStackImpl<Cleanup> &stack) {
-  // Scan down the stack.
-  for (Cleanup &cleanup : stack) {
-    // We need to land at a cleanup if (1) it has non-fallthrough outflows
-    // for any of our fallthroughs or (2) if it was active when any of the
-    // fallthrough branches began.  We only add non-fallthrough outflows
-    // to active cleanups, so (2) is sufficient.  We can conservatively
-    // approximate (2) with the presence of any uses while active at all.
-    if (cleanup.isUsedWhileActive())
-      return cleanup;
-
-    assert(!cleanup.getOutflows());
-  }
-
-  // We can't get out here because the existence of fallthroughs
-  // implies the existence of an outflow *somewhere*.
-  llvm_unreachable("ran out of cleanups looking for outflows!");
-}
-
-/// Get or create a normal entry block for the next meaningful
-/// cleanup.  This is designed for the needs of popAndForwardCleanup:
-/// it assumes that it's routing fallthroughs from a cleanup that just
-/// got popped.
-static llvm::BasicBlock *
-getOrCreateNextNormalEntryBlock(IRGenFunction &IGF,
-                                DiverseStackImpl<Cleanup> &stack) {
-  return getOrCreateNormalEntryBlock(IGF, getNextCleanupForFallthrough(stack));
-}
-
-/// Emit a cleanup at the current insertion point.
-static void emitCleanupHere(IRGenFunction &IGF, Cleanup &cleanup) {
-  assert(IGF.Builder.hasValidIP());
-
-  // If the cleanup requires a dynamic check for activation, we need
-  // to handle that here.
-  CleanupControl control = cleanup.getControl();
-  llvm::BasicBlock *contBB = nullptr;
-  if (control.hasFlag()) {
-    contBB = IGF.createBasicBlock("cleanup.cont");
-    llvm::BasicBlock *bodyBB = IGF.createBasicBlock("cleanup.body");
-
-    // Branch on the control flag.
-    llvm::Value *flagValue =
-      IGF.Builder.CreateLoad(control.getFlag(), Alignment(1));
-    IGF.Builder.CreateCondBr(flagValue, bodyBB, contBB);
-    IGF.Builder.emitBlock(bodyBB);
-  }
-
-  // Emit the cleanup body.
-  cleanup.emit(IGF);
-
-  assert(IGF.Builder.hasValidIP());
-
-  if (contBB) {
-    IGF.Builder.CreateBr(contBB);
-    IGF.Builder.emitBlock(contBB);
-  }
-}
-
 /// The top cleanup on the stack is dead.  Pop it off and perform any
 /// emission or forwarding necessary.
 static void popAndEmitTopCleanup(IRGenFunction &IGF,
@@ -384,9 +265,6 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
     // cleanup that's never been active.
     assert(stackCleanup.getNormalEntryBlock() == nullptr);
     
-    // We never add outflows to an inactive cleanup.
-    assert(stackCleanup.getOutflows() == nullptr);
-
     // This is just the usual invariant about the control flag only
     // existing on cleanups with both active and inactive references.
     assert(!stackCleanup.getControl().hasFlag());
@@ -397,98 +275,7 @@ static void popAndEmitTopCleanup(IRGenFunction &IGF,
     return;
   }
 
-  // Otherwise, we'll need to copy it off the cleanups stack.
-  CleanupBuffer buffer(stackCleanup);
-  Cleanup &cleanup = buffer.getCopy();
-
-  // Pop now.
-  stack.pop();
-
-  // We must have an entry block.
-  // TODO: avoid creating these in obvious cases.
-  llvm::BasicBlock *entry = cleanup.getNormalEntryBlock();
-  assert(entry && "no entry block for referenced top cleanup");
-  assert(!entry->use_empty() && "unused entry block");
-
-  llvm::BasicBlock *trueEntry;
-
-  // If the entry block has exactly one use, and that use is an
-  // unconditional branch, then merge this into its predecessor.
-  if (entry->hasOneUse()) {
-    llvm::TerminatorInst *term =
-      cast<llvm::TerminatorInst>(*entry->use_begin());
-    llvm::BranchInst *br = dyn_cast<llvm::BranchInst>(term);
-    if (br && br->isUnconditional()) {
-      trueEntry = br->getParent();
-      br->eraseFromParent();
-      delete entry;
-
-    // Even if it's not an unconditional branch, place the entry after
-    // the single predecessor.  This is likely to be the fallthrough
-    // edge of a switch-out.
-    } else {
-      trueEntry = entry;
-      entry->getParent()->getBasicBlockList()
-                         .insertAfter(term->getParent(), entry);
-    }
-
-  // If the block has multiple uses, insert it at the next reasonable point.
-  // Don't enter it yet, though.
-  } else {
-    trueEntry = entry;
-    IGF.Builder.insertBlockAnywhere(trueEntry);
-  }
-
-  // Temporarily enter the entry block.
-  IRBuilder::ShiftIP shiftedIP(IGF.Builder, trueEntry);
-
-  // Emit the cleanup.
-  emitCleanupHere(IGF, cleanup);
-
-  // Set up the outflows.
-  CleanupOutflows *outflows = cleanup.getOutflows();
-
-  // This is straightforward if we have no branch outflows.
-  if (!outflows) {
-    // If we have no branch outflows, we must at least have a
-    // fallthrough outflow.
-    assert(cleanup.hasFallthroughOutflow());
-
-    // Branch to the next cleanup.
-    llvm::BasicBlock *next = getOrCreateNextNormalEntryBlock(IGF, stack);
-    IGF.Builder.CreateBr(next);
-    return;
-  }
-
-  assert(!outflows->Outflows.empty());
-  llvm::OwningPtr<CleanupOutflows> outflowsDeleter(outflows);
-
-  // It's also straightforward if we have one branch outflow and
-  // no fallthrough.
-  if (!cleanup.hasFallthroughOutflow() && outflows->Outflows.size() == 1) {
-    IGF.Builder.CreateBr(outflows->Outflows[0].DestBlock);
-    return;
-  }
-
-  // Okay, we need a switch.
-
-  // The default destination is either the next entry block, if there
-  // are fallthroughs, or the unreachable block if there aren't.
-  llvm::BasicBlock *defaultDest;
-  if (cleanup.hasFallthroughOutflow())
-    defaultDest = getOrCreateNextNormalEntryBlock(IGF, stack);
-  else
-    defaultDest = IGF.getUnreachableBlock();
-
-  // Switch on the value in the jump destination slot.
-  llvm::Value *destValue =
-    IGF.Builder.CreateLoad(IGF.getJumpDestSlot(), IGF.getJumpDestAlignment(),
-                           "jumpdest.switchvalue");
-
-  llvm::SwitchInst *sw =
-    IGF.Builder.CreateSwitch(destValue, defaultDest, outflows->Outflows.size());
-  for (auto &outflow : outflows->Outflows)
-    sw->addCase(outflow.DestLabel, outflow.DestBlock);
+  assert(0);
 }
 
 /// Remove all the dead cleanups on the top of the cleanup stack.
@@ -506,49 +293,11 @@ static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
   }
 }
 
-/// Are there any active cleanups in the given range?
-static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
-                                 DiverseStackImpl<Cleanup>::iterator end) {
-  for (; begin != end; ++begin)
-    if (begin->isActive())
-      return true;
-  return false;
-}
-
 /// Leave a scope, with all its cleanups.
 void IRGenFunction::endScope(CleanupsDepth depth) {
   Cleanups.checkIterator(depth);
 
-  // Fast path: no cleanups to leave in this scope.
-  if (Cleanups.stable_begin() == depth) {
-    popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
-    return;
-  }
-
-  // Thread a branch through the cleanups if there are any active
-  // cleanups and we have a valid insertion point.
-  llvm::BasicBlock *contBB = nullptr;
-  if (Builder.hasValidIP() &&
-      hasAnyActiveCleanups(Cleanups.begin(), Cleanups.find(depth))) {
-    contBB = createBasicBlock("cleanups.fallthrough");
-    emitBranch(contBB, depth);
-  }
-
-  // Iteratively mark cleanups dead and pop them.
-  // Maybe we'd get better results if we marked them all dead in one shot?
-  while (Cleanups.stable_begin() != depth) {
-    // Mark the cleanup dead.
-    if (!Cleanups.begin()->isDead())
-      setCleanupState(*Cleanups.begin(), CleanupState::Dead);
-
-    // Pop it.
-    popAndEmitTopCleanup(*this, Cleanups);
-  }
-
-  // Emit the continuation block if we made one.
-  if (contBB) {
-    Builder.emitMergeableBlock(contBB);
-  }
+  popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
 }
 
 /// End the scope induced by a single cleanup.
@@ -571,7 +320,6 @@ Cleanup &IRGenFunction::initCleanup(Cleanup &cleanup, size_t allocSize,
   //      HasControlFlag set below
   cleanup.NextDestLabel = 0;
   cleanup.NormalEntryBB = nullptr;
-  cleanup.Outflows = nullptr;
   //      ControlBegin set below
   //      ControlEnd set below
 
@@ -706,63 +454,8 @@ void IRGenFunction::emitBranch(llvm::BasicBlock *cblock, CleanupsDepth cdepth) {
   }
 
   // If we got out to the destination depth, we're done.
-  if (it == depth) {
-    Builder.CreateBr(cblock);
-    return;
-  }
-
-  // Scan through the stack looking for the cleanup immediately prior
-  // to the scope depth.
-  auto innermost = it, outermost = innermost;
-  unsigned destLabel = 0;
-  while (true) {
-    auto next = it; ++next;
-
-    // Keep track of the outermost active cleanup we've seen.
-    if (it->isActive())
-      outermost = it;
-
-    // Keep track of the biggest label that any of the cleanups we're
-    // actually routing through has needed to deal with.  We don't
-    // actually have to route through this cleanup if it's not active
-    // and it doesn't end up inside the outermost scope, but it's not
-    // really worth doing another pass just to ignore these.
-    destLabel = std::max(destLabel, it->getNextDestLabel());
-
-    // Stop if the next location is the target scope depth.
-    if (next == depth) break;
-
-    // Otherwise, on to the next.
-    it = next;
-  }
-
-  assert(outermost->isActive());
-
-  // Create a new label for branching with our given combination of
-  // destination and cleanups.
-  // FIXME: We should reuse labels for multiple jumps to the same
-  // destination.
-  CleanupOutflows *outs = getOrCreateOutflows(*outermost);
-  llvm::ConstantInt *labelValue = llvm::ConstantInt::get(IGM.Int32Ty,
-                                                         destLabel);
-  outs->add(labelValue, cblock);
-
-  // Add the label to the outermost cleanup.
-  outermost->addActiveUse();
-  outermost->setNextDestLabel(destLabel + 1);
-
-  // Set the destination and branch to the innermost cleanup.
-  Builder.CreateStore(labelValue, getJumpDestSlot(), getJumpDestAlignment());
-  Builder.CreateBr(getOrCreateNormalEntryBlock(*this, *innermost));
-
-  // Walk through the intermediate cleanups again and add fallthrough outflows.
-  for (it = innermost; it != outermost; ++it) {
-    it->addUse();
-    it->addFallthroughOutflow();
-
-    // And tell each cleanup that the new label value has been reserved.
-    it->setNextDestLabel(destLabel + 1);
-  }
+  assert(it == depth);
+  Builder.CreateBr(cblock);
 }
 
 // Anchor the Cleanup v-table in this translation unit.

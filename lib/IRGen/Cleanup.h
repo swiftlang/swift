@@ -24,7 +24,6 @@ namespace irgen {
 
 // These classes are private to GenCleanup.cpp.
 class CleanupControl;
-class CleanupOutflows;
 
 /// A Cleanup is an object placed on IRGenFunction's cleanups stack to
 /// cause something to occur when a scope or full-expression is
@@ -38,7 +37,6 @@ class Cleanup {
   unsigned HasControlFlag : 1;
   unsigned NextDestLabel : 26;
   llvm::BasicBlock *NormalEntryBB;
-  CleanupOutflows *Outflows;
   void *ControlBegin;
   void *ControlEnd;
 
@@ -79,9 +77,6 @@ public:
 
   llvm::BasicBlock *getNormalEntryBlock() const { return NormalEntryBB; }
   void setNormalEntryBlock(llvm::BasicBlock *BB) { NormalEntryBB = BB; }
-
-  CleanupOutflows *getOutflows() const { return Outflows; }
-  void setOutflows(CleanupOutflows *outs) { Outflows = outs; }
 
   /// Does this cleanup have a fallthrough outflow, i.e. are there
   /// branches leading through it to the enclosing cleanup?  This is

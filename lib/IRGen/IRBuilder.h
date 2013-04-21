@@ -134,44 +134,6 @@ public:
     return StableIP(*this);
   }
 
-  /// A RAII object for temporarily saving and restoring the IP.
-  class ShiftIP {
-    IRBuilder &Builder;
-    llvm::BasicBlock *ClearedIP;
-    InsertPoint SavedIP;
-    bool Restored;
-
-    ShiftIP(const ShiftIP &) = delete;
-    ShiftIP &operator=(const ShiftIP &) = delete;
-
-    void restoreImpl() {
-      Builder.restoreIP(SavedIP);
-      Builder.ClearedIP = ClearedIP;
-    }
-
-  public:
-    ShiftIP(IRBuilder &builder, llvm::BasicBlock *newBlock)
-      : Builder(builder), ClearedIP(builder.ClearedIP),
-        SavedIP(builder.saveIP()), Restored(false) {
-      assert(newBlock != nullptr);
-      assert(newBlock->getParent() != nullptr &&
-             "new block has not been inserted!");
-
-      builder.ClearedIP = nullptr;
-      builder.SetInsertPoint(newBlock);
-    }
-
-    void restore() {
-      assert(!Restored);
-      restoreImpl();
-      Restored = true;
-    }
-
-    ~ShiftIP() {
-      if (!Restored) restoreImpl();
-    }
-  };
-
   llvm::LoadInst *CreateLoad(llvm::Value *addr, Alignment align,
                              const llvm::Twine &name = "") {
     llvm::LoadInst *load = IRBuilderBase::CreateLoad(addr, name);
