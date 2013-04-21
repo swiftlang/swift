@@ -956,7 +956,6 @@ namespace {
         
         // Push a cleanup to dealloc the allocation.
         OwnedAddress addr(rawAddr, box);
-        init.markAllocated(IGF, object, addr, IGF.getCleanupsDepth());
         return addr;
       }
 
@@ -972,8 +971,6 @@ namespace {
                         Alignment(1));
       OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
 
-      // Push a cleanup to dealloc it.
-      init.markAllocated(IGF, object, ownedAddr, IGF.getCleanupsDepth());
       return ownedAddr;
     }
 

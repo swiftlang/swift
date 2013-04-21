@@ -99,18 +99,6 @@ enum class Prologue : unsigned char {
   Bare
 };
 
-/// The valid states that a cleanup can be in.
-enum class CleanupState {
-  /// The cleanup is inactive but may be activated later.
-  Dormant,
-
-  /// The cleanup is currently active.
-  Active,
-
-  /// The cleanup is inactive and will not be activated later.
-  Dead
-};
-
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -136,15 +124,6 @@ public:
 
 //--- Control flow -------------------------------------------------------------
 public:
-
-  /// Return a stable reference to the current cleanup.
-  CleanupsDepth getCleanupsDepth() const {
-    return Cleanups.stable_begin();
-  }
-
-  void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
-                           Explosion &out);
-
   /// Is the current emission point conditionally evaluated?  Right
   /// now we don't have any expressions which introduce conditional
   /// evaluation, but it's not at all unlikely that this will change.
@@ -159,10 +138,8 @@ public:
                             const llvm::AttributeSet &attrs);
 
 private:
-  DiverseStack<Cleanup, 128> Cleanups;
   llvm::BasicBlock *UnreachableBB;
   llvm::Instruction *JumpDestSlot;
-  CleanupsDepth InnermostScope;
   
   friend class Scope;
 
@@ -219,11 +196,9 @@ public:
   void emitRetainCall(llvm::Value *value);
   llvm::Value *emitBestRetainCall(llvm::Value *value, ClassDecl *theClass);
   void emitRelease(llvm::Value *value);
-  ManagedValue enterReleaseCleanup(llvm::Value *value);
   void emitObjCRetain(llvm::Value *value, Explosion &explosion);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
   void emitObjCRelease(llvm::Value *value);
-  ManagedValue enterObjCReleaseCleanup(llvm::Value *value);
 
 //--- Expression emission ------------------------------------------------------
 public:

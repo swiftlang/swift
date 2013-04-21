@@ -28,7 +28,6 @@ namespace irgen {
 /// concluded.
 class Cleanup {
   unsigned AllocatedSize;
-  unsigned State : 2;
 
  protected:
   Cleanup() {}
@@ -38,15 +37,6 @@ public:
   /// Return the allocated size of this object.  This is required by
   /// DiverseStack for iteration.
   size_t allocated_size() const { return AllocatedSize; }
-
-  CleanupState getState() const { return CleanupState(State); }
-  void setState(CleanupState state) {
-    State = unsigned(state);
-  }
-
-   /// Is this cleanup active for code currently being executed?
-  bool isActive() const { return getState() == CleanupState::Active; }
-  bool isDead() const { return getState() == CleanupState::Dead; }
 
 private:
   virtual void _anchor();

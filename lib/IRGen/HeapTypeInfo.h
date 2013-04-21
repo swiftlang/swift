@@ -65,11 +65,7 @@ public:
 
   void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
                           Explosion &out) const {
-    if (asDerived().hasSwiftRefcount()) {
-      out.add(IGF.enterReleaseCleanup(value));
-    } else {
-      out.add(IGF.enterObjCReleaseCleanup(value));
-    }
+    out.add(ManagedValue(value));
   }
 };
 

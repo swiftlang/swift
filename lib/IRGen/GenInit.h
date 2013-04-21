@@ -62,9 +62,6 @@ public:
 ///     using one of the getObject* methods;
 ///   - register that Object with the Initialization using one of the
 ///     registerObject* methods;
-///   - mark when that object has been allocated using markAllocated; and
-///   - mark when that object has been initialization using
-///     markInitialized.
 ///
 /// This class also provides several convenience methods for
 /// performing one or more stages of this process.
@@ -108,16 +105,6 @@ public:
   /// Add an object that is going to be initialized, but which does not
   /// need a destroy cleanup.
   void registerObjectWithoutDestroy(InitializedObject object);
-
-  /// Mark that an object has been allocated, and associate a dealloc
-  /// cleanup with it.  This should be called even if allocation is
-  /// trivial and there isn't a dealloc cleanup.
-  void markAllocated(IRGenFunction &IGF, InitializedObject object,
-                     OwnedAddress address,
-                     CleanupsDepth dealloc);
-
-  /// Mark that the value has reached its instant of initialization.
-  void markInitialized(IRGenFunction &IGF, InitializedObject object);
 
 private:
   /// Add an object that is going to be initialized.

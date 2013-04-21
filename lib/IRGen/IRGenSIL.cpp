@@ -1157,9 +1157,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
                                     isOnHeap,
                                     // FIXME: derive name from SIL location
                                     "");
-  // Pretend the object is "initialized" so that the deallocation cleanup
-  // gets killed.
-  init.markInitialized(*this, initVar);
   
   newLoweredAddress(v, addr.getAddress());
 }
@@ -1196,9 +1193,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
                                     OnHeap,
                                     // FIXME: derive name from SIL location
                                     "");
-  // Pretend the object is "initialized" so that the deallocation cleanup
-  // gets killed.
-  init.markInitialized(*this, initBox);
   
   Explosion box(CurExplosionLevel);
   box.addUnmanaged(addr.getOwner());

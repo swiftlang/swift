@@ -200,10 +200,6 @@ static llvm::Value *emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
 }
 
 
-ManagedValue IRGenFunction::enterObjCReleaseCleanup(llvm::Value *value) {
-  return ManagedValue(value, getCleanupsDepth());
-}
-
 namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
   class ObjCTypeInfo : public HeapTypeInfo<ObjCTypeInfo> {

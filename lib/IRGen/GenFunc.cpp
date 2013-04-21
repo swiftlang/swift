@@ -419,7 +419,7 @@ namespace {
 
       // Load the data.
       Address dataAddr = projectData(IGF, addr);
-      e.add(IGF.enterReleaseCleanup(IGF.Builder.CreateLoad(dataAddr)));
+      e.add(ManagedValue(IGF.Builder.CreateLoad(dataAddr)));
     }
 
     void loadAsTake(IRGenFunction &IGF, Address address, Explosion &e) const {
@@ -453,7 +453,7 @@ namespace {
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
-      dest.add(IGF.enterReleaseCleanup(src.claimUnmanagedNext()));
+      dest.add(ManagedValue(src.claimUnmanagedNext()));
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
@@ -1068,12 +1068,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       // Just bitcast and rebuild the cleanup.
       llvm::Value *value = args.forwardNext(IGF);
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
-      out->add(IGF.enterReleaseCleanup(value));
+      out->add(ManagedValue(value));
     } else if (BuiltinName == "castFromObjectPointer") {
       // Just bitcast and rebuild the cleanup.
       llvm::Value *value = args.forwardNext(IGF);
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
-      out->add(IGF.enterReleaseCleanup(value));
+      out->add(ManagedValue(value));
     } else if (BuiltinName == "bridgeToRawPointer") {
       // Bitcast and immediately release the operand.
       // FIXME: Should annotate the ownership semantics of this builtin
@@ -1356,8 +1356,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     Address temp = init.emitLocalAllocation(IGF, obj, NotOnHeap, substResultTI,
                                             "call.aggresult");
     emitToMemory(temp, substResultTI);
-    init.markInitialized(IGF, obj);
-
+ 
     // If the subst result is passed as an aggregate, don't uselessly
     // copy the temporary.
     auto substSchema = substResultTI.getSchema(out.getKind());
@@ -1560,10 +1559,8 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
                                     object,
                                     NotOnHeap,
                                     "byval-temporary");
-    I.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     ti.initialize(IGF, in, addr.getAddress());
-    I.markInitialized(IGF, object);
-    
+     
     newByvals.push_back({out.size(), addr.getAlignment()});
     out.addUnmanaged(addr.getAddress().getAddress());
   } else {
@@ -1787,7 +1784,6 @@ void IRGenFunction::emitPrologue() {
   if (CurPrologue == Prologue::StandardWithContext) {
     ContextPtr = values.claimUnmanagedNext();
     ContextPtr->setName(".context");
-    enterReleaseCleanup(ContextPtr);
   }
 
   assert(values.empty() && "didn't exhaust all parameters?");
@@ -2098,5 +2094,5 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   llvm::Value *result = IGF.Builder.CreateCall2(converter, fn, context);
   
   // Tag the result with a cleanup and pass it on.
-  outBlock.add(IGF.enterObjCReleaseCleanup(result));
+  outBlock.add(ManagedValue(result));
 }

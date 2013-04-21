@@ -410,8 +410,7 @@ namespace {
 
       // Initialize into it.
       substTI.initialize(IGF, In, addr);
-      init.markInitialized(IGF, object);
-
+ 
       // Cast to the expected pointer type.
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
 

@@ -27,39 +27,21 @@ namespace irgen {
 class Scope {
   IRGenFunction &IGF;
   CleanupsDepth Depth;
-  CleanupsDepth SavedInnermostScope;
   IRGenFunction::LocalTypeDataDepth SavedLocalTypeDataDepth;
-
-  void popImpl() {
-    IGF.Cleanups.checkIterator(Depth);
-    IGF.Cleanups.checkIterator(IGF.InnermostScope);
-    assert(IGF.InnermostScope == Depth && "popping scopes out of order");
-
-    IGF.InnermostScope = SavedInnermostScope;
-    IGF.Cleanups.checkIterator(IGF.InnermostScope);
-
-    assert(IGF.ScopedLocalTypeData.size() >= SavedLocalTypeDataDepth);
-    IGF.endLocalTypeDataScope(SavedLocalTypeDataDepth);
-  }
 
 public:
   explicit Scope(IRGenFunction &IGF)
-    : IGF(IGF), Depth(IGF.getCleanupsDepth()),
-      SavedInnermostScope(IGF.InnermostScope),
-      SavedLocalTypeDataDepth(IGF.ScopedLocalTypeData.size()) {
-    assert(Depth.isValid());
-    IGF.Cleanups.checkIterator(IGF.InnermostScope);
-    IGF.InnermostScope = Depth;
+    : IGF(IGF),  SavedLocalTypeDataDepth(IGF.ScopedLocalTypeData.size()) {
   }
 
   void pop() {
     assert(Depth.isValid() && "popping a scope twice!");
-    popImpl();
-    Depth = CleanupsDepth::invalid();
+    assert(IGF.ScopedLocalTypeData.size() >= SavedLocalTypeDataDepth);
+    IGF.endLocalTypeDataScope(SavedLocalTypeDataDepth);
   }
 
   ~Scope() {
-    if (Depth.isValid()) popImpl();
+    if (Depth.isValid()) pop();
   }
 };
 

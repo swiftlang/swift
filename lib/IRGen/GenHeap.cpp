@@ -582,7 +582,7 @@ void IRGenFunction::emitRetainCall(llvm::Value *value) {
 static void emitRetainAndManage(IRGenFunction &IGF, llvm::Value *value,
                                 Explosion &out) {
   IGF.emitRetainCall(value);
-  out.add(IGF.enterReleaseCleanup(value));
+  out.add(ManagedValue(value));
 }
 
 /// Emit a retain of a value.  This is usually not required because
@@ -646,10 +646,3 @@ void IRGenFunction::emitRelease(llvm::Value *value) {
 }
 
 
-/// Enter a cleanup to release an object.
-ManagedValue IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
-  if (doesNotRequireRefCounting(value))
-    return ManagedValue(value);
-
-  return ManagedValue(value, getCleanupsDepth());
-}

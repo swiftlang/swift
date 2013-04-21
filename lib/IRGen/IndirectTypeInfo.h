@@ -64,7 +64,6 @@ public:
 
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
-    init.markInitialized(IGF, temp);
 
     // Enter a cleanup for the temporary.
     out.add(ManagedValue(dest.getAddress(), cleanup));
@@ -79,7 +78,6 @@ public:
     
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
-    init.markInitialized(IGF, temp);
     
     // Enter a cleanup for the temporary.
     out.addUnmanaged(dest.getAddress());
@@ -96,8 +94,7 @@ public:
 
     // Initialize it with a take of the source.
     asDerived().Derived::initializeWithTake(IGF, dest, src);
-    init.markInitialized(IGF, temp);
-
+ 
     // Enter a cleanup for the temporary.
     out.add(ManagedValue(dest.getAddress(), cleanup));
   }
@@ -136,11 +133,7 @@ public:
   
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     Address obj = asDerived().Derived::getAddressForPointer(in.claimUnmanagedNext());
-    if (asDerived().Derived::isPOD(ResilienceScope::Local)) {
-      out.addUnmanaged(obj.getAddress());
-    } else {
-      IGF.enterDestroyCleanup(obj, *this, out);
-    }
+    out.addUnmanaged(obj.getAddress());
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {

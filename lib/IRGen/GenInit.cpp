@@ -34,14 +34,6 @@
 using namespace swift;
 using namespace irgen;
 
-/// Enter a cleanup to destroy an object of arbitrary type.  Adds the
-/// address value to the given explosion, along with the appropriate
-/// cleanup.
-void IRGenFunction::enterDestroyCleanup(Address addr,
-                                        const TypeInfo &addrTI,
-                                        Explosion &out) {
-  out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
-}
 
 /// Register an object with the initialization process.
 CleanupsDepth Initialization::registerObject(IRGenFunction &IGF,
@@ -68,17 +60,6 @@ void Initialization::registerObject(InitializedObject object,
     CleanupsDepth::invalid(), destroy
   };
   Records.insert(std::make_pair(object.Opaque, record));
-}
-
-/// Mark that an object has been allocated.
-void Initialization::markAllocated(IRGenFunction &IGF,
-                                   InitializedObject object,
-                                   OwnedAddress address,
-                                   CleanupsDepth dealloc) {
-  assert(Records.find(object.Opaque) != Records.end() &&
-         "object was not registered with initialization");
-  ValueRecord &record = Records.find(object.Opaque)->second;
-  record.DeallocCleanup = dealloc;
 }
 
 /// Emit a global variable.
@@ -124,11 +105,8 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
                                      OnHeap_t onHeap,
                                      const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
-  if (isKnownEmpty()) {
-    OwnedAddress addr = createEmptyAlloca(IGF.IGM, *this);
-    init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
-    return addr;
-  }
+  if (isKnownEmpty())
+    return createEmptyAlloca(IGF.IGM, *this);
 
   // If the object does not need to be allocated on the heap,
   // allocate it on the stack.
@@ -138,7 +116,6 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
     // TODO: lifetime intrinsics?
 
     OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
-    init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
     return addr;
   }
 
@@ -156,14 +133,6 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
   rawAddr = elt.project(IGF, rawAddr, name);
 
   OwnedAddress addr(rawAddr, allocation);
-  init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
   return addr;
 }
 
-
-/// Mark that a value has reached its initialization point.
-void Initialization::markInitialized(IRGenFunction &IGF,
-                                     InitializedObject object) {
-  auto it = Records.find(object.Opaque);
-  assert(it != Records.end());
-}
