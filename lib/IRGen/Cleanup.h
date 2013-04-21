@@ -31,10 +31,7 @@ class CleanupControl;
 class Cleanup {
   unsigned AllocatedSize;
   unsigned State : 2;
-  unsigned UsedWhileActive : 1;
-  unsigned UsedWhileInactive : 1;
-  unsigned HasFallthroughOutflow : 1;
-  unsigned HasControlFlag : 1;
+   unsigned HasControlFlag : 1;
   unsigned NextDestLabel : 26;
   llvm::BasicBlock *NormalEntryBB;
   void *ControlBegin;
@@ -64,25 +61,8 @@ public:
   bool isActive() const { return getState() == CleanupState::Active; }
   bool isDead() const { return getState() == CleanupState::Dead; }
 
-  // Observe that some control flow is trying to break through this
-  // cleanup.
-  void addUse() {
-    if (isActive()) UsedWhileActive = true;
-    else UsedWhileInactive = true;
-  }
-  void addActiveUse() { assert(isActive()); UsedWhileActive = true; }
-  void addInactiveUse() { assert(!isActive()); UsedWhileInactive = true; }
-  bool isUsedWhileActive() const { return UsedWhileActive; }
-  bool isUsedWhileInactive() const { return UsedWhileInactive; }
-
   llvm::BasicBlock *getNormalEntryBlock() const { return NormalEntryBB; }
   void setNormalEntryBlock(llvm::BasicBlock *BB) { NormalEntryBB = BB; }
-
-  /// Does this cleanup have a fallthrough outflow, i.e. are there
-  /// branches leading through it to the enclosing cleanup?  This is
-  /// stored here so that we don't need to 
-  bool hasFallthroughOutflow() const { return HasFallthroughOutflow; }
-  void addFallthroughOutflow() { HasFallthroughOutflow = true; }
 
   unsigned getNextDestLabel() const { return NextDestLabel; }
   void setNextDestLabel(unsigned label) {

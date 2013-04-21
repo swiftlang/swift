@@ -136,7 +136,6 @@ public:
 
 //--- Control flow -------------------------------------------------------------
 public:
-  void emitBranch(llvm::BasicBlock *block, CleanupsDepth depth);
 
   /// Push a new cleanup in the current scope.
   template <class T, class... A>
@@ -197,8 +196,7 @@ public:
   }
 
   void endScope(CleanupsDepth depth);
-  void endSingleCleanupScope();
-
+ 
   void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
                            Explosion &out);
   void enterDestroyCleanup(Address addr, const TypeInfo &addrTI);
@@ -247,8 +245,6 @@ private:
 public:
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name);
-  llvm::AllocaInst *createSupportAlloca(llvm::Type *type, Alignment align,
-                                        const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
