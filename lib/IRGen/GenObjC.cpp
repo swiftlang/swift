@@ -848,67 +848,67 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
   if (canUseSwiftFunctionAsObjCFunction(IGM, sig, conventions,
                                         origFormalType)) {
     objcImpl = swiftImpl;
-
+    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  }
+  
   // Otherwise, build a function.
+  objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
+  IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
+                    explosionLevel, uncurryLevel,
+                    objcImpl, Prologue::Bare);
+  Explosion params = IGF.collectParameters();
+
+  SmallVector<llvm::Value *, 16> args;
+
+  // Remember the out-pointer.
+  if (sig.IsIndirectReturn) {
+    // TODO: remap return values?
+    args.push_back(params.claimNext());
+  }
+
+  auto fnType = cast<AnyFunctionType>(origFormalType);
+  auto selfType = CanType(fnType->getInput());
+  fnType = cast<AnyFunctionType>(CanType(fnType->getResult()));
+  auto formalArgType = CanType(fnType->getInput());
+
+  SmallVector<unsigned, 16> consumedArgs;
+  conventions.getConsumedArgs(IGM, callee, consumedArgs);
+
+  TranslateParameters translate(IGF, params, args, consumedArgs);
+
+  // Pull off and translate 'self'.
+  translate.visit(selfType);
+  params.getLastClaimed()->setName(method->isStatic() ? "This" : "this");
+
+  // 'self' just got pushed on, but we need it to come later.
+  auto self = args.back();
+  args.pop_back();
+
+  // Ignore '_cmd'.
+  translate.ignoreNext(1);
+
+  // Translate the formal parameters.
+  translate.visit(formalArgType);
+  assert(params.empty());
+
+  // Put 'self' in its proper place.
+  args.push_back(self);
+
+  // Perform the call.
+  // FIXME: other fn attributes?
+  auto call = IGF.Builder.CreateCall(swiftImpl, args);
+  if (sig.IsIndirectReturn) {
+    call->addAttribute(1, llvm::Attribute::StructRet);
+  }
+
+  if (call->getType()->isVoidTy()) {
+    IGF.Builder.CreateRetVoid();
   } else {
-    objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
-    IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
-                      explosionLevel, uncurryLevel,
-                      objcImpl, Prologue::Bare);
-    Explosion params = IGF.collectParameters();
-
-    SmallVector<llvm::Value *, 16> args;
-
-    // Remember the out-pointer.
-    if (sig.IsIndirectReturn) {
-      // TODO: remap return values?
-      args.push_back(params.claimNext());
+    llvm::Value *result = call;
+    if (conventions.isResultAutoreleased(IGM, callee)) {
+      result = emitObjCAutoreleaseReturnValue(IGF, result);
     }
-
-    auto fnType = cast<AnyFunctionType>(origFormalType);
-    auto selfType = CanType(fnType->getInput());
-    fnType = cast<AnyFunctionType>(CanType(fnType->getResult()));
-    auto formalArgType = CanType(fnType->getInput());
-
-    SmallVector<unsigned, 16> consumedArgs;
-    conventions.getConsumedArgs(IGM, callee, consumedArgs);
-
-    TranslateParameters translate(IGF, params, args, consumedArgs);
-
-    // Pull off and translate 'self'.
-    translate.visit(selfType);
-    params.getLastClaimed()->setName(method->isStatic() ? "This" : "this");
-
-    // 'self' just got pushed on, but we need it to come later.
-    auto self = args.back();
-    args.pop_back();
-
-    // Ignore '_cmd'.
-    translate.ignoreNext(1);
-
-    // Translate the formal parameters.
-    translate.visit(formalArgType);
-    assert(params.empty());
-
-    // Put 'self' in its proper place.
-    args.push_back(self);
-
-    // Perform the call.
-    // FIXME: other fn attributes?
-    auto call = IGF.Builder.CreateCall(swiftImpl, args);
-    if (sig.IsIndirectReturn) {
-      call->addAttribute(1, llvm::Attribute::StructRet);
-    }
-
-    if (call->getType()->isVoidTy()) {
-      IGF.Builder.CreateRetVoid();
-    } else {
-      llvm::Value *result = call;
-      if (conventions.isResultAutoreleased(IGM, callee)) {
-        result = emitObjCAutoreleaseReturnValue(IGF, result);
-      }
-      IGF.Builder.CreateRet(result);
-    }
+    IGF.Builder.CreateRet(result);
   }
 
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
@@ -930,73 +930,73 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
     return getObjCMethodPointerForSwiftImpl(IGM, selector, getter,
                                             swiftImpl, explosionLevel,
                                             /*uncurryLevel=*/ 1);
-  } else {
-    assert(!property->isProperty() && "property without getter?!");
-    
-    // Synthesize a getter.
-    
-    FormalType getterType = IGM.getTypeOfGetter(property);
-    CanType origFormalType = getterType.getType();
-    ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
-    llvm::SmallString<32> swiftName;
-    
-    // Generate the mangled name of the Swift getter (without actually creating
-    // a Function for it).
-    CodeRef getterCode = CodeRef::forGetter(property, explosionLevel,
-                                          getterType.getNaturalUncurryLevel());
-    LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
-    getterEntity.mangle(swiftName);
-    
-    llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
-
-    // Emit the ObjC method.
-    IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
-                      explosionLevel,
-                      getterType.getNaturalUncurryLevel(),
-                      objcImpl, Prologue::Bare);
-    Explosion params = IGF.collectParameters();
-    CanType propTy = property->getType()->getCanonicalType();
-    CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
-      ->getCanonicalType();
-    TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
-    llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
-    Alignment align(alignConstant
-                      ? alignConstant->getUniqueInteger().getZExtValue()
-                      : 1);
-    
-    // Pick out the arguments:
-    // - indirect return (if any)
-    Address indirectReturn;
-    if (requiresExternalIndirectResult(IGM, propTy)) {
-      indirectReturn = Address(params.claimNext(), align);
-    }
-    // - self (passed in at +0)
-    llvm::Value *thisValue = params.claimNext();
-    // - _cmd
-    params.claimNext();
-    
-    // Load the physical ivar.
-    OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
-                                                          thisValue,
-                                                          classTy,
-                                                          property);
-    
-    // Return it at +0.
-    if (indirectReturn.isValid()) {
-      // "initializeWithTake" because ObjC getter convention is to return at
-      // +0.
-      ti.initializeWithTake(IGF, indirectReturn, ivar.getAddress());
-      IGF.Builder.CreateRetVoid();
-    } else {
-      Explosion value(explosionLevel);
-      // "loadAsTake" because ObjC getter convention is to return at +0.
-      ti.loadAsTake(IGF, ivar.getAddress(), value);
-      IGF.emitScalarReturn(value);
-    }
-    
-    // Cast the method pointer to i8* and return it.
-    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
   }
+  
+  assert(!property->isProperty() && "property without getter?!");
+  
+  // Synthesize a getter.
+  
+  FormalType getterType = IGM.getTypeOfGetter(property);
+  CanType origFormalType = getterType.getType();
+  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
+  llvm::SmallString<32> swiftName;
+  
+  // Generate the mangled name of the Swift getter (without actually creating
+  // a Function for it).
+  CodeRef getterCode = CodeRef::forGetter(property, explosionLevel,
+                                        getterType.getNaturalUncurryLevel());
+  LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
+  getterEntity.mangle(swiftName);
+  
+  llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
+
+  // Emit the ObjC method.
+  IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
+                    explosionLevel,
+                    getterType.getNaturalUncurryLevel(),
+                    objcImpl, Prologue::Bare);
+  Explosion params = IGF.collectParameters();
+  CanType propTy = property->getType()->getCanonicalType();
+  CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
+    ->getCanonicalType();
+  TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
+  llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
+  Alignment align(alignConstant
+                    ? alignConstant->getUniqueInteger().getZExtValue()
+                    : 1);
+  
+  // Pick out the arguments:
+  // - indirect return (if any)
+  Address indirectReturn;
+  if (requiresExternalIndirectResult(IGM, propTy)) {
+    indirectReturn = Address(params.claimNext(), align);
+  }
+  // - self (passed in at +0)
+  llvm::Value *thisValue = params.claimNext();
+  // - _cmd
+  params.claimNext();
+  
+  // Load the physical ivar.
+  OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
+                                                        thisValue,
+                                                        classTy,
+                                                        property);
+  
+  // Return it at +0.
+  if (indirectReturn.isValid()) {
+    // "initializeWithTake" because ObjC getter convention is to return at
+    // +0.
+    ti.initializeWithTake(IGF, indirectReturn, ivar.getAddress());
+    IGF.Builder.CreateRetVoid();
+  } else {
+    Explosion value(explosionLevel);
+    // "loadAsTake" because ObjC getter convention is to return at +0.
+    ti.loadAsTake(IGF, ivar.getAddress(), value);
+    IGF.emitScalarReturn(value);
+  }
+  
+  // Cast the method pointer to i8* and return it.
+  return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -1017,73 +1017,73 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
     return getObjCMethodPointerForSwiftImpl(IGM, selector, setter,
                                             swiftImpl, explosionLevel,
                                             /*uncurryLevel=*/ 1);
-  } else {
-    assert(!property->isProperty() && "settable property w/o setter?!");
-    
-    // Synthesize a setter.
-    
-    FormalType setterType = IGM.getTypeOfSetter(property);
-    CanType origFormalType = setterType.getType();
-    ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
-    llvm::SmallString<32> swiftName;
-    
-    // Generate the mangled name of the Swift setter (without actually creating
-    // a Function for it).
-    CodeRef setterCode = CodeRef::forSetter(property, explosionLevel,
-                                            setterType.getNaturalUncurryLevel());
-    LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
-    setterEntity.mangle(swiftName);
-    
-    llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
-
-    // Emit the ObjC method.
-    IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
-                      explosionLevel,
-                      setterType.getNaturalUncurryLevel(),
-                      objcImpl, Prologue::Bare);
-    Explosion params = IGF.collectParameters();
-    CanType propTy = property->getType()->getCanonicalType();
-    CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
-      ->getCanonicalType();
-    TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
-    llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
-    Alignment align(alignConstant
-                    ? alignConstant->getUniqueInteger().getZExtValue()
-                    : 1);
-
-    // Pick out the arguments:
-    // - self (passed in at +0)
-    llvm::Value *thisValue = params.claimNext();
-    // - _cmd
-    params.claimNext();
-    // - value (passed in at +0) -- we'll deal with that below.
-    
-    // Project the physical ivar.
-    OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
-                                                          thisValue,
-                                                          classTy,
-                                                          property);
-    
-    if (requiresExternalByvalArgument(IGM, propTy)) {
-      // If the argument was passed byval in the C calling convention,
-      // assign it (with copy so that we retain it) into the ivar.
-      llvm::Value *value = params.claimNext();
-      Address valueAddr(value, align);
-      ti.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
-    } else {
-      Explosion copy(explosionLevel);
-      // Copy the argument values so they get retained.
-      ti.copy(IGF, params, copy);
-      
-      // Assign the exploded value to the ivar.
-      ti.assign(IGF, copy, ivar.getAddress());
-    }
-    
-    IGF.Builder.CreateRetVoid();
-    
-    // Cast the method pointer to i8* and return it.
-    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
   }
+  
+  assert(!property->isProperty() && "settable property w/o setter?!");
+  
+  // Synthesize a setter.
+  
+  FormalType setterType = IGM.getTypeOfSetter(property);
+  CanType origFormalType = setterType.getType();
+  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
+  llvm::SmallString<32> swiftName;
+  
+  // Generate the mangled name of the Swift setter (without actually creating
+  // a Function for it).
+  CodeRef setterCode = CodeRef::forSetter(property, explosionLevel,
+                                          setterType.getNaturalUncurryLevel());
+  LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
+  setterEntity.mangle(swiftName);
+  
+  llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
+
+  // Emit the ObjC method.
+  IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
+                    explosionLevel,
+                    setterType.getNaturalUncurryLevel(),
+                    objcImpl, Prologue::Bare);
+  Explosion params = IGF.collectParameters();
+  CanType propTy = property->getType()->getCanonicalType();
+  CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
+    ->getCanonicalType();
+  TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
+  llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
+  Alignment align(alignConstant
+                  ? alignConstant->getUniqueInteger().getZExtValue()
+                  : 1);
+
+  // Pick out the arguments:
+  // - self (passed in at +0)
+  llvm::Value *thisValue = params.claimNext();
+  // - _cmd
+  params.claimNext();
+  // - value (passed in at +0) -- we'll deal with that below.
+  
+  // Project the physical ivar.
+  OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
+                                                        thisValue,
+                                                        classTy,
+                                                        property);
+  
+  if (requiresExternalByvalArgument(IGM, propTy)) {
+    // If the argument was passed byval in the C calling convention,
+    // assign it (with copy so that we retain it) into the ivar.
+    llvm::Value *value = params.claimNext();
+    Address valueAddr(value, align);
+    ti.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
+  } else {
+    Explosion copy(explosionLevel);
+    // Copy the argument values so they get retained.
+    ti.copy(IGF, params, copy);
+    
+    // Assign the exploded value to the ivar.
+    ti.assign(IGF, copy, ivar.getAddress());
+  }
+  
+  IGF.Builder.CreateRetVoid();
+  
+  // Cast the method pointer to i8* and return it.
+  return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
 /// Produce a function pointer, suitable for invocation by
