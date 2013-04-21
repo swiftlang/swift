@@ -697,9 +697,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   Callee callee = Callee::forKnownFunction(cc,
                                            calleeTy.getSwiftType(),
                                            resultTy.getSwiftType(),
-                                           substitutions,
-                                           calleeFn,
-                                           ManagedValue(calleeData),
+                                           substitutions, calleeFn, calleeData,
                                            IGF.CurExplosionLevel,
                                            calleeTy.getUncurryLevel());
   return CallEmission(IGF, callee);

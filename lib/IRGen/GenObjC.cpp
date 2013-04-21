@@ -642,9 +642,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::C,
                                                       origFormalType,
                                                       substResultType,
-                                                      subs,
-                                                      messenger,
-                                                      ManagedValue(nullptr),
+                                                      subs, messenger, nullptr,
                                                       ExplosionKind::Minimal,
                                                       /*uncurry*/ 1));
   

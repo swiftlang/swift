@@ -111,7 +111,7 @@ void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
   
   // Otherwise, project from the base.
   auto fieldRange = fieldI.getProjectionRange(out.getKind());
-  ArrayRef<ManagedValue> element = base.getRange(fieldRange.first,
+  ArrayRef<llvm::Value *> element = base.getRange(fieldRange.first,
                                                  fieldRange.second);
   out.add(element);
 }

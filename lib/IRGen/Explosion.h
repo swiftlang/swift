@@ -29,30 +29,6 @@
 namespace swift {
 namespace irgen {
 
-/// A managed value is a pair of an llvm::Value* and an optional
-/// cleanup.
-class ManagedValue {
-  llvm::Value *Value;
-
-public:
-  ManagedValue() = default;
-  explicit ManagedValue(llvm::Value *value)
-    : Value(value) {}
-  ManagedValue(llvm::Value *value, CleanupsDepth cleanup)
-    : Value(value) {}
-
-  llvm::Value *getUnmanagedValue() const {
-    return getValue();
-  }
-  llvm::Value *getValue() const { return Value; }
- 
-  /// Forward this value, deactivating the cleanup and returning the
-  /// underlying value.
-  llvm::Value *forward(IRGenFunction &IGF) {
-    return getValue();
-  }
-};
-
 /// The representation for an explosion is just a list of raw LLVM
 /// values.  The meaning of these values is imposed externally by the
 /// type infos, except that it is expected that they will be passed
@@ -60,7 +36,7 @@ public:
 class Explosion {
   unsigned NextValue;
   ExplosionKind Kind;
-  SmallVector<ManagedValue, 8> Values;
+  SmallVector<llvm::Value*, 8> Values;
 
 public:
   Explosion(ExplosionKind kind) : NextValue(0), Kind(kind) {}
@@ -102,30 +78,30 @@ public:
     return Values.size() - NextValue;
   }
 
-  typedef ManagedValue *iterator;
+  typedef SmallVector<llvm::Value*, 8>::iterator iterator;
   iterator begin() { return Values.begin() + NextValue; }
   iterator end() { return Values.end(); }
 
-  typedef const ManagedValue *const_iterator;
+  typedef SmallVector<llvm::Value*, 8>::const_iterator const_iterator;
   const_iterator begin() const { return Values.begin() + NextValue; }
   const_iterator end() const { return Values.end(); }
 
   /// Add a value to the end of this exploded r-value.
-  void add(ManagedValue value) {
-    assert(value.getValue() && "adding null value to explosion");
+  void add(llvm::Value *value) {
+    assert(value && "adding null value to explosion");
     assert(NextValue == 0 && "adding to partially-claimed explosion?");
     Values.push_back(value);
   }
 
   /// Add an unmanaged value to the end of this exploded r-value.
   void addUnmanaged(llvm::Value *value) {
-    add(ManagedValue(value));
+    add(value);
   }
 
-  void add(llvm::ArrayRef<ManagedValue> values) {
+  void add(llvm::ArrayRef<llvm::Value*> values) {
 #ifndef NDEBUG
     for (auto value : values)
-      assert(value.getValue() && "adding null value to explosion");
+      assert(value && "adding null value to explosion");
 #endif
     assert(NextValue == 0 && "adding to partially-claimed explosion?");
     Values.append(values.begin(), values.end());
@@ -133,7 +109,7 @@ public:
 
   /// Return an array containing the given range of values.  The values
   /// are not claimed.
-  llvm::ArrayRef<ManagedValue> getRange(unsigned from, unsigned to) const {
+  llvm::ArrayRef<llvm::Value*> getRange(unsigned from, unsigned to) const {
     assert(from <= to);
     assert(to <= Values.size());
     return llvm::makeArrayRef(begin() + from, to - from);
@@ -141,7 +117,7 @@ public:
 
   /// Return an array containing all of the remaining values.  The values
   /// are not claimed.
-  llvm::ArrayRef<ManagedValue> getAll() {
+  llvm::ArrayRef<llvm::Value *> getAll() {
     return llvm::makeArrayRef(begin(), Values.size() - NextValue);
   }
 
@@ -172,29 +148,26 @@ public:
   /// Claim a value which is known to have no management.
   llvm::Value *claimUnmanagedNext() {
     assert(NextValue < Values.size());
-    return Values[NextValue++].getValue();
+    return Values[NextValue++];
   }
 
   /// Claim a series of values which are known to have no management.
   void claimUnmanaged(unsigned n, llvm::SmallVectorImpl<llvm::Value *> &out) {
     assert(NextValue + n <= Values.size());
-
-    out.reserve(out.size() + n);
-    for (auto i = begin(), e = i + n; i != e; ++i)
-      out.push_back(i->getUnmanagedValue());
+    out.append(begin(), begin()+n);
     NextValue += n;
   }
 
   /// Claim and return the next value in this explosion.
   /// The caller becomes responsible for managing the cleanup.
-  ManagedValue claimNext() {
+  llvm::Value *claimNext() {
     assert(NextValue < Values.size());
     return Values[NextValue++];
   }
 
   /// Claim and return the next N values in this explosion.
   /// The caller becomes responsible for managing the cleanups.
-  llvm::ArrayRef<ManagedValue> claim(unsigned n) {
+  llvm::ArrayRef<llvm::Value*> claim(unsigned n) {
     assert(NextValue + n <= Values.size());
     auto array = llvm::makeArrayRef(begin(), n);
     NextValue += n;
@@ -203,7 +176,7 @@ public:
 
   /// Claim and return all the values in this explosion.
   /// The caller becomes responsible for managing the cleanups.
-  llvm::ArrayRef<ManagedValue> claimAll() {
+  llvm::ArrayRef<llvm::Value*> claimAll() {
     return claim(size());
   }
 
@@ -211,18 +184,16 @@ public:
   /// cleanup if present.
   llvm::Value *forwardNext(IRGenFunction &IGF) {
     assert(NextValue < Values.size());
-    return Values[NextValue++].forward(IGF);
+    return Values[NextValue++];
   }
 
   /// Forward a series of values out of this explosion.
   void forward(IRGenFunction &IGF, unsigned n,
                llvm::SmallVectorImpl<llvm::Value *> &out) {
+    // FIXME: replace with claim()
     assert(NextValue + n <= Values.size());
 
-    out.reserve(out.size() + n);
-    for (auto i = begin(), e = i + n; i != e; ++i)
-      out.push_back(i->forward(IGF));
-
+    out.append(begin(), begin()+n);
     NextValue += n;
   }
 
@@ -232,12 +203,12 @@ public:
   /// if there is one.
   llvm::Value *getLastClaimed() {
     assert(NextValue > 0);
-    return Values[NextValue-1].getUnmanagedValue();
+    return Values[NextValue-1];
   }
 
   /// Claim and remove the last item in the array.
   /// Unlike the normal 'claim' methods, the item is gone forever.
-  ManagedValue takeLast() {
+  llvm::Value *takeLast() {
     assert(!empty());
     auto result = Values.back();
     Values.pop_back();

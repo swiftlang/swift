@@ -194,7 +194,7 @@ void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
 
 void Explosion::print(llvm::raw_ostream &OS) {
   for (auto value : makeArrayRef(Values).slice(NextValue)) {
-    value.getValue()->print(OS);
+    value->print(OS);
     OS << '\n';
   }
 }

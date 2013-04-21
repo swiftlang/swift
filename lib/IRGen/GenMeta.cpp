@@ -1693,8 +1693,7 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF,
 
   return Callee::forKnownFunction(AbstractCC::Method, formalType,
                                   substResultType, substitutions,
-                                  fn, ManagedValue(nullptr),
-                                  bestExplosion, bestUncurry);
+                                  fn, nullptr, bestExplosion, bestUncurry);
 }
 
 // Structs

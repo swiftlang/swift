@@ -579,12 +579,6 @@ void IRGenFunction::emitRetainCall(llvm::Value *value) {
   call->setDoesNotThrow();
 }
 
-static void emitRetainAndManage(IRGenFunction &IGF, llvm::Value *value,
-                                Explosion &out) {
-  IGF.emitRetainCall(value);
-  out.add(ManagedValue(value));
-}
-
 /// Emit a retain of a value.  This is usually not required because
 /// values in explosions are typically "live", i.e. have a +1 owned by
 /// the explosion.
@@ -594,13 +588,15 @@ void IRGenFunction::emitRetain(llvm::Value *value, Explosion &out) {
     return;
   }
 
-  emitRetainAndManage(*this, value, out);
+  emitRetainCall(value);
+  out.add(value);
 }
 
 /// Emit a load of a live value from the given retaining variable.
 void IRGenFunction::emitLoadAndRetain(Address address, Explosion &out) {
   llvm::Value *value = Builder.CreateLoad(address);
-  emitRetainAndManage(*this, value, out);
+  emitRetainCall(value);
+  out.add(value);
 }
 
 /// Emit a store of a live value to the given retaining variable.

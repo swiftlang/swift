@@ -59,7 +59,6 @@ namespace irgen {
   class HeapLayout;
   class IRGenModule;
   class LinkEntity;
-   class ManagedValue;
   class Scope;
   class TypeInfo;
   class Cleanup;

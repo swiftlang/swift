@@ -124,8 +124,8 @@ void swift::irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
   
   // Otherwise, project from the base.
   auto fieldRange = field.getProjectionRange(out.getKind());
-  ArrayRef<ManagedValue> element = tuple.getRange(fieldRange.first,
-                                                     fieldRange.second);
+  ArrayRef<llvm::Value *> element = tuple.getRange(fieldRange.first,
+                                                   fieldRange.second);
   out.add(element);
 }
 

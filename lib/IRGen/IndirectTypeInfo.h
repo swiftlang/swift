@@ -64,7 +64,7 @@ public:
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
 
-    out.add(ManagedValue(dest.getAddress()));
+    out.add(dest.getAddress());
   }
 
   void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
@@ -91,7 +91,7 @@ public:
     asDerived().Derived::initializeWithTake(IGF, dest, src);
  
     // Enter a cleanup for the temporary.
-    out.add(ManagedValue(dest.getAddress()));
+    out.add(dest.getAddress());
   }
 
   void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {
@@ -120,8 +120,7 @@ public:
   }
 
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    auto srcManaged = in.claimNext();
-    Address src = asDerived().Derived::getAddressForPointer(srcManaged.getValue());
+    Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
     asDerived().Derived::load(IGF, src, out);
     // Force the cleanup here?
   }

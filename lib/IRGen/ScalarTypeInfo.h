@@ -155,7 +155,7 @@ public:
   }
 
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    llvm::Value *value = in.claimNext().getValue();
+    llvm::Value *value = in.claimNext();
     asDerived().emitScalarRetain(IGF, value);
     asDerived().enterScalarCleanup(IGF, value, out);
   }
@@ -166,12 +166,12 @@ public:
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.claimNext().getValue();
+    llvm::Value *value = e.claimNext();
     asDerived().emitScalarRetain(IGF, value);
   }
 
   void release(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.claimNext().getValue();
+    llvm::Value *value = e.claimNext();
     asDerived().emitScalarRelease(IGF, value);
   }
   

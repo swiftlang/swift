@@ -2219,7 +2219,7 @@ namespace {
       Explosion sigParams = IGF.collectParameters();
 
       // The data parameter is a metatype; bind it as the This archetype.
-      llvm::Value *metatype = sigParams.takeLast().getUnmanagedValue();
+      llvm::Value *metatype = sigParams.takeLast();
       bindThisArchetype(IGF, metatype);
 
       // Peel off the result address if necessary.

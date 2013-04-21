@@ -29,7 +29,6 @@ namespace llvm {
 namespace swift {
 namespace irgen {
   class Address;
-  class ManagedValue;
 
 /// A heap layout is the result of laying out a complete structure for
 /// heap-allocation.

@@ -388,11 +388,11 @@ namespace {
       // Handle the not-unlikely case that the input is a single
       // indirect value.
       if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
-        ManagedValue inValue = In.claimNext();
-        auto addr = IGF.Builder.CreateBitCast(inValue.getValue(),
+        llvm::Value *inValue = In.claimNext();
+        auto addr = IGF.Builder.CreateBitCast(inValue,
                                               IGF.IGM.OpaquePtrTy,
                                               "substitution.reinterpret");
-        Out.add(ManagedValue(addr));
+        Out.add(addr);
         return;
       }
 
@@ -414,7 +414,7 @@ namespace {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
 
       // Add that to the output explosion.
-      Out.add(ManagedValue(addr.getAddress()));
+      Out.add(addr.getAddress());
     }
 
     void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
@@ -456,7 +456,7 @@ namespace {
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
 
-      ManagedValue substMV = In.claimNext();
+      llvm::Value *substMV = In.claimNext();
       if (origObjectTy == substObjectTy)
         return Out.add(substMV);
 
@@ -464,11 +464,11 @@ namespace {
       auto &origObjectTI = IGF.IGM.getFragileTypeInfo(origObjectTy);
       auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
 
-      auto substValue = substMV.getValue();
+      auto substValue = substMV;
       auto origValue =
         IGF.Builder.CreateBitCast(substValue, origPtrTy,
                                   substValue->getName() + ".reinterpret");
-      Out.add(ManagedValue(origValue));
+      Out.add(origValue);
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
@@ -544,15 +544,15 @@ namespace {
     void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
       auto &substTI = IGF.getFragileTypeInfo(substTy);
 
-      ManagedValue inValue = In.claimNext();
-      auto inAddr = IGF.Builder.CreateBitCast(inValue.getValue(),
+      llvm::Value *inValue = In.claimNext();
+      auto inAddr = IGF.Builder.CreateBitCast(inValue,
                                     substTI.getStorageType()->getPointerTo(),
                                               "substitution.reinterpret");
 
       // If the substituted type is still a single indirect value,
       // just pass it on without reinterpretation.
       if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
-        Out.add(ManagedValue(inAddr));
+        Out.add(inAddr);
         return;
       }
 
@@ -600,7 +600,7 @@ namespace {
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
 
-      ManagedValue origMV = In.claimNext();
+      llvm::Value *origMV = In.claimNext();
       if (origObjectTy == substObjectTy)
         return Out.add(origMV);
 
@@ -608,11 +608,10 @@ namespace {
       auto &substObjectTI = IGF.IGM.getFragileTypeInfo(substObjectTy);
       auto substPtrTy = substObjectTI.getStorageType()->getPointerTo();
 
-      auto origValue = origMV.getValue();
       auto substValue =
-        IGF.Builder.CreateBitCast(origValue, substPtrTy,
-                                  origValue->getName() + ".reinterpret");
-      Out.add(ManagedValue(substValue));
+        IGF.Builder.CreateBitCast(origMV, substPtrTy,
+                                  origMV->getName() + ".reinterpret");
+      Out.add(substValue);
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {

@@ -247,7 +247,7 @@ namespace {
       Explosion &values = getDirectValues();
       assert(values.size() == 2);
       llvm::Value *fn = values.claimUnmanagedNext();
-      ManagedValue data = values.claimNext();
+      llvm::Value *data = values.claimNext();
       return Callee::forIndirectCall(origFormalType, substResultType, subs,
                                      fn, data);
     }
@@ -419,7 +419,7 @@ namespace {
 
       // Load the data.
       Address dataAddr = projectData(IGF, addr);
-      e.add(ManagedValue(IGF.Builder.CreateLoad(dataAddr)));
+      e.add(IGF.Builder.CreateLoad(dataAddr));
     }
 
     void loadAsTake(IRGenFunction &IGF, Address address, Explosion &e) const {
@@ -448,22 +448,22 @@ namespace {
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
-      IGF.emitRetain(src.claimNext().getValue(), dest);
+      IGF.emitRetain(src.claimNext(), dest);
     }
 
     void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       src.transferInto(dest, 1);
-      dest.add(ManagedValue(src.claimUnmanagedNext()));
+      dest.add(src.claimUnmanagedNext());
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimUnmanagedNext();
-      IGF.emitRetainCall(e.claimNext().getValue());
+      IGF.emitRetainCall(e.claimNext());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
       e.claimUnmanagedNext();
-      IGF.emitRelease(e.claimNext().getValue());
+      IGF.emitRelease(e.claimNext());
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const {
@@ -735,16 +735,16 @@ llvm::Value *Callee::getOpaqueFunctionPointer(IRGenFunction &IGF) const {
 }
 
 /// Return this data pointer.
-ManagedValue Callee::getDataPointer(IRGenFunction &IGF) const {
+llvm::Value *Callee::getDataPointer(IRGenFunction &IGF) const {
   if (hasDataPointer()) return DataPtr;
-  return ManagedValue(IGF.IGM.RefCountedNull);
+  return IGF.IGM.RefCountedNull;
 }
 
 static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
                                                llvm::Value *fnPtr,
-                                               ManagedValue dataPtr,
+                                               llvm::Value *dataPtr,
                                                CanType origFnType) {
-  bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr.getValue());
+  bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr);
   auto extraData = (hasData ? ExtraData::Retainable : ExtraData::None);
   llvm::AttributeSet attrs;
   auto fnPtrTy = IGF.IGM.getFunctionType(AbstractCC::Freestanding,
@@ -757,7 +757,7 @@ static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
 /// construct a callee appropriately.
 static Callee emitIndirectCallee(IRGenFunction &IGF,
                                  llvm::Value *fnPtr,
-                                 ManagedValue dataPtr,
+                                 llvm::Value *dataPtr,
                                  ArrayRef<Substitution> subs,
                                  CanType origFnType,
                                  CanType substResultType) {
@@ -1008,8 +1008,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
-    llvm::Value *addrValue = args.takeLast().getUnmanagedValue();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, args.takeLast());
     
     // Mark that we're not returning anything.
     voidResult = true;
@@ -1025,8 +1024,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
     
     // Treat the raw pointer as a physical l-value of that type.
-    llvm::Value *addrValue = args.takeLast().getUnmanagedValue();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
+    Address addr = getAddressForUnsafePointer(IGF, valueTI, args.takeLast());
     
     // Mark that we're not returning anything.
     voidResult = true;    
@@ -1068,12 +1066,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       // Just bitcast and rebuild the cleanup.
       llvm::Value *value = args.forwardNext(IGF);
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
-      out->add(ManagedValue(value));
+      out->add(value);
     } else if (BuiltinName == "castFromObjectPointer") {
       // Just bitcast and rebuild the cleanup.
       llvm::Value *value = args.forwardNext(IGF);
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
-      out->add(ManagedValue(value));
+      out->add(value);
     } else if (BuiltinName == "bridgeToRawPointer") {
       // Bitcast and immediately release the operand.
       // FIXME: Should annotate the ownership semantics of this builtin
@@ -1362,7 +1360,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     if (substSchema.isSingleAggregate()) {
       auto substType = substSchema.begin()->getAggregateType()->getPointerTo();
       temp = IGF.Builder.CreateBitCast(temp, substType);
-      out.add(ManagedValue(temp.getAddress()));
+      out.add(temp.getAddress());
 
     } else {
       // Otherwise, we need to load.
@@ -1451,7 +1449,7 @@ void CallEmission::setFromCallee() {
   // Add the data pointer if we have one.
   if (CurCallee.hasDataPointer()) {
     assert(LastArgWritten > 0);
-    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF).getValue();
+    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
   }
 }
 
@@ -1511,7 +1509,7 @@ void CallEmission::forceCallee() {
 
   // Grab the values.
   llvm::Value *fnPtr = fn.claimUnmanagedNext();
-  ManagedValue dataPtr = fn.claimNext();
+  llvm::Value *dataPtr = fn.claimNext();
 
   // Set up for an indirect call.
   auto substFnType = cast<AnyFunctionType>(CurCallee.getSubstResultType());
@@ -1624,11 +1622,10 @@ void CallEmission::addArg(Explosion &arg) {
 
   auto argIterator = Args.begin() + targetIndex;
   auto values = arg.claimAll();
+  // fIXME: Should be w ritten as a std::copy.
   for (unsigned i = 0, e = values.size(); i != e; ++i) {
     auto value = values[i];
-    // The default rule is that arguments are consumed, in which case
-    // we need to deactivate cleanups when making the call.
-    *argIterator++ = value.getValue();
+    *argIterator++ = value;
   }
 
   LastArgWritten = newLastArgWritten;
@@ -1971,7 +1968,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // last parameter) and load out the extra, previously-curried
   // parameters.
   if (!layout.empty()) {
-    llvm::Value *rawData = params.takeLast().getUnmanagedValue();
+    llvm::Value *rawData = params.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
     
     // Perform the loads.
@@ -2080,8 +2077,8 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   fn = IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy);
 
   // Get the context pointer as a %swift.refcounted*.
-  ManagedValue mContext = swiftClosure.claimNext();
-  llvm::Value *context = IGF.Builder.CreateBitCast(mContext.forward(IGF),
+  llvm::Value *mContext = swiftClosure.claimNext();
+  llvm::Value *context = IGF.Builder.CreateBitCast(mContext,
                                                    IGF.IGM.RefCountedPtrTy);
   // Get the shim function we'll call.
   llvm::Function *converter = IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy);
@@ -2090,5 +2087,5 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   llvm::Value *result = IGF.Builder.CreateCall2(converter, fn, context);
   
   // Tag the result with a cleanup and pass it on.
-  outBlock.add(ManagedValue(result));
+  outBlock.add(result);
 }

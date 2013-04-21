@@ -162,7 +162,7 @@ namespace irgen {
 
     /// The data pointer required by the function.  There's an
     /// invariant that this never stores an llvm::ConstantPointerNull.
-    ManagedValue DataPtr;
+    llvm::Value *DataPtr;
 
     /// The archetype substitutions under which the function is being
     /// called.
@@ -185,8 +185,7 @@ namespace irgen {
                                           unsigned uncurryLevel) {
       return forKnownFunction(cc,
                               origFormalType, substResultType, subs,
-                              fn, ManagedValue(nullptr),
-                              explosionLevel, uncurryLevel);
+                              fn, nullptr, explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known instance method.  Methods never
@@ -199,8 +198,7 @@ namespace irgen {
                             unsigned uncurryLevel) {
       return forKnownFunction(AbstractCC::Method,
                               origFormalType, substResultType, subs,
-                              fn, ManagedValue(nullptr),
-                              explosionLevel, uncurryLevel);
+                              fn, nullptr, explosionLevel, uncurryLevel);
     }
 
     /// Prepare a callee for a known function with a known data pointer.
@@ -208,7 +206,7 @@ namespace irgen {
                                    CanType origFormalType,
                                    CanType substResultType,
                                    ArrayRef<Substitution> subs,
-                                   llvm::Value *fn, ManagedValue data,
+                                   llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel,
                                    unsigned uncurryLevel) {
       // Invariant on the function pointer.
@@ -216,8 +214,7 @@ namespace irgen {
                ->getElementType()->isFunctionTy());
 
       // Invariant on the data value.
-      assert(data.getValue() == nullptr ||
-             !isa<llvm::ConstantPointerNull>(data.getValue()));
+      assert(data == nullptr || !isa<llvm::ConstantPointerNull>(data));
 
       Callee result;
       result.ExplosionLevel = explosionLevel;
@@ -236,9 +233,9 @@ namespace irgen {
     static Callee forIndirectCall(CanType origFormalType,
                                   CanType substResultType,
                                   ArrayRef<Substitution> subs,
-                                  llvm::Value *fn, ManagedValue data) {
-      if (isa<llvm::ConstantPointerNull>(data.getValue()))
-        data = ManagedValue(nullptr);
+                                  llvm::Value *fn, llvm::Value *data) {
+      if (isa<llvm::ConstantPointerNull>(data))
+        data = nullptr;
       return forKnownFunction(AbstractCC::Freestanding,
                               origFormalType, substResultType, subs,
                               fn, data, ExplosionKind::Minimal, 0);
@@ -263,10 +260,10 @@ namespace irgen {
     llvm::Value *getFunctionPointer() const { return FnPtr; }
 
     /// Is it possible that this function requires a non-null data pointer?
-    bool hasDataPointer() const { return DataPtr.getValue() != nullptr; }
+    bool hasDataPointer() const { return DataPtr != nullptr; }
 
     /// Return the data pointer as a %swift.refcounted*.
-    ManagedValue getDataPointer(IRGenFunction &IGF) const;
+    llvm::Value *getDataPointer(IRGenFunction &IGF) const;
 
     /// Construct an OwnershipConventions in this callee.
     template <class T, class... Args>
