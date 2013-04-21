@@ -27,7 +27,6 @@
 
 #include "ASTVisitor.h"
 #include "CallEmission.h"
-#include "Cleanup.h"
 #include "Explosion.h"
 #include "FormalType.h"
 #include "FunctionRef.h"

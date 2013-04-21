@@ -23,7 +23,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
-#include "swift/Basic/DiverseStack.h"
 
 
 namespace llvm {
@@ -61,8 +60,6 @@ namespace irgen {
   class LinkEntity;
   class Scope;
   class TypeInfo;
-  class Cleanup;
-  typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 
 
 /// LocalTypeData - A nonce value for storing some sort of
@@ -128,7 +125,6 @@ public:
   /// evaluation, but it's not at all unlikely that this will change.
   bool isConditionallyEvaluated() const { return false; }
 
-  llvm::Value *getJumpDestSlot();
   static Alignment getJumpDestAlignment() { return Alignment(4); }
   llvm::BasicBlock *getUnreachableBlock();
 
@@ -137,9 +133,6 @@ public:
                             const llvm::AttributeSet &attrs);
 
 private:
-  llvm::BasicBlock *UnreachableBB;
-  llvm::Instruction *JumpDestSlot;
-  
   friend class Scope;
 
 //--- Function prologue and epilogue -------------------------------------------

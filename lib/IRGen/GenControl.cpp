@@ -18,7 +18,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CallSite.h"
 #include "llvm/IR/Function.h"
-#include "Cleanup.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 
@@ -42,26 +41,6 @@ IRGenFunction::createBasicBlock(const llvm::Twine &Name) {
   return llvm::BasicBlock::Create(IGM.getLLVMContext(), Name);
 }
 
-/// Get or create the jump-destination variable.
-llvm::Value *IRGenFunction::getJumpDestSlot() {
-  if (JumpDestSlot) return JumpDestSlot;
-
-  JumpDestSlot = new llvm::AllocaInst(IGM.Int32Ty, "jumpdest.var", AllocaIP);
-  return JumpDestSlot;
-}
-
-/// Get or create the unreachable block.
-llvm::BasicBlock *IRGenFunction::getUnreachableBlock() {
-  if (UnreachableBB) return UnreachableBB;
-
-  // Create it at the very end of the function.
-  UnreachableBB = createBasicBlock("unreachable");
-  new llvm::UnreachableInst(UnreachableBB->getContext(), UnreachableBB);
-  CurFn->getBasicBlockList().push_back(UnreachableBB);
-  
-  return UnreachableBB;
-}
-
 //****************************************************************************//
 //******************************* EXCEPTIONS *********************************//
 //****************************************************************************//
@@ -76,11 +55,3 @@ llvm::CallSite IRGenFunction::emitInvoke(llvm::CallingConv::ID convention,
   call->setCallingConv(convention);
   return call;
 }                                        
-
-//****************************************************************************//
-//******************************** CLEANUPS **********************************//
-//****************************************************************************//
-
-
-// Anchor the Cleanup v-table in this translation unit.
-void Cleanup::_anchor() {}

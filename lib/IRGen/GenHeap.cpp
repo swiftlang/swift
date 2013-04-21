@@ -23,7 +23,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 
-#include "Cleanup.h"
 #include "Explosion.h"
 #include "GenProto.h"
 #include "GenType.h"

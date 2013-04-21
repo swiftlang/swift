@@ -42,7 +42,6 @@
 #include "IRGenModule.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
-#include "Cleanup.h"
 
 
 using namespace swift;

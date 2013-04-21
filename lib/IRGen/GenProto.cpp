@@ -38,7 +38,6 @@
 #include "llvm/IR/Module.h"
 
 #include "CallEmission.h"
-#include "Cleanup.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "FunctionRef.h"

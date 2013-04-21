@@ -21,7 +21,6 @@
 #include "llvm/IR/GlobalVariable.h"
 
 #include "ASTVisitor.h"
-#include "Cleanup.h"
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenTuple.h"

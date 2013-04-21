@@ -35,8 +35,7 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
   : IGM(IGM), Builder(IGM.getLLVMContext()), CurFuncType(t),
     CurFuncParamPatterns(p), CurFn(Fn),
     CurExplosionLevel(explosionLevel), CurUncurryLevel(uncurryLevel),
-    CurPrologue(prologue), ContextPtr(nullptr),
-    UnreachableBB(nullptr), JumpDestSlot(nullptr) {
+    CurPrologue(prologue), ContextPtr(nullptr) {
   emitPrologue();
 }
 
