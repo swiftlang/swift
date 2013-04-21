@@ -91,10 +91,6 @@ public:
   // Is the scalar POD?
   // static const bool IsScalarPOD;
 
-  // Add the scalar with the appropriate cleanup to the explosion.
-  // void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
-  //                         Explosion &out) const;
-
   // Make the scalar +1.
   // void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const;
 
@@ -119,19 +115,16 @@ public:
     addr = asDerived().projectScalar(IGF, addr);
     llvm::Value *value = IGF.Builder.CreateLoad(addr);
     asDerived().emitScalarRetain(IGF, value);
-    asDerived().enterScalarCleanup(IGF, value, out);
+    out.add(value);
   }
 
   void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
-    llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    out.add(value);
+    out.add(IGF.Builder.CreateLoad(addr));
   }
-  
   void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
-    llvm::Value *value = IGF.Builder.CreateLoad(addr);
-    asDerived().enterScalarCleanup(IGF, value, out);
+    out.add(IGF.Builder.CreateLoad(addr));
   }
 
   void assign(IRGenFunction &IGF, Explosion &src, Address dest) const {
@@ -157,12 +150,11 @@ public:
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     llvm::Value *value = in.claimNext();
     asDerived().emitScalarRetain(IGF, value);
-    asDerived().enterScalarCleanup(IGF, value, out);
+    out.add(value);
   }
 
   void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    llvm::Value *value = in.claimNext();
-    asDerived().enterScalarCleanup(IGF, value, out);
+    out.add(in.claimNext());
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {
@@ -199,11 +191,6 @@ protected:
 private:
   friend class SingleScalarTypeInfo<Derived, Base>;
   static const bool IsScalarPOD = true;
-
-  void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
-                          Explosion &out) const {
-    out.add(value);
-  }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
   }

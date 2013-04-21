@@ -62,11 +62,6 @@ public:
       IGF.emitObjCRetainCall(value);
     }
   }
-
-  void enterScalarCleanup(IRGenFunction &IGF, llvm::Value *value,
-                          Explosion &out) const {
-    out.add(value);
-  }
 };
 
 }
