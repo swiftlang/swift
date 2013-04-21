@@ -160,22 +160,10 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
   return addr;
 }
 
-static void maybeSetCleanupState(IRGenFunction &IGF,
-                                 CleanupsDepth maybeCleanup,
-                                 CleanupState newState) {
-  if (maybeCleanup.isValid())
-    IGF.setCleanupState(maybeCleanup, newState);
-}
 
 /// Mark that a value has reached its initialization point.
 void Initialization::markInitialized(IRGenFunction &IGF,
                                      InitializedObject object) {
   auto it = Records.find(object.Opaque);
   assert(it != Records.end());
-
-  // Deactivate the dealloc cleanup.
-  maybeSetCleanupState(IGF, it->second.DeallocCleanup, CleanupState::Dead);
-
-  // Activate the destroy cleanup.
-  maybeSetCleanupState(IGF, it->second.DestroyCleanup, CleanupState::Active);
 }

@@ -137,66 +137,11 @@ public:
 //--- Control flow -------------------------------------------------------------
 public:
 
-  /// Push a new cleanup in the current scope.
-  template <class T, class... A>
-  T &pushCleanup(A &&... args) {
-    return pushCleanupInState<T, A...>(CleanupState::Active,
-                                       ::std::forward<A>(args)...);
-  }
-
-  /// Push a new cleanup in the current scope.
-  template <class T, class... A>
-  T &pushCleanupInState(CleanupState state, A &&... args) {
-    assert(state != CleanupState::Dead);
-
-#ifndef NDEBUG
-    CleanupsDepth oldTop = Cleanups.stable_begin();
-#endif
-
-    T &cleanup = Cleanups.push<T, A...>(::std::forward<A>(args)...);
-    T &result = static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
-
-#ifndef NDEBUG
-    auto newTop = Cleanups.begin(); ++newTop;
-    assert(newTop == Cleanups.find(oldTop));
-#endif
-    return result;
-  }
-
-  /// Push a new cleanup which is expected to be destroyed at the end
-  /// of the current full-expression.
-  ///
-  /// The relevant property here is that full-expression cleanups may
-  /// not be dominated by the locations in which they're active in a
-  /// full-expression expression.
-  template <class T, class... A>
-  T &pushFullExprCleanup(A &&... args) {
-    assert(!isConditionallyEvaluated());
-    return pushCleanup<T, A...>(::std::forward<A>(args)...);
-  }
-
-  template <class T, class... A>
-  T &pushFullExprCleanupInState(CleanupState state, A &&... args) {
-    assert(!isConditionallyEvaluated());
-    return pushCleanupInState<T, A...>(state, ::std::forward<A>(args)...);
-  }
-
   /// Return a stable reference to the current cleanup.
   CleanupsDepth getCleanupsDepth() const {
     return Cleanups.stable_begin();
   }
 
-  /// Set the state of the cleanup at the given depth.
-  /// The transition must be non-trivial and legal.
-  void setCleanupState(CleanupsDepth depth, CleanupState state);
-
-  Cleanup &findCleanup(CleanupsDepth depth) {
-    assert(depth != Cleanups.stable_end());
-    return *Cleanups.find(depth);
-  }
-
-  void endScope(CleanupsDepth depth);
- 
   void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
                            Explosion &out);
 
@@ -219,10 +164,7 @@ private:
   llvm::Instruction *JumpDestSlot;
   CleanupsDepth InnermostScope;
   
-  friend class Cleanup; // just so that it can befriend initCleanup
   friend class Scope;
-  Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
-  void setCleanupState(Cleanup &cleanup, CleanupState state);
 
 //--- Function prologue and epilogue -------------------------------------------
 public:

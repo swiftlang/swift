@@ -392,7 +392,7 @@ namespace {
         auto addr = IGF.Builder.CreateBitCast(inValue.getValue(),
                                               IGF.IGM.OpaquePtrTy,
                                               "substitution.reinterpret");
-        Out.add(ManagedValue(addr, inValue.getCleanup()));
+        Out.add(ManagedValue(addr));
         return;
       }
 
@@ -470,7 +470,7 @@ namespace {
       auto origValue =
         IGF.Builder.CreateBitCast(substValue, origPtrTy,
                                   substValue->getName() + ".reinterpret");
-      Out.add(ManagedValue(origValue, substMV.getCleanup()));
+      Out.add(ManagedValue(origValue));
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
@@ -554,15 +554,13 @@ namespace {
       // If the substituted type is still a single indirect value,
       // just pass it on without reinterpretation.
       if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {
-        Out.add(ManagedValue(inAddr, inValue.getCleanup()));
+        Out.add(ManagedValue(inAddr));
         return;
       }
 
       // Otherwise, load as a take and then kill the cleanup attached
       // to the archetype value.
       substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
-      if (inValue.hasCleanup())
-        IGF.setCleanupState(inValue.getCleanup(), CleanupState::Dead);
     }
 
     void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
@@ -616,7 +614,7 @@ namespace {
       auto substValue =
         IGF.Builder.CreateBitCast(origValue, substPtrTy,
                                   origValue->getName() + ".reinterpret");
-      Out.add(ManagedValue(substValue, origMV.getCleanup()));
+      Out.add(ManagedValue(substValue));
     }
 
     void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {

@@ -36,7 +36,6 @@ class Scope {
     assert(IGF.InnermostScope == Depth && "popping scopes out of order");
 
     IGF.InnermostScope = SavedInnermostScope;
-    IGF.endScope(Depth);
     IGF.Cleanups.checkIterator(IGF.InnermostScope);
 
     assert(IGF.ScopedLocalTypeData.size() >= SavedLocalTypeDataDepth);

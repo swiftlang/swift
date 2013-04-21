@@ -30,11 +30,9 @@ class Cleanup {
   unsigned AllocatedSize;
   unsigned State : 2;
 
-  friend Cleanup &IRGenFunction::initCleanup(Cleanup &, size_t, CleanupState);
-protected:
+ protected:
   Cleanup() {}
   virtual ~Cleanup() {}
-  // The fields are initialized by IRGenFunction::initCleanup.
 
 public:
   /// Return the allocated size of this object.  This is required by

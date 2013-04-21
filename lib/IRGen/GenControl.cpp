@@ -82,47 +82,5 @@ llvm::CallSite IRGenFunction::emitInvoke(llvm::CallingConv::ID convention,
 //****************************************************************************//
 
 
-
-/// Remove all the dead cleanups on the top of the cleanup stack.
-static void popAndEmitTopDeadCleanups(IRGenFunction &IGF,
-                                      DiverseStackImpl<Cleanup> &stack,
-                                      CleanupsDepth end) {
-  stack.checkIterator(end);
-
-  while (stack.stable_begin() != end && stack.begin()->isDead()) {
-    assert(!stack.empty());
-
-    // We might get better results popping them all at once.
-    stack.pop();
-    stack.checkIterator(end);
-  }
-}
-
-/// Leave a scope, with all its cleanups.
-void IRGenFunction::endScope(CleanupsDepth depth) {
-  Cleanups.checkIterator(depth);
-
-  popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
-}
-
-
-/// Initialize a just-pushed cleanup.
-Cleanup &IRGenFunction::initCleanup(Cleanup &cleanup, size_t allocSize,
-                                    CleanupState state) {
-  cleanup.AllocatedSize = allocSize;
-  cleanup.State = unsigned(state);
-
-  return cleanup;
-}
-
-/// Change the state of a cleanup.
-void IRGenFunction::setCleanupState(CleanupsDepth depth,
-                                    CleanupState newState) {
-}
-
-void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
-  cleanup.setState(newState);
-}
-
 // Anchor the Cleanup v-table in this translation unit.
 void Cleanup::_anchor() {}

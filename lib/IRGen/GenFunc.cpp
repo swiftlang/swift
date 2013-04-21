@@ -1254,11 +1254,6 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   assert(!EmittedCall);
   EmittedCall = true;
 
-  // Deactivate all the cleanups.
-  for (auto cleanup : Cleanups)
-    IGF.setCleanupState(cleanup, CleanupState::Dead);
-  Cleanups.clear();
-
   // Determine the calling convention.
   // FIXME: collect attributes in the CallEmission.
   auto cc = expandAbstractCC(IGF.IGM, getCallee().getConvention());
@@ -1374,8 +1369,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
     // Otherwise, we need to load.  Do a take-load and deactivate the cleanup.
     } else {
       substResultTI.loadAsTake(IGF, temp, out);
-      if (cleanup.isValid())
-        IGF.setCleanupState(cleanup, CleanupState::Dead);
     }
     return;
   }
@@ -1419,7 +1412,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
 CallEmission::CallEmission(CallEmission &&other)
   : IGF(other.IGF),
     Args(std::move(other.Args)),
-    Cleanups(std::move(other.Cleanups)),
     CurCallee(std::move(other.CurCallee)),
     CurOrigType(other.CurOrigType),
     RemainingArgsForCallee(other.RemainingArgsForCallee),
@@ -1458,13 +1450,10 @@ void CallEmission::setFromCallee() {
   Args.set_size(numArgs);
   LastArgWritten = numArgs;
 
-  // We should not have any cleanups at this point.
-  assert(Cleanups.empty());
-
   // Add the data pointer if we have one.
   if (CurCallee.hasDataPointer()) {
     assert(LastArgWritten > 0);
-    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF).split(Cleanups);
+    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF).getValue();
   }
 }
 
@@ -1645,7 +1634,7 @@ void CallEmission::addArg(Explosion &arg) {
     auto value = values[i];
     // The default rule is that arguments are consumed, in which case
     // we need to deactivate cleanups when making the call.
-    *argIterator++ = value.split(Cleanups);
+    *argIterator++ = value.getValue();
   }
 
   LastArgWritten = newLastArgWritten;
@@ -1862,11 +1851,6 @@ bool IRGenFunction::emitBranchToReturnBB() {
 
 /// Emit the epilogue for the function.
 void IRGenFunction::emitEpilogue() {
-  // Leave the cleanups created for the parameters if we've got a full
-  // prologue.
-  if (CurPrologue != Prologue::Bare)
-    endScope(Cleanups.stable_end());
-
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
 

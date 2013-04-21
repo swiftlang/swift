@@ -38,9 +38,6 @@ private:
   /// The builtin/special arguments to pass to the call.
   llvm::SmallVector<llvm::Value*, 8> Args;
 
-  /// The cleanups to deactivate when we make a call.
-  llvm::SmallVector<CleanupsDepth, 8> Cleanups;
-
   /// The function we're going to call.
   Callee CurCallee;
 
