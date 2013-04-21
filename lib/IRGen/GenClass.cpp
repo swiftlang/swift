@@ -425,32 +425,6 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 }
 
 
-namespace {
-  class ClassDestroyCleanup : public Cleanup {
-    llvm::Value *ThisValue;
-    const ClassTypeInfo &info;
-
-  public:
-    ClassDestroyCleanup(llvm::Value *ThisValue, const ClassTypeInfo &info)
-      : ThisValue(ThisValue), info(info) {}
-
-    void emit(IRGenFunction &IGF) const {
-      // FIXME: This implementation will be wrong once we get dynamic
-      // class layout.
-      auto &layout = info.getLayout(IGF.IGM);
-      Address baseAddr = layout.emitCastTo(IGF, ThisValue);
-
-      // Destroy all the instance variables of the class.
-      for (auto &field : layout.getElements()) {
-        if (field.Type->isPOD(ResilienceScope::Local))
-          continue;
-        
-        field.Type->destroy(IGF, field.project(IGF, baseAddr));
-      }
-    }
-  };
-}
-
 /// Emit the deallocating destructor for a class in terms of its destroying
 /// destructor.
 void irgen::emitDeallocatingDestructor(IRGenModule &IGM,

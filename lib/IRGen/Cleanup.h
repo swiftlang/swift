@@ -29,7 +29,6 @@ namespace irgen {
 class Cleanup {
   unsigned AllocatedSize;
   unsigned State : 2;
-  llvm::BasicBlock *NormalEntryBB;
 
   friend Cleanup &IRGenFunction::initCleanup(Cleanup &, size_t, CleanupState);
 protected:
@@ -50,11 +49,6 @@ public:
    /// Is this cleanup active for code currently being executed?
   bool isActive() const { return getState() == CleanupState::Active; }
   bool isDead() const { return getState() == CleanupState::Dead; }
-
-  llvm::BasicBlock *getNormalEntryBlock() const { return NormalEntryBB; }
-  void setNormalEntryBlock(llvm::BasicBlock *BB) { NormalEntryBB = BB; }
-
-  virtual void emit(IRGenFunction &IGF) const = 0;
 
 private:
   virtual void _anchor();

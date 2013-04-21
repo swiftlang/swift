@@ -629,14 +629,14 @@ static void emitReleaseCall(IRGenFunction &IGF, llvm::Value *value) {
   llvm::Constant *fn = IGF.IGM.getReleaseFn();
   if (value->getType() != IGF.IGM.RefCountedPtrTy) {
     llvm::FunctionType *fnType =
-      llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
+    llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
     fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
   }
-
+  
   // The call itself can never throw.
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
   call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();  
+  call->setDoesNotThrow();
 }
 
 /// Emit a release of a live value.
@@ -645,45 +645,11 @@ void IRGenFunction::emitRelease(llvm::Value *value) {
   return emitReleaseCall(*this, value);
 }
 
-namespace {
-  struct CallRelease : Cleanup {
-    llvm::Value *Value;
-    CallRelease(llvm::Value *value) : Value(value) {}
-
-    void emit(IRGenFunction &IGF) const {
-      emitReleaseCall(IGF, Value);
-    }
-  };
-}
 
 /// Enter a cleanup to release an object.
 ManagedValue IRGenFunction::enterReleaseCleanup(llvm::Value *value) {
   if (doesNotRequireRefCounting(value))
     return ManagedValue(value);
 
-  pushFullExprCleanup<CallRelease>(value);
   return ManagedValue(value, getCleanupsDepth());
-}
-
-namespace {
-  class CallDealloc : public Cleanup {
-    llvm::Value *Allocation;
-    llvm::Value *Size;
-  public:
-    CallDealloc(llvm::Value *allocation, llvm::Value *size)
-      : Allocation(allocation), Size(size) {}
-    void emit(IRGenFunction &IGF) const {
-      IGF.emitDeallocObjectCall(Allocation, Size);
-    }
-  };
-}
-
-/// Enter a cleanup to call swift_dealloc on the given pointer.
-/// This cleanup will usually be deactivated as soon as the
-/// initializer completes.
-CleanupsDepth
-IRGenFunction::pushDeallocCleanup(llvm::Value *allocation,
-                                  llvm::Value *size) {
-  pushFullExprCleanup<CallDealloc>(allocation, size);
-  return getCleanupsDepth();
 }

@@ -468,18 +468,7 @@ static void emitDestroyBufferCall(IRGenFunction &IGF,
   setHelperAttributes(call);
 }
 
-/// Emit a call to do a 'deallocateBuffer' operation.
-static void emitDeallocateBufferCall(IRGenFunction &IGF,
-                                     llvm::Value *witnessTable,
-                                     llvm::Value *metadata,
-                                     Address buffer) {
-  llvm::Value *fn = loadValueWitness(IGF, witnessTable,
-                                     ValueWitness::DeallocateBuffer);
-  llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  setHelperAttributes(call);
-}
+
 
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
@@ -500,51 +489,6 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
                                                      ExistentialLayout layout);
 
 namespace {
-  struct DestroyBuffer : Cleanup {
-    Address Buffer;
-    llvm::Value *Table;
-    llvm::Value *Metatype;
-    DestroyBuffer(Address buffer, llvm::Value *table, llvm::Value *metatype)
-      : Buffer(buffer), Table(table), Metatype(metatype) {}
-
-    void emit(IRGenFunction &IGF) const {
-      emitDestroyBufferCall(IGF, Table, Metatype, Buffer);
-    }
-  };
-
-  struct DeallocateBuffer : Cleanup {
-    Address Buffer;
-    llvm::Value *Table;
-    llvm::Value *Metatype;
-    DeallocateBuffer(Address buffer, llvm::Value *table, llvm::Value *metatype)
-      : Buffer(buffer), Table(table), Metatype(metatype) {}
-
-    void emit(IRGenFunction &IGF) const {
-      emitDeallocateBufferCall(IGF, Table, Metatype, Buffer);
-    }
-  };
-  
-  struct DeallocateBox : Cleanup {
-    llvm::Value *Box;
-    llvm::Value *Type;
-    DeallocateBox(llvm::Value *box, llvm::Value *type)
-      : Box(box), Type(type) {}
-
-    void emit(IRGenFunction &IGF) const {
-      IGF.emitDeallocBoxCall(Box, Type);
-    }
-  };
-
-  struct DestroyExistential : Cleanup {
-    ExistentialLayout Layout;
-    Address Addr;
-    DestroyExistential(ExistentialLayout layout, Address addr)
-      : Layout(layout), Addr(addr) {}
-
-    void emit(IRGenFunction &IGF) const {
-      emitDestroyExistential(IGF, Addr, Layout);
-    }
-  };
 
   /// A CRTP class for visiting the witnesses of a protocol.
   ///
@@ -1011,10 +955,8 @@ namespace {
         Address rawAddr(address, Alignment(1));
         
         // Push a cleanup to dealloc the allocation.
-        IGF.pushCleanup<DeallocateBox>(box, metadata);
-        CleanupsDepth dealloc = IGF.getCleanupsDepth();
         OwnedAddress addr(rawAddr, box);
-        init.markAllocated(IGF, object, addr, dealloc);
+        init.markAllocated(IGF, object, addr, IGF.getCleanupsDepth());
         return addr;
       }
 
@@ -1031,9 +973,7 @@ namespace {
       OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
 
       // Push a cleanup to dealloc it.
-      IGF.pushCleanup<DeallocateBuffer>(buffer, wtable, metadata);
-      CleanupsDepth dealloc = IGF.getCleanupsDepth();
-      init.markAllocated(IGF, object, ownedAddr, dealloc);
+      init.markAllocated(IGF, object, ownedAddr, IGF.getCleanupsDepth());
       return ownedAddr;
     }
 
@@ -1452,26 +1392,6 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
   }
   llvm_unreachable("bad packing!");
 }
-
-namespace {
-  /// A cleanup for deallocating a buffer when the concrete type
-  /// stored there is known.
-  class DeallocateConcreteBuffer : public Cleanup {
-    Address Buffer;
-    FixedPacking Packing;
-    const TypeInfo &ConcreteTI;
-
-  public:
-    DeallocateConcreteBuffer(Address buffer, FixedPacking packing,
-                             const TypeInfo &concreteTI)
-      : Buffer(buffer), Packing(packing), ConcreteTI(concreteTI) {}
-
-    void emit(IRGenFunction &IGF) const {
-      emitDeallocateBuffer(IGF, ConcreteTI, Packing, Buffer);
-    }
-  };
-}
-
 /// Emit a 'destroyObject' operation.
 static void emitDestroyObject(IRGenFunction &IGF,
                               const TypeInfo &type,

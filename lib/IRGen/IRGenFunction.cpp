@@ -187,18 +187,6 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
   return emitDeallocatingCall(*this, IGM.getSlowRawDeallocFn(), pointer, size);
 }
 
-/// Deallocate an object which was allocated but has not actually been
-/// initialized.
-void IRGenFunction::emitDeallocObjectCall(llvm::Value *ptr, llvm::Value *size) {
-  // For now, all we have is swift_deallocObject.
-  return emitDeallocatingCall(*this, IGM.getDeallocObjectFn(), ptr, size);
-}
-
-void IRGenFunction::emitDeallocBoxCall(llvm::Value *box, llvm::Value *type) {
-  llvm::CallInst *call = Builder.CreateCall2(IGM.getDeallocBoxFn(), box, type);
-  call->setCallingConv(IGM.RuntimeCC);
-  call->setDoesNotThrow();
-}
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);

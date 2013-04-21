@@ -57,8 +57,6 @@ IRGenModule::IRGenModule(ASTContext &Context,
   AllocBoxFn = nullptr;
   RetainNoResultFn = nullptr;
   ReleaseFn = nullptr;
-  DeallocObjectFn = nullptr;
-  DeallocBoxFn = nullptr;
   ObjCRetainFn = nullptr;
   ObjCReleaseFn = nullptr;
   RawAllocFn = nullptr;
@@ -362,28 +360,6 @@ llvm::Constant *IRGenModule::getReleaseFn() {
   if (auto fn = dyn_cast<llvm::Function>(ReleaseFn))
     fn->setDoesNotCapture(1);
   return ReleaseFn;
-}
-
-llvm::Constant *IRGenModule::getDeallocObjectFn() {
-  if (DeallocObjectFn) return DeallocObjectFn;
-
-  // void swift_deallocObject(void *ptr, size_t size);
-  llvm::Type *argTypes[] = { RefCountedPtrTy, SizeTy };
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, argTypes, false);
-  DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocObject", fnType);
-  return DeallocObjectFn;
-}
-
-llvm::Constant *IRGenModule::getDeallocBoxFn() {
-  if (DeallocObjectFn) return DeallocBoxFn;
-  
-  // void swift_deallocBox(void *ptr, Metadata *type);
-  llvm::Type *argTypes[] = { RefCountedPtrTy, TypeMetadataPtrTy };
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(VoidTy, argTypes, false);
-  DeallocObjectFn = createRuntimeFunction(*this, "swift_deallocBox", fnType);
-  return DeallocObjectFn;
 }
 
 llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {

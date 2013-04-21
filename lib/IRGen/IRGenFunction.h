@@ -199,7 +199,6 @@ public:
  
   void enterDestroyCleanup(Address addr, const TypeInfo &addrTI,
                            Explosion &out);
-  void enterDestroyCleanup(Address addr, const TypeInfo &addrTI);
 
   /// Is the current emission point conditionally evaluated?  Right
   /// now we don't have any expressions which introduce conditional
@@ -256,7 +255,6 @@ public:
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *align,
                                    const llvm::Twine &name = "");
-  void emitDeallocObjectCall(llvm::Value *pointer, llvm::Value *size);
   llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align,
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size);
@@ -264,7 +262,6 @@ public:
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                         llvm::Value *&box,
                         llvm::Value *&valueAddress);
-  void emitDeallocBoxCall(llvm::Value *box, llvm::Value *type);
   
 private:
   llvm::Instruction *AllocaIP;
@@ -273,8 +270,6 @@ private:
 public:
   llvm::Value *emitUnmanagedAlloc(const HeapLayout &layout,
                                   const llvm::Twine &name);
-  CleanupsDepth pushDeallocCleanup(llvm::Value *allocation,
-                                   llvm::Value *size);
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);

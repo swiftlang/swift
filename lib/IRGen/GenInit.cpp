@@ -34,51 +34,13 @@
 using namespace swift;
 using namespace irgen;
 
-namespace {
-  /// A cleanup to destroy an object whose address isn't actually known yet.
-  class UnboundDestroy : public Cleanup {
-    const TypeInfo &TI;
-    OwnedAddress Addr;
-
-  public:
-    UnboundDestroy(const TypeInfo &TI) : TI(TI) {}
-
-    void setAddress(OwnedAddress addr) {
-      assert(!Addr.isValid());
-      Addr = addr;
-    }
-
-    void emit(IRGenFunction &IGF) const {
-      assert(Addr.isValid());
-      llvm::Value *owner = Addr.getOwner();
-      if (!isa<llvm::ConstantPointerNull>(owner)) {
-        IGF.emitRelease(owner);
-      } else {
-        TI.destroy(IGF, Addr);
-      }
-    }
-  };
-}
-
 /// Enter a cleanup to destroy an object of arbitrary type.  Adds the
 /// address value to the given explosion, along with the appropriate
 /// cleanup.
 void IRGenFunction::enterDestroyCleanup(Address addr,
                                         const TypeInfo &addrTI,
                                         Explosion &out) {
-  enterDestroyCleanup(addr, addrTI);
   out.add(ManagedValue(addr.getAddress(), getCleanupsDepth()));
-}
-
-/// Enter a cleanup to destroy an object of arbitrary type.
-void IRGenFunction::enterDestroyCleanup(Address addr,
-                                        const TypeInfo &addrTI) {
-  assert(!addrTI.isPOD(ResilienceScope::Local) &&
-         "destroying something known to be POD");
-
-  // The use of UnboundDestroy here is not important.
-  UnboundDestroy &destroy = pushCleanup<UnboundDestroy>(addrTI);
-  destroy.setAddress(OwnedAddress(addr, IGM.RefCountedNull));
 }
 
 /// Register an object with the initialization process.
@@ -87,20 +49,9 @@ CleanupsDepth Initialization::registerObject(IRGenFunction &IGF,
                                              OnHeap_t onHeap,
                                              const TypeInfo &objectTI) {
   // Create the appropriate destroy cleanup.
-  CleanupsDepth destroy;
+  registerObject(object, CleanupsDepth::invalid());
 
-  // We need a destroy cleanup if the object is on the heap or non-POD.
-  if (onHeap || !objectTI.isPOD(ResilienceScope::Local)) {
-    IGF.pushFullExprCleanupInState<UnboundDestroy>(CleanupState::Dormant,
-                                                   objectTI);
-    destroy = IGF.getCleanupsDepth();
-  } else {
-    destroy = CleanupsDepth::invalid();
-  }
-
-  registerObject(object, destroy);
-
-  return destroy;
+  return CleanupsDepth::invalid();
 }
 
 void Initialization::registerObjectWithoutDestroy(InitializedObject object) {
@@ -128,13 +79,6 @@ void Initialization::markAllocated(IRGenFunction &IGF,
          "object was not registered with initialization");
   ValueRecord &record = Records.find(object.Opaque)->second;
   record.DeallocCleanup = dealloc;
-
-  // Update the destroy cleanup if present.
-  if (record.DestroyCleanup.isValid()) {
-    UnboundDestroy &destroy =
-      static_cast<UnboundDestroy&>(IGF.findCleanup(record.DestroyCleanup));
-    destroy.setAddress(address);
-  }
 }
 
 /// Emit a global variable.
@@ -211,13 +155,8 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
   Address rawAddr = layout.emitCastTo(IGF, allocation);
   rawAddr = elt.project(IGF, rawAddr, name);
 
-  // Push a cleanup to dealloc the allocation.
-  // FIXME: don't emit the size twice!
-  CleanupsDepth deallocCleanup
-    = IGF.pushDeallocCleanup(allocation, layout.emitSize(IGF));
-
   OwnedAddress addr(rawAddr, allocation);
-  init.markAllocated(IGF, object, addr, deallocCleanup);
+  init.markAllocated(IGF, object, addr, CleanupsDepth::invalid());
   return addr;
 }
 

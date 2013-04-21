@@ -222,9 +222,7 @@ public:
   llvm::Constant *getAllocBoxFn();
   llvm::Constant *getRetainNoResultFn();
   llvm::Constant *getReleaseFn();
-  llvm::Constant *getDeallocObjectFn();
-  llvm::Constant *getDeallocBoxFn();
-
+ 
   llvm::Constant *getRawAllocFn();
   llvm::Constant *getRawDeallocFn();
   llvm::Constant *getSlowAllocFn();
@@ -266,8 +264,6 @@ private:
   llvm::Constant *AllocBoxFn;
   llvm::Constant *RetainNoResultFn;
   llvm::Constant *ReleaseFn;
-  llvm::Constant *DeallocObjectFn;
-  llvm::Constant *DeallocBoxFn;
   llvm::Constant *RawAllocFn;
   llvm::Constant *RawDeallocFn;
   llvm::Constant *SlowAllocFn;

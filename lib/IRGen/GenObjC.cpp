@@ -199,19 +199,8 @@ static llvm::Value *emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
   return call;
 }
 
-namespace {
-  struct CallObjCRelease : Cleanup {
-    llvm::Value *Value;
-    CallObjCRelease(llvm::Value *value) : Value(value) {}
-
-    void emit(IRGenFunction &IGF) const {
-      IGF.emitObjCRelease(Value);
-    }
-  };
-}
 
 ManagedValue IRGenFunction::enterObjCReleaseCleanup(llvm::Value *value) {
-  pushFullExprCleanup<CallObjCRelease>(value);
   return ManagedValue(value, getCleanupsDepth());
 }
 

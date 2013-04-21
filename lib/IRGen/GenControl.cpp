@@ -111,8 +111,6 @@ Cleanup &IRGenFunction::initCleanup(Cleanup &cleanup, size_t allocSize,
                                     CleanupState state) {
   cleanup.AllocatedSize = allocSize;
   cleanup.State = unsigned(state);
-  cleanup.NormalEntryBB = nullptr;
-
 
   return cleanup;
 }
@@ -120,12 +118,6 @@ Cleanup &IRGenFunction::initCleanup(Cleanup &cleanup, size_t allocSize,
 /// Change the state of a cleanup.
 void IRGenFunction::setCleanupState(CleanupsDepth depth,
                                     CleanupState newState) {
-  auto iter = Cleanups.find(depth);
-  assert(iter != Cleanups.end() && "changing state of end of stack");
-  setCleanupState(*iter, newState);
-
-  if (newState == CleanupState::Dead && iter == Cleanups.begin())
-    popAndEmitTopDeadCleanups(*this, Cleanups, InnermostScope);
 }
 
 void IRGenFunction::setCleanupState(Cleanup &cleanup, CleanupState newState) {
