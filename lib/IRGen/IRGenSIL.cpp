@@ -783,7 +783,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   } else {
     Explosion result(IGF.CurExplosionLevel);
     emitBuiltinCall(IGF, builtin, args, &result, Address(), substitutions);
-    IGF.newLoweredExplosion(SILValue(i,0), result, IGF);
+    IGF.newLoweredExplosion(SILValue(i,0), result);
   }
 }
 
@@ -875,7 +875,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // If the result is a non-address value, emit to an explosion.
   Explosion result(CurExplosionLevel);
   emission.emitToExplosion(result);
-  newLoweredExplosion(SILValue(i, 0), result, *this);
+  newLoweredExplosion(SILValue(i, 0), result);
 }
 
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
@@ -1237,7 +1237,7 @@ void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(CurExplosionLevel);
   emitBridgeToBlock(*this, i->getType().getSwiftType(), from, to);
-  newLoweredExplosion(SILValue(i, 0), to, *this);
+  newLoweredExplosion(SILValue(i, 0), to);
 }
 
 void IRGenSILFunction::visitArchetypeToSuperInst(swift::ArchetypeToSuperInst *i)

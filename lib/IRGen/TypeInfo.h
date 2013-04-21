@@ -218,11 +218,6 @@ public:
   /// l-value operations.
   virtual void copy(IRGenFunction &IGF, Explosion &sourceExplosion,
                     Explosion &targetExplosion) const = 0;
-  
-  /// Enter management of an unmanaged exploded value by adding
-  /// cleanups where appropriate.
-  virtual void manage(IRGenFunction &IGF, Explosion &sourceExplosion,
-                      Explosion &destExplosion) const = 0;
 
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address) const = 0;

@@ -512,7 +512,7 @@ llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
   llvm::Value *beginPtr = getBeginPointer(IGF, layout, alloc);
   begin = ElementTI.getAddressForPointer(beginPtr);
 
-  // Zero-initialize and immediately enter a release cleanup.
+  // Zero-initialize.
   llvm::Value *sizeToMemset = IGF.Builder.CreateSub(size, layout.HeaderSize);
 
   Alignment arrayAlignment = layout.BestStaticAlignment;

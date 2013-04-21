@@ -126,10 +126,6 @@ namespace {
       // FIXME
     }
 
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      // FIXME
-    }
-
     void retain(IRGenFunction &IGF, Explosion &e) const {
       // FIXME
     }
@@ -223,10 +219,6 @@ namespace {
 
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
       if (Singleton) Singleton->copy(IGF, src, dest);
-    }
-
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      if (Singleton) Singleton->manage(IGF, src, dest);
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {

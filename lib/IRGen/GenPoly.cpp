@@ -553,8 +553,7 @@ namespace {
         return;
       }
 
-      // Otherwise, load as a take and then kill the cleanup attached
-      // to the archetype value.
+      // Otherwise, load as a take.
       substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
     }
 

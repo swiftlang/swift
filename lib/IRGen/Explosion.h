@@ -130,14 +130,12 @@ public:
   }
 
   /// Claim and return the next value in this explosion.
-  /// The caller becomes responsible for managing the cleanup.
   llvm::Value *claimNext() {
     assert(NextValue < Values.size());
     return Values[NextValue++];
   }
 
   /// Claim and return the next N values in this explosion.
-  /// The caller becomes responsible for managing the cleanups.
   llvm::ArrayRef<llvm::Value*> claim(unsigned n) {
     assert(NextValue + n <= Values.size());
     auto array = llvm::makeArrayRef(begin(), n);
@@ -146,7 +144,6 @@ public:
   }
 
   /// Claim and return all the values in this explosion.
-  /// The caller becomes responsible for managing the cleanups.
   llvm::ArrayRef<llvm::Value*> claimAll() {
     return claim(size());
   }

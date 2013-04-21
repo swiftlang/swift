@@ -71,15 +71,12 @@ public:
   }
   
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
-    // Create a temporary and memcpy into it, then enter a cleanup
-    // to destroy that.
+    // Create a temporary and memcpy into it.
     Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a take of the source.
     asDerived().Derived::initializeWithTake(IGF, dest, src);
- 
-    // Enter a cleanup for the temporary.
     out.add(dest.getAddress());
   }
 
@@ -111,12 +108,6 @@ public:
   void copy(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
     Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
     asDerived().Derived::load(IGF, src, out);
-    // Force the cleanup here?
-  }
-  
-  void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    Address obj = asDerived().Derived::getAddressForPointer(in.claimNext());
-    out.add(obj.getAddress());
   }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {

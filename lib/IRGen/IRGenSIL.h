@@ -390,13 +390,6 @@ public:
     newLoweredValue(v, LoweredValue(e));
   }
   
-  /// Create a new Explosion corresponding to the given SIL value, disabling
-  /// cleanups on the input Explosion if necessary.
-  void newLoweredExplosion(SILValue v, Explosion &e, IRGenFunction &IGF) {
-    assert(!v.getType().isAddress() && "explosion for address value?!");
-    newLoweredValue(v, LoweredValue(e));
-  }
-  
   /// Create a new StaticFunction corresponding to the given SIL value.
   void newLoweredStaticFunction(SILValue v,
                                 llvm::Function *f,

@@ -953,9 +953,7 @@ namespace {
         IGF.emitAllocBoxCall(metadata, box, address);
         Address rawAddr(address, Alignment(1));
         
-        // Push a cleanup to dealloc the allocation.
-        OwnedAddress addr(rawAddr, box);
-        return addr;
+        return OwnedAddress(rawAddr, box);
       }
 
       // Make a fixed-size buffer.

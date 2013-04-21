@@ -450,11 +450,6 @@ namespace {
       IGF.emitRetain(src.claimNext(), dest);
     }
 
-    void manage(IRGenFunction &IGF, Explosion &src, Explosion &dest) const {
-      src.transferInto(dest, 1);
-      dest.add(src.claimNext());
-    }
-
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
       IGF.emitRetainCall(e.claimNext());
@@ -784,7 +779,7 @@ static void extractUnmanagedScalarResults(IRGenFunction &IGF,
 }
 
 /// Extract the direct scalar results of a call instruction into an
-/// explosion, registering cleanups as appropriate for the type.
+/// explosion.
 static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
                                  const TypeInfo &resultTI, Explosion &out) {
   // We need to make a temporary explosion to hold the values as we
@@ -792,10 +787,7 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
   Explosion tempExplosion(out.getKind());
 
   // Extract the values.
-  extractUnmanagedScalarResults(IGF, call, tempExplosion);
-
-  // Take ownership.
-  resultTI.manage(IGF, tempExplosion, out);
+  extractUnmanagedScalarResults(IGF, call, out);
 }
 
 
@@ -1062,12 +1054,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     }
 
     if (BuiltinName == "castToObjectPointer") {
-      // Just bitcast and rebuild the cleanup.
+      // Just bitcast.
       llvm::Value *value = args.claimNext();
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
       out->add(value);
     } else if (BuiltinName == "castFromObjectPointer") {
-      // Just bitcast and rebuild the cleanup.
+      // Just bitcast.
       llvm::Value *value = args.claimNext();
       value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
       out->add(value);
@@ -1080,7 +1072,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
       out->add(value);
     } else if (BuiltinName == "bridgeFromRawPointer") {
-      // Bitcast, and immediately retain (and introduce a release cleanup).
+      // Bitcast, and immediately retain.
       // FIXME: Should annotate the ownership semantics of this builtin
       // so that SILGen can emit the retain and expose it to ARC optimization
       llvm::Value *value = args.claimNext();
@@ -2028,8 +2020,5 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   llvm::Function *converter = IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy);
   
   // Emit the call.
-  llvm::Value *result = IGF.Builder.CreateCall2(converter, fn, context);
-  
-  // Tag the result with a cleanup and pass it on.
-  outBlock.add(result);
+  outBlock.add(IGF.Builder.CreateCall2(converter, fn, context));
 }

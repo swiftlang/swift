@@ -152,10 +152,6 @@ public:
     asDerived().emitScalarRetain(IGF, value);
     out.add(value);
   }
-
-  void manage(IRGenFunction &IGF, Explosion &in, Explosion &out) const {
-    out.add(in.claimNext());
-  }
   
   void retain(IRGenFunction &IGF, Explosion &e) const {
     llvm::Value *value = e.claimNext();
