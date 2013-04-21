@@ -31,7 +31,6 @@ namespace irgen {
   class Address;
   class IRGenFunction;
   class IRGenModule;
-  class Initialization;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
@@ -160,9 +159,7 @@ public:
   virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
 
   /// Allocate a variable of this type.
-  virtual OwnedAddress allocate(IRGenFunction &IGF,
-                                Initialization &init,
-                                OnHeap_t onHeap,
+  virtual OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
                                 const llvm::Twine &name) const = 0;
 
   /// Load an explosion of values from an address.

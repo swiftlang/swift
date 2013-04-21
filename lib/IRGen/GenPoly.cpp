@@ -20,7 +20,6 @@
 
 #include "ASTVisitor.h"
 #include "Explosion.h"
-#include "GenInit.h"
 #include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -402,9 +401,8 @@ namespace {
     }
 
     void initIntoTemporary(const TypeInfo &substTI) {
-      Initialization init;
-      auto addr = init.emitLocalAllocation(IGF, NotOnHeap, substTI,
-                                           "substitution.temp").getAddress();
+      auto addr = substTI.allocate(IGF, NotOnHeap,
+                                   "substitution.temp").getAddress();
 
       // Initialize into it.
       substTI.initialize(IGF, In, addr);

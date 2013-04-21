@@ -30,6 +30,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -944,8 +945,8 @@ namespace {
     }
 
     /// Create an uninitialized archetype object.
-    OwnedAddress allocate(IRGenFunction &IGF, Initialization &init,
-                          OnHeap_t onHeap, const llvm::Twine &name) const {
+    OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
+                          const llvm::Twine &name) const {
       if (onHeap) {
         // Allocate a new object using the allocBox runtime call.
         llvm::Value *metadata = getMetadataRef(IGF);

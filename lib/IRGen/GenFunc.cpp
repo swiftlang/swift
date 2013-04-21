@@ -72,7 +72,6 @@
 #include "FunctionRef.h"
 #include "GenClass.h"
 #include "GenHeap.h"
-#include "GenInit.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenPoly.h"
@@ -1348,9 +1347,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     Type substResultType = getCallee().getSubstResultType();
     const TypeInfo &substResultTI = IGF.getFragileTypeInfo(substResultType);
 
-    Initialization init;
-    Address temp = init.emitLocalAllocation(IGF, NotOnHeap, substResultTI,
-                                            "call.aggresult");
+    Address temp = substResultTI.allocate(IGF, NotOnHeap, "call.aggresult");
     emitToMemory(temp, substResultTI);
  
     // If the subst result is passed as an aggregate, don't uselessly
@@ -1492,9 +1489,7 @@ void CallEmission::forceCallee() {
     auto &substTI = IGF.getFragileTypeInfo(CurCallee.getSubstResultType());
 
     // Allocate the temporary.
-    Initialization init;
-    Address addr = init.emitLocalAllocation(IGF, NotOnHeap, substTI,
-                                            "polymorphic-currying-temp")
+    Address addr = substTI.allocate(IGF, NotOnHeap, "polymorphic-currying-temp")
       .getUnownedAddress();
 
     // Emit the current call into that temporary.
@@ -1545,8 +1540,7 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
                      CanType ty) {
   TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
-    Initialization I;
-    OwnedAddress addr = ti.allocate(IGF, I, NotOnHeap, "byval-temporary");
+    OwnedAddress addr = ti.allocate(IGF, NotOnHeap, "byval-temporary");
     ti.initialize(IGF, in, addr.getAddress());
      
     newByvals.push_back({out.size(), addr.getAlignment()});
@@ -1749,15 +1743,8 @@ void IRGenFunction::emitPrologue() {
     } else if (resultSchema.empty()) {
       assert(!ReturnSlot.isValid());
     } else {
-      // Prepare the return slot.  We intentionally do not create
-      // a destroy cleanup, because the return slot doesn't really
-      // work in the normal way.
-      Initialization returnInit;
-
-      // Allocate the slot and leave its allocation cleanup hanging
-      // around.
-      ReturnSlot = returnInit.emitLocalAllocation(*this, NotOnHeap, resultType,
-                                                  "return_value");
+      // Prepare the return slot.
+      ReturnSlot = resultType.allocate(*this, NotOnHeap, "return_value");
     }
   }
 

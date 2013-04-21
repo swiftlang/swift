@@ -20,7 +20,6 @@
 #define SWIFT_IRGEN_INDIRECTTYPEINFO_H
 
 #include "Explosion.h"
-#include "GenInit.h"
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
 
@@ -52,8 +51,7 @@ public:
 
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
-    Initialization init;
-    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a copy of the source.
@@ -64,8 +62,7 @@ public:
 
   void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
-    Initialization init;
-    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
                                                  "temporary.forLoad");
     
     // Initialize it with a copy of the source.
@@ -76,8 +73,7 @@ public:
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary and memcpy into it, then enter a cleanup
     // to destroy that.
-    Initialization init;
-    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a take of the source.

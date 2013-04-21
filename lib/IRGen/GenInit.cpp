@@ -29,8 +29,6 @@
 #include "IRGenModule.h"
 #include "FixedTypeInfo.h"
 
-#include "GenInit.h"
-
 using namespace swift;
 using namespace irgen;
 
@@ -63,16 +61,9 @@ static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
                       IGM.RefCountedNull);
 }
 
-/// Allocate an object in local scope.
-OwnedAddress
-Initialization::emitLocalAllocation(IRGenFunction &IGF, OnHeap_t allocateOnHeap,
-                                    const TypeInfo &type, const Twine &name) {
-  return type.allocate(IGF, *this, allocateOnHeap, name);
-}
 
 /// Allocate an object with fixed layout.
-OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
-                                     OnHeap_t onHeap,
+OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, OnHeap_t onHeap,
                                      const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty())

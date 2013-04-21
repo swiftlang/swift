@@ -34,7 +34,6 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
-#include "GenInit.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenStruct.h"
@@ -1133,7 +1132,6 @@ void IRGenSILFunction::visitRetainAutoreleasedInst(
 
 void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
-  Initialization init;
   SILValue v(i, 0);
 
   OnHeap_t isOnHeap = NotOnHeap;
@@ -1148,7 +1146,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   }
   
   OwnedAddress addr = type.allocate(*this,
-                                    init,
                                     isOnHeap,
                                     // FIXME: derive name from SIL location
                                     "");
@@ -1179,9 +1176,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue boxValue(i, 0);
   SILValue ptrValue(i, 1);
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
-  Initialization init;
   OwnedAddress addr = type.allocate(*this,
-                                    init,
                                     OnHeap,
                                     // FIXME: derive name from SIL location
                                     "");

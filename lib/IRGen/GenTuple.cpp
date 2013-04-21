@@ -28,7 +28,6 @@
 
 #include "ASTVisitor.h"
 #include "GenHeap.h"
-#include "GenInit.h"
 #include "GenSequential.h"
 #include "GenType.h"
 #include "IRGenFunction.h"

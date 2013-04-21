@@ -26,7 +26,6 @@
 #include "ASTVisitor.h"
 #include "GenClass.h"
 #include "GenFunc.h"
-#include "GenInit.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenTuple.h"

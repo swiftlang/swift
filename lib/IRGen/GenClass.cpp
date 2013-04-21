@@ -29,6 +29,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CallSite.h"
 
 #include "Explosion.h"
@@ -41,7 +42,6 @@
 #include "IRGenModule.h"
 #include "GenHeap.h"
 #include "HeapTypeInfo.h"
-#include "GenInit.h"
 #include "Cleanup.h"
 
 

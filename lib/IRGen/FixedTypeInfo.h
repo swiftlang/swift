@@ -44,8 +44,7 @@ public:
   /// Whether this type is known to be empty.
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
-  OwnedAddress allocate(IRGenFunction &IGF, Initialization &init,
-                        OnHeap_t onHeap,
+  OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
                         const llvm::Twine &name) const;
 
   // We can give these reasonable default implementations.

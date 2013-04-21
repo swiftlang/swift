@@ -23,7 +23,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
-#include "GenInit.h"
 #include "GenMeta.h"
 #include "GenSequential.h"
 #include "GenType.h"
