@@ -22,8 +22,6 @@
 namespace swift {
 namespace irgen {
 
-// These classes are private to GenCleanup.cpp.
-class CleanupControl;
 
 /// A Cleanup is an object placed on IRGenFunction's cleanups stack to
 /// cause something to occur when a scope or full-expression is
@@ -31,11 +29,7 @@ class CleanupControl;
 class Cleanup {
   unsigned AllocatedSize;
   unsigned State : 2;
-   unsigned HasControlFlag : 1;
-  unsigned NextDestLabel : 26;
   llvm::BasicBlock *NormalEntryBB;
-  void *ControlBegin;
-  void *ControlEnd;
 
   friend Cleanup &IRGenFunction::initCleanup(Cleanup &, size_t, CleanupState);
 protected:
@@ -51,23 +45,14 @@ public:
   CleanupState getState() const { return CleanupState(State); }
   void setState(CleanupState state) {
     State = unsigned(state);
-    assert(getState() == state);
   }
 
-  CleanupControl getControl() const;
-  void setControl(const CleanupControl &control);
-
-  /// Is this cleanup active for code currently being executed?
+   /// Is this cleanup active for code currently being executed?
   bool isActive() const { return getState() == CleanupState::Active; }
   bool isDead() const { return getState() == CleanupState::Dead; }
 
   llvm::BasicBlock *getNormalEntryBlock() const { return NormalEntryBB; }
   void setNormalEntryBlock(llvm::BasicBlock *BB) { NormalEntryBB = BB; }
-
-  unsigned getNextDestLabel() const { return NextDestLabel; }
-  void setNextDestLabel(unsigned label) {
-    assert(label > NextDestLabel); NextDestLabel = label;
-  }
 
   virtual void emit(IRGenFunction &IGF) const = 0;
 
