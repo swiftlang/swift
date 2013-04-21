@@ -212,6 +212,8 @@ function(compile_swift_files)
       DEPENDS ${source_files}
       COMMENT "FIXME: generating module source file ${module_source_name}.swift")
     set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
+    install(FILES ${module_source_file}
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
   endif()
 
   add_custom_command(
@@ -428,8 +430,6 @@ macro(add_swift_library name)
       get_filename_component(extension ${external_source} EXT)
       if(extension STREQUAL ".swift")
         set(filename ${external_source})
-        install(FILES ${filename}
-          DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
       endif()
     endforeach(external_source)
   endif(SWIFTLIB_INSTALL)
