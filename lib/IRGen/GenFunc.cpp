@@ -1352,7 +1352,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
     Initialization init;
     InitializedObject obj = init.getObjectForTemporary();
-    auto cleanup = init.registerObject(IGF, obj, NotOnHeap, substResultTI);
     Address temp = init.emitLocalAllocation(IGF, obj, NotOnHeap, substResultTI,
                                             "call.aggresult");
     emitToMemory(temp, substResultTI);
@@ -1363,10 +1362,10 @@ void CallEmission::emitToExplosion(Explosion &out) {
     if (substSchema.isSingleAggregate()) {
       auto substType = substSchema.begin()->getAggregateType()->getPointerTo();
       temp = IGF.Builder.CreateBitCast(temp, substType);
-      out.add(ManagedValue(temp.getAddress(), cleanup));
+      out.add(ManagedValue(temp.getAddress()));
 
-    // Otherwise, we need to load.  Do a take-load and deactivate the cleanup.
     } else {
+      // Otherwise, we need to load.
       substResultTI.loadAsTake(IGF, temp, out);
     }
     return;
@@ -1498,7 +1497,6 @@ void CallEmission::forceCallee() {
     // Allocate the temporary.
     Initialization init;
     auto object = init.getObjectForTemporary();
-    init.registerObjectWithoutDestroy(object);
     Address addr = init.emitLocalAllocation(IGF, object, NotOnHeap, substTI,
                                             "polymorphic-currying-temp")
       .getUnownedAddress();
@@ -1553,7 +1551,6 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     Initialization I;
     InitializedObject object = I.getObjectForTemporary();
-    I.registerObject(IGF, object, NotOnHeap, ti);
     OwnedAddress addr = ti.allocate(IGF,
                                     I,
                                     object,
@@ -1767,7 +1764,6 @@ void IRGenFunction::emitPrologue() {
       // work in the normal way.
       Initialization returnInit;
       auto returnObject = returnInit.getObjectForTemporary();
-      returnInit.registerObjectWithoutDestroy(returnObject);
 
       // Allocate the slot and leave its allocation cleanup hanging
       // around.

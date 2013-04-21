@@ -35,33 +35,6 @@ using namespace swift;
 using namespace irgen;
 
 
-/// Register an object with the initialization process.
-CleanupsDepth Initialization::registerObject(IRGenFunction &IGF,
-                                             InitializedObject object,
-                                             OnHeap_t onHeap,
-                                             const TypeInfo &objectTI) {
-  // Create the appropriate destroy cleanup.
-  registerObject(object, CleanupsDepth::invalid());
-
-  return CleanupsDepth::invalid();
-}
-
-void Initialization::registerObjectWithoutDestroy(InitializedObject object) {
-  registerObject(object, CleanupsDepth::invalid());
-}
-
-/// Register an object with the initialization process.
-void Initialization::registerObject(InitializedObject object,
-                                    CleanupsDepth destroy) {
-  // The invariant is that the cleanup has to be an
-  // UnboundDestroy if it's valid.
-
-  ValueRecord record = {
-    CleanupsDepth::invalid(), destroy
-  };
-  Records.insert(std::make_pair(object.Opaque, record));
-}
-
 /// Emit a global variable.
 Address IRGenModule::emitGlobalVariable(VarDecl *var,
                                         const TypeInfo &type) {

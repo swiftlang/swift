@@ -58,15 +58,13 @@ public:
     // Create a temporary.
     Initialization init;
     auto temp = init.getObjectForTemporary();
-    auto cleanup = init.registerObject(IGF, temp, NotOnHeap, *this);
     Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
 
-    // Enter a cleanup for the temporary.
-    out.add(ManagedValue(dest.getAddress(), cleanup));
+    out.add(ManagedValue(dest.getAddress()));
   }
 
   void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
@@ -78,8 +76,6 @@ public:
     
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
-    
-    // Enter a cleanup for the temporary.
     out.addUnmanaged(dest.getAddress());
   }
   
@@ -88,7 +84,6 @@ public:
     // to destroy that.
     Initialization init;
     auto temp = init.getObjectForTemporary();
-    auto cleanup = init.registerObject(IGF, temp, NotOnHeap, *this);
     Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
                                                  "temporary.forLoad");
 
@@ -96,7 +91,7 @@ public:
     asDerived().Derived::initializeWithTake(IGF, dest, src);
  
     // Enter a cleanup for the temporary.
-    out.add(ManagedValue(dest.getAddress(), cleanup));
+    out.add(ManagedValue(dest.getAddress()));
   }
 
   void assign(IRGenFunction &IGF, Explosion &in, Address dest) const {

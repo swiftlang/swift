@@ -1138,7 +1138,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   Initialization init;
   SILValue v(i, 0);
   InitializedObject initVar = init.getObjectForValue(v);
-  init.registerObjectWithoutDestroy(initVar);
 
   OnHeap_t isOnHeap = NotOnHeap;
   switch (i->getAllocKind()) {
@@ -1186,7 +1185,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
   Initialization init;
   InitializedObject initBox = init.getObjectForValue(boxValue);
-  init.registerObjectWithoutDestroy(initBox);
   OwnedAddress addr = type.allocate(*this,
                                     init,
                                     initBox,

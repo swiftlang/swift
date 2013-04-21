@@ -404,7 +404,6 @@ namespace {
     void initIntoTemporary(const TypeInfo &substTI) {
       Initialization init;
       auto object = init.getObjectForTemporary();
-      auto cleanup = init.registerObject(IGF, object, NotOnHeap, substTI);
       auto addr = init.emitLocalAllocation(IGF, object, NotOnHeap, substTI,
                                            "substitution.temp").getAddress();
 
@@ -415,7 +414,7 @@ namespace {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
 
       // Add that to the output explosion.
-      Out.add(ManagedValue(addr.getAddress(), cleanup));
+      Out.add(ManagedValue(addr.getAddress()));
     }
 
     void visitArrayType(ArrayType *origTy, ArrayType *substTy) {

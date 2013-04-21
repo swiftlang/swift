@@ -45,8 +45,6 @@ public:
     return getValue();
   }
   llvm::Value *getValue() const { return Value; }
-
-  bool hasCleanup() const { return false; }
  
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
@@ -160,11 +158,7 @@ public:
 
   /// The next N values are being ignored.  They are all unmanaged.
   void ignoreUnmanaged(unsigned n) {
-#ifndef NDEBUG
     assert(NextValue + n <= Values.size());
-    for (auto i = NextValue, e = NextValue + n; i != e; ++i)
-      assert(!Values[i].hasCleanup());
-#endif
     markClaimed(n);
   }
 
@@ -178,7 +172,6 @@ public:
   /// Claim a value which is known to have no management.
   llvm::Value *claimUnmanagedNext() {
     assert(NextValue < Values.size());
-    assert(!Values[NextValue].hasCleanup());
     return Values[NextValue++].getValue();
   }
 

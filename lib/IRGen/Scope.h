@@ -26,22 +26,24 @@ namespace irgen {
 /// statement) has been entered.
 class Scope {
   IRGenFunction &IGF;
-  CleanupsDepth Depth;
   IRGenFunction::LocalTypeDataDepth SavedLocalTypeDataDepth;
-
+  bool Popped;
 public:
   explicit Scope(IRGenFunction &IGF)
-    : IGF(IGF),  SavedLocalTypeDataDepth(IGF.ScopedLocalTypeData.size()) {
+    : IGF(IGF), SavedLocalTypeDataDepth(IGF.ScopedLocalTypeData.size()) {
+      Popped = false;
   }
 
   void pop() {
-    assert(Depth.isValid() && "popping a scope twice!");
+    assert(!Popped);
     assert(IGF.ScopedLocalTypeData.size() >= SavedLocalTypeDataDepth);
     IGF.endLocalTypeDataScope(SavedLocalTypeDataDepth);
+    Popped = true;
   }
 
   ~Scope() {
-    if (Depth.isValid()) pop();
+    if (!Popped)
+      pop();
   }
 };
 

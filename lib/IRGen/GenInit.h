@@ -34,7 +34,6 @@
 #ifndef SWIFT_IRGEN_GENINIT_H
 #define SWIFT_IRGEN_GENINIT_H
 
-#include "llvm/ADT/DenseMap.h"
 #include "IRGenFunction.h"
 #include "swift/SIL/SILValue.h"
 
@@ -60,19 +59,10 @@ public:
 /// To use this, you need to:
 ///   - create an abstract Object for the object you'd like to initialize,
 ///     using one of the getObject* methods;
-///   - register that Object with the Initialization using one of the
-///     registerObject* methods;
 ///
 /// This class also provides several convenience methods for
 /// performing one or more stages of this process.
 class Initialization {
-  struct ValueRecord {
-    CleanupsDepth DeallocCleanup;
-    CleanupsDepth DestroyCleanup;
-  };
-
-  llvm::DenseMap<void *, ValueRecord> Records;
-
 public:
  
   /// Create an object reference for the given SIL value.
@@ -97,18 +87,6 @@ public:
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 
-  /// Add an object that is going to be initialized; use the
-  /// appropriate destroy cleanup for the given type.
-  CleanupsDepth registerObject(IRGenFunction &IGF, InitializedObject object,
-                               OnHeap_t onHeap, const TypeInfo &objectTI);
-
-  /// Add an object that is going to be initialized, but which does not
-  /// need a destroy cleanup.
-  void registerObjectWithoutDestroy(InitializedObject object);
-
-private:
-  /// Add an object that is going to be initialized.
-  void registerObject(InitializedObject object, CleanupsDepth destroy);
 };
 
 } // end namespace irgen
