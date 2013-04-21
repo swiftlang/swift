@@ -45,7 +45,6 @@ public:
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
   OwnedAddress allocate(IRGenFunction &IGF, Initialization &init,
-                        InitializedObject object,
                         OnHeap_t onHeap,
                         const llvm::Twine &name) const;
 

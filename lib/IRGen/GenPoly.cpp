@@ -403,8 +403,7 @@ namespace {
 
     void initIntoTemporary(const TypeInfo &substTI) {
       Initialization init;
-      auto object = init.getObjectForTemporary();
-      auto addr = init.emitLocalAllocation(IGF, object, NotOnHeap, substTI,
+      auto addr = init.emitLocalAllocation(IGF, NotOnHeap, substTI,
                                            "substitution.temp").getAddress();
 
       // Initialize into it.

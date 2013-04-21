@@ -24,7 +24,6 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
-  class Initialization;
   class OwnedAddress;
 
   /// Project the address of a tuple element.

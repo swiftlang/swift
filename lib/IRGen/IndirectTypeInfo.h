@@ -31,11 +31,7 @@ namespace irgen {
 /// implementing a type which is always passed indirectly.
 ///
 /// Subclasses must implement the following operations:
-///   OwnedAddress allocate(IRGenFunction &IGF, Initialization &init, Object obj,
-///                         OnHeap_t onHeap, const llvm::Twine &name) const;
-///   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const;
-///   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src) const;
-///   void destroy(IRGenFunction &IGF, Address obj) const;
+///   allocate, assignWithCopy, initializeWithCopy, destroy
 template <class Derived, class Base>
 class IndirectTypeInfo : public Base {
 protected:
@@ -57,8 +53,7 @@ public:
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
     Initialization init;
-    auto temp = init.getObjectForTemporary();
-    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a copy of the source.
@@ -70,8 +65,7 @@ public:
   void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
     Initialization init;
-    auto temp = init.getObjectForTemporary();
-    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
                                                  "temporary.forLoad");
     
     // Initialize it with a copy of the source.
@@ -83,8 +77,7 @@ public:
     // Create a temporary and memcpy into it, then enter a cleanup
     // to destroy that.
     Initialization init;
-    auto temp = init.getObjectForTemporary();
-    Address dest = asDerived().Derived::allocate(IGF, init, temp, NotOnHeap,
+    Address dest = asDerived().Derived::allocate(IGF, init, NotOnHeap,
                                                  "temporary.forLoad");
 
     // Initialize it with a take of the source.

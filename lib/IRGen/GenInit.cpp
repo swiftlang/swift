@@ -65,16 +65,13 @@ static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
 
 /// Allocate an object in local scope.
 OwnedAddress
-Initialization::emitLocalAllocation(IRGenFunction &IGF,
-                                    InitializedObject object,
-                                    OnHeap_t allocateOnHeap,
+Initialization::emitLocalAllocation(IRGenFunction &IGF, OnHeap_t allocateOnHeap,
                                     const TypeInfo &type, const Twine &name) {
-  return type.allocate(IGF, *this, object, allocateOnHeap, name);
+  return type.allocate(IGF, *this, allocateOnHeap, name);
 }
 
 /// Allocate an object with fixed layout.
 OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, Initialization &init,
-                                     InitializedObject object,
                                      OnHeap_t onHeap,
                                      const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.

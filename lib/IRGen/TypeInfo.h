@@ -32,7 +32,6 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class Initialization;
-  class InitializedObject;
   class Explosion;
   enum class ExplosionKind : unsigned;
   class ExplosionSchema;
@@ -163,7 +162,6 @@ public:
   /// Allocate a variable of this type.
   virtual OwnedAddress allocate(IRGenFunction &IGF,
                                 Initialization &init,
-                                InitializedObject object,
                                 OnHeap_t onHeap,
                                 const llvm::Twine &name) const = 0;
 

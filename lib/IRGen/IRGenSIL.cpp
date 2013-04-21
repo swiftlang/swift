@@ -1135,7 +1135,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
   Initialization init;
   SILValue v(i, 0);
-  InitializedObject initVar = init.getObjectForValue(v);
 
   OnHeap_t isOnHeap = NotOnHeap;
   switch (i->getAllocKind()) {
@@ -1150,7 +1149,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   
   OwnedAddress addr = type.allocate(*this,
                                     init,
-                                    initVar,
                                     isOnHeap,
                                     // FIXME: derive name from SIL location
                                     "");
@@ -1182,10 +1180,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue ptrValue(i, 1);
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
   Initialization init;
-  InitializedObject initBox = init.getObjectForValue(boxValue);
   OwnedAddress addr = type.allocate(*this,
                                     init,
-                                    initBox,
                                     OnHeap,
                                     // FIXME: derive name from SIL location
                                     "");

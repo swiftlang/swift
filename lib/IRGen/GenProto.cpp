@@ -945,8 +945,7 @@ namespace {
 
     /// Create an uninitialized archetype object.
     OwnedAddress allocate(IRGenFunction &IGF, Initialization &init,
-                          InitializedObject object, OnHeap_t onHeap,
-                          const llvm::Twine &name) const {
+                          OnHeap_t onHeap, const llvm::Twine &name) const {
       if (onHeap) {
         // Allocate a new object using the allocBox runtime call.
         llvm::Value *metadata = getMetadataRef(IGF);

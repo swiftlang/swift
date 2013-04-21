@@ -42,17 +42,6 @@ namespace swift {
 
 namespace irgen {
 
-/// An opaque means of identifying an object being initialized.
-class InitializedObject {
-  void *Opaque;
-  InitializedObject(void *opaque) : Opaque(opaque) {}
-  friend class Initialization;
-
-public:
-  static InitializedObject invalid() { return InitializedObject(nullptr); }
-  bool isValid() const { return Opaque != nullptr; }
-};
-
 /// An Initialization object manages the cleanups and lifetimes of a
 /// variable initialization.
 ///
@@ -64,17 +53,6 @@ public:
 /// performing one or more stages of this process.
 class Initialization {
 public:
- 
-  /// Create an object reference for the given SIL value.
-  InitializedObject getObjectForValue(SILValue v) {
-    return InitializedObject(v.getOpaqueValue());
-  }
-
-  /// Create an object reference for the given temporary.
-  InitializedObject getObjectForTemporary() {
-    // For now, we only support one of these.
-    return InitializedObject(reinterpret_cast<void*>(1));
-  }
 
   /// Create a local variable.
   ///
@@ -83,7 +61,7 @@ public:
   ///   or initialized.
   /// Postcondition: the abstract object will have been marked as
   ///   allocated, but not marked as initialized.
-  OwnedAddress emitLocalAllocation(IRGenFunction &IGF, InitializedObject object,
+  OwnedAddress emitLocalAllocation(IRGenFunction &IGF,
                                    OnHeap_t onHeap, const TypeInfo &type,
                                    const Twine &name);
 

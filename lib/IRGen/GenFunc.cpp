@@ -1349,8 +1349,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     const TypeInfo &substResultTI = IGF.getFragileTypeInfo(substResultType);
 
     Initialization init;
-    InitializedObject obj = init.getObjectForTemporary();
-    Address temp = init.emitLocalAllocation(IGF, obj, NotOnHeap, substResultTI,
+    Address temp = init.emitLocalAllocation(IGF, NotOnHeap, substResultTI,
                                             "call.aggresult");
     emitToMemory(temp, substResultTI);
  
@@ -1494,8 +1493,7 @@ void CallEmission::forceCallee() {
 
     // Allocate the temporary.
     Initialization init;
-    auto object = init.getObjectForTemporary();
-    Address addr = init.emitLocalAllocation(IGF, object, NotOnHeap, substTI,
+    Address addr = init.emitLocalAllocation(IGF, NotOnHeap, substTI,
                                             "polymorphic-currying-temp")
       .getUnownedAddress();
 
@@ -1548,12 +1546,7 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
   TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
     Initialization I;
-    InitializedObject object = I.getObjectForTemporary();
-    OwnedAddress addr = ti.allocate(IGF,
-                                    I,
-                                    object,
-                                    NotOnHeap,
-                                    "byval-temporary");
+    OwnedAddress addr = ti.allocate(IGF, I, NotOnHeap, "byval-temporary");
     ti.initialize(IGF, in, addr.getAddress());
      
     newByvals.push_back({out.size(), addr.getAlignment()});
@@ -1760,12 +1753,10 @@ void IRGenFunction::emitPrologue() {
       // a destroy cleanup, because the return slot doesn't really
       // work in the normal way.
       Initialization returnInit;
-      auto returnObject = returnInit.getObjectForTemporary();
 
       // Allocate the slot and leave its allocation cleanup hanging
       // around.
-      ReturnSlot = returnInit.emitLocalAllocation(*this, returnObject,
-                                                  NotOnHeap, resultType,
+      ReturnSlot = returnInit.emitLocalAllocation(*this, NotOnHeap, resultType,
                                                   "return_value");
     }
   }
