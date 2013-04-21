@@ -146,8 +146,7 @@ CanType irgen::getResultType(CanType type, unsigned uncurryLevel) {
 }
 
 const TypeInfo &IRGenFunction::getResultTypeInfo() const {
-  CanType resultType = getResultType(CurFuncType, CurUncurryLevel);
-  return IGM.getFragileTypeInfo(resultType);
+  return IGM.getFragileTypeInfo(CurResultType);
 }
 
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
@@ -763,9 +762,8 @@ static Callee emitIndirectCallee(IRGenFunction &IGF,
 }
 
 
-static void extractUnmanagedScalarResults(IRGenFunction &IGF,
-                                          llvm::Value *call,
-                                          Explosion &out) {
+static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
+                                 Explosion &out) {
   if (llvm::StructType *structType
         = dyn_cast<llvm::StructType>(call->getType())) {
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i) {
@@ -776,18 +774,6 @@ static void extractUnmanagedScalarResults(IRGenFunction &IGF,
     assert(!call->getType()->isVoidTy());
     out.add(call);
   }
-}
-
-/// Extract the direct scalar results of a call instruction into an
-/// explosion.
-static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
-                                 const TypeInfo &resultTI, Explosion &out) {
-  // We need to make a temporary explosion to hold the values as we
-  // tag them with cleanups.
-  Explosion tempExplosion(out.getKind());
-
-  // Extract the values.
-  extractUnmanagedScalarResults(IGF, call, out);
 }
 
 
@@ -911,7 +897,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     if (TheCall->getType()->isVoidTy())
       voidResult = true;
     else
-      extractUnmanagedScalarResults(IGF, TheCall, *out);
+      extractScalarResults(IGF, TheCall, *out);
 
     return;
   }
@@ -1217,8 +1203,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   if (result->getType()->isVoidTy()) return;
 
   // Extract out the scalar results.
-  auto &origResultTI = IGF.getFragileTypeInfo(CurOrigType);
-  extractScalarResults(IGF, result, origResultTI, out);
+  extractScalarResults(IGF, result, out);
 }
 
 /// Emit the unsubstituted result of this call to the given address.
@@ -1236,6 +1221,18 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   emitCallSite(true);
 }
 
+// FIXME: This doesn't belong on IGF.
+llvm::CallSite CallEmission::emitInvoke(llvm::CallingConv::ID convention,
+                                        llvm::Value *fn,
+                                        ArrayRef<llvm::Value*> args,
+                                        const llvm::AttributeSet &attrs) {
+  // TODO: exceptions!
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, args);
+  call->setAttributes(attrs);
+  call->setCallingConv(convention);
+  return call;
+}
+
 /// The private routine to ultimately emit a call or invoke instruction.
 llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   assert(RemainingArgsForCallee == 0);
@@ -1249,9 +1246,9 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
 
   // Make the call and clear the arguments array.
   auto fnPtr = getCallee().getFunctionPointer();  
-  llvm::CallSite call = IGF.emitInvoke(cc, fnPtr, Args,
-                                    llvm::AttributeSet::get(fnPtr->getContext(),
-                                                            Attrs));
+  llvm::CallSite call = emitInvoke(cc, fnPtr, Args,
+                                   llvm::AttributeSet::get(fnPtr->getContext(),
+                                                           Attrs));
   Args.clear();
 
   // Return.
@@ -1701,7 +1698,9 @@ void IRGenFunction::emitBBForReturn() {
 }
 
 /// Emit the prologue for the function.
-void IRGenFunction::emitPrologue() {  
+void IRGenFunction::emitPrologue(CanType CurFuncType,
+                                 ArrayRef<Pattern*> CurFuncParamPatterns,
+                                 unsigned CurUncurryLevel) {
   // Set up the IRBuilder.
   llvm::BasicBlock *EntryBB = createBasicBlock("entry");
   assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
@@ -1923,10 +1922,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     subIGF.emitRelease(rawData);
   }
   
-  llvm::CallSite callSite = subIGF.emitInvoke(fnPtr->getCallingConv(),
-                                              fnPtr, params.claimAll(),
-                                              fnPtr->getAttributes());
-  llvm::CallInst *call = cast<llvm::CallInst>(callSite.getInstruction());
+  llvm::CallInst *call = subIGF.Builder.CreateCall(fnPtr, params.claimAll());
+  call->setAttributes(fnPtr->getAttributes());
+  call->setCallingConv(fnPtr->getCallingConv());
   call->setTailCall();
   
   if (call->getType()->isVoidTy())

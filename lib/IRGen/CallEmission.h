@@ -78,6 +78,9 @@ private:
   void externalizeArguments(Explosion &arg,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                      CanType inputsTy);
+  llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
+                            ArrayRef<llvm::Value*> args,
+                            const llvm::AttributeSet &attrs);
 
 public:
   CallEmission(IRGenFunction &IGF, const Callee &callee)

@@ -929,7 +929,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
     llvm::Function *swiftImpl = IGM.getAddrOfGetter(property, explosionLevel);
     return getObjCMethodPointerForSwiftImpl(IGM, selector, getter,
                                             swiftImpl, explosionLevel,
-                                            /*uncurryLevel=*/ 2);
+                                            /*uncurryLevel=*/ 1);
   } else {
     assert(!property->isProperty() && "property without getter?!");
     
@@ -1016,7 +1016,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
     llvm::Function *swiftImpl = IGM.getAddrOfSetter(property, explosionLevel);
     return getObjCMethodPointerForSwiftImpl(IGM, selector, setter,
                                             swiftImpl, explosionLevel,
-                                            /*uncurryLevel=*/ 2);
+                                            /*uncurryLevel=*/ 1);
   } else {
     assert(!property->isProperty() && "settable property w/o setter?!");
     

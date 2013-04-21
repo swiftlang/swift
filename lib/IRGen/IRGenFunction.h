@@ -102,11 +102,9 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
-  CanType CurFuncType;
-  ArrayRef<Pattern*> CurFuncParamPatterns;
+  CanType CurResultType;
   llvm::Function *CurFn;
   ExplosionKind CurExplosionLevel;
-  unsigned CurUncurryLevel;
   Prologue CurPrologue;
   llvm::Value *ContextPtr;
 
@@ -118,21 +116,6 @@ public:
 
   void unimplemented(SourceLoc Loc, StringRef Message);
 
-//--- Control flow -------------------------------------------------------------
-public:
-  /// Is the current emission point conditionally evaluated?  Right
-  /// now we don't have any expressions which introduce conditional
-  /// evaluation, but it's not at all unlikely that this will change.
-  bool isConditionallyEvaluated() const { return false; }
-
-  static Alignment getJumpDestAlignment() { return Alignment(4); }
-  llvm::BasicBlock *getUnreachableBlock();
-
-  llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
-                            ArrayRef<llvm::Value*> args,
-                            const llvm::AttributeSet &attrs);
-
-private:
   friend class Scope;
 
 //--- Function prologue and epilogue -------------------------------------------
@@ -144,7 +127,9 @@ public:
   bool emitBranchToReturnBB();
   
 private:
-  void emitPrologue();
+  void emitPrologue(CanType CurFuncType,
+                    ArrayRef<Pattern*> CurFuncParamPatterns,
+                    unsigned CurUncurryLevel);
   void emitEpilogue();
 
   Address ReturnSlot;
