@@ -252,9 +252,9 @@ public:
   }
   void checkLoadInst(LoadInst *LI) {
     require(!LI->getType().isAddress(), "Can't load an address");
-    require(LI->getLValue().getType().isAddress(),
+    require(LI->getOperand().getType().isAddress(),
             "Load operand must be an address");
-    require(LI->getLValue().getType().getObjectType() == LI->getType(),
+    require(LI->getOperand().getType().getObjectType() == LI->getType(),
             "Load operand type and result type mismatch");
   }
 
@@ -277,7 +277,7 @@ public:
   }
   
   void checkInitializeVarInst(InitializeVarInst *ZI) {
-    require(ZI->getDest().getType().isAddress(),
+    require(ZI->getOperand().getType().isAddress(),
             "Dest address should be lvalue");
   }
   
@@ -339,31 +339,31 @@ public:
   void checkClassMetatypeInst(ClassMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "class_metatype instruction must be of metatype type");
-    require(MI->getBase().getType().getSwiftType()->getClassOrBoundGenericClass(),
+    require(MI->getOperand().getType().getSwiftType()->getClassOrBoundGenericClass(),
             "class_metatype base must be of class type");
-    require(MI->getBase().getType().getSwiftType() ==
+    require(MI->getOperand().getType().getSwiftType() ==
              CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "class_metatype result must be metatype of base class type");
   }
   void checkArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "archetype_metatype instruction must be of metatype type");
-    require(MI->getBase().getType().isAddress(),
+    require(MI->getOperand().getType().isAddress(),
             "archetype_metatype operand must be an address");
-    require(MI->getBase().getType().getSwiftRValueType()->is<ArchetypeType>(),
+    require(MI->getOperand().getType().getSwiftRValueType()->is<ArchetypeType>(),
             "archetype_metatype operand must be address of archetype type");
-    require(MI->getBase().getType().getSwiftRValueType() ==
+    require(MI->getOperand().getType().getSwiftRValueType() ==
             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "archetype_metatype result must be metatype of operand type");
   }
   void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "protocol_metatype instruction must be of metatype type");
-    require(MI->getBase().getType().isAddress(),
+    require(MI->getOperand().getType().isAddress(),
             "protocol_metatype operand must be an address");
-    require(MI->getBase().getType().getSwiftRValueType()->isExistentialType(),
+    require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
             "protocol_metatype operand must be address of protocol type");
-    require(MI->getBase().getType().getSwiftRValueType() ==
+    require(MI->getOperand().getType().getSwiftRValueType() ==
             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "protocol_metatype result must be metatype of operand type");
   }
@@ -374,7 +374,7 @@ public:
   void checkAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     require(MI->getType(0).is<MetaTypeType>(),
             "associated_metatype instruction must be of metatype type");
-    require(MI->getSourceMetatype().getType().is<MetaTypeType>(),
+    require(MI->getOperand().getType().is<MetaTypeType>(),
             "associated_metatype operand must be of metatype type");
   }
   
@@ -576,7 +576,7 @@ public:
   }
   
   void checkInitExistentialInst(InitExistentialInst *AEI) {
-    SILType exType = AEI->getExistential().getType();
+    SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),
             "init_existential must be applied to an address");
     require(exType.isExistentialType(),
@@ -600,7 +600,7 @@ public:
   }
   
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
-    SILType exType = DEI->getExistential().getType();
+    SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),
             "deinit_existential must be applied to an address");
     require(exType.isExistentialType(),
@@ -780,7 +780,7 @@ public:
     SILFunctionTypeInfo *ti =
       F.getLoweredType().getFunctionTypeInfo();
     SILType functionResultType = ti->getResultType();
-    SILType instResultType = RI->getReturnValue().getType();
+    SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
           llvm::dbgs() << "return inst type: ";
@@ -795,7 +795,7 @@ public:
     SILFunctionTypeInfo *ti =
     F.getLoweredType().getFunctionTypeInfo();
     SILType functionResultType = ti->getResultType();
-    SILType instResultType = RI->getReturnValue().getType();
+    SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
           functionResultType.dump();
           llvm::dbgs() << "return inst type: ";

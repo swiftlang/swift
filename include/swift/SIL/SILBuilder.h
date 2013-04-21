@@ -262,28 +262,28 @@ public:
                                      SILConstant Member,
                                      SILType MethodTy)
   {
-    return insert(new ClassMethodInst(Loc, Operand, Member, MethodTy, F));
+    return insert(new ClassMethodInst(Loc, Operand, Member, MethodTy));
   }
   
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
                                      SILConstant Member,
                                      SILType MethodTy)
   {
-    return insert(new SuperMethodInst(Loc, Operand, Member, MethodTy, F));
+    return insert(new SuperMethodInst(Loc, Operand, Member, MethodTy));
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, SILValue Operand,
                                              SILConstant Member,
                                              SILType MethodTy)
   {
-    return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy, F));
+    return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy));
   }
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
                                                  SILValue Operand,
                                                  SILConstant Member,
                                                  SILType MethodTy) {
-    return insert(new ProtocolMethodInst(Loc, Operand, Member, MethodTy, F));
+    return insert(new ProtocolMethodInst(Loc, Operand, Member, MethodTy));
   }
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,

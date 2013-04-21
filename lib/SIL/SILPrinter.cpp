@@ -325,7 +325,7 @@ public:
        << ", \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
-    OS << "load " << getID(LI->getLValue());
+    OS << "load " << getID(LI->getOperand());
   }
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " to " << getID(SI->getDest());
@@ -342,7 +342,7 @@ public:
     OS << "initialize_var ";
     if (!ZI->canDefaultConstruct())
       OS << "[no_default_construct] ";
-    OS << getID(ZI->getDest());
+    OS << getID(ZI->getOperand());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
@@ -358,34 +358,36 @@ public:
     }
   }
   
-  void printConversionInst(ConversionInst *CI, llvm::StringRef name) {
-    OS << name << " " << getID(CI->getOperand()) << ", $"
+  void printConversionInst(ConversionInst *CI,
+                           SILValue operand,
+                           llvm::StringRef name) {
+    OS << name << " " << getID(operand) << ", $"
       << CI->getType();
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
-    printConversionInst(CI, "convert_function");
+    printConversionInst(CI, CI->getOperand(), "convert_function");
   }
   void visitCoerceInst(CoerceInst *CI) {
-    printConversionInst(CI, "coerce");
+    printConversionInst(CI, CI->getOperand(), "coerce");
   }
   void visitUpcastInst(UpcastInst *CI) {
-    printConversionInst(CI, "upcast");
+    printConversionInst(CI, CI->getOperand(), "upcast");
   }
   void visitDowncastInst(DowncastInst *CI) {
-    printConversionInst(CI, "downcast");
+    printConversionInst(CI, CI->getOperand(), "downcast");
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
-    printConversionInst(CI, "address_to_pointer");
+    printConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
-    printConversionInst(CI, "thin_to_thick_function");
+    printConversionInst(CI, CI->getOperand(), "thin_to_thick_function");
   }
   void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
-    printConversionInst(CI, "bridge_to_block");
+    printConversionInst(CI, CI->getOperand(), "bridge_to_block");
   }
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
-    printConversionInst(CI, "archetype_to_super");
+    printConversionInst(CI, CI->getOperand(), "archetype_to_super");
   }
 
   void visitSuperToArchetypeInst(SuperToArchetypeInst *I) {
@@ -452,7 +454,7 @@ public:
     OS << "project_existential " << getID(PI->getOperand());
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
-    OS << "init_existential " << getID(AEI->getExistential()) << ", $";
+    OS << "init_existential " << getID(AEI->getOperand()) << ", $";
     AEI->getConcreteType()->print(OS);
   }
   void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
@@ -463,16 +465,18 @@ public:
        << " to " << getID(UEI->getDestExistential());
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
-    OS << "deinit_existential " << getID(DEI->getExistential());
+    OS << "deinit_existential " << getID(DEI->getOperand());
   }
   void visitClassMetatypeInst(ClassMetatypeInst *MI) {
-    OS << "class_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+    OS << "class_metatype $" << MI->getType() << ", " << getID(MI->getOperand());
   }
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
-    OS << "archetype_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+    OS << "archetype_metatype $" << MI->getType() << ", "
+       << getID(MI->getOperand());
   }
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
-    OS << "protocol_metatype $" << MI->getType() << ", " << getID(MI->getBase());
+    OS << "protocol_metatype $" << MI->getType() << ", "
+       << getID(MI->getOperand());
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype $" << MI->getType();
@@ -481,7 +485,7 @@ public:
     OS << "module @" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
-    OS << "associated_metatype " << getID(MI->getSourceMetatype())
+    OS << "associated_metatype " << getID(MI->getOperand())
        << ", $" << MI->getType();
   }
   
@@ -520,11 +524,11 @@ public:
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    OS << "return " << '(' << getID(RI->getReturnValue()) << ')';
+    OS << "return " << '(' << getID(RI->getOperand()) << ')';
   }
   
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    OS << "autorelease_return " << '(' << getID(RI->getReturnValue()) << ')';
+    OS << "autorelease_return " << '(' << getID(RI->getOperand()) << ')';
   }
 
   void printBranchArgs(OperandValueArrayRef args) {

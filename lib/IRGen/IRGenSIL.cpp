@@ -583,13 +583,13 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
 }
 
 void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
-  Explosion base = getLoweredExplosion(i->getBase());
+  Explosion base = getLoweredExplosion(i->getOperand());
   auto baseValue = base.claimNext();
   
   bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
   getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
   
-  CanType instanceType = i->getBase().getType().getSwiftType();
+  CanType instanceType = i->getOperand().getType().getSwiftType();
   
   llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
   if (isUsedAsSwiftMetatype)
@@ -956,12 +956,12 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
-  Explosion result = getLoweredExplosion(i->getReturnValue());
+  Explosion result = getLoweredExplosion(i->getOperand());
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
   if (IndirectReturn.isValid()) {
     TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                 i->getReturnValue().getType().getSwiftType());
+                                 i->getOperand().getType().getSwiftType());
     retType.initialize(*this, result, IndirectReturn);
     Builder.CreateRetVoid();
   } else
@@ -1078,7 +1078,7 @@ void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
 
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered(CurExplosionLevel);
-  Address source = getLoweredAddress(i->getLValue());
+  Address source = getLoweredAddress(i->getOperand());
   const TypeInfo &type = getFragileTypeInfo(i->getType().getSwiftRValueType());
   type.loadUnmanaged(*this, source, lowered);
   newLoweredExplosion(SILValue(i, 0), lowered);
@@ -1314,8 +1314,8 @@ void IRGenSILFunction::visitIntegerValueInst(swift::IntegerValueInst *i) {
 }
 
 void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
-  Address container = getLoweredAddress(i->getExistential());
-  CanType destType = i->getExistential().getType().getSwiftRValueType();
+  Address container = getLoweredAddress(i->getOperand());
+  CanType destType = i->getOperand().getType().getSwiftRValueType();
   CanType srcType = i->getConcreteType()->getCanonicalType();
   Address buffer = emitExistentialContainerInit(*this,
                                                 container,
@@ -1379,9 +1379,9 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
 }
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
-  CanType ty = i->getDest().getType().getSwiftRValueType();
+  CanType ty = i->getOperand().getType().getSwiftRValueType();
   TypeInfo const &ti = getFragileTypeInfo(ty);
-  Address dest = getLoweredAddress(i->getDest());
+  Address dest = getLoweredAddress(i->getOperand());
   Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
                                              IGM.Int8PtrTy),
                        Builder.getInt8(0),
