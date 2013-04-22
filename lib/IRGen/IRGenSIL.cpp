@@ -620,7 +620,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          SILType calleeTy,
-                                         SILType resultTy,
+                                         CanType resultTy,
                                          LoweredValue const &lv,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
@@ -638,7 +638,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod: {
     auto &objcMethod = lv.getObjCMethod();
     return prepareObjCMethodRootCall(IGF, objcMethod.getMethodDecl(),
-                                     resultTy.getSwiftType(),
+                                     resultTy,
                                      substitutions,
                                      IGF.CurExplosionLevel,
                                      1,
@@ -695,7 +695,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   
   Callee callee = Callee::forKnownFunction(cc,
                                            calleeTy.getSwiftType(),
-                                           resultTy.getSwiftType(),
+                                           resultTy,
                                            substitutions, calleeFn, calleeData,
                                            IGF.CurExplosionLevel,
                                            calleeTy.getUncurryLevel());
@@ -704,7 +704,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                                    SILType calleeTy,
-                                                   SILType resultTy,
+                                                   CanType resultTy,
                                                    LoweredValue const &lv) {
   switch (lv.kind) {
   case LoweredValue::Kind::SpecializedValue: {
@@ -799,9 +799,13 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                 builtin.getSubstitutions());
   }
 
+  CanType resultTy = i->hasIndirectReturn()
+    ? i->getIndirectReturn().getType().getSwiftRValueType()
+    : i->getType().getSwiftType();
+  
   CallEmission emission = getCallEmissionForLoweredValue(*this,
                                                          i->getCallee().getType(),
-                                                         i->getType(),
+                                                         resultTy,
                                                          calleeLV);
   
   SILFunctionTypeInfo *ti
