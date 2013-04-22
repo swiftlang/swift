@@ -295,10 +295,8 @@ struct InitializationForPattern
                              SILConstant(vd, SILConstant::Kind::GlobalAddress));
       return InitializationPtr(new GlobalInitialization(addr));
     }
-
-    Gen.emitLocalVariable(vd);
-    /// Create a BoxInitialization for the uninitialized box.
-    return InitializationPtr(new LocalVariableInitialization(vd, Gen));
+    
+    return Gen.emitLocalVariableWithCleanup(vd);
   }
   
   // Bind a tuple pattern by aggregating the component variables into a
@@ -816,6 +814,12 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd) {
     /// decl to.
     VarLocs[vd] = {box, addr};
   }
+}
+
+/// Create a LocalVariableInitialization for the uninitialized var.
+InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd) {
+  emitLocalVariable(vd);
+  return InitializationPtr(new LocalVariableInitialization(vd, *this));
 }
 
 void SILGenFunction::destroyLocalVariable(VarDecl *vd) {

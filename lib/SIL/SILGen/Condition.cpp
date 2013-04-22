@@ -122,7 +122,7 @@ SILBasicBlock *Condition::complete(SILBuilder &B) {
   // Kill the continuation block if it's not being used.  Case-exits
   // only leave themselves post-terminator if they use the
   // continuation block, so we're in an acceptable insertion state.
-  if (ContBB->pred_empty()) {
+  if (ContBB->pred_empty() && ContBB->bbarg_empty()) {
     ContBB->eraseFromParent();
     return B.hasValidInsertionPoint() ? B.getInsertionBB() : nullptr;
   }

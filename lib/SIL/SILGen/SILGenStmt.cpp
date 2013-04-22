@@ -40,19 +40,25 @@ static void emitOrDeleteBlock(SILBuilder &B, SILBasicBlock *BB) {
   }
 }
 
+static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
+  // Sema forces conditions to have Builtin.i1 type, which guarantees this.
+  SILValue V;
+  {
+    FullExpr Scope(gen.Cleanups);
+    V = gen.visit(E).forwardAsSingleValue(gen);
+  }
+  assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+
+  return V;
+}
+
 Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
                                 bool hasFalseCode, bool invertValue,
                                 ArrayRef<SILType> contArgs) {
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
   
-  // Sema forces conditions to have Builtin.i1 type, which guarantees this.
-  SILValue V;
-  {
-    FullExpr Scope(Cleanups);
-    V = visit(E).forwardAsSingleValue(*this);
-  }
-  assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
+  SILValue V = emitConditionValue(*this, E);
   
   SILBasicBlock *ContBB = new SILBasicBlock(&F, "condition.cont");
   SILBasicBlock *TrueBB = new SILBasicBlock(&F, "if.true");
@@ -369,16 +375,72 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 
-void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
-  llvm_unreachable("not implemented");
-}
-
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
-  llvm_unreachable("not implemented");
+  Scope OuterSwitchScope(Cleanups);
+  
+  // Emit and bind the subject variable.
+  {
+    InitializationPtr initSubject
+      = emitLocalVariableWithCleanup(S->getSubjectDecl());
+    emitExprInto(S->getSubjectExpr(), initSubject.get());
+  }
+  
+  // Emit the skeleton of the switch. Map cases to blocks so we can handle
+  // fallthrough statements.
+  CaseStmt *defaultCase = nullptr;
+  FallthroughDest::Map caseBodyBlocks;
+
+  for (auto *C : S->getCases()) {
+    // The default case is emitted last.
+    if (C->isDefault()) {
+      defaultCase = C;
+      continue;
+    }
+    
+    // Emit the condition for this case.
+    SILValue cond = emitConditionValue(*this, C->getConditionExpr());
+    
+    SILBasicBlock *trueBB = new SILBasicBlock(&F, "switch.case");
+    SILBasicBlock *falseBB = new SILBasicBlock(&F, "switch.next");
+
+    B.createCondBranch(C, cond, trueBB, falseBB);
+    
+    caseBodyBlocks[C] = trueBB;
+    
+    B.emitBlock(falseBB);
+  }
+  SILBasicBlock *contBB;
+  if (defaultCase) {
+    caseBodyBlocks[defaultCase] = B.getInsertionBB();
+    contBB = new SILBasicBlock(&F, "switch.cont");
+  } else {
+    contBB = B.getInsertionBB();
+  }
+  
+  // Emit the case bodies.
+  for (auto &caseAndBlock : caseBodyBlocks) {
+    CaseStmt *c = caseAndBlock.first;
+    SILBasicBlock *bb = caseAndBlock.second;
+    
+    B.setInsertionPoint(bb);
+    Scope CaseScope(Cleanups);
+    FallthroughDestStack.emplace_back(caseBodyBlocks, getCleanupsDepth());
+    visit(c->getBody());
+    FallthroughDestStack.pop_back();
+    if (B.hasValidInsertionPoint())
+      B.createBranch(c, contBB);
+  }
+  
+  B.setInsertionPoint(contBB);
 }
 
 void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
-  llvm_unreachable("not implemented");
+  llvm_unreachable("cases should be lowered as part of switch stmt");
+}
+
+void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
+  Cleanups.emitBranchAndCleanups(
+           FallthroughDestStack.back().getDestForCase(S->getFallthroughDest()));
 }
 
 ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,

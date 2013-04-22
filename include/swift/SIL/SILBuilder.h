@@ -73,6 +73,10 @@ public:
   void setInsertionPoint(SILBasicBlock *BB) {
     setInsertionPoint(BB, BB->end());
   }
+  
+  SILBasicBlock *getInsertionPoint() const {
+    return BB;
+  }
 
   /// emitBlock - Each basic block is individually new'd then emitted with
   /// this function.  Since each block is implicitly added to the Function's

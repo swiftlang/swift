@@ -190,6 +190,7 @@ public:
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
+  std::vector<FallthroughDest> FallthroughDestStack;
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
@@ -570,6 +571,11 @@ public:
   /// Emit the allocation for a local variable. Returns the address of the
   /// value. Does not register a cleanup.
   void emitLocalVariable(VarDecl *D);
+  
+  /// Emit the allocation for a local variable, provides an Initialization
+  /// that can be used to initialize it, and registers cleanups in the active
+  /// scope.
+  std::unique_ptr<Initialization> emitLocalVariableWithCleanup(VarDecl *D);
   
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(VarDecl *D);

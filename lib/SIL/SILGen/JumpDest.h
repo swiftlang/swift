@@ -19,9 +19,11 @@
 
 #include "swift/Basic/DiverseStack.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace swift {
   class SILBasicBlock;
+  class CaseStmt;
   
 namespace Lowering {
 
@@ -40,6 +42,30 @@ public:
 
   SILBasicBlock *getBlock() const { return Block; }
   CleanupsDepth getDepth() const { return Depth; }
+};
+  
+/// The destination map for a fallthrough.
+class LLVM_LIBRARY_VISIBILITY FallthroughDest {
+public:
+  using Map = llvm::MapVector<CaseStmt*, SILBasicBlock*>;
+
+private:
+  Map const &BlockMap;
+  CleanupsDepth Depth;
+  
+public:
+  FallthroughDest(Map const &map, CleanupsDepth depth)
+    : BlockMap(map), Depth(depth) {}
+  
+  SILBasicBlock *getBlockForCase(CaseStmt *C) {
+    return BlockMap.find(C)->second;
+  }
+  
+  CleanupsDepth getDepth() const { return Depth; }
+  
+  JumpDest getDestForCase(CaseStmt *C) {
+    return JumpDest(getBlockForCase(C), Depth);
+  }
 };
 
 } // end namespace Lowering

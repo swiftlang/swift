@@ -18,6 +18,7 @@
 #ifndef SWIFT_LOWERING_INITIALIZATION_H
 #define SWIFT_LOWERING_INITIALIZATION_H
 
+#include "swift/SIL/SILValue.h"
 #include "SILGen.h"
 #include "swift/Basic/DiverseList.h"
 #include <memory>
@@ -62,7 +63,7 @@ public:
   
   Initialization(Kind kind, Type type) : kind(kind), type(type) {}
   virtual ~Initialization() {}
-    
+
   /// If this initialization represents a single contiguous buffer, return the
   /// SILValue of that buffer's address. If not, returns an invalid SILValue.
   virtual SILValue getAddressOrNull() = 0;
