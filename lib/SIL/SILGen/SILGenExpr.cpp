@@ -96,7 +96,7 @@ RValue SILGenFunction::visit(swift::Expr *E) {
 }
 
 RValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
-  return emitApplyExpr(E);
+  return emitApplyExpr(E, C);
 }
 
 SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {

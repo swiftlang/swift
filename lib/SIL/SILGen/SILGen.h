@@ -544,11 +544,12 @@ public:
   SILValue emitArchetypeMethod(ArchetypeMemberRefExpr *e, SILValue archetype);
   SILValue emitProtocolMethod(ExistentialMemberRefExpr *e, SILValue existential);
   
-  RValue emitApplyExpr(ApplyExpr *e);
+  RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
                          ArrayRef<ManagedValue> Args,
-                         OwnershipConventions const &Ownership);
+                         OwnershipConventions const &Ownership,
+                         SGFContext C = SGFContext());
 
   //===--------------------------------------------------------------------===//
   // Declarations

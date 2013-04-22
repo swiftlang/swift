@@ -42,7 +42,8 @@ public:
   using SpecializedEmitter = ManagedValue (*)(SILGenFunction &,
                                               SILLocation,
                                               ArrayRef<Substitution>,
-                                              ArrayRef<ManagedValue>);
+                                              ArrayRef<ManagedValue>,
+                                              SGFContext);
   
   // Move, don't copy.
   Callee(const Callee &) = delete;
@@ -376,7 +377,8 @@ public:
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ManagedValue Fn,
                                        ArrayRef<ManagedValue> Args,
-                                       OwnershipConventions const &Ownership) {
+                                       OwnershipConventions const &Ownership,
+                                       SGFContext C) {
   // Conditionally consume the cleanup on an input value.
   auto forwardIfConsumed = [&](ManagedValue v, bool consumed) -> SILValue {
     return consumed
@@ -402,8 +404,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   if (resultTI.isAddressOnly()) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
-    // FIXME: Should pass down SGFContext so we can emit into an initialization.
-    SILValue buffer = emitTemporaryAllocation(Loc, resultTI.getLoweredType());
+    SILValue buffer = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
     argValues.push_back(buffer);
     B.createApply(Loc, fnValue, SGM.Types.getEmptyTupleType(),
                   argValues);
@@ -537,7 +538,7 @@ namespace {
       addCallSite(CallSite{std::forward<T>(args)...});
     }
     
-    ManagedValue apply() {
+    ManagedValue apply(SGFContext C = SGFContext()) {
       assert(!applied && "already applied!");
       
       applied = true;
@@ -561,25 +562,34 @@ namespace {
         uncurriedLoc = site.loc;
         std::move(site).emit(gen, args);
       }
-        
+      
+      // We use the context emit-into initialization only for the outermost
+      // call.
+      SGFContext uncurriedContext = extraSites.empty() ? C : SGFContext();
+
       // Emit the uncurried call.
       ManagedValue result;
+      
       if (specializedEmitter)
         result = specializedEmitter(gen,
                                     uncurriedLoc,
                                     callee.getSubstitutions(),
-                                    args);
+                                    args,
+                                    uncurriedContext);
       else
         result = gen.emitApply(uncurriedLoc, calleeValue, args,
-                               callee.getOwnershipConventions());
+                               callee.getOwnershipConventions(),
+                               uncurriedContext);
       
       // If there are remaining call sites, apply them to the result function.
-      for (auto &site : extraSites) {
+      for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
         args.clear();
-        SILLocation loc = site.loc;
-        std::move(site).emit(gen, args);
+        SILLocation loc = extraSites[i].loc;
+        std::move(extraSites[i]).emit(gen, args);
+        SGFContext context = i == size - 1 ? C : SGFContext();
         result = gen.emitApply(loc, result, args,
-                               callee.getOwnershipConventions());
+                               callee.getOwnershipConventions(),
+                               context);
       }
       
       return result;
@@ -608,6 +618,7 @@ namespace {
                                             SILLocation loc,
                                             ArrayRef<Substitution> substitutions,
                                             ArrayRef<ManagedValue> args,
+                                            SGFContext C,
                                             bool isTake) {
     assert(substitutions.size() == 1 && "load should have single substitution");
     assert(args.size() == 1 && "load should have a single argument");
@@ -618,22 +629,24 @@ namespace {
     SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
                                                  loadedType.getAddressType());
     // Perform the load.
-    return gen.emitLoad(loc, addr, SGFContext(), isTake);
+    return gen.emitLoad(loc, addr, C, isTake);
   }
 
   static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C,
                                  /*isTake*/ false);
   }
 
   static ManagedValue emitBuiltinMove(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C,
                                  /*isTake*/ true);
   }
 
@@ -641,7 +654,8 @@ namespace {
   static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
                                          SILLocation loc,
                                          ArrayRef<Substitution> substitutions,
-                                         ArrayRef<ManagedValue> args) {
+                                         ArrayRef<ManagedValue> args,
+                                         SGFContext C) {
     assert(args.size() == 2 && "destroy should have two arguments");
     assert(substitutions.size() == 1 &&
            "destroy should have a single substitution");
@@ -675,6 +689,7 @@ namespace {
                                         SILLocation loc,
                                         ArrayRef<Substitution> substitutions,
                                         ArrayRef<ManagedValue> args,
+                                        SGFContext C,
                                         bool isInitialization) {
     assert(args.size() >= 2 && "assign should have two arguments");
     assert(substitutions.size() == 1 &&
@@ -703,16 +718,18 @@ namespace {
   static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
                                         SILLocation loc,
                                         ArrayRef<Substitution> substitutions,
-                                        ArrayRef<ManagedValue> args) {
-    return emitBuiltinAssignOrInit(gen, loc, substitutions, args,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+    return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
                                    /*isInitialization*/ false);
   }
 
   static ManagedValue emitBuiltinInit(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,
-                                      ArrayRef<ManagedValue> args) {
-    return emitBuiltinAssignOrInit(gen, loc, substitutions, args,
+                                      ArrayRef<ManagedValue> args,
+                                      SGFContext C) {
+    return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
                                    /*isInitialization*/ true);
   }
 
@@ -720,7 +737,8 @@ namespace {
   static ManagedValue emitBuiltinCastToObjectPointer(SILGenFunction &gen,
                                            SILLocation loc,
                                            ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args) {
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
     assert(args.size() == 1 && "cast should have a single argument");
     
     // Save the cleanup on the argument so we can forward it onto the cast
@@ -739,7 +757,8 @@ namespace {
   static ManagedValue emitBuiltinCastFromObjectPointer(SILGenFunction &gen,
                                            SILLocation loc,
                                            ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args) {
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
     assert(args.size() == 1 && "cast should have a single argument");
     assert(substitutions.size() == 1 &&
            "cast should have a single substitution");
@@ -763,7 +782,8 @@ namespace {
   static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &gen,
                                           SILLocation loc,
                                           ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args) {
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
     assert(args.size() == 1 && "bridge should have a single argument");
     
     // Take the reference type argument and cast it to RawPointer.
@@ -779,7 +799,8 @@ namespace {
   static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &gen,
                                           SILLocation loc,
                                           ArrayRef<Substitution> substitutions,
-                                          ArrayRef<ManagedValue> args) {
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
     assert(substitutions.size() == 1 &&
            "bridge should have a single substitution");
     assert(args.size() == 1 && "bridge should have a single argument");
@@ -800,7 +821,8 @@ namespace {
   static ManagedValue emitBuiltinAddressOf(SILGenFunction &gen,
                                            SILLocation loc,
                                            ArrayRef<Substitution> substitutions,
-                                           ArrayRef<ManagedValue> args) {
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
     assert(args.size() == 1 && "addressof should have a single argument");
     
     // Take the address argument and cast it to RawPointer.
@@ -867,8 +889,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   return emission;
 }
 
-RValue SILGenFunction::emitApplyExpr(ApplyExpr *e) {
-  return RValue(*this, prepareApplyExpr(*this, e).apply());
+RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
+  return RValue(*this, prepareApplyExpr(*this, e).apply(c));
 }
 
 /// emitArrayInjectionCall - Form an array "Slice" out of an ObjectPointer
