@@ -410,6 +410,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_UNARY_OPERATION(id, name, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_SIL_OPERATION(id, name, overload) \
+   OverloadedBuiltinKind::overload,
 #define BUILTIN_MISC_OPERATION(id, name, overload) \
    OverloadedBuiltinKind::overload,
 #include "swift/AST/Builtins.def"

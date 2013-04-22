@@ -525,6 +525,11 @@ public:
   void visitUpcastInst(UpcastInst *i);
   void visitDowncastInst(DowncastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
+  void visitPointerToAddressInst(PointerToAddressInst *i);
+  void visitRefToObjectPointerInst(RefToObjectPointerInst *i);
+  void visitObjectPointerToRefInst(ObjectPointerToRefInst *i);
+  void visitRefToRawPointerInst(RefToRawPointerInst *i);
+  void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);

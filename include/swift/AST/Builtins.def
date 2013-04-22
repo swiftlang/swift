@@ -104,7 +104,47 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", Float)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", Float)
 #undef BUILTIN_BINARY_PREDICATE
 
+// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
+// These have various types.
+#ifndef BUILTIN_SIL_OPERATION
+#define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
+#endif
 
+/// Load has type (Builtin.RawPointer) -> T
+BUILTIN_SIL_OPERATION(Load, "load", Special)
+
+/// Move has type (Builtin.RawPointer) -> T
+BUILTIN_SIL_OPERATION(Move, "move", Special)
+
+/// Destroy has type (metatype<T>, Builtin.RawPointer) -> ()
+BUILTIN_SIL_OPERATION(Destroy, "destroy", Special)
+
+/// Assign has type (T, Builtin.RawPointer) -> ()
+BUILTIN_SIL_OPERATION(Assign, "assign", Special)
+
+/// Init has type (T, Builtin.RawPointer) -> ()
+BUILTIN_SIL_OPERATION(Init, "init", Special)
+
+/// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
+BUILTIN_SIL_OPERATION(CastToObjectPointer, "castToObjectPointer", Special)
+
+/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T.
+BUILTIN_SIL_OPERATION(CastFromObjectPointer, "castFromObjectPointer", Special)
+
+/// BridgeToRawPointer has type (T) -> Builtin.RawPointer.
+BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
+
+/// BridgeFromRawPointer (Builtin.RawPointer) -> T.
+/// SILGen requires that T is a single retainable pointer.
+/// Bridging to/from a raw pointer does not imply a retain.
+BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
+
+/// addressof ([byref] T) -> Builtin.RawPointer.
+/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
+/// valid within the scope of the statement for logical lvalues.
+BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
+
+#undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
 // These have various types.
@@ -114,21 +154,6 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", Float)
                        
 /// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(Gep, "gep", Integer)
-
-/// Load has type (Builtin.RawPointer) -> T
-BUILTIN_MISC_OPERATION(Load, "load", Special)
-
-/// Move has type (Builtin.RawPointer) -> T
-BUILTIN_MISC_OPERATION(Move, "move", Special)
-
-/// Destroy has type (metatype<T>, Builtin.RawPointer) -> ()
-BUILTIN_MISC_OPERATION(Destroy, "destroy", Special)
-
-/// Assign has type (T, Builtin.RawPointer) -> ()
-BUILTIN_MISC_OPERATION(Assign, "assign", Special)
-
-/// Init has type (T, Builtin.RawPointer) -> ()
-BUILTIN_MISC_OPERATION(Init, "init", Special)
 
 /// Sizeof has type (metatype<T>) -> Int64
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", Special)
@@ -144,25 +169,6 @@ BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", Special)
 
 /// DeallocRaw has type (Builtin.RawPointer, Int64) -> ()
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", Special)
-
-/// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
-BUILTIN_MISC_OPERATION(CastToObjectPointer, "castToObjectPointer", Special)
-
-/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T.
-BUILTIN_MISC_OPERATION(CastFromObjectPointer, "castFromObjectPointer", Special)
-
-/// BridgeToRawPointer has type (T) -> Builtin.RawPointer.
-BUILTIN_MISC_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
-
-/// BridgeFromRawPointer (Builtin.RawPointer) -> T.
-/// IRGen requires that T is a single retainable pointer.
-/// Bridging to/from a raw pointer does not imply a retain.
-BUILTIN_MISC_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
-
-/// addressof ([byref] T) -> Builtin.RawPointer.
-/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
-/// valid within the scope of the statement for logical lvalues.
-BUILTIN_MISC_OPERATION(AddressOf, "addressof", Special)
 
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", None)

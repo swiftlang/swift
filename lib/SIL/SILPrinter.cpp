@@ -380,6 +380,21 @@ public:
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
     printConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
+  void visitPointerToAddressInst(PointerToAddressInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "pointer_to_address");
+  }
+  void visitRefToObjectPointerInst(RefToObjectPointerInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "ref_to_object_pointer");
+  }
+  void visitObjectPointerToRefInst(ObjectPointerToRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "object_pointer_to_ref");
+  }
+  void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
+  }
+  void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
+  }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printConversionInst(CI, CI->getOperand(), "thin_to_thick_function");
   }

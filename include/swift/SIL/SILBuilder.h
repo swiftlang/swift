@@ -210,6 +210,31 @@ public:
     return insert(new AddressToPointerInst(Loc, Op, Ty));
   }
   
+  PointerToAddressInst *createPointerToAddress(SILLocation Loc, SILValue Op,
+                                               SILType Ty) {
+    return insert(new PointerToAddressInst(Loc, Op, Ty));
+  }
+  
+  RefToObjectPointerInst *createRefToObjectPointer(SILLocation Loc, SILValue Op,
+                                                   SILType Ty) {
+    return insert(new RefToObjectPointerInst(Loc, Op, Ty));
+  }
+  
+  ObjectPointerToRefInst *createObjectPointerToRef(SILLocation Loc, SILValue Op,
+                                                   SILType Ty) {
+    return insert(new ObjectPointerToRefInst(Loc, Op, Ty));
+  }
+  
+  RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,
+                                             SILType Ty) {
+    return insert(new RefToRawPointerInst(Loc, Op, Ty));
+  }
+  
+  RawPointerToRefInst *createRawPointerToRef(SILLocation Loc, SILValue Op,
+                                             SILType Ty) {
+    return insert(new RawPointerToRefInst(Loc, Op, Ty));
+  }
+  
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
     return insert(new ThinToThickFunctionInst(Loc, Op, Ty));

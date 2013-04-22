@@ -13,12 +13,16 @@
 #include "SILGen.h"
 #include "OwnershipConventions.h"
 #include "RValue.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
 using namespace Lowering;
 
 namespace {
+
+class CallEmission;
   
 /// Abstractly represents a callee, and knows how to emit the entry point
 /// reference for a callee at any valid uncurry level.
@@ -35,6 +39,11 @@ public:
   
   const Kind kind;
   
+  using SpecializedEmitter = ManagedValue (*)(SILGenFunction &,
+                                              SILLocation,
+                                              ArrayRef<Substitution>,
+                                              ArrayRef<ManagedValue>);
+  
   // Move, don't copy.
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
@@ -47,6 +56,8 @@ private:
   SILType specializedType;
   SpecializeExpr *specializeLoc = nullptr;
   OwnershipConventions ownership;
+  
+  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILConstant c);
   
 public:
   Callee(ManagedValue genericValue, OwnershipConventions &&ownership)
@@ -135,8 +146,32 @@ public:
     // FIXME: May need to adjust ownership conventions with uncurry level?
     return ownership;
   }
-};
   
+  ArrayRef<Substitution> getSubstitutions() const {
+    return substitutions;
+  }
+
+  /// Return a specialized emission function if this is a function with a known
+  /// lowering, such as a builtin, or return null if there is no specialized
+  /// emitter.
+  SpecializedEmitter getSpecializedEmitter(unsigned uncurryLevel) const {
+    // Currently we have no curried known functions.
+    if (uncurryLevel != 0)
+      return nullptr;
+    
+    switch (kind) {
+    case Kind::StandaloneFunction: {
+      if (SpecializedEmitter e
+            = getSpecializedEmitterForSILBuiltin(standaloneFunction))
+        return e;
+    }
+    case Kind::GenericValue:
+      break;
+    }
+    return nullptr;
+  }
+};
+
 /// An ASTVisitor for building SIL function calls.
 /// Nested ApplyExprs applied to an underlying curried function or method
 /// reference are flattened into a single SIL apply to the most uncurried entry
@@ -509,7 +544,15 @@ namespace {
 
       // Get the callee value at the needed uncurry level.
       unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
-      ManagedValue calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
+      
+      // Get either the specialized emitter for a known function, or the
+      // function value for a normal callee.
+      Callee::SpecializedEmitter specializedEmitter
+        = callee.getSpecializedEmitter(uncurryLevel);
+
+      ManagedValue calleeValue;
+      if (!specializedEmitter)
+        calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
       
       // Collect the arguments to the uncurried call.
       SmallVector<ManagedValue, 4> args;
@@ -520,8 +563,15 @@ namespace {
       }
         
       // Emit the uncurried call.
-      ManagedValue result = gen.emitApply(uncurriedLoc, calleeValue, args,
-                                          callee.getOwnershipConventions());
+      ManagedValue result;
+      if (specializedEmitter)
+        result = specializedEmitter(gen,
+                                    uncurriedLoc,
+                                    callee.getSubstitutions(),
+                                    args);
+      else
+        result = gen.emitApply(uncurriedLoc, calleeValue, args,
+                               callee.getOwnershipConventions());
       
       // If there are remaining call sites, apply them to the result function.
       for (auto &site : extraSites) {
@@ -547,10 +597,247 @@ namespace {
         applied(e.applied) {
       e.applied = true;
     }
+    
   private:
     CallEmission(const CallEmission &) = delete;
     CallEmission &operator=(const CallEmission &) = delete;
   };
+
+  /// Specialized emitter for Builtin.load and Builtin.move.
+  static ManagedValue emitBuiltinLoadOrMove(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ArrayRef<Substitution> substitutions,
+                                            ArrayRef<ManagedValue> args,
+                                            bool isTake) {
+    assert(substitutions.size() == 1 && "load should have single substitution");
+    assert(args.size() == 1 && "load should have a single argument");
+    
+    // The substitution gives the type of the load.
+    SILType loadedType = gen.getLoweredType(substitutions[0].Replacement);
+    // Convert the pointer argument to a SIL address.
+    SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                                 loadedType.getAddressType());
+    // Perform the load.
+    return gen.emitLoad(loc, addr, SGFContext(), isTake);
+  }
+
+  static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      ArrayRef<Substitution> substitutions,
+                                      ArrayRef<ManagedValue> args) {
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args,
+                                 /*isTake*/ false);
+  }
+
+  static ManagedValue emitBuiltinMove(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      ArrayRef<Substitution> substitutions,
+                                      ArrayRef<ManagedValue> args) {
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args,
+                                 /*isTake*/ true);
+  }
+
+  /// Specialized emitter for Builtin.destroy.
+  static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args) {
+    assert(args.size() == 2 && "destroy should have two arguments");
+    assert(substitutions.size() == 1 &&
+           "destroy should have a single substitution");
+    // The substitution determines the type of the thing we're destroying.
+    auto &ti = gen.getTypeLoweringInfo(substitutions[0].Replacement);
+    
+    // Destroy is a no-op for trivial types.
+    if (ti.isTrivial())
+      return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+    
+    SILType destroyType = ti.getLoweredType();
+
+    // Convert the pointer argument to a SIL address.
+    SILValue addr = gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
+                                                 destroyType.getAddressType());
+    
+    if (destroyType.isAddressOnly()) {
+      // If the type is address-only, destroy it indirectly.
+      gen.B.createDestroyAddr(loc, addr);
+    } else {
+      // Otherwise, load and release the value.
+      SILValue value = gen.B.createLoad(loc, addr);
+      gen.emitReleaseRValue(loc, value);
+    }
+    
+    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+  }
+
+  /// Specialized emitter for Builtin.assign and Builtin.init.
+  static ManagedValue emitBuiltinAssignOrInit(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        ArrayRef<Substitution> substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        bool isInitialization) {
+    assert(args.size() >= 2 && "assign should have two arguments");
+    assert(substitutions.size() == 1 &&
+           "assign should have a single substitution");
+
+    // The substitution determines the type of the thing we're destroying.
+    SILType assignType = gen.getLoweredType(substitutions[0].Replacement);
+    
+    // Convert the destination pointer argument to a SIL address.
+    SILValue addr = gen.B.createPointerToAddress(loc,
+                                                 args.back().getUnmanagedValue(),
+                                                 assignType.getAddressType());
+    
+    // Build the value to be assigned, reconstructing tuples if needed.
+    ManagedValue src = RValue(args.slice(0, args.size() - 1),
+                              assignType.getSwiftRValueType())
+      .getAsSingleValue(gen);
+    
+    if (isInitialization)
+      src.forwardInto(gen, loc, addr);
+    else
+      src.assignInto(gen, loc, addr);
+    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+  }
+
+  static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        ArrayRef<Substitution> substitutions,
+                                        ArrayRef<ManagedValue> args) {
+    return emitBuiltinAssignOrInit(gen, loc, substitutions, args,
+                                   /*isInitialization*/ false);
+  }
+
+  static ManagedValue emitBuiltinInit(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      ArrayRef<Substitution> substitutions,
+                                      ArrayRef<ManagedValue> args) {
+    return emitBuiltinAssignOrInit(gen, loc, substitutions, args,
+                                   /*isInitialization*/ true);
+  }
+
+  /// Specialized emitter for Builtin.castToObjectPointer.
+  static ManagedValue emitBuiltinCastToObjectPointer(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ArrayRef<Substitution> substitutions,
+                                           ArrayRef<ManagedValue> args) {
+    assert(args.size() == 1 && "cast should have a single argument");
+    
+    // Save the cleanup on the argument so we can forward it onto the cast
+    // result.
+    auto cleanup = args[0].getCleanup();
+    
+    // Take the reference type argument and cast it to ObjectPointer.
+    SILType objPointerType = SILType::getObjectPointerType(gen.F.getContext());
+    SILValue result = gen.B.createRefToObjectPointer(loc, args[0].getValue(),
+                                                     objPointerType);
+    // Return the cast result with the original cleanup.
+    return ManagedValue(result, cleanup);
+  }
+
+  /// Specialized emitter for Builtin.castFromObjectPointer.
+  static ManagedValue emitBuiltinCastFromObjectPointer(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ArrayRef<Substitution> substitutions,
+                                           ArrayRef<ManagedValue> args) {
+    assert(args.size() == 1 && "cast should have a single argument");
+    assert(substitutions.size() == 1 &&
+           "cast should have a single substitution");
+
+    // Save the cleanup on the argument so we can forward it onto the cast
+    // result.
+    auto cleanup = args[0].getCleanup();
+
+    // The substitution determines the destination type.
+    // FIXME: Archetype destination type?
+    SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
+    
+    // Take the reference type argument and cast it.
+    SILValue result = gen.B.createObjectPointerToRef(loc, args[0].getValue(),
+                                                     destType);
+    // Return the cast result with the original cleanup.
+    return ManagedValue(result, cleanup);
+  }
+
+  /// Specialized emitter for Builtin.bridgeToRawPointer.
+  static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          ArrayRef<Substitution> substitutions,
+                                          ArrayRef<ManagedValue> args) {
+    assert(args.size() == 1 && "bridge should have a single argument");
+    
+    // Take the reference type argument and cast it to RawPointer.
+    // RawPointers do not have ownership semantics, so the cleanup on the
+    // argument remains.
+    SILType rawPointerType = SILType::getRawPointerType(gen.F.getContext());
+    SILValue result = gen.B.createRefToRawPointer(loc, args[0].getValue(),
+                                                  rawPointerType);
+    return ManagedValue(result, ManagedValue::Unmanaged);
+  }
+
+  /// Specialized emitter for Builtin.bridgeFromRawPointer.
+  static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          ArrayRef<Substitution> substitutions,
+                                          ArrayRef<ManagedValue> args) {
+    assert(substitutions.size() == 1 &&
+           "bridge should have a single substitution");
+    assert(args.size() == 1 && "bridge should have a single argument");
+    
+    // The substitution determines the destination type.
+    // FIXME: Archetype destination type?
+    SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
+
+    // Take the raw pointer argument and cast it to the destination type.
+    SILValue result = gen.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
+                                                  destType);
+    // The result has ownership semantics, so retain it with a cleanup.
+    gen.emitRetainRValue(loc, result);
+    return gen.emitManagedRValueWithCleanup(result);
+  }
+
+  /// Specialized emitter for Builtin.addressof.
+  static ManagedValue emitBuiltinAddressOf(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ArrayRef<Substitution> substitutions,
+                                           ArrayRef<ManagedValue> args) {
+    assert(args.size() == 1 && "addressof should have a single argument");
+    
+    // Take the address argument and cast it to RawPointer.
+    SILType rawPointerType = SILType::getRawPointerType(gen.F.getContext());
+    SILValue result = gen.B.createAddressToPointer(loc, args[0].getUnmanagedValue(),
+                                                   rawPointerType);
+    return ManagedValue(result, ManagedValue::Unmanaged);
+  }
+
+  Callee::SpecializedEmitter
+  Callee::getSpecializedEmitterForSILBuiltin(SILConstant function) {
+    // Filter out non-function members and non-builtin modules.
+
+    if (function.kind != SILConstant::Kind::Func)
+      return nullptr;
+    if (!function.hasDecl())
+      return nullptr;
+    
+    ValueDecl *decl = function.getDecl();
+    
+    if (!isa<BuiltinModule>(decl->getDeclContext()))
+      return nullptr;
+    
+    SmallVector<Type, 2> types;
+    StringRef name =
+      getBuiltinBaseName(decl->getASTContext(), decl->getName().str(), types);
+
+    // Match SIL builtins to their emitters.
+    #define BUILTIN(Id, Name)
+    #define BUILTIN_SIL_OPERATION(Id, Name, Overload) \
+      if (name.equals(Name)) \
+        return &emitBuiltin##Id;
+
+    #include "swift/AST/Builtins.def"
+    
+    return nullptr;
+  }
 } // end anonymous namespace
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {

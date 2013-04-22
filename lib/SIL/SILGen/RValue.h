@@ -197,10 +197,6 @@ class RValue {
     elementOffsets = {};
   }
   
-  /// Private constructor to construct an RValue from a pre-exploded set of
-  /// ManagedValues. Used to implement the extractElement* methods.
-  RValue(ArrayRef<ManagedValue> values, CanType type);
-  
 public:
   /// Creates an invalid RValue object, in a "used" state.
   RValue() : elementsToBeAdded(Used) {}
@@ -232,6 +228,10 @@ public:
   /// will be exploded.
   RValue(SILGenFunction &gen, ManagedValue v);
 
+  /// Construct an RValue from a pre-exploded set of
+  /// ManagedValues. Used to implement the extractElement* methods.
+  RValue(ArrayRef<ManagedValue> values, CanType type);
+  
   /// Create an RValue to which values will be subsequently added using
   /// addElement(). The RValue will not be complete until all the elements have
   /// been added.

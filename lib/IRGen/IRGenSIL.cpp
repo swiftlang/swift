@@ -1227,6 +1227,61 @@ void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)
   newLoweredExplosion(SILValue(i, 0), to);
 }
 
+void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
+{
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *ptrValue = from.claimNext();
+
+  auto &ti = getFragileTypeInfo(i->getType().getSwiftRValueType());
+  
+  llvm::Type *destType = ti.getStorageType()->getPointerTo();
+  ptrValue = Builder.CreateBitCast(ptrValue, destType);
+  
+  newLoweredAddress(SILValue(i, 0),
+                    Address(ptrValue, ti.getBestKnownAlignment()));
+}
+
+static void emitPointerCastInst(IRGenSILFunction &IGF,
+                                SILValue src,
+                                SILValue dest,
+                                llvm::Type *castToType) {
+  Explosion from = IGF.getLoweredExplosion(src);
+  llvm::Value *ptrValue = from.claimNext();
+  
+  ptrValue = IGF.Builder.CreateBitCast(ptrValue, castToType);
+  
+  Explosion to(IGF.CurExplosionLevel);
+  to.add(ptrValue);
+  IGF.newLoweredExplosion(dest, to);
+}
+
+void IRGenSILFunction::visitRefToObjectPointerInst(
+                                             swift::RefToObjectPointerInst *i) {
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
+                      IGM.RefCountedPtrTy);
+}
+
+void IRGenSILFunction::visitObjectPointerToRefInst(
+                                             swift::ObjectPointerToRefInst *i) {
+  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  llvm::Type *destType = ti.getStorageType();
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
+                      destType);
+}
+
+void IRGenSILFunction::visitRefToRawPointerInst(
+                                             swift::RefToRawPointerInst *i) {
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
+                      IGM.Int8PtrTy);
+}
+
+void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
+  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  llvm::Type *destType = ti.getStorageType();
+  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
+                      destType);
+}
+
 void IRGenSILFunction::visitThinToThickFunctionInst(
                                             swift::ThinToThickFunctionInst *i) {
   // Take the incoming function pointer and add a null context pointer to it.

@@ -646,6 +646,55 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// PointerToAddressInst - Convert a Builtin.RawPointer value to a SIL address.
+class PointerToAddressInst
+  : public UnaryInstructionBase<ValueKind::PointerToAddressInst, ConversionInst>
+{
+public:
+  PointerToAddressInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// RefToObjectPointerInst - Convert a class instance reference to a
+/// Builtin.ObjectPointer.
+class RefToObjectPointerInst
+  : public UnaryInstructionBase<ValueKind::RefToObjectPointerInst,
+                                ConversionInst>
+{
+public:
+  RefToObjectPointerInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// ObjectPointerToRefInst - Convert a Builtin.ObjectPointer to a class instance
+/// reference.
+class ObjectPointerToRefInst
+  : public UnaryInstructionBase<ValueKind::ObjectPointerToRefInst,
+                                ConversionInst>
+{
+public:
+  ObjectPointerToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// RefToRawPointer - Convert a reference type to a Builtin.RawPointer.
+class RefToRawPointerInst
+  : public UnaryInstructionBase<ValueKind::RefToRawPointerInst, ConversionInst>
+{
+public:
+  RefToRawPointerInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// RawPointerToRefInst - Convert a Builtin.RawPointer to a reference type.
+class RawPointerToRefInst
+  : public UnaryInstructionBase<ValueKind::RawPointerToRefInst, ConversionInst>
+{
+public:
+  RawPointerToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
 class ThinToThickFunctionInst

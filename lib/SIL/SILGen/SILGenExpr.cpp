@@ -264,26 +264,33 @@ RValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E,
   return RValue(*this, ManagedValue(string, ManagedValue::Unmanaged));
 }
 
+ManagedValue SILGenFunction::emitLoad(SILLocation loc,
+                                      SILValue addr,
+                                      SGFContext C,
+                                      bool isTake) {
+  if (addr.getType().isAddressOnly()) {
+    // Copy the address-only value.
+    SILValue copy = getBufferForExprResult(loc, addr.getType(), C);
+    B.createCopyAddr(loc, addr, copy,
+                     isTake,
+                     /*isInitialize*/ true);
+    
+    return emitManagedRValueWithCleanup(copy);
+  }
+  
+  // Load the loadable value, and retain it if we aren't taking it.
+  SILValue loadedV = B.createLoad(loc, addr);
+  if (!isTake)
+    emitRetainRValue(loc, loadedV);
+  return emitManagedRValueWithCleanup(loadedV);
+}
+
 RValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
   RValue SubV = visit(E->getSubExpr());
   assert(SubV.isLValue() && "subexpr did not produce an lvalue");
   SILValue addr = SubV.getUnmanagedSingleValue(*this);
   
-  TypeLoweringInfo const &ti = getTypeLoweringInfo(E->getType());
-  if (ti.isAddressOnly()) {
-    // Copy the address-only value.
-    SILValue copy = getBufferForExprResult(E, ti.getLoweredType(), C);
-    B.createCopyAddr(E, addr, copy,
-                     /*isTake*/ false,
-                     /*isInitialize*/ true);
-    
-    return RValue(*this, emitManagedRValueWithCleanup(copy));
-  }
-  
-  // Load and retain the loadable value.
-  SILValue loadedV = B.createLoad(E, addr);
-  emitRetainRValue(E, loadedV);
-  return RValue(*this, emitManagedRValueWithCleanup(loadedV));
+  return RValue(*this, emitLoad(E, addr, C, /*isTake*/ false));
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,

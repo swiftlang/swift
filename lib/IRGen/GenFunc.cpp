@@ -776,18 +776,6 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
   }
 }
 
-
-/// Given an address representing an unsafe pointer to the given type,
-/// turn it into a valid Address.
-static Address getAddressForUnsafePointer(IRGenFunction &IGF,
-                                          const TypeInfo &type,
-                                          llvm::Value *addr) {
-  llvm::Value *castAddr =
-  IGF.Builder.CreateBitCast(addr, type.getStorageType()->getPointerTo());
-  return type.getAddressForPointer(castAddr);
-}
-
-
 static void emitCastBuiltin(IRGenFunction &IGF, FuncDecl *fn,
                             Explosion &result,
                             Explosion &args,
@@ -903,6 +891,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   }
   
   // TODO: A linear series of ifs is suboptimal.
+#define BUILTIN_SIL_OPERATION(id, name, overload) \
+  if (BuiltinName == name) \
+    llvm_unreachable(name " builtin should be lowered away by SILGen!");
+
 #define BUILTIN_CAST_OPERATION(id, name) \
   if (BuiltinName == name) \
     return emitCastBuiltin(IGF, fn, *out, args, llvm::Instruction::id);
@@ -938,78 +930,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return out->add(gep);
   }
 
-  if (BuiltinName == "load" || BuiltinName == "move") {
-    // The type of the operation is the generic parameter type.
-    Type valueTy = substitutions[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-
-    // Treat the raw pointer as a physical l-value of that type.
-    // FIXME: remapping
-    llvm::Value *addrValue = args.claimNext();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
-
-    // Handle the result being naturally in memory.
-    if (indirectOut.isValid()) {
-      if (BuiltinName == "move")
-        return valueTI.initializeWithTake(IGF, indirectOut, addr);
-      return valueTI.initializeWithCopy(IGF, indirectOut, addr);
-    }
-    
-    // Perform the load.
-    if (BuiltinName == "move")
-      return valueTI.loadAsTake(IGF, addr, *out);
-    return valueTI.load(IGF, addr, *out);
-  }
-
-  if (BuiltinName == "destroy") {
-    // The type of the operation is the generic parameter type.
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
-
-    // Skip the metatype if it has a non-trivial representation.
-    if (!IGF.IGM.hasTrivialMetatype(valueTy))
-      args.claimNext();
-
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-
-    llvm::Value *addrValue = args.claimNext();
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, addrValue);
-    valueTI.destroy(IGF, addr);
-
-    voidResult = true;
-    return;
-  }
-
-  if (BuiltinName == "assign") {
-    // The type of the operation is the generic parameter type.
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    
-    // Treat the raw pointer as a physical l-value of that type.
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, args.takeLast());
-    
-    // Mark that we're not returning anything.
-    voidResult = true;
-    
-    // Perform the assignment operation.
-    return valueTI.assign(IGF, args, addr);
-  }
-  
-  if (BuiltinName == "init") {
-    // The type of the operation is the type of the first argument of
-    // the store function.
-    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    
-    // Treat the raw pointer as a physical l-value of that type.
-    Address addr = getAddressForUnsafePointer(IGF, valueTI, args.takeLast());
-    
-    // Mark that we're not returning anything.
-    voidResult = true;    
-    
-    // Perform the init operation.
-    return valueTI.initialize(IGF, args, addr);
-  }
-
   if (BuiltinName == "allocRaw") {
     auto size = args.claimNext();
     auto align = args.claimNext();
@@ -1027,47 +947,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
-  if (BuiltinName == "castToObjectPointer" ||
-      BuiltinName == "castFromObjectPointer" ||
-      BuiltinName == "bridgeToRawPointer" ||
-      BuiltinName == "bridgeFromRawPointer") {
-    Type valueTy = substitutions[0].Replacement;
-    const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    if (!valueTI.isSingleRetainablePointer(ResilienceScope::Local)) {
-      IGF.unimplemented(SourceLoc(), "builtin pointer cast on invalid type");
-      IGF.emitFakeExplosion(valueTI, *out);
-      return;
-    }
-
-    if (BuiltinName == "castToObjectPointer") {
-      // Just bitcast.
-      llvm::Value *value = args.claimNext();
-      value = IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
-      out->add(value);
-    } else if (BuiltinName == "castFromObjectPointer") {
-      // Just bitcast.
-      llvm::Value *value = args.claimNext();
-      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
-      out->add(value);
-    } else if (BuiltinName == "bridgeToRawPointer") {
-      // Bitcast and immediately release the operand.
-      // FIXME: Should annotate the ownership semantics of this builtin
-      // so that SILGen can emit the release and expose it to ARC optimization
-      llvm::Value *value = args.claimNext();
-      IGF.emitRelease(value);
-      value = IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy);
-      out->add(value);
-    } else if (BuiltinName == "bridgeFromRawPointer") {
-      // Bitcast, and immediately retain.
-      // FIXME: Should annotate the ownership semantics of this builtin
-      // so that SILGen can emit the retain and expose it to ARC optimization
-      llvm::Value *value = args.claimNext();
-      value = IGF.Builder.CreateBitCast(value, valueTI.StorageType);
-      IGF.emitRetain(value, *out);
-    }
-    return;
-  }
-  
   if (BuiltinName.startswith("fence_")) {
     BuiltinName = BuiltinName.drop_front(strlen("fence_"));
     // Decode the ordering argument, which is required.

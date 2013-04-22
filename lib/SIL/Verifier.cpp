@@ -755,6 +755,46 @@ public:
                               AI->getType().getASTContext().TheRawPointerType),
             "address-to-pointer result type must be RawPointer");
   }
+
+  void checkRefToObjectPointerInst(RefToObjectPointerInst *AI) {
+    require(AI->getOperand().getType()
+              .getSwiftType()->getClassOrBoundGenericClass(),
+            "ref-to-object-pointer operand must be a class reference");
+    require(AI->getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheObjectPointerType),
+            "ref-to-object-pointer result must be ObjectPointer");
+  }
+  
+  void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
+    require(AI->getType()
+              .getSwiftType()->getClassOrBoundGenericClass(),
+            "object-pointer-to-ref result must be a class reference");
+    require(AI->getOperand().getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheObjectPointerType),
+            "object-pointer-to-ref operand must be ObjectPointer");
+  }
+  
+  void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
+    require(AI->getOperand().getType()
+              .getSwiftType()->getClassOrBoundGenericClass() ||
+            AI->getOperand().getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheObjectPointerType),
+            "ref-to-raw-pointer operand must be a class reference or ObjectPointer");
+    require(AI->getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheRawPointerType),
+            "ref-to-raw-pointer result must be RawPointer");
+  }
+  
+  void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
+    require(AI->getType()
+              .getSwiftType()->getClassOrBoundGenericClass() ||
+            AI->getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheObjectPointerType),
+            "raw-pointer-to-ref result must be a class reference or ObjectPointer");
+    require(AI->getOperand().getType().getSwiftType()->isEqual(
+                            AI->getType().getASTContext().TheRawPointerType),
+            "raw-pointer-to-ref operand must be ObjectPointer");
+  }
   
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     require(!ICI->getOperand().getType().isAddress(),
