@@ -574,7 +574,9 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   if (isInstanceMethod) {
     searchValue = emitClassHeapMetadataRef(IGF, searchClass);
   } else {
-    ClassDecl *searchClassDecl = searchClass->getClassOrBoundGenericClass();
+    ClassDecl *searchClassDecl =
+      cast<MetaTypeType>(searchClass)->getInstanceType()
+        ->getClassOrBoundGenericClass();
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl);
   }
   searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
