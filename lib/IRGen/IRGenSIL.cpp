@@ -1457,6 +1457,10 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 static bool silMethodIsObjC(SILConstant t) {
+  if (t.kind == SILConstant::Kind::Initializer)
+    return cast<ConstructorDecl>(t.getDecl())->getDeclContext()
+      ->getDeclaredTypeInContext()->getClassOrBoundGenericClass()->isObjC();
+
   return t.hasDecl() && t.getDecl()->isObjC();
 }
 
