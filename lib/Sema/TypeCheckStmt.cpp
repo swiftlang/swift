@@ -525,7 +525,7 @@ public:
       for (Expr *valueExpr : Case->getValueExprs()) {
         auto *subjRef
           = new (TC.Context) DeclRefExpr(subject,
-                                         valueExpr->getLoc(),
+                                         valueExpr->getSourceRange().Start,
                                          subject->getTypeOfReference());
         Expr *matchArgs[] = {subjRef, valueExpr};
         TupleExpr *matchArgExpr
