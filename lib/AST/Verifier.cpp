@@ -21,6 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include <functional>
 using namespace swift;
 
 namespace {
@@ -787,7 +788,7 @@ namespace {
         abort();
       }
       checkSourceRanges(E->getSourceRange(), Parent,
-                        ^ { E->print(Out); } );
+                        [&]{ E->print(Out); } );
     }
     
     void checkSourceRanges(Stmt *S) {
@@ -798,7 +799,7 @@ namespace {
         abort();
       }
       checkSourceRanges(S->getSourceRange(), Parent,
-                        ^ { S->print(Out); });
+                        [&]{ S->print(Out); });
     }
 
     void checkSourceRanges(Decl *D) {
@@ -809,14 +810,14 @@ namespace {
         abort();
       }
       checkSourceRanges(D->getSourceRange(), Parent,
-                        ^ { D->print(Out); });
+                        [&]{ D->print(Out); });
     }
     
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current,
                            llvm::PointerUnion<Expr *, Stmt *> Parent,
-                           void (^printEntity)()) {
+                           std::function<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())
           return;
