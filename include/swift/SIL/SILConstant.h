@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines the SILConstant struct, which is used to identify a SIL
-// global identifier that can be used as the operand of a ConstantRefInst
+// global identifier that can be used as the operand of a FunctionRefInst
 // instruction or that can have a SIL Function associated with it.
 //
 //===----------------------------------------------------------------------===//
@@ -34,7 +34,7 @@ namespace swift {
   class ClassDecl;
 
 /// SILConstant - A key for referencing an entity that can be the subject of a
-/// SIL ConstantRefInst or the name of a SILFunction body. This can currently
+/// SIL FunctionRefInst or the name of a SILFunction body. This can currently
 /// be either a reference to a ValueDecl for functions, methods, constructors,
 /// and other named entities, or a reference to a CapturingExpr (that is, a
 /// FuncExpr or ClosureExpr) for an anonymous function. In addition to the AST
@@ -73,11 +73,7 @@ struct SILConstant {
     
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
-    GlobalAccessor,
-    
-    /// GlobalAddress - this constant references the physical address of the
-    /// global VarDecl in loc.
-    GlobalAddress
+    GlobalAccessor
   };
   
   /// The ValueDecl or CapturingExpr represented by this SILConstant.
@@ -177,17 +173,6 @@ struct SILConstant {
   {}
 };
 
-/// PrettyStackTraceSILConstant - Observe that we are processing a specific
-/// SIL constant.
-class PrettyStackTraceSILConstant : public llvm::PrettyStackTraceEntry {
-  SILConstant C;
-  const char *Action;
-public:
-  PrettyStackTraceSILConstant(const char *Action, SILConstant C)
-    : C(C), Action(Action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
-};
-  
 } // end swift namespace
 
 namespace llvm {

@@ -22,15 +22,18 @@
 #include "swift/AST/Types.h"
 using namespace swift;
 
+SILFunction::SILFunction(SILModule &Module,
+                         SILConstant Name,
+                         SILType LoweredType)
+  : Module(Module), Name(Name), LoweredType(LoweredType) {
+  Module.functions.push_back(this);
+}
+
 SILFunction::~SILFunction() {
 }
 
-SILModule::SILModule(ASTContext &Context, bool makeToplevel)
-  : Context(Context), toplevel(nullptr), Types(*this) {
-  if (makeToplevel) {
-    toplevel = new (*this) SILFunction(*this, Types.getTopLevelFunctionType());
-    toplevel->setMangledName("top_level_code");
-  }
+SILModule::SILModule(ASTContext &Context)
+  : Context(Context), Types(*this) {
 }
 
 SILModule::~SILModule() {
@@ -81,12 +84,11 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
             || kind == Kind::Setter
-            || kind == Kind::GlobalAccessor
-            || kind == Kind::GlobalAddress)
+            || kind == Kind::GlobalAccessor)
            && "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
               "SILConstant for var");
     
-    bool isGlobal = kind == Kind::GlobalAccessor || kind == Kind::GlobalAddress;
+    bool isGlobal = kind == Kind::GlobalAccessor;
     
     assert((isGlobal ^ var->isProperty())
            && "can't reference property as global var");
@@ -218,4 +220,16 @@ SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
                  /*isAddress=*/false,
                  /*isLoadable=*/true);
+}
+
+ASTContext &SILFunction::getContext() const {
+  return Module.Context;
+}
+
+void *SILFunction::allocate(unsigned Size, unsigned Align) const {
+  return Module.allocate(Size, Align);
+}
+
+SILTypeList *SILFunction::getSILTypeList(ArrayRef<SILType> Types) const {
+  return Module.getSILTypeList(Types);
 }

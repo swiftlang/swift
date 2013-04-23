@@ -1713,20 +1713,20 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
 }
 
 /// Emit a SIL function.
-static void emitSILFunction(IRGenModule &IGM, SILConstant c,
+static void emitSILFunction(IRGenModule &IGM,
                             SILFunction *f,
                             llvm::Function *entrypoint,
                             BraceStmt *body = nullptr) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
   // Emit the code for the function.
-  PrettyStackTraceSILConstant stackTrace("emitting IR from SIL for", c);
+  PrettyStackTraceSILFunction stackTrace("emitting IR from SIL for", f);
   
   IRGenSILFunction igs(IGM,
                        f->getLoweredType().getSwiftType(),
                        explosionLevel,
-                       entrypoint);
-  igs.emitSILFunction(c, f);
+                       entrypoint); 
+  igs.emitSILFunction(f);
   
   // Walk the function body to look for local types or other decls.
   if (body)
@@ -1736,8 +1736,8 @@ static void emitSILFunction(IRGenModule &IGM, SILConstant c,
   // deallocating destructor.
   // FIXME: Deallocating destructors are currently trivial and never explicitly
   // referenced in SIL, but may eventually benefit from SIL representation.
-  if (c.isDestructor()) {
-    ClassDecl *cd = cast<ClassDecl>(c.getDecl());
+  if (!f->getName().isNull() && f->getName().isDestructor()) {
+    ClassDecl *cd = cast<ClassDecl>(f->getName().getDecl());
     llvm::Function *deallocator
       = IGM.getAddrOfDestructor(cd, DestructorKind::Deallocating);
     emitDeallocatingDestructor(IGM, cd, deallocator, entrypoint);
@@ -1745,13 +1745,16 @@ static void emitSILFunction(IRGenModule &IGM, SILConstant c,
 }
 
 /// Emit the definition for the given SIL constant.
-void IRGenModule::emitSILConstant(SILConstant c, SILFunction *f) {
+void IRGenModule::emitSILFunction(SILFunction *f) {
+  if (f->isExternal())
+    return;
+  
   llvm::Function *entrypoint;
   unsigned naturalCurryLevel;
   AbstractCC cc;
   BraceStmt *body;
-  getAddrOfSILConstant(c, entrypoint, naturalCurryLevel, cc, body);
-  emitSILFunction(*this, c, f, entrypoint, body);
+  getAddrOfSILFunction(f, entrypoint, naturalCurryLevel, cc, body);
+  ::emitSILFunction(*this, f, entrypoint, body);
 }
 
 /// Emit the forwarding stub function for a partial application.

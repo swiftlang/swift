@@ -233,17 +233,20 @@ public:
     
   }
 
-  void checkConstantRefInst(ConstantRefInst *CRI) {
-    if (CRI->getConstant().kind == SILConstant::Kind::GlobalAddress) {
-      require(CRI->getType().isAddress(),
-              "GlobalAddress SILConstant must have an address result type");
-      return;
-    }
-    
+  void checkFunctionRefInst(FunctionRefInst *CRI) {
     require(CRI->getType().is<AnyFunctionType>(),
-            "constant_ref should have a function result");
+            "function_ref should have a function result");
     require(CRI->getType().castTo<AnyFunctionType>()->isThin(),
-            "constant_ref should have a thin function result");
+            "function_ref should have a thin function result");
+  }
+  
+  void checkGlobalAddrInst(GlobalAddrInst *GAI) {
+    require(GAI->getType().isAddress(),
+            "GlobalAddr must have an address result type");
+    require(!GAI->getGlobal()->isProperty(),
+            "GlobalAddr cannot take the address of a property decl");
+    require(!GAI->getGlobal()->getDeclContext()->isLocalContext(),
+            "GlobalAddr cannot take the address of a local var");
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -925,11 +928,13 @@ public:
   }
   
   void visitSILFunction(SILFunction *F) {
+    
     verifyEntryPointArguments(F->getBlocks().begin());
     SILVisitor::visitSILFunction(F);
   }
   
   void verify() {
+
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
 };
@@ -941,6 +946,8 @@ public:
 /// invariants.
 void SILFunction::verify() const {
 #ifndef NDEBUG
+  if (isExternal())
+    return;
   SILVerifier(*this).verify();
 #endif
 }

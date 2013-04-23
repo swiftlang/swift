@@ -576,11 +576,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       // () -> [byref] T
       if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
         assert(!var->isProperty() && "constant ref to non-physical global var");
-        if (c.kind == SILConstant::Kind::GlobalAccessor) {
-          return getGlobalAccessorType(var->getType(), Context);
-        } else if (c.kind == SILConstant::Kind::GlobalAddress) {
-          return var->getTypeOfReference();
-        }
+        return getGlobalAccessorType(var->getType(), Context);
       }
       
       // If it's a function, mangle the function type with its capture

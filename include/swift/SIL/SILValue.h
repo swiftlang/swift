@@ -18,7 +18,7 @@
 #define SWIFT_SIL_VALUE_H
 
 #include "swift/Basic/Range.h"
-#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 

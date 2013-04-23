@@ -18,13 +18,13 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
 class ASTContext;
 class FuncExpr;
 class SILInstruction;
+class SILModule;
 class TranslationUnit;
   
 namespace Lowering {
@@ -34,7 +34,9 @@ namespace Lowering {
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
-class SILFunction : public SILAllocated<SILFunction> {
+class SILFunction
+  : public llvm::ilist_node<SILFunction>, SILAllocated<SILFunction>
+{
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
@@ -45,6 +47,10 @@ private:
 
   /// Module - This is the SIL module that the function belongs to.
   SILModule &Module;
+  
+  /// Name - This is the SILConstant that names the function.
+  /// FIXME: We want to eliminate this in favor of MangledName.
+  SILConstant Name;
 
   /// MangledName - This is the mangled name of the SIL function, which will
   /// be propagated into LLVM IR.
@@ -54,25 +60,28 @@ private:
   /// original function if the function consumes or returns address-only values.
   SILType LoweredType;
   
-  /// The collection of all BasicBlocks in the SILFunction.
+  /// The collection of all BasicBlocks in the SILFunction. Empty for external
+  /// function references.
   BlockListType BlockList;
 
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a SILFunction.
-  SILFunction(SILModule &Module, SILType LoweredType)
-    : Module(Module), LoweredType(LoweredType) {}
+  SILFunction(SILModule &Module, SILConstant Name, SILType LoweredType);
   
 public:
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
-  ASTContext &getContext() const { return Module.Context; }
   SILType getLoweredType() const { return LoweredType; }
 
   const std::string &getMangledName() const { return MangledName; }
   void setMangledName(const std::string &N) { MangledName = N; }
 
-
+  SILConstant getName() const { return Name; }
+  
+  /// True if this is a declaration of a function defined in another module.
+  bool isExternal() const { return BlockList.empty(); }
+  
   //===--------------------------------------------------------------------===//
   // Block List Access
   //===--------------------------------------------------------------------===//
@@ -83,12 +92,12 @@ public:
   typedef BlockListType::iterator iterator;
   typedef BlockListType::const_iterator const_iterator;
 
-  bool empty() { return BlockList.empty(); }
+  bool empty() const { return BlockList.empty(); }
   iterator begin() { return BlockList.begin(); }
   iterator end() { return BlockList.end(); }
   const_iterator begin() const { return BlockList.begin(); }
   const_iterator end() const { return BlockList.end(); }
-  unsigned size() { return BlockList.size(); }
+  unsigned size() const { return BlockList.size(); }
 
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
@@ -104,22 +113,66 @@ public:
   /// Pretty-print the SILFunction.
   void dump() const;
 
-  /// Pretty-print the SILFunction with the designated stream.
+  /// Pretty-print the SILFunction with the designated stream as a 'sil'
+  /// definition.
   void print(raw_ostream &OS) const;
+  
+  /// Pretty-print the SILFunction's name using SIL syntax,
+  /// '@function_mangled_name'.
+  void printName(raw_ostream &OS) const;
   
   //===--------------------------------------------------------------------===//
   // Forwarding to the SILModule's allocator and type information
   //===--------------------------------------------------------------------===//
-  void *allocate(unsigned Size, unsigned Align) const {
-    return Module.allocate(Size, Align);
-  }
+  ASTContext &getContext() const;
+
+  void *allocate(unsigned Size, unsigned Align) const;
   
-  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const {
-    return Module.getSILTypeList(Types);
-  }
+  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
 
 };
 
+/// Observe that we are processing a specific SIL function.
+class PrettyStackTraceSILFunction : public llvm::PrettyStackTraceEntry {
+  SILFunction *F;
+  const char *Action;
+public:
+  PrettyStackTraceSILFunction(const char *Action, SILFunction *F)
+  : F(F), Action(Action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
 } // end swift namespace
+
+//===----------------------------------------------------------------------===//
+// ilist_traits for SILFunction
+//===----------------------------------------------------------------------===//
+
+namespace llvm {
+  
+template <>
+struct ilist_traits<::swift::SILFunction> :
+public ilist_default_traits<::swift::SILFunction> {
+  typedef ::swift::SILFunction SILFunction;
+
+private:
+  mutable ilist_half_node<SILFunction> Sentinel;
+
+public:
+  SILFunction *createSentinel() const {
+    return static_cast<SILFunction*>(&Sentinel);
+  }
+  void destroySentinel(SILFunction *) const {}
+
+  SILFunction *provideInitialHead() const { return createSentinel(); }
+  SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
+  static void noteHead(SILFunction*, SILFunction*) {}
+  static void deleteNode(SILFunction *V) {}
+  
+private:
+  void createNode(const SILFunction &);
+};
+
+} // end llvm namespace
 
 #endif

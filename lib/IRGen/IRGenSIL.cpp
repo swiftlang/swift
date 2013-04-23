@@ -27,6 +27,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 
 #include "CallEmission.h"
@@ -149,10 +150,9 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   return phis;
 }
 
-void IRGenSILFunction::emitSILFunction(SILConstant c,
-                                       SILFunction *f) {
+void IRGenSILFunction::emitSILFunction(SILFunction *f) {
   DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        c.print(llvm::dbgs());
+        f->printName(llvm::dbgs());
         llvm::dbgs() << '\n';
         f->print(llvm::dbgs()));
   
@@ -201,7 +201,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
   }
 
   // Unravel the function types for each uncurry level.
-  unsigned level = c.uncurryLevel;
+  unsigned level = f->getLoweredType().getUncurryLevel();
   llvm::SmallVector<AnyFunctionType*, 4> uncurriedTypes;
   AnyFunctionType *uncurriedType = funcTy.castTo<AnyFunctionType>();
   for (;;) {
@@ -214,7 +214,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
 
   // Map LLVM arguments in inner-to-outer curry order to match the Swift
   // convention.
-  level = c.uncurryLevel;
+  level = f->getLoweredType().getUncurryLevel();
   do {
     unsigned from = funcTI->getUncurriedInputBegins()[level],
       to = funcTI->getUncurriedInputEnds()[level];
@@ -231,7 +231,7 @@ void IRGenSILFunction::emitSILFunction(SILConstant c,
       } else {
         Explosion explosion(CurExplosionLevel);
         
-        if (c.isDestructor()) {
+        if (f->getName().isDestructor()) {
           // The argument for a destructor comes in as a %swift.refcounted*.
           // Cast to the correct local type.
           TypeInfo const &thisTI
@@ -303,22 +303,6 @@ void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
   }
 }
 
-void IRGenSILFunction::emitGlobalTopLevel(TranslationUnit *TU,
-                                          SILModule *SILMod,
-                                          unsigned startElem) {
-  // Emit the toplevel function.
-  emitSILFunction(SILConstant(),
-                  SILMod->getTopLevelFunction());
-  
-  // Emit global variables.
-  for (VarDecl *global : SILMod->getGlobals()) {
-    TypeInfo const &ti = getFragileTypeInfo(global->getType());
-    IGM.emitGlobalVariable(global, ti);
-  }
-  
-  IRGenFunction::emitGlobalTopLevel(TU, startElem);
-}
-
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -334,16 +318,120 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-/// Find the entry point, natural curry level, and calling convention for a
-/// SILConstant function.
 void IRGenModule::getAddrOfSILConstant(SILConstant constant,
+                                       SILFunction *f,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
                                        AbstractCC &cc,
                                        BraceStmt *&body) {
-  if (CapturingExpr *anon = constant.loc.dyn_cast<CapturingExpr*>()) {    
-    fnptr = getAddrOfAnonymousFunction(constant, anon);
-    naturalCurryLevel = constant.uncurryLevel;
+  assert(constant.hasDecl() &&
+         "don't ask me for the address of anonymous functions");
+  ValueDecl *vd = constant.loc.get<ValueDecl*>();
+  naturalCurryLevel = constant.uncurryLevel;
+  
+  switch (constant.kind) {
+    case SILConstant::Kind::Func: {
+      // FIXME: fd is null for top_level_code.
+      FuncDecl *fd = cast_or_null<FuncDecl>(vd);
+      
+      // FIXME: Replace FunctionRef. This is gross.
+      FunctionRef fnRef = f
+        ? FunctionRef(fd, f, ExplosionKind::Minimal)
+        : FunctionRef(fd, ExplosionKind::Minimal, constant.uncurryLevel);
+      
+      fnptr = getAddrOfFunction(fnRef, ExtraData::None);
+      // FIXME: c calling convention
+      cc = fd ? getAbstractCC(fd) : AbstractCC::Freestanding;
+      body = fd ? fd->getBody()->getBody() : nullptr;
+      break;
+    }
+    case SILConstant::Kind::Getter: {
+      fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
+      // FIXME: subscript
+      FuncDecl *getter;
+      if (auto *var = dyn_cast<VarDecl>(vd))
+        getter = var->getGetter();
+      else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
+        getter = sub->getGetter();
+      else
+        llvm_unreachable("getter for decl that's not Var or Subscript");
+      
+      body = getter ? getter->getBody()->getBody() : nullptr;
+      if (getter)
+        cc = getAbstractCC(getter);
+      else
+        cc = vd->isInstanceMember()
+        ? AbstractCC::Method
+        : AbstractCC::Freestanding;
+      break;
+    }
+    case SILConstant::Kind::Setter: {
+      fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
+      // FIXME: subscript
+      FuncDecl *setter;
+      if (auto *var = dyn_cast<VarDecl>(vd))
+        setter = var->getSetter();
+      else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
+        setter = sub->getSetter();
+      else
+        llvm_unreachable("getter for decl that's not Var or Subscript");
+      
+      body = setter ? setter->getBody()->getBody() : nullptr;
+      if (setter)
+        cc = getAbstractCC(setter);
+      else
+        cc = vd->isInstanceMember()
+        ? AbstractCC::Method
+        : AbstractCC::Freestanding;
+      break;
+    }
+    case SILConstant::Kind::Allocator: {
+      ConstructorDecl *cd = cast<ConstructorDecl>(vd);
+      fnptr = getAddrOfConstructor(cd, ConstructorKind::Allocating,
+                                   ExplosionKind::Minimal);
+      body = cd->getBody();
+      cc = AbstractCC::Freestanding;
+      break;
+    }
+    case SILConstant::Kind::Initializer: {
+      ConstructorDecl *cd = cast<ConstructorDecl>(vd);
+      fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
+                                   ExplosionKind::Minimal);
+      body = cd->getBody();
+      cc = AbstractCC::Method;
+      break;
+    }
+    case SILConstant::Kind::OneOfElement: {
+      OneOfElementDecl *ed = cast<OneOfElementDecl>(vd);
+      fnptr = getAddrOfInjectionFunction(ed);
+      body = nullptr;
+      cc = AbstractCC::Freestanding;
+      break;
+    }
+    case SILConstant::Kind::Destructor: {
+      ClassDecl *cd = cast<ClassDecl>(vd);
+      fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
+      cc = AbstractCC::Method;
+      // FIXME: get body from DestructorDecl
+      body = nullptr;
+      break;
+    }
+    case SILConstant::Kind::GlobalAccessor: {
+      llvm_unreachable("unimplemented function_ref to global var");
+    }
+  }  
+}
+
+/// Find the entry point, natural curry level, and calling convention for a
+/// SILConstant function.
+void IRGenModule::getAddrOfSILFunction(SILFunction *f,
+                                       llvm::Function* &fnptr,
+                                       unsigned &naturalCurryLevel,
+                                       AbstractCC &cc,
+                                       BraceStmt *&body) {
+  if (CapturingExpr *anon = f->getName().loc.dyn_cast<CapturingExpr*>()) {
+    fnptr = getAddrOfAnonymousFunction(f, anon);
+    naturalCurryLevel = f->getLoweredType().getUncurryLevel();
     
     // FIXME: c calling convention for anonymous funcs?
     cc = AbstractCC::Freestanding;
@@ -356,128 +444,13 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
     return;
   }
   
-  ValueDecl *vd = constant.loc.get<ValueDecl*>();  
-  naturalCurryLevel = constant.uncurryLevel;
-
-  switch (constant.kind) {
-  case SILConstant::Kind::Func: {
-    // FIXME: currently only does ValueDecls. Handle CapturingExprs
-    FuncDecl *fd = cast<FuncDecl>(vd);
-
-    FunctionRef fnRef(fd,
-                      ExplosionKind::Minimal,
-                      constant.uncurryLevel);
-    
-    fnptr = getAddrOfFunction(fnRef, ExtraData::None);
-    // FIXME: c calling convention
-    cc = getAbstractCC(fd);
-    body = fd->getBody()->getBody();
-    break;
-  }
-  case SILConstant::Kind::Getter: {
-    fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
-    // FIXME: subscript
-    FuncDecl *getter;
-    if (auto *var = dyn_cast<VarDecl>(vd))
-      getter = var->getGetter();
-    else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
-      getter = sub->getGetter();
-    else
-      llvm_unreachable("getter for decl that's not Var or Subscript");
-    
-    body = getter ? getter->getBody()->getBody() : nullptr;
-    if (getter)
-      cc = getAbstractCC(getter);
-    else
-      cc = vd->isInstanceMember()
-        ? AbstractCC::Method
-        : AbstractCC::Freestanding;
-    break;
-  }
-  case SILConstant::Kind::Setter: {
-    fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
-    // FIXME: subscript
-    FuncDecl *setter;
-    if (auto *var = dyn_cast<VarDecl>(vd))
-      setter = var->getSetter();
-    else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
-      setter = sub->getSetter();
-    else
-      llvm_unreachable("getter for decl that's not Var or Subscript");
-
-    body = setter ? setter->getBody()->getBody() : nullptr;
-    if (setter)
-      cc = getAbstractCC(setter);
-    else
-      cc = vd->isInstanceMember()
-        ? AbstractCC::Method
-        : AbstractCC::Freestanding;
-    break;
-  }
-  case SILConstant::Kind::Allocator: {
-    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
-    fnptr = getAddrOfConstructor(cd, ConstructorKind::Allocating,
-                                 ExplosionKind::Minimal);
-    body = cd->getBody();
-    cc = AbstractCC::Freestanding;
-    break;
-  }
-  case SILConstant::Kind::Initializer: {
-    ConstructorDecl *cd = cast<ConstructorDecl>(vd);
-    fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
-                                 ExplosionKind::Minimal);
-    body = cd->getBody();
-    cc = AbstractCC::Method;
-    break;
-  }
-  case SILConstant::Kind::OneOfElement: {
-    OneOfElementDecl *ed = cast<OneOfElementDecl>(vd);
-    fnptr = getAddrOfInjectionFunction(ed);
-    body = nullptr;
-    cc = AbstractCC::Freestanding;
-    break;
-  }
-  case SILConstant::Kind::Destructor: {
-    ClassDecl *cd = cast<ClassDecl>(vd);
-    fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
-    cc = AbstractCC::Method;
-    // FIXME: get body from DestructorDecl
-    body = nullptr;
-    break;
-  }
-  case SILConstant::Kind::GlobalAccessor: {
-    llvm_unreachable("unimplemented constant_ref to global var");
-  }
-  case SILConstant::Kind::GlobalAddress: {
-    llvm_unreachable("GlobalAddress is not a function");
-  }
-  }
+  return getAddrOfSILConstant(f->getName(), f,
+                              fnptr, naturalCurryLevel, cc, body);
 }
 
-void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
-  // Emit GlobalAddress SILConstants by getting the global variable
-  // address.
-  if (i->getConstant().kind == SILConstant::Kind::GlobalAddress) {
-    VarDecl *global = cast<VarDecl>(i->getConstant().getDecl());
-    TypeInfo const &type = getFragileTypeInfo(global->getType());
-    
-    Address addr;
-    
-    // If the variable is empty, don't actually emit it; just return undef.
-    // FIXME: global destructors?
-    if (type.isKnownEmpty()) {
-      auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
-      addr = Address(undef, Alignment(1));
-    } else {
-      addr = IGM.getAddrOfGlobalVariable(global);
-    }
-
-    newLoweredAddress(SILValue(i, 0), addr);
-    return;
-  }
-  
+void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
   // Emit references to builtin decls specially.
-  if (auto *decl = i->getConstant().loc.dyn_cast<ValueDecl*>()) {
+  if (auto *decl = i->getFunction()->getName().loc.dyn_cast<ValueDecl*>()) {
     if (isa<BuiltinModule>(decl->getDeclContext())) {
       newLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(decl),
                              /*substitutions*/ {});
@@ -489,14 +462,14 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   unsigned naturalCurryLevel;
   AbstractCC cc;
   BraceStmt *body;
-  IGM.getAddrOfSILConstant(i->getConstant(),
+  IGM.getAddrOfSILFunction(i->getFunction(),
                            fnptr, naturalCurryLevel, cc, body);
   
   
   // Destructors have LLVM type void (%swift.refcounted*), but in SIL
-  // are used with type T -> (). Bitcast them immediately because the static
+  // are used with type T -> (). Bitcast them immediately because the uncast
   // function value isn't useful.
-  if (i->getConstant().isDestructor()) {
+  if (i->getFunction()->getName().isDestructor()) {
     llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
     
     Explosion e(ExplosionKind::Minimal);
@@ -509,6 +482,25 @@ void IRGenSILFunction::visitConstantRefInst(swift::ConstantRefInst *i) {
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
   newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);
+}
+
+void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
+  VarDecl *global = i->getGlobal();
+  TypeInfo const &type = getFragileTypeInfo(global->getType());
+  
+  Address addr;
+  
+  // If the variable is empty, don't actually emit it; just return undef.
+  // FIXME: global destructors?
+  if (type.isKnownEmpty()) {
+    auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
+    addr = Address(undef, Alignment(1));
+  } else {
+    addr = IGM.getAddrOfGlobalVariable(global);
+  }
+  
+  newLoweredAddress(SILValue(i, 0), addr);
+  return;
 }
 
 /// Determine whether a metatype value is used as a Swift metatype, ObjC class,
@@ -1533,7 +1525,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   unsigned naturalCurryLevel;
   AbstractCC cc;
   BraceStmt *body;
-  IGM.getAddrOfSILConstant(i->getMember(),
+  IGM.getAddrOfSILConstant(i->getMember(), nullptr,
                            fnptr, naturalCurryLevel, cc, body);
   
   newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);

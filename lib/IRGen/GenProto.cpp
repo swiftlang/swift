@@ -30,6 +30,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"

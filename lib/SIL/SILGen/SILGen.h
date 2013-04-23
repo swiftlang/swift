@@ -51,6 +51,11 @@ public:
   /// the module is not a main module.
   SILGenFunction /*nullable*/ *TopLevelSGF;
   
+  /// Mapping from SILConstants to emitted SILFunctions.
+  llvm::DenseMap<SILConstant, SILFunction*> emittedFunctions;
+  
+  SILFunction *emitTopLevelFunction();
+  
 public:
   SILGenModule(SILModule &M);
   ~SILGenModule();
@@ -60,6 +65,9 @@ public:
   
   /// Returns the type of a constant reference.
   SILType getConstantType(SILConstant constant);
+  
+  /// Get the function for a SILConstant.
+  SILFunction *getFunction(SILConstant constant);
   
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
@@ -479,16 +487,16 @@ public:
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
-  SILValue emitGlobalConstantRef(SILLocation loc, SILConstant constant);
+  SILValue emitGlobalFunctionRef(SILLocation loc, SILConstant constant);
   /// Returns a reference to a constant in local context. This will return a
   /// closure object reference if the constant refers to a local func decl.
-  /// In rvalue contexts, emitConstantRef should be used instead, which retains
+  /// In rvalue contexts, emitFunctionRef should be used instead, which retains
   /// a local constant and returns a ManagedValue with a cleanup.
-  SILValue emitUnmanagedConstantRef(SILLocation loc, SILConstant constant);
+  SILValue emitUnmanagedFunctionRef(SILLocation loc, SILConstant constant);
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
-  ManagedValue emitConstantRef(SILLocation loc, SILConstant constant);
+  ManagedValue emitFunctionRef(SILLocation loc, SILConstant constant);
 
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                ValueDecl *decl,
@@ -523,7 +531,7 @@ public:
                           LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
-  ManagedValue emitSpecializedPropertyConstantRef(
+  ManagedValue emitSpecializedPropertyFunctionRef(
                                           SILLocation loc,
                                           SILConstant constant,
                                           ArrayRef<Substitution> substitutions,

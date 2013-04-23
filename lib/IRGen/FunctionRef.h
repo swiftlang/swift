@@ -19,6 +19,8 @@
 #define SWIFT_IRGEN_FUNCTIONREF_H
 
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILFunction.h"
+#include "CallingConvention.h"
 #include "IRGen.h"
 
 namespace swift {
@@ -36,6 +38,8 @@ public:
 
 private:
   ValueDecl *TheDecl;
+  /// FIXME: SILFunction/SILConstant should subsume most of this functionality.
+  SILFunction *TheSILFunction;
   unsigned TheKind : 2;
   unsigned ExplosionLevel : 2;
   unsigned UncurryLevel : 28;
@@ -43,18 +47,22 @@ private:
   CodeRef(Kind kind, ValueDecl *theDecl, ExplosionKind explosionLevel,
           unsigned uncurryLevel)
     : TheDecl(theDecl),
+      TheSILFunction(nullptr),
       TheKind(unsigned(kind)),
       ExplosionLevel(unsigned(explosionLevel)),
       UncurryLevel(uncurryLevel) {
   }
 
+protected:
+  void setSILFunction(SILFunction *f) { TheSILFunction = f; }
+  
 public:
   CodeRef() = default;
 
   static CodeRef forFunction(FuncDecl *fn,
                              ExplosionKind explosionLevel,
                              unsigned uncurryLevel) {
-    assert(!fn->isGetterOrSetter());
+    assert(!fn || !fn->isGetterOrSetter());
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
@@ -85,12 +93,13 @@ public:
   }
 
   ValueDecl *getDecl() const { return TheDecl; }
+  SILFunction *getSILFunction() const { return TheSILFunction; }
   Kind getKind() const { return Kind(TheKind); }
   unsigned getUncurryLevel() const { return UncurryLevel; }
   ExplosionKind getExplosionLevel() const {
     return ExplosionKind(ExplosionLevel);
   }
-
+  
   friend bool operator==(CodeRef left, CodeRef right) {
     return left.getDecl() == right.getDecl() &&
            left.getKind() == right.getKind() &&
@@ -108,8 +117,24 @@ public:
   FunctionRef() = default;
   FunctionRef(FuncDecl *fn, ExplosionKind explosionLevel, unsigned uncurryLevel)
     : CodeRef(CodeRef::forFunction(fn, explosionLevel, uncurryLevel)) {}
+  
+  FunctionRef(FuncDecl *fn, SILFunction *sf, ExplosionKind explosionLevel)
+    : CodeRef(CodeRef::forFunction(fn, explosionLevel,
+                                   sf->getLoweredType().getUncurryLevel())) {
+    setSILFunction(sf);
+  }
 
-  FuncDecl *getDecl() const { return cast<FuncDecl>(CodeRef::getDecl()); }
+  FuncDecl *getDecl() const {
+    // FIXME: decl is null for top_level_code
+    return cast_or_null<FuncDecl>(CodeRef::getDecl());
+  }
+  
+  AbstractCC getAbstractCC() const {
+    // FIXME: decl is null for top_level_code
+    return getDecl()
+      ? irgen::getAbstractCC(getDecl())
+      : AbstractCC::Freestanding;
+  }
 };
 
 } // end namespace irgen

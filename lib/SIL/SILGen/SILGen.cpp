@@ -63,19 +63,42 @@ SILGenFunction::~SILGenFunction() {
 
 SILGenModule::SILGenModule(SILModule &M)
   : M(M), Types(M.Types), TopLevelSGF(nullptr) {
-  TopLevelSGF = new SILGenFunction(*this, *M.toplevel,
+  
+  SILFunction *toplevel = emitTopLevelFunction();
+  TopLevelSGF = new SILGenFunction(*this, *toplevel,
                                    /*hasVoidReturn=*/true);
 }
 
 SILGenModule::~SILGenModule() {
+  SILFunction *toplevel = &TopLevelSGF->getFunction();
   delete TopLevelSGF;
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
-        M.toplevel->print(llvm::dbgs()));
-  M.toplevel->verify();
+        toplevel->print(llvm::dbgs()));
+  toplevel->verify();
+}
+
+SILFunction *SILGenModule::emitTopLevelFunction() {
+  ASTContext &C = M.getContext();
+  Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
+                                        TupleType::getEmpty(C), C);
+  SILType loweredType = getLoweredType(topLevelType);
+  SILFunction *toplevel = new (M) SILFunction(M, SILConstant(), loweredType);
+  toplevel->setMangledName("top_level_code");
+  return toplevel;
 }
 
 SILType SILGenModule::getConstantType(SILConstant constant) {
   return Types.getConstantType(constant);
+}
+
+SILFunction *SILGenModule::getFunction(SILConstant constant) {
+  auto found = emittedFunctions.find(constant);
+  if (found != emittedFunctions.end())
+    return found->second;
+  
+  SILType constantType = getConstantType(constant);
+  
+  return new (M) SILFunction(M, constant, constantType);
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
@@ -84,31 +107,30 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
 
 template<typename T>
 SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
-  assert(!M.hasFunction(constant) &&
-         "already generated function for constant!");
+  SILFunction *f = getFunction(constant);
   
-  SILType constantType = getConstantType(constant);
+  assert(f->empty() && "already emitted function?!");
   
   DEBUG(llvm::dbgs() << "lowering ";
-        constant.print(llvm::dbgs());
+        f->printName(llvm::dbgs());
         llvm::dbgs() << " : $";
-        constantType.print(llvm::dbgs());
+        f->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
           astNode->print(llvm::dbgs());
           llvm::dbgs() << '\n';
         });
   
-  return new (M) SILFunction(M, constantType);
+  return f;
 }
 
 void SILGenModule::postEmitFunction(SILConstant constant,
                                     SILFunction *F) {
-
+  assert(!F->isExternal() && "did not emit any function body?!");
   DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
   F->verify();
-  M.functions[constant] = F;
+  emittedFunctions[constant] = F;
 }
 
 SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
@@ -239,7 +261,6 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 //===--------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
-
 
 SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
   SILModule *m = new SILModule(tu->getASTContext());

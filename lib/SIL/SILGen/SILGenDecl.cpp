@@ -291,8 +291,8 @@ struct InitializationForPattern
     // If this is a global variable, initialize it without allocations or
     // cleanups.
     if (!vd->getDeclContext()->isLocalContext()) {
-      SILValue addr = Gen.emitGlobalConstantRef(vd,
-                             SILConstant(vd, SILConstant::Kind::GlobalAddress));
+      SILValue addr = Gen.B.createGlobalAddr(vd, vd,
+                            Gen.getLoweredType(vd->getType()).getAddressType());
       return InitializationPtr(new GlobalInitialization(addr));
     }
     

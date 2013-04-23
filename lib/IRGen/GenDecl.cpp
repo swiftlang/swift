@@ -223,6 +223,12 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
 /// Emit all the top-level code in the translation unit.
 void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                                       unsigned StartElem) {
+  /// Emit all the code from the SIL module and declarations.
+  emitGlobalTopLevel(tunit, StartElem);
+  
+  llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
+  assert(topLevelCodeFn && "no top_level_code in SIL function?!");
+  
   Type emptyTuple = TupleType::getEmpty(Context);
   auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
   Pattern *params[] = {
@@ -236,41 +242,35 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
       getFunctionType(AbstractCC::Freestanding,
                       unitToUnit, ExplosionKind::Minimal, 0, ExtraData::None,
                       attrs);
-  llvm::Function *fn;
-  if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::Repl) {
-    // Emit a top-level code function to be called from main().
-    fn = llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
-                                "top_level_code", &Module);
-  } else {
-    // Otherwise, create a global initializer.
+  llvm::Function *initFn = nullptr;
+  if (tunit->Kind != TranslationUnit::Main &&
+      tunit->Kind != TranslationUnit::Repl) {
+    // Create a global initializer for library modules.
     // FIXME: This is completely, utterly, wrong.
-    fn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
+    initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
                                 tunit->Name.str() + ".init", &Module);
+    initFn->setAttributes(attrs);
+    
+    // Insert a call to the top_level_code symbol from the SIL module.
+    IRGenFunction initIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
+                          /*uncurry*/ 0, initFn, Prologue::Bare);
+    initIGF.Builder.CreateCall(topLevelCodeFn);
+    initIGF.Builder.CreateRetVoid();
   }
-  fn->setAttributes(attrs);
-
-  IRGenSILFunction(*this, unitToUnit, ExplosionKind::Minimal, fn)
-    .emitGlobalTopLevel(tunit, SILMod, StartElem);
   
-  for (auto &cf : *SILMod) {
-    SILConstant c = cf.first;
-    SILFunction *f = cf.second;
-    emitSILConstant(c, f);
-  }
-
   SmallVector<llvm::Constant *, 2> allInits;
   if (tunit->Kind == TranslationUnit::Main ||
       tunit->Kind == TranslationUnit::Repl) {
     // We don't need global init to call main().
-  } else if (isTrivialGlobalInit(fn)) {
+  } else if (isTrivialGlobalInit(topLevelCodeFn)) {
     // Not all translation units need a global initialization function.
-    fn->eraseFromParent();
+    initFn->eraseFromParent();
+    topLevelCodeFn->eraseFromParent();
   } else {
     // Build the initializer for the module.
     llvm::Constant *initAndPriority[] = {
       llvm::ConstantInt::get(Int32Ty, 1),
-      fn
+      initFn
     };
     allInits.push_back(llvm::ConstantStruct::getAnon(LLVMContext,
                                                      initAndPriority));
@@ -368,7 +368,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     }
     
     // Call the top-level code.
-    mainIGF.Builder.CreateCall(fn);
+    mainIGF.Builder.CreateCall(topLevelCodeFn);
     mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
   }
 
@@ -462,9 +462,19 @@ void IRGenModule::emitGlobalLists() {
                  llvm::GlobalValue::AppendingLinkage);
 }
 
-void IRGenFunction::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem){
+void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
+  // Emit global variables.
+  for (VarDecl *global : SILMod->getGlobals()) {
+    TypeInfo const &ti = getFragileTypeInfo(global->getType());
+    emitGlobalVariable(global, ti);
+  }
+  
+  // Emit SIL functions.
+  for (SILFunction &f : *SILMod) {
+    emitSILFunction(&f);
+  }
+
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    assert(Builder.hasValidIP());
     emitGlobalDecl(TU->Decls[i]);
   }
   
@@ -638,7 +648,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::SILFunction:
     // FIXME: This is incorrect, local linkage should be a property of
     // SILFunction.
-    return false;
+    return true;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -759,17 +769,16 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
 }
 
 /// Emit a global declaration.
-void IRGenFunction::emitGlobalDecl(Decl *D) {
+void IRGenModule::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Extension:
-    IGM.emitExtension(cast<ExtensionDecl>(D));
-    return;
+    return emitExtension(cast<ExtensionDecl>(D));
 
   case DeclKind::Protocol:
-    return IGM.emitProtocolDecl(cast<ProtocolDecl>(D));
+    return emitProtocolDecl(cast<ProtocolDecl>(D));
       
   case DeclKind::PatternBinding:
-    // The global initializations will be lowered separately for a SIL module.
+    // The global initializations are in SIL.
     return;
 
   case DeclKind::Subscript:
@@ -788,13 +797,13 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::OneOf:
-    return IGM.emitOneOfDecl(cast<OneOfDecl>(D));
+    return emitOneOfDecl(cast<OneOfDecl>(D));
 
   case DeclKind::Struct:
-    return IGM.emitStructDecl(cast<StructDecl>(D));
+    return emitStructDecl(cast<StructDecl>(D));
 
   case DeclKind::Class:
-    return IGM.emitClassDecl(cast<ClassDecl>(D));
+    return emitClassDecl(cast<ClassDecl>(D));
 
   // These declarations don't require IR-gen support.
   case DeclKind::Import:
@@ -821,7 +830,7 @@ void IRGenFunction::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
-void IRGenFunction::emitExternalDefinition(Decl *D) {
+void IRGenModule::emitExternalDefinition(Decl *D) {
   switch (D->getKind()) {
     case DeclKind::Extension:
     case DeclKind::Protocol:
@@ -847,7 +856,7 @@ void IRGenFunction::emitExternalDefinition(Decl *D) {
       
     case DeclKind::Struct:
       // Emit Swift metadata for the external struct.
-      emitStructMetadata(IGM, cast<StructDecl>(D));
+      emitStructMetadata(*this, cast<StructDecl>(D));
       break;
   }
 }
@@ -881,23 +890,24 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
 }
 
 /// Fetch the declaration corresponding to the given CapturingExpr.
-llvm::Function *IRGenModule::getAddrOfAnonymousFunction(SILConstant c,
+llvm::Function *IRGenModule::getAddrOfAnonymousFunction(SILFunction *f,
                                                         CapturingExpr *expr) {
+  unsigned uncurryLevel = f->getLoweredType().getUncurryLevel();
   LinkEntity entity = LinkEntity::forAnonymousFunction(expr,
                                                        ExplosionKind::Minimal,
-                                                       c.uncurryLevel);
+                                                       uncurryLevel);
   
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::AttributeSet attrs;
-  SILType silTy = SILMod->getFunction(c)->getLoweredType();
+  SILType silTy = f->getLoweredType();
   CanType ty = silTy.getSwiftType();
   auto *fnType = getFunctionType(AbstractCC::Freestanding,
                        ty,
                        entity.getExplosionKind(),
-                       c.uncurryLevel,
+                       uncurryLevel,
                        ExtraData::None,
                        attrs);
   auto cc = expandAbstractCC(*this, AbstractCC::Freestanding);
@@ -917,15 +927,13 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   if (entry) return cast<llvm::Function>(entry);
 
   llvm::FunctionType *fnType;
-  AbstractCC convention = getAbstractCC(fn.getDecl());
+  AbstractCC convention = fn.getAbstractCC();
   // A bit of a hack here. SIL represents closure functions with their context
   // expanded out and uses a partial application function to construct the
   // context. IRGen previously set up local functions to expect their extraData
   // prepackaged.
-  SILConstant silConstant = SILConstant(fn.getDecl());
   llvm::AttributeSet attrs;
-  if (SILMod->hasFunction(silConstant)) {
-    SILFunction *silFn = SILMod->getFunction(silConstant);
+  if (SILFunction *silFn = fn.getSILFunction()) {
     fnType = getFunctionType(convention,
                              silFn->getLoweredType().getSwiftType(),
                              fn.getExplosionLevel(),

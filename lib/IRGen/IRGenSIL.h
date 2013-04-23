@@ -23,6 +23,7 @@
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/IR/CallingConv.h"
 #include "CallEmission.h"
 #include "GenObjC.h"
@@ -359,15 +360,8 @@ public:
   ~IRGenSILFunction();
   
   /// Generate IR for the given SIL Function.
-  void emitSILFunction(SILConstant c, SILFunction *f);
+  void emitSILFunction(SILFunction *f);
 
-  /// Generate code from the global toplevel. This will emit all the
-  /// declarations in the given translation unit along with the toplevel
-  /// of the given SILModule.
-  void emitGlobalTopLevel(TranslationUnit *TU,
-                          SILModule *SILMod,
-                          unsigned startElem);
-  
   /// Generate local decls in the given function body. This skips VarDecls and
   /// other locals that are consumed by SIL.
   void emitLocalDecls(BraceStmt *body);
@@ -482,7 +476,8 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitSpecializeInst(SpecializeInst *i);
 
-  void visitConstantRefInst(ConstantRefInst *i);
+  void visitFunctionRefInst(FunctionRefInst *i);
+  void visitGlobalAddrInst(GlobalAddrInst *i);
 
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);

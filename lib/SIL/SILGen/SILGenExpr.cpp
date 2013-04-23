@@ -105,25 +105,25 @@ SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
                        {});
 }
 
-SILValue SILGenFunction::emitGlobalConstantRef(SILLocation loc,
+SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
                                                SILConstant constant) {
   assert(!LocalConstants.count(constant) &&
          "emitting ref to local constant without context?!");
-  return B.createConstantRef(loc, constant, SGM.getConstantType(constant));
+  return B.createFunctionRef(loc, SGM.getFunction(constant));
 }
 
-SILValue SILGenFunction::emitUnmanagedConstantRef(SILLocation loc,
+SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
                                                SILConstant constant) {
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
     return LocalConstants[constant];
   }
   
-  // Otherwise, use a global ConstantRefInst.
-  return emitGlobalConstantRef(loc, constant);
+  // Otherwise, use a global FunctionRefInst.
+  return emitGlobalFunctionRef(loc, constant);
 }
 
-ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
+ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILConstant constant) {
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
@@ -132,8 +132,8 @@ ManagedValue SILGenFunction::emitConstantRef(SILLocation loc,
     return emitManagedRValueWithCleanup(v);
   }
   
-  // Otherwise, use a global ConstantRefInst.
-  SILValue c = emitGlobalConstantRef(loc, constant);
+  // Otherwise, use a global FunctionRefInst.
+  SILValue c = emitGlobalFunctionRef(loc, constant);
   return ManagedValue(c, ManagedValue::Unmanaged);
 }
 
@@ -147,26 +147,9 @@ static ManagedValue emitGlobalVariable(SILGenFunction &gen,
   // FIXME: Always emit global variables directly. Eventually we want "true"
   // global variables to be indirectly accessed so that they can be initialized
   // on demand.
-  SILValue addr = gen.emitGlobalConstantRef(loc,
-                                            SILConstant(var, SILConstant::Kind::GlobalAddress));
+  SILValue addr = gen.B.createGlobalAddr(loc, var,
+                          gen.getLoweredType(var->getType()).getAddressType());
   return ManagedValue(addr, ManagedValue::LValue);
-
-  /*
-  // For global vars in top-level code, emit the address of the variable
-  // directly.
-  auto *TU = dyn_cast<TranslationUnit>(var->getDeclContext());
-  if (TU && (TU->Kind == TranslationUnit::Main
-             || TU->Kind == TranslationUnit::Repl)) {
-    SILValue addr = gen.emitGlobalConstantRef(loc,
-                           SILConstant(var, SILConstant::Kind::GlobalAddress));
-    return ManagedValue(addr, ManagedValue::LValue);
-  }
-  
-  // Otherwise, emit a call to the global accessor.
-  SILValue accessor = gen.emitGlobalConstantRef(loc,
-                           SILConstant(var, SILConstant::Kind::GlobalAccessor));
-  return gen.emitApply(loc, accessor, {});
-   */
 }
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
@@ -223,7 +206,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       ++uncurryLevel;
   }
 
-  return emitConstantRef(loc, SILConstant(decl, uncurryLevel));
+  return emitFunctionRef(loc, SILConstant(decl, uncurryLevel));
 }
 
 RValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
@@ -673,10 +656,12 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                            SILValue thisValue,
                                            SILConstant methodConstant,
                                            ArrayRef<Substitution> innerSubs) {
+  // FIXME: Emit dynamic dispatch instruction (class_method, super_method, etc.)
+  // if needed.
+  
   SILType methodType = SGM.getConstantType(methodConstant);
-  SILValue methodValue = B.createConstantRef(loc,
-                                          methodConstant,
-                                          methodType);
+  SILValue methodValue = B.createFunctionRef(loc,
+                                             SGM.getFunction(methodConstant));
   
   /// If the 'this' type is a bound generic, specialize the method ref with
   /// its substitutions.
@@ -1137,14 +1122,14 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
         }
         case CaptureKind::GetterSetter: {
           // Pass the setter and getter closure references on.
-          ManagedValue v = emitConstantRef(loc, SILConstant(capture,
+          ManagedValue v = emitFunctionRef(loc, SILConstant(capture,
                                                    SILConstant::Kind::Setter));
           capturedArgs.push_back(v.forward(*this));
           [[clang::fallthrough]];
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.
-          ManagedValue v = emitConstantRef(loc, SILConstant(capture,
+          ManagedValue v = emitFunctionRef(loc, SILConstant(capture,
                                                    SILConstant::Kind::Getter));
           capturedArgs.push_back(v.forward(*this));
           break;
@@ -1152,7 +1137,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       }
     }
     
-    SILValue functionRef = emitGlobalConstantRef(loc, constant);
+    SILValue functionRef = emitGlobalFunctionRef(loc, constant);
     Type closureSwiftTy
       = functionRef.getType().getAs<AnyFunctionType>()->getResult();
     SILType closureTy = getLoweredLoadableType(closureSwiftTy);
@@ -1160,7 +1145,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
                     B.createPartialApply(loc, functionRef, capturedArgs,
                                          closureTy));
   } else {
-    return ManagedValue(emitGlobalConstantRef(loc, constant),
+    return ManagedValue(emitGlobalFunctionRef(loc, constant),
                         ManagedValue::Unmanaged);
   }
 }
@@ -1689,7 +1674,7 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   // FIXME: Forward archetypes and specialize if the function is generic.
   
   // Partially apply the next uncurry level and return the result closure.
-  auto toFn = B.createConstantRef(fe, to, SGM.getConstantType(to));
+  auto toFn = B.createFunctionRef(fe, SGM.getFunction(to));
   SILType resultTy
     = SGM.getConstantType(from).getFunctionTypeInfo()->getResultType();
   auto toClosure = B.createPartialApply(fe, toFn, curriedArgs, resultTy);

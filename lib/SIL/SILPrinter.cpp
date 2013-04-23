@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -83,9 +84,6 @@ void SILConstant::print(raw_ostream &OS) const {
     break;
   case SILConstant::Kind::GlobalAccessor:
     OS << ".globalaccessor";
-    break;
-  case SILConstant::Kind::GlobalAddress:
-    OS << ".globaladdress";
     break;
   }
   if (uncurryLevel != 0) {
@@ -305,9 +303,14 @@ public:
     printFunctionInst(CI);
   }
 
-  void visitConstantRefInst(ConstantRefInst *DRI) {
-    OS << "constant_ref $" << DRI->getType(0) << ", @";
-    DRI->getConstant().print(OS);
+  void visitFunctionRefInst(FunctionRefInst *DRI) {
+    OS << "function_ref $" << DRI->getType() << ", ";
+    DRI->getFunction()->printName(OS);
+  }
+  
+  void visitGlobalAddrInst(GlobalAddrInst *GAI) {
+    OS << "global_addr $" << GAI->getType() << ", @";
+    OS << GAI->getGlobal()->getName();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
@@ -651,7 +654,27 @@ void SILFunction::dump() const {
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS) const {
-  SILPrinter(OS).print(this);
+  OS << "sil ";
+  printName(OS);
+  OS << " : $" << LoweredType;
+  
+  if (!isExternal()) {
+    OS << " {\n";
+    SILPrinter(OS).print(this);
+    OS << "}";
+  }
+  
+  OS << "\n\n";
+}
+      
+/// Pretty-print the SILFunction's name using SIL syntax,
+/// '@function_mangled_name'.
+void SILFunction::printName(raw_ostream &OS) const {
+  OS << "@";
+  if (MangledName.empty())
+    Name.print(OS);
+  else
+    OS << MangledName;  
 }
 
 /// Pretty-print the SILModule to errs.
@@ -661,19 +684,8 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  for (std::pair<SILConstant, SILFunction*> vf : *this) {
-    OS << "sil @";
-    vf.first.print(OS);
-    OS << " : $" << vf.second->getLoweredType() << " {\n";
-    vf.second->print(OS);
-    OS << "}\n\n";
-  }
-  
-  if (toplevel) {
-    OS << "toplevel {\n";
-    toplevel->print(OS);
-    OS << "}\n\n";
-  }
+  for (SILFunction const &f : *this)
+    f.print(OS);
 }
 
 void ValueBase::dumpInContext() const {
@@ -684,25 +696,12 @@ void ValueBase::dumpInContext() const {
 // Printing for PrettyStackTrace
 //===----------------------------------------------------------------------===//
 
-void PrettyStackTraceSILConstant::print(llvm::raw_ostream &out) const {
+void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
-  ASTContext *Ctx;
+  ASTContext &Ctx = F->getContext();
   SourceLoc sloc;
-  if (ValueDecl *decl = C.loc.dyn_cast<ValueDecl*>()) {
-    if (decl->getName().get())
-      out << '\'' << decl->getName() << '\'';
-    else
-      out << "'anonname=" << (const void*)decl << '\'';
-    Ctx = &decl->getASTContext();
-    sloc = decl->getStartLoc();
-  }
-  else if (CapturingExpr *expr = C.loc.dyn_cast<CapturingExpr*>()) {
-    out << "anonymous function";
-    Ctx = &expr->getASTContext();
-    sloc = expr->getStartLoc();
-  } else
-    llvm_unreachable("impossible sil constant");
+  F->printName(out);
 
   out << " at ";
-  printSourceLoc(out, sloc, *Ctx);
+  printSourceLoc(out, sloc, Ctx);
 }

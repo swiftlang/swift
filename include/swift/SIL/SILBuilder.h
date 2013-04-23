@@ -141,9 +141,11 @@ public:
     return insert(PartialApplyInst::create(Loc, Fn, Args, ClosureTy, F));
   }
 
-  ConstantRefInst *createConstantRef(SILLocation loc, SILConstant c,
-                                     SILType ty) {
-    return insert(new ConstantRefInst(loc, c, ty));
+  FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
+    return insert(new FunctionRefInst(loc, f));
+  }
+  GlobalAddrInst *createGlobalAddr(SILLocation loc, VarDecl *g, SILType ty) {
+    return insert(new GlobalAddrInst(loc, g, ty));
   }
 
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
@@ -385,13 +387,13 @@ public:
   }
   
   void createRetain(SILLocation Loc, SILValue Operand) {
-    // Retaining a constant_ref is a no-op.
-    if (!isa<ConstantRefInst>(Operand))
+    // Retaining a function_ref is a no-op.
+    if (!isa<FunctionRefInst>(Operand))
       insert(new RetainInst(Loc, Operand));
   }
   void createRelease(SILLocation Loc, SILValue Operand) {
-    // Releasing a constant_ref is a no-op.
-    if (!isa<ConstantRefInst>(Operand))
+    // Releasing a function_ref is a no-op.
+    if (!isa<FunctionRefInst>(Operand))
       insert(new ReleaseInst(Loc, Operand));
   }
   void createRetainAutoreleased(SILLocation Loc, SILValue Operand) {

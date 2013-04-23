@@ -199,15 +199,6 @@ public:
                      llvm::Value *metadata,
                      ArrayRef<llvm::Value*> wtables);
 
-private:
-
-  //--- Global context emission --------------------------------------------------
-public:
-  void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
-private:
-  void emitGlobalDecl(Decl *D);
-  void emitExternalDefinition(Decl *D);
-
 //--- Type emission ------------------------------------------------------------
 public:
   /// Look for a mapping for a local type-metadata reference.

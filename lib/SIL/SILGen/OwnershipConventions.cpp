@@ -76,7 +76,6 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::OneOfElement:
   case SILConstant::Kind::Destructor:
   case SILConstant::Kind::GlobalAccessor:
-  case SILConstant::Kind::GlobalAddress:
     return SelectorFamily::NonObjC;
   }
 }

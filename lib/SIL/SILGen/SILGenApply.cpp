@@ -33,7 +33,7 @@ public:
     /// FIXME: We should use more specific kinds so we can emit curried calls
     /// to methods.
     GenericValue,
-    /// A standalone function, referenceable by a ConstantRefInst.
+    /// A standalone function, referenceable by a FunctionRefInst.
     StandaloneFunction,
   };
   
@@ -126,7 +126,7 @@ public:
       assert(level <= standaloneFunction.uncurryLevel
              && "currying past natural uncurry level of standalone function");
       SILConstant constant = standaloneFunction.atUncurryLevel(level);
-      SILValue ref = gen.emitGlobalConstantRef(SILLocation(), constant);
+      SILValue ref = gen.emitGlobalFunctionRef(SILLocation(), constant);
       mv = ManagedValue(ref, ManagedValue::Unmanaged);
       break;
     }
@@ -923,7 +923,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   return emission.apply();
 }
 
-ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
+ManagedValue SILGenFunction::emitSpecializedPropertyFunctionRef(
                                           SILLocation loc,
                                           SILConstant constant,
                                           ArrayRef<Substitution> substitutions,
@@ -939,7 +939,7 @@ ManagedValue SILGenFunction::emitSpecializedPropertyConstantRef(
   
   // Get the accessor function. The type will be a polymorphic function if
   // the This type is generic.
-  SILValue method = emitGlobalConstantRef(loc, constant);
+  SILValue method = emitGlobalFunctionRef(loc, constant);
   
   // If there are substitutions, specialize the generic getter.
   // FIXME: Generic subscript operator could add another layer of
@@ -979,7 +979,7 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
                                          propType);
   
-  ManagedValue getter = emitSpecializedPropertyConstantRef(loc, get,
+  ManagedValue getter = emitSpecializedPropertyFunctionRef(loc, get,
                                                            substitutions,
                                                            propType);
   
@@ -1018,7 +1018,7 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
                                          propType);
 
-  ManagedValue setter = emitSpecializedPropertyConstantRef(loc, set,
+  ManagedValue setter = emitSpecializedPropertyFunctionRef(loc, set,
                                                            substitutions,
                                                            propType);
 

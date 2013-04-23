@@ -347,28 +347,47 @@ public:
   }
 };
 
-/// ConstantRefInst - Represents a reference to a *constant* declaration,
-/// evaluating to its value.
-class ConstantRefInst : public SILInstruction {
-  SILConstant Constant;
+/// FunctionRefInst - Represents a reference to a SIL function.
+class FunctionRefInst : public SILInstruction {
+  SILFunction *Function;
 public:
-  /// Construct a ConstantRefInst.
+  /// Construct a FunctionRefInst.
   ///
   /// \param Loc  The location of the reference.
-  /// \param C    The constant being referenced.
-  /// \param F    The type of the constant. Must be a function type.
-  ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty);
+  /// \param F    The function being referenced.
+  FunctionRefInst(SILLocation Loc, SILFunction *F);
 
-  /// getConstant - Return the referenced constant.
-  SILConstant getConstant() const;
+  /// Return the referenced function.
+  SILFunction *getFunction() const { return Function; }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ConstantRefInst;
+    return V->getKind() == ValueKind::FunctionRefInst;
+  }
+};
+  
+/// GlobalAddrInst - Gives the address of a global variable.
+class GlobalAddrInst : public SILInstruction {
+  VarDecl *Global;
+public:
+  GlobalAddrInst(SILLocation Loc, VarDecl *Global, SILType AddrTy)
+    : SILInstruction(ValueKind::GlobalAddrInst, Loc, AddrTy),
+      Global(Global) {}
+  
+  /// Return the referenced global variable decl.
+  VarDecl *getGlobal() const { return Global; }
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::GlobalAddrInst;
   }
 };
 

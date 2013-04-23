@@ -311,7 +311,7 @@ public:
   void emitExtension(ExtensionDecl *D);
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
-  void emitSILConstant(SILConstant c, SILFunction *f);
+  void emitSILFunction(SILFunction *f);
 
   llvm::FunctionType *getFunctionType(AbstractCC cc,
                                       CanType fnType, ExplosionKind kind,
@@ -326,7 +326,7 @@ public:
 
   Address getAddrOfGlobalVariable(VarDecl *D);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
-  llvm::Function *getAddrOfAnonymousFunction(SILConstant c,
+  llvm::Function *getAddrOfAnonymousFunction(SILFunction *f,
                                              CapturingExpr *expr);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
@@ -353,7 +353,14 @@ public:
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
+  /// FIXME: We shouldn't rely on SILConstants to mangle function symbols.
   void getAddrOfSILConstant(SILConstant constant,
+                            SILFunction *f,
+                            llvm::Function* &fnptr,
+                            unsigned &naturalCurryLevel,
+                            AbstractCC &cc,
+                            BraceStmt* &body);
+  void getAddrOfSILFunction(SILFunction *f,
                             llvm::Function* &fnptr,
                             unsigned &naturalCurryLevel,
                             AbstractCC &cc,
@@ -362,6 +369,13 @@ public:
 
   llvm::StringRef mangleType(CanType type,
                              llvm::SmallVectorImpl<char> &buffer);
+
+//--- Global context emission --------------------------------------------------
+public:
+  void emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem);
+private:
+  void emitGlobalDecl(Decl *D);
+  void emitExternalDefinition(Decl *D);
 };
 
 } // end namespace irgen

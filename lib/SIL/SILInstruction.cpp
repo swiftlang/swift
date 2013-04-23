@@ -18,7 +18,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
-#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 
@@ -237,13 +237,9 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
                                                 Args, ClosureType);
 }
 
-ConstantRefInst::ConstantRefInst(SILLocation Loc, SILConstant C, SILType Ty)
-  : SILInstruction(ValueKind::ConstantRefInst, Loc, Ty),
-    Constant(C) {
-}
-
-SILConstant ConstantRefInst::getConstant() const {
-  return Constant;
+FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
+  : SILInstruction(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
+    Function(F) {
 }
 
 IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)

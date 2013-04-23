@@ -212,6 +212,11 @@ class LinkEntity {
 public:
   static LinkEntity forFunction(CodeRef fn) {
 
+    if (auto *f = fn.getSILFunction()) {
+      if (!f->getMangledName().empty())
+        return forSILFunction(f);
+    }
+    
     LinkEntity entity;
     entity.setForDecl(getKindForFunction(fn.getKind()), fn.getDecl(),
                       fn.getExplosionLevel(), fn.getUncurryLevel());
