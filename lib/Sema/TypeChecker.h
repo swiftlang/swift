@@ -19,6 +19,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "llvm/ADT/SetVector.h"
 #include <functional>
 
 namespace swift {
@@ -408,6 +409,41 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
+  /// \name Name lookup
+  ///
+  /// Routines that perform name lookup.
+  ///
+  /// During type checking, these routines should be used instead of
+  /// \c MemberLookup and \c UnqualifiedLookup, because these routines will
+  /// lazily introduce declarations and (FIXME: eventually) perform recursive
+  /// type-checking that the AST-level lookup routines don't.
+  ///
+  /// @{
+private:
+  /// \brief The list of structs that require default constructors
+  /// to be defined.
+  ///
+  /// This vector lists all structs that have implicitly-defined default
+  /// constructors. Those structs not also in
+  /// \c structsNeedingDefaultConstructor still need to heave their
+  /// default constructors defined.
+  std::vector<StructDecl *> structsWithImplicitDefaultConstructor;
+
+  /// \brief The set of structs that still need a default constructor to be
+  /// implicitly defined.
+  llvm::DenseSet<StructDecl *> structsNeedingImplicitDefaultConstructor;
+
+public:
+  /// \brief Add the given struct to the list of structs that need an
+  /// implicit default constructor to be defined.
+  void requestImplicitDefaultConstructor(StructDecl *structDecl);
+
+  /// \brief Define the default constructor for the given struct.
+  void defineDefaultConstructor(StructDecl *structDecl);
+
+  /// \brief Define any implicit declarations that are still pending.
+  void definePendingImplicitDecls();
+
   /// \brief Pre-check protocol declaration, validating all of the types
   /// that are involved in conformance requirements.
   void preCheckProtocol(ProtocolDecl *D);
@@ -524,6 +560,26 @@ public:
   std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc,
                                                      LiteralKind LitTy,
                                                      bool Complain);
+
+  /// \brief Lookup a member in the given type.
+  ///
+  /// \param type The type in which we will look for a member.
+  /// \param name The name of the member to look for.
+  /// \param members Will be populated with the set of members found.
+  ///
+  /// \returns true if any members were found, false otherwise.
+  bool lookupMember(Type type, Identifier name,
+                    SmallVectorImpl<ValueDecl *> &members);
+
+  /// \brief Lookup the constructors of the given type.
+  ///
+  /// \param type The type for which we will look for constructors.
+  /// \param constructors Will be populated with the set of constructors found.
+  ///
+  /// \returns true if any members were found, false otherwise.
+  bool lookupConstructors(Type type,SmallVectorImpl<ValueDecl *> &constructors);
+
+  /// @}
 
   /// \name Overload resolution
   ///

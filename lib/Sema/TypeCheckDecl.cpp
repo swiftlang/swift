@@ -21,6 +21,81 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// \brief Describes the kind of implicit constructor that will be
+/// generated.
+enum class ImplicitConstructorKind {
+  /// \brief The default constructor, which default-initializes each
+  /// of the instance variables.
+  Default,
+  /// \brief The memberwise constructor, which initializes each of
+  /// the instance variables from a parameter of the same type and
+  /// name.
+  Memberwise
+};
+
+/// \brief Create an implicit struct constructor.
+///
+/// \param SD The struct for which a constructor will be created.
+/// \param ICK The kind of implicit constructor to create.
+///
+/// \returns The newly-created constructor, which has already been type-checked
+/// (but has not been added to the containing struct).
+static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
+                                                  StructDecl *structDecl,
+                                                  ImplicitConstructorKind ICK) {
+  ASTContext &context = tc.Context;
+  // Determine the parameter type of the implicit constructor.
+  SmallVector<TuplePatternElt, 8> patternElts;
+  SmallVector<VarDecl *, 8> allArgs;
+  if (ICK == ImplicitConstructorKind::Memberwise) {
+    for (auto member : structDecl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+
+      // Properties are computed, not initialized.
+      if (var->isProperty())
+        continue;
+
+      // Create the parameter.
+      auto *arg = new (context) VarDecl(structDecl->getLoc(),
+                                        var->getName(),
+                                        var->getType(), structDecl);
+      allArgs.push_back(arg);
+      Pattern *pattern = new (context) NamedPattern(arg);
+      TypeLoc tyLoc = TypeLoc::withoutLoc(var->getType());
+      pattern = new (context) TypedPattern(pattern, tyLoc);
+      patternElts.push_back(TuplePatternElt(pattern));
+    }
+  }
+
+  // Crate the onstructor.
+  auto constructorID = context.getIdentifier("constructor");
+  VarDecl *thisDecl
+  = new (context) VarDecl(SourceLoc(),
+                          context.getIdentifier("this"),
+                          Type(), structDecl);
+  ConstructorDecl *ctor =
+  new (context) ConstructorDecl(constructorID, structDecl->getLoc(),
+                                nullptr, thisDecl, nullptr, structDecl);
+  thisDecl->setDeclContext(ctor);
+  for (auto var : allArgs)
+    var->setDeclContext(ctor);
+
+  // Set its arguments.
+  auto pattern = TuplePattern::create(context, structDecl->getLoc(),
+                                      patternElts, structDecl->getLoc());
+  ctor->setArguments(pattern);
+
+  // Mark implicit.
+  ctor->setImplicit();
+
+  // Type-check the constructor declaration.
+  tc.typeCheckDecl(ctor, /*isFirstPass=*/true);
+  
+  return ctor;
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -361,80 +436,6 @@ public:
                                OOD->getInherited());
   }
 
-  /// \brief Describes the kind of implicit constructor that will be
-  /// generated.
-  enum class ImplicitConstructorKind {
-    /// \brief The default constructor, which default-initializes each
-    /// of the instance variables.
-    Default,
-    /// \brief The memberwise constructor, which initializes each of
-    /// the instance variables from a parameter of the same type and
-    /// name.
-    Memberwise
-  };
-
-  /// \brief Create an implicit struct constructor.
-  ///
-  /// \param SD The struct for which a constructor will be created.
-  /// \param ICK The kind of implicit constructor to create.
-  ///
-  /// \returns The newly-created constructor, which has already been type-checked
-  /// (but has not been added to the containing struct).
-  ConstructorDecl *createImplicitConstructor(StructDecl *structDecl,
-                                             ImplicitConstructorKind ICK) {
-    ASTContext &context = TC.Context;
-    // Determine the parameter type of the implicit constructor.
-    SmallVector<TuplePatternElt, 8> patternElts;
-    SmallVector<VarDecl *, 8> allArgs;
-    if (ICK == ImplicitConstructorKind::Memberwise) {
-      for (auto member : structDecl->getMembers()) {
-        auto var = dyn_cast<VarDecl>(member);
-        if (!var)
-          continue;
-
-        // Properties are computed, not initialized.
-        if (var->isProperty())
-          continue;
-
-        // Create the parameter.
-        auto *arg = new (context) VarDecl(structDecl->getLoc(),
-                                          var->getName(),
-                                          var->getType(), structDecl);
-        allArgs.push_back(arg);
-        Pattern *pattern = new (context) NamedPattern(arg);
-        TypeLoc tyLoc = TypeLoc::withoutLoc(var->getType());
-        pattern = new (context) TypedPattern(pattern, tyLoc);
-        patternElts.push_back(TuplePatternElt(pattern));
-      }
-    }
-
-    // Crate the onstructor.
-    auto constructorID = context.getIdentifier("constructor");
-    VarDecl *thisDecl
-      = new (context) VarDecl(SourceLoc(), 
-                              context.getIdentifier("this"),
-                              Type(), structDecl);
-    ConstructorDecl *ctor = 
-      new (context) ConstructorDecl(constructorID, structDecl->getLoc(), 
-                                    nullptr, thisDecl, nullptr, structDecl);
-    thisDecl->setDeclContext(ctor);
-    for (auto var : allArgs)
-      var->setDeclContext(ctor);
-    
-    // Set its arguments.        
-    auto pattern = TuplePattern::create(context, structDecl->getLoc(),
-                                        patternElts, structDecl->getLoc());
-    ctor->setArguments(pattern);
-
-    // Mark implicit.
-    ctor->setImplicit();
-
-    // Type-check the constructor declaration.
-    visit(ctor);
-
-    return ctor;
-  }
-
   void visitStructDecl(StructDecl *SD) {
     if (!IsSecondPass) {
       checkInherited(SD, SD->getInherited());
@@ -485,20 +486,21 @@ public:
 
         // Create the implicit memberwise constructor.
         auto ctor = createImplicitConstructor(
-                      SD, ImplicitConstructorKind::Memberwise);
+                      TC, SD, ImplicitConstructorKind::Memberwise);
         members.push_back(ctor);
-     
-        // If we found any instance variables, the default constructor will be
-        // different than the memberwise constructor. Create it.
-        if (FoundInstanceVar) {
-          ctor = createImplicitConstructor(
-                   SD, ImplicitConstructorKind::Default);
-          members.push_back(ctor);
-        }
-        
-        // Set the members of the struct.   
+
+        // Set the members of the struct.
         SD->setMembers(TC.Context.AllocateCopy(members),
                        SD->getBraces());
+
+        // If we found any instance variables, the default constructor will be
+        // different than the memberwise constructor. Whether this
+        // constructor will actually be defined depends on whether all of
+        // the instance variables can be default-initialized, which we
+        // don't know yet. This will be determined lazily.
+        if (FoundInstanceVar) {
+          TC.requestImplicitDefaultConstructor(SD);
+        }
       }
     }
 
@@ -795,6 +797,43 @@ public:
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   bool isSecondPass = !isFirstPass && D->getDeclContext()->isModuleContext();
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
+}
+
+void TypeChecker::requestImplicitDefaultConstructor(StructDecl *structDecl) {
+  assert(!structsNeedingImplicitDefaultConstructor.count(structDecl));
+  structsNeedingImplicitDefaultConstructor.insert(structDecl);
+  structsWithImplicitDefaultConstructor.push_back(structDecl);
+}
+
+void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
+  // Erase this from the set of structs that need an implicit default
+  // constructor.
+  assert(structsNeedingImplicitDefaultConstructor.count(structDecl));
+  structsNeedingImplicitDefaultConstructor.erase(structDecl);
+
+  // Create the default constructor.
+  auto ctor = createImplicitConstructor(
+                *this, structDecl, ImplicitConstructorKind::Default);
+
+  // Copy the list of members, so we can add to it.
+  // FIXME: Painfully inefficient to do the copy here.
+  SmallVector<Decl *, 4> members(structDecl->getMembers().begin(),
+                                 structDecl->getMembers().end());
+
+  // Create the implicit memberwise constructor.
+  members.push_back(ctor);
+
+  // Set the members of the struct.
+  structDecl->setMembers(Context.AllocateCopy(members),
+                         structDecl->getBraces());
+}
+
+void TypeChecker::definePendingImplicitDecls() {
+  // Default any implicit default constructors.
+  for (auto structDecl : structsWithImplicitDefaultConstructor) {
+    if (structsNeedingImplicitDefaultConstructor.count(structDecl))
+      defineDefaultConstructor(structDecl);
+  }
 }
 
 void TypeChecker::preCheckProtocol(ProtocolDecl *D) {

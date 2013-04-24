@@ -658,10 +658,9 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
     // Check for a struct or oneof with a constructor.
     SmallVector<ValueDecl *, 4> Viable;
-    ConstructorLookup Ctors(Ty, TU);
-    if (Ctors.isSuccess()) {
-      auto Best = filterOverloadSet(Ctors.Results, false, Ty, E2, Type(),
-                                    Viable);
+    SmallVector<ValueDecl *, 4> ctors;
+    if (lookupConstructors(Ty, ctors)) {
+      auto Best = filterOverloadSet(ctors, false, Ty, E2, Type(), Viable);
       if (Best) {
         ValueDecl *BestDecl = Best.getDecl();
         Expr *Ref = new (Context) DeclRefExpr(BestDecl, E1->getStartLoc(),
@@ -1144,11 +1143,10 @@ public:
       Arg->setType(TupleType::getEmpty(TC.Context));
     }
     
-
-    ConstructorLookup Ctors(CT, TC.TU);
+    SmallVector<ValueDecl *, 4> ctors;
+    (void)TC.lookupConstructors(CT, ctors);
     llvm::SmallVector<ValueDecl *, 4> Viable;
-    auto Best = TC.filterOverloadSet(Ctors.Results, false, CT, Arg, Type(),
-                                     Viable);
+    auto Best = TC.filterOverloadSet(ctors, false, CT, Arg, Type(), Viable);
 
     if (Best) {
       Type ClassMetaTy = MetaTypeType::get(CT, TC.Context);

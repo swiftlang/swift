@@ -1741,8 +1741,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // constructors. This construction only applies to oneof and struct types
   // (or generic versions of oneof or struct types).
   if (kind == TypeMatchKind::Construction && isConstructibleType(type2)) {
-    ConstructorLookup constructors(type2, TC.TU);
-    if (constructors.isSuccess()) {
+    SmallVector<ValueDecl *, 4> ctors;
+    if (TC.lookupConstructors(type2, ctors)) {
       auto &context = getASTContext();
       // FIXME: lame name
       auto name = context.getIdentifier("constructor");
@@ -2030,8 +2030,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   if (name.str() == "constructor") {
     // Constructors have their own approach to name lookup.
-    ConstructorLookup constructors(baseObjTy, TC.TU);
-    if (!constructors.isSuccess()) {
+    SmallVector<ValueDecl *, 4> ctors;
+    if (!TC.lookupConstructors(baseObjTy, ctors)) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
 
@@ -2046,7 +2046,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       needIdentityConstructor = false;
     } else {
       // FIXME: Busted for generic types.
-      for (auto constructor : constructors.Results) {
+      for (auto constructor : ctors) {
         if (auto funcTy = constructor->getType()->getAs<FunctionType>()) {
           if ((funcTy = funcTy->getResult()->getAs<FunctionType>())) {
             // Dig out the input type.
@@ -2069,7 +2069,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     
     // Introduce a new overload set.
     SmallVector<OverloadChoice, 4> choices;
-    for (auto constructor : constructors.Results) {
+    for (auto constructor : ctors) {
       choices.push_back(OverloadChoice(baseTy, constructor));
     }
 

@@ -1048,7 +1048,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
   }
 
   // Find all of the constructors of the string type we're coercing to.
-  ConstructorLookup Ctors(DestTy, TC.TU);
+  SmallVector<ValueDecl *, 4> ctors;
+  TC.lookupConstructors(DestTy, ctors);
 
   for (auto &Segment : E->getSegments()) {
     // First, try coercing to the string type.
@@ -1070,7 +1071,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
     // Second, try to find a constructor to explicitly perform the conversion.
     SmallVector<ValueDecl *, 4> Viable;
-    auto Best = TC.filterOverloadSet(Ctors.Results, /*OperatorSyntax=*/true,
+    auto Best = TC.filterOverloadSet(ctors, /*OperatorSyntax=*/true,
                                      DestTy, Segment, Type(), Viable);
     if (Best) {
       if (!(Flags & CF_Apply))
@@ -1101,7 +1102,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       // FIXME: We want range information here.
       diagnose(Segment->getLoc(), diag::string_interpolation_overload_fail,
                Segment->getType(), DestTy);
-      TC.printOverloadSetCandidates(Viable.empty()? Ctors.Results : Viable);
+      TC.printOverloadSetCandidates(Viable.empty()? ctors : Viable);
     }
     return nullptr;
   }

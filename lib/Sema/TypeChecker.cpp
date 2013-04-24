@@ -743,7 +743,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       TC.typeCheckDecl(D, /*isFirstPass*/false);
     }
   }
-  
+
+  // Define any pending implicitly declarations.
+  TC.definePendingImplicitDecls();
+
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
   if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
