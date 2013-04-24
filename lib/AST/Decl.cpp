@@ -1095,6 +1095,9 @@ namespace {
       ED->getExtendedType()->print(OS);
       printInherited(ED->getInherited());
       for (Decl *Member : ED->getMembers()) {
+        if (Member->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(Member);
       }
@@ -1123,6 +1126,9 @@ namespace {
       printCommon(PD, "protocol");
       printInherited(PD->getInherited());
       for (auto VD : PD->getMembers()) {
+        if (VD->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(VD);
       }
@@ -1154,6 +1160,9 @@ namespace {
     void visitTranslationUnit(const TranslationUnit *TU) {
       OS.indent(Indent) << "(translation_unit";
       for (Decl *D : TU->Decls) {
+        if (D->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(D);
       }
@@ -1203,6 +1212,9 @@ namespace {
       printCommon(OOD, "oneof_decl");
       printInherited(OOD->getInherited());
       for (Decl *D : OOD->getMembers()) {
+        if (D->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(D);
       }
@@ -1218,6 +1230,9 @@ namespace {
       printCommon(SD, "struct_decl");
       printInherited(SD->getInherited());
       for (Decl *D : SD->getMembers()) {
+        if (D->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(D);
       }
@@ -1228,6 +1243,9 @@ namespace {
       printCommon(CD, "class_decl");
       printInherited(CD->getInherited());
       for (Decl *D : CD->getMembers()) {
+        if (D->isImplicit())
+          continue;
+
         OS << '\n';
         printRec(D);
       }
