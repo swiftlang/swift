@@ -385,7 +385,6 @@ public:
     ASTContext &context = TC.Context;
     // Determine the parameter type of the implicit constructor.
     SmallVector<TuplePatternElt, 8> patternElts;
-    SmallVector<TupleTypeElt, 8> tupleElts;
     SmallVector<VarDecl *, 8> allArgs;
     if (ICK == ImplicitConstructorKind::Memberwise) {
       for (auto member : structDecl->getMembers()) {
@@ -406,14 +405,8 @@ public:
         TypeLoc tyLoc = TypeLoc::withoutLoc(var->getType());
         pattern = new (context) TypedPattern(pattern, tyLoc);
         patternElts.push_back(TuplePatternElt(pattern));
-
-        // FIXME: Default argument once we have member initializers.
-        tupleElts.push_back(TupleTypeElt(var->getType(), var->getName()));
       }
     }
-
-    // Parameter type.
-    Type paramTy = TupleType::get(tupleElts, context);
 
     // Crate the onstructor.
     auto constructorID = context.getIdentifier("constructor");
