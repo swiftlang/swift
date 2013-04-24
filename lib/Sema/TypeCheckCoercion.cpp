@@ -157,40 +157,14 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   /// \brief Flags that control how the coercion is performed, e.g.,
   /// if we are returning new/updated ASTs and emitted diagnostics.
   unsigned Flags;
-  
-  /// \brief A wrapper around an optional in-flight diagnostic, which
-  /// acts like a diagnostic if it is initialized with a diagnostic but is
-  /// otherwise inert.
-  class CoerceDiagnostic {
-    Optional<InFlightDiagnostic> Diag;
-    
-  public:
-    CoerceDiagnostic() : Diag() { }
-    CoerceDiagnostic(CoerceDiagnostic &&Other) : Diag(std::move(Other.Diag)) { }
-    CoerceDiagnostic(InFlightDiagnostic &&Diag) : Diag(std::move(Diag)) { }
-    
-    /// \brief Add a source range to the diagnostic.
-    CoerceDiagnostic &operator<<(SourceRange R) {
-      if (Diag)
-        *Diag << R;
-      return *this;
-    }
-    
-    /// \brief Add a fix-it to the diagnostic.
-    CoerceDiagnostic &operator<<(Diagnostic::FixIt F) {
-      if (Diag)
-        *Diag << F;
-      return *this;
-    }
-  };
-  
+
   /// diagnose - Diagnose a problem encountered during type coercion.
   template<typename ...ArgTypes>
-  CoerceDiagnostic diagnose(ArgTypes &&...Args) {
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
     if (Flags & CF_Apply)
       return TC.diagnose(std::forward<ArgTypes>(Args)...);
     
-    return CoerceDiagnostic();
+    return InFlightDiagnostic();
   }
 
   /// unchanged - Return an unchanged expressions as a coerced result.
