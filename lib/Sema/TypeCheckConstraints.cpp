@@ -2624,7 +2624,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
 
     // FIXME: Crappy diagnostic.
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      << expr->getSourceRange();
+      .highlight(expr->getSourceRange());
 
     return nullptr;
   }
@@ -2682,7 +2682,7 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
     // If the destination is a settable lvalue, we're good; get its object type.
     if (!destLV->isSettable()) {
       cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
-        << dest->getSourceRange();
+        .highlight(dest->getSourceRange());
     }
     destTy = destLV->getObjectType();
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
@@ -2700,7 +2700,7 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
   } else {
     if (!destTy->is<ErrorType>())
       cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
-        << dest->getSourceRange();
+        .highlight(dest->getSourceRange());
 
     return Type();
   }
@@ -2779,7 +2779,8 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
 
     // FIXME: Crappy diagnostic.
     diagnose(equalLoc, diag::constraint_assign_type_check_fail)
-      << dest->getSourceRange() << src->getSourceRange();
+      .highlight(dest->getSourceRange())
+      .highlight(src->getSourceRange());
 
     return { nullptr, nullptr };
   }

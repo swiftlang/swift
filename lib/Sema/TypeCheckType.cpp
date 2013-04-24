@@ -213,7 +213,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         // FIXME: We need to centralize ambiguity checking
         if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
           diagnose(Loc, diag::ambiguous_type_base, Name)
-            << SourceRange(Loc, Components.back().Loc);
+            .highlight(SourceRange(Loc, Components.back().Loc));
           for (auto Result : Globals.Results) {
             if (Globals.Results[0].hasValueDecl())
               diagnose(Result.getValueDecl(), diag::found_candidate);
@@ -226,7 +226,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         if (Globals.Results.empty()) {
           diagnose(Loc, Components.size() == 1 ? 
                      diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-            << SourceRange(Loc, Components.back().Loc);
+            .highlight(SourceRange(Loc, Components.back().Loc));
           return true;
         }
 
@@ -280,7 +280,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         // FIXME: Diagnostic if not found or ambiguous?
       } else {
         diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
-          << SourceRange(Components[0].Loc, Components.back().Loc);
+          .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
         return true;
       }
 
@@ -333,10 +333,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
           diagnose(C.Loc, Components.size() == 1 ? 
                    diag::named_definition_isnt_type :
                    diag::dotted_reference_not_type, C.Id)
-            << SourceRange(C.Loc, Components.back().Loc);
+            .highlight(SourceRange(C.Loc, Components.back().Loc));
         else
           diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-            << SourceRange(Components[0].Loc, Components.back().Loc);
+            .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
         return true;
       }
 

@@ -202,8 +202,7 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
   SourceLoc NulLoc = Lexer::getSourceLoc(Ptr);
   SourceLoc NulEndLoc = Lexer::getSourceLoc(Ptr+1);
   Diags->diagnose(NulLoc, diag::lex_nul_character)
-    << Diagnostic::FixIt::makeDeletion(DiagnosticInfo::Range(NulLoc,
-                                                             NulEndLoc));
+    .fixItRemove(DiagnosticInfo::Range(NulLoc, NulEndLoc));
 }
 
 /// skipSlashSlashComment - Skip to the end of the line of a // comment.
@@ -302,7 +301,7 @@ void Lexer::skipSlashStarComment() {
 
       const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
       diagnose(EOL, diag::lex_unterminated_block_comment)
-        << Diagnostic::FixIt::makeInsertion(getSourceLoc(EOL), Terminator);
+        .fixItInsert(getSourceLoc(EOL), Terminator);
       diagnose(StartPtr, diag::lex_comment_start);
       return;
     }
@@ -855,7 +854,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
     // String literals cannot be used in interpolated string literals.
     case '"':
       L->diagnose(CurPtr - 1, diag::lex_unexpected_quote_string_interpolation)
-        << SourceRange(InterpStart, Lexer::getSourceLoc(CurPtr-1));
+        .highlight(Diagnostic::Range(InterpStart,
+                                     Lexer::getSourceLoc(CurPtr-1)));
       return CurPtr-1;
     case 0:
       // If we hit EOF, we fail.
@@ -1076,7 +1076,7 @@ Restart:
       // While we are not C, we should not ignore the strong Unix command-line
       // tool conventions that motivate this warning.
       diagnose(CurPtr-1, diag::lex_missing_newline_eof)
-        << Diagnostic::FixIt::makeInsertion(getSourceLoc(CurPtr-1), "\n");
+        .fixItInsert(getSourceLoc(CurPtr-1), "\n");
     }
     return formToken(tok::eof, TokStart);
 

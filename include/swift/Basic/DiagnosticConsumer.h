@@ -67,21 +67,9 @@ struct DiagnosticInfo {
     DiagnosticInfo::Range Range;
     std::string Text;
 
+  public:
     FixIt(DiagnosticInfo::Range R, llvm::StringRef Str)
       : Range(R), Text(Str) {}
-
-  public:
-    static FixIt makeInsertion(SourceLoc L, llvm::StringRef Str) {
-      return FixIt(DiagnosticInfo::Range(L, L), Str);
-    }
-
-    static FixIt makeReplacement(DiagnosticInfo::Range R, llvm::StringRef Str) {
-      return FixIt(R, Str);
-    }
-
-    static FixIt makeDeletion(DiagnosticInfo::Range R) {
-      return FixIt(R, {});
-    }
 
     DiagnosticInfo::Range getRange() const { return Range; }
     llvm::StringRef getText() const { return Text; }

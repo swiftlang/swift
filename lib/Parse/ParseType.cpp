@@ -462,7 +462,7 @@ bool Parser::parseTypeArray(TypeLoc &result) {
   
   // FIXME: We don't supported fixed-length arrays yet.
   diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
-    << sizeEx.get()->getSourceRange();
+    .highlight(sizeEx.get()->getSourceRange());
   
   return true;
 }

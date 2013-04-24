@@ -50,7 +50,7 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
 
   if (Tok.is(tok::r_brace)) {
     diagnose(Tok.getLoc(), diag::extra_rbrace)
-      << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
+      .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
   }
   
@@ -957,7 +957,7 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
     
       if (HasGetSet) {
         diagnose(pattern.get()->getLoc(), diag::getset_init)
-          << Init.get()->getSourceRange();
+          .highlight(Init.get()->getSourceRange());
         Init = nullptr;
       }
       if (Flags & PD_DisallowInit) {
@@ -1056,8 +1056,7 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
     // Reject 'static' functions at global scope.
     if (!HasContainerType) {
       diagnose(Tok, diag::static_func_decl_global_scope)
-        << Diagnostic::FixIt::makeDeletion(Diagnostic::Range(StaticLoc,
-                                                             Tok.getLoc()));
+        .fixItRemove(Diagnostic::Range(StaticLoc, Tok.getLoc()));
       StaticLoc = SourceLoc();
     }
   }
@@ -1318,7 +1317,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
       SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
                                                               PreviousLoc);
       diagnose(EndOfPreviousLoc, diag::declaration_same_line_without_semi)
-        << Diagnostic::FixIt::makeInsertion(EndOfPreviousLoc, ";");
+        .fixItInsert(EndOfPreviousLoc, ";");
       // FIXME: Add semicolon to the AST?
     }
 

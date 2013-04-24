@@ -261,14 +261,14 @@ public:
     MemberLookup Lookup(BaseType, Name, TC.TU);
     if (!Lookup.isSuccess()) {
       TC.diagnose(Loc, MissingMember, BaseType)
-        << Base->getSourceRange();
+        .highlight(Base->getSourceRange());
       return nullptr;
     }
     
     // Make sure we found a function (which may be overloaded, of course).
     if (!isa<FuncDecl>(Lookup.Results.front().D)) {
       TC.diagnose(Loc, NonFuncMember, BaseType)
-        << Base->getSourceRange();
+        .highlight(Base->getSourceRange());
       TC.diagnose(Lookup.Results.front().D,
                   diag::decl_declared_here,
                   Lookup.Results.front().D->getName());
@@ -632,7 +632,7 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->is<LValueType>()) {
     diagnose(E->getLoc(), diag::expression_unused_lvalue)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return;
   }
 
@@ -641,7 +641,7 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
     diagnose(E->getLoc(), diag::expression_unused_function)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return;
   }
 }

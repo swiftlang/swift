@@ -198,7 +198,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
 
     assert(OperEndLoc != Tok.getLoc() && "binary operator with no spaces?");
     diagnose(PreviousLoc, diag::expected_prefix_operator)
-      << Diagnostic::FixIt::makeDeletion(Diagnostic::Range(OperEndLoc,
+      .fixItRemove(Diagnostic::Range(OperEndLoc,
                                                            Tok.getLoc()));
     break;
   }
@@ -964,7 +964,7 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
       // If there is no identifier after the colon, we have an error.
       if (Tok.isNot(tok::identifier)) {
         diagnose(Tok, diag::selector_argument_name_missing)
-          << SourceRange(colonLoc);
+          .highlight(SourceRange(colonLoc));
         break;
       }
     }
@@ -1016,13 +1016,10 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
 
     // Check whether we have too many elements.
     if (size > 1) {
-      diagnose(tuple->getLParenLoc(),
-               diag::selector_call_multiple_args,
-               size)
-        << SourceRange(Lexer::getLocForEndOfToken(
-                         SourceMgr,
-                         tuple->getElement(0)->getEndLoc()),
-                       tuple->getRParenLoc());
+      SourceLoc endLoc =
+        Lexer::getLocForEndOfToken(SourceMgr,tuple->getElement(0)->getEndLoc());
+      diagnose(tuple->getLParenLoc(), diag::selector_call_multiple_args, size)
+        .highlight(SourceRange(endLoc, tuple->getRParenLoc()));
       selectorArg = tuple->getElement(0);
       continue;
     }
@@ -1203,7 +1200,7 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
     SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
     diagnose(Tok, diag::expected_separator, ",")
-      << Diagnostic::FixIt::makeInsertion(InsertLoc, ",");
+      .fixItInsert(InsertLoc, ",");
     Invalid |= true;
   }
 

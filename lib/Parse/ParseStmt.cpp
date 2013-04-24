@@ -114,7 +114,7 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
 bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok.getLoc(), diag::illegal_semi_stmt)
-      << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
+      .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
     return true;
   } else if (isStartOfStmtOtherThanAssignment(Tok)) {
@@ -196,7 +196,7 @@ void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
                                                               PreviousLoc);
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-        << Diagnostic::FixIt::makeInsertion(EndOfPreviousLoc, ";");
+        .fixItInsert(EndOfPreviousLoc, ";");
       // FIXME: Add semicolon to the AST?
     }
 

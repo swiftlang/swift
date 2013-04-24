@@ -127,7 +127,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
     if (!Index) {
       diagnose(SE->getBase()->getLoc(), diag::while_converting_subscript_index,
                IndexType)
-        << SE->getIndex()->getSourceRange();
+        .highlight(SE->getIndex()->getSourceRange());
       SE->setType(ErrorType::get(Context));
       return 0;
     }
@@ -156,7 +156,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   if (!Lookup.isSuccess()) {
     diagnose(SE->getIndex()->getStartLoc(),
              diag::no_subscript_declaration, BaseTy)
-      << SE->getBase()->getSourceRange();
+      .highlight(SE->getBase()->getSourceRange());
     SE->setType(ErrorType::get(Context));
     return SE;
   }
@@ -205,7 +205,8 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
   if (Viable.empty()) {
     diagnose(SE->getIndex()->getStartLoc(), diag::subscript_overload_fail,
              false, BaseTy, SE->getIndex()->getType())
-      << SE->getBase()->getSourceRange() << SE->getIndex()->getSourceRange();
+      .highlight(SE->getBase()->getSourceRange())
+      .highlight(SE->getIndex()->getSourceRange());
     printOverloadSetCandidates(Viable.empty()? LookupResults : Viable);
     SE->setType(ErrorType::get(Context));
     return SE;
@@ -302,7 +303,7 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
   if (!Index) {
     diagnose(E->getBase()->getLoc(), diag::while_converting_subscript_index,
              IndexType)
-      << E->getIndex()->getSourceRange();
+      .highlight(E->getIndex()->getSourceRange());
     E->setType(ErrorType::get(Context));
     return nullptr;
   }
@@ -368,7 +369,7 @@ Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
   if (!Index) {
     diagnose(E->getBase()->getLoc(), diag::while_converting_subscript_index,
              IndexType)
-      << E->getIndex()->getSourceRange();
+      .highlight(E->getIndex()->getSourceRange());
     E->setType(ErrorType::get(Context));
     return nullptr;
   }
@@ -429,7 +430,7 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   if (!Index) {
     diagnose(E->getBase()->getLoc(), diag::while_converting_subscript_index,
              IndexType)
-      << E->getIndex()->getSourceRange();
+      .highlight(E->getIndex()->getSourceRange());
     E->setType(ErrorType::get(Context));
     return nullptr;
   }
@@ -614,7 +615,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     if (E2 == 0) {
       diagnose(E1->getLoc(), diag::while_converting_function_argument,
                FT->getInput())
-        << E->getArg()->getSourceRange();
+        .highlight(E->getArg()->getSourceRange());
       return 0;
     }
 
@@ -673,7 +674,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
     }
     if (!E2->getType()->isUnresolvedType()) {
       diagnose(E->getLoc(), diag::constructor_overload_fail, !Viable.empty(), Ty)
-        << E->getSourceRange();
+        .highlight(E->getSourceRange());
       printOverloadSetCandidates(Viable);
       return 0;
     }
@@ -1163,7 +1164,7 @@ public:
     } else if (!Arg->getType()->isUnresolvedType()) {
       TC.diagnose(E->getLoc(), diag::constructor_overload_fail,
                   !Viable.empty(), CT)
-        << E->getSourceRange();
+        .highlight(E->getSourceRange());
       TC.printOverloadSetCandidates(Viable);
     }
 
@@ -1270,8 +1271,8 @@ public:
       if (auto *AddrOf = dyn_cast<AddressOfExpr>(
                            E->getSubExpr()->getSemanticsProvidingExpr()))
         TC.diagnose(E->getLoc(), diag::address_of_address)
-          << AddrOf->getSourceRange()
-          << Diagnostic::FixIt::makeDeletion(SourceRange(E->getLoc()));
+          .highlight(AddrOf->getSourceRange())
+          .fixItRemove(SourceRange(E->getLoc()));
       
       E->setType(E->getSubExpr()->getType());
       return E;
@@ -1286,7 +1287,7 @@ public:
     // Complain.
     TC.diagnose(E->getLoc(), diag::address_of_rvalue,
                 E->getSubExpr()->getType())
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return nullptr;
   }
 
@@ -1461,7 +1462,8 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (FieldNo == -1) {
       // FIXME: This diagnostic is a bit painful.
       diagnose(E->getDotLoc(), diag::no_member_of_tuple, TT, MemberName)
-        << Base->getSourceRange() << SourceRange(E->getNameLoc());
+        .highlight(Base->getSourceRange())
+        .highlight(SourceRange(E->getNameLoc()));
       return 0;
     }
 
@@ -1482,23 +1484,27 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     
     if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
       diagnose(E->getDotLoc(), diag::no_member_of_module, MT->getModule()->Name,
-               MemberName) << Base->getSourceRange()
-        << SourceRange(E->getNameLoc(), E->getNameLoc());
+               MemberName)
+        .highlight(Base->getSourceRange())
+        .highlight(SourceRange(E->getNameLoc()));
     } else if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
       diagnose(E->getDotLoc(), diag::no_member_of_metatype,
-               MTT->getInstanceType(), MemberName) << Base->getSourceRange()
-      << SourceRange(E->getNameLoc(), E->getNameLoc());
+               MTT->getInstanceType(), MemberName)
+        .highlight(Base->getSourceRange())
+        .highlight(SourceRange(E->getNameLoc()));
     } else if (BaseTy->is<ProtocolType>() ||
                BaseTy->is<ProtocolCompositionType>()) {
       diagnose(E->getDotLoc(), diag::no_member_of_protocol,
-               BaseTy, MemberName) << Base->getSourceRange()
-      << SourceRange(E->getNameLoc(), E->getNameLoc());
+               BaseTy, MemberName)
+        .highlight(Base->getSourceRange())
+        .highlight(SourceRange(E->getNameLoc()));
       
     } else {
       // FIXME: This diagnostic is ridiculously painful.
       diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy,
                MemberName)
-      << Base->getSourceRange() << SourceRange(E->getNameLoc(),E->getNameLoc());
+        .highlight(Base->getSourceRange())
+        .highlight(SourceRange(E->getNameLoc()));
     }
     return 0;
       
@@ -1512,7 +1518,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (R.Kind == MemberLookupResult::MemberProperty) {
       diagnose(E->getNameLoc(), diag::no_member_of_metatype,
                BaseTy->castTo<MetaTypeType>()->getInstanceType(), MemberName)
-        << SourceRange(E->getNameLoc(), E->getNameLoc());
+        .highlight(SourceRange(E->getNameLoc()));
       return 0;
     }
   }
@@ -1948,7 +1954,7 @@ bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
   // Otherwise, emit an error about the ambiguity.
   diagnose(dependence.OneUnresolvedExpr->getLoc(),
            diag::ambiguous_expression_unresolved)
-    << dependence.OneUnresolvedExpr->getSourceRange();
+    .highlight(dependence.OneUnresolvedExpr->getSourceRange());
   E = 0;
   return true;
 }
@@ -2074,7 +2080,7 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
   } while (numConversionsRemaining != 0);
 
   TC.diagnose(E->getLoc(), diagnostic, origType)
-    << E->getSourceRange();
+    .highlight(E->getSourceRange());
   return true;
 }
 
@@ -2094,7 +2100,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
       uint64_t size = lit->getValue().getZExtValue();
       if (size == 0) {
         diagnose(lit->getLoc(), diag::new_array_bound_zero)
-          << lit->getSourceRange();
+          .highlight(lit->getSourceRange());
         return nullptr;
       }
     }
@@ -2105,7 +2111,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
   // Otherwise, if a constant expression is required, fail.
   if (constantRequired) {
     diagnose(E->getLoc(), diag::non_constant_array)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return true;
   }
 
@@ -2155,7 +2161,7 @@ static Type ComputeAssignDestTy(TypeChecker &TC, Expr *Dest,
   } else {
     if (!DestTy->is<ErrorType>())
       TC.diagnose(EqualLoc, diag::assignment_lhs_not_lvalue)
-        << Dest->getSourceRange();
+        .highlight(Dest->getSourceRange());
   
     return Type();
   }
@@ -2243,7 +2249,7 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
 
     diagnose(SrcDependence.OneUnresolvedExpr->getLoc(),
              diag::ambiguous_expression_unresolved)
-      << SrcDependence.OneUnresolvedExpr->getSourceRange();
+      .highlight(SrcDependence.OneUnresolvedExpr->getSourceRange());
     return true;
   }
 
@@ -2266,6 +2272,6 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
   // Both source and destination are still unresolved.
   diagnose(DestDependence.OneUnresolvedExpr->getLoc(),
            diag::ambiguous_expression_unresolved)
-    << DestDependence.OneUnresolvedExpr->getSourceRange();
+    .highlight(DestDependence.OneUnresolvedExpr->getSourceRange());
   return true;
 }

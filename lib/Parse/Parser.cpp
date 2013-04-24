@@ -317,7 +317,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     while (Tok.is(SeparatorK)) {
       diagnose(Tok, diag::unexpected_separator,
                SeparatorK == tok::comma ? "," : ";")
-        << Diagnostic::FixIt::makeDeletion(SourceRange(Tok.getLoc()));
+        .fixItRemove(SourceRange(Tok.getLoc()));
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -337,7 +337,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       SourceLoc InsertLoc = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
-        << Diagnostic::FixIt::makeInsertion(InsertLoc, Separator);
+        .fixItInsert(InsertLoc, Separator);
       Invalid = true;
     }
     // If we haven't made progress, skip ahead

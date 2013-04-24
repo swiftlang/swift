@@ -1299,7 +1299,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       // FIXME: Shouldn't ever happen.
       tc.diagnose(fn->getLoc(), diag::while_converting_function_argument,
                   fnType->getInput())
-        << origArg->getSourceRange();
+        .highlight(origArg->getSourceRange());
 
       return nullptr;
     }

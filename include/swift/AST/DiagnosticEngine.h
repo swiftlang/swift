@@ -180,14 +180,13 @@ namespace swift {
     ArrayRef<Range> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
 
-    Diagnostic &operator<<(Range R) {
+    void addRange(Range R) {
       Ranges.push_back(R);
-      return *this;
     }
 
-    Diagnostic &operator<<(FixIt F) {
-      FixIts.push_back(F);
-      return *this;
+    // Avoid copying the fix-it text more than necessary.
+    void addFixIt(FixIt &&F) {
+      FixIts.push_back(std::move(F));
     }
   };
   
@@ -239,13 +238,28 @@ namespace swift {
 
     /// \brief Add a range to the currently-active diagnostic.
     ///
-    /// \sa DiagnosticInfo::Range
-    InFlightDiagnostic &operator<<(Diagnostic::Range R);
+    /// Use a SourceRange for a token-based range; explicitly construct a
+    /// Diagnostic::Range from two SourceLocs for a character-based range.
+    InFlightDiagnostic &highlight(Diagnostic::Range R);
 
-    /// \brief Add a fix-it to the currently-active diagnostic.
+    /// \brief Add a replacement fix-it to the currently-active diagnostic.
     ///
-    /// \sa DiagnosticInfo::FixIt
-    InFlightDiagnostic &operator<<(Diagnostic::FixIt F);
+    /// Use a SourceRange for a token-based range; explicitly construct a
+    /// Diagnostic::Range from two SourceLocs for a character-based range.
+    InFlightDiagnostic &fixItReplace(Diagnostic::Range R, StringRef Str);
+
+    /// \brief Add an insertion fix-it to the currently-active diagnostic.
+    InFlightDiagnostic &fixItInsert(SourceLoc L, StringRef Str) {
+      return fixItReplace(Diagnostic::Range(L, L), Str);
+    }
+
+    /// \brief Add a removal fix-it to the currently-active diagnostic.
+    ///
+    /// Use a SourceRange for a token-based range; explicitly construct a
+    /// Diagnostic::Range from two SourceLocs for a character-based range.
+    InFlightDiagnostic &fixItRemove(Diagnostic::Range R) {
+      return fixItReplace(R, {});
+    }
   };
     
   /// \brief Class responsible for formatting diagnostics and presenting them
@@ -421,18 +435,18 @@ namespace swift {
   };
 
   inline InFlightDiagnostic &
-  InFlightDiagnostic::operator<<(Diagnostic::Range R) {
+  InFlightDiagnostic::highlight(Diagnostic::Range R) {
     assert(IsActive && "Cannot modify an inactive diagnostic");
     if (Engine)
-      Engine->getActiveDiagnostic() << R;
+      Engine->getActiveDiagnostic().addRange(R);
     return *this;
   }
 
   inline InFlightDiagnostic &
-  InFlightDiagnostic::operator<<(Diagnostic::FixIt F) {
+  InFlightDiagnostic::fixItReplace(Diagnostic::Range R, StringRef Str) {
     assert(IsActive && "Cannot modify an inactive diagnostic");
     if (Engine)
-      Engine->getActiveDiagnostic() << F;
+      Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(R, Str));
     return *this;
   }
 } // end namespace swift

@@ -191,7 +191,7 @@ class SemaCoerce : public ExprVisitor<SemaCoerce, CoercedResult> {
   CoercedResult failed(Expr *E) {
     if (Flags & CF_Apply)
       TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
-        << E->getSourceRange();
+        .highlight(E->getSourceRange());
     return nullptr;
   }
 
@@ -328,7 +328,8 @@ public:
     
     diagnose(E->getIndex()->getStartLoc(), diag::subscript_overload_fail,
              !Viable.empty(), BaseTy, E->getIndex()->getType())
-      << E->getBase()->getSourceRange() << E->getIndex()->getSourceRange();
+      .highlight(E->getBase()->getSourceRange())
+      .highlight(E->getIndex()->getSourceRange());
     TC.printOverloadSetCandidates(Viable);
     E->setType(ErrorType::get(TC.Context));
     return nullptr;
@@ -349,7 +350,7 @@ public:
         if (Flags & CF_Apply) {
           TC.diagnose(Loc, diag::implicit_use_of_lvalue,
                       Best.getType()->getRValueType())
-          << Ovl.getExpr()->getSourceRange();
+            .highlight(Ovl.getExpr()->getSourceRange());
         }
 
         return nullptr;
@@ -381,11 +382,11 @@ public:
       if (Viable.empty()) {
         diagnose(Loc, diag::no_candidates_ref,
                  Ovl.getCandidates()[0]->getName())
-          << Ovl.getExpr()->getSourceRange();
+          .highlight(Ovl.getExpr()->getSourceRange());
         TC.printOverloadSetCandidates(Ovl.getCandidates());
       } else {
         diagnose(Loc, diag::overloading_ambiguity)
-          << Ovl.getExpr()->getSourceRange();
+          .highlight(Ovl.getExpr()->getSourceRange());
         TC.printOverloadSetCandidates(Viable);
       }
     }
@@ -549,8 +550,8 @@ public:
         // The code would have type-checked without '&'; tell the user that the
         // '&' is extraneous and type-check as if it weren't there.
         diagnose(E->getLoc(), diag::explicit_lvalue)
-          << E->getSubExpr()->getSourceRange()
-          << Diagnostic::FixIt::makeDeletion(SourceRange(E->getLoc()));
+          .highlight(E->getSubExpr()->getSourceRange())
+          .fixItRemove(SourceRange(E->getLoc()));
         return coerceToType(E->getSubExpr(), DestTy, CC, Flags);
       }
 
@@ -609,7 +610,7 @@ public:
       if (Flags & CF_Apply) {
         TC.diagnose(E->getLoc(), diag::load_of_explicit_lvalue,
                     LValue->getObjectType())
-          << AddrOf->getSourceRange();
+          .highlight(AddrOf->getSourceRange());
         E->setType(ErrorType::get(TC.Context));
       }
       
@@ -1184,7 +1185,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         return CoercionResult::Unknowable;
       } else {
         diagnose(E->getFn()->getLoc(), diag::overloading_ambiguity)
-          << E->getSourceRange();
+          .highlight(E->getSourceRange());
         TC.printOverloadSetCandidates(Viable);
       }
       E->setType(ErrorType::get(TC.Context));
@@ -1244,7 +1245,7 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   FunctionType *FT = DestTy->getAs<FunctionType>();
   if (FT == 0) {
     diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return nullptr;
   }
 
@@ -1318,7 +1319,7 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   FunctionType *FT = DestTy->getAs<FunctionType>();
   if (FT == 0 || E->getNumParamPatterns() != 1) {
     diagnose(E->getStartLoc(), diag::funcexpr_not_function_type, DestTy)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     return nullptr;
   }
   
@@ -1331,7 +1332,7 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
         !ExplicitResultTy->isEqual(FT->getResult())) {
       diagnose(E->getStartLoc(), diag::funcexpr_incompatible_result,
                ExplicitResultTy, FT->getResult())
-        << E->getSourceRange();
+        .highlight(E->getSourceRange());
       return nullptr;
     }
   }
@@ -2166,8 +2167,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
         if (!AddressAllowed) {
           TC.diagnose(E->getLoc(), diag::implicit_use_of_lvalue,
                       SrcLT->getObjectType())
-            << E->getSourceRange()
-            << Diagnostic::FixIt::makeInsertion(E->getLoc(), "&");
+            .highlight(E->getSourceRange())
+            .fixItInsert(E->getLoc(), "&");
         }
 
         if (SrcLT->getQualifiers() < DestLT->getQualifiers())
@@ -2184,7 +2185,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       if (Flags & CF_Apply)
         TC.diagnose(E->getLoc(), diag::invalid_conversion_of_lvalue,
                     SrcLT->getObjectType(), DestLT->getObjectType())
-          << E->getSourceRange();
+          .highlight(E->getSourceRange());
       return nullptr;
     }
 
@@ -2347,14 +2348,14 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // When diagnosing a failed conversion, ignore l-values on the source type.
   if (Flags & CF_Apply) {
     TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
     }
   return nullptr;
 }
 
 void CoercedExpr::diagnose() const {
   TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), DestTy)
-    << E->getSourceRange();
+    .highlight(E->getSourceRange());
 }
 
 void CoercionContext::requestSubstitutionsFor(

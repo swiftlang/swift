@@ -296,7 +296,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
 
     if (Globals.Results.size() > 1) {
       diagnose(Loc, diag::ambiguous_type_base, Name)
-        << SourceRange(Loc, Components.back().Loc);
+        .highlight(SourceRange(Loc, Components.back().Loc));
       for (auto Result : Globals.Results) {
         if (Globals.Results[0].hasValueDecl())
           diagnose(Result.getValueDecl(), diag::found_candidate);
@@ -309,7 +309,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     if (Globals.Results.empty()) {
       diagnose(Loc, Components.size() == 1 ? 
                  diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-        << SourceRange(Loc, Components.back().Loc);
+        .highlight(SourceRange(Loc, Components.back().Loc));
       return true;
     }
 
@@ -348,17 +348,17 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
         C.Value = cast<TypeDecl>(Decls.back());
     } else if (LastOne.Value.is<ValueDecl*>()) {
       diagnose(C.Loc, diag::cannot_resolve_extension_dot)
-        << SourceRange(Components[0].Loc, Components.back().Loc);
+        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
       return true;
     } else {
       diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
-        << SourceRange(Components[0].Loc, Components.back().Loc);
+        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
       return true;
     }
 
     if (C.Value.isNull()) {
       diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-        << SourceRange(Components[0].Loc, Components.back().Loc);
+        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
       return true;
     }
 
@@ -387,7 +387,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
   diagnose(Components.back().Loc,
            Components.size() == 1 ? diag::named_definition_isnt_type :
              diag::dotted_reference_not_type, Components.back().Id)
-    << SourceRange(Components[0].Loc, Components.back().Loc);
+    .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
   return true;
 }
 

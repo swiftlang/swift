@@ -111,7 +111,7 @@ bool ConstraintSystem::diagnose() {
         tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
                     tuple1->getFields().size(),
                     tuple2->getFields().size())
-          << range1 << range2;
+          .highlight(range1).highlight(range2);
         break;
       }
 
@@ -119,7 +119,7 @@ bool ConstraintSystem::diagnose() {
         tc.diagnose(loc, diag::invalid_tuple_element_unused,
                     failure.getFirstType(),
                     failure.getSecondType())
-          << range1 << range2;
+          .highlight(range1).highlight(range2);
         break;
 
       case Failure::TypesNotEqual:
@@ -131,21 +131,21 @@ bool ConstraintSystem::diagnose() {
                     failure.getKind() - Failure::TypesNotEqual,
                     failure.getFirstType(),
                     failure.getSecondType())
-          << range1 << range2;
+          .highlight(range1).highlight(range2);
         break;
 
       case Failure::DoesNotHaveMember:
         tc.diagnose(loc, diag::does_not_have_member,
                     failure.getFirstType(),
                     failure.getName())
-          << range1 << range2;
+          .highlight(range1).highlight(range2);
         break;
 
       case Failure::DoesNotConformToProtocol:
         tc.diagnose(loc, diag::type_does_not_conform,
                     failure.getFirstType(),
                     failure.getSecondType())
-            << range1 << range2;
+          .highlight(range1).highlight(range2);
         break;
 
       default:

@@ -50,11 +50,13 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     Type TypeB = Elements[1]->getType();
     if (displayOperandType(TypeA) && displayOperandType(TypeB)) {
       diagnose(L, diag::no_candidates_binop, I, TypeA, TypeB)
-        << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
+        .highlight(Elements[0]->getSourceRange())
+        .highlight(Elements[1]->getSourceRange());
     }
     else {
       diagnose(L, diag::no_candidates_op, 0, I)
-        << Elements[0]->getSourceRange() << Elements[1]->getSourceRange();
+        .highlight(Elements[0]->getSourceRange())
+        .highlight(Elements[1]->getSourceRange());
     }
   }
   else if (isa<PrefixUnaryExpr>(E) || isa<PostfixUnaryExpr>(E)) {
@@ -71,16 +73,16 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     Type TypeArg = Arg->getType();
     if (displayOperandType(TypeArg)) {      
       diagnose(Arg->getLoc(), diag::no_candidates_unary, I, TypeArg)
-        << Arg->getSourceRange();
+        .highlight(Arg->getSourceRange());
     }
     else {
       diagnose(Arg->getLoc(), diag::no_candidates_op, 1, I)
-        << Arg->getSourceRange();
+        .highlight(Arg->getSourceRange());
     }
   }
   else {
     diagnose(E->getLoc(), diag::no_candidates)
-      << E->getSourceRange();
+      .highlight(E->getSourceRange());
   }
   printOverloadSetCandidates(Candidates);
 }
