@@ -885,6 +885,7 @@ ConstructorDecl::computeThisType(GenericParamList **OuterGenericParams) const {
 
 Type ConstructorDecl::getArgumentType() const {
   Type ArgTy = getType();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
   ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
   return ArgTy;
 }

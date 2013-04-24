@@ -805,11 +805,133 @@ void TypeChecker::requestImplicitDefaultConstructor(StructDecl *structDecl) {
   structsWithImplicitDefaultConstructor.push_back(structDecl);
 }
 
+/// \brief Determine whether the given type can be default-initialized.
+static bool isDefaultInitializable(TypeChecker &tc, Type ty) {
+  CanType canTy = ty->getCanonicalType();
+  switch (canTy->getKind()) {
+  case TypeKind::Archetype:
+  case TypeKind::BoundGenericStruct:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+    // Break to look for constructors.
+    break;
+
+  case TypeKind::Array:
+    // Arrays are default-initializable if their element types are.
+    return isDefaultInitializable(tc, ty->castTo<ArrayType>()->getBaseType());
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::Class:
+    // Classes are default-initializable (with 0).
+    // FIXME: This may not be what we want in the long term.
+    return true;
+
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+    // Existentials are not default-initializable.
+    // FIXME: We will eventually want them to be default-initializable.
+    return false;
+
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinOpaquePointer:
+  case TypeKind::BuiltinRawPointer:
+    // Built-in types are default-initializable.
+    return true;
+
+  case TypeKind::Tuple:
+    // Check whether all fields either have an initializer or have
+    // default-initializable types.
+    for (auto &elt : ty->castTo<TupleType>()->getFields()) {
+      if (!elt.getInit() && !isDefaultInitializable(tc, elt.getType()))
+        return false;
+    }
+    return true;
+
+  case TypeKind::Function:
+  case TypeKind::LValue:
+  case TypeKind::PolymorphicFunction:
+  case TypeKind::MetaType:
+  case TypeKind::Module:
+      return false;
+
+  // Sugar types.
+#define TYPE(Id, Parent)
+#define SUGARED_TYPE(Id, Parent) case TypeKind::Id:
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("Not using the canonical type?");
+
+#define TYPE(Id, Parent)
+#define UNCHECKED_TYPE(Id, Parent) case TypeKind::Id:
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::DeducibleGenericParam:
+  case TypeKind::UnboundGeneric:
+    // Error cases.
+    return false;
+  }
+
+  // We need to look for a default constructor.
+  llvm::SmallVector<ValueDecl *, 4> ctors;
+  if (!tc.lookupConstructors(ty, ctors))
+    return false;
+
+  // Check whether we have a constructor that can be called with an empty
+  // tuple.
+  bool foundDefaultConstructor = false;
+  for (auto member : ctors) {
+    // Dig out the parameter tuple for this constructor.
+    auto ctor = cast<ConstructorDecl>(member);
+    auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
+    if (!paramTuple)
+      continue;
+
+    // Check whether any of the tuple elements are missing an initializer.
+    bool missingInit = false;
+    for (auto &elt : paramTuple->getFields()) {
+      if (elt.getInit())
+        continue;
+
+      missingInit = true;
+      break;
+    }
+    if (missingInit)
+      continue;
+
+    // We found a constructor that can be invoked with an empty tuple.
+    if (foundDefaultConstructor) {
+      // We found two constructors that can be invoked with an empty tuple.
+      return false;
+    }
+
+    foundDefaultConstructor = true;
+  }
+
+  return foundDefaultConstructor;
+}
+
 void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
   // Erase this from the set of structs that need an implicit default
   // constructor.
   assert(structsNeedingImplicitDefaultConstructor.count(structDecl));
   structsNeedingImplicitDefaultConstructor.erase(structDecl);
+
+  // Verify that all of the instance variables of this struct have default
+  // constructors.
+  for (auto member : structDecl->getMembers()) {
+    auto var = dyn_cast<VarDecl>(member);
+    if (!var || var->isProperty())
+      continue;
+
+    // FIXME: Check for an initializer on the variable.
+
+    // If this variable is not default-initializable, we're done: we can't
+    // add the default constructor because it will be ill-formed.
+    if (!isDefaultInitializable(*this, var->getType()))
+      return;
+  }
 
   // Create the default constructor.
   auto ctor = createImplicitConstructor(
