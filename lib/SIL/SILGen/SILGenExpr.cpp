@@ -1317,13 +1317,40 @@ namespace {
   };
 }
 
-static void emitImplicitValueConstructor(SILGenFunction &gen,
-                                         ConstructorDecl *ctor) {
+static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
+                                                ConstructorDecl *ctor) {
   emitConstructorMetatypeArg(gen, ctor);
 
+  SILType thisTy
+    = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
+  
+  // FIXME: We should actually elementwise default-construct the elements.
+  if (thisTy.isAddressOnly()) {
+    SILValue resultSlot
+      = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
+    gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
+    gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
+  } else {
+    SILValue addr = gen.B.createAllocVar(ctor, AllocKind::Stack, thisTy);
+    gen.B.createInitializeVar(ctor, addr, /*canDefaultConstruct*/ false);
+    SILValue result = gen.B.createLoad(ctor, addr);
+    gen.B.createReturn(ctor, result);
+  }
+}
+
+static void emitImplicitValueConstructor(SILGenFunction &gen,
+                                         ConstructorDecl *ctor) {
   auto *TP = cast<TuplePattern>(ctor->getArguments());
   SILType thisTy
     = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
+
+  if (TP->getFields().empty() &&
+      !thisTy.getCompoundTypeInfo()->getElements().empty()) {
+    // Emit a default constructor.
+    return emitImplicitValueDefaultConstructor(gen, ctor);
+  }
+
+  emitConstructorMetatypeArg(gen, ctor);
 
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
