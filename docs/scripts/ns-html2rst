@@ -33,7 +33,7 @@ usage: nshtml2rst < NSString.html > NSString.rst
 
     # Let pandoc do most of the hard work
     p = subprocess.Popen(
-        args=['pandoc', '-f', 'html', '-t', 'rst']
+        args=['pandoc', '--reference-links', '-f', 'html', '-t', 'rst']
         , stdin=subprocess.PIPE
         , stdout=subprocess.PIPE
     )
