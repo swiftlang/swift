@@ -1746,7 +1746,7 @@ static void emitSILFunction(IRGenModule &IGM,
 
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
-  if (f->isExternal())
+  if (f->isExternalDeclaration())
     return;
   
   llvm::Function *entrypoint;

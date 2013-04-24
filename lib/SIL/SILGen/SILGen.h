@@ -66,6 +66,14 @@ public:
   /// Returns the type of a constant reference.
   SILType getConstantType(SILConstant constant);
   
+  /// Returns the calling convention for a function.
+  AbstractCC getConstantCC(SILConstant constant) {
+    return getConstantType(constant).getFunctionTypeInfo()->getAbstractCC();
+  }
+  
+  /// Determine the linkage of a constant.
+  SILLinkage getConstantLinkage(SILConstant constant);
+  
   /// Get the function for a SILConstant.
   SILFunction *getFunction(SILConstant constant);
   
@@ -117,7 +125,7 @@ public:
   void addGlobalVariable(VarDecl *global);
   
   /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalDefinition(Decl *d);
+  void emitExternalDefinition(Decl *d);  
 };
   
 /// Materialize - Represents a temporary allocation.
@@ -247,14 +255,19 @@ public:
   SILBuilder &getBuilder() { return B; }
   
   TypeLoweringInfo const &getTypeLoweringInfo(Type t,
-                                              unsigned uncurryLevel = 0) {
-    return SGM.Types.getTypeLoweringInfo(t, uncurryLevel);
+                                      AbstractCC cc = AbstractCC::Freestanding,
+                                      unsigned uncurryLevel = 0) {
+    return SGM.Types.getTypeLoweringInfo(t, cc, uncurryLevel);
   }
-  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
+  SILType getLoweredType(Type t,
+                         AbstractCC cc = AbstractCC::Freestanding,
+                         unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, cc, uncurryLevel).getLoweredType();
   }
-  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, uncurryLevel);
+  SILType getLoweredLoadableType(Type t,
+                                 AbstractCC cc = AbstractCC::Freestanding,
+                                 unsigned uncurryLevel = 0) {
+    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, cc, uncurryLevel);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
@@ -541,9 +554,13 @@ public:
                              SILValue thisValue,
                              SILConstant methodConstant,
                              ArrayRef<Substitution> innerSubstitutions);
-  
-  SILValue emitThickenFunction(SILLocation loc, SILValue thinFn);
   void emitStore(SILLocation loc, ManagedValue src, SILValue destAddr);
+  
+  /// Convert a value with a specialized representation (such as a thin function
+  /// reference, or a function reference with a foreign calling convention) to
+  /// the generalized representation of its Swift type, which can then be stored
+  /// to a variable or passed as an argument or return value.
+  SILValue emitGeneralizedValue(SILLocation loc, SILValue thinFn);
   
   //
   // Helpers for emitting ApplyExpr chains.

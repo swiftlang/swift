@@ -243,8 +243,7 @@ public:
     }
     return CanType(fty->getResult());
   }
-  
-  
+
   /// Cast the Swift type referenced by this SIL type, or return null if the
   /// cast fails.
   template<typename TYPE>
@@ -333,12 +332,25 @@ public:
   }
 };
 
+/// A high-level calling convention.
+enum class AbstractCC : unsigned char {
+  /// The C calling convention.
+  C,
+  
+  /// The calling convention used for calling a normal function.
+  Freestanding,
+  
+  /// The calling convention used for calling an instance method.
+  Method
+};
+  
 /// SILFunctionTypeInfo - SILType for a FunctionType or PolymorphicFunctionType.
 /// Specifies the uncurry level and SIL-level calling convention for the
 /// function.
 class SILFunctionTypeInfo : public SILTypeInfo {
   SILType resultType;
-  unsigned inputTypeCount;
+  unsigned inputTypeCount : 24;
+  AbstractCC cc : 8;
   unsigned uncurryCount : 31;
   unsigned indirectReturn : 1;
 
@@ -361,10 +373,12 @@ class SILFunctionTypeInfo : public SILTypeInfo {
                       unsigned inputTypeCount,
                       SILType resultType,
                       unsigned uncurryCount,
-                      bool hasIndirectReturn)
+                      bool hasIndirectReturn,
+                      AbstractCC cc)
     : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo, swiftType),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
+      cc(cc),
       uncurryCount(uncurryCount),
       indirectReturn(hasIndirectReturn)
   {
@@ -377,6 +391,7 @@ public:
                                      SILType resultType,
                                      ArrayRef<unsigned> uncurriedInputCounts,
                                      bool hasIndirectReturn,
+                                     AbstractCC cc,
                                      SILBase &base);
   
   /// Returns the list of input types needed to fully apply a function of
@@ -454,15 +469,18 @@ public:
                        getUncurryBuffer()[level+1] - getUncurryBuffer()[level]);
   }
   
+  /// Returns the abstract calling convention of the function type.
+  AbstractCC getAbstractCC() const { return cc; }
+  
   static bool classof(SILTypeInfo const *ti) {
     return ti->getKind() == SILTypeInfoKind::SILFunctionTypeInfo;
   }
 };
 
 /// SILCompoundTypeInfo - SILType for a compound type, such as a tuple,
-/// struct, or class. Contains the type information for the type's elements
+/// struct, or class. This contains the type information for the type's elements
 /// indexable by Extract, ElementAddr, or RefElementAddr instructions. For
-/// nominal types, also provides a mapping from Swift VarDecls to field
+/// nominal types, this also provides a mapping from Swift VarDecls to field
 /// indices.
 class SILCompoundTypeInfo : public SILTypeInfo {
 public:

@@ -701,6 +701,51 @@ public:
     }
   }
   
+  void checkConvertCCInst(ConvertCCInst *CCI) {
+    require(!CCI->getOperand().getType().isAddress(),
+            "convert_cc operand cannot be an address");
+    require(!CCI->getType().isAddress(),
+            "convert_cc result cannot be an address");
+    require(CCI->getOperand().getType().is<AnyFunctionType>(),
+            "convert_cc operand must be a function");
+    require(CCI->getType().is<AnyFunctionType>(),
+            "convert_cc result must be a function");
+    require(CCI->getType().getUncurryLevel()
+              == CCI->getOperand().getType().getUncurryLevel(),
+            "convert_cc operand and result type must have same "
+            "uncurry level");
+    if (auto *opFTy = dyn_cast<FunctionType>(
+                                 CCI->getOperand().getType().getSwiftType())) {
+      auto *resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
+      require(resFTy &&
+              opFTy->getInput()->isEqual(resFTy->getInput()) &&
+              opFTy->getResult()->isEqual(resFTy->getResult()) &&
+              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
+              opFTy->isBlock() == resFTy->isBlock(),
+              "convert_cc operand and result type must differ only "
+              " in calling convention");
+      require(!resFTy->isThin(),
+              "convert_cc result must be thin");
+      require(opFTy->isThin(),
+              "convert_cc operand must be thin");
+    } else if (auto *opPTy = dyn_cast<PolymorphicFunctionType>(
+                                 CCI->getOperand().getType().getSwiftType())) {
+      auto *resPTy = dyn_cast<PolymorphicFunctionType>(
+                                               CCI->getType().getSwiftType());
+      require(resPTy &&
+              opPTy->getInput()->isEqual(resPTy->getInput()) &&
+              opPTy->getResult()->isEqual(resPTy->getResult()),
+              "convert_cc operand and result type must differ only "
+              " in calling convention");
+      require(!resPTy->isThin(),
+              "convert_cc result must be thin");
+      require(opPTy->isThin(),
+              "convert_cc operand must be thin");
+    } else {
+      llvm_unreachable("invalid AnyFunctionType?!");
+    }    
+  }
+  
   void checkSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
     require(SAI->getSrcBase().getType().hasReferenceSemantics(),
             "super_to_archetype source must be a reference type");
@@ -946,8 +991,11 @@ public:
 /// invariants.
 void SILFunction::verify() const {
 #ifndef NDEBUG
-  if (isExternal())
+  if (isExternalDeclaration()) {
+    assert(getLinkage() != SILLinkage::Internal &&
+           "external declaration of internal SILFunction not allowed");
     return;
+  }
   SILVerifier(*this).verify();
 #endif
 }

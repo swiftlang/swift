@@ -67,8 +67,7 @@ namespace {
       gen.B.createDestroyAddr(SILLocation(), address);
     }
   };
-
-  } // end anonymous namespace
+} // end anonymous namespace
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
   if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial()) {
@@ -711,7 +710,8 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
     }
     
     SILType specType = getLoweredLoadableType(outerMethodTy,
-                                      methodValue.getType().getUncurryLevel());
+                              methodType.getFunctionTypeInfo()->getAbstractCC(),
+                              methodValue.getType().getUncurryLevel());
     
     methodValue = B.createSpecialize(loc, methodValue, allSubs, specType);
   }
@@ -752,8 +752,10 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
                                         e->getType(),
                                         F.getContext());
     SILConstant c(e->getDecl());
-    return B.createArchetypeMethod(e, archetype,
-                         c, getLoweredLoadableType(methodType, c.uncurryLevel));
+    return B.createArchetypeMethod(e, archetype, c,
+                                   getLoweredLoadableType(methodType,
+                                                          SGM.getConstantCC(c),
+                                                          c.uncurryLevel));
   } else {
     llvm_unreachable("archetype properties not yet implemented");
   }
@@ -779,8 +781,10 @@ SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
                                         e->getType(),
                                         F.getContext());
     SILConstant c(e->getDecl());
-    return B.createProtocolMethod(e, existential,
-                        c, getLoweredLoadableType(methodType, c.uncurryLevel));
+    return B.createProtocolMethod(e, existential, c,
+                                  getLoweredLoadableType(methodType,
+                                                         SGM.getConstantCC(c),
+                                                         c.uncurryLevel));
   } else {
     llvm_unreachable("existential properties not yet implemented");
   }
@@ -1757,10 +1761,7 @@ RValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
   // Thicken thin function value if necessary.
   // FIXME: This should go away when Swift typechecking learns how to handle
   // thin functions.
-  if (func.getType().is<FunctionType>() &&
-      func.getType().castTo<FunctionType>()->isThin()) {
-    func = emitThickenFunction(E, func);
-  }
+  func = emitGeneralizedValue(E, func);
   
   // Emit the bridge_to_block instruction.
   SILValue block = B.createBridgeToBlock(E, func,
@@ -1793,11 +1794,29 @@ RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
   return RValue(*this, emitManagedRValueWithCleanup(result));
 }
 
-SILValue SILGenFunction::emitThickenFunction(SILLocation loc, SILValue thinFn) {
-  Type thickTy = getThickFunctionType(thinFn.getType().getSwiftType());
+SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
+  assert(v.getType().getUncurryLevel() == 0 &&
+         "uncurried functions shouldn't be used as swift values");
+  // Thicken thin functions.
+  if (v.getType().is<AnyFunctionType>() &&
+      v.getType().castTo<AnyFunctionType>()->isThin()) {
+    // Thunk functions to the standard "freestanding" calling convention.
+    if (v.getType().getFunctionTypeInfo()->getAbstractCC()
+          != AbstractCC::Freestanding) {
+      SILType freestandingType
+        = getLoweredLoadableType(v.getType().getSwiftType(),
+                                 AbstractCC::Freestanding,
+                                 0);
+      v = B.createConvertCC(loc, v, freestandingType);
+    }
+    
+    Type thickTy = getThickFunctionType(v.getType().getSwiftType());
+    
+    v = B.createThinToThickFunction(loc, v,
+                                    getLoweredLoadableType(thickTy));
+  }
   
-  return B.createThinToThickFunction(loc, thinFn,
-                                     getLoweredLoadableType(thickTy));
+  return v;
 }
 
 void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
@@ -1806,15 +1825,7 @@ void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
   // If we store a function value, we lose its thinness.
   // FIXME: This should go away when Swift typechecking learns how to handle
   // thin functions.
-  if (src.getType().is<AnyFunctionType>() &&
-      src.getType().castTo<AnyFunctionType>()->isThin()) {
-    assert(!destAddr.getType().getObjectType().castTo<AnyFunctionType>()
-             ->isThin()
-           && "remove this when Swift actually emits thin function types");
-    
-    fwdSrc = emitThickenFunction(loc, fwdSrc);
-  }
-  
+  fwdSrc = emitGeneralizedValue(loc, fwdSrc);  
   B.createStore(loc, fwdSrc, destAddr);
 }
 

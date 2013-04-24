@@ -31,6 +31,13 @@ namespace Lowering {
   class SILGenModule;
 }
 
+/// Linkage attribute for a SIL function.
+enum class SILLinkage : unsigned char {
+  External,
+  ClangThunk,
+  Internal,
+};
+  
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -45,8 +52,9 @@ private:
   friend class SILModule;
   friend class Lowering::SILGenModule;
 
-  /// Module - This is the SIL module that the function belongs to.
-  SILModule &Module;
+  /// ModuleAndLinkage - The SIL module that the function belongs to, and
+  /// the function's linkage.
+  llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
   
   /// Name - This is the SILConstant that names the function.
   /// FIXME: We want to eliminate this in favor of MangledName.
@@ -56,8 +64,7 @@ private:
   /// be propagated into LLVM IR.
   std::string MangledName;
 
-  /// The lowered type of the function. This will differ from the type of the
-  /// original function if the function consumes or returns address-only values.
+  /// The lowered type of the function.
   SILType LoweredType;
   
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
@@ -66,13 +73,28 @@ private:
 
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a SILFunction.
-  SILFunction(SILModule &Module, SILConstant Name, SILType LoweredType);
+  SILFunction(SILModule &Module, SILLinkage Linkage,
+              SILConstant Name,
+              SILType LoweredType);
   
 public:
   ~SILFunction();
 
-  SILModule &getModule() const { return Module; }
+  SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
   SILType getLoweredType() const { return LoweredType; }
+  SILFunctionTypeInfo *getFunctionTypeInfo() const {
+    return LoweredType.getFunctionTypeInfo();
+  }
+  
+  /// Returns the uncurry level of this entry point.
+  unsigned getUncurryLevel() const {
+    return getFunctionTypeInfo()->getUncurryLevel();
+  }
+  
+  /// Returns the calling convention used by this entry point.
+  AbstractCC getAbstractCC() const {
+    return getFunctionTypeInfo()->getAbstractCC();
+  }
 
   const std::string &getMangledName() const { return MangledName; }
   void setMangledName(const std::string &N) { MangledName = N; }
@@ -80,7 +102,10 @@ public:
   SILConstant getName() const { return Name; }
   
   /// True if this is a declaration of a function defined in another module.
-  bool isExternal() const { return BlockList.empty(); }
+  bool isExternalDeclaration() const { return BlockList.empty(); }
+  
+  /// Get this function's linkage attribute.
+  SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
   
   //===--------------------------------------------------------------------===//
   // Block List Access
@@ -129,7 +154,6 @@ public:
   void *allocate(unsigned Size, unsigned Align) const;
   
   SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
-
 };
 
 /// Observe that we are processing a specific SIL function.

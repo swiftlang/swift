@@ -646,9 +646,7 @@ bool LinkEntity::isLocalLinkage() const {
     return false;
 
   case Kind::SILFunction:
-    // FIXME: This is incorrect, local linkage should be a property of
-    // SILFunction.
-    return true;
+    return getSILFunction()->getLinkage() == SILLinkage::Internal;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -656,6 +654,8 @@ bool LinkEntity::isLocalLinkage() const {
 bool LinkEntity::isClangThunk() const {
   // Constructors, subscripts, properties, and type metadata synthesized in the
   // mapping to Clang modules are local.
+  if (getKind() == Kind::SILFunction)
+    return getSILFunction()->getLinkage() == SILLinkage::ClangThunk;
 
   if (isDeclKind(getKind())) {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);

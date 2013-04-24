@@ -120,11 +120,7 @@ void CleanupManager::emitReturnAndCleanups(SILLocation loc, SILValue returnValue
   } else {
     // Thicken thin function return values.
     // FIXME: Swift type-checking should to this for us.
-    if (returnValue.getType().is<AnyFunctionType>() &&
-        returnValue.getType().castTo<AnyFunctionType>()->isThin()) {
-      returnValue = Gen.emitThickenFunction(loc, returnValue);
-    }
-
+    returnValue = Gen.emitGeneralizedValue(loc, returnValue);
     B.createReturn(loc, returnValue);
   }
 }

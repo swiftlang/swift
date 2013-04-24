@@ -82,7 +82,8 @@ SILFunction *SILGenModule::emitTopLevelFunction() {
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
                                         TupleType::getEmpty(C), C);
   SILType loweredType = getLoweredType(topLevelType);
-  SILFunction *toplevel = new (M) SILFunction(M, SILConstant(), loweredType);
+  SILFunction *toplevel = new (M) SILFunction(M, SILLinkage::Internal,
+                                              SILConstant(), loweredType);
   toplevel->setMangledName("top_level_code");
   return toplevel;
 }
@@ -91,14 +92,37 @@ SILType SILGenModule::getConstantType(SILConstant constant) {
   return Types.getConstantType(constant);
 }
 
+SILLinkage SILGenModule::getConstantLinkage(SILConstant constant) {
+  /// Anonymous functions always have internal linkage.
+  if (!constant.hasDecl())
+    return SILLinkage::Internal;
+  
+  ValueDecl *d = constant.getDecl();
+  DeclContext *dc = d->getDeclContext();
+  while (!dc->isModuleContext()) {
+    if (dc->isLocalContext())
+      return SILLinkage::Internal;
+    dc = dc->getParent();
+  }
+  
+  if (isa<ClangModule>(dc) &&
+      (isa<ConstructorDecl>(d) ||
+       isa<SubscriptDecl>(d) ||
+       (isa<VarDecl>(d) && cast<VarDecl>(d)->isProperty())))
+    return SILLinkage::ClangThunk;
+  
+  return SILLinkage::External;
+}
+
 SILFunction *SILGenModule::getFunction(SILConstant constant) {
   auto found = emittedFunctions.find(constant);
   if (found != emittedFunctions.end())
     return found->second;
   
   SILType constantType = getConstantType(constant);
+  SILLinkage linkage = getConstantLinkage(constant);
   
-  return new (M) SILFunction(M, constant, constantType);
+  return new (M) SILFunction(M, linkage, constant, constantType);
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
@@ -126,7 +150,7 @@ SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
 
 void SILGenModule::postEmitFunction(SILConstant constant,
                                     SILFunction *F) {
-  assert(!F->isExternal() && "did not emit any function body?!");
+  assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
   F->verify();

@@ -23,9 +23,12 @@
 using namespace swift;
 
 SILFunction::SILFunction(SILModule &Module,
+                         SILLinkage Linkage,
                          SILConstant Name,
                          SILType LoweredType)
-  : Module(Module), Name(Name), LoweredType(LoweredType) {
+  : ModuleAndLinkage(&Module, Linkage), Name(Name),
+    LoweredType(LoweredType)
+{
   Module.functions.push_back(this);
 }
 
@@ -223,13 +226,13 @@ SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
 }
 
 ASTContext &SILFunction::getContext() const {
-  return Module.Context;
+  return getModule().Context;
 }
 
 void *SILFunction::allocate(unsigned Size, unsigned Align) const {
-  return Module.allocate(Size, Align);
+  return getModule().allocate(Size, Align);
 }
 
 SILTypeList *SILFunction::getSILTypeList(ArrayRef<SILType> Types) const {
-  return Module.getSILTypeList(Types);
+  return getModule().getSILTypeList(Types);
 }

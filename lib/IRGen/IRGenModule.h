@@ -69,8 +69,9 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
 
-namespace irgen {
   enum class AbstractCC : unsigned char;
+
+namespace irgen {
   class Address;
   class CodeRef;
   enum class ExplosionKind : unsigned;

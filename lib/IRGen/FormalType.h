@@ -21,8 +21,9 @@
 #include "swift/AST/Type.h"
 
 namespace swift {
-namespace irgen {
   enum class AbstractCC : unsigned char;
+
+namespace irgen {
 
 /// The formal type of a function.
 class FormalType {

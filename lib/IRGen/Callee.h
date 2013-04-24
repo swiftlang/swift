@@ -20,6 +20,7 @@
 
 #include <type_traits>
 #include "llvm/IR/DerivedTypes.h"
+#include "swift/SIL/SILType.h"
 #include "CallingConvention.h"
 #include "Explosion.h"
 #include "IRGen.h"

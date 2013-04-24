@@ -124,15 +124,25 @@ public:
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
 class TypeConverter {
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
-  llvm::DenseMap<std::pair<TypeBase *, unsigned>, TypeLoweringInfo *> types;
+  
+  using TypeKey = std::pair<TypeBase *, unsigned>;
+  TypeKey getTypeKey(CanType t, AbstractCC cc, unsigned uncurryLevel) {
+    return {t.getPointer(), uncurryLevel << 8 | unsigned(cc)};
+  }
+  
+  llvm::DenseMap<TypeKey, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   TypeLoweringInfo const &makeTypeLoweringInfo(CanType t,
+                                               AbstractCC cc,
                                                unsigned uncurryLevel);
-  SILTypeInfo *makeSILTypeInfo(CanType t, unsigned uncurryLevel);
+  SILTypeInfo *makeSILTypeInfo(CanType t,
+                               AbstractCC cc,
+                               unsigned uncurryLevel);
   void makeLayoutForDecl(SmallVectorImpl<SILCompoundTypeInfo::Element> &theInfo,
                          NominalTypeDecl *decl);
   SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft,
+                                               AbstractCC cc,
                                                unsigned uncurryLevel);
 
   Type makeConstantType(SILConstant constant);
@@ -148,11 +158,14 @@ public:
 
   /// Returns the SIL TypeLoweringInfo for a SIL type.
   TypeLoweringInfo const &getTypeLoweringInfo(Type t,
-                                              unsigned uncurryLevel = 0);
+                                      AbstractCC cc = AbstractCC::Freestanding,
+                                      unsigned uncurryLevel = 0);
   
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, uncurryLevel).loweredType;
+  SILType getLoweredType(Type t,
+                         AbstractCC cc = AbstractCC::Freestanding,
+                         unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, cc, uncurryLevel).loweredType;
   }
   
   /// Returns the SIL type of a constant reference.
@@ -198,7 +211,7 @@ public:
                               GenericParamList *genericParams = nullptr) const;
   
 };
-
+  
 } // namespace Lowering
 } // namespace swift
 

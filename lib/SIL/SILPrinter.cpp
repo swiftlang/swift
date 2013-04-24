@@ -101,12 +101,34 @@ void SILType::print(raw_ostream &OS) const {
     OS << "*";
   }
   CanType swiftTy = getSwiftRValueType();
+
+  if (isa<AnyFunctionType>(swiftTy)) {
+    // Print function attributes relevant to SIL.
+    auto info = getFunctionTypeInfo();
+    if (info->getAbstractCC() != AbstractCC::Freestanding) {
+      OS << "[sil_cc=";
+      switch (info->getAbstractCC()) {
+      case AbstractCC::C:
+        OS << "c";
+        break;
+      case AbstractCC::Method:
+        OS << "method";
+        break;
+      case AbstractCC::Freestanding:
+        OS << "freestanding";
+        break;
+      }
+      OS << "] ";
+    }
+  }
+  
   unsigned uncurries = getUncurryLevel();
   while (uncurries-- > 0) {
     AnyFunctionType *fTy = cast<AnyFunctionType>(swiftTy);
     if (auto *pfTy = dyn_cast<PolymorphicFunctionType>(fTy))
       pfTy->printGenericParams(OS);
-    bool hasParens = fTy->getInput()->is<TupleType>();
+    bool hasParens = fTy->getInput()->is<TupleType>()
+                  || fTy->getInput()->is<ParenType>();
     if (!hasParens) OS << '(';
     fTy->getInput()->print(OS);
     if (!hasParens) OS << ')';
@@ -398,6 +420,9 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
     printConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
   }
+  void visitConvertCCInst(ConvertCCInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "convert_cc");
+  }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printConversionInst(CI, CI->getOperand(), "thin_to_thick_function");
   }
@@ -456,21 +481,29 @@ public:
     OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
        << EI->getField()->getName().get();
   }
+  
+  void printDynamicMethodInst(DynamicMethodInst *I,
+                              SILValue Operand,
+                              StringRef Name) {
+    OS << Name << " ";
+    if (I->isVolatile())
+      OS << "[volatile] ";
+    
+    OS << getID(Operand) << ", @";
+    I->getMember().print(OS);
+  }
+  
   void visitClassMethodInst(ClassMethodInst *AMI) {
-    OS << "class_method " << getID(AMI->getOperand()) << ", @";
-    AMI->getMember().print(OS);
+    printDynamicMethodInst(AMI, AMI->getOperand(), "class_method");
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
-    OS << "super_method " << getID(AMI->getOperand()) << ", @";
-    AMI->getMember().print(OS);
+    printDynamicMethodInst(AMI, AMI->getOperand(), "super_method");
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-    OS << "archetype_method " << getID(AMI->getOperand()) << ", @";
-    AMI->getMember().print(OS);
+    printDynamicMethodInst(AMI, AMI->getOperand(), "archetype_method");
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
-    OS << "protocol_method " << getID(AMI->getOperand()) << ", @";
-    AMI->getMember().print(OS);
+    printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getID(PI->getOperand());
@@ -558,7 +591,7 @@ public:
       OS << '(';
       interleave(args.begin(), args.end(),
                  [&](SILValue v) { OS << getID(v); },
-                 [&]() { OS << ", "; });
+                 [&] { OS << ", "; });
       OS << ')';
     }
     
@@ -655,10 +688,21 @@ void SILFunction::dump() const {
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS) const {
   OS << "sil ";
+  switch (getLinkage()) {
+  case SILLinkage::Internal:
+    OS << "internal ";
+    break;
+  case SILLinkage::ClangThunk:
+    OS << "clang_thunk ";
+    break;
+  case SILLinkage::External:
+    break;
+  }
+  
   printName(OS);
   OS << " : $" << LoweredType;
   
-  if (!isExternal()) {
+  if (!isExternalDeclaration()) {
     OS << " {\n";
     SILPrinter(OS).print(this);
     OS << "}";

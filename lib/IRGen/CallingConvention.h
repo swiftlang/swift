@@ -26,22 +26,11 @@ namespace llvm {
 }
 
 namespace swift {
-class ValueDecl;
+  class ValueDecl;
+  enum class AbstractCC : unsigned char;
 
 namespace irgen {
-class IRGenModule;
-
-/// An abstract calling convention.
-enum class AbstractCC : unsigned char {
-  /// The C calling convention.
-  C,
-
-  /// The calling convention used for calling a normal function.
-  Freestanding,
-
-  /// The calling convention used for calling an instance method.
-  Method
-};
+  class IRGenModule;
 
 AbstractCC getAbstractCC(ValueDecl *fn);
 

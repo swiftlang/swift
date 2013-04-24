@@ -90,9 +90,11 @@ public:
     // Save the type of the SpecializeExpr at the right depth in the type.
     assert(specializedType.getUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
+    AbstractCC cc = specializedType.getFunctionTypeInfo()->getAbstractCC();
     if (callDepth == 0) {
       specializedType = gen.getLoweredLoadableType(
                                              getThinFunctionType(e->getType()),
+                                             cc,
                                              specializedType.getUncurryLevel());
     } else {
       FunctionType *ft = specializedType.castTo<FunctionType>();
@@ -104,6 +106,7 @@ public:
                                               /*isThin*/ true,
                                               outerInput->getASTContext());
       specializedType = gen.getLoweredLoadableType(newSpecialized,
+                                             cc,
                                              specializedType.getUncurryLevel());
     }
     specializeLoc = e;
@@ -949,7 +952,8 @@ ManagedValue SILGenFunction::emitSpecializedPropertyFunctionRef(
            "generic getter is not of a poly function type");
     substPropertyType = getThinFunctionType(substPropertyType);
     SILType loweredPropertyType = getLoweredLoadableType(substPropertyType,
-                                                         constant.uncurryLevel);
+                                                   SGM.getConstantCC(constant),
+                                                   constant.uncurryLevel);
     
     method = B.createSpecialize(loc, method, substitutions,
                                 loweredPropertyType);

@@ -20,6 +20,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILType.h"
 #include "CallingConvention.h"
 #include "IRGen.h"
 

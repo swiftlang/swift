@@ -101,10 +101,7 @@ public:
     SILValue v = forward(gen);
     // Thicken thin function values.
     // FIXME: Swift type-checking should do this.
-    if (v.getType().is<AnyFunctionType>() &&
-        v.getType().castTo<AnyFunctionType>()->isThin()) {
-      v = gen.emitThickenFunction(loc, v);
-    }
+    v = gen.emitGeneralizedValue(loc, v);
     return v;
   }
   
@@ -113,10 +110,7 @@ public:
     SILValue v = getValue();
     // Thicken thin function value.
     // FIXME: Swift type-checking should do this.
-    if (v.getType().is<AnyFunctionType>() &&
-        v.getType().castTo<AnyFunctionType>()->isThin()) {
-      v = gen.emitThickenFunction(loc, v);
-    }
+    v = gen.emitGeneralizedValue(loc, v);
     return v;
   }
   

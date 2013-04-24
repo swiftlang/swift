@@ -716,6 +716,16 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
+/// ConvertCCInst - Thunks a function reference, giving a function reference to
+/// the same function with a different calling convention.
+class ConvertCCInst
+  : public UnaryInstructionBase<ValueKind::ConvertCCInst, ConversionInst>
+{
+public:
+  ConvertCCInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
 /// BridgeToBlockInst - Converts a Swift function value to an ObjC-compatible
 /// block.
 class BridgeToBlockInst
@@ -967,13 +977,18 @@ public:
 /// method lookup.
 class DynamicMethodInst : public SILInstruction {
   SILConstant Member;
+  bool Volatile;
 public:
   DynamicMethodInst(ValueKind Kind,
                     SILLocation Loc, SILType Ty,
-                    SILConstant Member)
-    : SILInstruction(Kind, Loc, Ty), Member(Member) {}
+                    SILConstant Member,
+                    bool Volatile = false)
+    : SILInstruction(Kind, Loc, Ty), Member(Member), Volatile(Volatile) {}
   
   SILConstant getMember() const { return Member; }
+  
+  /// True if this dynamic dispatch is semantically required.
+  bool isVolatile() const { return Volatile; }
   
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_DynamicMethodInst &&

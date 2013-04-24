@@ -231,6 +231,7 @@ namespace {
 } // end anonymous namespace
   
 SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
+                                                            AbstractCC cc,
                                                             unsigned uncurries)
 {
   CanType topType(ft);
@@ -260,10 +261,13 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
                                      resultType,
                                      uncurriedInputCounts,
                                      hasIndirectReturn,
+                                     cc,
                                      M);
 }
 
-SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t, unsigned uncurryLevel) {
+SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t,
+                                            AbstractCC cc,
+                                            unsigned uncurryLevel) {
   //
   // Make a SILCompoundTypeInfo for struct or class types.
   NominalTypeDecl *ntd = nullptr;
@@ -295,7 +299,7 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t, unsigned uncurryLevel) {
   //
   // Make a SILFunctionTypeInfo for function types.
   if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
-    return makeInfoForFunctionType(ft, uncurryLevel);
+    return makeInfoForFunctionType(ft, cc, uncurryLevel);
   }
   
   //
@@ -304,10 +308,12 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t, unsigned uncurryLevel) {
 }
   
 TypeLoweringInfo const &
-TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
+TypeConverter::makeTypeLoweringInfo(CanType t,
+                                    AbstractCC cc,
+                                    unsigned uncurryLevel) {
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
   TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
-  types[{t.getPointer(), uncurryLevel}] = theInfo;
+  types[getTypeKey(t, cc, uncurryLevel)] = theInfo;
   bool address = false;
   bool addressOnly = false;
   
@@ -333,10 +339,10 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
 
   // Derive SILType for LValueType from the object type.
   if (address) {
-    theInfo->loweredType = getLoweredType(t, uncurryLevel).getAddressType();
+    theInfo->loweredType = getLoweredType(t, cc, uncurryLevel).getAddressType();
   }
   // Generate SILTypeInfo for lowered types that need it.
-  else if (SILTypeInfo *info = makeSILTypeInfo(t, uncurryLevel)) {
+  else if (SILTypeInfo *info = makeSILTypeInfo(t, cc, uncurryLevel)) {
     theInfo->loweredType = SILType(info,
                                    /*address=*/ address || addressOnly,
                                    /*loadable=*/ !addressOnly);
@@ -351,21 +357,37 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
 }
   
 TypeLoweringInfo const &
-TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
+TypeConverter::getTypeLoweringInfo(Type t,
+                                   AbstractCC cc,
+                                   unsigned uncurryLevel) {
   CanType ct = t->getCanonicalType();
-  auto existing = types.find({ct.getPointer(), uncurryLevel});
+  auto existing = types.find(getTypeKey(ct, cc, uncurryLevel));
   if (existing == types.end()) {
-    return makeTypeLoweringInfo(ct, uncurryLevel);
+    return makeTypeLoweringInfo(ct, cc, uncurryLevel);
   } else
     return *existing->second;
+}
+
+static AbstractCC getAbstractCC(SILConstant c) {
+  // Anonymous functions currently always have Freestanding CC.
+  if (!c.hasDecl())
+    return AbstractCC::Freestanding;
+  
+  if (c.getDecl()->isInstanceMember() ||
+      c.kind == SILConstant::Kind::Initializer)
+    return AbstractCC::Method;
+  if (c.getDecl()->hasClangNode())
+    return AbstractCC::C;
+  return AbstractCC::Freestanding;
 }
 
 SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
   if (found == constantTypes.end()) {
     Type swiftTy = getThinFunctionType(makeConstantType(constant));
+    AbstractCC cc = getAbstractCC(constant);
     SILType loweredTy
-      = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
+      = getTypeLoweringInfo(swiftTy, cc, constant.uncurryLevel).getLoweredType();
     DEBUG(llvm::dbgs() << "constant ";
           constant.print(llvm::dbgs());
           llvm::dbgs() << " has type ";

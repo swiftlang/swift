@@ -22,6 +22,7 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                        SILType resultType,
                                        ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
+                                       AbstractCC cc,
                                        SILBase &base)
 {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
@@ -36,7 +37,8 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                                      inputTypes.size(),
                                                      resultType,
                                                      uncurriedInputCounts.size(),
-                                                     hasIndirectReturn);
+                                                     hasIndirectReturn,
+                                                     cc);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
   fi->getUncurryBuffer()[0] = 0;

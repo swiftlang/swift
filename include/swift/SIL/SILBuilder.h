@@ -236,7 +236,11 @@ public:
                                              SILType Ty) {
     return insert(new RawPointerToRefInst(Loc, Op, Ty));
   }
-  
+
+  ConvertCCInst *createConvertCC(SILLocation Loc, SILValue Op, SILType Ty) {
+    return insert(new ConvertCCInst(Loc, Op, Ty));
+  }
+
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
     return insert(new ThinToThickFunctionInst(Loc, Op, Ty));
