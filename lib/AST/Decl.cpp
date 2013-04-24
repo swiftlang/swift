@@ -859,7 +859,7 @@ SourceLoc ConstructorDecl::getLoc() const {
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {
-  if (!Body)
+  if (!Body || !Body->getEndLoc().isValid())
     return cast<NominalTypeDecl>(getDeclContext())->getLoc();
   return { ConstructorLoc, Body->getEndLoc() };
 }
