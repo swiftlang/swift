@@ -341,7 +341,7 @@ Pattern grammar
 ---------------
 
 The standard syntax rule is that the pattern grammar mirrors the
-introduction-rule expression grammar, but parsing a patterns whenever
+introduction-rule expression grammar, but parses a pattern wherever
 you would otherwise put an expression.  This means that, for example,
 if we add array literal expressions, we should also add a
 corresponding array literal pattern. I think that principle is worth
@@ -375,7 +375,7 @@ that, and I think that will serve to divide them in programmers' minds.
 So we can get away with some things. :)
 
 In general, a lot of these productions are the same, so I'm going to
-talk about *-patterns, with some specific special rules that only
+talk about ``*``-patterns, with some specific special rules that only
 apply to specific pattern kinds.
 
 ::
