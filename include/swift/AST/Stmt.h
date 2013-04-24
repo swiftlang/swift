@@ -59,6 +59,10 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc TrailingSemiLoc;
   
+  /// isImplicit - Determines whether this statement was implicitly-generated,
+  /// rather than explicitly written in the AST.
+  bool isImplicit() const;
+
   /// walk - This recursively walks the AST rooted at this statement.
   Stmt *walk(ASTWalker &walker);
   Stmt *walk(ASTWalker &&walker) { return walk(walker); }

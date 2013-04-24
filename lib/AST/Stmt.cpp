@@ -53,6 +53,16 @@ return cast<ID##Stmt>(this)->getSourceRange();
   llvm_unreachable("statement type not handled!");
 }
 
+bool Stmt::isImplicit() const {
+  if (auto brace = dyn_cast<BraceStmt>(this)) {
+    if (brace->getLBraceLoc().isInvalid() &&
+        brace->getRBraceLoc().isInvalid())
+      return true;
+  }
+
+  return false;
+}
+
 SourceRange AssignStmt::getSourceRange() const {
   return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
 }
