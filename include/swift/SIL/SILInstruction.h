@@ -120,15 +120,28 @@ template<ValueKind KIND, typename BASE = SILInstruction, bool HAS_RESULT = true>
 class UnaryInstructionBase : public BASE {
   FixedOperandList<1> Operands;
   
-public:  
+  /// Check HAS_RESULT in enable_if predicates by injecting a dependency on
+  /// a template argument.
+  template<typename X>
+  struct has_result {
+    enum { value = HAS_RESULT };
+  };
+
+public:
+  
   UnaryInstructionBase(SILLocation Loc, SILValue Operand)
     : BASE(KIND, Loc), Operands(this, Operand) {}
 
-  UnaryInstructionBase(SILLocation Loc, SILValue Operand, SILType Ty)
+  template<typename X = void>
+  UnaryInstructionBase(SILLocation Loc, SILValue Operand,
+                       typename std::enable_if<has_result<X>::value, 
+                                               SILType>::type Ty)
     : BASE(KIND, Loc, Ty), Operands(this, Operand) {}
   
-  template<typename...A>
-  UnaryInstructionBase(SILLocation Loc, SILValue Operand, SILType Ty,
+  template<typename X = void, typename...A>
+  UnaryInstructionBase(SILLocation Loc, SILValue Operand,
+                       typename std::enable_if<has_result<X>::value, 
+                                               SILType>::type Ty,
                        A &&...args)
     : BASE(KIND, Loc, Ty, std::forward<A>(args)...), Operands(this, Operand) {}
   
@@ -136,7 +149,8 @@ public:
   
   /// getType() is ok if this is known to only have one type.
   template<typename X = void>
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  typename std::enable_if<has_result<X>::value, SILType>::type
+  getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   
