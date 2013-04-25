@@ -32,6 +32,22 @@ namespace irgen {
 
 class Size;
 
+enum IsPOD_t : bool { IsNotPOD, IsPOD };
+inline IsPOD_t operator&(IsPOD_t l, IsPOD_t r) {
+  return IsPOD_t(unsigned(l) & unsigned(r));
+}
+inline IsPOD_t &operator&=(IsPOD_t &l, IsPOD_t r) {
+  return (l = (l & r));
+}
+
+enum IsFixedSize_t : bool { IsNotFixedSize, IsFixedSize };
+inline IsFixedSize_t operator&(IsFixedSize_t l, IsFixedSize_t r) {
+  return IsFixedSize_t(unsigned(l) & unsigned(r));
+}
+inline IsFixedSize_t &operator&=(IsFixedSize_t &l, IsFixedSize_t r) {
+  return (l = (l & r));
+}
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,
