@@ -157,15 +157,6 @@ public:
       field.getTypeInfo().loadAsTake(IGF, fieldAddr, out);
     }
   }
-
-  void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &out) const {
-    for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
-      
-      Address fieldAddr = field.projectAddress(IGF, addr);
-      field.getTypeInfo().loadUnmanaged(IGF, fieldAddr, out);
-    }
-  }
   
   void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
     for (auto &field : getFields()) {

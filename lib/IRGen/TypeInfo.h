@@ -166,10 +166,6 @@ public:
   virtual void load(IRGenFunction &IGF, Address addr,
                     Explosion &explosion) const = 0;
 
-  /// Load an explosion of values from an address without setting up cleanups.
-  virtual void loadUnmanaged(IRGenFunction &IGF, Address addr,
-                             Explosion &explosion) const = 0;
-
   /// Perform a 'take' load of the given address.  This is like a C++
   /// move-initialization, except that the object at the old address
   /// will not be destroyed.

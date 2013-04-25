@@ -380,7 +380,7 @@ namespace {
                                          address->getName() + ".data");
     }
 
-    static void doLoad(IRGenFunction &IGF, Address address, Explosion &e) {
+    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
       // Load the function.
       Address fnAddr = projectFunction(IGF, address);
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
@@ -390,27 +390,7 @@ namespace {
       IGF.emitLoadAndRetain(dataAddr, e);
     }
 
-    void load(IRGenFunction &IGF, Address address, Explosion &e) const {
-      doLoad(IGF, address, e);
-    }
-
-    static void doLoadUnmanaged(IRGenFunction &IGF, Address address,
-                                Explosion &e) {
-      // Load the function.
-      Address fnAddr = projectFunction(IGF, address);
-      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
-      
-      // Load the data.
-      Address dataAddr = projectData(IGF, address);
-      e.add(IGF.Builder.CreateLoad(dataAddr));
-    }
-    
-    void loadUnmanaged(IRGenFunction &IGF, Address address,
-                       Explosion &e) const {
-      doLoadUnmanaged(IGF, address, e);
-    }
-    
-    static void doLoadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) {
+    void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // Load the function.
       Address fnAddr = projectFunction(IGF, addr);
       e.add(IGF.Builder.CreateLoad(fnAddr));
@@ -418,10 +398,6 @@ namespace {
       // Load the data.
       Address dataAddr = projectData(IGF, addr);
       e.add(IGF.Builder.CreateLoad(dataAddr));
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address address, Explosion &e) const {
-      doLoadAsTake(IGF, address, e);
     }
 
     void assign(IRGenFunction &IGF, Explosion &e, Address address) const {

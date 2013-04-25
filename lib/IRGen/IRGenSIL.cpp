@@ -1076,7 +1076,7 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered(CurExplosionLevel);
   Address source = getLoweredAddress(i->getOperand());
   const TypeInfo &type = getFragileTypeInfo(i->getType().getSwiftRValueType());
-  type.loadUnmanaged(*this, source, lowered);
+  type.loadAsTake(*this, source, lowered);
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
 

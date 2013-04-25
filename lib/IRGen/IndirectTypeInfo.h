@@ -60,16 +60,6 @@ public:
     out.add(dest.getAddress());
   }
 
-  void loadUnmanaged(IRGenFunction &IGF, Address src, Explosion &out) const {
-    // Create a temporary.
-    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
-                                                 "temporary.forLoad");
-    
-    // Initialize it with a copy of the source.
-    asDerived().Derived::initializeWithCopy(IGF, dest, src);
-    out.add(dest.getAddress());
-  }
-  
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary and memcpy into it.
     Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,

@@ -94,10 +94,6 @@ namespace {
       // FIXME
     }
 
-    void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      // FIXME
-    }
-    
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       // FIXME
     }
@@ -179,11 +175,6 @@ namespace {
       Singleton->load(IGF, getSingletonAddress(IGF, addr), e);
     }
 
-    void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &e) const {
-      if (!Singleton) return;
-      Singleton->loadUnmanaged(IGF, getSingletonAddress(IGF, addr), e);
-    }
-    
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {
       if (!Singleton) return;
       Singleton->loadAsTake(IGF, getSingletonAddress(IGF, addr), e);

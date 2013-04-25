@@ -118,10 +118,6 @@ public:
     out.add(value);
   }
 
-  void loadUnmanaged(IRGenFunction &IGF, Address addr, Explosion &out) const {
-    addr = asDerived().projectScalar(IGF, addr);
-    out.add(IGF.Builder.CreateLoad(addr));
-  }
   void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
     addr = asDerived().projectScalar(IGF, addr);
     out.add(IGF.Builder.CreateLoad(addr));
