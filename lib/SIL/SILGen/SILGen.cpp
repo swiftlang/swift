@@ -255,11 +255,11 @@ SILFunction *SILGenModule::emitClosure(ClosureExpr *ce) {
 
 SILFunction *SILGenModule::emitDestructor(ClassDecl *cd,
                                           DestructorDecl /*nullable*/ *dd) {
-  SILConstant constant(cd, SILConstant::Kind::Destructor);
-  
-  SILFunction *f = preEmitFunction(constant, dd);
+  // Emit the destroying destructor.
+  SILConstant destroyer(cd, SILConstant::Kind::Destroyer);
+  SILFunction *f = preEmitFunction(destroyer, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
-  postEmitFunction(constant, f);
+  postEmitFunction(destroyer, f);
   
   return f;
 }

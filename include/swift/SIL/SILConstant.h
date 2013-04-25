@@ -67,9 +67,9 @@ struct SILConstant {
     /// a OneOfElementDecl.
     OneOfElement,
     
-    /// Destructor = this constant references the destructor for the ClassDecl
-    /// in loc.
-    Destructor,
+    /// Destroyer - this constant references the destroying destructor for the
+    /// ClassDecl in loc.
+    Destroyer,
     
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
@@ -136,10 +136,6 @@ struct SILConstant {
   /// True if the SILConstant references a oneof entry point.
   bool isOneOfElement() const {
     return kind == Kind::OneOfElement;
-  }
-  /// True if the SILConstant references a destructor.
-  bool isDestructor() const {
-    return kind == Kind::Destructor;
   }
   /// True if the SILConstant references a global variable accessor.
   bool isGlobal() const {

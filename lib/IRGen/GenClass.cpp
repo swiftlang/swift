@@ -457,6 +457,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
     IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   
   llvm::Value *arg = deallocator->getArgumentList().begin();
+  arg = IGF.Builder.CreateBitCast(arg, info.getStorageType());
   IGF.Builder.CreateCall(destroyer, arg);
   
   llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
@@ -489,6 +490,13 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   // Emit the class metadata.
   emitClassMetadata(*this, D, layout);
 
+  // Emit the deallocating destructor.
+  llvm::Function *deallocator
+    = getAddrOfDestructor(D, DestructorKind::Deallocating);
+  llvm::Function *destroyer
+    = getAddrOfDestructor(D, DestructorKind::Destroying);
+  emitDeallocatingDestructor(*this, D, deallocator, destroyer);
+  
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
   for (Decl *member : D->getMembers()) {

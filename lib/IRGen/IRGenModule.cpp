@@ -103,7 +103,6 @@ IRGenModule::IRGenModule(ASTContext &Context,
     TypeMetadataPatternStructTy->getPointerTo(defaultAS);
 
   DeallocatingDtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
-  DestroyingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
 
   // A full heap metadata is basically just an additional small prefix

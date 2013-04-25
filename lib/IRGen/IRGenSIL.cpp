@@ -230,17 +230,7 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
                    argType.getAddressForPointer(params.claimNext()));
       } else {
         Explosion explosion(CurExplosionLevel);
-        
-        if (f->getName().isDestructor()) {
-          // The argument for a destructor comes in as a %swift.refcounted*.
-          // Cast to the correct local type.
-          TypeInfo const &thisTI
-            = getFragileTypeInfo(arg->getType().getSwiftType());
-          llvm::Value *argValue = params.claimNext();
-          argValue = Builder.CreateBitCast(argValue, thisTI.getStorageType());
-          explosion.add(argValue);
-        } else
-          argType.reexplode(*this, params, explosion);
+        argType.reexplode(*this, params, explosion);
         newLoweredExplosion(arg, explosion);
       }
     }
@@ -408,7 +398,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       cc = AbstractCC::Freestanding;
       break;
     }
-    case SILConstant::Kind::Destructor: {
+    case SILConstant::Kind::Destroyer: {
       ClassDecl *cd = cast<ClassDecl>(vd);
       fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
       cc = AbstractCC::Method;
@@ -466,19 +456,7 @@ void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
                            fnptr, naturalCurryLevel, cc, body);
   
   
-  // Destructors have LLVM type void (%swift.refcounted*), but in SIL
-  // are used with type T -> (). Bitcast them immediately because the uncast
-  // function value isn't useful.
-  if (i->getFunction()->getName().isDestructor()) {
-    llvm::Value *fnValue = Builder.CreateBitCast(fnptr, IGM.Int8PtrTy);
-    
-    Explosion e(ExplosionKind::Minimal);
-    e.add(fnValue);
-    newLoweredExplosion(SILValue(i, 0), e);
-    return;
-  }
-  
-  // For non-destructor functions, store the function constant and calling
+  // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
   newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);

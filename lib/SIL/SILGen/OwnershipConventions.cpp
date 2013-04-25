@@ -74,7 +74,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::Initializer:
   /// These constants don't correspond to method families we care about yet.
   case SILConstant::Kind::OneOfElement:
-  case SILConstant::Kind::Destructor:
+  case SILConstant::Kind::Destroyer:
   case SILConstant::Kind::GlobalAccessor:
     return SelectorFamily::NonObjC;
   }

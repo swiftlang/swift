@@ -1707,17 +1707,6 @@ static void emitSILFunction(IRGenModule &IGM,
   // Walk the function body to look for local types or other decls.
   if (body)
     igs.emitLocalDecls(body);
-  
-  // If the function was a destroying destructor, emit the corresponding
-  // deallocating destructor.
-  // FIXME: Deallocating destructors are currently trivial and never explicitly
-  // referenced in SIL, but may eventually benefit from SIL representation.
-  if (!f->getName().isNull() && f->getName().isDestructor()) {
-    ClassDecl *cd = cast<ClassDecl>(f->getName().getDecl());
-    llvm::Function *deallocator
-      = IGM.getAddrOfDestructor(cd, DestructorKind::Deallocating);
-    emitDeallocatingDestructor(IGM, cd, deallocator, entrypoint);
-  }
 }
 
 /// Emit the definition for the given SIL constant.

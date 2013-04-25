@@ -1212,9 +1212,16 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   auto cc = expandAbstractCC(*this, AbstractCC::Method);
 
   LinkInfo link = LinkInfo::get(*this, entity);
-  llvm::FunctionType *dtorTy = kind == DestructorKind::Deallocating
-    ? DeallocatingDtorTy
-    : DestroyingDtorTy;
+  llvm::FunctionType *dtorTy;
+  if (kind == DestructorKind::Deallocating) {
+    dtorTy = DeallocatingDtorTy;
+  } else {
+    const TypeInfo &info =
+      getFragileTypeInfo(cd->getDeclaredTypeInContext());
+    dtorTy = llvm::FunctionType::get(VoidTy,
+                                     info.getStorageType(),
+                                     /*isVarArg*/ false);
+  }
   
   entry = link.createFunction(*this, dtorTy, cc, attrs);
   return entry;

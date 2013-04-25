@@ -459,7 +459,7 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
 }
 
 /// Get the type of a destructor function, This -> ().
-static Type getDestructorType(ClassDecl *cd, ASTContext &C) {
+static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
   Type classType = cd->getDeclaredTypeInContext();
 
   Type voidType = TupleType::getEmpty(C);
@@ -563,8 +563,8 @@ Type TypeConverter::makeConstantType(SILConstant c) {
       return getMethodTypeInContext(contextType, subscriptType, genericParams);
     } else {
       // If this is a destructor, derive the destructor type.
-      if (c.kind == SILConstant::Kind::Destructor) {
-        return getDestructorType(cast<ClassDecl>(vd), Context);
+      if (c.kind == SILConstant::Kind::Destroyer) {
+        return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
       }
       
       // If this is a constructor initializer, derive the initializer type.

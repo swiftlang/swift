@@ -81,7 +81,7 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
            && "can only create OneOfElement SILConstant for oneof element");
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<ClassDecl>(vd)) {
-    assert(kind == Kind::Destructor
+    assert(kind == Kind::Destroyer
            && "can only create Destructor SILConstant for class");
     naturalUncurryLevel = 0;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
@@ -157,11 +157,11 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
       }
       naturalUncurryLevel = getNaturalUncurryLevel(fd);
     }
-    // Map DestructorDecls to Destructor SILConstants of the ClassDecl.
+    // Map DestructorDecls to Destroyer SILConstants of the ClassDecl.
     else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
       ClassDecl *cd = cast<ClassDecl>(dd->getParent());
       loc = cd;
-      kind = Kind::Destructor;
+      kind = Kind::Destroyer;
       naturalUncurryLevel = 0;
     }
     // Map ConstructorDecls to the Allocator SILConstant of the constructor.

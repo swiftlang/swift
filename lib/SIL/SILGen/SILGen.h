@@ -281,11 +281,12 @@ public:
   /// emitClosure - Generates code for a ClosureExpr. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosure(ClosureExpr *ce);
-  /// emitDestructor - Generates code for a class destructor. This emits the
-  /// body code from the DestructorDecl (if any),
+  /// emitDestructor - Generates code for a class destroying destructor. This
+  /// emits the body code from the DestructorDecl (if any),
   /// implicitly releases the elements of the class, and calls the base
-  /// class destructor or deallocates the instance if this is a root class.
+  /// class destructor.
   void emitDestructor(ClassDecl *cd, DestructorDecl *dd);
+  
   /// emitValueConstructor - Generates code for a struct constructor.
   /// This allocates the new 'this' value, emits the
   /// body code, then returns the final initialized 'this'.

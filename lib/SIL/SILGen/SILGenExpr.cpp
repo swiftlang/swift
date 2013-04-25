@@ -1264,7 +1264,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     }
     
     SILConstant dtorConstant =
-      SILConstant(baseClass, SILConstant::Kind::Destructor);
+      SILConstant(baseClass, SILConstant::Kind::Destroyer);
     SILValue baseThis = B.createUpcast(dd,
                                     thisValue,
                                     getLoweredLoadableType(baseTy));
