@@ -78,12 +78,12 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
   // assertions.
   if (!nonEmpty) {
     assert(!builder.empty() == requiresHeapHeader(layoutKind));
-    Align = Alignment(1);
-    TotalSize = Size(0);
+    MinimumAlign = Alignment(1);
+    MinimumSize = Size(0);
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
-    Align = builder.getAlignment();
-    TotalSize = builder.getSize();
+    MinimumAlign = builder.getAlignment();
+    MinimumSize = builder.getSize();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -95,13 +95,13 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
 }
 
 llvm::Value *StructLayout::emitSize(IRGenFunction &IGF) const {
-  assert(hasStaticLayout());
-  return llvm::ConstantInt::get(IGF.IGM.SizeTy, getSize().getValue());
+  assert(isFixedLayout());
+  return IGF.IGM.getSize(getSize());
 }
 
 llvm::Value *StructLayout::emitAlign(IRGenFunction &IGF) const {
-  assert(hasStaticLayout());
-  return llvm::ConstantInt::get(IGF.IGM.SizeTy, getAlignment().getValue());
+  assert(isFixedLayout());
+  return IGF.IGM.getSize(getAlignment().asSize());
 }
 
 /// Bitcast an arbitrary pointer to be a pointer to this type.

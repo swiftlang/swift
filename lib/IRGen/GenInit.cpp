@@ -77,7 +77,7 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, OnHeap_t onHeap,
 
   // Lay out the type as a heap object.
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);
-  assert(!layout.empty() && "non-empty type had empty layout?");
+  assert(!layout.isKnownEmpty() && "non-empty type had empty layout?");
   auto &elt = layout.getElements()[0];
 
   // Allocate a new object.

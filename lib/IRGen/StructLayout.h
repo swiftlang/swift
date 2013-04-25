@@ -160,7 +160,7 @@ private:
   llvm::SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
-  bool IsKnownLayout = true;
+  bool IsFixedLayout = true;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
@@ -177,13 +177,13 @@ public:
                  LayoutStrategy strategy);
 
   /// Return whether the layout is known to be empty.
-  bool empty() const { return IsKnownLayout && CurSize == Size(0); }
+  bool empty() const { return IsFixedLayout && CurSize == Size(0); }
 
   /// Return the current set of fields.
   llvm::ArrayRef<llvm::Type*> getStructFields() const { return StructFields; }
 
-  /// Return whether the structure has a known layout.
-  bool hasKnownLayout() const { return IsKnownLayout; }
+  /// Return whether the structure has a fixed-size layout.
+  bool isFixedLayout() const { return IsFixedLayout; }
 
   /// Return the size of the structure built so far.
   Size getSize() const { return CurSize; }
@@ -200,8 +200,16 @@ public:
 
 /// A struct layout is the result of laying out a complete structure.
 class StructLayout {
-  Alignment Align;
-  Size TotalSize;
+  /// The statically-known minimum bound on the alignment.
+  Alignment MinimumAlign;
+
+  /// The statically-known minimum bound on the size.
+  Size MinimumSize;
+
+  /// Whether this layout is fixed in size.  If so, the size and
+  /// alignment are exact.
+  bool IsFixedLayout;
+
   llvm::Type *Ty;
   llvm::SmallVector<ElementLayout, 8> Elements;
 
@@ -222,18 +230,21 @@ public:
   StructLayout(const StructLayoutBuilder &builder,
                llvm::Type *type,
                llvm::ArrayRef<ElementLayout> elements)
-    : Align(builder.getAlignment()), TotalSize(builder.getSize()),
-      Ty(type), Elements(elements.begin(), elements.end()) {}
+    : MinimumAlign(builder.getAlignment()),
+      MinimumSize(builder.getSize()),
+      IsFixedLayout(builder.isFixedLayout()),
+      Ty(type),
+      Elements(elements.begin(), elements.end()) {}
 
   /// Return the element layouts.  This is parallel to the fields
   /// passed in the constructor.
   llvm::ArrayRef<ElementLayout> getElements() const { return Elements; }
   llvm::Type *getType() const { return Ty; }
-  Size getSize() const { return TotalSize; }
-  Alignment getAlignment() const { return Align; }
-  bool empty() const { return TotalSize.isZero(); }
+  Size getSize() const { return MinimumSize; }
+  Alignment getAlignment() const { return MinimumAlign; }
+  bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
 
-  bool hasStaticLayout() const { return true; }
+  bool isFixedLayout() const { return IsFixedLayout; }
   llvm::Value *emitSize(IRGenFunction &IGF) const;
   llvm::Value *emitAlign(IRGenFunction &IGF) const;
 

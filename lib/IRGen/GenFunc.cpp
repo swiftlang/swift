@@ -1741,7 +1741,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        HeapLayout const &layout) {
   llvm::AttributeSet attrs;
   ExtraData extraData
-    = layout.empty() ? ExtraData::None : ExtraData::Retainable;
+    = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
                                                   outType,
                                                   explosionLevel,
@@ -1764,7 +1764,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
   // parameters.
-  if (!layout.empty()) {
+  if (!layout.isKnownEmpty()) {
     llvm::Value *rawData = params.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
     
@@ -1804,7 +1804,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Store the context arguments on the heap.
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypes);
   llvm::Value *data;
-  if (layout.empty()) {
+  if (layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
   } else {
     // Allocate a new object.
