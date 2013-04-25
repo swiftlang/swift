@@ -874,6 +874,23 @@ public:
   }
 };
 
+/// BuiltinZeroInst - Represents the zero value of a builtin integer,
+/// floating-point, or pointer type.
+class BuiltinZeroInst : public SILInstruction {
+public:
+  BuiltinZeroInst(SILLocation Loc, SILType Type)
+    : SILInstruction(ValueKind::BuiltinZeroInst, Loc, Type) {}
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BuiltinZeroInst;
+  }
+};
+
 /// MetatypeInst - Represents the production of an instance of a given metatype
 /// named statically.
 class MetatypeInst : public SILInstruction {

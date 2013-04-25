@@ -1009,6 +1009,14 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
   newLoweredExplosion(SILValue(i, 0), out);
 }
 
+void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
+  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  llvm::Value *zeroValue = llvm::Constant::getNullValue(ti.getStorageType());
+  Explosion out(CurExplosionLevel);
+  out.add(zeroValue);
+  newLoweredExplosion(SILValue(i, 0), out);
+}
+
 void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
   SILValue v(i, 0);
   Explosion lowered(CurExplosionLevel);

@@ -79,8 +79,8 @@ void SILConstant::print(raw_ostream &OS) const {
   case SILConstant::Kind::OneOfElement:
     OS << ".oneofelt";
     break;
-  case SILConstant::Kind::Destructor:
-    OS << ".destructor";
+  case SILConstant::Kind::Destroyer:
+    OS << ".destroyer";
     break;
   case SILConstant::Kind::GlobalAccessor:
     OS << ".globalaccessor";
@@ -480,6 +480,10 @@ public:
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
        << EI->getField()->getName().get();
+  }
+  
+  void visitBuiltinZeroInst(BuiltinZeroInst *ZI) {
+    OS << "builtin_zero $" << ZI->getType();
   }
   
   void printDynamicMethodInst(DynamicMethodInst *I,

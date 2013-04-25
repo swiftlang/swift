@@ -335,6 +335,12 @@ public:
               "Tuple element arguments do not match tuple type!");
     }
   }
+  
+  void checkBuiltinZeroInst(BuiltinZeroInst *ZI) {
+    require(ZI->getType().is<BuiltinType>(),
+            "builtin_zero result must be a builtin type");
+  }
+  
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType(0).is<MetaTypeType>(),
             "metatype instruction must be of metatype type");

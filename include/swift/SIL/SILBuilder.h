@@ -359,6 +359,10 @@ public:
     return insert(new DeinitExistentialInst(Loc, Existential));
   }
   
+  BuiltinZeroInst *createBuiltinZero(SILLocation Loc, SILType Type) {
+    return insert(new BuiltinZeroInst(Loc, Type));
+  }
+  
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
     return insert(new MetatypeInst(Loc, Metatype));
   }

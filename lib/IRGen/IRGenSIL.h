@@ -487,6 +487,7 @@ public:
   void visitStoreInst(StoreInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
+  void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
