@@ -263,6 +263,9 @@ public:
     // If it could be resolved, though, we would have already resolved it.
     return failed(E);
   }
+  CoercedResult visitZeroValueExpr(ZeroValueExpr *E) {
+    return unchanged(E);
+  }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
     if (E->getType()->isUnresolvedType())
       return CoercionResult::Unknowable;

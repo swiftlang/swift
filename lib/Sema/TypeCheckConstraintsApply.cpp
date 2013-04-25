@@ -972,6 +972,11 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    Expr *visitZeroValueExpr(ZeroValueExpr *expr) {
+      // Do nothing with zero-value initialization expressions.
+      return simplifyExprType(expr);
+    }
+
     Expr *visitApplyExpr(ApplyExpr *expr) {
       return finishApply(expr, expr->getType(), expr);
     }

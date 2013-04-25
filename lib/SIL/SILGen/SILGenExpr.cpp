@@ -1794,6 +1794,10 @@ RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
   return RValue(*this, emitManagedRValueWithCleanup(result));
 }
 
+RValue SILGenFunction::visitZeroValueExpr(ZeroValueExpr *E, SGFContext C) {
+  llvm_unreachable("ZeroValueExpr not implemented yet");
+}
+
 SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
   assert(v.getType().getUncurryLevel() == 0 &&
          "uncurried functions shouldn't be used as swift values");

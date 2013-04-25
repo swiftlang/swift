@@ -746,6 +746,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
+  prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
+                           TC.implicitlyDefinedFunctions.end());
+  TC.implicitlyDefinedFunctions.clear();
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.

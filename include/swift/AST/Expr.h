@@ -2296,7 +2296,24 @@ public:
     return E->getKind() == ExprKind::If;
   }
 };
-  
+
+/// \brief An expression that produces a zero value for types that
+/// default-initialize to zero, including builtin types and classes.
+///
+/// This expression is synthesizes by type checking and cannot be written
+/// directly by the user.
+class ZeroValueExpr : public Expr {
+public:
+  explicit ZeroValueExpr(Type Ty)
+    : Expr(ExprKind::ZeroValue, Ty) { }
+
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ZeroValue;
+  }
+};
+
 } // end namespace swift
 
 #endif

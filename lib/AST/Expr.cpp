@@ -102,7 +102,31 @@ bool Expr::isImplicit() const {
   if (const ImplicitConversionExpr *ICE
         = dyn_cast<ImplicitConversionExpr>(this))
     return ICE->getSubExpr()->isImplicit();
-  
+
+  if (const MemberRefExpr *memberRef = dyn_cast<MemberRefExpr>(this))
+    return memberRef->getNameLoc().isInvalid();
+  if (auto memberRef = dyn_cast<GenericMemberRefExpr>(this))
+    return memberRef->getNameLoc().isInvalid();
+  if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(this))
+    return memberRef->getNameLoc().isInvalid();
+
+  if (const MetatypeExpr *metatype = dyn_cast<MetatypeExpr>(this))
+    return metatype->getLoc().isInvalid();
+
+  if (const ApplyExpr *apply = dyn_cast<ApplyExpr>(this))
+    return apply->getArg()->isImplicit();
+
+  if (const TupleExpr *tuple = dyn_cast<TupleExpr>(this)) {
+    if (!tuple->getSourceRange().isInvalid())
+      return false;
+
+    for (auto elt : tuple->getElements()) {
+      if (!elt->isImplicit())
+        return false;
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -827,7 +851,11 @@ public:
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << ')';
   }
-  
+
+  void visitZeroValueExpr(ZeroValueExpr *E) {
+    printCommon(E, "zero_value_expr") << ')';
+  }
+
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName);
     if (E->isSuper())

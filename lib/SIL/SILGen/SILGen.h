@@ -487,6 +487,7 @@ public:
                                                 SGFContext C);
   RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
   RValue visitIfExpr(IfExpr *E, SGFContext C);
+  RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
 
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,

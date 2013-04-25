@@ -90,7 +90,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
-  
+  Expr *visitZeroValueExpr(ZeroValueExpr *E) { return E; }
+
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     for (auto &Segment : E->getSegments()) {
       if (Expr *Seg = doIt(Segment))

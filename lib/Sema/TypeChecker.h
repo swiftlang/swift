@@ -279,6 +279,10 @@ public:
   TranslationUnit &TU;
   ASTContext &Context;
 
+  /// \brief The list of implicitly-defined functions created by the
+  /// type checker.
+  std::vector<FuncExprLike> implicitlyDefinedFunctions;
+
 private:
   /// \brief The 'Enumerable' protocol, used by the for-each loop.
   ProtocolDecl *EnumerableProto;

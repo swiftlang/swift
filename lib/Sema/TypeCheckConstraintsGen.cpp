@@ -765,6 +765,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
+    Type visitZeroValueExpr(ZeroValueExpr *expr) {
+      return CS.openType(expr->getType());
+    }
+
     Type visitApplyExpr(ApplyExpr *expr) {
       ASTContext &Context = CS.getASTContext();
 

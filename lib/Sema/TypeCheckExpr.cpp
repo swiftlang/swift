@@ -1185,7 +1185,12 @@ public:
     // OpaqueValueExpr is fully type-checked.
     return E;
   }
-    
+
+  Expr *visitZeroValueExpr(ZeroValueExpr *E) {
+    // ZeroValueExpr is fully type-checked.
+    return E;
+  }
+
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;

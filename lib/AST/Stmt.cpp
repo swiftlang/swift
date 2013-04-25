@@ -55,9 +55,29 @@ return cast<ID##Stmt>(this)->getSourceRange();
 
 bool Stmt::isImplicit() const {
   if (auto brace = dyn_cast<BraceStmt>(this)) {
+    for (auto element : brace->getElements()) {
+      if (auto expr = element.dyn_cast<Expr *>()) {
+        if (!expr->isImplicit())
+          return false;
+        continue;
+      }
+
+      if (auto stmt = element.dyn_cast<Stmt *>()) {
+        if (!stmt->isImplicit())
+          return false;
+        continue;
+      }
+
+      if (!element.get<Decl *>()->isImplicit())
+        return false;
+    }
     if (brace->getLBraceLoc().isInvalid() &&
         brace->getRBraceLoc().isInvalid())
       return true;
+  }
+
+  if (auto assign = dyn_cast<AssignStmt>(this)) {
+    return assign->getEqualLoc().isInvalid();
   }
 
   return false;
