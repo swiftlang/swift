@@ -38,8 +38,7 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   // If the variable is empty, don't actually emit it; just return undef.
   // FIXME: global destructors?
   if (type.isKnownEmpty()) {
-    auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
-    return type.getAddressForPointer(undef);
+    return type.getUndefAddress();
   }
   
   /// Get the global variable.
@@ -54,10 +53,7 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
 
 /// Create an allocation for an empty object.
 static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
-  llvm::Value *badPointer =
-    llvm::UndefValue::get(type.getStorageType()->getPointerTo());
-  return OwnedAddress(type.getAddressForPointer(badPointer),
-                      IGM.RefCountedNull);
+  return OwnedAddress(type.getUndefAddress(), IGM.RefCountedNull);
 }
 
 

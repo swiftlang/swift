@@ -128,6 +128,9 @@ public:
 
   /// Given a generic pointer to this type, produce an Address for it.
   Address getAddressForPointer(llvm::Value *ptr) const;
+
+  /// Produce an undefined pointer to an object of this type.
+  Address getUndefAddress() const;
     
   /// Return the size and alignment of this type.
   virtual std::pair<llvm::Value*,llvm::Value*>

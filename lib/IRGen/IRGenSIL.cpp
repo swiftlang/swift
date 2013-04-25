@@ -493,8 +493,7 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
   // If the variable is empty, don't actually emit it; just return undef.
   // FIXME: global destructors?
   if (type.isKnownEmpty()) {
-    auto undef = llvm::UndefValue::get(type.StorageType->getPointerTo());
-    addr = Address(undef, Alignment(1));
+    addr = type.getUndefAddress();
   } else {
     addr = IGM.getAddrOfGlobalVariable(global);
   }

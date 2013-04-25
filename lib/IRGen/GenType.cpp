@@ -49,6 +49,11 @@ Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   return Address(ptr, StorageAlignment);
 }
 
+Address TypeInfo::getUndefAddress() const {
+  return Address(llvm::UndefValue::get(getStorageType()->getPointerTo(0)),
+                 StorageAlignment);
+}
+
 /// Whether this type is known to be empty.
 bool TypeInfo::isKnownEmpty() const {
   if (auto fixed = dyn_cast<FixedTypeInfo>(this))
