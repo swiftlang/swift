@@ -4,7 +4,6 @@
 <ul>
 <li>The following are from public headers from public frameworks, which are AppKit and Foundation (verified).</li>
 <li>A double dash ("--") means unavailable in Swift.</li>
-<li>These are arranged according Objective-C categories.</li>
 <li>Creating substrings in Swift is very fast. Therefore Cocoa APIs that take
     NSRanges are replaced with Swift APIs that do <em>not</em> take ranges. One
     must use range-based subscripting to achieve the same effect. For example:
@@ -14,12 +13,8 @@
 
 <table border="1">
 <tr><td>Status</td><td>Swift</td><td>Objective C</td></tr>
-
-<tr><td colspan="3"><b>NSString</b></td></tr>
 <tr><td align="center">&#x2714;</td><td><pre>var length : Int</pre></td><td>- (NSUInteger)length;</td></tr>
 <tr><td align="center">&#x2714;</td><td><pre>subscript(index : Int) -> Char</pre></td><td>- (unichar)characterAtIndex:(NSUInteger)index;</td></tr>
-
-<tr><td colspan="3"><b>NSStringExtensionMethods</b></td></tr>
 <tr><td></td><td><pre>var chars : CharEnumeratorType</pre></td><td>- (void)getCharacters:(unichar *)buffer range:(NSRange)aRange;</td></tr>
 <tr><td align="center" rowspan="3">&#x2714;</td><td rowspan="3"><pre>subscript(range : Range&lt;Int&gt;) -&gt; String</pre></td><td>- (NSString *)substringToIndex:(NSUInteger)to;</td></tr>
 <tr><!-- see above --><td>- (NSString *)substringFromIndex:(NSUInteger)from;</td></tr>
@@ -94,11 +89,15 @@ func != (lhs : String, rhs : String) -&gt; Bool</pre></td><td>- (BOOL)isEqualToS
 <tr><td></td><td>TBD</td><td>+ (NSStringEncoding)defaultCStringEncoding;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (const NSStringEncoding *)availableStringEncodings;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)init;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithCharactersNoCopy:(unichar *)characters length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer;</td></tr>
+
+<tr><td colspan="3"><b>Constructors</b></td></tr>
+<tr><td align="center">&#x2714;</td><td>Not applicable</td><td>- (instancetype)init;</td></tr>
+<tr><td align="center">&#x2714;</td><td>Not applicable</td><td>- (instancetype)initWithString:(NSString *)aString;</td></tr>
+<tr><td align="center">&#x2714;</td><td>Not applicable</td><td>+ (instancetype)string;</td></tr>
+<tr><td align="center">&#x2714;</td><td>Not applicable</td><td>+ (instancetype)stringWithString:(NSString *)string;</td></tr>
+<tr><td align="center">&#x2714;</td><td>Not available (too error prone)</td><td>- (instancetype)initWithCharactersNoCopy:(unichar *)characters length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer;</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithCharacters:(const unichar *)characters length:(NSUInteger)length;</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithUTF8String:(const char *)nullTerminatedCString;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithString:(NSString *)aString;</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithFormat:(NSString *)format arguments:(va_list)argList NS_FORMAT_FUNCTION(1,0);</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithFormat:(NSString *)format locale:(id)locale, ... NS_FORMAT_FUNCTION(1,3);</td></tr>
@@ -106,99 +105,81 @@ func != (lhs : String, rhs : String) -&gt; Bool</pre></td><td>- (BOOL)isEqualToS
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithData:(NSData *)data encoding:(NSStringEncoding)encoding;</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithBytes:(const void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)encoding;</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithBytesNoCopy:(void *)bytes length:(NSUInteger)len encoding:(NSStringEncoding)encoding freeWhenDone:(BOOL)freeBuffer;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)string;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)stringWithString:(NSString *)string;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (instancetype)stringWithCharacters:(const unichar *)characters length:(NSUInteger)length;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (instancetype)stringWithUTF8String:(const char *)nullTerminatedCString;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (instancetype)stringWithFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);</td></tr>
 <tr><td></td><td>TBD</td><td>+ (instancetype)localizedStringWithFormat:(NSString *)format, ... NS_FORMAT_FUNCTION(1,2);</td></tr>
 <tr><td></td><td>TBD</td><td>- (instancetype)initWithCString:(const char *)nullTerminatedCString encoding:(NSStringEncoding)encoding;</td></tr>
 <tr><td></td><td>TBD</td><td>+ (instancetype)stringWithCString:(const char *)cString encoding:(NSStringEncoding)enc;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)stringWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>- (instancetype)initWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)stringWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-<tr><td></td><td>TBD</td><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
-
-<tr><td colspan="3"><b>NSPasteboardWriting</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (NSArray *)writableTypesForPasteboard:(NSPasteboard *)pasteboard;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSPasteboardWritingOptions)writingOptionsForType:(NSString *)type pasteboard:(NSPasteboard *)pasteboard;</td></tr>
-<tr><td></td><td>TBD</td><td>- (id)pasteboardPropertyListForType:(NSString *)type;</td></tr>
-
-<tr><td colspan="3"><b>NSPasteboardReading</b></td></tr>
-<tr><td></td><td>TBD</td><td>+ (NSArray *)readableTypesForPasteboard:(NSPasteboard *)pasteboard;</td></tr>
-<tr><td></td><td>TBD</td><td>+ (NSPasteboardReadingOptions)readingOptionsForType:(NSString *)type pasteboard:(NSPasteboard *)pasteboard;</td></tr>
-<tr><td></td><td>TBD</td><td>- (id)initWithPasteboardPropertyList:(id)propertyList ofType:(NSString *)type;</td></tr>
-
-<tr><td colspan="3"><b>NSStringDrawing</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (NSSize)sizeWithAttributes:(NSDictionary *)attrs;</td></tr>
-<tr><td></td><td>TBD</td><td>- (void)drawAtPoint:(NSPoint)point withAttributes:(NSDictionary *)attrs;</td></tr>
-<tr><td></td><td>TBD</td><td>- (void)drawInRect:(NSRect)rect withAttributes:(NSDictionary *)attrs;</td></tr>
-
-<tr><td colspan="3"><b>NSExtendedStringDrawing</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (void)drawWithRect:(NSRect)rect options:(NSStringDrawingOptions)options attributes:(NSDictionary *)attributes;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSRect)boundingRectWithSize:(NSSize)size options:(NSStringDrawingOptions)options attributes:(NSDictionary *)attributes;</td></tr>
 
 <tr><td colspan="3"><b>NSLinguisticAnalysis</b></td></tr>
 <tr><td></td><td>TBD</td><td>- (NSArray *)linguisticTagsInRange:(NSRange)range scheme:(NSString *)tagScheme options:(NSLinguisticTaggerOptions)opts orthography:(NSOrthography *)orthography tokenRanges:(NSArray **)tokenRanges NS_AVAILABLE(10_7, 5_0);</td></tr>
 <tr><td></td><td>TBD</td><td>- (void)enumerateLinguisticTagsInRange:(NSRange)range scheme:(NSString *)tagScheme options:(NSLinguisticTaggerOptions)opts orthography:(NSOrthography *)orthography usingBlock:(void (^)(NSString *tag, NSRange tokenRange, NSRange sentenceRange, BOOL *stop))block NS_AVAILABLE(10_7, 5_0);</td></tr>
 
-<tr><td colspan="3"><b>NSStringPathExtensions</b></td></tr>
-<tr><td></td><td>TBD</td><td>+ (NSString *)pathWithComponents:(NSArray *)components;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSArray *)pathComponents;</td></tr>
-<tr><td></td><td>TBD</td><td>- (BOOL)isAbsolutePath;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)lastPathComponent;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByDeletingLastPathComponent;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByAppendingPathComponent:(NSString *)str;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)pathExtension;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByDeletingPathExtension;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByAppendingPathExtension:(NSString *)str;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByAbbreviatingWithTildeInPath;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByExpandingTildeInPath;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByStandardizingPath;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByResolvingSymlinksInPath;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSArray *)stringsByAppendingPaths:(NSArray *)paths;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSUInteger)completePathIntoString:(NSString **)outputName caseSensitive:(BOOL)flag matchesIntoArray:(NSArray **)outputArray filterTypes:(NSArray *)filterTypes;</td></tr>
-<tr><td></td><td>--</td><td>- (__strong const char *)fileSystemRepresentation NS_RETURNS_INNER_POINTER;</td></tr>
-<tr><td></td><td>TBD</td><td>- (BOOL)getFileSystemRepresentation:(char *)cname maxLength:(NSUInteger)max;</td></tr>
+<tr><td colspan="3"><b>Unavailable on Swift Strings</b></td></tr>
+<tr><td colspan="2" rowspan="9">See: <code>struct URL</code></td><td>- (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>+ (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>- (instancetype)initWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>+ (instancetype)stringWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByAddingPercentEncodingWithAllowedCharacters:(NSCharacterSet *)allowedCharacters NS_AVAILABLE(10_9, 7_0);</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByRemovingPercentEncoding NS_AVAILABLE(10_9, 7_0);</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
+<tr><td colspan="2" rowspan="5"> See: <code>class File</code></td><td>- (instancetype)initWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>+ (instancetype)stringWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>- (instancetype)initWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>+ (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error;</td></tr>
+<tr><!-- see above --><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error;</td></tr>
+<tr><td colspan="2" rowspan="17">See: <code>struct Path</code></td><td>+ (NSString *)pathWithComponents:(NSArray *)components;</td></tr>
+<tr><!-- see above --><td>- (NSArray *)pathComponents;</td></tr>
+<tr><!-- see above --><td>- (BOOL)isAbsolutePath;</td></tr>
+<tr><!-- see above --><td>- (NSString *)lastPathComponent;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByDeletingLastPathComponent;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByAppendingPathComponent:(NSString *)str;</td></tr>
+<tr><!-- see above --><td>- (NSString *)pathExtension;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByDeletingPathExtension;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByAppendingPathExtension:(NSString *)str;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByAbbreviatingWithTildeInPath;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByExpandingTildeInPath;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByStandardizingPath;</td></tr>
+<tr><!-- see above --><td>- (NSString *)stringByResolvingSymlinksInPath;</td></tr>
+<tr><!-- see above --><td>- (NSArray *)stringsByAppendingPaths:(NSArray *)paths;</td></tr>
+<tr><!-- see above --><td>- (NSUInteger)completePathIntoString:(NSString **)outputName caseSensitive:(BOOL)flag matchesIntoArray:(NSArray **)outputArray filterTypes:(NSArray *)filterTypes;</td></tr>
+<tr><!-- see above --><td>- (__strong const char *)fileSystemRepresentation NS_RETURNS_INNER_POINTER;</td></tr>
+<tr><!-- see above --><td>- (BOOL)getFileSystemRepresentation:(char *)cname maxLength:(NSUInteger)max;</td></tr>
+<tr><td colspan="2" rowspan="2">Not applicable. Property lists are a feature of Cocoa.</td><td>- (id)propertyList;</td></tr>
+<tr><!-- see above --><td>- (NSDictionary *)propertyListFromStringsFileFormat;</td></tr>
+<tr><td colspan="2" rowspan="11">Not applicable. Swift does not provide GUI support.</td><td>- (NSSize)sizeWithAttributes:(NSDictionary *)attrs;</td></tr>
+<tr><!-- see above --><td>- (void)drawAtPoint:(NSPoint)point withAttributes:(NSDictionary *)attrs;</td></tr>
+<tr><!-- see above --><td>- (void)drawInRect:(NSRect)rect withAttributes:(NSDictionary *)attrs;</td></tr>
+<tr><!-- see above --><td>- (void)drawWithRect:(NSRect)rect options:(NSStringDrawingOptions)options attributes:(NSDictionary *)attributes;</td></tr>
+<tr><!-- see above --><td>- (NSRect)boundingRectWithSize:(NSSize)size options:(NSStringDrawingOptions)options attributes:(NSDictionary *)attributes;</td></tr>
+<tr><!-- see above --><td>- (NSArray *)writableTypesForPasteboard:(NSPasteboard *)pasteboard;</td></tr>
+<tr><!-- see above --><td>- (NSPasteboardWritingOptions)writingOptionsForType:(NSString *)type pasteboard:(NSPasteboard *)pasteboard;</td></tr>
+<tr><!-- see above --><td>- (id)pasteboardPropertyListForType:(NSString *)type;</td></tr>
+<tr><!-- see above --><td>+ (NSArray *)readableTypesForPasteboard:(NSPasteboard *)pasteboard;</td></tr>
+<tr><!-- see above --><td>+ (NSPasteboardReadingOptions)readingOptionsForType:(NSString *)type pasteboard:(NSPasteboard *)pasteboard;</td></tr>
+<tr><!-- see above --><td>- (id)initWithPasteboardPropertyList:(id)propertyList ofType:(NSString *)type;</td></tr>
 
-<tr><td colspan="3"><b>NSExtendedStringPropertyListParsing</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (id)propertyList;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSDictionary *)propertyListFromStringsFileFormat;</td></tr>
-
-<tr><td colspan="3"><b>NSURLUtilities</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByAddingPercentEncodingWithAllowedCharacters:(NSCharacterSet *)allowedCharacters NS_AVAILABLE(10_9, 7_0);</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByRemovingPercentEncoding NS_AVAILABLE(10_9, 7_0);</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
-<tr><td></td><td>TBD</td><td>- (NSString *)stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
-
-<!-- Deprecated stuff isn't interesting to talk about or compare
-
-<tr><td colspan="3"><b>NSStringDeprecated</b></td></tr>
-<tr><td></td><td></td><td>- (const char *)cString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (const char *)lossyCString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (NSUInteger)cStringLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (void)getCString:(char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength range:(NSRange)aRange remainingRange:(NSRangePointer)leftoverRange NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (id)initWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (id)initWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>+ (id)stringWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>+ (id)stringWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (id)initWithCStringNoCopy:(char *)bytes length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (id)initWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (id)initWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>+ (id)stringWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>+ (id)stringWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td></td><td>- (void)getCharacters:(unichar *)buffer;</td></tr>
--->
+<tr><td colspan="2" rowspan="18">Not applicable. Already deprecated in Cocoa.</td><td>- (const char *)cString;
+<tr><!-- see above --><td>- (const char *)lossyCString;
+<tr><!-- see above --><td>- (NSUInteger)cStringLength;
+<tr><!-- see above --><td>- (void)getCString:(char *)bytes;
+<tr><!-- see above --><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength;
+<tr><!-- see above --><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength range:(NSRange)aRange remainingRange:(NSRangePointer)leftoverRange;
+<tr><!-- see above --><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile;
+<tr><!-- see above --><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically;
+<tr><!-- see above --><td>- (id)initWithContentsOfFile:(NSString *)path;
+<tr><!-- see above --><td>- (id)initWithContentsOfURL:(NSURL *)url;
+<tr><!-- see above --><td>+ (id)stringWithContentsOfFile:(NSString *)path;
+<tr><!-- see above --><td>+ (id)stringWithContentsOfURL:(NSURL *)url;
+<tr><!-- see above --><td>- (id)initWithCStringNoCopy:(char *)bytes length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer;
+<tr><!-- see above --><td>- (id)initWithCString:(const char *)bytes length:(NSUInteger)length;
+<tr><!-- see above --><td>- (id)initWithCString:(const char *)bytes;
+<tr><!-- see above --><td>+ (id)stringWithCString:(const char *)bytes length:(NSUInteger)length;
+<tr><!-- see above --><td>+ (id)stringWithCString:(const char *)bytes;
+<tr><!-- see above --><td>- (void)getCharacters:(unichar *)buffer;</td></tr>
 
 </table>
 <h1>Footnotes</h1>
