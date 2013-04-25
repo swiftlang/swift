@@ -373,11 +373,11 @@ static AbstractCC getAbstractCC(SILConstant c) {
   if (!c.hasDecl())
     return AbstractCC::Freestanding;
   
+  if (c.getDecl()->hasClangNode())
+    return AbstractCC::C;
   if (c.getDecl()->isInstanceMember() ||
       c.kind == SILConstant::Kind::Initializer)
     return AbstractCC::Method;
-  if (c.getDecl()->hasClangNode())
-    return AbstractCC::C;
   return AbstractCC::Freestanding;
 }
 

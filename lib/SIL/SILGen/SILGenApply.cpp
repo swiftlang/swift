@@ -330,6 +330,20 @@ public:
     visit(e->getSubExpr());
   }
   
+  bool needsSuperMethodDispatch(SILConstant c) {
+    // ObjC methods and constructors require super dispatch.
+    if (gen.SGM.getConstantCC(c) == AbstractCC::C)
+      return true;
+    if (c.kind == SILConstant::Kind::Initializer) {
+      DeclContext *ctorDC = cast<ConstructorDecl>(c.getDecl())->getDeclContext();
+      if (auto *cls = dyn_cast<ClassDecl>(ctorDC)) {
+        if (cls->isObjC())
+          return true;
+      }
+    }
+    return false;
+  }
+
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     // FIXME: Eliminate the implicit coercions of the SuperExpr.
@@ -363,8 +377,15 @@ public:
     
     setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
     
-    SILValue superMethod = gen.B.createSuperMethod(apply, super.getValue(),
-                                                   constant, constantTy);
+    SILValue superMethod;
+    if (needsSuperMethodDispatch(constant)) {
+      // ObjC super calls require dynamic dispatch.
+      superMethod = gen.B.createSuperMethod(apply, super.getValue(),
+                                            constant, constantTy);
+    } else {
+      // Native Swift super calls are direct.
+      superMethod = gen.emitGlobalFunctionRef(apply, constant);
+    }
     setCallee(ManagedValue(superMethod, ManagedValue::Unmanaged),
               OwnershipConventions::get(gen, constant));
   }

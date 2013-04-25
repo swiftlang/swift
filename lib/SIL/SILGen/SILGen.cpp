@@ -122,7 +122,9 @@ SILFunction *SILGenModule::getFunction(SILConstant constant) {
   SILType constantType = getConstantType(constant);
   SILLinkage linkage = getConstantLinkage(constant);
   
-  return new (M) SILFunction(M, linkage, constant, constantType);
+  SILFunction *F = new (M) SILFunction(M, linkage, constant, constantType);
+  emittedFunctions[constant] = F;
+  return F;
 }
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
@@ -154,7 +156,6 @@ void SILGenModule::postEmitFunction(SILConstant constant,
   DEBUG(llvm::dbgs() << "lowered sil:\n";
         F->print(llvm::dbgs()));
   F->verify();
-  emittedFunctions[constant] = F;
 }
 
 SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
