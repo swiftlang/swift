@@ -172,25 +172,29 @@ func != (lhs : String, rhs : String) -&gt; Bool</pre></td><td>- (BOOL)isEqualToS
 <tr><td></td><td>TBD</td><td>- (NSString *)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
 <tr><td></td><td>TBD</td><td>- (NSString *)stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)enc;</td></tr>
 
+<!-- Deprecated stuff isn't interesting to talk about or compare
+
 <tr><td colspan="3"><b>NSStringDeprecated</b></td></tr>
-<tr><td></td><td>--</td><td>- (const char *)cString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (const char *)lossyCString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (NSUInteger)cStringLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (void)getCString:(char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength range:(NSRange)aRange remainingRange:(NSRangePointer)leftoverRange NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (id)initWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (id)initWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>+ (id)stringWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>+ (id)stringWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (id)initWithCStringNoCopy:(char *)bytes length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (id)initWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (id)initWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>+ (id)stringWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>+ (id)stringWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
-<tr><td></td><td>--</td><td>- (void)getCharacters:(unichar *)buffer;</td></tr>
+<tr><td></td><td></td><td>- (const char *)cString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (const char *)lossyCString NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (NSUInteger)cStringLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (void)getCString:(char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (void)getCString:(char *)bytes maxLength:(NSUInteger)maxLength range:(NSRange)aRange remainingRange:(NSRangePointer)leftoverRange NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)atomically NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (id)initWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (id)initWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>+ (id)stringWithContentsOfFile:(NSString *)path NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>+ (id)stringWithContentsOfURL:(NSURL *)url NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (id)initWithCStringNoCopy:(char *)bytes length:(NSUInteger)length freeWhenDone:(BOOL)freeBuffer NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (id)initWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (id)initWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>+ (id)stringWithCString:(const char *)bytes length:(NSUInteger)length NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>+ (id)stringWithCString:(const char *)bytes NS_DEPRECATED(10_0, 10_4, 2_0, 2_0);</td></tr>
+<tr><td></td><td></td><td>- (void)getCharacters:(unichar *)buffer;</td></tr>
+-->
+
 </table>
 <h1>Footnotes</h1>
 <ol>
