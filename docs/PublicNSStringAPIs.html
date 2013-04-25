@@ -5,6 +5,11 @@
 <li>The following are from public headers from public frameworks, which are AppKit and Foundation (verified).</li>
 <li>A double dash ("--") means unavailable in Swift.</li>
 <li>These are arranged according Objective-C categories.</li>
+<li>Creating substrings in Swift is very fast. Therefore Cocoa APIs that take
+    NSRanges are replaced with Swift APIs that do <em>not</em> take ranges. One
+    must use range-based subscripting to achieve the same effect. For example:
+    <code>[str doFoo:arg withRange:arg2]</code> becomes
+    <code>str[arg2].doFoo(arg)</code>.
 </ul>
 
 <table border="1">
@@ -15,7 +20,7 @@
 <tr><td align="center">&#x2714;</td><td><pre>subscript(index : Int) -> Char</pre></td><td>- (unichar)characterAtIndex:(NSUInteger)index;</td></tr>
 
 <tr><td colspan="3"><b>NSStringExtensionMethods</b></td></tr>
-<tr><td></td><td>TBD</td><td>- (void)getCharacters:(unichar *)buffer range:(NSRange)aRange;</td></tr>
+<tr><td></td><td><pre>var chars : CharEnumeratorType</pre></td><td>- (void)getCharacters:(unichar *)buffer range:(NSRange)aRange;</td></tr>
 <tr><td align="center" rowspan="3">&#x2714;</td><td rowspan="3"><pre>subscript(range : Range&lt;Int&gt;) -&gt; String</pre></td><td>- (NSString *)substringToIndex:(NSUInteger)to;</td></tr>
 <tr><!-- see above --><td>- (NSString *)substringFromIndex:(NSUInteger)from;</td></tr>
 <tr><!-- see above --><td>- (NSString *)substringWithRange:(NSRange)range;</td></tr>
