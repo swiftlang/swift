@@ -80,10 +80,12 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     assert(!builder.empty() == requiresHeapHeader(layoutKind));
     MinimumAlign = Alignment(1);
     MinimumSize = Size(0);
+    IsFixedLayout = true;
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
+    IsFixedLayout = builder.isFixedLayout();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -114,6 +116,7 @@ Address StructLayout::emitCastTo(IRGenFunction &IGF,
 }
 
 Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
+                               NonFixedOffsets offsets,
                                const llvm::Twine &suffix) const {
   switch (getKind()) {
   case Kind::Empty:
@@ -124,6 +127,14 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                        getStructIndex(),
                                        getByteOffset(),
                                  baseAddr.getAddress()->getName() + suffix);
+
+  case Kind::NonFixed: {
+    assert(offsets.hasValue());
+    llvm::Value *offset =
+      offsets.getValue()->getOffsetForIndex(IGF, getNonFixedElementIndex());
+    return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getType(),
+                                 baseAddr.getAddress()->getName() + suffix);
+  }
   }
   llvm_unreachable("bad element layout kind");
 }
@@ -145,58 +156,122 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   for (auto &elt : elts) {
     auto &eltTI = elt.getType();
 
-    auto isPOD = eltTI.isPOD(ResilienceScope::Local);
-
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {
-      elt.completeEmpty(isPOD);
-      continue;
-    }
+      addEmptyElement(elt);
+    } else {
+      // Anything else we do at least potentially adds storage requirements.
+      addedStorage = true;
 
-    // Anything else we do at least potentially adds storage requirements.
-    addedStorage = true;
+      // TODO: consider using different layout rules.
+      // If the rules are changed so that fields aren't necessarily laid
+      // out sequentially, the computation of InstanceStart in the
+      // RO-data will need to be fixed.
 
-    // FIXME: handle resilient/dependently-sized types
-    auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
-
-    // TODO: consider using different layout rules.
-    // If the rules are changed so that fields aren't necessarily laid
-    // out sequentially, the computation of InstanceStart in the
-    // RO-data will need to be fixed.
-
-    // The struct alignment is the max of the alignment of the fields.
-    CurAlignment = std::max(CurAlignment, fixedEltTI.getFixedAlignment());
-
-    // If the current tuple size isn't a multiple of the field's
-    // required alignment, we need to pad out.
-    Alignment eltAlignment = fixedEltTI.getFixedAlignment();
-    if (Size offsetFromAlignment = CurSize % eltAlignment) {
-      unsigned paddingRequired
-        = eltAlignment.getValue() - offsetFromAlignment.getValue();
-      assert(paddingRequired != 0);
-
-      // We don't actually need to uglify the IR unless the natural
-      // alignment of the IR type for the field isn't good enough.
-      Alignment fieldIRAlignment(
-          IGM.DataLayout.getABITypeAlignment(eltTI.StorageType));
-      assert(fieldIRAlignment <= eltAlignment);
-      if (fieldIRAlignment != eltAlignment) {
-        auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
-        StructFields.push_back(paddingTy);
+      // If this element is resiliently- or dependently-sized, record
+      // that and configure the ElementLayout appropriately.
+      if (isa<FixedTypeInfo>(eltTI)) {
+        addFixedSizeElement(elt);
+      } else {
+        addNonFixedSizeElement(elt);
       }
-
-      // Regardless, the storage size goes up.
-      CurSize += Size(paddingRequired);
     }
 
-    // Set the element's offset and field-index.
-    elt.completeFixed(isPOD, CurSize, StructFields.size());
-
-    StructFields.push_back(eltTI.getStorageType());
-    CurSize += fixedEltTI.getFixedSize();
+    NextNonFixedOffsetIndex++;
   }
 
   return addedStorage;
+}
+
+void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
+  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
+
+  // Note that, even in the presence of elements with non-fixed
+  // size, we continue to compute the minimum size and alignment
+  // requirements of the overall aggregate as if all the
+  // non-fixed-size elements were empty.  This gives us minimum
+  // bounds on the size and alignment of the aggregate.
+
+  // The struct alignment is the max of the alignment of the fields.
+  CurAlignment = std::max(CurAlignment, eltTI.getFixedAlignment());
+
+  // If the current tuple size isn't a multiple of the field's
+  // required alignment, we need to pad out.
+  Alignment eltAlignment = eltTI.getFixedAlignment();
+  if (Size offsetFromAlignment = CurSize % eltAlignment) {
+    unsigned paddingRequired
+      = eltAlignment.getValue() - offsetFromAlignment.getValue();
+    assert(paddingRequired != 0);
+
+    // We don't actually need to uglify the IR unless the natural
+    // alignment of the IR type for the field isn't good enough.
+    // We also don't need to bother actually adding an IR field if
+    // the field can't be statically accessed.
+    Alignment fieldIRAlignment(
+          IGM.DataLayout.getABITypeAlignment(eltTI.StorageType));
+    assert(fieldIRAlignment <= eltAlignment);
+    if (fieldIRAlignment != eltAlignment && isFixedLayout()) {
+      auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
+      StructFields.push_back(paddingTy);
+    }
+
+    // Regardless, the storage size goes up.
+    CurSize += Size(paddingRequired);
+  }
+
+  // If the overall structure so far has a fixed layout, then add
+  // this as a field to the layout.
+  if (isFixedLayout()) {
+    addElementAtFixedOffset(elt);
+
+  // Otherwise, just remember the next non-fixed offset index.
+  } else {
+    addElementAtNonFixedOffset(elt);
+  }
+  CurSize += eltTI.getFixedSize();
+}
+
+void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
+  // If the element is the first non-empty element to be added to the
+  // structure, we can assign it a fixed offset (namely zero) despite
+  // it not having a fixed size/alignment.
+  if (isFixedLayout() && CurSize.isZero()) {
+    addElementAtFixedOffset(elt);
+    IsFixedLayout = false;
+    return;
+  }
+
+  // Otherwise, we cannot give it a fixed offset, even if all the
+  // previous elements are non-fixed.  The problem is not that it has
+  // an unknown *size*; it's that it has an unknown *alignment*, which
+  // might force us to introduce padding.  Absent some sort of user
+  // "max alignment" annotation (or having reached the platform
+  // maximum alignment, if there is one), these are part and parcel.
+  IsFixedLayout = false;
+  addElementAtNonFixedOffset(elt);
+}
+
+/// Add an empty element to the aggregate.
+void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
+  elt.completeEmpty(elt.getType().isPOD(ResilienceScope::Local));
+}
+
+/// Add an element at the fixed offset of the current end of the
+/// aggregate.
+void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
+  assert(isFixedLayout());
+  assert(isa<FixedTypeInfo>(elt.getType()));
+
+  elt.completeFixed(elt.getType().isPOD(ResilienceScope::Local),
+                    CurSize, StructFields.size());
+  StructFields.push_back(elt.getType().getStorageType());
+}
+
+/// Add an element at a non-fixed offset to the aggregate.
+void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
+  assert(!isFixedLayout());
+  elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Local),
+                       NextNonFixedOffsetIndex);
 }
 
 /// Produce the current fields as an anonymous structure.

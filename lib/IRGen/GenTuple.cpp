@@ -62,6 +62,9 @@ namespace {
     TupleTypeInfo(llvm::Type *T, unsigned numFields)
       : SequentialTypeInfo(T, numFields) {
     }
+
+    /// FIXME: implement
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };
 
   class TupleTypeBuilder :
@@ -136,9 +139,10 @@ OwnedAddress swift::irgen::projectTupleElementAddress(IRGenFunction &IGF,
   const TupleTypeInfo &tupleTI = getAsTupleTypeInfo(IGF, tupleType);
   const TupleFieldInfo &field = tupleTI.getFields()[fieldNo];
   if (field.isEmpty())
-    return {Address(), nullptr};
-  Address fieldAddr = field.projectAddress(IGF,
-                                           base.getAddress());
+    return {field.getTypeInfo().getUndefAddress(), nullptr};
+
+  auto offsets = tupleTI.getNonFixedOffsets(IGF);
+  Address fieldAddr = field.projectAddress(IGF, base.getAddress(), offsets);
   return {fieldAddr, base.getOwner()};
 }
 

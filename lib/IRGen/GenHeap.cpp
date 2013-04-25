@@ -72,11 +72,14 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
 
   Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
+  // FIXME: provide non-fixed offsets
+  NonFixedOffsets offsets = Nothing;
+
   for (auto &field : layout.getElements()) {
-    if (field.getType().isPOD(ResilienceScope::Local))
+    if (field.isPOD())
       continue;
 
-    field.getType().destroy(IGF, field.project(IGF, structAddr));
+    field.getType().destroy(IGF, field.project(IGF, structAddr, offsets));
   }
 
   llvm::Value *size = layout.emitSize(IGF);

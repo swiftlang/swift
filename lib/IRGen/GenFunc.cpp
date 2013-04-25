@@ -1760,6 +1760,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                        fwd, Prologue::Bare);
   
   Explosion params = subIGF.collectParameters();
+
+  // FIXME: support
+  NonFixedOffsets offsets = Nothing;
   
   // If there's a data pointer required, grab it (it's always the
   // last parameter) and load out the extra, previously-curried
@@ -1770,7 +1773,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     
     // Perform the loads.
     for (auto &fieldLayout : layout.getElements()) {
-      Address fieldAddr = fieldLayout.project(subIGF, data);
+      Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       fieldLayout.getType().load(subIGF, fieldAddr, params);
     }
     
@@ -1810,10 +1813,13 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Allocate a new object.
     data = IGF.emitUnmanagedAlloc(layout, "closure");
     Address dataAddr = layout.emitCastTo(IGF, data);
+
+    // FIXME: preserve non-fixed offsets
+    NonFixedOffsets offsets = Nothing;
     
     // Perform the store.
     for (auto &fieldLayout : layout.getElements()) {
-      Address fieldAddr = fieldLayout.project(IGF, dataAddr);
+      Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
       fieldLayout.getType().initialize(IGF, args, fieldAddr);
     }
   }

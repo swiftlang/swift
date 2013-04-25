@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
+#include "swift/Basic/Optional.h"
 #include "IRGen.h"
 
 namespace llvm {
@@ -56,11 +57,35 @@ enum class LayoutKind {
   HeapObject,
 };
 
-/// An element layout is the layout for a single element of a type.
+/// An abstract class for determining non-fixed offsets.
+class NonFixedOffsetsImpl {
+protected:
+  ~NonFixedOffsetsImpl() = default;
+public:
+  /// Return the offset (in bytes, as a size_t) of the element with
+  /// the given index.
+  virtual llvm::Value *getOffsetForIndex(IRGenFunction &IGF,
+                                         unsigned index) const = 0;
+};
+
+/// The type to pass around for non-fixed offsets.
+typedef Optional<const NonFixedOffsetsImpl*> NonFixedOffsets;
+
+/// An element layout is the layout for a single element of some sort
+/// of aggregate structure.
 class ElementLayout {
 public:
   enum class Kind {
-    Empty, Fixed
+    /// The element is known to require no storage in the aggregate.
+    Empty,
+
+    /// The element can be positioned at a fixed offset within the
+    /// aggregate.
+    Fixed,
+
+    /// The element cannot be positioned at a fixed offset within the
+    /// aggregate.
+    NonFixed
   };
 
 private:
@@ -72,8 +97,9 @@ private:
   /// The offset in bytes from the start of the struct.
   unsigned ByteOffset;
 
-  /// The index of this element in the LLVM struct.
-  unsigned StructIndex : 29;
+  /// The index of this element, either in the LLVM struct (if fixed)
+  /// or in the non-fixed elements array (if non-fixed).
+  unsigned Index : 29;
 
   /// Whether this element is known to be POD in the local resilience
   /// domain.
@@ -89,10 +115,6 @@ private:
     return (TheKind != IncompleteKind);
   }
 
-  bool isCompletedFixed() const {
-    return isCompleted() && getKind() == Kind::Fixed;
-  }
-
 public:
   static ElementLayout getIncomplete(const TypeInfo &type) {
     return ElementLayout(type);
@@ -103,23 +125,31 @@ public:
     TheKind = other.TheKind;
     IsPOD = other.IsPOD;
     ByteOffset = other.ByteOffset;
-    StructIndex = other.StructIndex;
+    Index = other.Index;
   }
 
   void completeEmpty(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::Empty);
     IsPOD = unsigned(isPOD);
-    ByteOffset = 0;
-    StructIndex = 0;
+    Index = 0; // make a complete write of the bitfield
   }
 
   void completeFixed(IsPOD_t isPOD, Size byteOffset, unsigned structIndex) {
     TheKind = unsigned(Kind::Fixed);
     IsPOD = unsigned(isPOD);
     ByteOffset = byteOffset.getValue();
-    StructIndex = structIndex;
+    Index = structIndex;
 
     assert(getByteOffset() == byteOffset);
+  }
+
+  /// Complete this element layout with a non-fixed offset.
+  ///
+  /// \param nonFixedElementIndex - the index into the elements array
+  void completeNonFixed(IsPOD_t isPOD, unsigned nonFixedElementIndex) {
+    TheKind = unsigned(Kind::NonFixed);
+    IsPOD = unsigned(isPOD);
+    Index = nonFixedElementIndex;
   }
 
   const TypeInfo &getType() const { return Type; }
@@ -134,21 +164,34 @@ public:
     return getKind() == Kind::Empty;
   }
 
-  Size getByteOffset() const {
-    assert(isCompletedFixed());
-    return Size(ByteOffset);
-  }
-  unsigned getStructIndex() const {
-    assert(isCompletedFixed());
-    return StructIndex;
-  }
-
+  /// Is this element known to be POD?
   IsPOD_t isPOD() const {
     assert(isCompleted());
     return IsPOD_t(IsPOD);
   }
 
+  /// Given that this element has a fixed offset, return that offset in bytes.
+  Size getByteOffset() const {
+    assert(isCompleted() && getKind() == Kind::Fixed);
+    return Size(ByteOffset);
+  }
+
+  /// Given that this element has a fixed offset, return the index in
+  /// the LLVM struct.
+  unsigned getStructIndex() const {
+    assert(isCompleted() && getKind() == Kind::Fixed);
+    return Index;
+  }
+
+  /// Given that this element does not have a fixed offset, return its
+  /// index in the nonfixed-elements array.
+  unsigned getNonFixedElementIndex() const {
+    assert(isCompleted() && getKind() == Kind::NonFixed);
+    return Index;
+  }
+
   Address project(IRGenFunction &IGF, Address addr,
+                  NonFixedOffsets offsets,
                   const llvm::Twine &suffix = "") const;
 };
 
@@ -160,6 +203,7 @@ private:
   llvm::SmallVector<llvm::Type*, 8> StructFields;
   Size CurSize = Size(0);
   Alignment CurAlignment = Alignment(1);
+  unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
@@ -196,6 +240,14 @@ public:
 
   /// Build the current elements as a new anonymous struct type.
   void setAsBodyOfStruct(llvm::StructType *type) const;
+
+private:
+  void addFixedSizeElement(ElementLayout &elt);
+  void addNonFixedSizeElement(ElementLayout &elt);
+  void addEmptyElement(ElementLayout &elt);
+
+  void addElementAtFixedOffset(ElementLayout &elt);
+  void addElementAtNonFixedOffset(ElementLayout &elt);
 };
 
 /// A struct layout is the result of laying out a complete structure.

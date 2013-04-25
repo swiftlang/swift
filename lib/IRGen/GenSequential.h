@@ -68,8 +68,9 @@ public:
     return Layout.isPOD();
   }
 
-  Address projectAddress(IRGenFunction &IGF, Address seq) const {
-    return Layout.project(IGF, seq, "." + asImpl()->getFieldName());
+  Address projectAddress(IRGenFunction &IGF, Address seq,
+                         NonFixedOffsets offsets) const {
+    return Layout.project(IGF, seq, offsets, "." + asImpl()->getFieldName());
   }  
 
   std::pair<unsigned, unsigned> getProjectionRange(ExplosionKind kind) const {
@@ -101,6 +102,8 @@ private:
     return reinterpret_cast<FieldImpl*>(static_cast<Impl*>(this)+1);
   }
 
+  const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
+
   template <class, class, class> friend class SequentialTypeBuilder;
 
 protected:
@@ -130,57 +133,63 @@ public:
   }
 
   void load(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address fieldAddr = field.projectAddress(IGF, addr);
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       field.getTypeInfo().load(IGF, fieldAddr, out);
     }
   }
 
   void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &out) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address fieldAddr = field.projectAddress(IGF, addr);
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       field.getTypeInfo().loadAsTake(IGF, fieldAddr, out);
     }
   }
   
   void assign(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address fieldAddr = field.projectAddress(IGF, addr);
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       field.getTypeInfo().assign(IGF, e, fieldAddr);
     }
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address destField = field.projectAddress(IGF, dest);
-      Address srcField = field.projectAddress(IGF, src);
+      Address destField = field.projectAddress(IGF, dest, offsets);
+      Address srcField = field.projectAddress(IGF, src, offsets);
       field.getTypeInfo().assignWithCopy(IGF, destField, srcField);
     }
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address destField = field.projectAddress(IGF, dest);
-      Address srcField = field.projectAddress(IGF, src);
+      Address destField = field.projectAddress(IGF, dest, offsets);
+      Address srcField = field.projectAddress(IGF, src, offsets);
       field.getTypeInfo().assignWithTake(IGF, destField, srcField);
     }
   }
 
   void initialize(IRGenFunction &IGF, Explosion &e, Address addr) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
       
-      Address fieldAddr = field.projectAddress(IGF, addr);
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       field.getTypeInfo().initialize(IGF, e, fieldAddr);
     }
   }
@@ -193,11 +202,12 @@ public:
                FixedTypeInfo::initializeWithCopy(IGF, dest, src);
     }
 
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
       if (field.isEmpty()) continue;
 
-      Address destField = field.projectAddress(IGF, dest);
-      Address srcField = field.projectAddress(IGF, src);
+      Address destField = field.projectAddress(IGF, dest, offsets);
+      Address srcField = field.projectAddress(IGF, src, offsets);
       field.getTypeInfo().initializeWithCopy(IGF, destField, srcField);
     }
   }
@@ -221,9 +231,12 @@ public:
   }
   
   void destroy(IRGenFunction &IGF, Address addr) const {
-    for (auto &field : getFields())
-      if (!field.isPOD())
-        field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr));
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isPOD()) continue;
+
+      field.getTypeInfo().destroy(IGF, field.projectAddress(IGF, addr, offsets));
+    }
   }
 };
 

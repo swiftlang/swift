@@ -397,10 +397,11 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     case FieldAccess::ConstantDirect: {
       // FIXME: This field index computation is an ugly hack.
       unsigned fieldIndex = getFieldIndex(baseClass, field);
-      
+
       Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM));
       auto &element = baseClassTI.getElements(IGF.IGM)[fieldIndex];
-      Address memberAddr = element.project(IGF, baseAddr);
+      Address memberAddr = element.project(IGF, baseAddr,
+                                           /*non fixed offsets*/ nullptr);
       return OwnedAddress(memberAddr, base);
     }
       

@@ -84,9 +84,12 @@ OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, OnHeap_t onHeap,
   // TODO: lifetime intrinsics?
   llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name + ".alloc");
 
+  // FIXME: provide non-fixed offsets
+  NonFixedOffsets offsets = Nothing;
+
   // Cast and GEP down to the element.
   Address rawAddr = layout.emitCastTo(IGF, allocation);
-  rawAddr = elt.project(IGF, rawAddr, name);
+  rawAddr = elt.project(IGF, rawAddr, offsets, name);
 
   OwnedAddress addr(rawAddr, allocation);
   return addr;

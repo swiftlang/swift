@@ -55,6 +55,9 @@ namespace {
     StructTypeInfo(llvm::Type *T, unsigned numFields)
       : SequentialTypeInfo(T, numFields) {
     }
+
+    /// FIXME: implement
+    Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
   };
 
   class StructTypeBuilder :
@@ -92,7 +95,8 @@ OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
          && "not a struct type");
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
   auto &fieldI = baseTI.getFields()[fieldIndex];
-  Address project = fieldI.projectAddress(IGF, base);
+  auto offsets = baseTI.getNonFixedOffsets(IGF);
+  Address project = fieldI.projectAddress(IGF, base, offsets);
   return OwnedAddress(project, base.getOwner());
 }
 
