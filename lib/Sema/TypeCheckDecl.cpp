@@ -1036,7 +1036,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
     // If there is no initializer, rely on zero initialization.
     // FIXME: Or if there's a zero-initialization somewhere in there. This is
     // a temporary hack.
-    if (!initializer || createdZeroInit)
+    if (!initializer)
       continue;
 
     // Create the assignment.

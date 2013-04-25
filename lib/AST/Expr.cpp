@@ -102,7 +102,7 @@ bool Expr::isImplicit() const {
   if (const ImplicitConversionExpr *ICE
         = dyn_cast<ImplicitConversionExpr>(this))
     return ICE->getSubExpr()->isImplicit();
-
+  
   if (const MemberRefExpr *memberRef = dyn_cast<MemberRefExpr>(this))
     return memberRef->getNameLoc().isInvalid();
   if (auto memberRef = dyn_cast<GenericMemberRefExpr>(this))
@@ -126,6 +126,9 @@ bool Expr::isImplicit() const {
     }
     return true;
   }
+
+  if (isa<ZeroValueExpr>(this))
+    return true;  
 
   return false;
 }

@@ -1795,7 +1795,9 @@ RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
 }
 
 RValue SILGenFunction::visitZeroValueExpr(ZeroValueExpr *E, SGFContext C) {
-  llvm_unreachable("ZeroValueExpr not implemented yet");
+  SILValue zero = B.createBuiltinZero(E,
+                                      getLoweredLoadableType(E->getType()));
+  return RValue(*this, ManagedValue(zero, ManagedValue::Unmanaged));
 }
 
 SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
