@@ -11,28 +11,14 @@
   thinking behind the current design and proposes a language extension
   for in-place operation support.
 
-Mutation
-========
+String Mutation
+===============
 
-Should Swift ``String``\ s be immutable? If ``String`` were going to
-be a ``class`` type, since reference and value semantics are
-indistinguishable in the absence of mutation, immutability would
-confer the benefits of value semantics. For example, once you got
-ahold of a ``String`` value, nobody else could modify it.  However,
-we've agreed that ``String`` is to be a ``struct`` type with value
-semantics.
-
-Once a value type is stipulated, strict immutability doesn't really
-confer the same benefits and has some serious downsides for usability
-(and is in fact not supported by the language design).  For example, a
-truly immutable value type can't be assigned or ``swap``\ ped.  If
-``String`` were immutable, we wouldn't be able to sort an array of
-them.
-
-Therefore (news flash) all Swift ``String``\ s are mutable.  The
-question is *how* can they be mutated?  Does it make sense to limit
+Should Swift ``String``\ s be immutable? Although their backing store is
+immutable, the values themselves can be reassigned, swapped, ``+=``'ed,
+and so on. Does it make sense to limit
 mutations to those that can be expressed as wholesale assignments?
-Surprisingly, the question turns out to be meaningless, because any
+The question turns out to be meaningless, because any
 mutation of a ``String`` can be expressed in terms of a wholesale
 assignment.  If we tried to impose an “assignment-only” limitation, I'd still be
 free to write::
@@ -79,7 +65,7 @@ easily.  With a creating ``upper()``, we get::
 
   var z = f().upper().split() // compose operations
 
-with a mutating ``upper()``, we get::
+With a mutating ``upper()``, we get::
 
   var y = x.copy()   // y is going to be an upcased copy of x...
   y.upper()          // ...eventually
@@ -87,8 +73,8 @@ with a mutating ``upper()``, we get::
   x.upper()          // upcase x in place
 
   var tmp = f()      // operations don't compose
-  tmp = tmp.upper()
-  var z = tmp.split()
+  tmp.upper()
+  tmp.split()
 
 The creating interfaces are a clear usability win.  The minor
 inconvenience of assigning ``x.upper()`` into ``x`` is more than
@@ -115,7 +101,7 @@ there *are* good arguments for their mutating variants.  For example,
 if you want to do an in-place modification on something that's verbose
 to access, ::
 
-   some.thing().that_is.verbose().to_access.upper()
+   some.thing().that_is.verbose().to_access.inplace_upper()
 
 is a lot cleaner than either of these approaches::
 
@@ -126,9 +112,8 @@ is a lot cleaner than either of these approaches::
    tmp.to_access = tmp.to_access.upper()
 
 Furthermore, ``x = x.upper()`` causes an allocation/deallocation pair
-and data copying that 
-a. can be avoided with a mutating interface
-b. are unlikely to be optimized away by even a clever compiler
+and data copying that can be avoided with a mutating interface
+and are are unlikely to be optimized away by even a clever compiler.
 
 .. Admonition:: It's not just about ``String``\ s
 
