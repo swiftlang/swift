@@ -148,6 +148,13 @@ public:
                   Size size, Alignment align);
   void emitMemCpy(Address dest, Address src, Size size);
 
+  llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
+                                 llvm::Type *objectType,
+                                 const llvm::Twine &name = "");
+  Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
+                            const TypeInfo &type,
+                            const llvm::Twine &name = "");
+
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *align,
                                    const llvm::Twine &name = "");

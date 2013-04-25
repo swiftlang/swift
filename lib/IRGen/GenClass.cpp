@@ -350,16 +350,26 @@ const StructLayout &ClassTypeInfo::getLayout(IRGenModule &IGM) const {
   return *Layout;
 }
 
-/// Cast the base to i8*, apply the given inbounds offset, and cast to
-/// a pointer to the given type.
-static llvm::Value *emitGEPToOffset(IRGenFunction &IGF,
-                                    llvm::Value *base,
-                                    llvm::Value *offset,
-                                    llvm::Type *type,
-                                    const llvm::Twine &name = "") {
-  auto addr = IGF.Builder.CreateBitCast(base, IGF.IGM.Int8PtrTy);
-  addr = IGF.Builder.CreateInBoundsGEP(addr, offset);
-  return IGF.Builder.CreateBitCast(addr, type->getPointerTo(), name);
+/// Cast the base to i8*, apply the given inbounds offset (in bytes,
+/// as a size_t), and cast to a pointer to the given type.
+llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
+                                              llvm::Value *offset,
+                                              llvm::Type *objectType,
+                                              const llvm::Twine &name) {
+  assert(offset->getType() == IGM.SizeTy);
+  auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
+  addr = Builder.CreateInBoundsGEP(addr, offset);
+  return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
+}
+
+/// Cast the base to i8*, apply the given inbounds offset (in bytes,
+/// as a size_t), and create an address in the given type.
+Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
+                                         llvm::Value *offset,
+                                         const TypeInfo &type,
+                                         const llvm::Twine &name) {
+  auto addr = emitByteOffsetGEP(base, offset, type.getStorageType(), name);
+  return type.getAddressForPointer(addr);
 }
 
 /// Emit a field l-value by applying the given offset to the given base.
@@ -368,10 +378,9 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
                                         llvm::Value *offset,
                                         VarDecl *field) {
   auto &fieldTI = IGF.getFragileTypeInfo(field->getType());
-  auto addr = emitGEPToOffset(IGF, base, offset, fieldTI.getStorageType(),
+  auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
-  Address fieldAddr = fieldTI.getAddressForPointer(addr);
-  return OwnedAddress(fieldAddr, base);
+  return OwnedAddress(addr, base);
 }
 
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
@@ -414,7 +423,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
       auto indirectOffset =
         IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
       auto offsetA =
-        emitGEPToOffset(IGF, metadata, indirectOffset, IGF.IGM.SizeTy);
+        IGF.emitByteOffsetGEP(metadata, indirectOffset, IGF.IGM.SizeTy);
       auto offset =
         IGF.Builder.CreateLoad(Address(offsetA, IGF.IGM.getPointerAlignment()));
       return emitAddressAtOffset(IGF, base, offset, field);
