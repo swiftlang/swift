@@ -55,12 +55,12 @@ void irgen::addHeapHeaderToLayout(IRGenModule &IGM,
 StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
-                           llvm::StructType *typeToFill)
-    : Elements(types.size()) {
+                           llvm::StructType *typeToFill) {
+  Elements.reserve(types.size());
 
   // Fill in the Elements array.
-  for (unsigned i = 0, e = types.size(); i != e; ++i)
-    Elements[i].Type = types[i];
+  for (auto type : types)
+    Elements.push_back(ElementLayout::getIncomplete(*type));
 
   assert(typeToFill == nullptr || typeToFill->isOpaque());
 
@@ -115,8 +115,17 @@ Address StructLayout::emitCastTo(IRGenFunction &IGF,
 
 Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
-  return IGF.Builder.CreateStructGEP(baseAddr, StructIndex, ByteOffset,
-                                     baseAddr.getAddress()->getName() + suffix);
+  switch (getKind()) {
+  case Kind::Empty:
+    return getType().getUndefAddress();
+
+  case Kind::Fixed:
+    return IGF.Builder.CreateStructGEP(baseAddr,
+                                       getStructIndex(),
+                                       getByteOffset(),
+                                 baseAddr.getAddress()->getName() + suffix);
+  }
+  llvm_unreachable("bad element layout kind");
 }
 
 void StructLayoutBuilder::addHeapHeader() {
@@ -134,12 +143,13 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   // Loop through the elements.  The only valid field in each element
   // is Type; StructIndex and ByteOffset need to be laid out.
   for (auto &elt : elts) {
-    auto &eltTI = *elt.Type;
+    auto &eltTI = elt.getType();
+
+    auto isPOD = eltTI.isPOD(ResilienceScope::Local);
 
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {
-      elt.StructIndex = ElementLayout::NoStructIndex;
-      elt.ByteOffset = Size(-1);
+      elt.completeEmpty(isPOD);
       continue;
     }
 
@@ -180,8 +190,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
     }
 
     // Set the element's offset and field-index.
-    elt.ByteOffset = CurSize;
-    elt.StructIndex = StructFields.size();
+    elt.completeFixed(isPOD, CurSize, StructFields.size());
 
     StructFields.push_back(eltTI.getStorageType());
     CurSize += fixedEltTI.getFixedSize();

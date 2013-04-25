@@ -323,8 +323,8 @@ namespace {
         VarDecl *var = dyn_cast<VarDecl>(member);
         if (!var || var->isProperty()) continue;
 
-        LastElements.push_back(ElementLayout());
-        LastElements.back().Type = &IGM.getFragileTypeInfo(var->getType());
+        auto &eltType = IGM.getFragileTypeInfo(var->getType());
+        LastElements.push_back(ElementLayout::getIncomplete(eltType));
       }
 
       // Add those fields to the builder.
@@ -692,7 +692,7 @@ namespace {
           instanceStart = instanceSize;
         } else {
           // FIXME: assumes layout is always sequential!
-          instanceStart = FieldLayout->getElements()[0].ByteOffset;
+          instanceStart = FieldLayout->getElements()[0].getByteOffset();
         }
       }
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
@@ -884,7 +884,7 @@ namespace {
       auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
       offsetVar->setConstant(false);
       auto offsetVal =
-        llvm::ConstantInt::get(IGM.IntPtrTy, elt.ByteOffset.getValue());
+        llvm::ConstantInt::get(IGM.IntPtrTy, elt.getByteOffset().getValue());
       offsetVar->setInitializer(offsetVal);
 
       // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals

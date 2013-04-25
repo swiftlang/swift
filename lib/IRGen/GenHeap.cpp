@@ -73,10 +73,10 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
   for (auto &field : layout.getElements()) {
-    if (field.Type->isPOD(ResilienceScope::Local))
+    if (field.getType().isPOD(ResilienceScope::Local))
       continue;
 
-    field.Type->destroy(IGF, field.project(IGF, structAddr));
+    field.getType().destroy(IGF, field.project(IGF, structAddr));
   }
 
   llvm::Value *size = layout.emitSize(IGF);

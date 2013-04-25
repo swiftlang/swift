@@ -32,21 +32,9 @@ template <class, class, class> class SequentialTypeBuilder;
 
 /// A field of a sequential type.
 template <class FieldImpl> class SequentialField {
-  const TypeInfo &FieldTI;
+  ElementLayout Layout;
 
   template <class, class, class> friend class SequentialTypeBuilder;
-
-  Size StorageOffset;
-
-  /// IsPOD - is this element known to be POD with ResilienceScope::Local?
-  unsigned IsPOD : 1;
-
-  /// IsEmpty - is this element known to be empty with ResilienceScope::Local?
-  unsigned IsEmpty : 1;
-
-  /// StorageIndex - the index to use with getelementptr in order to
-  /// access this element.
-  unsigned StorageIndex : 30;
 
   /// MaximalBegin/MaximalEnd - the range of explosion indexes for
   /// this element, under a maximal explosion
@@ -59,28 +47,29 @@ template <class FieldImpl> class SequentialField {
   unsigned MinimalEnd : 16;
 
 protected:
-  SequentialField(const TypeInfo &elementTI) : FieldTI(elementTI) {}
+  explicit SequentialField(const TypeInfo &elementTI)
+    : Layout(ElementLayout::getIncomplete(elementTI)) {}
 
   const FieldImpl *asImpl() const {
     return static_cast<const FieldImpl*>(this);
   }
 public:
-  const TypeInfo &getTypeInfo() const { return FieldTI; }
+  const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
-  bool isEmpty() const {
-    return IsEmpty;
+  void completeFrom(const ElementLayout &layout) {
+    Layout.completeFrom(layout);
   }
 
-  bool isPOD() const {
-    return IsPOD;
+  bool isEmpty() const {
+    return Layout.isEmpty();
+  }
+
+  IsPOD_t isPOD() const {
+    return Layout.isPOD();
   }
 
   Address projectAddress(IRGenFunction &IGF, Address seq) const {
-    if (IsEmpty) return seq;
-
-    llvm::Value *addr = seq.getAddress();
-    return IGF.Builder.CreateStructGEP(seq, StorageIndex, StorageOffset,
-                           addr->getName() + "." + asImpl()->getFieldName());
+    return Layout.project(IGF, seq, "." + asImpl()->getFieldName());
   }  
 
   std::pair<unsigned, unsigned> getProjectionRange(ExplosionKind kind) const {
@@ -265,12 +254,14 @@ protected:
     SeqTI->StorageType = StorageType;
     SeqTI->completeFixed(layout.getSize(), layout.getAlignment());
 
-    FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();    
+    IsPOD_t seqIsPOD = IsPOD;
+    FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();
     for (auto &fieldLayout : layout.getElements()) {
       FieldImpl &field = *nextFieldInfo++;
-      field.StorageOffset = fieldLayout.ByteOffset;
-      field.StorageIndex = fieldLayout.StructIndex;
+      field.completeFrom(fieldLayout);
+      seqIsPOD &= field.isPOD();
     }
+    SeqTI->setPOD(seqIsPOD);
   }
 
 public:
@@ -304,7 +295,6 @@ public:
 
     FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();
     unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
-    IsPOD_t seqIsPOD = IsPOD;
     Size storageSize;
     Alignment storageAlignment(1);
 
@@ -318,11 +308,6 @@ public:
       FieldImpl &fieldInfo = *::new((void*) nextFieldInfo++)
                         FieldImpl(asImpl()->getFieldInfo(astField, fieldTI));
 
-      // Record POD-ness.
-      IsPOD_t isPOD = fieldTI.isPOD(ResilienceScope::Local);
-      fieldInfo.IsPOD = bool(isPOD);
-      seqIsPOD &= isPOD;
-
       fieldInfo.MaximalBegin = maximalExplosionSize;
       maximalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Maximal);
       fieldInfo.MaximalEnd = maximalExplosionSize;
@@ -330,12 +315,8 @@ public:
       fieldInfo.MinimalBegin = minimalExplosionSize;
       minimalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Minimal);
       fieldInfo.MinimalEnd = minimalExplosionSize;
-
-      bool isEmpty = fieldTI.isKnownEmpty();
-      fieldInfo.IsEmpty = isEmpty;
     }
 
-    SeqTI->setPOD(seqIsPOD);
     SeqTI->MaximalExplosionSize = maximalExplosionSize;
     SeqTI->MinimalExplosionSize = minimalExplosionSize;
 

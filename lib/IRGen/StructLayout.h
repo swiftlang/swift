@@ -57,18 +57,96 @@ enum class LayoutKind {
 };
 
 /// An element layout is the layout for a single element of a type.
-struct ElementLayout {
-  /// A constant value used to record that there is no structure index.
-  enum : unsigned { NoStructIndex = unsigned(-1) };
+class ElementLayout {
+public:
+  enum class Kind {
+    Empty, Fixed
+  };
 
-  /// The offset in bytes from the start of the struct.
-  Size ByteOffset;
-
-  /// The index of this element in the LLVM struct.
-  unsigned StructIndex;
+private:
+  enum : unsigned { IncompleteKind  = 3 };
 
   /// The swift type information for this element.
-  const TypeInfo *Type;
+  const TypeInfo &Type;
+
+  /// The offset in bytes from the start of the struct.
+  unsigned ByteOffset;
+
+  /// The index of this element in the LLVM struct.
+  unsigned StructIndex : 29;
+
+  /// Whether this element is known to be POD in the local resilience
+  /// domain.
+  unsigned IsPOD : 1;
+
+  /// The kind of layout performed for this element.
+  unsigned TheKind : 2;
+
+  explicit ElementLayout(const TypeInfo &type)
+    : Type(type), TheKind(IncompleteKind) {}
+
+  bool isCompleted() const {
+    return (TheKind != IncompleteKind);
+  }
+
+  bool isCompletedFixed() const {
+    return isCompleted() && getKind() == Kind::Fixed;
+  }
+
+public:
+  static ElementLayout getIncomplete(const TypeInfo &type) {
+    return ElementLayout(type);
+  }
+
+  void completeFrom(const ElementLayout &other) {
+    assert(!isCompleted());
+    TheKind = other.TheKind;
+    IsPOD = other.IsPOD;
+    ByteOffset = other.ByteOffset;
+    StructIndex = other.StructIndex;
+  }
+
+  void completeEmpty(IsPOD_t isPOD) {
+    TheKind = unsigned(Kind::Empty);
+    IsPOD = unsigned(isPOD);
+    ByteOffset = 0;
+    StructIndex = 0;
+  }
+
+  void completeFixed(IsPOD_t isPOD, Size byteOffset, unsigned structIndex) {
+    TheKind = unsigned(Kind::Fixed);
+    IsPOD = unsigned(isPOD);
+    ByteOffset = byteOffset.getValue();
+    StructIndex = structIndex;
+
+    assert(getByteOffset() == byteOffset);
+  }
+
+  const TypeInfo &getType() const { return Type; }
+
+  Kind getKind() const {
+    assert(isCompleted());
+    return Kind(TheKind);
+  }
+
+  /// Is this element known to be empty?
+  bool isEmpty() const {
+    return getKind() == Kind::Empty;
+  }
+
+  Size getByteOffset() const {
+    assert(isCompletedFixed());
+    return Size(ByteOffset);
+  }
+  unsigned getStructIndex() const {
+    assert(isCompletedFixed());
+    return StructIndex;
+  }
+
+  IsPOD_t isPOD() const {
+    assert(isCompleted());
+    return IsPOD_t(IsPOD);
+  }
 
   Address project(IRGenFunction &IGF, Address addr,
                   const llvm::Twine &suffix = "") const;

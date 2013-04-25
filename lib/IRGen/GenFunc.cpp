@@ -1771,7 +1771,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Perform the loads.
     for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(subIGF, data);
-      fieldLayout.Type->load(subIGF, fieldAddr, params);
+      fieldLayout.getType().load(subIGF, fieldAddr, params);
     }
     
     // Kill the allocated data pointer immediately.  The safety of
@@ -1814,7 +1814,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // Perform the store.
     for (auto &fieldLayout : layout.getElements()) {
       Address fieldAddr = fieldLayout.project(IGF, dataAddr);
-      fieldLayout.Type->initialize(IGF, args, fieldAddr);
+      fieldLayout.getType().initialize(IGF, args, fieldAddr);
     }
   }
   assert(args.empty() && "unused args in partial application?!");
