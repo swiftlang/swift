@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines FixedTypeInfo, which is a convenient abstract
-// implementation of TypeInfo for working with types that can be laid
-// out statically.
+// This file defines FixedTypeInfo, which supplements the TypeInfo
+// interface for classes with (at least locally) fixed-layout type
+// implementations.
 //
 //===----------------------------------------------------------------------===//
 
