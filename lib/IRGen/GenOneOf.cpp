@@ -350,14 +350,15 @@ namespace {
 const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
   llvm::StructType *convertedStruct = IGM.createNominalType(oneof);
 
+  // Create a forward declaration for that type.
+  auto typeCacheKey = oneof->getDeclaredType().getPointer();
+  addForwardDecl(typeCacheKey, convertedStruct);
+
   // Compute the implementation strategy.
   OneofImplStrategy strategy(oneof);
 
   // Create the TI as a forward declaration and map it in the table.
   OneofTypeInfo *convertedTI = strategy.create(convertedStruct);
-  auto typesMapKey = oneof->getDeclaredType().getPointer();
-  assert(!Types.count(typesMapKey));
-  Types.insert(std::make_pair(typesMapKey, convertedTI));
 
   // We don't need a discriminator if this is a singleton ADT.
   if (strategy.getKind() == OneofImplStrategy::Singleton) {
@@ -372,8 +373,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
       oneofTI->StorageAlignment = Alignment(1);
       oneofTI->Singleton = nullptr;
     } else {
-      const TypeInfo &eltTI = getFragileTypeInfo(eltType->getCanonicalType());
-      assert(eltTI.isComplete());
+      const TypeInfo &eltTI = getCompleteTypeInfo(eltType->getCanonicalType());
 
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
       storageType = eltTI.StorageType;
@@ -427,8 +427,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
 
     // Compute layout for the type, and ignore variants with
     // zero-size data.
-    const TypeInfo &eltTInfo = getFragileTypeInfo(eltType->getCanonicalType());
-    assert(eltTInfo.isComplete());
+    auto &eltTInfo = getCompleteTypeInfo(eltType->getCanonicalType());
     if (eltTInfo.isKnownEmpty()) continue;
 
     auto &fixedEltTI = cast<FixedTypeInfo>(eltTInfo);

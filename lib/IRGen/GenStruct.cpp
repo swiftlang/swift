@@ -52,8 +52,9 @@ namespace {
   class StructTypeInfo : // FIXME: FixedTypeInfo as the base class is a lie.
     public SequentialTypeInfo<StructTypeInfo, FixedTypeInfo, StructFieldInfo> {
   public:
-    StructTypeInfo(llvm::Type *T, unsigned numFields)
-      : SequentialTypeInfo(T, numFields) {
+    StructTypeInfo(unsigned numFields, llvm::Type *T, Size size, Alignment align,
+                   IsPOD_t isPOD)
+      : SequentialTypeInfo(numFields, T, size, align, isPOD) {
     }
 
     /// FIXME: implement
@@ -61,7 +62,7 @@ namespace {
   };
 
   class StructTypeBuilder :
-    public SequentialTypeBuilder<StructTypeBuilder, StructTypeInfo, VarDecl*> {
+    public SequentialTypeBuilder<StructTypeBuilder, StructFieldInfo, VarDecl*> {
 
     llvm::StructType *StructTy;
   public:
@@ -69,8 +70,16 @@ namespace {
       SequentialTypeBuilder(IGM), StructTy(structTy) {
     }
 
-    StructTypeInfo *construct(void *buffer, ArrayRef<VarDecl*> fields) {
-      return ::new(buffer) StructTypeInfo(StructTy, fields.size());
+    StructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
+                                const StructLayout &layout) {
+      return create<StructTypeInfo>(fields, layout.getType(), layout.getSize(),
+                                    layout.getAlignment(), layout.isKnownPOD());
+    }
+
+    StructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
+                                   const StructLayout &layout) {
+      // FIXME: implement properly
+      return createFixed(fields, layout);
     }
 
     StructFieldInfo getFieldInfo(VarDecl *field, const TypeInfo &fieldTI) {
@@ -79,10 +88,9 @@ namespace {
 
     Type getType(VarDecl *field) { return field->getType(); }
 
-    void performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      StructLayout layout(IGM, LayoutKind::NonHeapObject,
+    StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
+      return StructLayout(IGM, LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
-      recordLayout(layout, StructTy);
     }
   };
 }  // end anonymous namespace.
@@ -175,8 +183,6 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
-  StructTypeBuilder builder(IGM, IGM.createNominalType(D));
-
   // Collect all the fields from the type.
   SmallVector<VarDecl*, 8> fields;
   for (Decl *D : D->getMembers())
@@ -184,12 +190,14 @@ const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
       if (!VD->isProperty())
         fields.push_back(VD);
 
-  // Allocate the TypeInfo and register it as a forward-declaration.
-  // We do this before we look at any of the child types.
-  auto structTI = builder.create(fields);
-  auto typesMapKey = D->getDeclaredType().getPointer();
-  Types.insert(std::make_pair(typesMapKey, structTI));
+  // Create the struct type.
+  auto ty = IGM.createNominalType(D);
 
-  // Complete the type and return it.
-  return builder.complete(fields);
+  // Register a forward declaration before we look at any of the child types.
+  auto typesMapKey = D->getDeclaredType().getPointer();
+  addForwardDecl(typesMapKey, ty);
+
+  // Build the type.
+  StructTypeBuilder builder(IGM, ty);
+  return builder.layout(fields);
 }

@@ -102,15 +102,14 @@ private:
     return reinterpret_cast<FieldImpl*>(static_cast<Impl*>(this)+1);
   }
 
-  const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
-
   template <class, class, class> friend class SequentialTypeBuilder;
 
 protected:
-  SequentialTypeInfo(llvm::Type *ty, unsigned numFields)
-    : Base(ty, Size(0), Alignment(0), IsPOD), NumFields(numFields) {
-    assert(!this->isComplete());
-  }
+  const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
+
+  template <class... As> 
+  SequentialTypeInfo(unsigned numFields, As&&...args)
+    : Base(std::forward<As>(args)...), NumFields(numFields) {}
 
 public:
   ArrayRef<FieldImpl> getFields() const {
@@ -248,79 +247,41 @@ public:
 ///   Type getType(const ASTField &field);
 ///   void performLayout(ArrayRef<const TypeInfo *> fieldTypes);
 ///     - should call recordLayout with the layout
-template <class BuilderImpl, class TypeInfoImpl, class ASTField>
+template <class BuilderImpl, class FieldImpl, class ASTField>
 class SequentialTypeBuilder {
-
-public:
-  typedef typename TypeInfoImpl::FieldImpl FieldImpl;
-
-private:
-  TypeInfoImpl *SeqTI;
-
 protected:
   IRGenModule &IGM;
-  SequentialTypeBuilder(IRGenModule &IGM) : SeqTI(nullptr), IGM(IGM) {}
+  SequentialTypeBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
   BuilderImpl *asImpl() { return static_cast<BuilderImpl*>(this); }
 
-  void recordLayout(StructLayout &layout, llvm::Type *StorageType) {
-    SeqTI->StorageType = StorageType;
-    SeqTI->completeFixed(layout.getSize(), layout.getAlignment());
-
-    IsPOD_t seqIsPOD = IsPOD;
-    FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();
-    for (auto &fieldLayout : layout.getElements()) {
-      FieldImpl &field = *nextFieldInfo++;
-      field.completeFrom(fieldLayout);
-      seqIsPOD &= field.isPOD();
-    }
-    SeqTI->setPOD(seqIsPOD);
-  }
-
 public:
-  static void completeEmpty(TypeInfoImpl *seqTI) {
-    seqTI->completeFixed(Size(0), Alignment(1));
-    assert(seqTI->isComplete());
+  /// Allocate and initialize a type info of the given type.
+  template <class T, class... As>
+  T *create(ArrayRef<FieldImpl> fields, As &&...args) {
+    void *buffer =
+      ::operator new(sizeof(T) + fields.size() * sizeof(FieldImpl));
+    T *type = new(buffer) T(fields.size(), std::forward<As>(args)...);
+    std::uninitialized_copy(fields.begin(), fields.end(), type->getFieldsBuffer());
+    return type;
   }
 
-  TypeInfoImpl *create(llvm::ArrayRef<ASTField> astFields) {
-    void *buffer = ::operator new(sizeof(TypeInfoImpl) +
-                                  astFields.size() * sizeof(FieldImpl));
-    return SeqTI = asImpl()->construct(buffer, astFields);
-  }
-
-  TypeInfoImpl *complete(llvm::ArrayRef<ASTField> astFields) {
-    assert(SeqTI && "no allocated type info!");
-    assert(!SeqTI->isComplete() && "completing type twice!");
-
-    assert(astFields.size() == SeqTI->NumFields);
-
-    if (astFields.empty()) {
-      SeqTI->setPOD(IsPOD);
-      SeqTI->MaximalExplosionSize = 0;
-      SeqTI->MinimalExplosionSize = 0;
-      asImpl()->completeEmpty(SeqTI);
-      return SeqTI;
-    }
-
+  TypeInfo *layout(llvm::ArrayRef<ASTField> astFields) {
+    SmallVector<FieldImpl, 8> fields;
     SmallVector<const TypeInfo *, 8> fieldTypesForLayout;
+    fields.reserve(astFields.size());
     fieldTypesForLayout.reserve(astFields.size());
 
-    FieldImpl *nextFieldInfo = SeqTI->getFieldsBuffer();
     unsigned maximalExplosionSize = 0, minimalExplosionSize = 0;
-    Size storageSize;
-    Alignment storageAlignment(1);
-
     for (auto &astField : astFields) {
       // Compute the field's type info.
-      const TypeInfo &fieldTI =
-        IGM.getFragileTypeInfo(asImpl()->getType(astField));
+      auto &fieldTI = IGM.getFragileTypeInfo(asImpl()->getType(astField));
       assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
 
-      FieldImpl &fieldInfo = *::new((void*) nextFieldInfo++)
-                        FieldImpl(asImpl()->getFieldInfo(astField, fieldTI));
+      fields.push_back(FieldImpl(asImpl()->getFieldInfo(astField, fieldTI)));
 
+      auto &fieldInfo = fields.back();
       fieldInfo.MaximalBegin = maximalExplosionSize;
       maximalExplosionSize += fieldTI.getExplosionSize(ExplosionKind::Maximal);
       fieldInfo.MaximalEnd = maximalExplosionSize;
@@ -330,13 +291,25 @@ public:
       fieldInfo.MinimalEnd = minimalExplosionSize;
     }
 
-    SeqTI->MaximalExplosionSize = maximalExplosionSize;
-    SeqTI->MinimalExplosionSize = minimalExplosionSize;
+    // Perform layout and fill in the fields.
+    StructLayout layout = asImpl()->performLayout(fieldTypesForLayout);
+    for (unsigned i = 0, e = fields.size(); i != e; ++i) {
+      fields[i].completeFrom(layout.getElements()[i]);
+    }
 
-    asImpl()->performLayout(fieldTypesForLayout);
+    // Create the type info.
 
-    assert(SeqTI->isComplete());
-    return SeqTI;
+    if (layout.isFixedLayout()) {
+      auto seqTI = asImpl()->createFixed(fields, layout);
+      seqTI->MaximalExplosionSize = maximalExplosionSize;
+      seqTI->MinimalExplosionSize = minimalExplosionSize;
+      return seqTI;
+    }
+
+    auto seqTI = asImpl()->createNonFixed(fields, layout);
+    seqTI->MaximalExplosionSize = maximalExplosionSize;
+    seqTI->MinimalExplosionSize = minimalExplosionSize;
+    return seqTI;
   }  
 };
 

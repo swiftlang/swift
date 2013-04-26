@@ -57,6 +57,11 @@ enum class LayoutKind {
   HeapObject,
 };
 
+class NonFixedOffsetsImpl;
+
+/// The type to pass around for non-fixed offsets.
+typedef Optional<NonFixedOffsetsImpl*> NonFixedOffsets;
+
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
 protected:
@@ -65,11 +70,10 @@ public:
   /// Return the offset (in bytes, as a size_t) of the element with
   /// the given index.
   virtual llvm::Value *getOffsetForIndex(IRGenFunction &IGF,
-                                         unsigned index) const = 0;
-};
+                                         unsigned index) = 0;
 
-/// The type to pass around for non-fixed offsets.
-typedef Optional<const NonFixedOffsetsImpl*> NonFixedOffsets;
+  operator NonFixedOffsets() { return NonFixedOffsets(this); }
+};
 
 /// An element layout is the layout for a single element of some sort
 /// of aggregate structure.
@@ -92,7 +96,7 @@ private:
   enum : unsigned { IncompleteKind  = 3 };
 
   /// The swift type information for this element.
-  const TypeInfo &Type;
+  const TypeInfo *Type;
 
   /// The offset in bytes from the start of the struct.
   unsigned ByteOffset;
@@ -109,7 +113,7 @@ private:
   unsigned TheKind : 2;
 
   explicit ElementLayout(const TypeInfo &type)
-    : Type(type), TheKind(IncompleteKind) {}
+    : Type(&type), TheKind(IncompleteKind) {}
 
   bool isCompleted() const {
     return (TheKind != IncompleteKind);
@@ -152,7 +156,7 @@ public:
     Index = nonFixedElementIndex;
   }
 
-  const TypeInfo &getType() const { return Type; }
+  const TypeInfo &getType() const { return *Type; }
 
   Kind getKind() const {
     assert(isCompleted());
@@ -205,6 +209,7 @@ private:
   Alignment CurAlignment = Alignment(1);
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
+  IsPOD_t IsKnownPOD = IsPOD;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
@@ -228,6 +233,10 @@ public:
 
   /// Return whether the structure has a fixed-size layout.
   bool isFixedLayout() const { return IsFixedLayout; }
+
+  /// Return whether the structure is known to be POD in the local
+  /// resilience scope.
+  IsPOD_t isKnownPOD() const { return IsKnownPOD; }
 
   /// Return the size of the structure built so far.
   Size getSize() const { return CurSize; }
@@ -262,6 +271,9 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
+  /// Whether the elements in this layout are all POD.
+  IsPOD_t IsKnownPOD;
+
   llvm::Type *Ty;
   llvm::SmallVector<ElementLayout, 8> Elements;
 
@@ -285,6 +297,7 @@ public:
     : MinimumAlign(builder.getAlignment()),
       MinimumSize(builder.getSize()),
       IsFixedLayout(builder.isFixedLayout()),
+      IsKnownPOD(builder.isKnownPOD()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
@@ -295,6 +308,7 @@ public:
   Size getSize() const { return MinimumSize; }
   Alignment getAlignment() const { return MinimumAlign; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
+  IsPOD_t isKnownPOD() const { return IsKnownPOD; }
 
   bool isFixedLayout() const { return IsFixedLayout; }
   llvm::Value *emitSize(IRGenFunction &IGF) const;

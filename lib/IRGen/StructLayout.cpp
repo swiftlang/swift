@@ -81,11 +81,13 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     MinimumAlign = Alignment(1);
     MinimumSize = Size(0);
     IsFixedLayout = true;
+    IsKnownPOD = IsPOD;
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
     IsFixedLayout = builder.isFixedLayout();
+    IsKnownPOD = builder.isKnownPOD();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -155,6 +157,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   // is Type; StructIndex and ByteOffset need to be laid out.
   for (auto &elt : elts) {
     auto &eltTI = elt.getType();
+    IsKnownPOD &= eltTI.isPOD(ResilienceScope::Local);
 
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {

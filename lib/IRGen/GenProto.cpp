@@ -51,6 +51,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "NecessaryBindings.h"
+#include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
@@ -563,7 +564,8 @@ namespace {
   /// thing here is that performing an operation involving archetypes
   /// is dependent on the witness binding we can see.
   class ArchetypeTypeInfo :
-      public IndirectTypeInfo<ArchetypeTypeInfo, TypeInfo> {
+      public IndirectTypeInfo<ArchetypeTypeInfo,
+                              WitnessSizedTypeInfo<ArchetypeTypeInfo> > {
 
     ArchetypeType *TheArchetype;
 
@@ -576,7 +578,7 @@ namespace {
 
     ArchetypeTypeInfo(ArchetypeType *archetype, llvm::Type *type,
                       ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(type, Alignment(1), IsNotPOD, IsNotFixedSize),
+      : IndirectTypeInfo(type, Alignment(1), IsNotPOD),
         TheArchetype(archetype) {
       assert(protocols.size() == archetype->getConformsTo().size());
       for (unsigned i = 0, e = protocols.size(); i != e; ++i) {

@@ -334,7 +334,7 @@ namespace {
       if (isSuper)
         argTys.push_back(IGM.ObjCSuperPtrTy);
       else
-        argTys.push_back(IGM.getFragileType(CanType(selfFnType->getInput())));
+        argTys.push_back(IGM.getStorageType(CanType(selfFnType->getInput())));
 
       // Add the _cmd argument.
       argTys.push_back(IGM.ObjCSELTy);

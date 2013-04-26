@@ -126,6 +126,7 @@ public:
   llvm::FunctionType *DeallocatingDtorTy; /// size_t (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
+  llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
   llvm::StructType *TypeMetadataPatternStructTy;/// %swift.type_pattern = type { ... }
@@ -166,7 +167,8 @@ public:
   const TypeInfo &getFragileTypeInfo(Type T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
-  llvm::Type *getFragileType(CanType T);
+  llvm::Type *getStorageType(CanType T);
+  llvm::PointerType *getStoragePointerType(CanType T);
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(CanType T, ExplosionSchema &schema);

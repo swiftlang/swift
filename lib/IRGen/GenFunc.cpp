@@ -1164,7 +1164,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
 
   // For aliasable types, just bitcast the output address.
   case ResultDifference::Aliasable: {
-    auto origTy = IGF.IGM.getFragileType(CurOrigType)->getPointerTo();
+    auto origTy = IGF.IGM.getStoragePointerType(CurOrigType);
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
     [[clang::fallthrough]];
   }

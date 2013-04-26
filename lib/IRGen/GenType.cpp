@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/SmallString.h"
@@ -185,6 +186,14 @@ TypeConverter::~TypeConverter() {
   }
 }
 
+/// Add a temporary forward declaration for a type.  This will live
+/// only until a proper mapping is added.
+void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
+  assert(key->isCanonical());
+  assert(!Types.Cache.count(key) && "entry already exists for type!");
+  Types.Cache.insert(std::make_pair(key, type));
+}
+
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
   return Types.getWitnessTablePtrTypeInfo();
 }
@@ -223,52 +232,95 @@ const TypeInfo &IRGenFunction::getFragileTypeInfo(CanType T) {
   return IGM.getFragileTypeInfo(T);
 }
 
-/// Get the fragile IR type for the given type.
-llvm::Type *IRGenModule::getFragileType(CanType T) {
-  return getFragileTypeInfo(T).StorageType;
+/// Get a pointer to the storage type for the given type.  Note that,
+/// unlike fetching the type info and asking it for the storage type,
+/// this operation will succeed for forward-declarations.
+llvm::PointerType *IRGenModule::getStoragePointerType(CanType T) {
+  return getStorageType(T)->getPointerTo();
+}
+
+/// Get the storage type for the given type.  Note that, unlike
+/// fetching the type info and asking it for the storage type, this
+/// operation will succeed for forward-declarations.
+llvm::Type *IRGenModule::getStorageType(CanType T) {
+  auto entry = Types.getTypeEntry(T);
+  if (auto ti = entry.dyn_cast<const TypeInfo*>()) {
+    return ti->getStorageType();
+  } else {
+    return entry.get<llvm::Type*>();
+  }
 }
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
-  return Types.getFragileTypeInfo(T->getCanonicalType());
+  return getFragileTypeInfo(T->getCanonicalType());
 }
 
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getFragileTypeInfo(CanType T) {
-  return Types.getFragileTypeInfo(T);
+  return Types.getCompleteTypeInfo(T);
 }
 
-const TypeInfo &TypeConverter::getFragileTypeInfo(CanType canonicalTy) {
-  auto entry = Types.find(canonicalTy.getPointer());
-  if (entry != Types.end())
-    return *entry->second;
+/// 
+const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
+  auto entry = getTypeEntry(T);
+  assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
+  auto &ti = *entry.get<const TypeInfo*>();
+  assert(ti.isComplete());
+  return ti;
+}
 
-  const TypeInfo *result = convertType(canonicalTy);
-  Types[canonicalTy.getPointer()] = result;
+TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
+  auto it = Types.Cache.find(canonicalTy.getPointer());
+  if (it != Types.Cache.end())
+    return it->second;
+
+  // Convert the type.
+  TypeCacheEntry convertedEntry = convertType(canonicalTy);
+  auto convertedTI = convertedEntry.dyn_cast<const TypeInfo*>();
+
+  // If that gives us a forward declaration (which can happen with
+  // bound generic types), don't propagate that into the cache here,
+  // because we won't know how to clear it later.
+  if (!convertedTI) return convertedEntry;
+
+  auto &entry = Types.Cache[canonicalTy.getPointer()];
+  assert(entry == TypeCacheEntry() ||
+         (entry.is<llvm::Type*>() &&
+          entry.get<llvm::Type*>() == convertedTI->getStorageType()));
+  entry = convertedTI;
 
   // If the type info hasn't been added to the list of types, do so.
-  if (!result->NextConverted) {
-    result->NextConverted = FirstType;
-    FirstType = result;
+  if (!convertedTI->NextConverted) {
+    convertedTI->NextConverted = FirstType;
+    FirstType = convertedTI;
   }
 
-  return *result;
+  return convertedTI;
 }
 
-/// A convenience implementation of getFragileTypeInfo that starts
-/// from a class declaration.
+/// A convenience for grabbing the TypeInfo for a class declaration.
 const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
   // If we have generic parameters, use the bound-generics conversion
   // routine.  This does an extra level of caching based on the common
   // class decl.
-  if (theClass->getGenericParams())
-    return *convertBoundGenericType(theClass);
+  TypeCacheEntry entry;
+  if (theClass->getGenericParams()) {
+    entry = convertBoundGenericType(theClass);
 
   // Otherwise, use the declared type.
-  return getFragileTypeInfo(theClass->getDeclaredType()->getCanonicalType());
+  } else {
+    entry = getTypeEntry(theClass->getDeclaredType()->getCanonicalType());
+  }
+
+  // This will always yield a TypeInfo because forward-declarations
+  // are unnecessary when converting class types.
+  return *entry.get<const TypeInfo*>();
 }
 
-const TypeInfo *TypeConverter::convertType(CanType canTy) {
+TypeCacheEntry TypeConverter::convertType(CanType canTy) {
+  PrettyStackTraceType stackTrace(IGM.Context, "converting", canTy);
+
   llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *ty = canTy.getPointer();
   switch (ty->getKind()) {
@@ -366,8 +418,7 @@ const TypeInfo *TypeConverter::convertType(CanType canTy) {
 /// just a bare pointer.  For heap l-values, this is a pair of a bare
 /// pointer with an object reference.
 const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
-  const TypeInfo &objectTI = IGM.getFragileTypeInfo(T->getObjectType());
-  llvm::PointerType *referenceType = objectTI.StorageType->getPointerTo();
+  auto referenceType = IGM.getStoragePointerType(CanType(T->getObjectType()));
   
   // If it's not a heap l-value, just use the reference type as a
   // primitive pointer.
@@ -377,18 +428,27 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
                          IGM.getPointerAlignment());
 }
 
+static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,
+                                 TypeBase *key, const TypeInfo *result) {
+  assert(cache.count(key) && "no forward declaration?");
+  assert(cache[key].is<llvm::Type*>() && "overwriting real entry!");
+  cache[key] = result;
+}
 
-const TypeInfo *TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
+TypeCacheEntry TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
   assert(decl->getGenericParams());
 
   // Look to see if we've already emitted this type under a different
   // set of arguments.  We cache under the unbound type, which should
   // never collide with anything.
+  //
+  // FIXME: this isn't really inherently good; we might want to use
+  // different type implementations for different applications.
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->is<UnboundGenericType>());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto entry = Types.find(key);
-  if (entry != Types.end())
+  auto entry = Types.Cache.find(key);
+  if (entry != Types.Cache.end())
     return entry->second;
 
   switch (decl->getKind()) {
@@ -403,19 +463,20 @@ const TypeInfo *TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
 
   case DeclKind::Class: {
     auto result = convertClassType(cast<ClassDecl>(decl));
-    Types.insert(std::make_pair(key, result));
+    assert(!Types.Cache.count(key));
+    Types.Cache.insert(std::make_pair(key, result));
     return result;
   }
 
   case DeclKind::OneOf: {
     auto result = convertOneOfType(cast<OneOfDecl>(decl));
-    assert(Types.count(key) && "didn't insert forward declaration!");    
+    overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
 
   case DeclKind::Struct: {
     auto result = convertStructType(cast<StructDecl>(decl));
-    assert(Types.count(key) && "didn't insert forward declaration!");
+    overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }
   }

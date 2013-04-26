@@ -50,10 +50,12 @@ namespace irgen {
   class Size;
   class TypeInfo;
 
+/// Either a type or a forward-declaration.
+typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
+
 /// The helper class for generating types.
 class TypeConverter {
   IRGenModule &IGM;
-  llvm::DenseMap<TypeBase*, const TypeInfo*> Types;
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
@@ -63,7 +65,10 @@ class TypeConverter {
   static const TypeInfo *createPrimitive(llvm::Type *T,
                                          Size size, Alignment align);
 
-  const TypeInfo *convertType(CanType T);
+  void addForwardDecl(TypeBase *key, llvm::Type *type);
+
+  TypeCacheEntry convertType(CanType T);
+  TypeCacheEntry convertBoundGenericType(NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertOneOfType(OneOfDecl *D);
   const TypeInfo *convertStructType(StructDecl *D);
@@ -77,16 +82,27 @@ class TypeConverter {
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
-  const TypeInfo *convertBoundGenericType(NominalTypeDecl *D);
 
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
-  const TypeInfo &getFragileTypeInfo(CanType T);
+
+  TypeCacheEntry getTypeEntry(CanType type);
+  const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo &getFragileTypeInfo(ClassDecl *D);
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+
+private:
+  class Types_t {
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> Cache;
+    friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
+    friend TypeCacheEntry
+      TypeConverter::convertBoundGenericType(NominalTypeDecl *D);
+    friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
+  };
+  Types_t Types;
 };
 
 } // end namespace irgen

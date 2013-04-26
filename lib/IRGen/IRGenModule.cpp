@@ -35,6 +35,25 @@
 using namespace swift;
 using namespace irgen;
 
+const unsigned DefaultAS = 0;
+
+/// A helper for creating LLVM struct types.
+static llvm::StructType *createStructType(IRGenModule &IGM,
+                                          StringRef name,
+                                  std::initializer_list<llvm::Type*> types) {
+  return llvm::StructType::create(IGM.getLLVMContext(),
+                                  ArrayRef<llvm::Type*>(types.begin(),
+                                                        types.size()),
+                                  name);
+};
+
+/// A helper for creating pointer-to-struct types.
+static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
+                                                  StringRef name,
+                                  std::initializer_list<llvm::Type*> types) {
+  return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
+};
+
 IRGenModule::IRGenModule(ASTContext &Context,
                          Options &Opts, llvm::Module &Module,
                          const llvm::DataLayout &DataLayout,
@@ -64,8 +83,6 @@ IRGenModule::IRGenModule(ASTContext &Context,
   SlowAllocFn = nullptr;
   SlowRawDeallocFn = nullptr;
 
-  const unsigned defaultAS = 0;
-
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
@@ -75,23 +92,31 @@ IRGenModule::IRGenModule(ASTContext &Context,
   // address point of a type metadata.  This is at least one word, and
   // potentially more than that, past the start of the actual global
   // structure.
-  llvm::Type *typeMetadataElts[] = { MetadataKindTy };
-  TypeMetadataStructTy =
-    llvm::StructType::create(getLLVMContext(), typeMetadataElts,
-                             "swift.type");
-  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(defaultAS);
+  TypeMetadataStructTy = createStructType(*this, "swift.type", {
+    MetadataKindTy          // MetadataKind Kind;
+  });
+  TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
+
+  // A tuple type metadata has a couple extra fields.
+  auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
+    TypeMetadataPtrTy,      // Metadata *Type;
+    SizeTy                  // size_t Offset;
+  });
+  TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
+    TypeMetadataStructTy,   // (base)
+    SizeTy,                 // size_t NumElements;
+    Int8PtrTy,              // const char *Labels;
+    llvm::ArrayType::get(tupleElementTy, 0) // Element Elements[];
+  });
 
   // A full type metadata is basically just an adjustment to the
   // address point of a type metadata.  Resilience may cause
   // additional data to be laid out prior to this address point.
-  llvm::Type *fullTypeMetadataElts[] = {
+  FullTypeMetadataStructTy = createStructType(*this, "swift.full_type", {
     WitnessTablePtrTy,
     TypeMetadataStructTy
-  };
-  FullTypeMetadataStructTy =
-    llvm::StructType::create(getLLVMContext(), fullTypeMetadataElts,
-                             "swift.full_type");
-  FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(defaultAS);
+  });
+  FullTypeMetadataPtrTy = FullTypeMetadataStructTy->getPointerTo(DefaultAS);
 
   // A metadata pattern is a structure from which generic type
   // metadata are allocated.  We leave this struct type intentionally
@@ -100,7 +125,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   TypeMetadataPatternStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.type_pattern");
   TypeMetadataPatternPtrTy =
-    TypeMetadataPatternStructTy->getPointerTo(defaultAS);
+    TypeMetadataPatternStructTy->getPointerTo(DefaultAS);
 
   DeallocatingDtorTy = llvm::FunctionType::get(SizeTy, RefCountedPtrTy, false);
   llvm::Type *dtorPtrTy = DeallocatingDtorTy->getPointerTo();
@@ -108,37 +133,35 @@ IRGenModule::IRGenModule(ASTContext &Context,
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
-  llvm::Type *fullHeapMetadataElts[] = {
+  FullHeapMetadataStructTy =
+                  createStructType(*this, "swift.full_heapmetadata", {
     dtorPtrTy,
     WitnessTablePtrTy,
     TypeMetadataStructTy
-  };
-  FullHeapMetadataStructTy =
-    llvm::StructType::create(getLLVMContext(), fullHeapMetadataElts,
-                             "swift.full_heapmetadata");
-  FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(defaultAS);
+  });
+  FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(DefaultAS);
 
   llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, SizeTy };
   RefCountedStructTy->setBody(refCountedElts);
 
-  PtrSize = Size(DataLayout.getPointerSize(defaultAS));
+  PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
 
-  llvm::Type *funcElts[] = { Int8PtrTy, RefCountedPtrTy };
-  FunctionPairTy = llvm::StructType::get(LLVMContext, funcElts,
-                                         /*packed*/ false);
-
+  FunctionPairTy = createStructType(*this, "swift.function", {
+    Int8PtrTy,
+    RefCountedPtrTy
+  });
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
-                  ->getPointerTo(defaultAS);
+                  ->getPointerTo(DefaultAS);
 
   FixedBufferTy = nullptr;
   for (unsigned i = 0; i != NumValueWitnessFunctions; ++i)
     ValueWitnessTys[i] = nullptr;
 
   ObjCPtrTy = llvm::StructType::create(getLLVMContext(), "objc_object")
-                ->getPointerTo(defaultAS);
+                ->getPointerTo(DefaultAS);
 
   ObjCClassStructTy = llvm::StructType::create(LLVMContext, "objc_class");
-  ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(defaultAS);
+  ObjCClassPtrTy = ObjCClassStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcClassElts[] = {
     ObjCClassPtrTy,
     ObjCClassPtrTy,
@@ -149,7 +172,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   ObjCClassStructTy->setBody(objcClassElts);
 
   ObjCSuperStructTy = llvm::StructType::create(LLVMContext, "objc_super");
-  ObjCSuperPtrTy = ObjCSuperStructTy->getPointerTo(defaultAS);
+  ObjCSuperPtrTy = ObjCSuperStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcSuperElts[] = {
     ObjCPtrTy,
     ObjCClassPtrTy
