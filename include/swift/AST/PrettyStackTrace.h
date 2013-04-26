@@ -19,6 +19,7 @@
 #define SWIFT_PRETTYSTACKTRACE_H
 
 #include "llvm/Support/PrettyStackTrace.h"
+#include "swift/AST/Type.h"
 
 namespace swift {
   class ASTContext;
@@ -74,6 +75,17 @@ class PrettyStackTraceStmt : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceStmt(ASTContext &C, const char *action, Stmt *S)
     : Context(C), TheStmt(S), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+/// PrettyStackTraceType - Observe that we are processing a specific type.
+class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {
+  ASTContext &Context;
+  Type TheType;
+  const char *Action;
+public:
+  PrettyStackTraceType(ASTContext &C, const char *action, Type type)
+    : Context(C), TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 

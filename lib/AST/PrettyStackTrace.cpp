@@ -17,6 +17,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -148,7 +149,47 @@ void PrettyStackTraceStmt::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
+namespace {
+  /// Map a Type to an interesting declaration whose source range we
+  /// should print.
+  struct InterestingDeclForType
+      : TypeVisitor<InterestingDeclForType, Decl*> {
+    Decl *visitType(TypeBase *type) {
+      return nullptr;
+    }
+    Decl *visitUnboundGenericType(UnboundGenericType *type) {
+      return type->getDecl();
+    }
+    Decl *visitBoundGenericType(BoundGenericType *type) {
+      return type->getDecl();
+    }
+    Decl *visitNominalType(NominalType *type) {
+      return type->getDecl();
+    }
+    Decl *visitNameAliasType(NameAliasType *type) {
+      return type->getDecl();
+    }
+  };
+}
+
+void PrettyStackTraceType::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  if (TheType.isNull()) {
+    out << "NULL type!\n";
+    return;
+  }
+
+  out << "type '" << TheType << '\'';
+  if (Decl *decl = InterestingDeclForType().visit(TheType)) {
+    out << " (declared at ";
+    printSourceRange(out, decl->getSourceRange(), Context);
+    out << ')';
+  }
+  out << '\n';
+}
+
 void PrettyStackTraceLocation::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " starting at ";
   printSourceLoc(out, Loc, Context);
+  out << '\n';
 }
