@@ -757,4 +757,5 @@ void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
 
   out << " at ";
   printSourceLoc(out, sloc, Ctx);
+  out << '\n';
 }
