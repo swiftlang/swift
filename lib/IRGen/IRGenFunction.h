@@ -146,7 +146,10 @@ public:
   const TypeInfo &getFragileTypeInfo(CanType T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
+  void emitMemCpy(llvm::Value *dest, llvm::Value *src,
+                  llvm::Value *size, Alignment align);
   void emitMemCpy(Address dest, Address src, Size size);
+  void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                                  llvm::Type *objectType,

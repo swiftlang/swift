@@ -50,10 +50,19 @@ IRGenFunction::~IRGenFunction() {
 /// be of i8* type.
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                Size size, Alignment align) {
-  Builder.CreateMemCpy(dest, src, size.getValue(), align.getValue(), false);
+  emitMemCpy(dest, src, IGM.getSize(size), align);
+}
+
+void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
+                               llvm::Value *size, Alignment align) {
+  Builder.CreateMemCpy(dest, src, size, align.getValue(), false);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
+  emitMemCpy(dest, src, IGM.getSize(size));
+}
+
+void IRGenFunction::emitMemCpy(Address dest, Address src, llvm::Value *size) {
   // Map over to the inferior design of the LLVM intrinsic.
   emitMemCpy(dest.getAddress(), src.getAddress(), size,
              std::min(dest.getAlignment(), src.getAlignment()));
