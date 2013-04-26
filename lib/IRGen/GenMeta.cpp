@@ -1129,10 +1129,10 @@ static llvm::Value *emitLoadFromMetadataAtIndex(IRGenFunction &IGF,
 }
 
 /// Given a type metadata pointer, load its value witness table.
-llvm::Value *irgen::emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
-                                                        llvm::Value *metadata) {
-  return emitLoadFromMetadataAtIndex(IGF, metadata, -1,
-                                     IGF.IGM.WitnessTablePtrTy);
+llvm::Value *
+IRGenFunction::emitValueWitnessTableRefForMetadata(llvm::Value *metadata) {
+  return emitLoadFromMetadataAtIndex(*this, metadata, -1,
+                                     IGM.WitnessTablePtrTy);
 }
 
 /// Load the metadata reference at the given index.

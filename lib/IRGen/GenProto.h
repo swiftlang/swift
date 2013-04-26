@@ -43,7 +43,6 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class TypeInfo;
-  enum class ValueWitness : unsigned;
 
   /// Emit the metadata and witness table initialization for an allocated
   /// existential container.

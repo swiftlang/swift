@@ -18,6 +18,8 @@
 #ifndef SWIFT_IRGEN_PROTOCOLINFO_H
 #define SWIFT_IRGEN_PROTOCOLINFO_H
 
+#include "swift/AST/Decl.h"
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "ValueWitness.h"

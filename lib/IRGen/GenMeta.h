@@ -67,11 +67,6 @@ namespace irgen {
                                                    llvm::Value *metatype,
                                                    CanType type);
 
-  /// Given a reference to type metadata, produce the type's value
-  /// witness table reference.
-  llvm::Value *emitValueWitnessTableRefForMetadata(IRGenFunction &IGF,
-                                                   llvm::Value *metadata);
-
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout);

@@ -170,7 +170,7 @@ public:
                         llvm::Value *&valueAddress);
 
   llvm::Value *emitTypeMetadataRef(CanType type);
-
+  llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
 private:
   llvm::Instruction *AllocaIP;
