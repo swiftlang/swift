@@ -112,6 +112,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     llvm::SmallString<128> DefaultModuleCache;
     llvm::sys::path::system_temp_directory(/*erasedOnReboot=*/false,
                                            DefaultModuleCache);
+    llvm::sys::path::append(DefaultModuleCache, "org.llvm.clang");
+    llvm::sys::path::append(DefaultModuleCache, "ModuleCache");
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(DefaultModuleCache.str());
   } else {
