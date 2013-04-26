@@ -3216,7 +3216,7 @@ namespace {
       case SourceKind::GenericLValueMetadata: {
         CanType argTy = stripLabel(substInputType);
         CanType objTy = CanType(cast<LValueType>(argTy)->getObjectType());
-        out.add(emitTypeMetadataRef(IGF, objTy));
+        out.add(IGF.emitTypeMetadataRef(objTy));
         return;
       }
       }
@@ -3260,7 +3260,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
 
     // Add the metadata reference unelss it's fulfilled.
     if (!Fulfillments.count(FulfillmentKey(archetype, nullptr))) {
-      out.add(emitTypeMetadataRef(IGF, argType));
+      out.add(IGF.emitTypeMetadataRef(argType));
     }
 
     // Nothing else to do if there aren't any protocols to witness.
@@ -3358,7 +3358,7 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
   ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
 
   // First, write out the metadata.
-  metadata = emitTypeMetadataRef(IGF, srcType);
+  metadata = IGF.emitTypeMetadataRef(srcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
   
   // Compute basic layout information about the type.  If we have a

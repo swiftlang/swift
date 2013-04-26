@@ -20,7 +20,6 @@
 
 #include "ASTVisitor.h"
 #include "Explosion.h"
-#include "GenMeta.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "TypeInfo.h"
@@ -481,7 +480,7 @@ namespace {
         assert(IGF.IGM.hasTrivialMetatype(origInstanceTy) ||
                isa<ArchetypeType>(origInstanceTy));
         if (isa<ArchetypeType>(origInstanceTy))
-          Out.add(emitTypeMetadataRef(IGF, substInstanceTy));
+          Out.add(IGF.emitTypeMetadataRef(substInstanceTy));
         return;
       }
 
@@ -667,7 +666,7 @@ void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
   superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
   
   // Retrieve the metadata.
-  llvm::Value *metadataRef = emitTypeMetadataRef(*this, destType);
+  llvm::Value *metadataRef = emitTypeMetadataRef(destType);
   if (metadataRef->getType() != IGM.Int8PtrTy)
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
   

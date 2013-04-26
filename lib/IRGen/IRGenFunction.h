@@ -165,6 +165,9 @@ public:
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                         llvm::Value *&box,
                         llvm::Value *&valueAddress);
+
+  llvm::Value *emitTypeMetadataRef(CanType type);
+
   
 private:
   llvm::Instruction *AllocaIP;

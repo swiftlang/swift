@@ -83,7 +83,7 @@ namespace {
       // TODO: but we are partially determined by the outer context!
       for (auto &sub : type->getSubstitutions()) {
         CanType subbed = sub.Replacement->getCanonicalType();
-        Values.push_back(emitTypeMetadataRef(IGF, subbed));
+        Values.push_back(IGF.emitTypeMetadataRef(subbed));
       }
 
       // All of those values are metadata pointers.
@@ -454,8 +454,8 @@ namespace {
 }
 
 /// Produce the type metadata pointer for the given type.
-llvm::Value *irgen::emitTypeMetadataRef(IRGenFunction &IGF, CanType type) {
-  return EmitTypeMetadataRef(IGF).visit(type);
+llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
+  return EmitTypeMetadataRef(*this).visit(type);
 }
 
 /// Produce the heap metadata pointer for the given class type.  For
@@ -523,7 +523,7 @@ void irgen::emitMetaTypeRef(IRGenFunction &IGF, CanType type,
     return;
 
   // Otherwise, emit a metadata reference.
-  llvm::Value *metadata = emitTypeMetadataRef(IGF, type);
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(type);
   explosion.add(metadata);
 }
 
