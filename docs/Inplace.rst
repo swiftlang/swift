@@ -125,6 +125,26 @@ and are are unlikely to be optimized away by even a clever compiler.
    general feature we're proposing into the core language and leaving
    these optimizations to the library wherever possible.
 
+Copy On Write
+=============
+
+Once we agree that mutating operations are viable, we can also agree
+that copy-on-write is a viable optimization for mutating operations in
+those cases where the string's buffer is uniquely referenced::
+
+  struct String {
+    ...
+
+    func inplace_upper() {
+      this.unique()                  // copy buffer iff refcount > 1
+      for i in 0..buffer.length {
+        buffer[i].inplace_upper()    // naïve ASCII-only implementation
+      }
+    }
+    ...
+
+  }
+
 Ponies for Everyone!
 ====================
 
