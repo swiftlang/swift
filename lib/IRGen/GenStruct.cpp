@@ -164,12 +164,11 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func:
-      // Methods are emitted as SIL Functions already.
+      emitLocalDecls(cast<FuncDecl>(member));
       continue;
-    case DeclKind::Constructor: {
-      // Constructors get emitted as SIL Functions.
+    case DeclKind::Constructor:
+      emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
-    }
     }
     llvm_unreachable("bad extension member kind");
   }

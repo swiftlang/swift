@@ -528,8 +528,10 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func:
+      emitLocalDecls(cast<FuncDecl>(member));
+      continue;
     case DeclKind::Constructor:
-      // Methods are emitted as SIL Functions already.
+      emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
     case DeclKind::OneOfElement: {
       OneOfElementDecl *elt = cast<OneOfElementDecl>(member);

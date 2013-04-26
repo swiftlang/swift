@@ -249,50 +249,6 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
     visitSILBasicBlock(&bb);
 }
 
-void IRGenSILFunction::emitLocalDecls(BraceStmt *body) {
-  for (auto element : body->getElements()) {
-    Decl *decl = element.dyn_cast<Decl*>();
-    if (!decl)
-      break;
-    switch (decl->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::Subscript:
-    case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
-    case DeclKind::Extension:
-    case DeclKind::OneOfElement:
-    case DeclKind::Constructor:
-    case DeclKind::Destructor:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      llvm_unreachable("declaration cannot appear in local scope");
-
-    case DeclKind::TypeAlias:
-      // no IR generation support required.
-      return;
-
-    case DeclKind::PatternBinding:
-    case DeclKind::Var:
-    case DeclKind::Func:
-      // These get lowered by SIL.
-      return;
-
-    case DeclKind::OneOf:
-      IGM.emitOneOfDecl(cast<OneOfDecl>(decl));
-      break;
-
-    case DeclKind::Struct:
-      IGM.emitStructDecl(cast<StructDecl>(decl));
-      break;
-
-    case DeclKind::Class:
-      IGM.emitClassDecl(cast<ClassDecl>(decl));
-      break;
-    }
-  }
-}
-
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -312,8 +268,7 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
                                        SILFunction *f,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
-                                       AbstractCC &cc,
-                                       BraceStmt *&body) {
+                                       AbstractCC &cc) {
   assert(constant.hasDecl() &&
          "don't ask me for the address of anonymous functions");
   ValueDecl *vd = constant.loc.get<ValueDecl*>();
@@ -332,7 +287,6 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       fnptr = getAddrOfFunction(fnRef, ExtraData::None);
       // FIXME: c calling convention
       cc = fd ? getAbstractCC(fd) : AbstractCC::Freestanding;
-      body = fd ? fd->getBody()->getBody() : nullptr;
       break;
     }
     case SILConstant::Kind::Getter: {
@@ -346,7 +300,6 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       else
         llvm_unreachable("getter for decl that's not Var or Subscript");
       
-      body = getter ? getter->getBody()->getBody() : nullptr;
       if (getter)
         cc = getAbstractCC(getter);
       else
@@ -366,7 +319,6 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       else
         llvm_unreachable("getter for decl that's not Var or Subscript");
       
-      body = setter ? setter->getBody()->getBody() : nullptr;
       if (setter)
         cc = getAbstractCC(setter);
       else
@@ -379,7 +331,6 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       ConstructorDecl *cd = cast<ConstructorDecl>(vd);
       fnptr = getAddrOfConstructor(cd, ConstructorKind::Allocating,
                                    ExplosionKind::Minimal);
-      body = cd->getBody();
       cc = AbstractCC::Freestanding;
       break;
     }
@@ -387,14 +338,12 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       ConstructorDecl *cd = cast<ConstructorDecl>(vd);
       fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
                                    ExplosionKind::Minimal);
-      body = cd->getBody();
       cc = AbstractCC::Method;
       break;
     }
     case SILConstant::Kind::OneOfElement: {
       OneOfElementDecl *ed = cast<OneOfElementDecl>(vd);
       fnptr = getAddrOfInjectionFunction(ed);
-      body = nullptr;
       cc = AbstractCC::Freestanding;
       break;
     }
@@ -402,8 +351,6 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
       ClassDecl *cd = cast<ClassDecl>(vd);
       fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
       cc = AbstractCC::Method;
-      // FIXME: get body from DestructorDecl
-      body = nullptr;
       break;
     }
     case SILConstant::Kind::GlobalAccessor: {
@@ -417,25 +364,18 @@ void IRGenModule::getAddrOfSILConstant(SILConstant constant,
 void IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
-                                       AbstractCC &cc,
-                                       BraceStmt *&body) {
+                                       AbstractCC &cc) {
   if (CapturingExpr *anon = f->getName().loc.dyn_cast<CapturingExpr*>()) {
     fnptr = getAddrOfAnonymousFunction(f, anon);
     naturalCurryLevel = f->getLoweredType().getUncurryLevel();
     
     // FIXME: c calling convention for anonymous funcs?
-    cc = AbstractCC::Freestanding;
-    
-    if (auto *func = dyn_cast<FuncExpr>(anon)) {
-      body = func->getBody();
-    } else {
-      body = nullptr;
-    }
+    cc = AbstractCC::Freestanding;    
     return;
   }
   
   return getAddrOfSILConstant(f->getName(), f,
-                              fnptr, naturalCurryLevel, cc, body);
+                              fnptr, naturalCurryLevel, cc);
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
@@ -451,9 +391,8 @@ void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  BraceStmt *body;
   IGM.getAddrOfSILFunction(i->getFunction(),
-                           fnptr, naturalCurryLevel, cc, body);
+                           fnptr, naturalCurryLevel, cc);
   
   
   // Store the function constant and calling
@@ -1509,9 +1448,8 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  BraceStmt *body;
   IGM.getAddrOfSILConstant(i->getMember(), nullptr,
-                           fnptr, naturalCurryLevel, cc, body);
+                           fnptr, naturalCurryLevel, cc);
   
   newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);
 }

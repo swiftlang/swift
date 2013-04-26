@@ -362,10 +362,6 @@ public:
   /// Generate IR for the given SIL Function.
   void emitSILFunction(SILFunction *f);
 
-  /// Generate local decls in the given function body. This skips VarDecls and
-  /// other locals that are consumed by SIL.
-  void emitLocalDecls(BraceStmt *body);
-  
   void newLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = loweredValues.insert({v, std::move(lv)});
     assert(inserted.second && "already had lowered value for sil value?!");

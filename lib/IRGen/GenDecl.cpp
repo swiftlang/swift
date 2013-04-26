@@ -814,7 +814,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     return;
 
   case DeclKind::Func:
-    return;  // Handled as SIL functions.
+    // Emit local definitions from the function body.
+    return emitLocalDecls(cast<FuncDecl>(D));
 
   case DeclKind::TopLevelCode:
     // All the top-level code will be lowered separately.
@@ -850,9 +851,9 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
       llvm_unreachable("Not a valid external definition for IRgen");
 
     case DeclKind::Func:
+      return emitLocalDecls(cast<FuncDecl>(D));
     case DeclKind::Constructor:
-      // Methods are emitted as SIL functions already.
-      return;
+      return emitLocalDecls(cast<ConstructorDecl>(D));
       
     case DeclKind::Struct:
       // Emit Swift metadata for the external struct.
@@ -1500,8 +1501,10 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
         continue;
       llvm_unreachable("decl not allowed in extension!");
     case DeclKind::Func:
+      emitLocalDecls(cast<FuncDecl>(member));
+      continue;
     case DeclKind::Constructor:
-      // Methods are emitted as their own SIL functions.
+      emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
     }
     llvm_unreachable("bad extension member kind");

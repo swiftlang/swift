@@ -538,9 +538,13 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       // FIXME: Will need an implementation here for resilience
       continue;
     case DeclKind::Func:
+      emitLocalDecls(cast<FuncDecl>(member));
+      continue;
     case DeclKind::Constructor:
+      emitLocalDecls(cast<ConstructorDecl>(member));
+      continue;
     case DeclKind::Destructor:
-      // Functions should be lowered through SIL.
+      emitLocalDecls(cast<DestructorDecl>(member));
       continue;
     }
     llvm_unreachable("bad extension member kind");

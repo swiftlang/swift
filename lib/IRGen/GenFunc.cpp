@@ -48,6 +48,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -1691,8 +1692,7 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
 /// Emit a SIL function.
 static void emitSILFunction(IRGenModule &IGM,
                             SILFunction *f,
-                            llvm::Function *entrypoint,
-                            BraceStmt *body = nullptr) {
+                            llvm::Function *entrypoint) {
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
   // Emit the code for the function.
@@ -1703,10 +1703,6 @@ static void emitSILFunction(IRGenModule &IGM,
                        explosionLevel,
                        entrypoint); 
   igs.emitSILFunction(f);
-  
-  // Walk the function body to look for local types or other decls.
-  if (body)
-    igs.emitLocalDecls(body);
 }
 
 /// Emit the definition for the given SIL constant.
@@ -1717,9 +1713,8 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   llvm::Function *entrypoint;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  BraceStmt *body;
-  getAddrOfSILFunction(f, entrypoint, naturalCurryLevel, cc, body);
-  ::emitSILFunction(*this, f, entrypoint, body);
+  getAddrOfSILFunction(f, entrypoint, naturalCurryLevel, cc);
+  ::emitSILFunction(*this, f, entrypoint);
 }
 
 /// Emit the forwarding stub function for a partial application.
@@ -1872,4 +1867,83 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   
   // Emit the call.
   outBlock.add(IGF.Builder.CreateCall2(converter, fn, context));
+}
+
+namespace {
+
+struct EmitLocalDecls : public ASTWalker {
+  IRGenModule &IGM;
+  
+  EmitLocalDecls(IRGenModule &IGM) : IGM(IGM) {}
+  
+  bool walkToDeclPre(Decl *D) override {
+    switch (D->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::Subscript:
+    case DeclKind::TopLevelCode:
+    case DeclKind::Protocol:
+    case DeclKind::Extension:
+    case DeclKind::OneOfElement:
+    case DeclKind::Constructor:
+    case DeclKind::Destructor:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
+      llvm_unreachable("declaration cannot appear in local scope");
+      
+    case DeclKind::TypeAlias:
+      // no IR generation support required.
+    case DeclKind::PatternBinding:
+    case DeclKind::Var:
+      // These get lowered by SIL.
+      return false;
+      
+    case DeclKind::Func:
+      // The body gets lowered by SIL, but we need to check for local decls.
+      IGM.emitLocalDecls(cast<FuncDecl>(D));
+      return false;
+      
+    case DeclKind::OneOf:
+      IGM.emitOneOfDecl(cast<OneOfDecl>(D));
+      return false;
+      
+    case DeclKind::Struct:
+      IGM.emitStructDecl(cast<StructDecl>(D));
+      return false;
+      
+    case DeclKind::Class:
+      IGM.emitClassDecl(cast<ClassDecl>(D));
+      return false;
+    }
+  }
+  
+  bool walkToExprPre(Expr *E) override {
+    if (auto *FE = dyn_cast<FuncExpr>(E)) {
+      IGM.emitLocalDecls(FE->getBody());
+      return false;
+    }
+    return true;
+  }
+};
+
+} // end anonymous namespace
+
+void IRGenModule::emitLocalDecls(BraceStmt *body) {
+  EmitLocalDecls walker(*this);
+  body->walk(walker);
+}
+
+void IRGenModule::emitLocalDecls(FuncDecl *fd) {
+  if (fd->getBody() && fd->getBody()->getBody())
+    emitLocalDecls(fd->getBody()->getBody());
+}
+
+void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {
+  if (cd->getBody())
+    emitLocalDecls(cd->getBody());
+}
+
+void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
+  if (dd->getBody())
+    emitLocalDecls(dd->getBody());
 }

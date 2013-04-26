@@ -312,6 +312,13 @@ public:
   Address emitGlobalVariable(VarDecl *var, const TypeInfo &type);
   
   void emitSILFunction(SILFunction *f);
+  
+  /// Generate local decls in the given function body. This skips VarDecls and
+  /// other locals that are consumed by SIL.
+  void emitLocalDecls(BraceStmt *body);
+  void emitLocalDecls(FuncDecl *fd);
+  void emitLocalDecls(ConstructorDecl *cd);
+  void emitLocalDecls(DestructorDecl *dd);
 
   llvm::FunctionType *getFunctionType(AbstractCC cc,
                                       CanType fnType, ExplosionKind kind,
@@ -358,13 +365,11 @@ public:
                             SILFunction *f,
                             llvm::Function* &fnptr,
                             unsigned &naturalCurryLevel,
-                            AbstractCC &cc,
-                            BraceStmt* &body);
+                            AbstractCC &cc);
   void getAddrOfSILFunction(SILFunction *f,
                             llvm::Function* &fnptr,
                             unsigned &naturalCurryLevel,
-                            AbstractCC &cc,
-                            BraceStmt* &body);
+                            AbstractCC &cc);
   llvm::Function *getAddrOfBridgeToBlockConverter(CanType blockType);
 
   llvm::StringRef mangleType(CanType type,
