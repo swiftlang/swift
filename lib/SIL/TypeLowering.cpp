@@ -158,15 +158,9 @@ public:
     for (TupleTypeElt const &elt : t->getFields()) {
       CanType ct = elt.getType()->getCanonicalType();
       setPathType(ct);
-      
-      visit(ct);
-      // FIXME: Address-only tuples complicate function argument handling a bit.
-      // Consider all tuples loadable for now, even though this is broken.
-      /*
       if (visit(ct) == IsAddressOnly) {
         return IsAddressOnly;
       }
-       */
       advancePath();
     }
     popPath();
