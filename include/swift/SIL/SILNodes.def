@@ -55,6 +55,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(AllocBoxInst, SILInstruction)
   INST(AllocArrayInst, SILInstruction)
   INST(FunctionRefInst, SILInstruction)
+  INST(BuiltinFunctionRefInst, SILInstruction)
   INST(GlobalAddrInst, SILInstruction)
 
   ABSTRACT_VALUE(FunctionInst, SILInstruction)

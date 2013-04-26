@@ -35,6 +35,7 @@ class SILBasicBlock;
 class CharacterLiteralExpr;
 class DeclRefExpr;
 class FloatLiteralExpr;
+class FuncDecl;
 class IntegerLiteralExpr;
 class MetatypeExpr;
 class StringLiteralExpr;
@@ -352,6 +353,27 @@ public:
   }
 };
 
+/// BuiltinFunctionRefInst - Represents a reference to a primitive function from
+/// the Builtin module.
+class BuiltinFunctionRefInst : public SILInstruction {
+  FuncDecl *Function;
+public:
+  BuiltinFunctionRefInst(SILLocation Loc, FuncDecl *Function, SILType Ty)
+    : SILInstruction(ValueKind::BuiltinFunctionRefInst, Loc, Ty),
+      Function(Function)
+  {}
+  
+  FuncDecl *getFunction() const { return Function; }
+  
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BuiltinFunctionRefInst;
+  }
+};
+  
 /// FunctionRefInst - Represents a reference to a SIL function.
 class FunctionRefInst : public SILInstruction {
   SILFunction *Function;

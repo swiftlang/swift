@@ -14,8 +14,9 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 
@@ -233,6 +234,15 @@ public:
     
   }
 
+  void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
+    require(isa<BuiltinModule>(BFI->getFunction()->getDeclContext()),
+            "builtin_function_ref must refer to a function in the Builtin module");
+    require(BFI->getType().is<AnyFunctionType>(),
+            "builtin_function_ref should have a function result");
+    require(BFI->getType().castTo<AnyFunctionType>()->isThin(),
+            "builtin_function_ref should have a thin function result");
+  }
+  
   void checkFunctionRefInst(FunctionRefInst *CRI) {
     require(CRI->getType().is<AnyFunctionType>(),
             "function_ref should have a function result");

@@ -330,6 +330,11 @@ public:
     DRI->getFunction()->printName(OS);
   }
   
+  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
+    OS << "builtin_function_ref $" << BFI->getType()
+       << ", @" << BFI->getFunction()->getName();
+  }
+  
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
     OS << "global_addr $" << GAI->getType() << ", @";
     OS << GAI->getGlobal()->getName();

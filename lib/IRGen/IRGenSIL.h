@@ -472,6 +472,7 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitSpecializeInst(SpecializeInst *i);
 
+  void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
 

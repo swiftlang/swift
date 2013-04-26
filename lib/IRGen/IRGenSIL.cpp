@@ -378,16 +378,14 @@ void IRGenModule::getAddrOfSILFunction(SILFunction *f,
                               fnptr, naturalCurryLevel, cc);
 }
 
+void IRGenSILFunction::visitBuiltinFunctionRefInst(swift::BuiltinFunctionRefInst *i)
+{
+  newLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(i->getFunction()),
+                         /*substitutions*/ {});
+  return;
+}
+
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
-  // Emit references to builtin decls specially.
-  if (auto *decl = i->getFunction()->getName().loc.dyn_cast<ValueDecl*>()) {
-    if (isa<BuiltinModule>(decl->getDeclContext())) {
-      newLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(decl),
-                             /*substitutions*/ {});
-      return;
-    }
-  }
-  
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;

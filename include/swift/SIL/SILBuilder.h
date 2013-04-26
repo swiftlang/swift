@@ -141,6 +141,11 @@ public:
     return insert(PartialApplyInst::create(Loc, Fn, Args, ClosureTy, F));
   }
 
+  BuiltinFunctionRefInst *createBuiltinFunctionRef(SILLocation loc,
+                                                   FuncDecl *f,
+                                                   SILType ty) {
+    return insert(new BuiltinFunctionRefInst(loc, f, ty));
+  }
   FunctionRefInst *createFunctionRef(SILLocation loc, SILFunction *f) {
     return insert(new FunctionRefInst(loc, f));
   }
