@@ -14,14 +14,16 @@
 String Mutation
 ===============
 
-Should Swift ``String``\ s be immutable? Although their backing store is
-immutable, the values themselves can be reassigned, swapped, ``+=``'ed,
-and so on. Does it make sense to limit
-mutations to those that can be expressed as wholesale assignments?
-The question turns out to be meaningless, because any
-mutation of a ``String`` can be expressed in terms of a wholesale
-assignment.  If we tried to impose an “assignment-only” limitation, I'd still be
-free to write::
+Should Swift ``String``\ s be immutable? Even if the backing store is
+immutable, the values themselves could still be reassigned and
+swapped.  Therefore, there's really no choice: ``String``\ s **are
+mutable**.
+
+We can also ask if it makes sense to *limit* mutations to those that
+can be expressed as wholesale assignments, but that question turns out
+to be meaningless, because *any* mutation of a ``String`` can be
+expressed in terms of a wholesale assignment.  Even if we tried to
+impose an “assignment-only” limitation, I'd still be free to write::
 
   extension String {
     func inplace_upper() {
@@ -33,7 +35,7 @@ The ``inplace_upper`` implementation above is semantically
 indistinguishable from one that's written in terms of by-part
 mutations.  We never pass out *logical* references to the underlying
 string buffer—even though the buffer may be shared by many strings,
-each one presents an logically-independent value.
+each ``String`` instance presents an logically-independent value.
 
 In-Place Mutations
 ==================
@@ -72,9 +74,9 @@ With a mutating ``upper()``, we get::
 
   x.upper()          // upcase x in place
 
-  var tmp = f()      // operations don't compose
-  tmp.upper()
-  tmp.split()
+  var z = f()      // operations don't compose
+  z.upper()
+  z.split()
 
 The creating interfaces are a clear usability win.  The minor
 inconvenience of assigning ``x.upper()`` into ``x`` is more than
