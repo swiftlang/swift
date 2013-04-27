@@ -958,20 +958,9 @@ NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
   selectorArgs.push_back(firstArg.get());
   selectorPieces.push_back(Identifier());
   while (true) {
-    // If there is a colon on a new line, parse it. This is a continuation.
-    if (Tok.is(tok::colon) && Tok.isAtStartOfLine()) {
-      SourceLoc colonLoc = consumeToken();
-
-      // If there is no identifier after the colon, we have an error.
-      if (Tok.isNot(tok::identifier)) {
-        diagnose(Tok, diag::selector_argument_name_missing)
-          .highlight(SourceRange(colonLoc));
-        break;
-      }
-    }
     // Otherwise, an identifier on the same line continues the
     // selector arguments.
-    else if (Tok.isNot(tok::identifier) || Tok.isAtStartOfLine()) {
+    if (Tok.isNot(tok::identifier) || Tok.isAtStartOfLine()) {
       // We're done.
       break;
     }
