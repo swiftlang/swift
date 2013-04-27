@@ -30,33 +30,34 @@ using namespace swift;
 ///     expr-sequence expr-as
 ///
 NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
-  NullablePtr<Expr> first = parseExprSequence(Message);
-  if (first.isNull())
+  NullablePtr<Expr> expr = parseExprSequence(Message);
+  if (expr.isNull())
     return nullptr;
   
   if (Tok.is(tok::kw_is)) {
-    return parseExprIs(first.get());
+    return parseExprIs(expr.get());
   }
   if (Tok.is(tok::kw_as)) {
-    return parseExprAs(first.get());
+    return parseExprAs(expr.get());
   }
   
   NullablePtr<IfExpr> ifExpr = nullptr;
-  
+  Expr *first = expr.get();
   while (Tok.is(tok::question)) {
-    NullablePtr<IfExpr> nextIf = parseExprIf(first.get());
+    NullablePtr<IfExpr> nextIf = parseExprIf(first);
     if (nextIf.isNull())
       return nullptr;
     
-    if (ifExpr.isNull())
-      ifExpr = nextIf;
-    else {
+    if (ifExpr.isNull()) {
+      expr = nextIf.get();
+    } else {
       ifExpr.get()->setElseExpr(nextIf.get());
     }
+    ifExpr = nextIf;
     first = nextIf.get()->getElseExpr();
   }
   
-  return ifExpr.isNull() ? first.get() : ifExpr.get();
+  return expr;
 }
 
 /// parseExprIs
