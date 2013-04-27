@@ -325,6 +325,8 @@ public:
             "struct field count mismatch!");
     
     for (size_t i = 0; i < SI->getElements().size(); ++i) {
+      require(!SI->getElements()[i].getType().isAddress(),
+              "structs can't be composed from SIL addresses");
       require(SI->getElements()[i].getType() == ti->getElements()[i].type,
               "struct element arguments do not match struct type!");
     }

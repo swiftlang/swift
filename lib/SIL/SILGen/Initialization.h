@@ -45,8 +45,8 @@ public:
     /// This Initialization is for a _ binding or other ignored value; the
     /// corresponding result can be discarded.
     Ignored,
-    /// This Initialization is for a [byref] argument binding, which is
-    /// initialized using bindAddress().
+    /// This Initialization is for a [byref] or address-only argument binding,
+    /// which is initialized using bindAddress().
     AddressBinding,
     /// This Initialization is for a single buffer with a physical address,
     /// which can be accessed with getAddress() and stored to.

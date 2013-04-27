@@ -152,7 +152,7 @@ public:
   }
 };
 
-/// Cleanup to destroy an initialized variable
+/// Cleanup to destroy an initialized variable.
 class CleanupLocalVariable : public Cleanup {
   VarDecl *var;
 public:
@@ -161,6 +161,19 @@ public:
   
   void emit(SILGenFunction &gen) override {
     gen.destroyLocalVariable(var);
+  }
+};
+  
+/// Cleanup to destroy an address-only argument. We destroy the value without
+/// deallocating the storage.
+class CleanupAddressOnlyArgument : public Cleanup {
+  SILValue addr;
+public:
+  CleanupAddressOnlyArgument(SILValue addr)
+    : addr(addr) {}
+  
+  void emit(SILGenFunction &gen) override {
+    gen.B.createDestroyAddr(SILLocation(), addr);
   }
 };
 
@@ -257,7 +270,10 @@ struct InitializationForPattern
   : public PatternVisitor<InitializationForPattern, InitializationPtr>
 {
   SILGenFunction &Gen;
-  InitializationForPattern(SILGenFunction &Gen) : Gen(Gen) {}
+  enum ArgumentOrVar_t { Argument, Var } ArgumentOrVar;
+  InitializationForPattern(SILGenFunction &Gen,
+                           ArgumentOrVar_t ArgumentOrVar)
+    : Gen(Gen), ArgumentOrVar(ArgumentOrVar) {}
   
   // Paren & Typed patterns are noops, just look through them.
   InitializationPtr visitParenPattern(ParenPattern *P) {
@@ -296,6 +312,15 @@ struct InitializationForPattern
       return InitializationPtr(new GlobalInitialization(addr));
     }
     
+    // If this is an address-only function argument with fixed lifetime,
+    // we can bind the address we were passed for the variable, and we don't
+    // need to initialize it.
+    SILType loweredTy = Gen.getLoweredType(vd->getType());
+    if (ArgumentOrVar == Argument && loweredTy.isAddressOnly()
+        && vd->hasFixedLifetime()) {
+      return InitializationPtr(new ByrefArgumentInitialization(vd));
+    }
+    
     return Gen.emitLocalVariableWithCleanup(vd);
   }
   
@@ -317,7 +342,8 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D,
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   InitializationPtr initialization =
-    InitializationForPattern(*this).visit(D->getPattern());
+    InitializationForPattern(*this, InitializationForPattern::Var)
+      .visit(D->getPattern());
   
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, emit 'initialize_var' placeholder
@@ -366,8 +392,11 @@ struct ArgumentInitVisitor :
     if (I) {
       switch (I->kind) {
       case Initialization::Kind::AddressBinding:
-        assert(ty->is<LValueType>() && "binding address to non-lvalue?!");
         I->bindAddress(arg, gen);
+        // If this is an address-only non-byref argument, we take ownership
+        // of the referenced value.
+        if (!ty->is<LValueType>())
+          gen.Cleanups.pushCleanup<CleanupAddressOnlyArgument>(arg);
         break;
 
       case Initialization::Kind::SingleBuffer:
@@ -560,8 +589,9 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   // Emit the argument variables.
   for (size_t i = 0; i < paramPatterns.size(); ++i) {
     // Allocate the local mutable argument storage and set up an Initialization.
-    InitializationPtr argInit =
-                       InitializationForPattern(*this).visit(paramPatterns[i]);
+    InitializationPtr argInit
+      = InitializationForPattern(*this, InitializationForPattern::Argument)
+        .visit(paramPatterns[i]);
     // Add the SILArguments and use them to initialize the local argument
     // values.
     ArgumentInitVisitor(*this, F).visit(paramPatterns[i], argInit.get());
