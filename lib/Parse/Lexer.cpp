@@ -93,10 +93,14 @@ static bool isStartOfUTF8Character(unsigned char C) {
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
 /// UTF8 character, validate it and advance the lexer past it.  This returns the
 /// encoded character or ~0U if the encoding is invalid.
-static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
-  assert((signed char)(*Ptr) < 0 && "Not the start of an encoded letter");
+static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
+                                                const char *End) {
+  if (Ptr >= End)
+    return ~0U;
   
   unsigned char CurByte = *Ptr++;
+  if (CurByte < 0x80)
+    return CurByte;
   
   // Read the number of high bits set, which indicates the number of bytes in
   // the character.
@@ -111,7 +115,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
       EncodedBytes > 4) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
-    while (!isStartOfUTF8Character(*Ptr))
+    while (Ptr < End && !isStartOfUTF8Character(*Ptr))
       ++Ptr;
     return ~0U;
   }
@@ -121,6 +125,8 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr) {
   
   // Read and validate the continuation bytes.
   for (unsigned i = 1; i != EncodedBytes; ++i) {
+    if (Ptr >= End)
+      return ~0U;
     CurByte = *Ptr;
     // If the high bit isn't set or the second bit isn't clear, then this is not
     // a continuation byte!
@@ -219,7 +225,7 @@ void Lexer::skipSlashSlashComment() {
       if ((signed char)(CurPtr[-1]) < 0) {
         --CurPtr;
         const char *CharStart = CurPtr;
-        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
+        if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
           diagnose(CharStart, diag::lex_invalid_utf8_character);
       }
       break;   // Otherwise, eat other characters.
@@ -278,7 +284,7 @@ void Lexer::skipSlashStarComment() {
       if ((signed char)(CurPtr[-1]) < 0) {
         --CurPtr;
         const char *CharStart = CurPtr;
-        if (validateUTF8CharacterAndAdvance(CurPtr) == ~0U)
+        if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
           diagnose(CharStart, diag::lex_invalid_utf8_character);
       }
 
@@ -308,21 +314,110 @@ void Lexer::skipSlashStarComment() {
   }
 }
 
-static bool isValidStartOfIdentifier(char c) {
-  return isalpha(c) || c == '_';
+static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
+  if (c < 0x80)
+    return isalnum(c) || c == '_' || c == '$';
+  
+  // N1518: Recommendations for extended identifier characters for C and C++
+  // Proposed Annex X.1: Ranges of characters allowed
+  return c == 0x00A8 || c == 0x00AA || c == 0x00AD || c == 0x00AF
+    || (c >= 0x00B2 && c <= 0x00B5) || (c >= 0x00B7 && c <= 0x00BA)
+    || (c >= 0x00BC && c <= 0x00BE) || (c >= 0x00C0 && c <= 0x00D6)
+    || (c >= 0x00D8 && c <= 0x00F6) || (c >= 0x00F8 && c <= 0x00FF)
+  
+    || (c >= 0x0100 && c <= 0x167F)
+    || (c >= 0x1681 && c <= 0x180D)
+    || (c >= 0x180F && c <= 0x1FFF)
+  
+    || (c >= 0x200B && c <= 0x200D)
+    || (c >= 0x202A && c <= 0x202E)
+    || (c >= 0x203F && c <= 0x2040)
+    || c == 0x2054
+    || (c >= 0x2060 && c <= 0x206F)
+  
+    || (c >= 0x2070 && c <= 0x218F)
+    || (c >= 0x2460 && c <= 0x24FF)
+    || (c >= 0x2776 && c <= 0x2793)
+    || (c >= 0x2C00 && c <= 0x2DFF)
+    || (c >= 0x2E80 && c <= 0x2FFF)
+  
+    || (c >= 0x3004 && c <= 0x3007)
+    || (c >= 0x3021 && c <= 0x302F)
+    || (c >= 0x3031 && c <= 0x303F)
+  
+    || (c >= 0x3040 && c <= 0xD7FF)
+  
+    || (c >= 0xF900 && c <= 0xFD3D)
+    || (c >= 0xFD40 && c <= 0xFDCF)
+    || (c >= 0xFDF0 && c <= 0xFE44)
+    || (c >= 0xFE47 && c <= 0xFFFD)
+  
+    || (c >= 0x10000 && c <= 0x1FFFD)
+    || (c >= 0x20000 && c <= 0x2FFFD)
+    || (c >= 0x30000 && c <= 0x3FFFD)
+    || (c >= 0x40000 && c <= 0x4FFFD)
+    || (c >= 0x50000 && c <= 0x5FFFD)
+    || (c >= 0x60000 && c <= 0x6FFFD)
+    || (c >= 0x70000 && c <= 0x7FFFD)
+    || (c >= 0x80000 && c <= 0x8FFFD)
+    || (c >= 0x90000 && c <= 0x9FFFD)
+    || (c >= 0xA0000 && c <= 0xAFFFD)
+    || (c >= 0xB0000 && c <= 0xBFFFD)
+    || (c >= 0xC0000 && c <= 0xCFFFD)
+    || (c >= 0xD0000 && c <= 0xDFFFD)
+    || (c >= 0xE0000 && c <= 0xEFFFD);
 }
-static bool isValidContinuationOfIdentifier(char c) {
-  return isalnum(c) || c == '_' || c == '$';
+static bool isValidIdentifierStartCodePoint(uint32_t c) {
+  if (!isValidIdentifierContinuationCodePoint(c))
+    return false;
+  if (c < 0x80 && (isnumber(c) || c == '$'))
+    return false;
+
+  // N1518: Recommendations for extended identifier characters for C and C++
+  // Proposed Annex X.2: Ranges of characters disallowed initially
+  if ((c >= 0x0300 && c <= 0x36F)
+      || (c >= 0x1DC0 && c <= 0x1DFF)
+      || (c >= 0x20D0 && c <= 0x20FF)
+      || (c >= 0xFE20 && c <= 0xFE2F))
+    return false;
+  
+  return true;
+}
+
+static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
+                                                   char const *end) {
+  char const *next = ptr;
+  uint32_t c = validateUTF8CharacterAndAdvance(next, end);
+  if (c == ~0U)
+    return false;
+  if (isValidIdentifierContinuationCodePoint(c)) {
+    ptr = next;
+    return true;
+  }
+  return false;
+}
+
+static bool advanceIfValidStartOfIdentifier(char const *&ptr,
+                                            char const *end) {
+  char const *next = ptr;
+  uint32_t c = validateUTF8CharacterAndAdvance(next, end);
+  if (c == ~0U)
+    return false;
+  if (isValidIdentifierStartCodePoint(c)) {
+    ptr = next;
+    return true;
+  }
+  return false;
 }
 
 /// isIdentifier - Checks whether a string matches the identifier regex.
 bool Lexer::isIdentifier(llvm::StringRef string) {
   if (string.empty()) return false;
-  if (!isValidStartOfIdentifier(string[0])) return false;
-  for (unsigned i = 1, e = string.size(); i != e; ++i)
-    if (!isValidContinuationOfIdentifier(string[i]))
-      return false;
-  return true;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidStartOfIdentifier(p, end))
+    return false;
+  while (p < end && advanceIfValidContinuationOfIdentifier(p, end));
+  return p == end;
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
@@ -330,11 +425,13 @@ bool Lexer::isIdentifier(llvm::StringRef string) {
 /// FIXME: We should also allow unicode characters in identifiers.
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
-  assert(isValidStartOfIdentifier(*TokStart) && "Unexpected start");
+  CurPtr = TokStart;
+  bool didStart = advanceIfValidStartOfIdentifier(CurPtr, BufferEnd);
+  assert(didStart && "Unexpected start");
+  (void) didStart;
 
-  // Lex [a-zA-Z_$0-9]*
-  while (isValidContinuationOfIdentifier(*CurPtr))
-    ++CurPtr;
+  // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
+  while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
   tok Kind =
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
@@ -527,8 +624,7 @@ void Lexer::lexHexNumber() {
     ++CurPtr;
   if (CurPtr - TokStart == 2) {
     diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-    while (isValidContinuationOfIdentifier(*CurPtr))
-      ++CurPtr;
+    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
   }
   
@@ -594,8 +690,7 @@ void Lexer::lexNumber() {
       ++CurPtr;
     if (CurPtr - TokStart == 2) {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-      while (isValidContinuationOfIdentifier(*CurPtr))
-        ++CurPtr;
+      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
       return formToken(tok::unknown, TokStart);
     }
     return formToken(tok::integer_literal, TokStart);
@@ -606,8 +701,7 @@ void Lexer::lexNumber() {
       ++CurPtr;
     if (CurPtr - TokStart == 2) {
       diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-      while (isValidContinuationOfIdentifier(*CurPtr))
-        ++CurPtr;
+      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
       return formToken(tok::unknown, TokStart);
     }
     return formToken(tok::integer_literal, TokStart);
@@ -628,10 +722,10 @@ void Lexer::lexNumber() {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
     // something else, then this is the end of the token.
     if (*CurPtr != 'e' && *CurPtr != 'E') {
-      if (isValidContinuationOfIdentifier(*CurPtr)) {
-        diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-        while (isValidContinuationOfIdentifier(*CurPtr))
-          ++CurPtr;
+      char const *tmp = CurPtr;
+      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
+        diagnose(tmp, diag::lex_expected_digit_in_int_literal);
+        while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
         return formToken(tok::unknown, TokStart);
       }
       return formToken(tok::integer_literal, TokStart);
@@ -655,8 +749,7 @@ void Lexer::lexNumber() {
       
     if (!isdigit(*CurPtr)) {
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
-      while (isValidContinuationOfIdentifier(*CurPtr))
-        ++CurPtr;
+      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
       return formToken(tok::unknown, TokStart);
     }
     
@@ -688,7 +781,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
       return CurPtr[-1];
     }
     --CurPtr;
-    unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr);
+    unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
     if (CharValue != ~0U) return CharValue;
     if (EmitDiagnostics)
       diagnose(CharStart, diag::lex_invalid_utf8_character);
@@ -1051,9 +1144,24 @@ Restart:
   const char *TokStart = CurPtr;
   
   switch (*CurPtr++) {
-  default:
-    diagnose(CurPtr-1, diag::lex_invalid_character);
+  default: {
+    char const *tmp = CurPtr-1;
+    if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
+      return lexIdentifier();
+    
+    if (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd)) {
+      // If this is a valid identifier continuation, but not a valid identifier
+      // start, attempt to recover by eating more continuation characters.
+      diagnose(CurPtr-1, diag::lex_invalid_identifier_start_character);
+      while (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd));
+    } else {
+      // This character isn't allowed in Swift source.
+      validateUTF8CharacterAndAdvance(tmp, BufferEnd);
+      diagnose(CurPtr-1, diag::lex_invalid_character);
+    }
+    CurPtr = tmp;
     return formToken(tok::unknown, TokStart);
+  }
 
   case '\n':
   case '\r':

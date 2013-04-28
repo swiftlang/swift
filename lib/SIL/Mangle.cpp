@@ -17,8 +17,10 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Punycode.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -72,6 +74,14 @@ namespace {
     }
   };        
 }
+        
+static bool isNonAscii(StringRef str) {
+  for (unsigned char c : str) {
+    if (c >= 0x80)
+      return true;
+  }
+  return false;
+}
 
 /// Mangle an identifier into the buffer.
 void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
@@ -83,6 +93,16 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   // where the count is the number of characters in the identifier,
   // and where individual identifier characters represent themselves.
   if (!ident.isOperator()) {
+    // If the identifier contains non-ASCII characters, Punycode it, and mangle
+    // the encoded string as:
+    //   'X' count identifier-char+
+    if (isNonAscii(str)) {
+      llvm::SmallString<32> encoded;
+      Punycode::encodePunycode(str, encoded);
+      Buffer << 'X' << encoded.size() << encoded;
+      return;
+    }
+      
     Buffer << str.size() << str;
     return;
   }

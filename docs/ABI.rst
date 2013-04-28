@@ -44,7 +44,7 @@ All Swift-mangled names begin with this prefix.
   local-marker ::= 'L'
 
 Entity manglings all start with a nominal-type-kind ([COV]), an
-identifier ([0-9o]), or a substitution ([S]).  Global manglings start
+identifier ([0-9oX]), or a substitution ([S]).  Global manglings start
 with any of those or [MTWw].
 
 ::
@@ -163,10 +163,22 @@ witnesses for a type.
   operator-char ::= 'z'                      // . 'zperiod'
 
 <identifier> is run-length encoded: the natural indicates how many
-characters follow.  Operator characters are mapped into ASCII as
-given.  Non-ASCII identifier characters are... translated into ASCII
-somehow?  In neither case can an identifier start with a digit, so
+characters follow.  Operator characters are mapped to letter characters as
+given. In neither case can an identifier start with a digit, so
 there's no ambiguity with the run-length.
+
+::
+
+  identifier ::= 'X' natural identifier-start-char identifier-char*
+
+Identifiers that contain non-ASCII characters are encoded using the Punycode
+algorithm specified in RFC 3492, with the modifications that ``_`` is used
+as the encoding delimiter, and uppercase letters A through J are used in place
+of digits 0 through 9 in the encoding character set. The mangling then
+consists of an ``X`` followed by the run length of the encoded string and the
+encoded string itself. For example, the identifier ``vergüenza`` is mangled
+to ``X12vergenza_JFa``. (The encoding in standard Punycode would be
+``vergenza-95a``)
 
 ::
 
