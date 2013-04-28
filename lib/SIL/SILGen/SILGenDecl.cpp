@@ -373,17 +373,8 @@ struct ArgumentInitVisitor :
 
   SILValue makeArgument(Type ty, SILBasicBlock *parent) {
     assert(ty && "no type?!");
-    // Destructure tuple arguments.
-    if (TupleType *tupleTy = ty->getAs<TupleType>()) {
-      SmallVector<SILValue, 4> tupleArgs;
-      for (auto &field : tupleTy->getFields()) {
-        tupleArgs.push_back(makeArgument(field.getType(), parent));
-      }
-      // FIXME: address-only tuples
-      return initB.createTuple(SILLocation(), gen.getLoweredType(ty),
-                               tupleArgs);
-    }
-    return new (f.getModule()) SILArgument(gen.getLoweredType(ty), parent);
+    return RValue::emitBBArguments(ty->getCanonicalType(),
+                                   gen, parent).forwardAsSingleValue(gen);
   }
   
   void storeArgumentInto(Type ty, SILValue arg, SILLocation loc, Initialization *I)

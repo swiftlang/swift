@@ -20,6 +20,7 @@
 #include "Initialization.h"
 #include "SILGen.h"
 #include "RValue.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeVisitor.h"
 #include <deque>
 
@@ -296,6 +297,34 @@ public:
   }
 };
   
+class EmitBBArguments : public Lowering::TypeVisitor<EmitBBArguments,
+                                                     /*RetTy*/ RValue>
+{
+public:
+  SILGenFunction &gen;
+  SILBasicBlock *parent;
+  
+  EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent)
+    : gen(gen), parent(parent) {}
+  
+  RValue visitType(TypeBase *t) {
+    SILValue arg = new (gen.SGM.M) SILArgument(gen.getLoweredType(t), parent);
+    ManagedValue mv = t->is<LValueType>()
+      ? ManagedValue(arg, ManagedValue::LValue)
+      : gen.emitManagedRValueWithCleanup(arg);
+    return RValue(gen, mv);
+  }
+  
+  RValue visitTupleType(TupleType *t) {
+    RValue rv{CanType(t)};
+    
+    for (auto &field : t->getFields())
+      rv.addElement(visit(CanType(field.getType())));
+    
+    return rv;
+  }
+};
+  
 } // end anonymous namespace
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
@@ -313,6 +342,12 @@ RValue::RValue(SILGenFunction &gen, ManagedValue v)
 RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
   elementOffsets.push_back(0);
+}
+
+RValue RValue::emitBBArguments(CanType type,
+                               SILGenFunction &gen,
+                               SILBasicBlock *parent) {
+  return EmitBBArguments(gen, parent).visit(type);
 }
 
 void RValue::addElement(RValue &&element) & {
