@@ -70,8 +70,7 @@ private:
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a SILFunction.
   SILFunction(SILModule &Module, SILLinkage Linkage,
-              llvm::StringRef MangledName,
-              SILType LoweredType);
+              StringRef MangledName, SILType LoweredType);
   
 public:
   ~SILFunction();
@@ -92,8 +91,8 @@ public:
     return getFunctionTypeInfo()->getAbstractCC();
   }
 
-  llvm::StringRef getMangledName() const { return MangledName; }
-  void setMangledName(llvm::StringRef N) {
+  StringRef getMangledName() const { return MangledName; }
+  void setMangledName(StringRef N) {
     MangledName = N;
   }
   
@@ -151,7 +150,7 @@ public:
 
   void *allocate(unsigned Size, unsigned Align) const;
   
-  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
+  SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
 };
 
 /// Observe that we are processing a specific SIL function.
@@ -161,7 +160,7 @@ class PrettyStackTraceSILFunction : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceSILFunction(const char *Action, SILFunction *F)
   : F(F), Action(Action) {}
-  virtual void print(llvm::raw_ostream &OS) const;
+  virtual void print(raw_ostream &OS) const;
 };
 
 } // end swift namespace
