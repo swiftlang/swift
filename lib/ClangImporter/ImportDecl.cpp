@@ -491,11 +491,19 @@ namespace {
         auto type = Impl.importType(clangContext.getTagDeclType(clangEnum));
         if (!type)
           return nullptr;
+        // FIXME: Importing the type will can recursively revisit this same
+        // EnumConstantDecl. Short-circuit out if we already emitted the import
+        // for this decl.
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
 
         // Create the global constant.
-        return Impl.createConstant(name, dc, type,
-                                   clang::APValue(decl->getInitVal()),
-                                   ConstantConvertKind::Coerce);
+        auto result = Impl.createConstant(name, dc, type,
+                                          clang::APValue(decl->getInitVal()),
+                                          ConstantConvertKind::Coerce);
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        return result;
       }
           
       case EnumKind::Options: {
@@ -517,11 +525,19 @@ namespace {
                           Impl.getClangASTContext().getTagDeclType(clangEnum));
         if (!enumType)
           return nullptr;
+        // FIXME: Importing the type will can recursively revisit this same
+        // EnumConstantDecl. Short-circuit out if we already emitted the import
+        // for this decl.
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
 
         // Create the global constant.
-        return Impl.createConstant(name, dc, enumType,
-                                   clang::APValue(decl->getInitVal()),
-                                   ConstantConvertKind::Construction);
+        auto result = Impl.createConstant(name, dc, enumType,
+                                          clang::APValue(decl->getInitVal()),
+                                          ConstantConvertKind::Construction);
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        return result;
       }
 
       case EnumKind::OneOf: {
@@ -532,6 +548,13 @@ namespace {
         if (!dc)
           return nullptr;
 
+        // FIXME: Importing the type will can recursively revisit this same
+        // EnumConstantDecl. Short-circuit out if we already emitted the import
+        // for this decl.
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
+
         auto element
           = new (context) OneOfElementDecl(SourceLoc(), name, TypeLoc(), dc);
 
@@ -541,6 +564,7 @@ namespace {
         element->overwriteType(FunctionType::get(argTy,
                                                  oneof->getDeclaredType(),
                                                  context));
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
         return element;
       }
       }
