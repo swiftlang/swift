@@ -19,7 +19,7 @@ add_swift_library(swiftIRGen
   IRGenFunction.cpp
   IRGenModule.cpp
   IRGenSIL.cpp
-  Mangle.cpp
+  Linking.cpp
   OptimizeARC.cpp
   StructLayout.cpp
   DEPENDS swiftAST)

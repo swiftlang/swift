@@ -38,7 +38,6 @@ namespace irgen {
   class AbstractCallee;
   class Address;
   class Explosion;
-  enum class ExplosionKind : unsigned;
   class CallEmission;
   class IRGenFunction;
   class IRGenModule;

@@ -38,6 +38,7 @@ All Swift-mangled names begin with this prefix.
   entity ::= context 'c' type                // non-allocating constructor
   entity ::= declaration 'g'                 // getter
   entity ::= declaration 's'                 // setter
+  entity ::= declaration 'a'                 // addressor
   entity ::= declaration                     // other declaration
   declaration ::= context identifier type
   local-marker ::= 'L'
@@ -140,6 +141,7 @@ witnesses for a type.
   identifier ::= natural identifier-start-char identifier-char*
   identifier ::= 'op' natural operator-char+
   operator-char ::= 'a'                      // &
+  operator-char ::= 'c'                      // @
   operator-char ::= 'd'                      // /
   operator-char ::= 'e'                      // =
   operator-char ::= 'g'                      // >
@@ -150,8 +152,8 @@ witnesses for a type.
   operator-char ::= 'p'                      // +
   operator-char ::= 'r'                      // %
   operator-char ::= 's'                      // -
-  operator-char ::= 'x'                      // ^
   operator-char ::= 't'                      // ~
+  operator-char ::= 'x'                      // ^
   operator-char ::= 'z'                      // .
 
 <identifier> is run-length encoded: the natural indicates how many

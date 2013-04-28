@@ -56,6 +56,8 @@ public:
   
   SILFunction *emitTopLevelFunction();
   
+  size_t anonymousFunctionCounter = 0;
+  
 public:
   SILGenModule(SILModule &M);
   ~SILGenModule();
@@ -81,6 +83,10 @@ public:
   SILType getLoweredType(Type t) {
     return Types.getTypeLoweringInfo(t).getLoweredType();
   }
+  
+  /// Generate the mangled symbol name for a SILConstant.
+  void mangleConstant(SILConstant constant,
+                      SILFunction *f);
 
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms

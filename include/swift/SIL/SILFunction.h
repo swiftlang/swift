@@ -56,10 +56,6 @@ private:
   /// the function's linkage.
   llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
   
-  /// Name - This is the SILConstant that names the function.
-  /// FIXME: We want to eliminate this in favor of MangledName.
-  SILConstant Name;
-
   /// MangledName - This is the mangled name of the SIL function, which will
   /// be propagated into LLVM IR.
   std::string MangledName;
@@ -74,7 +70,7 @@ private:
   // Intentionally marked private so that we need to use
   // 'SILModule::constructSIL()' to generate a SILFunction.
   SILFunction(SILModule &Module, SILLinkage Linkage,
-              SILConstant Name,
+              llvm::StringRef MangledName,
               SILType LoweredType);
   
 public:
@@ -96,11 +92,13 @@ public:
     return getFunctionTypeInfo()->getAbstractCC();
   }
 
-  const std::string &getMangledName() const { return MangledName; }
-  void setMangledName(const std::string &N) { MangledName = N; }
-
-  SILConstant getName() const { return Name; }
+  llvm::StringRef getMangledName() const { return MangledName; }
+  void setMangledName(llvm::StringRef N) {
+    MangledName = N;
+  }
   
+  std::string &getMutableMangledName() { return MangledName; }
+
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }
   

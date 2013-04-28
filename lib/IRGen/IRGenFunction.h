@@ -50,10 +50,13 @@ namespace swift {
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
   class Explosion;
-  enum class ExplosionKind : unsigned;
   class FunctionRef;
   class HeapLayout;
   class IRGenModule;
@@ -104,12 +107,12 @@ public:
 
   CanType CurResultType;
   llvm::Function *CurFn;
-  ExplosionKind CurExplosionLevel;
+  Mangle::ExplosionKind CurExplosionLevel;
   Prologue CurPrologue;
   llvm::Value *ContextPtr;
 
   IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
-                ExplosionKind explosion,
+                Mangle::ExplosionKind explosion,
                 unsigned uncurryLevel, llvm::Function *fn,
                 Prologue prologue = Prologue::Standard);
   ~IRGenFunction();

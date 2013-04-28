@@ -27,16 +27,22 @@
 #include "llvm/IR/GlobalValue.h"
 #include "FunctionRef.h"
 #include "IRGen.h"
+#include "ValueWitness.h"
 
 namespace llvm {
   class AttributeSet;
   class Value;
+  class FunctionType;
 }
 
 namespace swift {
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
+  
 namespace irgen {
-enum class ExplosionKind : unsigned;
-class IRGenModule;
+  class IRGenModule;
 
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
@@ -173,7 +179,7 @@ class LinkEntity {
   }
 
   void setForDecl(Kind kind, 
-                  ValueDecl *decl, ExplosionKind explosionKind,
+                  ValueDecl *decl, Mangle::ExplosionKind explosionKind,
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
@@ -183,7 +189,7 @@ class LinkEntity {
   }
 
   void setForCapturingExpr(Kind kind,
-                  CapturingExpr *expr, ExplosionKind explosionKind,
+                  CapturingExpr *expr, Mangle::ExplosionKind explosionKind,
                   unsigned uncurryLevel) {
     assert(isCapturingExprKind(kind));
     Pointer = expr;
@@ -211,12 +217,6 @@ class LinkEntity {
 
 public:
   static LinkEntity forFunction(CodeRef fn) {
-
-    if (auto *f = fn.getSILFunction()) {
-      if (!f->getMangledName().empty())
-        return forSILFunction(f);
-    }
-    
     LinkEntity entity;
     entity.setForDecl(getKindForFunction(fn.getKind()), fn.getDecl(),
                       fn.getExplosionLevel(), fn.getUncurryLevel());
@@ -224,7 +224,7 @@ public:
   }
   
   static LinkEntity forAnonymousFunction(CapturingExpr *expr,
-                                         ExplosionKind explosionLevel,
+                                         Mangle::ExplosionKind explosionLevel,
                                          unsigned uncurryLevel) {
     LinkEntity entity;
     entity.setForCapturingExpr(Kind::AnonymousFunction,
@@ -236,12 +236,12 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl, ExplosionKind(0), 0);
+    entity.setForDecl(Kind::Other, decl, Mangle::ExplosionKind(0), 0);
     return entity;
   }
 
   static LinkEntity forWitnessTableOffset(ValueDecl *decl,
-                                          ExplosionKind explosionKind,
+                                          Mangle::ExplosionKind explosionKind,
                                           unsigned uncurryLevel) {
     LinkEntity entity;
     entity.setForDecl(Kind::WitnessTableOffset, decl,
@@ -267,27 +267,27 @@ public:
 
   static LinkEntity forDestructor(ClassDecl *decl, DestructorKind kind) {
     LinkEntity entity;
-    entity.setForDecl(Kind::Destructor, decl, ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::Destructor, decl, Mangle::ExplosionKind::Minimal, 0);
     entity.Data |= LINKENTITY_SET_FIELD(DtorKind, unsigned(kind));
     return entity;
   }
 
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClass, decl, ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::ObjCClass, decl, Mangle::ExplosionKind::Minimal, 0);
     return entity;
   }
 
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCMetaclass, decl, ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::ObjCMetaclass, decl, Mangle::ExplosionKind::Minimal, 0);
     return entity;
   }
 
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::SwiftMetaclassStub,
-                      decl, ExplosionKind::Minimal, 0);
+                      decl, Mangle::ExplosionKind::Minimal, 0);
     return entity;
   }
 
@@ -327,10 +327,12 @@ public:
     return entity;
   }
 
-  static LinkEntity forSILFunction(SILFunction *F) {
+  static LinkEntity forSILFunction(SILFunction *F, Mangle::ExplosionKind level)
+  {
     LinkEntity entity;
     entity.Pointer = F;
-    entity.Data = unsigned(Kind::SILFunction) << KindShift;
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction))
+                | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(level));
     return entity;
   }
 
@@ -354,9 +356,9 @@ public:
     return reinterpret_cast<SILFunction*>(Pointer);
   }
   
-  ExplosionKind getExplosionKind() const {
+  Mangle::ExplosionKind getExplosionKind() const {
     assert(isDeclKind(getKind()) || isCapturingExprKind(getKind()));
-    return ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
+    return Mangle::ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
   }
   unsigned getUncurryLevel() const {
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);

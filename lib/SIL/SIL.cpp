@@ -24,9 +24,9 @@ using namespace swift;
 
 SILFunction::SILFunction(SILModule &Module,
                          SILLinkage Linkage,
-                         SILConstant Name,
+                         StringRef Name,
                          SILType LoweredType)
-  : ModuleAndLinkage(&Module, Linkage), Name(Name),
+  : ModuleAndLinkage(&Module, Linkage), MangledName(Name),
     LoweredType(LoweredType)
 {
   Module.functions.push_back(this);

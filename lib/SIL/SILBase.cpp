@@ -85,5 +85,3 @@ SILTypeList *SILBase::getSILTypeList(ArrayRef<SILType> Types) const {
   UniqueMap->InsertNode(NewList, InsertPoint);
   return NewList;
 }
-
-

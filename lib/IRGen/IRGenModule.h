@@ -70,11 +70,14 @@ namespace swift {
   class VarDecl;
 
   enum class AbstractCC : unsigned char;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
   class Address;
   class CodeRef;
-  enum class ExplosionKind : unsigned;
   class ExplosionSchema;
   class FormalType;
   class FunctionRef;
@@ -172,10 +175,10 @@ public:
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(CanType T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(CanType T, ExplosionKind kind);
-  unsigned getExplosionSize(CanType T, ExplosionKind kind);
-  llvm::PointerType *isSingleIndirectValue(CanType T, ExplosionKind kind);
-  llvm::PointerType *requiresIndirectResult(CanType T, ExplosionKind kind);
+  ExplosionSchema getSchema(CanType T, Mangle::ExplosionKind kind);
+  unsigned getExplosionSize(CanType T, Mangle::ExplosionKind kind);
+  llvm::PointerType *isSingleIndirectValue(CanType T, Mangle::ExplosionKind kind);
+  llvm::PointerType *requiresIndirectResult(CanType T, Mangle::ExplosionKind kind);
   bool hasTrivialMetatype(CanType type);
   bool isPOD(CanType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(CanType type, ResilienceScope scope);
@@ -323,7 +326,7 @@ public:
   void emitLocalDecls(DestructorDecl *dd);
 
   llvm::FunctionType *getFunctionType(AbstractCC cc,
-                                      CanType fnType, ExplosionKind kind,
+                                      CanType fnType, Mangle::ExplosionKind kind,
                                       unsigned uncurryLevel,
                                       ExtraData data,
                                       llvm::AttributeSet &attrs);
@@ -340,11 +343,11 @@ public:
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
-                                  ExplosionKind kind);
-  llvm::Function *getAddrOfGetter(ValueDecl *D, ExplosionKind kind);
+                                  Mangle::ExplosionKind kind);
+  llvm::Function *getAddrOfGetter(ValueDecl *D, Mangle::ExplosionKind kind);
   llvm::Function *getAddrOfSetter(ValueDecl *D, FormalType type,
-                                  ExplosionKind kind);
-  llvm::Function *getAddrOfSetter(ValueDecl *D, ExplosionKind kind);
+                                  Mangle::ExplosionKind kind);
+  llvm::Function *getAddrOfSetter(ValueDecl *D, Mangle::ExplosionKind kind);
   Address getAddrOfWitnessTableOffset(CodeRef code);
   Address getAddrOfWitnessTableOffset(VarDecl *field);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
@@ -353,7 +356,7 @@ public:
                                              llvm::Type *definitionType = nullptr);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D,
                                        ConstructorKind kind,
-                                       ExplosionKind explosionLevel);
+                                       Mangle::ExplosionKind explosionLevel);
   llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind);
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
@@ -362,13 +365,8 @@ public:
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
-  /// FIXME: We shouldn't rely on SILConstants to mangle function symbols.
-  void getAddrOfSILConstant(SILConstant constant,
-                            SILFunction *f,
-                            llvm::Function* &fnptr,
-                            unsigned &naturalCurryLevel,
-                            AbstractCC &cc);
   void getAddrOfSILFunction(SILFunction *f,
+                            ExplosionKind level,
                             llvm::Function* &fnptr,
                             unsigned &naturalCurryLevel,
                             AbstractCC &cc);

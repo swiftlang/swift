@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
+#include "swift/SIL/Mangle.h"
 #include <cassert>
 
 namespace llvm {
@@ -26,9 +27,15 @@ namespace llvm {
 }
 
 namespace swift {
-class CanType;
+  class CanType;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
+  
+  using Mangle::ExplosionKind;
 
 class Size;
 
@@ -96,27 +103,6 @@ enum class ResilienceScope {
   /// Universal scope means that the decision has to be consistent
   /// across all possible clients who could see this declaration.
   Universal
-};
-
-/// ExplosionKind - A policy for choosing what types should be
-/// exploded, as informed by the resilience model.
-enum class ExplosionKind : unsigned {
-  /// A minimal explosion does not explode types that do not have a
-  /// universally fragile representation.  This provides a baseline
-  /// for what all components can possibly support.
-  ///   - All exported functions must be compiled to at least provide
-  ///     a minimally-exploded entrypoint, or else it will be
-  ///     impossible for components that do not have that type
-  ///     to call the function.
-  ///   - Similarly, any sort of opaque function call must be through
-  ///     a minimally-exploded entrypoint.
-  Minimal,
-
-  /// A maximal explosion explodes all types with fragile
-  /// representation, even when they're not universally fragile.  This
-  /// is useful when internally manipulating objects or when working
-  /// with specialized entry points for a function.
-  Maximal
 };
 
 /// Whether an object is fixed in size or not.  This answer is always

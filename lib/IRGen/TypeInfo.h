@@ -27,12 +27,16 @@ namespace llvm {
 }
 
 namespace swift {
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
+
 namespace irgen {
   class Address;
   class IRGenFunction;
   class IRGenModule;
   class Explosion;
-  enum class ExplosionKind : unsigned;
   class ExplosionSchema;
   enum OnHeap_t : unsigned char;
   class OwnedAddress;
@@ -140,10 +144,10 @@ public:
   virtual void getSchema(ExplosionSchema &schema) const = 0;
 
   /// A convenience for getting the schema of a single type.
-  ExplosionSchema getSchema(ExplosionKind kind) const;
+  ExplosionSchema getSchema(Mangle::ExplosionKind kind) const;
 
   /// Return the number of elements in an explosion of this type.
-  virtual unsigned getExplosionSize(ExplosionKind kind) const = 0;
+  virtual unsigned getExplosionSize(Mangle::ExplosionKind kind) const = 0;
 
   /// Allocate a variable of this type.
   virtual OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,

@@ -30,12 +30,15 @@ namespace swift {
   class NominalTypeDecl;
   class StructDecl;
   class Substitution;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
   class AbstractCallee;
   class Callee;
   class Explosion;
-  enum class ExplosionKind : unsigned;
   class IRGenFunction;
   class IRGenModule;
   class StructLayout;
@@ -131,7 +134,7 @@ namespace irgen {
                            llvm::Value *base, CanType baseType,
                            FuncDecl *method, CanType substResultType,
                            llvm::ArrayRef<Substitution> substitutions,
-                           ExplosionKind maxExplosion,
+                           Mangle::ExplosionKind maxExplosion,
                            unsigned bestUncurry);
                            
 

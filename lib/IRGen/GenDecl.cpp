@@ -720,10 +720,9 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
                                          llvm::FunctionType *fnType,
                                          llvm::CallingConv::ID cc,
                                          const llvm::AttributeSet &attrs) {
-  llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
+  llvm::Function *existing = IGM.Module.getFunction(getName());
   if (existing) {
-    if (isa<llvm::Function>(existing) &&
-        isPointerTo(existing->getType(), fnType))
+    if (isPointerTo(existing->getType(), fnType))
       return cast<llvm::Function>(existing);
 
     IGM.error(SourceLoc(),
@@ -934,20 +933,11 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   // context. IRGen previously set up local functions to expect their extraData
   // prepackaged.
   llvm::AttributeSet attrs;
-  if (SILFunction *silFn = fn.getSILFunction()) {
-    fnType = getFunctionType(convention,
-                             silFn->getLoweredType().getSwiftType(),
-                             fn.getExplosionLevel(),
-                             fn.getUncurryLevel(),
-                             ExtraData::None,
-                             attrs);
-  } else {
-    fnType = getFunctionType(convention,
-                             fn.getDecl()->getType()->getCanonicalType(),
-                             fn.getExplosionLevel(), fn.getUncurryLevel(),
-                             extraData,
-                             attrs);
-  }
+  fnType = getFunctionType(convention,
+                           fn.getDecl()->getType()->getCanonicalType(),
+                           fn.getExplosionLevel(), fn.getUncurryLevel(),
+                           extraData,
+                           attrs);
 
   auto cc = expandAbstractCC(*this, convention);
 

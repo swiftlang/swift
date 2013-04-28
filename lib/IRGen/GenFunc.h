@@ -62,9 +62,6 @@ namespace irgen {
                          Explosion &swiftClosure,
                          Explosion &outBlock);
 
-  /// Returns true if the given function type is represented as an ObjC block.
-  bool isBlockFunctionType(Type t);
-  
   /// Does an ObjC method or C function returning the given type require an
   /// sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,

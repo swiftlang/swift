@@ -25,11 +25,14 @@ namespace swift {
   class CanType;
   class FuncDecl;
   class Substitution;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
   class AbstractCallee;
   class CallEmission;
-  enum class ExplosionKind : unsigned;
   class IRGenFunction;
   class IRGenModule;
 
@@ -41,7 +44,7 @@ namespace irgen {
                                          ValueDecl *method,
                                          CanType substResultType,
                                          llvm::ArrayRef<Substitution> subs,
-                                         ExplosionKind bestExplosion,
+                                         Mangle::ExplosionKind bestExplosion,
                                          unsigned bestUncurry,
                                          bool isSuper);
 

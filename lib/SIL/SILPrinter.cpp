@@ -27,6 +27,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FormattedStream.h"
 using namespace swift;
 
@@ -723,13 +724,23 @@ void SILFunction::print(llvm::raw_ostream &OS) const {
 /// Pretty-print the SILFunction's name using SIL syntax,
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
-  OS << "@";
-  if (MangledName.empty())
-    Name.print(OS);
-  else
-    OS << MangledName;  
+  OS << "@" << MangledName;  
 }
 
+/// Verify the module.
+void SILModule::verify() const {
+#ifndef NDEBUG
+  llvm::StringSet<> functionNames;
+  for (SILFunction const &f : *this) {
+    if (!functionNames.insert(f.getMangledName())) {
+      llvm::errs() << "Function redefined: " << f.getMangledName() << "!\n";
+      assert(false && "triggering standard assertion failure routine");
+    }
+    f.verify();
+  }
+#endif
+}
+      
 /// Pretty-print the SILModule to errs.
 void SILModule::dump() const {
   print(llvm::errs());

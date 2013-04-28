@@ -1064,6 +1064,13 @@ public:
   /// True if the function type is "thin", meaning values of the type can be
   /// represented as simple function pointers without context.
   bool isThin() const { return OutputAndIsThin.getInt(); }
+
+  /// True if this type allows an implicit conversion from a function argument
+  /// expression of type T to a function of type () -> T.
+  bool isAutoClosure() const;
+  
+  /// True if this type is an Objective-C-compatible block type.
+  bool isBlock() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

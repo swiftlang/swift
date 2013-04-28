@@ -39,8 +39,6 @@ public:
 
 private:
   ValueDecl *TheDecl;
-  /// FIXME: SILFunction/SILConstant should subsume most of this functionality.
-  SILFunction *TheSILFunction;
   unsigned TheKind : 2;
   unsigned ExplosionLevel : 2;
   unsigned UncurryLevel : 28;
@@ -48,15 +46,11 @@ private:
   CodeRef(Kind kind, ValueDecl *theDecl, ExplosionKind explosionLevel,
           unsigned uncurryLevel)
     : TheDecl(theDecl),
-      TheSILFunction(nullptr),
       TheKind(unsigned(kind)),
       ExplosionLevel(unsigned(explosionLevel)),
       UncurryLevel(uncurryLevel) {
   }
 
-protected:
-  void setSILFunction(SILFunction *f) { TheSILFunction = f; }
-  
 public:
   CodeRef() = default;
 
@@ -94,7 +88,6 @@ public:
   }
 
   ValueDecl *getDecl() const { return TheDecl; }
-  SILFunction *getSILFunction() const { return TheSILFunction; }
   Kind getKind() const { return Kind(TheKind); }
   unsigned getUncurryLevel() const { return UncurryLevel; }
   ExplosionKind getExplosionLevel() const {
@@ -119,12 +112,6 @@ public:
   FunctionRef(FuncDecl *fn, ExplosionKind explosionLevel, unsigned uncurryLevel)
     : CodeRef(CodeRef::forFunction(fn, explosionLevel, uncurryLevel)) {}
   
-  FunctionRef(FuncDecl *fn, SILFunction *sf, ExplosionKind explosionLevel)
-    : CodeRef(CodeRef::forFunction(fn, explosionLevel,
-                                   sf->getLoweredType().getUncurryLevel())) {
-    setSILFunction(sf);
-  }
-
   FuncDecl *getDecl() const {
     // FIXME: decl is null for top_level_code
     return cast_or_null<FuncDecl>(CodeRef::getDecl());

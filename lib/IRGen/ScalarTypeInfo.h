@@ -22,6 +22,7 @@
 #include "Explosion.h"
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
+#include "swift/SIL/Mangle.h"
 
 namespace swift {
 namespace irgen {

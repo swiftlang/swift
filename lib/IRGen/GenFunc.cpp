@@ -454,15 +454,8 @@ namespace {
   };
 }
 
-bool irgen::isBlockFunctionType(Type t) {
-  if (FunctionType *ft = t->getAs<FunctionType>()) {
-    return ft->isBlock();
-  }
-  return false;
-}
-
 const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
-  if (isBlockFunctionType(T))
+  if (T->isBlock())
     return new BlockTypeInfo(IGM.ObjCPtrTy,
                              IGM.getPointerSize(),
                              IGM.getPointerAlignment());
@@ -1713,7 +1706,9 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   llvm::Function *entrypoint;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  getAddrOfSILFunction(f, entrypoint, naturalCurryLevel, cc);
+  // FIXME: explosion levels
+  getAddrOfSILFunction(f, ExplosionKind::Minimal,
+                       entrypoint, naturalCurryLevel, cc);
   ::emitSILFunction(*this, f, entrypoint);
 }
 

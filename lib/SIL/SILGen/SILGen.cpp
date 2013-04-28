@@ -14,6 +14,7 @@
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/Mangle.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -75,6 +76,7 @@ SILGenModule::~SILGenModule() {
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
         toplevel->print(llvm::dbgs()));
   toplevel->verify();
+  M.verify();
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction() {
@@ -82,10 +84,8 @@ SILFunction *SILGenModule::emitTopLevelFunction() {
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
                                         TupleType::getEmpty(C), C);
   SILType loweredType = getLoweredType(topLevelType);
-  SILFunction *toplevel = new (M) SILFunction(M, SILLinkage::Internal,
-                                              SILConstant(), loweredType);
-  toplevel->setMangledName("top_level_code");
-  return toplevel;
+  return new (M) SILFunction(M, SILLinkage::Internal,
+                             "top_level_code", loweredType);
 }
 
 SILType SILGenModule::getConstantType(SILConstant constant) {
@@ -122,8 +122,10 @@ SILFunction *SILGenModule::getFunction(SILConstant constant) {
   SILType constantType = getConstantType(constant);
   SILLinkage linkage = getConstantLinkage(constant);
   
-  SILFunction *F = new (M) SILFunction(M, linkage, constant, constantType);
+  SILFunction *F = new (M) SILFunction(M, linkage, "", constantType);
+  mangleConstant(constant, F);
   emittedFunctions[constant] = F;
+
   return F;
 }
 
@@ -171,10 +173,9 @@ SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // If the function is a standalone function and is curried, emit the thunks
   // for the intermediate curry levels.
   // FIXME: It might make more sense to do this lazily and emit curry thunks
-  // with internal linkage in IRGen.
+  // with internal linkage.
   
-  // FIXME: Should we emit thunks for getters and setters? IRGen doesn't know
-  // how to mangle them currently.
+  // Getters and setters can't be referenced uncurried, so skip thunking them.
   ValueDecl *vd = decl.dyn_cast<ValueDecl*>();
   FuncDecl *fd = dyn_cast_or_null<FuncDecl>(vd);
   if (fd && fd->isGetterOrSetter())
@@ -298,13 +299,13 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
   for (auto mod : tu->getASTContext().LoadedClangModules) {
     for (auto &def : mod->getExternalDefinitions()) {
       switch (def.getStage()) {
-        case ExternalDefinition::NameBound:
-          llvm_unreachable("external definition not type-checked");
-          
-        case ExternalDefinition::TypeChecked:
-          // FIXME: We should emit this definition only if it's actually needed.
-          sgm.emitExternalDefinition(def.getDecl());
-          break;
+      case ExternalDefinition::NameBound:
+        llvm_unreachable("external definition not type-checked");
+        
+      case ExternalDefinition::TypeChecked:
+        // FIXME: We should emit this definition only if it's actually needed.
+        sgm.emitExternalDefinition(def.getDecl());
+        break;
       }
     }
   }

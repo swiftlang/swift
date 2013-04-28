@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
@@ -264,122 +265,45 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-void IRGenModule::getAddrOfSILConstant(SILConstant constant,
-                                       SILFunction *f,
-                                       llvm::Function* &fnptr,
-                                       unsigned &naturalCurryLevel,
-                                       AbstractCC &cc) {
-  assert(constant.hasDecl() &&
-         "don't ask me for the address of anonymous functions");
-  ValueDecl *vd = constant.loc.get<ValueDecl*>();
-  naturalCurryLevel = constant.uncurryLevel;
-  
-  switch (constant.kind) {
-    case SILConstant::Kind::Func: {
-      // FIXME: fd is null for top_level_code.
-      FuncDecl *fd = cast_or_null<FuncDecl>(vd);
-      
-      // FIXME: Replace FunctionRef. This is gross.
-      FunctionRef fnRef = f
-        ? FunctionRef(fd, f, ExplosionKind::Minimal)
-        : FunctionRef(fd, ExplosionKind::Minimal, constant.uncurryLevel);
-      
-      fnptr = getAddrOfFunction(fnRef, ExtraData::None);
-      // FIXME: c calling convention
-      cc = fd ? getAbstractCC(fd) : AbstractCC::Freestanding;
-      break;
-    }
-    case SILConstant::Kind::Getter: {
-      fnptr = getAddrOfGetter(vd, ExplosionKind::Minimal);
-      // FIXME: subscript
-      FuncDecl *getter;
-      if (auto *var = dyn_cast<VarDecl>(vd))
-        getter = var->getGetter();
-      else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
-        getter = sub->getGetter();
-      else
-        llvm_unreachable("getter for decl that's not Var or Subscript");
-      
-      if (getter)
-        cc = getAbstractCC(getter);
-      else
-        cc = vd->isInstanceMember()
-        ? AbstractCC::Method
-        : AbstractCC::Freestanding;
-      break;
-    }
-    case SILConstant::Kind::Setter: {
-      fnptr = getAddrOfSetter(vd, ExplosionKind::Minimal);
-      // FIXME: subscript
-      FuncDecl *setter;
-      if (auto *var = dyn_cast<VarDecl>(vd))
-        setter = var->getSetter();
-      else if (auto *sub = dyn_cast<SubscriptDecl>(vd))
-        setter = sub->getSetter();
-      else
-        llvm_unreachable("getter for decl that's not Var or Subscript");
-      
-      if (setter)
-        cc = getAbstractCC(setter);
-      else
-        cc = vd->isInstanceMember()
-        ? AbstractCC::Method
-        : AbstractCC::Freestanding;
-      break;
-    }
-    case SILConstant::Kind::Allocator: {
-      ConstructorDecl *cd = cast<ConstructorDecl>(vd);
-      fnptr = getAddrOfConstructor(cd, ConstructorKind::Allocating,
-                                   ExplosionKind::Minimal);
-      cc = AbstractCC::Freestanding;
-      break;
-    }
-    case SILConstant::Kind::Initializer: {
-      ConstructorDecl *cd = cast<ConstructorDecl>(vd);
-      fnptr = getAddrOfConstructor(cd, ConstructorKind::Initializing,
-                                   ExplosionKind::Minimal);
-      cc = AbstractCC::Method;
-      break;
-    }
-    case SILConstant::Kind::OneOfElement: {
-      OneOfElementDecl *ed = cast<OneOfElementDecl>(vd);
-      fnptr = getAddrOfInjectionFunction(ed);
-      cc = AbstractCC::Freestanding;
-      break;
-    }
-    case SILConstant::Kind::Destroyer: {
-      ClassDecl *cd = cast<ClassDecl>(vd);
-      fnptr = getAddrOfDestructor(cd, DestructorKind::Destroying);
-      cc = AbstractCC::Method;
-      break;
-    }
-    case SILConstant::Kind::GlobalAccessor: {
-      llvm_unreachable("unimplemented function_ref to global var");
-    }
-  }  
-}
-
 /// Find the entry point, natural curry level, and calling convention for a
 /// SILConstant function.
 void IRGenModule::getAddrOfSILFunction(SILFunction *f,
+                                       ExplosionKind level,
                                        llvm::Function* &fnptr,
                                        unsigned &naturalCurryLevel,
-                                       AbstractCC &cc) {
-  if (CapturingExpr *anon = f->getName().loc.dyn_cast<CapturingExpr*>()) {
-    fnptr = getAddrOfAnonymousFunction(f, anon);
-    naturalCurryLevel = f->getLoweredType().getUncurryLevel();
-    
-    // FIXME: c calling convention for anonymous funcs?
-    cc = AbstractCC::Freestanding;    
+                                       AbstractCC &absCC) {
+  naturalCurryLevel = f->getUncurryLevel();
+  absCC = f->getAbstractCC();
+
+  // Check whether we've created the function already.
+  // FIXME: We should integrate this into the LinkEntity cache more cleanly.
+  if (llvm::Function *fn = Module.getFunction(f->getMangledName())) {
+    fnptr = fn;
     return;
   }
+      
+  LinkEntity entity = LinkEntity::forSILFunction(f, level);
   
-  return getAddrOfSILConstant(f->getName(), f,
-                              fnptr, naturalCurryLevel, cc);
+  llvm::FunctionType *fnType;
+  // A bit of a hack here. SIL represents closure functions with their context
+  // expanded out and uses a partial application function to construct the
+  // context. IRGen previously set up local functions to expect their extraData
+  // prepackaged.
+  llvm::AttributeSet attrs;
+  fnType = getFunctionType(absCC,
+                           f->getLoweredType().getSwiftType(),
+                           level,
+                           naturalCurryLevel,
+                           ExtraData::None,
+                           attrs);
+  
+  auto cc = expandAbstractCC(*this, absCC);
+  LinkInfo link = LinkInfo::get(*this, entity);
+  fnptr = link.createFunction(*this, fnType, cc, attrs);
 }
 
-void IRGenSILFunction::visitBuiltinFunctionRefInst(swift::BuiltinFunctionRefInst *i)
-{
+void IRGenSILFunction::visitBuiltinFunctionRefInst(
+                                             swift::BuiltinFunctionRefInst *i) {
   newLoweredBuiltinValue(SILValue(i, 0), cast<FuncDecl>(i->getFunction()),
                          /*substitutions*/ {});
   return;
@@ -389,9 +313,8 @@ void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
   llvm::Function *fnptr;
   unsigned naturalCurryLevel;
   AbstractCC cc;
-  IGM.getAddrOfSILFunction(i->getFunction(),
+  IGM.getAddrOfSILFunction(i->getFunction(), CurExplosionLevel,
                            fnptr, naturalCurryLevel, cc);
-  
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
@@ -1441,15 +1364,8 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
                          i->getOperand().getType().getSwiftType());
     return;
   }
-  
-  // For Swift classes, just emit a direct ref to the referenced super method.
-  llvm::Function *fnptr;
-  unsigned naturalCurryLevel;
-  AbstractCC cc;
-  IGM.getAddrOfSILConstant(i->getMember(), nullptr,
-                           fnptr, naturalCurryLevel, cc);
-  
-  newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);
+
+  llvm_unreachable("super_method to non-objc callee");
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
