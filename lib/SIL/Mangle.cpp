@@ -70,11 +70,11 @@ namespace {
       if (n.N != 0) out << (n.N - 1);
       return (out << '_');
     }
-  };
+  };        
 }
 
 /// Mangle an identifier into the buffer.
-void Mangler::mangleIdentifier(Identifier ident) {
+void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   StringRef str = ident.str();
   assert(!str.empty() && "mangling an empty identifier!");
 
@@ -88,10 +88,26 @@ void Mangler::mangleIdentifier(Identifier ident) {
   }
 
   // Mangle operator identifiers as
-  //   'op' count operator-char+
+  //   operator ::= 'o' operator-fixity count operator-char+
+  //   operator-fixity ::= 'p' // prefix
+  //   operator-fixity ::= 'P' // postfix
+  //   operator-fixity ::= 'i' // infix
   // where the count is the number of characters in the operator,
   // and where the individual operator characters are translated.
-  Buffer << "op";
+  Buffer << 'o';
+  switch (fixity) {
+  case OperatorFixity::NotOperator:
+    llvm_unreachable("operator mangled without fixity specified!");
+  case OperatorFixity::Infix:
+    Buffer << 'i';
+    break;
+  case OperatorFixity::Prefix:
+    Buffer << 'p';
+    break;
+  case OperatorFixity::Postfix:
+    Buffer << 'P';
+    break;
+  }
 
   Buffer << str.size();
   for (unsigned i = 0, e = str.size(); i != e; ++i) {
@@ -283,11 +299,21 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
   else
     mangleType(T, explosion, uncurryLevel);
 }
+        
+static OperatorFixity getDeclFixity(ValueDecl *decl) {
+  if (!decl->getName().isOperator())
+    return OperatorFixity::NotOperator;
+  if (decl->getAttrs().isPostfix())
+    return OperatorFixity::Postfix;
+  if (decl->getAttrs().isPrefix())
+    return OperatorFixity::Prefix;
+  return OperatorFixity::Infix;
+}
 
 void Mangler::mangleDeclName(ValueDecl *decl, IncludeType includeType) {
   // decl ::= context identifier
   mangleContextOf(decl);
-  mangleIdentifier(decl->getName());
+  mangleIdentifier(decl->getName(), getDeclFixity(decl));
 
   if (includeType == IncludeType::No) return;
 
@@ -450,9 +476,14 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);
-    // type ::= 'T' tuple-field+ '_'
+    // type ::= 'T' tuple-field+ '_'  // tuple
+    // type ::= 't' tuple-field+ '_'  // variadic tuple
     // tuple-field ::= identifier? type
-    Buffer << 'T';
+    if (tuple->getFields().size() > 0
+        && tuple->getFields().back().isVararg())
+      Buffer << 't';
+    else
+      Buffer << 'T';
     for (auto &field : tuple->getFields()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
@@ -649,6 +680,9 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
     return true;
   } else if (name == "Float32") {
     Buffer << "Sf";
+    return true;
+  } else if (name == "Slice") {
+    Buffer << "Sa";
     return true;
   } else if (name == "String") {
     Buffer << "SS";

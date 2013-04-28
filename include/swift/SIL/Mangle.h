@@ -43,6 +43,13 @@ enum class ExplosionKind : unsigned {
  
 enum class IncludeType : bool { No, Yes };
 
+enum class OperatorFixity {
+  NotOperator,
+  Infix,
+  Prefix,
+  Postfix
+};
+  
 /// A class for mangling declarations.
 class Mangler {
   struct ArchetypeInfo {
@@ -74,7 +81,8 @@ private:
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleProtocolName(ProtocolDecl *protocol);
-  void mangleIdentifier(Identifier ident);
+  void mangleIdentifier(Identifier ident,
+                        OperatorFixity fixity = OperatorFixity::NotOperator);
   void mangleGetterOrSetterContext(FuncDecl *fn);
   void bindGenericParameters(const GenericParamList *genericParams,
                              bool mangleParameters);

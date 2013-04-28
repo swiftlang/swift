@@ -95,6 +95,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'Qd' index index                  // archetype with depth=M+1
   type ::= 'R' type                          // l-value
   type ::= 'T' tuple-element* '_'            // tuple
+  type ::= 't' tuple-element* '_'            // variadic tuple
   type ::= 'U' generics '_' type             // generic type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
@@ -139,22 +140,27 @@ witnesses for a type.
 ::
 
   identifier ::= natural identifier-start-char identifier-char*
-  identifier ::= 'op' natural operator-char+
-  operator-char ::= 'a'                      // &
-  operator-char ::= 'c'                      // @
-  operator-char ::= 'd'                      // /
-  operator-char ::= 'e'                      // =
-  operator-char ::= 'g'                      // >
-  operator-char ::= 'l'                      // <
-  operator-char ::= 'm'                      // *
-  operator-char ::= 'n'                      // !
-  operator-char ::= 'o'                      // |
-  operator-char ::= 'p'                      // +
-  operator-char ::= 'r'                      // %
-  operator-char ::= 's'                      // -
-  operator-char ::= 't'                      // ~
-  operator-char ::= 'x'                      // ^
-  operator-char ::= 'z'                      // .
+  identifier ::= 'o' operator-fixity natural operator-char+
+
+  operator-fixity ::= 'p'                    // prefix operator
+  operator-fixity ::= 'P'                    // postfix operator
+  operator-fixity ::= 'i'                    // infix operator
+
+  operator-char ::= 'a'                      // & 'and'
+  operator-char ::= 'c'                      // @ 'commercial at'
+  operator-char ::= 'd'                      // / 'divide'
+  operator-char ::= 'e'                      // = 'equals'
+  operator-char ::= 'g'                      // > 'greater'
+  operator-char ::= 'l'                      // < 'less'
+  operator-char ::= 'm'                      // * 'multiply'
+  operator-char ::= 'n'                      // ! 'not'
+  operator-char ::= 'o'                      // | 'or'
+  operator-char ::= 'p'                      // + 'plus'
+  operator-char ::= 'r'                      // % 'remainder'
+  operator-char ::= 's'                      // - 'subtract'
+  operator-char ::= 't'                      // ~ 'tilde'
+  operator-char ::= 'x'                      // ^ 'xor'
+  operator-char ::= 'z'                      // . 'zperiod'
 
 <identifier> is run-length encoded: the natural indicates how many
 characters follow.  Operator characters are mapped into ASCII as
@@ -195,6 +201,7 @@ function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
 
   known-module ::= 'So'                      // Objective-C
   known-module ::= 'Ss'                      // swift
+  known-nominal-type ::= 'Sa'                // swift.Slice
   known-nominal-type ::= 'Sb'                // swift.Bool
   known-nominal-type ::= 'Sc'                // swift.Char
   known-nominal-type ::= 'Sd'                // swift.Float64
