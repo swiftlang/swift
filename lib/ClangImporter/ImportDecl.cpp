@@ -946,6 +946,12 @@ namespace {
         llvm_unreachable("Caller did not filter non-constructor methods");
 
       case clang::OMF_init: {
+        // FIXME: Ignore no-argument 'init' methods other than 'init' itself
+        // for now. Swift can't support more than one no-argument constructor.
+        if (objcMethod->param_size() == 0 &&
+            objcMethod->getSelector().getNameForSlot(0) != "init")
+          return nullptr;
+        
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
         clang::ObjCInterfaceDecl *interface;
