@@ -34,8 +34,7 @@ enum class ImplicitConstructorKind {
 };
 
 static bool isDefaultInitializable(TypeChecker &tc, Type ty,
-                                   Expr **initializer,
-                                   bool &createdZeroInit);
+                                   Expr **initializer);
 
 namespace {
 
@@ -296,13 +295,12 @@ public:
         return;
 
       Type ty = PBD->getPattern()->getType();
-      bool createdZeroInit = false;
       Expr *initializer = nullptr;
-      if (!isDefaultInitializable(TC, ty, &initializer, createdZeroInit)) {
+      if (!isDefaultInitializable(TC, ty, &initializer)) {
         // FIXME: Better diagnostics here.
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
         PBD->setInvalid();
-      } else if (!createdZeroInit) {
+      } else {
         if (TC.typeCheckExpression(initializer, ty)) {
           TC.diagnose(PBD, diag::while_converting_var_init, ty);
           return;
@@ -846,13 +844,8 @@ void TypeChecker::addImplicitConstructors(StructDecl *structDecl) {
 ///
 /// \param initializer If non-null, we will assigned an initializer expression
 /// that performs the default initialization.
-///
-/// \param createdZeroInit Bool that will be set true if we performed any
-/// builtin zero initializations, for which we don't yet have SIL support.
-/// FIXME: Removed createdZeroInit.
 static bool isDefaultInitializable(TypeChecker &tc, Type ty,
-                                   Expr **initializer,
-                                   bool &createdZeroInit) {
+                                   Expr **initializer) {
   CanType canTy = ty->getCanonicalType();
   switch (canTy->getKind()) {
   case TypeKind::Archetype:
@@ -874,7 +867,6 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
     // FIXME: This may not be what we want in the long term.
     if (initializer) {
       *initializer = new (tc.Context) ZeroValueExpr(ty);
-      createdZeroInit = true;
     }
     return true;
 
@@ -892,7 +884,6 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
     // Built-in types are default-initializable.
     if (initializer) {
       *initializer = new (tc.Context) ZeroValueExpr(ty);
-      createdZeroInit = true;
     }
     return true;
 
@@ -910,10 +901,8 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
 
       // Check whether the element is default-initializable.
       Expr *eltInit = nullptr;
-      bool childCreatedZeroInit = false;
       if (!isDefaultInitializable(tc, elt.getType(),
-                                  initializer? &eltInit : nullptr,
-                                  childCreatedZeroInit))
+                                  initializer? &eltInit : nullptr))
         return false;
 
       // If we need to produce an initializer, add this element.
@@ -921,9 +910,6 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
         assert(eltInit && "Missing initializer?");
         eltInits.push_back(eltInit);
         eltNames.push_back(elt.getName());
-
-        if (childCreatedZeroInit)
-          createdZeroInit = true;
       }
     }
 
@@ -1035,9 +1021,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
 
     // If this variable is not default-initializable, we're done: we can't
     // add the default constructor because it will be ill-formed.
-    bool createdZeroInit = false;
-    if (!isDefaultInitializable(*this, var->getType(), nullptr,
-                                createdZeroInit))
+    if (!isDefaultInitializable(*this, var->getType(), nullptr))
       return;
   }
 
@@ -1069,9 +1053,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
     // If this variable is not default-initializable, we're done: we can't
     // add the default constructor because it will be ill-formed.
     Expr *initializer = nullptr;
-    bool createdZeroInit = false;
-    if (!isDefaultInitializable(*this, var->getType(), &initializer,
-                                createdZeroInit))
+    if (!isDefaultInitializable(*this, var->getType(), &initializer))
       return;
 
     // If there is no initializer, rely on zero initialization.
