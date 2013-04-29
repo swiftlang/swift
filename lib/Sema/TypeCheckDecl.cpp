@@ -1053,8 +1053,9 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
     // If this variable is not default-initializable, we're done: we can't
     // add the default constructor because it will be ill-formed.
     Expr *initializer = nullptr;
-    if (!isDefaultInitializable(*this, var->getType(), &initializer))
-      return;
+    bool result = isDefaultInitializable(*this, var->getType(), &initializer);
+    (void)result;
+    assert(result && "isDefaultInitializable check above lied?");
 
     // If there is no initializer, rely on zero initialization.
     // FIXME: Or if there's a zero-initialization somewhere in there. This is
