@@ -473,7 +473,42 @@ public:
     return E->getKind() == ExprKind::UnresolvedDeclRef;
   }
 };
-
+  
+/// UnresolvedIfExpr - This represents a '?' within an unresolved SequenceExpr.
+/// It will be matched to an UnresolvedElseExpr and transformed to an IfExpr
+/// during precedence parsing in NameBinding.
+class UnresolvedIfExpr : public Expr {
+  SourceLoc Loc;
+public:
+  UnresolvedIfExpr(SourceLoc Loc)
+    : Expr(ExprKind::UnresolvedIf), Loc(Loc) {}
+  
+  SourceLoc getLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedIf;
+  }
+};
+  
+/// UnresolvedElseExpr - This represents a ':' within an unresolved
+/// SequenceExpr.
+/// It will be matched to an UnresolvedElseExpr and transformed to an IfExpr
+/// during precedence parsing in NameBinding.
+class UnresolvedElseExpr : public Expr {
+  SourceLoc Loc;
+public:
+  UnresolvedElseExpr(SourceLoc Loc)
+    : Expr(ExprKind::UnresolvedElse), Loc(Loc) {}
+  
+  SourceLoc getLoc() const { return Loc; }
+  SourceRange getSourceRange() const { return Loc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedElse;
+  }
+};
+  
 /// MemberRefExpr - This represents 'a.b' where we are referring to a member
 /// of a type, such as a property or variable.
 ///

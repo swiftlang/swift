@@ -584,6 +584,12 @@ public:
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
   }
+  void visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
+    printCommon(E, "unresolved_if_expr") << ')';
+  }
+  void visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
+    printCommon(E, "unresolved_else_expr") << ')';
+  }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';
     printRec(E->getSubExpr());

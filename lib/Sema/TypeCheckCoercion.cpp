@@ -475,6 +475,14 @@ public:
     
     return unchanged(E);
   }
+  
+  CoercedResult visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
+    llvm_unreachable("this node should be eliminated by name binding");
+  }
+  CoercedResult visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
+    llvm_unreachable("this node should be eliminated by name binding");
+  }
+  
   CoercedResult visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     // We can't do much with the destination type here. The expression
     // might end up being valid, if later the base expression gets a type

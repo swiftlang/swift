@@ -25,7 +25,7 @@ using namespace swift;
 
 /// parseExpr
 ///   expr:
-///     expr-sequence expr-if*
+///     expr-sequence
 ///     expr-sequence expr-is
 ///     expr-sequence expr-as
 ///
@@ -39,22 +39,6 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
   }
   if (Tok.is(tok::kw_as)) {
     return parseExprAs(expr.get());
-  }
-  
-  NullablePtr<IfExpr> ifExpr = nullptr;
-  Expr *first = expr.get();
-  while (Tok.is(tok::question)) {
-    NullablePtr<IfExpr> nextIf = parseExprIf(first);
-    if (nextIf.isNull())
-      return nullptr;
-    
-    if (ifExpr.isNull()) {
-      expr = nextIf.get();
-    } else {
-      ifExpr.get()->setElseExpr(nextIf.get());
-    }
-    ifExpr = nextIf;
-    first = nextIf.get()->getElseExpr();
   }
   
   return expr;
@@ -94,46 +78,21 @@ NullablePtr<Expr> Parser::parseExprAs(Expr *sub) {
     : (Expr*) new (Context) CoerceExpr(sub, asLoc, type);
 }
 
-/// parseExprIf
-///
-///   expr-if:
-///     '?' expr-sequence ':' expr-sequence
-///
-NullablePtr<IfExpr> Parser::parseExprIf(Expr *condExpr) {
-  SourceLoc questionLoc = consumeToken(tok::question);
-  
-  NullablePtr<Expr> thenExpr
-    = parseExprSequence(diag::expected_expr_after_if_question);
-  if (thenExpr.isNull())
-    return nullptr;
-  
-  if (!Tok.is(tok::colon)) {
-    diagnose(Tok, diag::expected_colon_after_if_question);
-    return nullptr;
-  }
-  
-  SourceLoc colonLoc = consumeToken(tok::colon);
-  
-  NullablePtr<Expr> elseExpr
-    = parseExprSequence(diag::expected_expr_after_if_colon);
-  if (elseExpr.isNull())
-    return nullptr;
-  
-  return new (Context) IfExpr(condExpr, questionLoc,
-                              thenExpr.get(), colonLoc, elseExpr.get());
-}
-
 /// parseExprSequence
 ///
 ///   expr-sequence:
 ///     expr-unary expr-binary*
 ///   expr-binary:
 ///     operator-binary expr-unary
+///     '?' expr-unary
+///     ':' expr-unary
 ///
 /// The sequencing for binary exprs is not structural, i.e., binary operators
-/// are not inherently right-associative.
+/// are not inherently right-associative. If present, '?' and ':' tokens must
+/// match.
 NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
+  SmallVector<UnresolvedIfExpr*, 2> UnmatchedIfs;
 
   while (true) {
     // Parse a unary expression.
@@ -142,20 +101,60 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
       return 0;
     SequencedExprs.push_back(Primary.get());
 
-    // If the next token is not a binary operator, we're done.
-    if (!Tok.is(tok::oper_binary))
+    switch (Tok.getKind()) {
+    case tok::oper_binary: {
+      // Parse the operator.
+      Expr *Operator = parseExprOperator();
+      SequencedExprs.push_back(Operator);
+      
+      // The message is only valid for the first subexpr.
+      Message = diag::expected_expr_after_operator;
       break;
+    }
+    
+    case tok::question: {
+      // Save the '?'.
+      auto *unresolvedIf = new (Context) UnresolvedIfExpr(consumeToken());
+      SequencedExprs.push_back(unresolvedIf);
+      UnmatchedIfs.push_back(unresolvedIf);
+      
+      Message = diag::expected_expr_after_if_question;
+      break;
+    }
 
-    // Parse the operator.
-    Expr *Operator = parseExprOperator();
-    SequencedExprs.push_back(Operator);
+    case tok::colon: {
+      // If there's no preceding '?', this isn't a ternary colon. We're done.
+      if (UnmatchedIfs.empty())
+        goto done;
+      UnmatchedIfs.pop_back();
 
-    // The message is only valid for the first subexpr.
-    Message = diag::expected_expr_after_operator;
+      // Save the ':'.
+      auto *unresolvedElse = new (Context) UnresolvedElseExpr(consumeToken());
+      SequencedExprs.push_back(unresolvedElse);
+
+      
+      Message = diag::expected_expr_after_if_colon;
+      break;
+    }
+        
+    default:
+      // If the next token is not a binary operator, we're done.
+      goto done;
+    }
   }
-
+done:
+  
   // If we had semantic errors, just fail here.
   assert(!SequencedExprs.empty());
+
+  // If we found invalid ternaries, return an error expr.
+  if (!UnmatchedIfs.empty()) {
+    for (auto *unmatchedIf : UnmatchedIfs) {
+      diagnose(unmatchedIf->getLoc(), diag::expected_colon_after_if_question);
+    }
+    return new (Context) ErrorExpr({SequencedExprs.front()->getStartLoc(),
+                                    SequencedExprs.back()->getEndLoc()});
+  }
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1)

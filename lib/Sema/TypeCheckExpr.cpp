@@ -1297,7 +1297,8 @@ public:
   }
 
   Expr *makeBinOp(Expr *Op, Expr *LHS, Expr *RHS, bool TypeCheckAST);
-  Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, unsigned MinPrecedence,
+  Expr *foldSequence(Expr *LHS,
+                     ArrayRef<Expr*> &S, unsigned MinPrecedence,
                      bool TypeCheckAST);
   Expr *visitSequenceExpr(SequenceExpr *E, bool TypeCheckAST);
 
@@ -1341,6 +1342,13 @@ public:
   Expr *visitIfExpr(IfExpr *E) {
     TC.diagnose(E->getLoc(), diag::requires_constraint_checker);
     return nullptr;
+  }
+    
+  Expr *visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
+    llvm_unreachable("this node should be eliminated by name binding");
+  }
+  Expr *visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
+    llvm_unreachable("this node should be eliminated by name binding");
   }
   
   SemaExpressionTree(TypeChecker &tc) : TC(tc) {}
@@ -1541,7 +1549,12 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+  assert(!isa<UnresolvedElseExpr>(E) &&
+         "should fold ':' as part of ternary folding");
+  if (isa<UnresolvedIfExpr>(E)) {
+    // Ternary has fixed precedence.
+    return InfixData(100, Associativity::Right);
+  } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (Optional<InfixOperatorDecl*> maybeOp
       = TC.TU.lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc())) {
       if (auto *op = *maybeOp)
@@ -1588,20 +1601,101 @@ Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS,
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
+Expr *SemaExpressionTree::foldSequence(Expr *LHS,
+                                       ArrayRef<Expr*> &S,
                                        unsigned MinPrecedence,
                                        bool TypeCheckAST) {
   // Invariant: S is even-sized.
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
   assert((S.size() & 1) == 0);
-
-  // Extract out the first operator.  If its precedence is lower
-  // than the minimum, stop here.
-  Expr *Op1 = S[0];
-  InfixData Op1Info = getInfixData(TC, Op1);
-  if (Op1Info.getPrecedence() < MinPrecedence) return LHS;
-
+  
+  // An "operator" for our purposes can be either a binary op, or the MHS of a
+  // ternary.
+  struct Op {
+    enum { Null, Binary, Ternary } kind;
+    union {
+      Expr *binary;
+      struct {
+        SourceLoc question;
+        swift::Expr *mhs;
+        SourceLoc colon;
+      } ternary;
+    };
+    InfixData infixData;
+    
+    Op() : kind(Null) {}
+    
+    Op(Expr *binary, InfixData data)
+      : kind(Binary), binary(binary), infixData(data) {}
+    Op(SourceLoc question, swift::Expr *mhs, SourceLoc colon, InfixData data)
+      : kind(Ternary), ternary{question, mhs, colon}, infixData(data) {}
+    
+    SourceLoc getLoc() const {
+      switch (kind) {
+      case Null:
+        llvm_unreachable("null op");
+      case Binary:
+        return binary->getLoc();
+      case Ternary:
+        return ternary.question;
+      }
+    }
+    
+    explicit operator bool() const { return kind != Null; }
+  };
+  
+  /// Get the next binary or ternary operator, if appropriate to this pass.
+  auto getNextOperator = [&]() -> Op {
+    Expr *op = S[0];
+    // If this is a ternary ':', stop here.
+    // The outer parse will match it to a '?'.
+    if (isa<UnresolvedElseExpr>(op)) {
+      return {};
+    }
+    
+    // If the operator's precedence is lower than the minimum, stop here.
+    InfixData opInfo = getInfixData(TC, op);
+    if (opInfo.getPrecedence() < MinPrecedence) return {};
+    // If this is a ternary '?', do a maximal-munch parse of the middle operand
+    // up to the matching ':'.
+    if (isa<UnresolvedIfExpr>(op)) {
+      Expr *MHS = S[1];
+      assert(S.size() >= 4 &&
+             "SequenceExpr doesn't have enough elts to complete ternary");
+      S = S.slice(2);
+      MHS = foldSequence(MHS, S, 0, TypeCheckAST);
+      assert(S.size() >= 2 &&
+             "folding MHS of ternary did not leave enough elts to complete ternary");
+      assert(isa<UnresolvedElseExpr>(S[0]) &&
+             "folding MHS of ternary did not end at ':'");
+      return Op(op->getLoc(), MHS, S[0]->getLoc(), opInfo);
+    }
+    return Op(op, opInfo);
+  };
+  
+  /// Finalize an operator expression.
+  auto makeOperatorExpr = [&](Expr *LHS, Op Operator, Expr *RHS) -> Expr* {
+    switch (Operator.kind) {
+    case Op::Null:
+      llvm_unreachable("should have break'ed on null Op");
+        
+    case Op::Binary:
+      return makeBinOp(Operator.binary, LHS, RHS, TypeCheckAST);
+    
+    case Op::Ternary:
+      return new (TC.Context) IfExpr(LHS,
+                                     Operator.ternary.question,
+                                     Operator.ternary.mhs,
+                                     Operator.ternary.colon,
+                                     RHS);
+    }
+  };
+  
+  // Extract out the first operator.
+  Op Op1 = getNextOperator();
+  if (!Op1) return LHS;
+  
   // We will definitely be consuming at least one operator.
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
@@ -1610,25 +1704,27 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
   while (!S.empty()) {
     assert(!S.empty());
     assert((S.size() & 1) == 0);
-    assert(Op1Info.getPrecedence() >= MinPrecedence);
+    assert(Op1.infixData.getPrecedence() >= MinPrecedence);
 
     // Pull out the next binary operator.
     Expr *Op2 = S[0];
+    // If this is a ternary ':', break out of the loop.
+    if (isa<UnresolvedElseExpr>(Op2)) break;
+  
     InfixData Op2Info = getInfixData(TC, Op2);
-
     // If the second operator's precedence is lower than the min
     // precedence, break out of the loop.
     if (Op2Info.getPrecedence() < MinPrecedence) break;
-
+    
     // If the first operator's precedence is higher than the second
     // operator's precedence, or they have matching precedence and are
     // both left-associative, fold LHS and RHS immediately.
-    if (Op1Info.getPrecedence() > Op2Info.getPrecedence() ||
-        (Op1Info == Op2Info && Op1Info.isLeftAssociative())) {
-      LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
+    if (Op1.infixData.getPrecedence() > Op2Info.getPrecedence() ||
+        (Op1.infixData == Op2Info && Op1.infixData.isLeftAssociative())) {
+      LHS = makeOperatorExpr(LHS, Op1, RHS);
+      Op1 = getNextOperator();
+      assert(Op1 && "should get a valid operator here");
       RHS = S[1];
-      Op1 = Op2;
-      Op1Info = Op2Info;
       S = S.slice(2);
       continue;
     }
@@ -1637,8 +1733,9 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     // operator's precedence, recursively fold all such
     // higher-precedence operators starting from this point, then
     // repeat.
-    if (Op1Info.getPrecedence() < Op2Info.getPrecedence()) {
-      RHS = foldSequence(RHS, S, Op1Info.getPrecedence() + 1, TypeCheckAST);
+    if (Op1.infixData.getPrecedence() < Op2Info.getPrecedence()) {
+      RHS = foldSequence(RHS, S, Op1.infixData.getPrecedence() + 1,
+                         TypeCheckAST);
       continue;
     }
 
@@ -1646,9 +1743,10 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
     // operator's precedence, and they're both right-associative,
     // recursively fold operators starting from this point, then
     // immediately fold LHS and RHS.
-    if (Op1Info == Op2Info && Op1Info.isRightAssociative()) {
-      RHS = foldSequence(RHS, S, Op1Info.getPrecedence(), TypeCheckAST);
-      LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
+    if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
+      RHS = foldSequence(RHS, S, Op1.infixData.getPrecedence(),
+                         TypeCheckAST);
+      LHS = makeOperatorExpr(LHS, Op1, RHS);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
@@ -1659,26 +1757,27 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS, ArrayRef<Expr*> &S,
 
     // If we ended up here, it's because we have two operators
     // with mismatched or no associativity.
-    assert(Op1Info.getPrecedence() == Op2Info.getPrecedence());
-    assert(Op1Info.getAssociativity() != Op2Info.getAssociativity() ||
-           Op1Info.isNonAssociative());
+    assert(Op1.infixData.getPrecedence() == Op2Info.getPrecedence());
+    assert(Op1.infixData.getAssociativity() != Op2Info.getAssociativity()
+           || Op1.infixData.isNonAssociative());
 
-    if (Op1Info.isNonAssociative()) {
+    if (Op1.infixData.isNonAssociative()) {
       // FIXME: QoI ranges
-      TC.diagnose(Op1->getLoc(), diag::non_assoc_adjacent);
+      TC.diagnose(Op1.getLoc(), diag::non_assoc_adjacent);
     } else if (Op2Info.isNonAssociative()) {
       TC.diagnose(Op2->getLoc(), diag::non_assoc_adjacent);
     } else {
-      TC.diagnose(Op1->getLoc(), diag::incompatible_assoc);
+      TC.diagnose(Op1.getLoc(), diag::incompatible_assoc);
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeBinOp(Op1, LHS, RHS, TypeCheckAST);
+    LHS = makeOperatorExpr(LHS, Op1, RHS);
     return foldSequence(LHS, S, MinPrecedence, TypeCheckAST);
   }
 
-  // Fold LHS and RHS together and declare completion.
-  return makeBinOp(Op1, LHS, RHS, TypeCheckAST);
+  // Fold LHS (and MHS, if ternary) and RHS together and declare completion.
+
+  return makeOperatorExpr(LHS, Op1, RHS);
 }
 
 /// foldSequence - Take a SequenceExpr and fold it into a tree of
@@ -1692,7 +1791,8 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E,
   Expr *LHS = Elts[0];
   Elts = Elts.slice(1);
 
-  Expr *Result = foldSequence(LHS, Elts, /*min precedence*/ 0, TypeCheckAST);
+  Expr *Result = foldSequence(LHS, Elts, /*min precedence*/ 0,
+                              TypeCheckAST);
   assert(Elts.empty());
   return Result;
 }

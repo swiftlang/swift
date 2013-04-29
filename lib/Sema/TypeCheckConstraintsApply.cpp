@@ -1038,6 +1038,13 @@ namespace {
 
       return expr;
     }
+    
+    Expr *visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
+    Expr *visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
 
     Expr *visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");

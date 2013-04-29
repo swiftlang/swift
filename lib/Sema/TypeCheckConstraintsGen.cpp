@@ -863,6 +863,13 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return resultTy;
     }
     
+    Type visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
+    Type visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
+    
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

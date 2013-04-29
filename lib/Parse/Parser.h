@@ -375,7 +375,6 @@ public:
   // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
   // returns a raw Expr*.
   NullablePtr<Expr> parseExpr(Diag<> ID);
-  NullablePtr<IfExpr> parseExprIf(Expr *condExpr);
   NullablePtr<Expr> parseExprIs(Expr *sub);
   NullablePtr<Expr> parseExprAs(Expr *sub);
   NullablePtr<Expr> parseExprSequence(Diag<> ID);

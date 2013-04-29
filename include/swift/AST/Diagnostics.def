@@ -608,6 +608,8 @@ ERROR(expected_lbrace_func_expr,decl_parsing,none,
 // If expressions
 ERROR(expected_expr_after_if_question,expr_parsing,none,
       "expected expression after '?' in ternary expression", ())
+ERROR(expected_question_before_if_colon,expr_parsing,none,
+      "expected '?' before ':' in ternary expression", ())
 ERROR(expected_colon_after_if_question,expr_parsing,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_if_colon,expr_parsing,none,
