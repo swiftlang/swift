@@ -45,11 +45,12 @@ namespace {
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      unsigned *BufferOffset,
-                                     unsigned BufferEndOffset) {
+                                     unsigned BufferEndOffset,
+                                     SILModule *SIL) {
   Parser P(BufferID, TU->getComponent(), TU->Ctx,
            BufferOffset ? *BufferOffset : 0, BufferEndOffset,
            TU->Kind == TranslationUnit::Main ||
-           TU->Kind == TranslationUnit::Repl);
+           TU->Kind == TranslationUnit::Repl, SIL);
   PrettyStackTraceParser stackTrace(P);
   bool FoundSideEffects = P.parseTranslationUnit(TU);
   if (BufferOffset)
@@ -66,7 +67,7 @@ Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
   DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
   
   TU->ASTStage = TranslationUnit::Parsing;
-  Parser P(TU->getComponent(), TU->Ctx, expr, diags);
+  Parser P(TU->getComponent(), TU->Ctx, expr, diags, nullptr);
   // Prime the lexer.
   P.consumeToken();
   P.CurDeclContext = TU;
@@ -102,13 +103,15 @@ static StringRef ComputeLexStart(StringRef File, unsigned Offset,
 
 
 Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
-               unsigned Offset, unsigned EndOffset, bool IsMainModule)
+               unsigned Offset, unsigned EndOffset, bool IsMainModule,
+               SILModule *SIL)
   : SourceMgr(Context.SourceMgr),
     Diags(Context.Diags),
     Buffer(SourceMgr.getMemoryBuffer(BufferID)),
     L(new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, EndOffset,
                                  IsMainModule),
-                 SourceMgr, &Diags)),
+                 SourceMgr, &Diags, SIL != nullptr)),
+    SIL(SIL),
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),
@@ -116,12 +119,13 @@ Parser::Parser(unsigned BufferID, swift::Component *Comp, ASTContext &Context,
 }
 
 Parser::Parser(swift::Component *Comp, ASTContext &Context,
-               llvm::StringRef fragment, DiagnosticEngine &Diags)
+               llvm::StringRef fragment, DiagnosticEngine &Diags,SILModule *SIL)
   : SourceMgr(Context.SourceMgr),
     Diags(Diags),
     Buffer(llvm::MemoryBuffer::getMemBuffer(fragment, "",
                                             /*RequiresTerminator*/ false)),
-    L(new Lexer(fragment, SourceMgr, &Diags)),
+    L(new Lexer(fragment, SourceMgr, &Diags, SIL != nullptr)),
+    SIL(SIL),
     Component(Comp),
     Context(Context),
     ScopeInfo(*this),

@@ -1034,7 +1034,7 @@ public:
   /// Responds to a REPL input. Returns true if the repl should continue,
   /// false if it should quit.
   bool handleREPLInput(REPLInputKind inputKind, llvm::StringRef Line) {
-    Lexer L(Line, Context.SourceMgr, nullptr);
+    Lexer L(Line, Context.SourceMgr, nullptr, nullptr /*not SIL*/);
     switch (inputKind) {
       case REPLInputKind::REPLQuit:
         return false;
