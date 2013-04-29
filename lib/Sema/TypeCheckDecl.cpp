@@ -284,7 +284,33 @@ public:
       }
       return;
     }
-    if (PBD->getInit() && !IsFirstPass) {
+
+    // If there is no initializer and we are not in a type context,
+    // create a default initializer.
+    if (!PBD->getInit() && !IsFirstPass &&
+        isa<TypedPattern>(PBD->getPattern()) &&
+        !PBD->getDeclContext()->isTypeContext()) {
+      // Type-check the pattern.
+      if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false,
+                              /*allowUnknownTypes*/false))
+        return;
+
+      Type ty = PBD->getPattern()->getType();
+      bool createdZeroInit = false;
+      Expr *initializer = nullptr;
+      if (!isDefaultInitializable(TC, ty, &initializer, createdZeroInit)) {
+        // FIXME: Better diagnostics here.
+        TC.diagnose(PBD, diag::decl_no_default_init, ty);
+        PBD->setInvalid();
+      } else if (!createdZeroInit) {
+        if (TC.typeCheckExpression(initializer, ty)) {
+          TC.diagnose(PBD, diag::while_converting_var_init, ty);
+          return;
+        }
+
+        PBD->setInit(initializer);
+      }
+    } else if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
       if (isa<TypedPattern>(PBD->getPattern())) {
         if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false,
@@ -314,7 +340,9 @@ public:
                               /*allowUnknownTypes*/false))
         return;
     }
+
     visitBoundVars(PBD->getPattern());
+
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {

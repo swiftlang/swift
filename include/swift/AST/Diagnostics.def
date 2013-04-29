@@ -986,6 +986,9 @@ NOTE(overridden_here,sema_tcd,none,
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a base class", ())
 
+ERROR(decl_no_default_init,sema_tcd,none,
+      "cannot default-initialize variable of type %0", (Type))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
