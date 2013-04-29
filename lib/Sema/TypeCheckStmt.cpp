@@ -677,20 +677,6 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *CD) {
 
   Stmt *Body = CD->getBody();
 
-  // If this is an implicitly-generated default constructor with no
-  // body, fill in the body now.
-  if (!Body && CD->isImplicit()) {
-    if (auto pattern = dyn_cast<TuplePattern>(CD->getArguments())) {
-      if (pattern->getNumFields() == 0) {
-        // FIXME: Actually assign each member to an empty 
-        // FIXME: Check whether these expressions actually type-check. If not,
-        // remove the implicit default constructor.
-        CD->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
-        Body = CD->getBody();
-      }
-    }
-  }
-
   if (Body)
     StmtChecker(*this, CD).typeCheckStmt(Body);
 }
