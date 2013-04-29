@@ -300,7 +300,7 @@ ArrayRef<ProtocolDecl *> ExtensionDecl::getProtocols() {
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
-  if (Init)
+  if (Init && !Init->isImplicit())
     return { VarLoc, Init->getSourceRange().End };
   return { VarLoc, Pat->getSourceRange().End };
 }

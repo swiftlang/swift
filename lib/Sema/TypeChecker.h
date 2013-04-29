@@ -413,6 +413,10 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
+  /// \brief Add any implicitly-defined constructors required for the given
+  /// struct.
+  void addImplicitConstructors(StructDecl *structDecl);
+
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -438,10 +442,6 @@ private:
   llvm::DenseSet<StructDecl *> structsNeedingImplicitDefaultConstructor;
 
 public:
-  /// \brief Add the given struct to the list of structs that need an
-  /// implicit default constructor to be defined.
-  void requestImplicitDefaultConstructor(StructDecl *structDecl);
-
   /// \brief Define the default constructor for the given struct.
   void defineDefaultConstructor(StructDecl *structDecl);
 

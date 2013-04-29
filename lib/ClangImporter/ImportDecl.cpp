@@ -424,10 +424,6 @@ namespace {
 
         members.push_back(member);
       }
-      
-      // Create a value constructor for the struct.
-      ConstructorDecl *ctor = createValueConstructor(result, members);
-      members.push_back(ctor);
 
       // FIXME: Source range isn't totally accurate because Clang lacks the
       // location of the '{'.

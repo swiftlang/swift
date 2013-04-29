@@ -744,11 +744,53 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
+  // Type-check any externally-sourced type definitions. We may need to
+  // add implicit constructors.
+  // FIXME: This is O(N^2), because we're not tracking new definitions.
+  llvm::SetVector<StructDecl *> externalStructs;
+  for (auto imported : TC.Context.LoadedClangModules) {
+    for (auto &def : imported->getExternalDefinitions()) {
+      switch (def.getStage()) {
+      case ExternalDefinition::TypeChecked:
+        continue;
+
+      case ExternalDefinition::NameBound:
+        break;
+      }
+
+      auto decl = def.getDecl();
+      if (auto structDecl = dyn_cast<StructDecl>(decl)) {
+        // StructDecls should already be typed by the ClangImporter and don't
+        // need additional typechecking.
+        TC.addImplicitConstructors(structDecl);
+        def.setStage(ExternalDefinition::TypeChecked);
+        externalStructs.insert(structDecl);
+      }
+      continue;
+    }
+  }
+
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
   prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
                            TC.implicitlyDefinedFunctions.end());
   TC.implicitlyDefinedFunctions.clear();
+  
+  // For externally-defined structs, add each of the implicitly-defined
+  // constructors to the list of external definitions.
+  for (auto sd : externalStructs) {
+    for (auto member : sd->getMembers()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        if (ctor->isImplicit()) {
+          auto dc = sd->getDeclContext();
+          while (dc->getParent())
+            dc = dc->getParent();
+          auto clangMod = cast<ClangModule>(dc);
+          clangMod->addExternalDefinition(ctor);
+        }
+      }
+    }
+  }
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
@@ -807,6 +849,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
     // Type-check any externally-sourced definitions and types.
     // FIXME: This is O(N^2), because we're not tracking new definitions.
+    externalStructs.clear();
     for (auto imported : TC.Context.LoadedClangModules) {
       for (auto &def : imported->getExternalDefinitions()) {
         switch (def.getStage()) {
@@ -833,10 +876,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           def.setStage(ExternalDefinition::TypeChecked);
           continue;
         }
-        if (isa<StructDecl>(decl)) {
+        if (auto structDecl = dyn_cast<StructDecl>(decl)) {
           // StructDecls should already be typed by the ClangImporter and don't
-          // need additional typechecking.
+          // need additional typechecking. However, we may still need to
+          // add implicitly-defined constructors.
+          TC.addImplicitConstructors(structDecl);
           def.setStage(ExternalDefinition::TypeChecked);
+          externalStructs.insert(structDecl);
           continue;
         }
 
@@ -844,6 +890,28 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       }
       for (Type t : imported->getTypes())
         TC.validateTypeSimple(t);
+    }
+
+    // Define any pending implicitly declarations.
+    TC.definePendingImplicitDecls();
+    prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
+                             TC.implicitlyDefinedFunctions.end());
+    TC.implicitlyDefinedFunctions.clear();
+
+    // For externally-defined structs, add each of the implicitly-defined
+    // constructors to the list of external definitions.
+    for (auto sd : externalStructs) {
+      for (auto member : sd->getMembers()) {
+        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+          if (ctor->isImplicit()) {
+            auto dc = sd->getDeclContext();
+            while (dc->getParent())
+              dc = dc->getParent();
+            auto clangMod = cast<ClangModule>(dc);
+            clangMod->addExternalDefinition(ctor);
+          }
+        }
+      }
     }
   } while (currentFuncExpr < prePass.FuncExprs.size());
   

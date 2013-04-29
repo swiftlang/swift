@@ -114,7 +114,7 @@ bool Expr::isImplicit() const {
     return metatype->getLoc().isInvalid();
 
   if (const ApplyExpr *apply = dyn_cast<ApplyExpr>(this))
-    return apply->getArg()->isImplicit();
+    return apply->getArg() && apply->getArg()->isImplicit();
 
   if (const TupleExpr *tuple = dyn_cast<TupleExpr>(this)) {
     if (!tuple->getSourceRange().isInvalid())
