@@ -214,11 +214,139 @@ __ creating-or-mutating-_
 Optimization and Convenience
 ============================
 
-A discussion of two language features:
+We've discussed providing a means to automatically derive in-place assignment
+versions of operators from the creating operators, and vice
+versa. This provides a consistent interface to operators for free without
+boilerplate::
 
-1. Generating ``x.upper()`` from
-   ``x.inplace_upper()`` and vice-versa (as with ``+`` and ``+=``) 
+      operator infix ☃ {}
+      func ☃ (x:Int, y:Int) -> Int { ... }
 
-2. Optimizing ``x = x.upper()`` into ``x.inplace_upper()``
+      // Users want this to work...
+      var x = 0
+      x ☃= 12
 
-TODO: write me
+      // ...without typing all this
+      operator infix ☃= { assignment }
+      func ☃=(x:[byref] Int, y:Int) {
+        x = x ☃ y
+      }
+
+We've also discussed teaching the compiler the relationship between
+value-creating and in-place forms of operators, so that it can optimize
+operations that take rvalues or kill lvalues into in-place operations on the
+user's behalf::
+
+      struct BigInt { ... }
+  
+      // Users want to write this:
+      func foo(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
+        return x + y + z
+      }
+  
+      // but want the perfomance of this:
+      func fooʹ(x:BigInt, y:BigInt, z:BigInt) -> BigInt {
+        var r = x
+        r += y
+        r += z
+        return r
+      }
+
+These same motivations extend to methods with in-place and value-creating
+variants. Methods such as ``str.upper()`` that return the same type as their
+``this`` parameter can be derived from and optimized into
+``str.inplace_upper()``, in the same way ``+`` can be from ``+=``.
+
+Enabling the in-place relationship
+----------------------------------
+
+For operators, we have the ``assignment`` attribute for in-place
+operators. We can extend this attribute to also specify the value-creating form
+of the operator::
+
+      operator infix += {
+        // Assignment form of +
+        assignment +
+      }
+
+For methods, we propose tying the relationship to the ``inplace_*`` naming
+convention proposed for the standard library. That has the advantage of
+encouraging consistent coding standards and eliminating boilerplate entirely.
+
+Alternatively, if baking a naming convention into the compiler is unpalatable,
+we can use declaration attributes::
+
+      struct String {
+        func [inplace_of=upper] inplace_upper() { ... }
+        func [inplace=inplace_upper] upper() { ... }
+      }
+
+Default implementations
+-----------------------
+
+When an in-place relationship is created, a definition matching either the
+in-place or value-creating form introduces an implicit definition of the other
+form::
+
+      func += (x:[byref] String, y:String) { ... }
+      // Implicitly defines func + (x:String, y:String) -> String
+
+      func + (x:Int, y:Int) -> Int { ... }
+      // Implicitly defines func += (x:[byref] Int, y:Int) -> ()
+
+      struct String {
+        func upper() -> String { ... }
+        // Implicitly defines inplace_upper() -> ()
+      }
+
+      struct Stringʹ {
+        func inplace_upper() { ... }
+        // Implicitly defines upper() -> Stringʹ
+      }
+
+Both forms can also be explicitly defined if desired.
+
+The implicit value-creating definition copies its left argument and applies the
+in-place form, as if written::
+
+      func + (x:String, y:String) -> String {
+        var r = x
+        x += y
+        return r
+      }
+
+      extension Stringʹ {
+        func upper() -> Stringʹ {
+          var r = this
+          r.inplace_upper()
+          return r
+        }
+      }
+
+The implicit in-place form applies the value-creating form to its arguments and
+assigns the result to its left argument, as if written::
+
+      func += (x:[byref] Int, y:Int) {
+        x = x + y
+      }
+
+      extension String {
+        func inplace_upper() {
+          this = this.upper()
+        }
+      }
+
+Optimizations
+-------------
+
+The compiler should be allowed to exploit the in-place relationship to optimize
+code. Some obvious optimization opportunities include:
+
+* Code that performs in-place assignment using value-creating forms, such as
+  ``x = x + y`` or ``s = s.upper()``, can be transformed to use the in-place
+  form.
+* Compound expressions can be written in terms of value-creating forms, with
+  the compiler transforming operations on rvalues into in-place operations.
+* If the last use of an lvalue is as an argument to an operation with an
+  in-place form, that operation can be turned into the in-place form.
+
