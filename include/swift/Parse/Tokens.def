@@ -54,8 +54,6 @@ KEYWORD(var)
 KEYWORD(static)
 KEYWORD(subscript)
 
-KEYWORD(sil)        // This is only enabled when parsing .sil files.
-
 // Statement keywords.
 KEYWORD(if)
 KEYWORD(do)

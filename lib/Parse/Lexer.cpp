@@ -160,9 +160,8 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 //===----------------------------------------------------------------------===//
 
 Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
-             DiagnosticEngine *Diags, const char *CurrentPosition,
-             bool InSILMode)
-  : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode) {
+             DiagnosticEngine *Diags, const char *CurrentPosition)
+  : SourceMgr(SourceMgr), Diags(Diags) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
   CurPtr = CurrentPosition;
@@ -185,7 +184,7 @@ tok Lexer::getTokenKind(StringRef Text) {
   assert(Text.data() >= BufferStart && Text.data() <= BufferEnd &&
          "Text string does not fall within lexer's buffer");
   Lexer L(StringRef(BufferStart, BufferEnd - BufferStart), SourceMgr, Diags,
-          Text.data(), false);
+          Text.data());
   Token Result;
   L.lex(Result);
   return Result.getKind();
@@ -479,9 +478,6 @@ void Lexer::lexIdentifier() {
 
     .Default(tok::identifier);
 
-  if (InSILMode && StringRef(TokStart, CurPtr-TokStart) == "sil")
-    Kind = tok::kw_sil;
-  
   return formToken(Kind, TokStart);
 }
 
