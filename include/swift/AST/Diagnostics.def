@@ -990,6 +990,9 @@ ERROR(overload_base_decl,sema_tcd,none,
 
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
+ERROR(decl_no_default_init_ivar,sema_tcd,none,
+      "cannot default-initialize instance variable %0 of type %1", 
+      (Identifier, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

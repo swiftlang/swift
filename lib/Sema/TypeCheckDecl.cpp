@@ -33,9 +33,6 @@ enum class ImplicitConstructorKind {
   Memberwise
 };
 
-static bool isDefaultInitializable(TypeChecker &tc, Type ty,
-                                   Expr **initializer);
-
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -296,7 +293,7 @@ public:
 
       Type ty = PBD->getPattern()->getType();
       Expr *initializer = nullptr;
-      if (!isDefaultInitializable(TC, ty, &initializer)) {
+      if (!TC.isDefaultInitializable(ty, &initializer)) {
         // FIXME: Better diagnostics here.
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
         PBD->setInvalid();
@@ -836,16 +833,7 @@ void TypeChecker::addImplicitConstructors(StructDecl *structDecl) {
   }
 }
 
-/// \brief Determine whether the given type can be default-initialized.
-///
-/// \param tc The type checker in which we're performing this checking.
-///
-/// \param ty The type we are checking.
-///
-/// \param initializer If non-null, we will assigned an initializer expression
-/// that performs the default initialization.
-static bool isDefaultInitializable(TypeChecker &tc, Type ty,
-                                   Expr **initializer) {
+bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   CanType canTy = ty->getCanonicalType();
   switch (canTy->getKind()) {
   case TypeKind::Archetype:
@@ -866,7 +854,7 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
     // Classes are default-initializable (with 0).
     // FIXME: This may not be what we want in the long term.
     if (initializer) {
-      *initializer = new (tc.Context) ZeroValueExpr(ty);
+      *initializer = new (Context) ZeroValueExpr(ty);
     }
     return true;
 
@@ -883,7 +871,7 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
   case TypeKind::BuiltinRawPointer:
     // Built-in types are default-initializable.
     if (initializer) {
-      *initializer = new (tc.Context) ZeroValueExpr(ty);
+      *initializer = new (Context) ZeroValueExpr(ty);
     }
     return true;
 
@@ -901,7 +889,7 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
 
       // Check whether the element is default-initializable.
       Expr *eltInit = nullptr;
-      if (!isDefaultInitializable(tc, elt.getType(),
+      if (!isDefaultInitializable(elt.getType(),
                                   initializer? &eltInit : nullptr))
         return false;
 
@@ -920,10 +908,10 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
         *initializer = eltInits[0];
       else
         *initializer
-          = new (tc.Context) TupleExpr(SourceLoc(),
-                                       tc.Context.AllocateCopy(eltInits),
-                                       tc.Context.AllocateCopy(eltNames).data(),
-                                       SourceLoc());
+          = new (Context) TupleExpr(SourceLoc(),
+                                    Context.AllocateCopy(eltInits),
+                                    Context.AllocateCopy(eltNames).data(),
+                                    SourceLoc());
     }
     return true;
   }
@@ -952,7 +940,7 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
 
   // We need to look for a default constructor.
   llvm::SmallVector<ValueDecl *, 4> ctors;
-  if (!tc.lookupConstructors(ty, ctors))
+  if (!lookupConstructors(ty, ctors))
     return false;
 
   // Check whether we have a constructor that can be called with an empty
@@ -994,12 +982,10 @@ static bool isDefaultInitializable(TypeChecker &tc, Type ty,
 
   // We found a default constructor. Construct the initializer expression.
   // FIXME: As an optimization, we could build a fully type-checked AST here.
-  Expr *arg = new (tc.Context) TupleExpr(SourceLoc(), { }, nullptr,
-                                         SourceLoc());
-  Expr *metatype = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
-                                                 MetaTypeType::get(ty,
-                                                                   tc.Context));
-  *initializer = new (tc.Context) CallExpr(metatype, arg);
+  Expr *arg = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc());
+  Expr *metatype = new (Context) MetatypeExpr(nullptr, SourceLoc(),
+                                              MetaTypeType::get(ty, Context));
+  *initializer = new (Context) CallExpr(metatype, arg);
 
   return true;
 }
@@ -1021,7 +1007,7 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
 
     // If this variable is not default-initializable, we're done: we can't
     // add the default constructor because it will be ill-formed.
-    if (!isDefaultInitializable(*this, var->getType(), nullptr))
+    if (!isDefaultInitializable(var->getType(), nullptr))
       return;
   }
 
@@ -1041,40 +1027,11 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
   structDecl->setMembers(Context.AllocateCopy(members),
                          structDecl->getBraces());
 
-  // Create the body of the default constructor.
-  SmallVector<BraceStmt::ExprStmtOrDecl, 4> body;
-  for (auto member : structDecl->getMembers()) {
-    auto var = dyn_cast<VarDecl>(member);
-    if (!var || var->isProperty())
-      continue;
+  // Create an empty body for the default constructor. The type-check of the
+  // constructor body will introduce default initializations of the members.
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
 
-    // FIXME: Check for an initializer on the variable.
-
-    // If this variable is not default-initializable, we're done: we can't
-    // add the default constructor because it will be ill-formed.
-    Expr *initializer = nullptr;
-    bool result = isDefaultInitializable(*this, var->getType(), &initializer);
-    (void)result;
-    assert(result && "isDefaultInitializable check above lied?");
-
-    // If there is no initializer, rely on zero initialization.
-    // FIXME: Or if there's a zero-initialization somewhere in there. This is
-    // a temporary hack.
-    if (!initializer)
-      continue;
-
-    // Create the assignment.
-    auto thisDecl = ctor->getImplicitThisDecl();
-    Expr *dest = buildMemberRefExpr(new (Context) DeclRefExpr(thisDecl,
-                                                              SourceLoc(),
-                                                              thisDecl->getTypeOfReference()),
-                                    SourceLoc(), var, SourceLoc());
-    body.push_back(new (Context) AssignStmt(dest, SourceLoc(), initializer));
-  }
-
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), body, SourceLoc()));
-
-  // Add tihs to the list of implicitly-defined functions.
+  // Add this to the list of implicitly-defined functions.
   implicitlyDefinedFunctions.push_back(ctor);
 }
 

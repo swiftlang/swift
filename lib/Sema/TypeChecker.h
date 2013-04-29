@@ -442,6 +442,14 @@ private:
   llvm::DenseSet<StructDecl *> structsNeedingImplicitDefaultConstructor;
 
 public:
+  /// \brief Determine whether the given type can be default-initialized.
+  ///
+  /// \param ty The type we are checking.
+  ///
+  /// \param initializer If non-null, we will assigned an initializer expression
+  /// that performs the default initialization.
+  bool isDefaultInitializable(Type ty, Expr **initializer);
+
   /// \brief Define the default constructor for the given struct.
   void defineDefaultConstructor(StructDecl *structDecl);
 

@@ -615,7 +615,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       elem = SubExpr;
       continue;
     }
-    
+
     if (Stmt *SubStmt = elem.dyn_cast<Stmt*>()) {
       if (!typeCheckStmt(SubStmt))
         elem = SubStmt;
@@ -669,16 +669,119 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   FE->computeCaptures(Context);
 }
 
-void TypeChecker::typeCheckConstructorBody(ConstructorDecl *CD) {
-  if (auto allocThis = CD->getAllocThisExpr()) {
+void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
+  if (auto allocThis = ctor->getAllocThisExpr()) {
     if (!typeCheckExpression(allocThis))
-      CD->setAllocThisExpr(allocThis);
+      ctor->setAllocThisExpr(allocThis);
   }
 
-  Stmt *Body = CD->getBody();
+  BraceStmt *body = ctor->getBody();
 
-  if (Body)
-    StmtChecker(*this, CD).typeCheckStmt(Body);
+  if (body) {
+    // Figure out which members already have initializers. We don't
+    // default-initialize those members.
+    // FIXME: This traversal is quite simplistic and quite stupid. It should
+    // use dataflow analysis to determine which members are guaranteed to
+    // be (manually) initialized before they are used.
+    bool allOfThisInitialized = false;
+    auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
+                         ->getNominalOrBoundGenericNominal();
+    llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
+    for (auto elt : body->getElements()) {
+      auto stmt = elt.dyn_cast<Stmt *>();
+      if (!stmt)
+        continue;
+
+      auto assign = dyn_cast<AssignStmt>(stmt);
+      if (!assign)
+        continue;
+
+      // We have an assignment. Check whether the left-hand side refers to
+      // a member of our class.
+      VarDecl *member = nullptr;
+      auto dest = assign->getDest()->getSemanticsProvidingExpr();
+      if (auto memberRef = dyn_cast<MemberRefExpr>(dest))
+        member = memberRef->getDecl();
+      else if (auto memberRef = dyn_cast<ExistentialMemberRefExpr>(dest))
+        member = dyn_cast<VarDecl>(memberRef->getDecl());
+      else if (auto memberRef = dyn_cast<ArchetypeMemberRefExpr>(dest))
+        member = dyn_cast<VarDecl>(memberRef->getDecl());
+      else if (auto memberRef = dyn_cast<GenericMemberRefExpr>(dest))
+        member = dyn_cast<VarDecl>(memberRef->getDecl());
+      else if (auto memberRef = dyn_cast<UnresolvedDotExpr>(dest)) {
+        if (auto base = dyn_cast<DeclRefExpr>(
+                          memberRef->getBase()->getSemanticsProvidingExpr())) {
+          if (base->getDecl()->getName().str().equals("this")) {
+            // Look for the member within this type.
+            MemberLookup lookup(nominalDecl->getDeclaredTypeInContext(),
+                                memberRef->getName(), TU);
+            if (lookup.isSuccess() && lookup.Results.size() == 1)
+              member = dyn_cast<VarDecl>(lookup.Results[0].D);
+          }
+        }
+      } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {
+        // If the left-hand side is 'this', we're initializing the
+        // whole object.
+        if (declRef->getDecl()->getName().str().equals("this")) {
+          allOfThisInitialized = true;
+          break;
+        }
+      }
+
+      if (member)
+        initializedMembers.insert(member);
+    }
+
+    // Default-initialize all of the members.
+    SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
+    if (!allOfThisInitialized) {
+      for (auto member : nominalDecl->getMembers()) {
+        auto var = dyn_cast<VarDecl>(member);
+        if (!var || var->isProperty())
+          continue;
+
+        // If we already saw an initializer for this member, don't initialize it.
+        if (!initializedMembers.insert(var))
+          continue;
+
+        // FIXME: Check for an initializer on the variable.
+
+        // If this variable is not default-initializable, we're done: we can't
+        // add the default constructor because it will be ill-formed.
+        Expr *initializer = nullptr;
+        if (!isDefaultInitializable(var->getType(), &initializer)) {
+          diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
+                   var->getName(), var->getType());
+          diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
+          continue;
+        }
+
+        // Create the assignment.
+        auto thisDecl = ctor->getImplicitThisDecl();
+        Expr *dest
+          = buildMemberRefExpr(
+              new (Context) DeclRefExpr(thisDecl,
+                                        SourceLoc(),
+                                        thisDecl->getTypeOfReference()),
+              SourceLoc(), var, SourceLoc());
+        defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
+                                                        initializer));
+      }
+    }
+    
+    // If we added any default initializers, update the body.
+    if (!defaultInits.empty()) {
+      defaultInits.append(body->getElements().begin(),
+                          body->getElements().end());
+
+      body = BraceStmt::create(Context, body->getLBraceLoc(), defaultInits,
+                               body->getRBraceLoc());
+    }
+
+    // Type-check the body.
+    StmtChecker(*this, ctor).typeCheckStmt(body);
+    ctor->setBody(body);
+  }
 }
 
 void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
