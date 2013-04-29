@@ -89,11 +89,16 @@ public:
 
     /// The element cannot be positioned at a fixed offset within the
     /// aggregate.
-    NonFixed
+    NonFixed,
+
+    /// The element is an object lacking a fixed size but located at
+    /// offset zero.  This is necessary because LLVM forbids even a
+    /// 'gep 0' on an unsized type.
+    InitialNonFixedSize
   };
 
 private:
-  enum : unsigned { IncompleteKind  = 3 };
+  enum : unsigned { IncompleteKind  = 4 };
 
   /// The swift type information for this element.
   const TypeInfo *Type;
@@ -103,14 +108,14 @@ private:
 
   /// The index of this element, either in the LLVM struct (if fixed)
   /// or in the non-fixed elements array (if non-fixed).
-  unsigned Index : 29;
+  unsigned Index : 28;
 
   /// Whether this element is known to be POD in the local resilience
   /// domain.
   unsigned IsPOD : 1;
 
   /// The kind of layout performed for this element.
-  unsigned TheKind : 2;
+  unsigned TheKind : 3;
 
   explicit ElementLayout(const TypeInfo &type)
     : Type(&type), TheKind(IncompleteKind) {}
@@ -134,6 +139,12 @@ public:
 
   void completeEmpty(IsPOD_t isPOD) {
     TheKind = unsigned(Kind::Empty);
+    IsPOD = unsigned(isPOD);
+    Index = 0; // make a complete write of the bitfield
+  }
+
+  void completeInitialNonFixedSize(IsPOD_t isPOD) {
+    TheKind = unsigned(Kind::InitialNonFixedSize);
     IsPOD = unsigned(isPOD);
     Index = 0; // make a complete write of the bitfield
   }
@@ -257,6 +268,7 @@ private:
 
   void addElementAtFixedOffset(ElementLayout &elt);
   void addElementAtNonFixedOffset(ElementLayout &elt);
+  void addNonFixedSizeElementAtOffsetZero(ElementLayout &elt);
 };
 
 /// A struct layout is the result of laying out a complete structure.

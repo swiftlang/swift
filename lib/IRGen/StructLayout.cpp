@@ -137,6 +137,11 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
     return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getType(),
                                  baseAddr.getAddress()->getName() + suffix);
   }
+
+  case Kind::InitialNonFixedSize:
+    return IGF.Builder.CreateBitCast(baseAddr,
+                                 getType().getStorageType()->getPointerTo(),
+                                 baseAddr.getAddress()->getName() + suffix);
   }
   llvm_unreachable("bad element layout kind");
 }
@@ -239,7 +244,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
   // structure, we can assign it a fixed offset (namely zero) despite
   // it not having a fixed size/alignment.
   if (isFixedLayout() && CurSize.isZero()) {
-    addElementAtFixedOffset(elt);
+    addNonFixedSizeElementAtOffsetZero(elt);
     IsFixedLayout = false;
     return;
   }
@@ -275,6 +280,19 @@ void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
   elt.completeNonFixed(elt.getType().isPOD(ResilienceScope::Local),
                        NextNonFixedOffsetIndex);
+}
+
+/// Add a non-fixed-size element to the aggregate at offset zero.
+void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt) {
+  assert(isFixedLayout());
+  assert(!isa<FixedTypeInfo>(elt.getType()));
+  assert(CurSize.isZero());
+  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Local));
+
+  // Add the storage type to make the type unsized.  We can't GEP to
+  // this element, though, because LLVM forbids even 'gep 0' on an
+  // unsized type.
+  StructFields.push_back(elt.getType().getStorageType());
 }
 
 /// Produce the current fields as an anonymous structure.
