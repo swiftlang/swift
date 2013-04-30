@@ -1362,7 +1362,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // FIXME: Need an AST to represent this properly.
     return convertToType(tc, apply->getArg(), ty);
   }
-  assert(!ty->is<ClassType>() && !ty->is<BoundGenericClassType>());
 
   // We have the constructor.
   auto choice = selected->first;

@@ -1253,12 +1253,11 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
 /// \brief Determine whether the given type is constructible, meaning that
 /// a construction constraint on the type can enumerate constructors.
 static bool isConstructibleType(Type type) {
-  if (type->is<StructType>() || type->is<OneOfType>())
+  if (type->is<NominalType>())
     return true;
 
-  if (auto BGT = type->getAs<BoundGenericType>())
-    if (isa<StructDecl>(BGT->getDecl()) || isa<OneOfDecl>(BGT->getDecl()))
-      return true;
+  if (type->is<BoundGenericType>())
+    return true;
 
   return false;
 }
@@ -2846,7 +2845,8 @@ void Solution::dump(llvm::SourceMgr *sm) {
   out << "Overload choices:\n";
   for (auto ovl : overloadChoices) {
     out.indent(2);
-    ovl.first->dump(sm);
+    if (ovl.first)
+      ovl.first->dump(sm);
     out << " with ";
 
     auto choice = ovl.second.first;
