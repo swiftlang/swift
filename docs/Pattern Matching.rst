@@ -147,22 +147,121 @@ relatively simple ADTs::
   stmt            ::= stmt-switch
   stmt-switch     ::= 'switch' expr '{' switch-group+ '}'
   switch-group    ::= case-introducer+ stmt-brace-item+
-  case-introducer ::= 'case' match-pattern case-guard? ':'
+  case-introducer ::= 'case' match-pattern-list case-guard? ':'
   case-introducer ::= 'default' case-guard? ':'
   case-guard      ::= 'where' expr
+  match-pattern-list ::= match-pattern
+  match-pattern-list ::= match-pattern-list ',' match-pattern
 
 We can get away with using "switch" here because we're going to unify
 both values and patterns under match-pattern.  The works chiefly by
 making decompositional binding a bit more awkward, but has the major
 upside of reducing the likelihood of dumb mistakes (rebinding 'true',
 for example), and it means that C-looking switches actually match our
-semantics quite closely.
+semantics quite closely.  The latter is something of a priority: a C
+switch over an enum is actually pretty elegant --- well, except for
+all the explicit scoping and 'break' statements, but the switching
+side of it feels clean.
+
+Default
+.......
 
 I keep going back and forth about having a "default" case-introducer.
-On the one hand, I kindof want to encourage total matches;  on the
-other hand, having it is consistent with C, and it's not an unnatural
-style.  We can certainly recommend complete matches in switches,
-though.
+On the one hand, I kindof want to encourage total matches.  On the
+other hand, (1) having it is consistent with C, (2) it's not an
+unnatural style, and (3) there are cases where exhaustive switching
+isn't going to be possible.  We can certainly recommend complete
+matches in switches, though.
+
+If we do have a 'default', I think it makes the most sense for it to be
+semantically a complete match and therefore require it to be
+positioned at the end (on pain of later matches being irrelevant).
+First, this gives more sensible behavior to 'default where
+x.isPurple()', which really doesn't seem like it should get reordered
+with the surrounding cases; and second, it makes the matching story
+very straightforward.  And users who like to put 'default:' at the top
+won't accidentally get unexpected behavior because coverage checking
+will immediately complain about the fact that every case after an
+unguarded 'default' is obviously dead.
+
+Case groups
+...........
+
+A case-group lets you do the same thing for multiple cases without an
+extra syntactic overhead (like a 'fallthrough' after every case).  For
+some types (e.g. classic functional linked lists) this is basically
+pointless, but for a lot of other types (Int, enums, etc.) it's
+pervasive.
+
+The most important semantic design point here is about bound variables
+in a grouped case, e.g. (using ?x as a "bind this variable" introducer;
+see the pattern grammar):
+
+  switch (pair) {
+  case (?x,0):
+  case (0,?y):
+    return 1
+  case (?x,?y)
+    return foo(x-1,y) + foo(x,y-1)
+  }
+
+It's tempting to just say that an unsound name binding (i.e. a name
+not bound in all cases or bound to values of different types) is just
+always an error, but I think that's probably not the way to go.  There
+are two things I have in mind here: first, these variables can be
+useful in pattern guards even if they're not used in the case block
+itself, and second, a well-chosen name can make a pattern much more
+self-documenting.  So I think it should only be an error to *refer* to
+an unsound name binding.
+
+The most important syntactic design point here is whether to require
+(or even allow) the 'case' keyword to be repeated for each case.  In
+many cases, it can be much more compact to allow a comma-separated
+list of patterns after 'case':
+
+  switch (day) {
+  case .Terrible, .Horrible, .NoGood, .VeryBad:
+    abort()
+  case .ActuallyPrettyReasonableWhenYouLookBackOnIt:
+    continue
+  }
+
+or even more so:
+
+  case 0..2, 5..10, 14..18, 22..:
+    flagConditionallyAcceptableAge()
+
+On the other hand, if this list gets really long, the wrapping gets a
+little weird:
+
+  case .Terrible, .Horrible, .NoGood, .VeryBad,
+       .Awful, .Dreadful, .Appalling, .Horrendous,
+       .Deplorable, .Unpleasant, .Ghastly, .Dire:
+    abort()
+
+And while I think pattern guards should be able to apply to multiple
+cases, it would be nice to allow different cases in a group to have
+different pattern guards:
+
+  case .None:
+  case .Some(?c) where c.isSpace() || c.isASCIIControl():
+    skipToEOL()
+
+So really I think we should permit multiple 'case' introducers:
+
+  case .Terrible, .Horrible, .NoGood, .VeryBad:
+  case .Awful, .Dreadful, .Appalling, .Horrendous:
+  case .Deplorable, .Unpleasant, .Ghastly, .Dire:
+    abort()
+
+With the rule that a pattern guard can only use bindings that are
+sound across its guarded patterns (those within the same 'case'), and
+the statement itself can only use bindings that are sound across all
+of the cases.  A reference that refers to an unsound binding is an
+error; lookup doesn't just ignore the binding.
+
+Scoping
+.......
 
 Despite the lack of grouping braces, the semantics are that the statements in
 each case-group form their own scope, and falling off the end causes control to
@@ -216,11 +315,14 @@ also directly precedented in C, and it's even roughly the right
 grammatical function.  It used to look pretty silly after ":name", but
 it's way better after ".name".
 
+Case selection semantics
+........................
+
 The semantics of a switch statement are to first evaluate the value
 operand, then proceed down the list of case-introducers and execute
 the statements for the switch-group that had the first satisfied
 introducer.  It is an error if a case-pattern can never trigger
-because the earlier case-patterns are exhaustive.
+because earlier case-patterns are exhaustive.
 
 A 'default' is satisfied if it has no guard or if the guard evaluates to true.
 
@@ -229,8 +331,8 @@ the guard evaluates to true after binding variables.  The guard is not
 evaluated if the pattern is not fully satisfied.  We'll talk about satisfying
 a pattern later.
 
-All of the case-patterns in a case-group must bind exactly the same variables
-with exactly the same types.
+Non-exhaustive switches
+.......................
 
 Since falling out of a statement is reasonable behavior in an
 imperative language — in contrast to, say, a functional language where
@@ -249,10 +351,14 @@ some people really want to write "where x < 10" and "where x >= 10",
 and I can see their point. At the same time, we really don't want to
 go down that road.
 
-Patterns come up (or potentially come up) in a few other places in the grammar::
+Other uses of patterns
+----------------------
+
+Patterns come up (or could potentially come up) in a few other places
+in the grammar::
 
 Var bindings
-------------
+............
 
 Variable bindings only have a single pattern, which has to be exhaustive, which
 also means there's no point in supporting guards here. I think we just get
@@ -261,7 +367,7 @@ this::
   decl-var ::= 'var' attribute-list? pattern-exhaustive value-specifier
 
 Function parameters
--------------------
+...................
 
 The functional languages all permit you to directly pattern-match in the
 function declaration, like this example from SML::
@@ -294,7 +400,7 @@ function body. We could remove those with something like this::
 Anyway, that's easy to add later if we see the need.
 
 Assignment
-----------
+..........
 
 This is a bit iffy. It's a lot like var bindings, but it doesn't have a keyword,
 so it's really kindof ambiguous given the pattern grammar.
@@ -306,11 +412,11 @@ don't know what the neighbors will think::
   .feet(x) += yard.dimensions.height // returns Feet, which has one constructor, :feet.
   .feet(x) += yard.dimensions.width
 
-It's probably better to just have l-value tuple expressions and not work in
-arbitrary patterns.
+It's probably better to just have l-value tuple expressions and not
+try to work in arbitrary patterns.
 
 Pattern-match expression
-------------------------
+........................
 
 This is an attempt to provide that dispensation for query functions we were
 talking about.
@@ -321,37 +427,62 @@ effectively we should have::
   expr-binary ::= # most of the current expr grammar
   
   expr ::= expr-binary
-  expr ::= expr-binary 'matches' case-pattern pattern-guard?
+  expr ::= expr-binary '~' match-pattern pattern-guard?
+  expr ::= expr-binary 'isa' expr-primary pattern-guard?
 
-The semantics are that this evaluates to true if the pattern and pattern-guard
-are satisfied. If the pattern binds variables, it's an error if the expression
-isn't immediately used as a condition; otherwise, the variables are in scope in
-any code dominated by the 'true' edge. I've intentionally written this in a way
-that suggests it holds even within complex expressions, but at the very least
-this should work::
+The semantics are that this evaluates to true if the pattern and
+pattern-guard are satisfied.
 
-  if rect.dimensions matches (height = h, width = w) where h >= w {
-    …
+Perl and Ruby use '=~' as the regexp pattern-matching operator.  The
+problem with that is that it really looks like an assignment operator,
+so I am using something slightly different.  The idea is that it's a
+"hand-waving equality"; maybe '~~' would be better.  Another obvious
+alternative would be a keyword operator like 'matches'.  Note that
+this impacts a discussion in the section below about expression patterns.
+
+'isa' as an operator is just an attractive abbreviation for an 'isa'
+pattern:
+  "A isa B where C" <==> "A ~ isa B where C"
+
+Now.  I think that this feature is far more powerful if the name
+bindings, type-refinements, etc. from patterns are available in code
+for which a trivial analysis would reveal that the result of the
+expression is true.
+
+For example:
+
+  if x isa Window where x.isVisible {
+    // can use Window methods on x here
   }
 
-The keyword 'matches' is not set in stone. It's hardly even set in sand. Clearly
-we should use =~. :)
+Taken a bit further, we can remove the need for 'where' in the
+expression form:
+
+  if x isa Window && x.isVisible { ... }
+
+That might be problematic without hard-coding the common
+control-flow operators, though.  (As well as hardcoding some
+assumptions about Bool.convertToLogicValue...)
 
 Pattern grammar
 ---------------
 
-The standard syntax rule is that the pattern grammar mirrors the
-introduction-rule expression grammar, but parses a pattern wherever
-you would otherwise put an expression.  This means that, for example,
-if we add array literal expressions, we should also add a
-corresponding array literal pattern. I think that principle is worth
-keeping.
+The usual syntax rule from functional languages is that the pattern
+grammar mirrors the introduction-rule expression grammar, but parses a
+pattern wherever you would otherwise put an expression.  This means
+that, for example, if we add array literal expressions, we should also
+add a corresponding array literal pattern. I think that principle is
+very natural and worth sticking to wherever possible.
+
+Two kinds of pattern
+....................
 
 We're blurring the distinction between patterns and expressions a lot
 here.  My current thinking is that this simplifies things for the
 programmer --- the user concept becomes basically "check whether we're
-equal to this expression, but allow some holes".  But it's possible
-that it instead might be really badly confusing.  We'll see!  It'll be fun!
+equal to this expression, but allow some holes and some more complex
+'matcher' values".  But it's possible that it instead might be really
+badly confusing.  We'll see!  It'll be fun!
 
 This kindof forces us to have parallel pattern grammars for the two
 major clients:
@@ -373,6 +504,9 @@ same production — you might if you were in a functional language where
 you really can decompose in a function signature, but we don't allow
 that, and I think that will serve to divide them in programmers' minds.
 So we can get away with some things. :)
+
+Binding patterns
+................
 
 In general, a lot of these productions are the same, so I'm going to
 talk about ``*``-patterns, with some specific special rules that only
@@ -404,6 +538,9 @@ reference.  I considered using 'var' instead, but using punctuation
 means we don't need a space, which means this is much more compact in
 practice.
 
+Annotation patterns
+...................
+
 ::
 
   exhaustive-pattern ::= exhaustive-pattern ':' type
@@ -414,6 +551,49 @@ variable isn't always inferrable (or correctly inferrable), and types
 in function signatures are generally outright required.  It's not as
 useful in a match pattern, and the colon can be grammatically awkward
 there, so we disallow it.
+
+'isa' patterns
+..............
+
+::
+
+  match-pattern ::= 'isa' expression
+
+The expression in an 'isa' must have metatype type.  The pattern is
+satisfied if the value is of that dynamic type (or an inheritance
+subtype).  The pattern is ill-formed if it provably cannot be
+satisfied.
+
+In a 'switch' statement, this would typically appear like this:
+
+  case isa NSObject:
+
+It can, however, appear in recursive positions:
+
+  case (isa NSObject, isa NSObject):
+
+If the value matched is immediately the value of a local variable, I
+think it would be really useful if this pattern could introduce a type
+refinement within its case, so that the local variable would have the
+refined type within that scope.  However, making this kind of type
+refinement sound would require us to prevent there from being any sort
+of mutable alias of the local variable under an unrefined type.
+That's usually going to be fine in Swift because we usually don't
+permit the address of a local to escape in a way that crosses
+statement boundaries.  However, closures are a major problem for this
+model.  If we had immutable local bindings --- and, better yet, if
+they were the default --- this problem would largely go away.
+
+This sort of type refinement could also be a problem with code like:
+
+  while expr isa ParenExpr {
+    expr = expr.getSubExpr()
+  }
+
+It's tricky.
+
+"Call" patterns
+...............
 
 ::
 
@@ -428,18 +608,6 @@ A match pattern can resemble a global name or a call to a global name.
 As a call, the match-pattern-tuple must begin with an unspaced '('.
 The global name is resolved as normal, and then the pattern is
 interpreted according to what is found:
-
-- If the name resolves to a type, then for the pattern to be
-  satisfied, the dynamic type of the matched value must be the
-  specified type (or a subtype).  If this is trivially impossible
-  (e.g., if the matched expression is not existential and the static
-  types are unrelated), the pattern is ill-formed.
-
-  In addition, if there is an arguments clause, it must be
-  non-empty, and each element in the clause must have an identifier.
-  For each element, the identifier must correspond to a known
-  property of the type, and the value of that property must satisfy
-  the element pattern.
 
 - If the name resolves to a oneof element, then the dynamic type
   of the matched value must match the oneof type as discussed above,
@@ -462,6 +630,9 @@ I'm not totally sold on not allowing positional matching against
 struct elements; that seems unfortunate in cases where positionality
 is conventionally unambiguous, like with a point.
 
+Expression patterns
+...................
+
 ::
 
   match-pattern ::= expression
@@ -480,9 +651,31 @@ doing something not allowing in patterns, like using a unary operator
 or calling an identity function; those seem like unfortunate language
 solutions, though.
 
-A value satisfies an expression pattern if it equals the value of the
-expression.  I guess this means the == operator, but maybe it means
-calling some other global or member function instead.
+Satisfying an expression pattern
+................................
+
+A value satisfies an expression pattern if the match operation
+succeeds.  I think it would be natural for this match operation to be
+spelled the same way as that match-expression operator, so e.g. a
+member function called 'matches' or a global binary operator called
+'~' or whatever.
+
+The lookup of this operation poses some interesting questions.  In
+general, the operation itself is likely to be associated with the
+intended type of the expression pattern, but that type will often
+require refinement from the type of the matched value.
+
+For example, consider a pattern like this:
+
+  case 0..10:
+
+We should be able to use this pattern when switching on a value which
+is not an Int, but if we type-check the expression on its own, we will
+assign it the type Range<Int>, which will not necessarily permit us
+to match (say) a UInt8.
+
+Order of evaluation of patterns
+...............................
 
 I'd like to keep the order of evaluation and testing of expressions
 within a pattern unspecified if I can; I imagine that there should be
