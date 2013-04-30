@@ -51,7 +51,9 @@ arguments to calls?
 **Functions** are used by calling them. This is something of a special case:
 some values of function type may carry data, there isn't really a useful model
 for directly accessing it. Values of function type are basically completely
-opaque.
+opaque, except that we do provide thin vs. thick function types, which is
+potentially something we could pattern-match on, although many things can
+introduce thunks and so the result would not be reliable.
 
 **Scalars** are used by feeding them to primitive binary operators.  This is
 also something of a special case, because there's no useful way in which scalars
@@ -320,8 +322,20 @@ Case selection semantics
 The semantics of a switch statement are to first evaluate the value
 operand, then proceed down the list of case-introducers and execute
 the statements for the switch-group that had the first satisfied
-introducer.  It is an error if a case-pattern can never trigger
-because earlier case-patterns are exhaustive.
+introducer.
+
+It is an error if a case-pattern can never trigger because earlier
+cases are exhaustive.  Some kinds of pattern (like 'default' cases
+and '_') are obviously exhaustive by themselves, but other patterns
+(like patterns on properties) can be much harder to reason about
+exhaustiveness for, and of course pattern guards can make this
+outright undecidable.  It may be easiest to apply very straightforward
+rules (like "ignore guarded patterns") for the purposes of deciding
+whether the program is actually ill-formed; anything else that we can
+prove is unreachable would only merit a warning.  We'll probably
+also want a way to say explicitly that a case can never occur (with
+semantics like llvm_unreachable, i.e. a reliable runtime failure unless
+that kind of runtime safety checking is disabled at compile-time).
 
 A 'default' is satisfied if it has no guard or if the guard evaluates to true.
 
@@ -336,9 +350,10 @@ Non-exhaustive switches
 Since falling out of a statement is reasonable behavior in an
 imperative language — in contrast to, say, a functional language where
 you're in an expression and you need to produce a value — there's a
-colorable argument that non-exhaustive matches should be okay.  I'm
-inclined to disagree, though, and say that they should be errors and
-people who want non-exhaustive matches can put in default cases.
+colorable argument that non-exhaustive matches should be okay.  I
+dislike this, however, and propose that it should be an error to
+make an non-exhaustive switch; people who want non-exhaustive matches
+can explicitly put in default cases.
 Exhaustiveness actually isn't that difficult to check, at least over
 ADTs.  It's also really the behavior that I would expect from the
 syntax, or at least implicitly falling out seems dangerous in a way
@@ -665,7 +680,6 @@ It's tricky.
   match-pattern-identifier-tower ::= match-pattern-identifier-tower '.' identifier
 
 A match pattern can resemble a global name or a call to a global name.
-As a call, the match-pattern-tuple must begin with an unspaced '('.
 The global name is resolved as normal, and then the pattern is
 interpreted according to what is found:
 
