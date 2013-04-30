@@ -1253,12 +1253,9 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
 /// \brief Determine whether the given type is constructible, meaning that
 /// a construction constraint on the type can enumerate constructors.
 static bool isConstructibleType(Type type) {
-  if (type->is<NominalType>())
-    return true;
-
-  if (type->is<BoundGenericType>())
-    return true;
-
+  if (auto nominal = type->getNominalOrBoundGenericNominal())
+    return !isa<ProtocolDecl>(nominal);
+  
   return false;
 }
 

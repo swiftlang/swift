@@ -1345,9 +1345,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // element to use.
   // Note: we also allow class types here, for now, because T(x) is still
   // allowed to use coercion syntax.
-  assert(ty->is<StructType>() || ty->is<BoundGenericStructType>() ||
-         ty->is<OneOfType>() || ty->is<BoundGenericOneOfType>() ||
-         ty->is<ClassType>() || ty->is<BoundGenericClassType>());
+  assert(ty->getNominalOrBoundGenericNominal());
   assert(origExpr && "Missing original expression for construction");
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
@@ -1438,4 +1436,3 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   ExprWalker walker(rewriter);
   return expr->walk(walker);
 }
-#include "swift/AST/ASTVisitor.h"

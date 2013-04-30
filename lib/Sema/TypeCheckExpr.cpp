@@ -447,18 +447,6 @@ Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
   
 }
 
-
-bool isConstructibleType(Type Ty) {
-  if (Ty->is<StructType>() || Ty->is<OneOfType>())
-    return true;
-
-  if (auto BGT = Ty->getAs<BoundGenericType>())
-    if (isa<StructDecl>(BGT->getDecl()) || isa<OneOfDecl>(BGT->getDecl()))
-      return true;
-
-  return false;
-}
-
 /// \brief Retrieve the declaration that this expression references.
 static ValueDecl *getReferencedDecl(Expr *E) {
   E = E->getSemanticsProvidingExpr();
@@ -651,13 +639,13 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
 
     // If the 'function' is a direct reference to a type, this is a
     // construction. The type needs to be a struct or oneof.
-    if (!isConstructibleType(Ty)) {
+    if (!Ty->getNominalOrBoundGenericNominal()) {
       diagnose(E->getLoc(), diag::cannot_construct_type, Ty);
       E->setType(ErrorType::get(Context));
       return 0;
     }
 
-    // Check for a struct or oneof with a constructor.
+    // Check for a nominal type with a constructor.
     SmallVector<ValueDecl *, 4> Viable;
     SmallVector<ValueDecl *, 4> ctors;
     if (lookupConstructors(Ty, ctors)) {
