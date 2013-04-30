@@ -427,38 +427,49 @@ effectively we should have::
   expr-binary ::= # most of the current expr grammar
   
   expr ::= expr-binary
-  expr ::= expr-binary '~' match-pattern pattern-guard?
-  expr ::= expr-binary 'isa' expr-primary pattern-guard?
+  expr ::= expr-binary 'is' expr-primary pattern-guard?
 
 The semantics are that this evaluates to true if the pattern and
 pattern-guard are satisfied.
 
-Perl and Ruby use '=~' as the regexp pattern-matching operator.  The
-problem with that is that it really looks like an assignment operator,
-so I am using something slightly different.  The idea is that it's a
-"hand-waving equality"; maybe '~~' would be better.  Another obvious
-alternative would be a keyword operator like 'matches'.  Note that
-this impacts a discussion in the section below about expression patterns.
+'is' or 'isa'
+`````````````
 
-'isa' as an operator is just an attractive abbreviation for an 'isa'
-pattern:
-  "A isa B where C" <==> "A ~ isa B where C"
+Perl and Ruby use '=~' as the regexp pattern-matching operator, which
+is both obscure and really looks like an assignment operator, so I'm
+stealing Joe's 'is' operator, which is currently used for dynamic
+type-checks.  I'm of two minds about this:  I like 'is' a lot for
+value-matching, but not for dynamic type-checks.
 
-Now.  I think that this feature is far more powerful if the name
-bindings, type-refinements, etc. from patterns are available in code
-for which a trivial analysis would reveal that the result of the
-expression is true.
+One possibility would be to use 'is' as the generic pattern-matching
+operator but use a different spelling (like 'isa') for dynamic
+type-checks, including the 'is' pattern.  This would give us
+"x isa NSObject" as an expression and "case isa NSObject:" as a
+case selector, both of which I feel read much better.  But in this
+proposal, we just use a single operator.
 
-For example:
+Other alternatives to 'is' include 'matches' (reads very naturally but
+is somewhat verbose) or some sort of novel operator like '~~'.
 
-  if x isa Window where x.isVisible {
+Note that this impacts a discussion in the section below about
+expression patterns.
+
+Dominance
+`````````
+
+I think that this feature is far more powerful if the name bindings,
+type-refinements, etc. from patterns are available in code for which a
+trivial analysis would reveal that the result of the expression is
+true.  For example:
+
+  if s is Window where x.isVisible {
     // can use Window methods on x here
   }
 
 Taken a bit further, we can remove the need for 'where' in the
 expression form:
 
-  if x isa Window && x.isVisible { ... }
+  if x is Window && x.isVisible { ... }
 
 That might be problematic without hard-coding the common
 control-flow operators, though.  (As well as hardcoding some
@@ -552,25 +563,75 @@ in function signatures are generally outright required.  It's not as
 useful in a match pattern, and the colon can be grammatically awkward
 there, so we disallow it.
 
-'isa' patterns
+'is' patterns
 ..............
 
 ::
 
-  match-pattern ::= 'isa' expression
+  match-pattern ::= 'is' type
 
-The expression in an 'isa' must have metatype type.  The pattern is
-satisfied if the value is of that dynamic type (or an inheritance
-subtype).  The pattern is ill-formed if it provably cannot be
-satisfied.
+This pattern is satisfied if the dynamic type of the matched value
+"satisfies" the named type:
+
+  - if the named type is an Objective-C class type, the dynamic type
+    must be a class type, and an 'isKindOf:' check is performed;
+
+  - if the named type is a Swift class type, the dynamic type must be
+    a class type, and a subtype check is performed;
+
+  - if the named type is a metatype, the dynamic type must be a metatype,
+    and the object type of the dynamic type must satisfy the object type
+    of the named type;
+
+  - otherwise the named type must equal the dynamic type.
+
+This inquiry is about dynamic types; archetypes and existentials are
+looked through.
+
+The pattern is ill-formed if it provably cannot be satisfied.
 
 In a 'switch' statement, this would typically appear like this:
 
-  case isa NSObject:
+  case is NSObject:
 
 It can, however, appear in recursive positions:
 
-  case (isa NSObject, isa NSObject):
+  case (is NSObject, is NSObject):
+
+Ambiguity with type value matching
+``````````````````````````````````
+
+There is a potential point of confusion here with dynamic type
+checking (done by an 'is' pattern) vs. value equality on type objects
+(done by an expression pattern where the expression is of metatype
+type.  This is resolved by the proposal (currently outstanding but
+generally accepted, I think) to disallow naked references to type
+constants and instead require them to be somehow decorated.
+
+That is, this pattern requires the user to write something like this:
+
+  case is NSObject:
+
+It is quite likely that users will often accidentally write something
+like this:
+
+  case NSObject:
+
+It would be very bad if that were actually accepted as a valid
+expression but with the very different semantics of testing equality
+of type objects.  For the most part, type-checking would reject that
+as invalid, but a switch on (say) a value of archetype type would
+generally work around that.
+
+However, we have an outstanding proposal to generally forbid 'NSObject'
+from appearing as a general expression;  the user would have to decorate
+it like the following, which would let us eliminate the common mistake:
+
+  case NSObject.type:
+
+
+Type refinement
+```````````````
 
 If the value matched is immediately the value of a local variable, I
 think it would be really useful if this pattern could introduce a type
@@ -586,7 +647,7 @@ they were the default --- this problem would largely go away.
 
 This sort of type refinement could also be a problem with code like:
 
-  while expr isa ParenExpr {
+  while expr is ParenExpr {
     expr = expr.getSubExpr()
   }
 
@@ -609,6 +670,16 @@ As a call, the match-pattern-tuple must begin with an unspaced '('.
 The global name is resolved as normal, and then the pattern is
 interpreted according to what is found:
 
+- If the name resolves to a type, then the dynamic type of the matched
+  value must match the named type (according to the rules below for
+  'is' patterns).  It is okay for this to be trivially true.
+
+  In addition, there must be an non-empty arguments clause, and each
+  element in the clause must have an identifier.  For each element,
+  the identifier must correspond to a known property of the named
+  type, and the value of that property must satisfy the element
+  pattern.
+
 - If the name resolves to a oneof element, then the dynamic type
   of the matched value must match the oneof type as discussed above,
   and the value must be of the specified element.  There must be
@@ -629,6 +700,10 @@ properties goes some way towards making that okay.
 I'm not totally sold on not allowing positional matching against
 struct elements; that seems unfortunate in cases where positionality
 is conventionally unambiguous, like with a point.
+
+Matching against struct types requires arguments because this is
+intended to be used for structure decomposition, not dynamic type
+testing.  For the latter, an 'is' pattern should be used.
 
 Expression patterns
 ...................
