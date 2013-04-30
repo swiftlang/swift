@@ -62,11 +62,14 @@ static Identifier getModuleIdentifier(StringRef OutputName,
   return Context.getIdentifier(moduleName);
 }
 
+
+/// "SIL" is non-null when we're parsing a .sil file instead of a .swift file.
 TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
                                   StringRef OutputName,
                                   ArrayRef<unsigned> BufferIDs,
-                                  bool ParseOnly, bool IsMainModule) {
+                                  bool ParseOnly, bool IsMainModule,
+                                  SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = getModuleIdentifier(OutputName, Context, IsMainModule);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
@@ -80,7 +83,7 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
     const llvm::MemoryBuffer *Buffer =
       Context.SourceMgr.getMemoryBuffer(BufferID);
     do {
-      parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
+      parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
       if (!ParseOnly && BufferIDs.size() == 1) {
         performNameBinding(TU, CurTUElem);
         performTypeChecking(TU, CurTUElem);

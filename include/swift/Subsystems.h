@@ -41,11 +41,13 @@ namespace swift {
 
   /// parseIntoTranslationUnit - Parse a single buffer into the given
   /// taranslation unit.  If the translation unit is the main module, stop
-  /// parsing after the next stmt-brace-item with side-effects.  Returns
-  /// the number of bytes parsed from the given buffer.
+  /// parsing after the next stmt-brace-item with side-effects.  If "SIL" is
+  /// present, then we're parsing a .sil file instead of a .swift file.
+  ///
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 unsigned *BufferOffset = 0,
-                                unsigned BufferEndOffset = 0);
+                                unsigned BufferEndOffset = 0,
+                                SILModule *SIL = 0);
 
   /// Attempt to parse a StringRef as a code completion context expression.
   /// Returns the parsed expression if successful, or null if an expression

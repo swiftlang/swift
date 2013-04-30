@@ -160,8 +160,9 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 //===----------------------------------------------------------------------===//
 
 Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
-             DiagnosticEngine *Diags, const char *CurrentPosition)
-  : SourceMgr(SourceMgr), Diags(Diags) {
+             DiagnosticEngine *Diags, const char *CurrentPosition,
+             bool InSILMode)
+  : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
   CurPtr = CurrentPosition;
@@ -184,7 +185,7 @@ tok Lexer::getTokenKind(StringRef Text) {
   assert(Text.data() >= BufferStart && Text.data() <= BufferEnd &&
          "Text string does not fall within lexer's buffer");
   Lexer L(StringRef(BufferStart, BufferEnd - BufferStart), SourceMgr, Diags,
-          Text.data());
+          Text.data(), /*not SIL mode*/ false);
   Token Result;
   L.lex(Result);
   return Result.getKind();
@@ -478,6 +479,9 @@ void Lexer::lexIdentifier() {
 
     .Default(tok::identifier);
 
+  if (InSILMode && StringRef(TokStart, CurPtr-TokStart) == "sil")
+    Kind = tok::kw_sil;
+  
   return formToken(Kind, TokStart);
 }
 
@@ -1265,7 +1269,7 @@ SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
   if (!Buffer)
     return SourceLoc();
   
-  Lexer L(Buffer->getBuffer(), SM, 0, Loc.Value.getPointer());
+  Lexer L(Buffer->getBuffer(), SM, nullptr, Loc.Value.getPointer(), false);
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
 }

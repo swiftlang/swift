@@ -42,17 +42,20 @@ class Lexer {
 
   Token NextToken;
   
+  /// InSILMode - This is true if we're lexing a .sil file instead of a .swift
+  /// file.  This enables the 'sil' keyword.
+  bool InSILMode;
+  
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags, 
-        const char *CurrentPosition);
+        DiagnosticEngine *Diags, const char *CurrentPosition, bool InSILMode);
 
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags)
-    : Lexer(Buffer, SourceMgr, Diags, Buffer.begin()) { }
+        DiagnosticEngine *Diags, bool InSILMode)
+    : Lexer(Buffer, SourceMgr, Diags, Buffer.begin(), InSILMode) { }
 
   const char *getBufferEnd() const { return BufferEnd; }
 
