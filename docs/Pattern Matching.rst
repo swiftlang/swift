@@ -17,8 +17,8 @@ When type theorists consider a programming language, we break it down like this:
 
 Swift has a pretty small set of types right now:
 
-* Fundamental types: currently i1, i8, i16, i32, and i64; eventually
-  float and double; maybe others.
+* Fundamental types: currently i1, i8, i16, i32, and i64; 
+  float and double; eventually maybe others.
 * Function types.
 * Tuples. Heterogenous fixed-length products. Swift's system
   provides two basic kinds of element: positional and labelled.
@@ -217,7 +217,7 @@ an unsound name binding.
 The most important syntactic design point here is whether to require
 (or even allow) the 'case' keyword to be repeated for each case.  In
 many cases, it can be much more compact to allow a comma-separated
-list of patterns after 'case':
+list of patterns after 'case'::
 
   switch (day) {
   case .Terrible, .Horrible, .NoGood, .VeryBad:
@@ -226,13 +226,13 @@ list of patterns after 'case':
     continue
   }
 
-or even more so:
+or even more so::
 
   case 0..2, 5..10, 14..18, 22..:
     flagConditionallyAcceptableAge()
 
 On the other hand, if this list gets really long, the wrapping gets a
-little weird:
+little weird::
 
   case .Terrible, .Horrible, .NoGood, .VeryBad,
        .Awful, .Dreadful, .Appalling, .Horrendous,
@@ -241,13 +241,13 @@ little weird:
 
 And while I think pattern guards should be able to apply to multiple
 cases, it would be nice to allow different cases in a group to have
-different pattern guards:
+different pattern guards::
 
   case .None:
   case .Some(?c) where c.isSpace() || c.isASCIIControl():
     skipToEOL()
 
-So really I think we should permit multiple 'case' introducers:
+So really I think we should permit multiple 'case' introducers::
 
   case .Terrible, .Horrible, .NoGood, .VeryBad:
   case .Awful, .Dreadful, .Appalling, .Horrendous:
@@ -265,7 +265,7 @@ Scoping
 
 Despite the lack of grouping braces, the semantics are that the statements in
 each case-group form their own scope, and falling off the end causes control to
-resume at the end of the match statement — i.e. "implicit break", not "implicit
+resume at the end of the switch statement — i.e. "implicit break", not "implicit
 fallthrough".
 
 Chris seems motivated to eventually add an explicit 'fallthrough'
@@ -282,7 +282,7 @@ both lets us avoid a 'case' keyword, but otherwise it leads to ugly style,
 because either the last case ends in two braces on the same line or cases have
 to further indented. Okay, it's easy enough to not require braces on the match,
 with the grammar saying that cases are just greedily consumed — there's no
-ambiguity here because the match statement is necessarily within braces. But
+ambiguity here because the switch statement is necessarily within braces. But
 that leaves the code without a definitive end to the cases, and the closing
 braces end up causing a lot of unnecessary vertical whitespace, like so::
 
@@ -294,7 +294,7 @@ braces end up causing a lot of unnecessary vertical whitespace, like so::
     …
   }
   
-So instead, let's require the match statement to have braces, and
+So instead, let's require the switch statement to have braces, and
 we'll allow the cases to be written without them::
 
   switch (x) {
@@ -312,8 +312,7 @@ We require the trailing colon because it's a huge cue for separating
 things, really making single-line cases visually appealing, and the
 fact that it doesn't suggest closing punctuation is a huge boon.  It's
 also directly precedented in C, and it's even roughly the right
-grammatical function.  It used to look pretty silly after ":name", but
-it's way better after ".name".
+grammatical function.
 
 Case selection semantics
 ........................
