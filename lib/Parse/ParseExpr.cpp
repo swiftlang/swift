@@ -238,7 +238,7 @@ Expr *Parser::parseExprOperator() {
 ///
 ///   expr-new:
 ///     'new' type-identifier expr-new-bounds
-///     'new' type-identifier expr-call-suffix?
+///     'new' type-identifier expr-paren?
 ///     'new' type-identifier '.' selector-args
 ///   expr-new-bounds:
 ///     expr-new-bound
@@ -304,9 +304,9 @@ NullablePtr<Expr> Parser::parseExprNew() {
 
       Init = Arg;
     } 
-    // Parse the optional expr-call-suffix.
+    // Parse the optional expr-paren.
     else if (Tok.isFollowingLParen()) {
-      Init = parseExprCallSuffix(/*isConstructor=*/true);
+      Init = parseExprList(tok::l_paren, tok::r_paren);
       if (Init.isNull())
         return nullptr;
     }
@@ -401,7 +401,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
         result = new (Context) CallExpr(result, args);
       } else if (Tok.isFollowingLParen()) {
         // Parse Swift-style constructor arguments.
-        NullablePtr<Expr> arg = parseExprCallSuffix(/*isConstructor=*/true);
+        NullablePtr<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
         // FIXME: Unfortunate recovery here.
         if (arg.isNull())
           return nullptr;
@@ -487,7 +487,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     expr-postfix '[' expr ']'
 ///
 ///   expr-call:
-///     expr-postfix expr-call-suffix
+///     expr-postfix expr-paren
 ///
 ///   expr-postfix:
 ///     expr-primary
@@ -648,7 +648,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
-      NullablePtr<Expr> Arg = parseExprCallSuffix(/*isConstructor=*/false);
+      NullablePtr<Expr> Arg =parseExprList(tok::l_paren, tok::r_paren);
       // FIXME: Unfortunate recovery here.
       if (Arg.isNull())
         return 0;
@@ -929,114 +929,6 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   }
 
   return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc);
-}
-
-/// \brief Parse an expression call suffix.
-///
-/// expr-call-suffix:
-///   expr-paren selector-arg*
-///
-/// selector-arg:
-///   ':'? identifier expr-paren
-NullablePtr<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
-  assert(Tok.isFollowingLParen() && "Not a call suffix?");
-
-  // Parse the first argument.
-  NullablePtr<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
-  if (firstArg.isNull())
-    return 0;
-
-  // If we don't have any selector arguments, we're done.
-  if (!(Tok.is(tok::colon) && Tok.isAtStartOfLine()) &&
-      !(Tok.is(tok::identifier) && !Tok.isAtStartOfLine()))
-    return firstArg;
-
-  // Parse the selector arguments.
-  SmallVector<Expr *, 4> selectorArgs;
-  SmallVector<Identifier, 4> selectorPieces;
-  selectorArgs.push_back(firstArg.get());
-  selectorPieces.push_back(Identifier());
-  while (true) {
-    // Otherwise, an identifier on the same line continues the
-    // selector arguments.
-    if (Tok.isNot(tok::identifier) || Tok.isAtStartOfLine()) {
-      // We're done.
-      break;
-    }
-
-    // Consume the selector piece.
-    Identifier selectorPiece = Context.getIdentifier(Tok.getText());
-    consumeToken(tok::identifier);
-
-    // Look for the following '(' that provides arguments.
-    if (Tok.isNot(tok::l_paren)) {
-      diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
-      break;
-    }
-
-    // Parse the expression. We parse a full expression list, but
-    // complain about it later.
-    NullablePtr<Expr> selectorArg = parseExprList(tok::l_paren, tok::r_paren);
-    if (selectorArg.isNull()) {
-      // FIXME: Crummy recovery
-      return 0;
-    }
-    selectorArgs.push_back(selectorArg.get());
-    selectorPieces.push_back(selectorPiece);
-  }
-
-  // Verify that each argument is a simple, parenthesized expression.
-  bool isFirst = true;
-  for (auto &selectorArg : selectorArgs) {
-    bool wasFirst = isFirst;
-    isFirst = false;
-    
-    // Parenthesized expressions are fine.
-    if (isa<ParenExpr>(selectorArg))
-      continue;
-
-    // We have a tuple.
-    auto tuple = cast<TupleExpr>(selectorArg);
-    unsigned size = tuple->getElements().size();
-
-    // Empty tuples are okay.
-    if (size == 0)
-      continue;
-
-    // Check whether we have too many elements.
-    if (size > 1) {
-      SourceLoc endLoc =
-        Lexer::getLocForEndOfToken(SourceMgr,tuple->getElement(0)->getEndLoc());
-      diagnose(tuple->getLParenLoc(), diag::selector_call_multiple_args, size)
-        .highlight(SourceRange(endLoc, tuple->getRParenLoc()));
-      selectorArg = tuple->getElement(0);
-      continue;
-    }
-
-    // Check whether the first element has a name.
-    if (!tuple->getElementName(0).empty()) {
-      if (wasFirst && isConstructor) {
-        selectorPieces[0] = tuple->getElementName(0);
-      } else {
-        // FIXME: Use the location of the name, if we stored it.
-        // FIXME: Fix-It to remove the name.
-        diagnose(tuple->getElement(0)->getStartLoc(),
-                 diag::selector_call_named_arg);
-      }
-
-      selectorArg = new (Context) ParenExpr(tuple->getLParenLoc(),
-                                            tuple->getElement(0),
-                                            tuple->getRParenLoc());
-      continue;
-    }
-  }
-
-  return new (Context) TupleExpr(selectorArgs.front()->getStartLoc(),
-                                 Context.AllocateCopy(selectorArgs),
-                                 Context.AllocateCopy<Identifier>(
-                                   selectorPieces.begin(),
-                                   selectorPieces.end()),
-                                 selectorArgs.back()->getEndLoc());
 }
 
 /// \brief Parse a selector argument following the ".".

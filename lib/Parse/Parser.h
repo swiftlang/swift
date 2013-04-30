@@ -389,7 +389,6 @@ public:
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
-  NullablePtr<Expr> parseExprCallSuffix(bool isConstructor);
 
   /// \brief Parse selector arguments where the first name is part of
   /// the resulting tuple expression.

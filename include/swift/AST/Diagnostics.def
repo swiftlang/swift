@@ -486,9 +486,7 @@ ERROR(expected_case_colon,stmt_parsing,none,
       "expected ':' after '%0'", (StringRef))
 ERROR(expected_case_stmt,stmt_parsing,none,
       "expected statement or expression in 'switch'", ())
-ERROR(case_colon_start_of_line,stmt_parsing,none,
-      "':' ending a case must not start on a new line", ())
-      
+
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------
@@ -583,17 +581,6 @@ ERROR(expected_selector_variadic_argument,expr_parsing,none,
       "expected argument expression", ())
 ERROR(expected_rparen_selector_args,expr_parsing,none,
       "expected ')' to close message argument list", ())
-ERROR(selector_argument_name_missing,expr_parsing,none,
-      "expected selector piece after ':'", ())
-ERROR(whitespace_before_lparen,expr_parsing,none,
-      "cannot have whitespace prior to '(' in a call", ())
-ERROR(expected_selector_call_args,expr_parsing,none,
-      "expected '(' following selector piece %0", (Identifier))
-ERROR(selector_call_multiple_args,expr_parsing,none,
-      "selector call argument can have at most one argument (%0 provided)",
-      (unsigned))
-ERROR(selector_call_named_arg,expr_parsing,none,
-      "selector call argument cannot be named", ())
 
 // Array literal expressions
 ERROR(expected_expr_array,expr_parsing,none,
