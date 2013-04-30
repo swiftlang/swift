@@ -20,6 +20,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
 #include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Sema.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -102,8 +103,8 @@ static bool isSignToken(clang::Token const &tok) {
          tok.getKind() == clang::tok::minus;
 }
 
-ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
-                                                      clang::MacroInfo *macro) {
+static ValueDecl *importMacro(ClangImporter::Implementation &impl,
+                              Identifier name, clang::MacroInfo *macro) {
   // Currently we only convert non-function-like macros.
   if (macro->isFunctionLike())
     return nullptr;
@@ -117,11 +118,23 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
-      return importLiteral(*this, name, tok);
+      return importLiteral(impl, name, tok);
     }
-    
-    // TODO: If it's an identifier token, alias the named identifier.
-  } else if (macro->getNumTokens() == 2) {
+
+    if (tok.is(clang::tok::identifier)) {
+      auto clangID = tok.getIdentifierInfo();
+      // If it's an identifier that is itself a macro, look into that macro.
+      if (clangID->hasMacroDefinition()) {
+        auto macroID = impl.Instance->getPreprocessor().getMacroInfo(clangID);
+        return impl.importMacro(name, macroID);
+      }
+
+      // FIXME: If the identifier refers to a declaration, alias it?
+    }
+    return nullptr;
+  }
+
+  if (macro->getNumTokens() == 2) {
     // Check for a two-token expansion of the form +<number> or -<number>.
     // These are technically subtly wrong because they allow things like:
     //   #define EOF -1
@@ -132,9 +145,13 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     
     if (isSignToken(signTok) &&
         litTok.getKind() == clang::tok::numeric_constant) {
-      return importNumericLiteral(*this, name, &signTok, litTok);
+      return importNumericLiteral(impl, name, &signTok, litTok);
     }
-  } else if (macro->getNumTokens() == 4) {
+
+    return nullptr;
+  }
+
+  if (macro->getNumTokens() == 4) {
     // Check for a four-token expansion of the form (+<number>) or (-<number>).
     clang::Token const &lparenTok = macro->tokens_begin()[0];
     clang::Token const &signTok = macro->tokens_begin()[1];
@@ -145,9 +162,27 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
         rparenTok.getKind() == clang::tok::r_paren &&
         isSignToken(signTok) &&
         litTok.getKind() == clang::tok::numeric_constant) {
-      return importNumericLiteral(*this, name, &signTok, litTok);
+      return importNumericLiteral(impl, name, &signTok, litTok);
     }
   }
 
   return nullptr;
+}
+
+ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
+                                                      clang::MacroInfo *macro) {
+  // Look for the value for an already-imported macro.
+  auto known = ImportedMacros.find(macro);
+  if (known != ImportedMacros.end()) {
+    return known->second;
+  }
+  
+  // We haven't tried to import this macro yet. Do so now, and cache the
+  // result.
+  auto valueDecl = ::importMacro(*this, name, macro);
+  ImportedMacros[macro] = valueDecl;
+  if (valueDecl) {
+    valueDecl->setClangNode(macro);
+  }
+  return valueDecl;
 }

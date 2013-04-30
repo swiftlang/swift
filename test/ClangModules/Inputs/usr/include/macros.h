@@ -9,3 +9,4 @@
 #define true 1
 #define false 0
 
+#define A_PI M_PI
