@@ -827,9 +827,12 @@ namespace {
       if (Parent.isNull())
           return;
           
-      if (Stmt *S = Parent.dyn_cast<Stmt*>())
+      if (Stmt *S = Parent.dyn_cast<Stmt*>()) {
         Enclosing = S->getSourceRange();
-      else {
+        if (S->isImplicit())
+          return;
+
+      } else {
         // FIXME: This hack is required because the inclusion check below
         // doesn't compares the *start* of the ranges, not the end of the
         // ranges.  In the case of an interpolated string literal expr, the
@@ -838,8 +841,12 @@ namespace {
         // embedded expression will fail.
         if (isa<InterpolatedStringLiteralExpr>(Parent.get<Expr*>()))
           return;
+
+        Expr *E = Parent.get<Expr*>();
+        if (E->isImplicit())
+          return;
         
-        Enclosing = Parent.get<Expr*>()->getSourceRange();
+        Enclosing = E->getSourceRange();
       }
       
       // FIXME: This is a very ugly way to check inclusion.

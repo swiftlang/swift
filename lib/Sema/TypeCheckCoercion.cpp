@@ -266,6 +266,9 @@ public:
   CoercedResult visitZeroValueExpr(ZeroValueExpr *E) {
     return unchanged(E);
   }
+  CoercedResult visitDefaultValueExpr(DefaultValueExpr *E) {
+    llvm_unreachable("Already special cased in SemaCoerce::coerceToType");
+  }
   CoercedResult visitSubscriptExpr(SubscriptExpr *E) {
     if (E->getType()->isUnresolvedType())
       return CoercionResult::Unknowable;
@@ -2122,6 +2125,19 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     PE->setSubExpr(Sub.getExpr());
     PE->setType(Sub.getType());
     return coerced(PE, Flags);
+  }
+
+  if (DefaultValueExpr *defValue = dyn_cast<DefaultValueExpr>(E)) {
+    CoercedResult Sub = coerceToType(defValue->getSubExpr(), DestTy, CC, Flags);
+    if (!Sub)
+      return Sub;
+
+    if (!(Flags & CF_Apply))
+      return DestTy;
+
+    defValue->setSubExpr(Sub.getExpr());
+    defValue->setType(Sub.getType());
+    return coerced(defValue, Flags);
   }
 
   // If our expression has polymorphic function type, perform deduction for it.

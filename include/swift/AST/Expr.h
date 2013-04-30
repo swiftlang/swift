@@ -2349,6 +2349,28 @@ public:
   }
 };
 
+/// \brief An expression that describes the use of a default value, which may
+/// come from the default argument of a function type or member initializer.
+///
+/// This expression is synthesizes by type checking and cannot be written
+/// directly by the user.
+class DefaultValueExpr : public Expr {
+  Expr *subExpr;
+
+public:
+  explicit DefaultValueExpr(Expr *subExpr)
+    : Expr(ExprKind::DefaultValue, subExpr->getType()), subExpr(subExpr) { }
+
+  Expr *getSubExpr() const { return subExpr; }
+  void setSubExpr(Expr *sub) { subExpr = sub; }
+  
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DefaultValue;
+  }
+};
+  
 } // end namespace swift
 
 #endif

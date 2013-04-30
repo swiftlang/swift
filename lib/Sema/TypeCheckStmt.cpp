@@ -669,6 +669,60 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   FE->computeCaptures(Context);
 }
 
+/// \brief Given a pattern declaring some number of member variables, build an
+/// expression that references the variables relative to 'this' with the same
+/// structure as the pattern.
+///
+/// \param tc The type checker.
+/// \param thisDecl The 'this' declaration.
+/// \param pattern The pattern.
+static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
+                                        Pattern *pattern) {
+  switch (pattern->getKind()) {
+  case PatternKind::Any:
+    // FIXME: Unfortunate case. We have no way to represent 'forget this value'
+    // in the AST.
+    return nullptr;
+
+  case PatternKind::Named:
+    return tc.buildMemberRefExpr(
+             new (tc.Context) DeclRefExpr(thisDecl,
+                                          SourceLoc(),
+                                          thisDecl->getTypeOfReference()),
+             SourceLoc(), cast<NamedPattern>(pattern)->getDecl(), SourceLoc());
+
+  case PatternKind::Paren:
+    return createPatternMemberRefExpr(
+             tc, thisDecl,
+             cast<ParenPattern>(pattern)->getSubPattern());
+
+  case PatternKind::Tuple: {
+    auto tuple = cast<TuplePattern>(pattern);
+    SmallVector<Expr *, 4> elements;
+    for (auto elt : tuple->getFields()) {
+      auto sub = createPatternMemberRefExpr(tc, thisDecl, elt.getPattern());
+      if (!sub)
+        return nullptr;
+
+      elements.push_back(sub);
+    }
+
+    if (elements.size() == 1)
+      return elements[0];
+    return new (tc.Context) TupleExpr(SourceLoc(),
+                                      tc.Context.AllocateCopy(elements),
+                                      nullptr,
+                                      SourceLoc());
+  }
+
+  case PatternKind::Typed:
+    return createPatternMemberRefExpr(
+             tc,
+             thisDecl,
+             cast<TypedPattern>(pattern)->getSubPattern());
+  }
+}
+
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   if (auto allocThis = ctor->getAllocThisExpr()) {
     if (!typeCheckExpression(allocThis))
@@ -698,6 +752,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
 
       // We have an assignment. Check whether the left-hand side refers to
       // a member of our class.
+      // FIXME: Also look into TupleExpr destinations.
       VarDecl *member = nullptr;
       auto dest = assign->getDest()->getSemanticsProvidingExpr();
       if (auto memberRef = dyn_cast<MemberRefExpr>(dest))
@@ -736,36 +791,66 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
     SmallVector<BraceStmt::ExprStmtOrDecl, 4> defaultInits;
     if (!allOfThisInitialized) {
       for (auto member : nominalDecl->getMembers()) {
-        auto var = dyn_cast<VarDecl>(member);
-        if (!var || var->isProperty())
+        // We only care about pattern bindings.
+        auto patternBind = dyn_cast<PatternBindingDecl>(member);
+        if (!patternBind)
           continue;
 
-        // If we already saw an initializer for this member, don't initialize it.
-        if (!initializedMembers.insert(var))
-          continue;
+        // If the pattern has an initializer, use it.
+        // FIXME: Implement this.
+        if (auto initializer = patternBind->getInit()) {
+          // Create a tuple expression with the same structure as the
+          // pattern.
+          if (Expr *dest = createPatternMemberRefExpr(
+                             *this,
+                             ctor->getImplicitThisDecl(),
+                             patternBind->getPattern())) {
+            initializer = new (Context) DefaultValueExpr(initializer);
+            defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
+                                                            initializer));
+            continue;
+          }
 
-        // FIXME: Check for an initializer on the variable.
 
-        // If this variable is not default-initializable, we're done: we can't
-        // add the default constructor because it will be ill-formed.
-        Expr *initializer = nullptr;
-        if (!isDefaultInitializable(var->getType(), &initializer)) {
-          diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
-                   var->getName(), var->getType());
-          diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
-          continue;
+          diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
+          diagnose(patternBind->getLoc(), diag::decl_init_here);
         }
 
-        // Create the assignment.
-        auto thisDecl = ctor->getImplicitThisDecl();
-        Expr *dest
-          = buildMemberRefExpr(
-              new (Context) DeclRefExpr(thisDecl,
-                                        SourceLoc(),
-                                        thisDecl->getTypeOfReference()),
-              SourceLoc(), var, SourceLoc());
-        defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
-                                                        initializer));
+        // Find the variables in the pattern. They'll each need to be
+        // default-initialized.
+        SmallVector<VarDecl *, 4> variables;
+        patternBind->getPattern()->collectVariables(variables);
+
+        // Initialize the variables.
+        for (auto var : variables) {
+          if (var->isProperty())
+            continue;
+
+          // If we already saw an initializer for this member, don't initialize it.
+          if (!initializedMembers.insert(var))
+            continue;
+
+          // If this variable is not default-initializable, we're done: we can't
+          // add the default constructor because it will be ill-formed.
+          Expr *initializer = nullptr;
+          if (!isDefaultInitializable(var->getType(), &initializer)) {
+            diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar,
+                     var->getName(), var->getType());
+            diagnose(var->getLoc(), diag::decl_declared_here, var->getName());
+            continue;
+          }
+
+          // Create the assignment.
+          auto thisDecl = ctor->getImplicitThisDecl();
+          Expr *dest
+            = buildMemberRefExpr(
+                new (Context) DeclRefExpr(thisDecl,
+                                          SourceLoc(),
+                                          thisDecl->getTypeOfReference()),
+                SourceLoc(), var, SourceLoc());
+          defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
+                                                          initializer));
+        }
       }
     }
     

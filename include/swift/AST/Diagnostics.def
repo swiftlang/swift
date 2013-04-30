@@ -993,6 +993,10 @@ ERROR(decl_no_default_init,sema_tcd,none,
 ERROR(decl_no_default_init_ivar,sema_tcd,none,
       "cannot default-initialize instance variable %0 of type %1", 
       (Identifier, Type))
+ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
+      "cannot use member initializer when one of the variables is '_'", ())
+NOTE(decl_init_here,sema_tcd,none,
+     "member initializer is here", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

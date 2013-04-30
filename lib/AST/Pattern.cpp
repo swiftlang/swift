@@ -78,6 +78,33 @@ SourceLoc Pattern::getLoc() const {
   return getStartLoc();
 }
 
+void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
+  switch (getKind()) {
+  case PatternKind::Any:
+    return;
+
+  case PatternKind::Named:
+    variables.push_back(cast<NamedPattern>(this)->getDecl());
+    return;
+
+  case PatternKind::Paren:
+    return cast<ParenPattern>(this)->getSubPattern()
+             ->collectVariables(variables);
+
+  case PatternKind::Tuple: {
+    auto tuple = cast<TuplePattern>(this);
+    for (auto elt : tuple->getFields()) {
+      elt.getPattern()->collectVariables(variables);
+    }
+    return;
+  }
+
+  case PatternKind::Typed:
+    return cast<TypedPattern>(this)->getSubPattern()
+             ->collectVariables(variables);
+  }
+}
+
 Pattern *Pattern::clone(ASTContext &context) const {
   Pattern *result;
   switch (getKind()) {

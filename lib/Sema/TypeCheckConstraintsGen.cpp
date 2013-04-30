@@ -402,7 +402,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitParenExpr(ParenExpr *expr) {
-      return expr->getSubExpr()->getType();
+      expr->setType(expr->getSubExpr()->getType());
+      return expr->getType();
     }
 
     Type visitTupleExpr(TupleExpr *expr) {
@@ -769,6 +770,11 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return CS.openType(expr->getType());
     }
 
+    Type visitDefaultValueExpr(DefaultValueExpr *expr) {
+      expr->setType(expr->getSubExpr()->getType());
+      return expr->getType();
+    }
+
     Type visitApplyExpr(ApplyExpr *expr) {
       ASTContext &Context = CS.getASTContext();
 
@@ -941,8 +947,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
     virtual bool walkToExprPre(Expr *expr) {
-      // Don't recurse into array-new expressions.
-      return !isa<NewArrayExpr>(expr);
+      // Don't recurse into array-new or default-value expressions.
+      return !isa<NewArrayExpr>(expr) && !isa<DefaultValueExpr>(expr);
     }
 
     virtual Expr *walkToExprPost(Expr *expr) {
@@ -1012,6 +1018,12 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         auto type = CG.visitNewArrayExpr(newArray);
         expr->setType(type);
+        return false;
+      }
+
+      // We don't visit default value expressions; they've already been
+      // type-checked.
+      if (isa<DefaultValueExpr>(expr)) {
         return false;
       }
 

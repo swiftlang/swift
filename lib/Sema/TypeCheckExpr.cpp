@@ -1191,6 +1191,11 @@ public:
     return E;
   }
 
+  Expr *visitDefaultValueExpr(DefaultValueExpr *E) {
+    E->setType(E->getSubExpr()->getType());
+    return E;
+  }
+
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
     // DotSyntaxBaseIgnoredExpr is fully type checked.
     return E;

@@ -977,6 +977,10 @@ namespace {
       return simplifyExprType(expr);
     }
 
+    Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Expr *visitApplyExpr(ApplyExpr *expr) {
       return finishApply(expr, expr->getType(), expr);
     }
@@ -1404,6 +1408,11 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         Rewriter.visitNewArrayExpr(newArray);
+        return false;
+      }
+
+      // For a default-value expression, do nothing.
+      if (isa<DefaultValueExpr>(expr)) {
         return false;
       }
 

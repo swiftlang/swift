@@ -94,6 +94,9 @@ public:
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceLoc getLoc() const;
 
+  /// \brief Collect the set of variables referenced in the given pattern.
+  void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
+
   Pattern *clone(ASTContext &context) const;
   
   static bool classof(const Pattern *P) { return true; }

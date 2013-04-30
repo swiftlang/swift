@@ -84,7 +84,10 @@ SourceLoc Expr::getLoc() const {
 Expr *Expr::getSemanticsProvidingExpr() {
   if (ParenExpr *PE = dyn_cast<ParenExpr>(this))
     return PE->getSubExpr()->getSemanticsProvidingExpr();
-      
+
+  if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
+    return DE->getSubExpr()->getSemanticsProvidingExpr();
+  
   return this;
 }
 
@@ -127,7 +130,7 @@ bool Expr::isImplicit() const {
     return true;
   }
 
-  if (isa<ZeroValueExpr>(this))
+  if (isa<ZeroValueExpr>(this) || isa<DefaultValueExpr>(this))
     return true;  
 
   return false;
@@ -943,6 +946,11 @@ public:
     printCommon(E, "is_subtype_expr") << ' ';
     E->getTypeLoc().getType()->print(OS);
     OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitDefaultValueExpr(DefaultValueExpr *E) {
+    printCommon(E, "default_value_expr") << ' ';
     printRec(E->getSubExpr());
     OS << ')';
   }

@@ -999,16 +999,30 @@ void TypeChecker::defineDefaultConstructor(StructDecl *structDecl) {
   // Verify that all of the instance variables of this struct have default
   // constructors.
   for (auto member : structDecl->getMembers()) {
-    auto var = dyn_cast<VarDecl>(member);
-    if (!var || var->isProperty())
+    // We only care about pattern bindings.
+    auto patternBind = dyn_cast<PatternBindingDecl>(member);
+    if (!patternBind)
       continue;
 
-    // FIXME: Check for an initializer on the variable.
+    // If the pattern has an initializer, we don't need any default
+    // initialization for its variables.
+    if (patternBind->getInit())
+      continue;
 
-    // If this variable is not default-initializable, we're done: we can't
-    // add the default constructor because it will be ill-formed.
-    if (!isDefaultInitializable(var->getType(), nullptr))
-      return;
+    // Find the variables in the pattern. They'll each need to be
+    // default-initialized.
+    SmallVector<VarDecl *, 4> variables;
+    patternBind->getPattern()->collectVariables(variables);
+
+    for (auto var : variables) {
+      if (var->isProperty())
+        continue;
+
+      // If this variable is not default-initializable, we're done: we can't
+      // add the default constructor because it will be ill-formed.
+      if (!isDefaultInitializable(var->getType(), nullptr))
+        return;
+    }
   }
 
   // Create the default constructor.
