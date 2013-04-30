@@ -195,7 +195,7 @@ pervasive.
 
 The most important semantic design point here is about bound variables
 in a grouped case, e.g. (using ?x as a "bind this variable" introducer;
-see the pattern grammar):
+see the pattern grammar)::
 
   switch (pair) {
   case (?x,0):
@@ -459,14 +459,14 @@ Dominance
 I think that this feature is far more powerful if the name bindings,
 type-refinements, etc. from patterns are available in code for which a
 trivial analysis would reveal that the result of the expression is
-true.  For example:
+true.  For example::
 
   if s is Window where x.isVisible {
     // can use Window methods on x here
   }
 
 Taken a bit further, we can remove the need for 'where' in the
-expression form:
+expression form::
 
   if x is Window && x.isVisible { ... }
 
@@ -589,11 +589,11 @@ looked through.
 
 The pattern is ill-formed if it provably cannot be satisfied.
 
-In a 'switch' statement, this would typically appear like this:
+In a 'switch' statement, this would typically appear like this::
 
   case is NSObject:
 
-It can, however, appear in recursive positions:
+It can, however, appear in recursive positions::
 
   case (is NSObject, is NSObject):
 
@@ -607,12 +607,12 @@ type.  This is resolved by the proposal (currently outstanding but
 generally accepted, I think) to disallow naked references to type
 constants and instead require them to be somehow decorated.
 
-That is, this pattern requires the user to write something like this:
+That is, this pattern requires the user to write something like this::
 
   case is NSObject:
 
 It is quite likely that users will often accidentally write something
-like this:
+like this::
 
   case NSObject:
 
@@ -624,7 +624,7 @@ generally work around that.
 
 However, we have an outstanding proposal to generally forbid 'NSObject'
 from appearing as a general expression;  the user would have to decorate
-it like the following, which would let us eliminate the common mistake:
+it like the following, which would let us eliminate the common mistake::
 
   case NSObject.type:
 
@@ -644,7 +644,7 @@ statement boundaries.  However, closures are a major problem for this
 model.  If we had immutable local bindings --- and, better yet, if
 they were the default --- this problem would largely go away.
 
-This sort of type refinement could also be a problem with code like:
+This sort of type refinement could also be a problem with code like::
 
   while expr is ParenExpr {
     expr = expr.getSubExpr()
@@ -739,7 +739,7 @@ general, the operation itself is likely to be associated with the
 intended type of the expression pattern, but that type will often
 require refinement from the type of the matched value.
 
-For example, consider a pattern like this:
+For example, consider a pattern like this::
 
   case 0..10:
 
