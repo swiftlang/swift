@@ -2008,31 +2008,6 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
 
-/// NewReferenceExpr - The allocation of a reference type.  Allocates and
-/// constructs an object, then returns a reference to it.
-class NewReferenceExpr : public ApplyExpr {
-private:
-  SourceLoc NewLoc;
-  TypeLoc ElementTy;
-
-public:
-  NewReferenceExpr(TypeLoc ty, SourceLoc newLoc, Expr *CtorArg)
-    : ApplyExpr(ExprKind::NewReference, nullptr, CtorArg), NewLoc(newLoc),
-      ElementTy(ty) {}
-
-  /// Return the location of the 'new' keyword.
-  SourceLoc getNewLoc() const { return NewLoc; }
-
-  SourceRange getSourceRange() const;
-  SourceLoc getLoc() const { return NewLoc; }
-
-  TypeLoc &getElementTypeLoc() { return ElementTy; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::NewReference;
-  }
-};
-
 /// ThisApplyExpr - Abstract application that provides the 'this' pointer for
 /// a method curried as (this : This) -> (params) -> result.
 ///

@@ -985,41 +985,6 @@ namespace {
       return finishApply(expr, expr->getType(), expr);
     }
 
-    Expr *visitNewReferenceExpr(NewReferenceExpr *expr) {
-      auto instanceTy = simplifyType(expr->getType());
-      expr->setType(instanceTy);
-
-      // Find the constructor we selected for this expression.
-      auto selected = getOverloadChoice(
-                      cs.getConstraintLocator(
-                        expr,
-                        ConstraintLocator::ConstructorMember));
-      auto choice = selected.first;
-      auto constructor = cast<ConstructorDecl>(choice.getDecl());
-
-      // Form the constructor call expression.
-      auto &tc = cs.getTypeChecker();
-      auto classMetaTy = MetaTypeType::get(instanceTy, tc.Context);
-      Expr *typeBase = new (tc.Context) MetatypeExpr(nullptr, expr->getLoc(),
-                                                     classMetaTy);
-      Expr *ctorRef = buildMemberRef(typeBase, expr->getLoc(),
-                                     constructor, expr->getLoc(),
-                                     selected.second);
-
-      // Extract (or create) the argument;
-      Expr *arg = expr->getArg();
-      if (!arg) {
-        arg = new (tc.Context) TupleExpr(expr->getLoc(),
-                                         MutableArrayRef<Expr *>(), nullptr,
-                                         expr->getLoc());
-        arg->setType(TupleType::getEmpty(tc.Context));
-      }
-
-      expr->setFn(ctorRef);
-      expr->setArg(arg);
-      return finishApply(expr, expr->getType(), expr);
-    }
-
     Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
       return expr;
     }

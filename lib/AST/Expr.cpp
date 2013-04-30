@@ -252,12 +252,6 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
   return E;
 }
 
-SourceRange NewReferenceExpr::getSourceRange() const {
-  if (getArg())
-    return { NewLoc, getArg()->getEndLoc() };
-  return { NewLoc, ElementTy.getSourceRange().End };
-}
-
 SourceRange TupleExpr::getSourceRange() const {
   if (LParenLoc.isValid()) {
     assert(RParenLoc.isValid() && "Mismatched parens?");
@@ -893,9 +887,6 @@ public:
   }
   void visitDotSyntaxCallExpr(DotSyntaxCallExpr *E) {
     printApplyExpr(E, "dot_syntax_call_expr");
-  }
-  void visitNewReferenceExpr(NewReferenceExpr *E) {
-    printApplyExpr(E, "new_reference_expr");
   }
   void visitConstructorRefCallExpr(ConstructorRefCallExpr *E) {
     printApplyExpr(E, "constructor_ref_call_expr");

@@ -238,8 +238,6 @@ Expr *Parser::parseExprOperator() {
 ///
 ///   expr-new:
 ///     'new' type-identifier expr-new-bounds
-///     'new' type-identifier expr-paren?
-///     'new' type-identifier '.' selector-args
 ///   expr-new-bounds:
 ///     expr-new-bound
 ///     expr-new-bounds expr-new-bound
@@ -290,35 +288,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
   if (hadInvalid) return nullptr;
 
   if (bounds.empty()) {
-    NullablePtr<Expr> Init;
-
-    // Parse '.' selector-args
-    if (Tok.is(tok::period) && peekToken().is(tok::l_paren)) {
-      // Consume the '.'.
-      consumeToken(tok::period);
-
-      Expr *Arg = nullptr;
-      if (parseSelectorArgs(Arg)) {
-        return nullptr;
-      }
-
-      Init = Arg;
-    } 
-    // Parse the optional expr-paren.
-    else if (Tok.isFollowingLParen()) {
-      Init = parseExprList(tok::l_paren, tok::r_paren);
-      if (Init.isNull())
-        return nullptr;
-    }
-
-    return new (Context) NewReferenceExpr(elementTy, newLoc,
-                                          Init.getPtrOrNull());
-  }
-
-  // TODO: we allow a tuple-expr here as an initializer?
-  if (Tok.isFollowingLParen()) {
-    diagnose(newLoc, diag::array_new_init_unsupported);
-    return nullptr;
+    diagnose(newLoc, diag::expected_bracket_array_new);
+    return new (Context) ErrorExpr({newLoc, PreviousLoc});
   }
 
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);

@@ -716,39 +716,6 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
     }
 
-    Type visitNewReferenceExpr(NewReferenceExpr *expr) {
-      // Create a new object of some reference type.
-      auto instanceTy = CS.openType(expr->getElementTypeLoc().getType());
-
-      // One must be able to construct an object from the provided argument,
-      // or () if no argument was provided.
-      Type argTy;
-      if (auto arg = expr->getArg())
-        argTy = arg->getType();
-      else
-        argTy = TupleType::getEmpty(CS.getASTContext());
-
-      auto &context = CS.getASTContext();
-      // FIXME: lame name
-      auto name = context.getIdentifier("constructor");
-      auto tv = CS.createTypeVariable();
-
-      // The constructors will have type T -> instanceTy, for some fresh type
-      // variable T.
-      // FIXME: When we add support for class clusters, we'll need a new type
-      // variable for the return type that is a subtype of instanceTy.
-      CS.addValueMemberConstraint(instanceTy, name,
-        FunctionType::get(tv, instanceTy, context),
-                          CS.getConstraintLocator(
-                            expr,
-                            ConstraintLocator::ConstructorMember));
-
-      // The first type must be convertible to the constructor's argument type.
-      CS.addConstraint(ConstraintKind::Conversion, argTy, tv,
-        CS.getConstraintLocator(expr, ConstraintLocator::ConstructionArgument));
-      return instanceTy;
-    }
-
     Type visitMetatypeExpr(MetatypeExpr *expr) {
       auto base = expr->getBase();
 

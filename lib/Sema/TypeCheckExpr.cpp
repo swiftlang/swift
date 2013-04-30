@@ -1103,62 +1103,6 @@ public:
     return E;
   }
 
-  Expr *visitNewReferenceExpr(NewReferenceExpr *E) {
-    if (TC.validateType(E->getElementTypeLoc(), /*isFirstPass*/false))
-      return nullptr;
-
-    E->setType(E->getElementTypeLoc().getType());
-
-    Type CT;
-    if (E->getType()->is<ClassType>())
-      CT = E->getType();
-    else if (auto BGT = E->getType()->getAs<BoundGenericType>()) {
-      if (isa<ClassDecl>(BGT->getDecl()))
-        CT = E->getType();
-    }
-    if (!CT) {
-      TC.diagnose(E->getLoc(), diag::new_reference_not_class);
-      return nullptr;
-    }
-
-    Expr *Arg;
-    if (E->getArg()) {
-      Arg = E->getArg();
-    } else {
-      // We don't have an explicit argument; fake one up.
-      Arg = new (TC.Context) TupleExpr(E->getLoc(),
-                                       MutableArrayRef<Expr *>(),
-                                       nullptr, E->getLoc());
-      Arg->setType(TupleType::getEmpty(TC.Context));
-    }
-    
-    SmallVector<ValueDecl *, 4> ctors;
-    (void)TC.lookupConstructors(CT, ctors);
-    llvm::SmallVector<ValueDecl *, 4> Viable;
-    auto Best = TC.filterOverloadSet(ctors, false, CT, Arg, Type(), Viable);
-
-    if (Best) {
-      Type ClassMetaTy = MetaTypeType::get(CT, TC.Context);
-      Expr *TypeBase = new (TC.Context) MetatypeExpr(nullptr, E->getLoc(),
-                                                     ClassMetaTy);
-      Expr *CtorRef = new (TC.Context) DeclRefExpr(Best.getDecl(),
-                                                   E->getLoc(),
-                                                   Best.getDecl()->getType());
-      CtorRef = new (TC.Context) ConstructorRefCallExpr(CtorRef, TypeBase);
-      CtorRef = TC.recheckTypes(CtorRef);
-      E->setFn(CtorRef);
-      E->setArg(Arg);
-      return TC.semaApplyExpr(E);
-    } else if (!Arg->getType()->isUnresolvedType()) {
-      TC.diagnose(E->getLoc(), diag::constructor_overload_fail,
-                  !Viable.empty(), CT)
-        .highlight(E->getSourceRange());
-      TC.printOverloadSetCandidates(Viable);
-    }
-
-    return E;
-  }
-
   Expr *visitMetatypeExpr(MetatypeExpr *E) {
     if (Expr *base = E->getBase()) {
       if (!base->getType()->is<ErrorType>())

@@ -2516,15 +2516,6 @@ namespace {
         return expr;
       }
 
-      // Type check the type in a new expression.
-      if (auto newRef = dyn_cast<NewReferenceExpr>(expr)) {
-        if (TC.validateType(newRef->getElementTypeLoc(),
-                            /*isFirstPass=*/false))
-          return nullptr;
-
-        return expr;
-      }
-      
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {

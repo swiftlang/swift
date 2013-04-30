@@ -249,9 +249,6 @@ public:
   CoercedResult visitNewArrayExpr(NewArrayExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
-  CoercedResult visitNewReferenceExpr(NewReferenceExpr *E) {
-    return failed(E); // FIXME: Is this reachable?
-  }
   CoercedResult visitIfExpr(IfExpr *E) {
     return failed(E); // FIXME: Is this reachable?
   }
