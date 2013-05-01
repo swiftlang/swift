@@ -417,8 +417,6 @@
 
   <div>
   <div class="commentary">
-    FIXME: We need to support unicode identifiers.
-
     <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
     and in general users cannot provide custom definitions for the '=' operator.
     This distinctly differs from C++, which allows '=' to be overloaded.
@@ -434,14 +432,45 @@
   </div>
 
   <pre class="grammar">
-    identifier ::= [a-zA-Z_][a-zA-Z_$0-9]*
+    identifier ::= id-start id-continue*
+    
+    // An identifier can start with an ASCII letter or underscore...
+    id-start ::= [A-Za-z_]
+
+    // or a Unicode alphanumeric character in the Basic Multilingual Plane...
+    // (excluding combining characters, which can't appear initially)
+    id-start ::= [\u00A8\u00AA\u00AD\u00AF\u00B2-\u00B5\u00B7-00BA]
+    id-start ::= [\u00BC-\u00BE\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]
+    id-start ::= [\u0100-\u02FF\u0370-\u167F\u1681-\u180D\u180F-\u1DBF]
+    id-start ::= [\u1E00-\u1FFF]
+    id-start ::= [\u200B-\u200D\u202A-\u202E\u203F-\u2040\u2054\u2060-\u206F]
+    id-start ::= [\u2070-\u20CF\u2100-\u218F\u2460-\u24FF\u2776-\u2793]
+    id-start ::= [\u2C00-\u2DFF\u2E80-\u2FFF]
+    id-start ::= [\u3004-\u3007\u3021-\u302F\u3031-\u303F\u3040-\uD7FF]
+    id-start ::= [\uF900-\uFD3D\uFD40-\uFDCF\uFDF0-\uFE1F\uFE30-FE44]
+    id-start ::= [\uFE47-\uFFFD]
+
+    // or a non-private-use, valid code point outside of the BMP.
+    id-start ::= [\u10000-\u1FFFD\u20000-\u2FFFD\u30000-\u3FFFD\u40000-\u4FFFD]
+    id-start ::= [\u50000-\u5FFFD\u60000-\u6FFFD\u70000-\u7FFFD\u80000-\u8FFFD]
+    id-start ::= [\u90000-\u9FFFD\uA0000-\uAFFFD\uB0000-\uBFFFD\uC0000-\uCFFFD]
+    id-start ::= [\uD0000-\uDFFFD\uE0000-\uEFFFD]
+
+    // After the first code point, an identifier can contain ASCII digits...
+    id-continue ::= [0-9]
+
+    // and/or combining characters...
+    id-continue ::= [\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]
+
+    // in addition to the starting character set.
+    id-continue ::= id-start
     
     <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^~]+
     <a name="operator">operator</a> ::= \.\.
 
       Note: excludes '=', see <b>[1]</b>
-            excludes '->', see <b>[2]</b>
-            excludes unary '&', see <b>[3]</b>
+            excludes '-&gt;', see <b>[2]</b>
+            excludes unary '&amp;', see <b>[3]</b>
             excludes '//', '/*', and '*/', see <b>[4]</b>
             '..' is an operator, not two '.'s.
 
@@ -452,6 +481,36 @@
     left-binder ::= [ \r\n\t\(\[\{,;]
 
     any-identifier ::= identifier | operator
+  </pre>
+
+  <p>The set of valid identifier characters is consistent with WG14 N1518,
+    "Recommendations for extended identifier characters for C and C++".
+    This roughly corresponds to the alphanumeric characters in the Basic
+    Multilingual Plane and all non-private-use code points outside of the BMP.
+    It excludes mathematical symbols, arrows, line and
+    box drawing characters, and private-use and invalid code points.
+    An identifier cannot begin with one of the ASCII digits '0' through '9'
+    or with a combining character.</p>
+
+  <p>The Swift compiler does not normalize Unicode source code, and matches
+    identifiers by code points only. Source code must be normalized to a
+    consistent normalization form before being submitted to the compiler.
+
+  <pre class=example>
+    // Valid identifiers
+    foo
+    _0
+    swift
+    vernissé
+    &#x95EA;&#x4EAE;
+    &#x05de;&#x05d1;&#x05e8;&#x05d9;&#x05e7;
+    &#x1F604;
+
+    // Invalid identifiers
+    &#x2603;     // Is a symbol
+    0cool // Starts with an ASCII digit
+     &#x0301;foo  // Starts with a combining character
+    &#xF8FF;     // Is a private-use character
   </pre>
 
   <p><tt>operator-binary</tt>, <tt>operator-prefix</tt>, and
@@ -1964,7 +2023,6 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr         ::= expr-sequence <a href="#expr-ternary">expr-ternary</a>*
     expr         ::= expr-sequence <a href="#expr-cast">expr-cast</a>
 
     expr-sequence ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
@@ -2003,9 +2061,8 @@ ill-formed if the type does not conform to the protocol.</p>
     baz()
   </pre>
 
-  <p>A unary or binary expression may optionally be followed by one or more
-    <a href="#expr-ternary">ternary operator</a> expressions or by a
-    <a href="#expr-cast">cast expression</a>.
+  <p>A unary or binary expression may optionally be followed by a
+    <a href="#expr-cast">cast operator</a>.
 
   <!-- ===================================================================== -->
   <h3 id="expr-cast">Cast Operators</h3>
@@ -2063,7 +2120,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <p><tt>as</tt>, <tt>as!</tt>, and <tt>is</tt> all have lower precedence than
   all binary operators. They must be parenthesized if used in larger expressions,
-  including within nested cast expressions or ternary operator expressions.
+  including within nested cast expressions.
 
   <pre class="example">
     (b as! D).derivedMethod()
@@ -2082,7 +2139,10 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
   
   <pre class="grammar">
-    expr-binary ::= <a href="#operator">operator-binary</a> <a href="#expr-unary">expr-unary</a>
+    expr-binary ::= operator-binary-or-ternary <a href="#expr-unary">expr-unary</a>
+    
+    op-binary-or-ternary ::= <a href="#operator">operator-binary</a>
+    op-binary-or-ternary ::= '?' <a href="#expr">expr-sequence</a> ':'
   </pre>
 
   <p>Infix binary expressions are not formed during parsing.  Instead,
@@ -2099,6 +2159,38 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <pre class="example">
     4 + 5 * 123
+  </pre>
+
+  <h4 id="expr-ternary">Ternary operator</h4>
+
+  <p>The ternary operator <tt>a ? b : c</tt> is hardcoded as a conditional
+  operator.  The subexpression to the left of the
+  '?' is evaluated, and is converted to 'Bool' using the result's
+  'getLogicValue' method if it is not already 'Bool'. If the condition is
+  true, the subexpression to the right of '?' is evaluated, and its result
+  becomes the result of the expression. If the
+  condition is false, the subexpression to the right of ':' is evaluated, and
+  its result becomes the result of the expression. Only one of the
+  '?' or ':' subexpressions will be evaluated. The results of the
+  '?' and ':' subexpressions must be implicitly convertible to a common type,
+  which becomes the type of the ternary expression.
+
+  <p>Ternary parsing is handled as part of sequence expression folding. The
+  middle arm of the ternary is parsed maximal-munch as a sequence
+  expression from the '?' up to the matching ':'. The <tt>? ... :</tt> sequence
+  then participates in binary operator folding as if it were a single binary
+  operator with fixed precedence of 100 and right associativity.</p>
+
+  <pre class="example">
+    x += b ? y : z
+    x += a ? b ? y : z : w
+
+    for i in 1..101 {
+      println(i % 15      ? "fizzbuzz"
+            : i %  3 == 0 ? "fizz"
+            : i %  5 == 0 ? "buzz"
+            : "\(i)")
+    }
   </pre>
   
   <!-- ===================================================================== -->
@@ -2571,58 +2663,15 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="grammar">
     expr-new        ::= 'new' <a href="#type">type-identifier</a> expr-new-bounds
-    expr-new        ::= 'new' <a href="#type">type-identifier</a> <a href="#expr-paren">expr-paren</a>?
-    expr-new        ::= 'new' <a href="#type">type-identifier</a> '.' <a href="#selector-args">selector-args</a>
   
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
     expr-new-bound  ::= lsquare-following <a href="#expr">expr?</a> ']'
   </pre>
     
-  <p>Allocates and initializes a new array of objects with value
-    semantics or an individual object with reference semantics.  If
-    any bounds clauses are present, the first clause must have an
-    expression; subsequent bounds, if present, must be constant under the
-    <a href="#type-array">usual rules for array types</a>.</p>
-
-  <!-- ===================================================================== -->
-  <h3 id="expr-ternary">Ternary Expressions</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    expr-ternary ::= <a href="#expr">expr-sequence</a> '?' <a href="#expr">expr-sequence</a> ':' <a href="#expr">expr-sequence</a>
-  </pre
-
-  <p>Similar to <a href="#stmt-if">'if' statements</a>, the ternary operator
-  <tt>a ? b : c</tt> provides simple branching control flow within an expression.
-  The condition subexpression before the '?' is evaluated, and is converted
-  to 'Bool' using the result's 'getLogicValue' method if it is not already
-  'Bool'. If the condition is true, the subexpression to the right of '?' is
-  evaluated, and its result becomes the result of the expression. If the
-  condition is false, the subexpression to the right of ':' is evaluated, and
-  its result becomes the result of the expression. Only one of the
-  '?' or ':' subexpressions will be evaluated. The results of the
-  '?' and ':' subexpressions must be implicitly convertible to a common type,
-  which becomes the type of the ternary expression.
-  
-  <p>The ternary operator is
-  right-associative and has lower precedence than all binary operators. ('='
-  and ',' are not considered operators in Swift, but they syntactically have
-  lower precedence than the ternary.)
-
-  <p>Some examples:
-
-  <pre class="example">
-    for i in 1..101 {
-      println(i % 15
-        ? "fizzbuzz"
-        : i % 3 == 0
-        ? "fizz"
-        : i % 5 == 0
-        ? "buzz"
-        : "\(i)")
-    }
-  </pre>
+  <p>Allocates and initializes a new array of objects. The first clause must
+    be an expression; subsequent bounds, if present, must be constant under
+    the <a href="#type-array">usual rules for array types</a>.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
