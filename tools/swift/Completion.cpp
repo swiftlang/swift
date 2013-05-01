@@ -224,16 +224,17 @@ static CompletionContext getCompletionContext(DeclContext *dc,
   } else if (prefix.back() == '.') {
     // Try to figure out a qualified lookup context from the expression
     // preceding the dot.
+    // FIXME: Unicode.
     StringRef beforeDot = prefix.slice(0, prefix.size() - 1);
     prefix = StringRef();
     return getCompletionContextFromDotExpression(TU, dc, beforeDot);
-  } else if (Identifier::isOperatorChar(prefix.back())) {
+  } else if (Identifier::isOperatorStartCodePoint(prefix.back())) {
     // If the character preceding us looks like an operator character,
     // walk backward to find as much of an operator name as we can.
     for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
          p != begin;
          --p) {
-      if (!Identifier::isOperatorChar(*(p-1))) {
+      if (!Identifier::isOperatorStartCodePoint(*(p-1))) {
         prefix = StringRef(p, end - p);
         return CompletionContext(dc, tuEndLoc);
       }

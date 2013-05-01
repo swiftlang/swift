@@ -51,7 +51,8 @@ static char mangleOperatorChar(char op) {
   case '~': return 't'; // 'tilde'
   case '^': return 'x'; // 'xor'
   case '.': return 'z'; // 'zperiod' (the z is silent)
-  default: llvm_unreachable("bad identifier character");
+  default:
+    return op;
   }
 }
 
@@ -88,21 +89,21 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   StringRef str = ident.str();
   assert(!str.empty() && "mangling an empty identifier!");
 
+  // If the identifier contains non-ASCII character, we mangle with an initial
+  // X and Punycode the identifier string.
+  llvm::SmallString<32> punycodeBuf;
+
+  if (isNonAscii(str)) {
+    Buffer << 'X';
+    Punycode::encodePunycode(str, punycodeBuf);
+    str = punycodeBuf;
+  }
+  
   // Mangle normal identifiers as
   //   count identifier-char+
   // where the count is the number of characters in the identifier,
   // and where individual identifier characters represent themselves.
   if (!ident.isOperator()) {
-    // If the identifier contains non-ASCII characters, Punycode it, and mangle
-    // the encoded string as:
-    //   'X' count identifier-char+
-    if (isNonAscii(str)) {
-      llvm::SmallString<32> encoded;
-      Punycode::encodePunycode(str, encoded);
-      Buffer << 'X' << encoded.size() << encoded;
-      return;
-    }
-      
     Buffer << str.size() << str;
     return;
   }
@@ -129,9 +130,10 @@ void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
     break;
   }
 
+  // Mangle ASCII operators directly.
   Buffer << str.size();
-  for (unsigned i = 0, e = str.size(); i != e; ++i) {
-    Buffer << mangleOperatorChar(str[i]);
+  for (char c : str) {
+    Buffer << mangleOperatorChar(c);
   }
 }
 

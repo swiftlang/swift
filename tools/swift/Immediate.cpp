@@ -555,8 +555,9 @@ public:
         ++p;
       }
       while (isspace(*--p) && p >= s);
-      if (Identifier::isOperatorChar(*p)) {
-        while (Identifier::isOperatorChar(*p) && --p >= s);
+      // FIXME: Unicode operators
+      if (Identifier::isOperatorStartCodePoint(*p)) {
+        while (Identifier::isOperatorContinuationCodePoint(*p) && --p >= s);
         if (*p == ' ' || *p == '\t')
           UnfinishedInfixExpr = true;
       }

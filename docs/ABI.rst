@@ -171,6 +171,7 @@ there's no ambiguity with the run-length.
 ::
 
   identifier ::= 'X' natural identifier-start-char identifier-char*
+  identifier ::= 'X' 'o' operator-fixity natural identifier-char*
 
 Identifiers that contain non-ASCII characters are encoded using the Punycode
 algorithm specified in RFC 3492, with the modifications that ``_`` is used
@@ -180,6 +181,14 @@ consists of an ``X`` followed by the run length of the encoded string and the
 encoded string itself. For example, the identifier ``vergüenza`` is mangled
 to ``X12vergenza_JFa``. (The encoding in standard Punycode would be
 ``vergenza-95a``)
+
+Operators that contain non-ASCII characters are mangled by first mapping the
+ASCII operator characters to letters as for pure ASCII operator names, then
+Punycode-encoding the substituted string. The mangling then consists of
+``Xo`` followed by the fixity, run length of the encoded string, and the encoded
+string itself. For example, the infix operator ``«+»`` is mangled to
+``Xoi7p_qcaDc`` (``p_qcaDc`` being the encoding of the substituted
+string ``«p»``).
 
 ::
 

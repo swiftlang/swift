@@ -376,7 +376,7 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
 
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.2: Ranges of characters disallowed initially
-  if ((c >= 0x0300 && c <= 0x36F)
+  if ((c >= 0x0300 && c <= 0x036F)
       || (c >= 0x1DC0 && c <= 0x1DFF)
       || (c >= 0x20D0 && c <= 0x20FF)
       || (c >= 0xFE20 && c <= 0xFE2F))
@@ -385,30 +385,39 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
   return true;
 }
 
-static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
-                                                   char const *end) {
+static bool advanceIf(char const *&ptr,
+                      char const *end,
+                      bool (*predicate)(uint32_t)) {
   char const *next = ptr;
   uint32_t c = validateUTF8CharacterAndAdvance(next, end);
   if (c == ~0U)
     return false;
-  if (isValidIdentifierContinuationCodePoint(c)) {
+  if (predicate(c)) {
     ptr = next;
     return true;
   }
   return false;
+
 }
 
 static bool advanceIfValidStartOfIdentifier(char const *&ptr,
                                             char const *end) {
-  char const *next = ptr;
-  uint32_t c = validateUTF8CharacterAndAdvance(next, end);
-  if (c == ~0U)
-    return false;
-  if (isValidIdentifierStartCodePoint(c)) {
-    ptr = next;
-    return true;
-  }
-  return false;
+  return advanceIf(ptr, end, isValidIdentifierStartCodePoint);
+}
+
+static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
+                                                   char const *end) {
+  return advanceIf(ptr, end, isValidIdentifierContinuationCodePoint);
+}
+
+static bool advanceIfValidStartOfOperator(char const *&ptr,
+                                          char const *end) {
+  return advanceIf(ptr, end, Identifier::isOperatorStartCodePoint);
+}
+
+static bool advanceIfValidContinuationOfOperator(char const *&ptr,
+                                                 char const *end) {
+  return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
 /// isIdentifier - Checks whether a string matches the identifier regex.
@@ -531,8 +540,12 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
-    while (Identifier::isOperatorChar(*CurPtr) && *CurPtr != '.')
-      ++CurPtr;
+    CurPtr = TokStart;
+    bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
+    assert(didStart && "unexpected operator start");
+    (void) didStart;
+    
+    while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
   }
 
   // Decide between the binary, prefix, and postfix cases.
@@ -1149,6 +1162,9 @@ Restart:
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
       return lexIdentifier();
+    
+    if (advanceIfValidStartOfOperator(tmp, BufferEnd))
+      return lexOperatorIdentifier();
     
     if (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd)) {
       // If this is a valid identifier continuation, but not a valid identifier
