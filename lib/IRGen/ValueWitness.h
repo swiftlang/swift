@@ -152,6 +152,12 @@ enum class ValueWitness : unsigned {
   /// for an uninitialized object of this type.  Return the address of
   /// that object.
   AllocateBuffer,
+  
+  ///   M *(*typeof)(T *obj, M *self);
+  ///
+  /// Given a valid object of this type, returns the metatype pointer for
+  /// the dynamic type of the value of the object.
+  TypeOf,
 
   ///   size_t size;
   ///

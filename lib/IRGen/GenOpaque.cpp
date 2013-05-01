@@ -110,6 +110,14 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
     return llvm::FunctionType::get(ptrTy, args, false);
   }
 
+  // M *(*typeof)(T *src, M *self);
+  case ValueWitness::TypeOf: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *args[] = { ptrTy, metaTy };
+    return llvm::FunctionType::get(metaTy, args, false);
+  }
+      
   case ValueWitness::Size:
   case ValueWitness::Alignment:
   case ValueWitness::Stride:
@@ -163,6 +171,8 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
     return "initializeWithCopy";
   case ValueWitness::InitializeWithTake:
     return "initializeWithTake";
+  case ValueWitness::TypeOf:
+    return "typeof";
   case ValueWitness::Size:
     return "size";
   case ValueWitness::Alignment:
@@ -358,6 +368,20 @@ void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
+}
+
+/// Emit a call to the 'typeof' operation.
+llvm::Value *irgen::emitTypeofCall(IRGenFunction &IGF,
+                                   llvm::Value *witnessTable,
+                                   llvm::Value *metadata,
+                                   llvm::Value *object) {
+  auto fn = emitLoadOfValueWitness(IGF, witnessTable,
+                                   ValueWitness::TypeOf);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall2(fn, object, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+  return call;
 }
 
 /// Emit a load of the 'size' value witness.

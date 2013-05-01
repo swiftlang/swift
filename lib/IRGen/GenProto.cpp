@@ -1284,6 +1284,10 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     IGF.Builder.CreateRet(result.getAddress());
     return;
   }
+      
+  case ValueWitness::TypeOf: {
+    llvm_unreachable("always have a known implementation of typeof witness");
+  }
 
   case ValueWitness::Size:
   case ValueWitness::Alignment:
@@ -1692,6 +1696,17 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       return asOpaquePtr(IGM, getReturnSelfFunction(IGM));
     goto standard;
 
+  case ValueWitness::TypeOf:
+    /// Class types require dynamic type lookup.
+    if (ClassDecl *cd = concreteType->getClassOrBoundGenericClass()) {
+      if (hasKnownSwiftMetadata(IGM, cd))
+        return asOpaquePtr(IGM, IGM.getObjectTypeofFn());
+      return asOpaquePtr(IGM, IGM.getObjCTypeofFn());
+    } else {
+      // Other types have static metadata.
+      return asOpaquePtr(IGM, IGM.getStaticTypeofFn());
+    }
+      
   case ValueWitness::Size: {
     if (auto value = concreteTI.getStaticSize(IGM))
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
@@ -3252,6 +3267,23 @@ irgen::getArchetypeMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
+}
+
+llvm::Value *
+irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
+                                       Address addr,
+                                       CanType type) {
+  ArchetypeType *archetype = cast<ArchetypeType>(type);
+  auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+  
+  // Acquire the archetype's static metadata.
+  llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
+  
+  // Get its value witness table.
+  llvm::Value *vwtable = archetypeTI.getValueWitnessTable(IGF);
+  
+  // Call the 'typeof' value witness.
+  return emitTypeofCall(IGF, vwtable, metadata, addr.getAddress());
 }
 
 /// Extract the method pointer and metadata from a protocol witness table

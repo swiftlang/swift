@@ -355,7 +355,7 @@ namespace {
 static MetadataCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
-swift::swift_getObjCClassMetadata(ClassMetadata *theClass) {
+swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   // If the class pointer is valid as metadata, no translation is required.
   if (theClass->isTypeMetadata()) {
     return theClass;
@@ -605,6 +605,11 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_initializeBufferWithCopy(dest,
                                         tuple_projectBuffer(src, metatype),
                                         metatype);
+}
+
+static const Metadata *tuple_typeof(OpaqueValue *obj,
+                                    const Metadata *metatype) {
+  return metatype;
 }
 
 /// Standard, inefficient witness table for tuples.

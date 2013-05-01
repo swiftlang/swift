@@ -434,6 +434,42 @@ llvm::Constant *IRGenModule::getGetObjCClassMetadataFn() {
   return GetObjCClassMetadataFn;
 }
 
+llvm::Constant *IRGenModule::getStaticTypeofFn() {
+  if (StaticTypeofFn) return StaticTypeofFn;
+  
+  // type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
+  llvm::Type *argTypes[] = { OpaquePtrTy, TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  StaticTypeofFn =
+    createReadnoneRuntimeFunction(*this, "swift_staticTypeof", fnType);
+  return StaticTypeofFn;
+}
+
+llvm::Constant *IRGenModule::getObjectTypeofFn() {
+  if (ObjectTypeofFn) return ObjectTypeofFn;
+  
+  // type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
+  llvm::Type *argTypes[] = { OpaquePtrTy, TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  ObjectTypeofFn =
+    createRuntimeFunction(*this, "swift_objectTypeof", fnType);
+  return ObjectTypeofFn;
+}
+
+llvm::Constant *IRGenModule::getObjCTypeofFn() {
+  if (ObjectTypeofFn) return ObjCTypeofFn;
+  
+  // type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
+  llvm::Type *argTypes[] = { OpaquePtrTy, TypeMetadataPtrTy };
+  llvm::FunctionType *fnType =
+    llvm::FunctionType::get(TypeMetadataPtrTy, argTypes, false);
+  ObjCTypeofFn =
+    createRuntimeFunction(*this, "swift_objcTypeof", fnType);
+  return ObjCTypeofFn;
+}
+
 llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   if (GetTupleMetadataFn) return GetTupleMetadataFn;
 

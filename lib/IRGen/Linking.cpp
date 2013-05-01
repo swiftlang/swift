@@ -50,6 +50,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeBufferWithTake: return "Tk";
   case ValueWitness::InitializeWithTake: return "tk";
   case ValueWitness::ProjectBuffer: return "pr";
+  case ValueWitness::TypeOf: return "ty";
 
   case ValueWitness::Size:
   case ValueWitness::Alignment:

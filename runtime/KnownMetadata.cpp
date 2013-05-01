@@ -41,6 +41,12 @@ template <class T> static T *copy(T *dest, T *src, const Metadata *self) {
   return dest;
 }
 
+/// A function which returns back a static metatype.
+const Metadata *swift::swift_staticTypeof(OpaqueValue *src,
+                                          const Metadata *self) {
+  return self;
+}
+
 // Work around a Xcode 4.5 bug (rdar://12288058) by explicitly
 // instantiating this function template at the types we'll need.
 #define INSTANTIATE(TYPE) \
@@ -65,6 +71,7 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::initializeWithTake*) &copy<TYPE>,               \
   (value_witness_types::assignWithTake*) &copy<TYPE>,                   \
   (value_witness_types::allocateBuffer*) &projectBuffer,                \
+  (value_witness_types::typeof*) &swift_staticTypeof,                   \
   (value_witness_types::size) (SIZE),                                   \
   (value_witness_types::alignment) (SIZE),                              \
   (value_witness_types::stride) (SIZE)                                  \
@@ -109,6 +116,18 @@ static HeapObject **assignWithoutRetain(HeapObject **dest,
   return dest;
 }
 
+/// A function to get the dynamic class type of a Swift heap object.
+const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
+                                          const Metadata *self) {
+  auto *heapRef = *reinterpret_cast<HeapObject**>(obj);
+  auto *classMetadata = static_cast<const ClassMetadata*>(heapRef->metadata);
+  // If the heap metadata for the object is not a type, give up and return the
+  // static type.
+  if (!classMetadata->isTypeMetadata())
+    return self;
+  return classMetadata;
+}
+
 /// The basic value-witness table for Swift object pointers.
 const ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::destroyBuffer*) &destroyWithRelease,
@@ -123,6 +142,7 @@ const ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
   (value_witness_types::assignWithTake*) &assignWithoutRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
+  (value_witness_types::typeof*) &swift_objectTypeof,
   (value_witness_types::size) sizeof(void*),
   (value_witness_types::alignment) alignof(void*),
   (value_witness_types::stride) sizeof(void*)
@@ -136,6 +156,9 @@ const ValueWitnessTable swift::_TWVBo = {
 // ARC entrypoints.
 extern "C" void *objc_retain(void *);
 extern "C" void objc_release(void *);
+
+// ObjC runtime entrypoints.
+extern "C" const void *object_getClass(void *);
 
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
@@ -168,6 +191,19 @@ static void **assignWithoutObjCRetain(void **dest, void **src,
   return dest;
 }
 
+/// A function to get the Swift type metadata wrapper for an ObjC object's
+/// dynamic type.
+
+const Metadata *swift::swift_objcTypeof(OpaqueValue *src, const Metadata *self)
+{
+  auto object = *reinterpret_cast<void**>(src);
+  auto theClass = object_getClass(object);
+  auto classAsMetadata = reinterpret_cast<const ClassMetadata*>(theClass);
+  if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
+  
+  return swift_getObjCClassMetadata(classAsMetadata);
+}
+
 /// The basic value-witness table for ObjC object pointers.
 const ValueWitnessTable swift::_TWVBO = {
   (value_witness_types::destroyBuffer*) &destroyWithObjCRelease,
@@ -182,6 +218,7 @@ const ValueWitnessTable swift::_TWVBO = {
   (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
   (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
+  (value_witness_types::typeof*) &swift_objcTypeof,
   (value_witness_types::size) sizeof(void*),
   (value_witness_types::alignment) alignof(void*),
   (value_witness_types::stride) sizeof(void*)
@@ -252,6 +289,7 @@ const ValueWitnessTable swift::_TWVFT_T_ = {
   (value_witness_types::initializeWithTake*) &function_initWithoutRetain,
   (value_witness_types::assignWithTake*) &function_assignWithoutRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
+  (value_witness_types::typeof*) &swift_staticTypeof,
   (value_witness_types::size) sizeof(Function),
   (value_witness_types::alignment) alignof(Function),
   (value_witness_types::stride) sizeof(Function)
@@ -278,6 +316,7 @@ const ValueWitnessTable swift::_TWVT_ = {
   (value_witness_types::initializeWithTake*) &doNothing3,
   (value_witness_types::assignWithTake*) &doNothing3,
   (value_witness_types::allocateBuffer*) &projectBuffer,
+  (value_witness_types::typeof*) &swift_staticTypeof,
   (value_witness_types::size) 0,
   (value_witness_types::alignment) 1,
   (value_witness_types::stride) 0

@@ -160,7 +160,7 @@ private:
   Size PtrSize;
   llvm::Type *FixedBufferTy;           /// [N x i8], where N == 3 * sizeof(void*)
 
-  enum { NumValueWitnessFunctions = 12 };
+  enum { NumValueWitnessFunctions = 13 };
   llvm::PointerType *ValueWitnessTys[NumValueWitnessFunctions]; /// pointer-to-functions
 
 //--- Types -----------------------------------------------------------------
@@ -261,6 +261,11 @@ public:
   llvm::Constant *getGetObjCClassMetadataFn();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
+  
+  llvm::Constant *getStaticTypeofFn();
+  llvm::Constant *getObjectTypeofFn();
+  llvm::Constant *getObjCTypeofFn();
+  
   ClassDecl *getSwiftRootClass();
 
 private:
@@ -296,6 +301,9 @@ private:
   llvm::Constant *ObjCSelRegisterNameFn = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
+  llvm::Constant *StaticTypeofFn = nullptr;
+  llvm::Constant *ObjectTypeofFn = nullptr;
+  llvm::Constant *ObjCTypeofFn = nullptr;
   ClassDecl *SwiftRootClass = nullptr;
 
 //--- Generic ---------------------------------------------------------------

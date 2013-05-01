@@ -243,6 +243,15 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
 typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
                                     const Metadata *self);
 
+  
+/// Given an initialized object, return the metadata pointer for its dynamic
+/// type.
+///
+/// Preconditions:
+///   'src' is an initialized object
+typedef const Metadata *typeof(OpaqueValue *src,
+                               const Metadata *self);
+  
 /// The number of bytes required to store an object of this type.
 /// This value may be zero.  This value is not necessarily a
 /// multiple of the alignment.
@@ -276,7 +285,8 @@ extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
   MACRO(initializeBufferWithTake) \
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
-  MACRO(allocateBuffer)
+  MACRO(allocateBuffer) \
+  MACRO(typeof)
 
 /// A value-witness table.  A value witness table is built around
 /// the requirements of some specific type.  The information in
@@ -706,7 +716,7 @@ swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 extern "C" const Metadata *
-swift_getObjCClassMetadata(ClassMetadata *theClass);
+swift_getObjCClassMetadata(const ClassMetadata *theClass);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///
@@ -815,6 +825,33 @@ extern "C" const void *
 swift_dynamicCastUnconditional(const void *object,
                                const Metadata *targetType);
 
+/// \brief Standard 'typeof' value witness for types with static metatypes.
+///
+/// \param obj  A pointer to the object. Ignored.
+/// \param self The type metadata for the object.
+///
+/// \returns self.
+extern "C" const Metadata *
+swift_staticTypeof(OpaqueValue *obj, const Metadata *self);
+
+/// \brief Standard 'typeof' value witness for heap object references.
+///
+/// \param obj  A pointer to the object reference.
+/// \param self The static type metadata for the object. Ignored.
+///
+/// \returns The dynamic type metadata for the object.
+extern "C" const Metadata *
+swift_objectTypeof(OpaqueValue *obj, const Metadata *self);
+
+/// \brief Standard 'typeof' value witness for ObjC object references.
+///
+/// \param obj  A pointer to the object reference.
+/// \param self The static type metadata for the object. Ignored.
+///
+/// \returns The dynamic type metadata for the object.
+extern "C" const Metadata *
+swift_objcTypeof(OpaqueValue *obj, const Metadata *self);
+  
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */

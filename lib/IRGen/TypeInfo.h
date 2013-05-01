@@ -197,8 +197,8 @@ public:
   virtual void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                          Explosion &targetExplosion) const = 0;
 
-  /// Copy a value into a new explosion without touching any of the
-  /// existing cleanups.  This operation may also shift explosion levels.
+  /// Copy a value into a new explosion with independent ownership.
+  /// This operation may also shift explosion levels.
   ///
   /// This operation is useful when an explosion is being used
   /// multiple times, for example in when doing load-modify-store
@@ -209,10 +209,10 @@ public:
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address) const = 0;
   
-  /// Retains a value. Does not affect cleanups.
+  /// Retains a value.
   virtual void retain(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
-  /// Releases a value. Does not affect cleanups.
+  /// Releases a value.
   virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
   /// Should optimizations be enabled which rely on the representation

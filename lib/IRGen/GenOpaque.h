@@ -107,7 +107,13 @@ namespace irgen {
                              llvm::Value *witnessTable,
                              llvm::Value *metadata,
                              Address buffer);
-
+  
+  /// Emit a call to the 'typeof' operation.
+  llvm::Value *emitTypeofCall(IRGenFunction &IGF,
+                              llvm::Value *witnessTable,
+                              llvm::Value *metadata,
+                              llvm::Value *object);
+  
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable);
 

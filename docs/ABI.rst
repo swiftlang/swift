@@ -133,6 +133,7 @@ and so the structure is quite simple.
   value-witness-kind ::= 'Tk'                // initializeBufferWithTake
   value-witness-kind ::= 'tk'                // initializeWithTake
   value-witness-kind ::= 'pr'                // projectBuffer
+  value-witness-kind ::= 'ty'                // typeof
 
 <value-witness-kind> differentiates the kinds of function value
 witnesses for a type.

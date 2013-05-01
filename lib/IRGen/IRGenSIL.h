@@ -487,6 +487,7 @@ public:
   void visitBuiltinZeroInst(BuiltinZeroInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitClassMetatypeInst(ClassMetatypeInst *i);
+  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
   void visitExtractInst(ExtractInst *i);
   void visitElementAddrInst(ElementAddrInst *i);

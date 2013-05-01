@@ -118,6 +118,10 @@ namespace irgen {
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
                             llvm::SmallVectorImpl<llvm::Value *> &out);
 
+  /// Emit a dynamic metatype lookup for the given archetype.
+  llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
+                                               Address archetypeAddr,
+                                               CanType archetypeType);
 } // end namespace irgen
 } // end namespace swift
 
