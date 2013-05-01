@@ -416,21 +416,6 @@
   <!-- ===================================================================== -->
 
   <div>
-  <div class="commentary">
-    <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
-    and in general users cannot provide custom definitions for the '=' operator.
-    This distinctly differs from C++, which allows '=' to be overloaded.
-
-    <br><br><b>[2]</b> The '-&gt;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
-      and cannot be used as an operator identifier.
-
-    <br><br><b>[3]</b> The unary prefix '&amp;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
-      and cannot be used as an operator identifier.
-
-    <br><br><b>[4]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
-      and cannot be used as operator identifiers.
-  </div>
-
   <pre class="grammar">
     identifier ::= id-start id-continue*
     
@@ -464,25 +449,8 @@
 
     // in addition to the starting character set.
     id-continue ::= id-start
-    
-    <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^~]+
-    <a name="operator">operator</a> ::= \.\.
-
-      Note: excludes '=', see <b>[1]</b>
-            excludes '-&gt;', see <b>[2]</b>
-            excludes unary '&amp;', see <b>[3]</b>
-            excludes '//', '/*', and '*/', see <b>[4]</b>
-            '..' is an operator, not two '.'s.
-
-    operator-binary ::= operator
-    operator-prefix ::= operator
-    operator-postfix ::= operator
-
-    left-binder ::= [ \r\n\t\(\[\{,;]
-
-    any-identifier ::= identifier | operator
   </pre>
-
+    
   <p>The set of valid identifier characters is consistent with WG14 N1518,
     "Recommendations for extended identifier characters for C and C++".
     This roughly corresponds to the alphanumeric characters in the Basic
@@ -511,6 +479,42 @@
     0cool // Starts with an ASCII digit
      &#x0301;foo  // Starts with a combining character
     &#xF8FF;     // Is a private-use character
+  </pre>
+
+  <h4>Operators</h4>
+
+  <div class="commentary">
+    <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
+    and in general users cannot provide custom definitions for the '=' operator.
+    This distinctly differs from C++, which allows '=' to be overloaded.
+
+    <br><br><b>[2]</b> The '-&gt;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
+      and cannot be used as an operator identifier.
+
+    <br><br><b>[3]</b> The unary prefix '&amp;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
+      and cannot be used as an operator identifier.
+
+    <br><br><b>[4]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
+      and cannot be used as operator identifiers.
+  </div>
+
+  <pre class="grammar">
+    <a name="operator">operator</a> ::= [@/=-+*%&lt;&gt;!&amp;|^~]+
+    <a name="operator">operator</a> ::= \.\.
+
+      Note: excludes '=', see <b>[1]</b>
+            excludes '-&gt;', see <b>[2]</b>
+            excludes unary '&amp;', see <b>[3]</b>
+            excludes '//', '/*', and '*/', see <b>[4]</b>
+            '..' is an operator, not two '.'s.
+
+    operator-binary ::= operator
+    operator-prefix ::= operator
+    operator-postfix ::= operator
+
+    left-binder ::= [ \r\n\t\(\[\{,;]
+
+    any-identifier ::= identifier | operator
   </pre>
 
   <p><tt>operator-binary</tt>, <tt>operator-prefix</tt>, and
@@ -542,9 +546,8 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    dollarident ::= $[0-9a-zA-Z_$]*
+    dollarident ::= '$' id-continue+
   </pre>
-  
   
   <p>Tokens that start with a $ are separate class of identifier, which are
   fixed purpose names that are defined by the implementation.
