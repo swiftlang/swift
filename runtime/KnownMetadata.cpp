@@ -71,7 +71,7 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::initializeWithTake*) &copy<TYPE>,               \
   (value_witness_types::assignWithTake*) &copy<TYPE>,                   \
   (value_witness_types::allocateBuffer*) &projectBuffer,                \
-  (value_witness_types::typeof*) &swift_staticTypeof,                   \
+  (value_witness_types::typeOf*) &swift_staticTypeof,                   \
   (value_witness_types::size) (SIZE),                                   \
   (value_witness_types::alignment) (SIZE),                              \
   (value_witness_types::stride) (SIZE)                                  \
@@ -142,7 +142,7 @@ const ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
   (value_witness_types::assignWithTake*) &assignWithoutRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeof*) &swift_objectTypeof,
+  (value_witness_types::typeOf*) &swift_objectTypeof,
   (value_witness_types::size) sizeof(void*),
   (value_witness_types::alignment) alignof(void*),
   (value_witness_types::stride) sizeof(void*)
@@ -218,7 +218,7 @@ const ValueWitnessTable swift::_TWVBO = {
   (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
   (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeof*) &swift_objcTypeof,
+  (value_witness_types::typeOf*) &swift_objcTypeof,
   (value_witness_types::size) sizeof(void*),
   (value_witness_types::alignment) alignof(void*),
   (value_witness_types::stride) sizeof(void*)
@@ -289,7 +289,7 @@ const ValueWitnessTable swift::_TWVFT_T_ = {
   (value_witness_types::initializeWithTake*) &function_initWithoutRetain,
   (value_witness_types::assignWithTake*) &function_assignWithoutRetain,
   (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeof*) &swift_staticTypeof,
+  (value_witness_types::typeOf*) &swift_staticTypeof,
   (value_witness_types::size) sizeof(Function),
   (value_witness_types::alignment) alignof(Function),
   (value_witness_types::stride) sizeof(Function)
@@ -316,7 +316,7 @@ const ValueWitnessTable swift::_TWVT_ = {
   (value_witness_types::initializeWithTake*) &doNothing3,
   (value_witness_types::assignWithTake*) &doNothing3,
   (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeof*) &swift_staticTypeof,
+  (value_witness_types::typeOf*) &swift_staticTypeof,
   (value_witness_types::size) 0,
   (value_witness_types::alignment) 1,
   (value_witness_types::stride) 0

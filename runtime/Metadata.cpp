@@ -607,7 +607,7 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                         metatype);
 }
 
-static const Metadata *tuple_typeof(OpaqueValue *obj,
+static const Metadata *tuple_typeOf(OpaqueValue *obj,
                                     const Metadata *metatype) {
   return metatype;
 }

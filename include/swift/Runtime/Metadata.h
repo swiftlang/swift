@@ -249,7 +249,7 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
 ///
 /// Preconditions:
 ///   'src' is an initialized object
-typedef const Metadata *typeof(OpaqueValue *src,
+typedef const Metadata *typeOf(OpaqueValue *src,
                                const Metadata *self);
   
 /// The number of bytes required to store an object of this type.
@@ -286,7 +286,7 @@ extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
   MACRO(allocateBuffer) \
-  MACRO(typeof)
+  MACRO(typeOf)
 
 /// A value-witness table.  A value witness table is built around
 /// the requirements of some specific type.  The information in
