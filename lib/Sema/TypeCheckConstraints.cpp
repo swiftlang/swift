@@ -940,8 +940,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     return result;
   }
 
-  assert(kind == TypeMatchKind::Conversion ||
-         kind == TypeMatchKind::Construction);
+  assert(kind == TypeMatchKind::Conversion);
 
   // Compute the element shuffles for conversions.
   enum {
@@ -1075,7 +1074,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       Type variadicBaseType = elt2.getVarargBaseTy();
       for (unsigned variadicSrc : variadicArguments) {
         switch (matchTypes(tuple1->getElementType(variadicSrc),
-                           variadicBaseType, kind, subFlags,
+                           variadicBaseType, TypeMatchKind::Conversion, subFlags,
                            locator.withPathElement(
                              LocatorPathElt::getTupleElement(variadicSrc)),
                            trivial)) {
@@ -1159,10 +1158,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case TypeMatchKind::Conversion:
     subKind = TypeMatchKind::Subtype;
     break;
-
-  case TypeMatchKind::Construction:
-    subKind = TypeMatchKind::Conversion;
-    break;
   }
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
@@ -1218,9 +1213,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
-
-  case TypeMatchKind::Construction:
-    return ConstraintKind::Construction;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -1242,21 +1234,9 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return Failure::TypesNotConvertible;
-
-  case TypeMatchKind::Construction:
-    return Failure::TypesNotConstructible;
   }
 
   llvm_unreachable("unhandled type matching kind");
-}
-
-/// \brief Determine whether the given type is constructible, meaning that
-/// a construction constraint on the type can enumerate constructors.
-static bool isConstructibleType(Type type) {
-  if (auto nominal = type->getNominalOrBoundGenericNominal())
-    return !isa<ProtocolDecl>(nominal);
-  
-  return false;
 }
 
 ConstraintSystem::SolutionKind
@@ -1358,7 +1338,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
-    case TypeMatchKind::Construction:
       if (flags & TMF_GenerateConstraints) {
         // Add a new constraint between these types. We consider the current
         // type-matching problem to the "solved" by this addition, because
@@ -1526,8 +1505,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                ConstraintLocator::ParentType),
                              trivial)) {
           case SolutionKind::Error:
-            // There may still be a Conversion or Construction we can satisfy
-            // the constraint with.
+            // There may still be a conversion that can satisfy the constraint.
             // FIXME: The recursive match may have introduced new equality
             // constraints that are now invalid. rdar://problem/13140447
             if (kind >= TypeMatchKind::Conversion)
@@ -1568,8 +1546,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                LocatorPathElt::getGenericArgument(i)),
                              trivial)) {
           case SolutionKind::Error:
-            // There may still be a Conversion or Construction we can satisfy
-            // the constraint with.
+            // There may still be a conversion that can satisfy this constraint.
             // FIXME: The recursive match may have introduced new equality
             // constraints that are now invalid. rdar://problem/13140447
             if (kind >= TypeMatchKind::Conversion) {
@@ -1678,13 +1655,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // (or bound generic class) if it is derived from that class.
       if (auto upcastResult = solveDerivedFrom(type1, type2))
         return *upcastResult;
-
-      // A class can be downcast to its subclass as part of a 'construction'
-      // constraint.
-      if (kind >= TypeMatchKind::Construction) {
-        if (auto downcastResult = solveDerivedFrom(type2, type1))
-          return *downcastResult;
-      }
     }
   }
 
@@ -1733,39 +1703,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
   
-  // A type can be constructed by passing an argument to one of its
-  // constructors. This construction only applies to oneof and struct types
-  // (or generic versions of oneof or struct types).
-  if (kind == TypeMatchKind::Construction && isConstructibleType(type2)) {
-    SmallVector<ValueDecl *, 4> ctors;
-    if (TC.lookupConstructors(type2, ctors)) {
-      auto &context = getASTContext();
-      // FIXME: lame name
-      auto name = context.getIdentifier("constructor");
-      auto tv = createTypeVariable();
-
-      // The constructor will have function type T -> T2, for a fresh type
-      // variable T. Note that these constraints specifically require a
-      // match on the result type because the constructors for oneofs and struct
-      // types always return a value of exactly that type.
-      addValueMemberConstraint(type2, name,
-                               FunctionType::get(tv, type2, context),
-                               getConstraintLocator(
-                                 locator.withPathElement(
-                                   ConstraintLocator::ConstructorMember)));
-
-      // The first type must be convertible to the constructor's argument type.
-      addConstraint(ConstraintKind::Conversion, type1, tv,
-                    getConstraintLocator(
-                      locator.withPathElement(
-                        ConstraintLocator::ConstructionArgument)));
-
-      // FIXME: Do we want to consider conversion functions simultaneously with
-      // constructors? Right now, we prefer constructors if they exist.
-      return SolutionKind::Solved;
-    }
-  }
-
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
   if (concrete && kind >= TypeMatchKind::Conversion &&
@@ -1930,6 +1867,121 @@ Type ConstraintSystem::simplifyType(Type type,
                             
             return type;
          });
+}
+
+/// \brief Determine whether the given type is constructible, meaning that
+/// a construction constraint on the type can enumerate constructors.
+static bool isConstructibleType(Type type) {
+  if (auto nominal = type->getNominalOrBoundGenericNominal())
+    return !isa<ProtocolDecl>(nominal);
+  
+  return false;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
+                                                 unsigned flags,
+                                                 ConstraintLocator *locator) {
+  // Desugar the value type.
+  auto desugarValueType = valueType->getDesugaredType();
+
+  // If we have a type variable that has been bound to a fixed type,
+  // look through to that fixed type.
+  auto desugarValueTypeVar = dyn_cast<TypeVariableType>(desugarValueType);
+  if (desugarValueTypeVar) {
+    if (auto fixed = getFixedType(desugarValueTypeVar)) {
+      valueType = fixed;
+      desugarValueType = fixed->getDesugaredType();
+      desugarValueTypeVar = nullptr;
+    }
+  }
+
+  switch (desugarValueType->getKind()) {
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    llvm_unreachable("Type has not been desugared completely");
+    
+  case TypeKind::Error:
+    return SolutionKind::Error;
+    
+  case TypeKind::UnstructuredUnresolved:
+    llvm_unreachable("Unstructured unresolved type");
+    
+  case TypeKind::TypeVariable:
+    return SolutionKind::Unsolved;
+
+  case TypeKind::Tuple: {
+    // Tuple construction is simply tuple conversion.
+    bool trivial = false;
+    return matchTypes(argType, valueType, TypeMatchKind::Conversion,
+                      flags|TMF_GenerateConstraints, locator, trivial);
+  }
+
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
+    // Break out to handle the actual construction below.
+    break;
+
+  case TypeKind::PolymorphicFunction:
+    llvm_unreachable("Polymorphic function type should have been opened");
+
+  case TypeKind::UnboundGeneric:
+    llvm_unreachable("Unbound generic type should have been opened");
+
+#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+  case TypeKind::MetaType:
+  case TypeKind::Function:
+  case TypeKind::Array:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::LValue:
+    // If we are supposed to record failures, do so.
+    if (flags & TMF_RecordFailures) {
+      recordFailure(locator, Failure::TypesNotConstructible,
+                    valueType, argType);
+    }
+    
+    return SolutionKind::Error;
+  }
+
+  SmallVector<ValueDecl *, 4> ctors;
+  if (!TC.lookupConstructors(valueType, ctors)) {
+    // If we are supposed to record failures, do so.
+    if (flags & TMF_RecordFailures) {
+      recordFailure(locator, Failure::TypesNotConstructible,
+                    valueType, argType);
+    }
+    
+    return SolutionKind::Error;
+  }
+
+  auto &context = getASTContext();
+  // FIXME: lame name
+  auto name = context.getIdentifier("constructor");
+  auto tv = createTypeVariable();
+  
+  // The constructor will have function type T -> T2, for a fresh type
+  // variable T. Note that these constraints specifically require a
+  // match on the result type because the constructors for oneofs and struct
+  // types always return a value of exactly that type.
+  addValueMemberConstraint(valueType, name,
+                           FunctionType::get(tv, valueType, context),
+                           getConstraintLocator(
+                             locator, 
+                             ConstraintLocator::ConstructorMember));
+  
+  // The first type must be convertible to the constructor's argument type.
+  addConstraint(ConstraintKind::Conversion, argType, tv,
+                getConstraintLocator(locator,
+                                     ConstraintLocator::ConstructionArgument));
+
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -2137,7 +2189,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
-  case ConstraintKind::Construction: return TypeMatchKind::Construction;
+
+  case ConstraintKind::Construction:
+    llvm_unreachable("Construction constraints don't involve type matches");
 
   case ConstraintKind::Literal:
     llvm_unreachable("Literals don't involve type matches");
@@ -2159,14 +2213,19 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::EqualRvalue:
   case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
-  case ConstraintKind::Conversion:
-  case ConstraintKind::Construction: {
+  case ConstraintKind::Conversion: {
     // For relational constraints, match up the types.
     bool trivial = true;
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       getTypeMatchKind(constraint.getKind()),
                       TMF_RecordFailures, constraint.getLocator(), trivial);
   }
+
+  case ConstraintKind::Construction:
+    return simplifyConstructionConstraint(constraint.getSecondType(),
+                                          constraint.getFirstType(),
+                                          TMF_RecordFailures,
+                                          constraint.getLocator());
 
   case ConstraintKind::Literal:
     return simplifyLiteralConstraint(constraint.getFirstType(),

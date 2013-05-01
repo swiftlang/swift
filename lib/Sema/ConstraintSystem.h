@@ -1181,10 +1181,7 @@ enum class TypeMatchKind : char {
   Subtype,
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
-  Conversion,
-  /// \brief Requires the first type to either be convertible to the second
-  /// type or to be a suitable constructor argument for the second type.
-  Construction
+  Conversion
 };
 
 /// \brief The result of comparing two constraint systems that are a solutions
@@ -1943,6 +1940,21 @@ private:
   Type simplifyType(Type type,
                     llvm::SmallPtrSet<TypeVariableType *, 16> &substituting);
 
+  /// \brief Attempt to simplify the given construction constraint.
+  ///
+  /// \param valueType The type being constructed.
+  ///
+  /// \param argType The type of the argument, used to call \c
+  /// valueType's constructor.
+  ///
+  /// \param flags Flags that indicate how the constraint should be
+  /// simplified.
+  /// 
+  /// \param locator Locator describing where this construction
+  /// occurred.
+  SolutionKind simplifyConstructionConstraint(Type valueType, Type argType,
+                                              unsigned flags,
+                                              ConstraintLocator *locator);
 
   /// \brief Attempt to simplify the given literal constraint.
   SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind,
