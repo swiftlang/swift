@@ -821,9 +821,9 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
       // context.
-      auto *SubExpr = new(Context)UnresolvedDeclRefExpr(OperName,
-                                                        DeclRefKind::Ordinary,
-                                                        Loc);
+      auto *SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
+                                                         DeclRefKind::Ordinary,
+                                                         Loc);
       SubExprs.push_back(SubExpr);
     } else {
       NullablePtr<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
