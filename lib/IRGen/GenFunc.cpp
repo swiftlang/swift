@@ -1205,8 +1205,8 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
   // Okay, we're naturally emitting to an explosion.
   // Figure out how the substituted result differs from the original.
-  auto resultDiff = computeResultDifference(IGF.IGM, CurOrigType,
-                       getCallee().getSubstResultType()->getCanonicalType());
+  CanType substType = getCallee().getSubstResultType()->getCanonicalType();
+  auto resultDiff = computeResultDifference(IGF.IGM, CurOrigType, substType);
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
   case ResultDifference::Identical:
@@ -1228,6 +1228,20 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
   // If they do differ, we need to remap.
   case ResultDifference::Divergent:
+    if (isa<MetaTypeType>(substType) && isa<MetaTypeType>(CurOrigType)) {
+      // If we got here, it's because the substituted metatype is trivial.
+      // Remapping is easy--the substituted type is empty, so we drop the
+      // nontrivial representation of the original type.
+      assert(IGF.IGM.hasTrivialMetatype(
+                      CanType(cast<MetaTypeType>(substType)->getInstanceType()))
+             && "remapping to nontrivial metatype?!");
+      
+      Explosion temp(getCallee().getExplosionLevel());
+      emitToUnmappedExplosion(temp);
+      temp.claimAll();
+      return;
+    }
+      
     // There's a related FIXME in the Builtin.load/move code.
     IGF.unimplemented(SourceLoc(), "remapping explosion");
     const TypeInfo &substResultTI =
