@@ -838,48 +838,45 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   case '\'': ++CurPtr; return '\'';
   case '\\': ++CurPtr; return '\\';
   // Unicode escapes of various lengths.
-  case 'x':  //  \x HEX HEX
-    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2])) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_x_escape);
-      return 0;
-    }
-    
-    StringRef(CurPtr+1, 2).getAsInteger(16, CharValue);
-    
+  case 'x': {  //  \x HEX HEX
+    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2]);
+    if (ValidChars != 2 && EmitDiagnostics)
+      diagnose(CurPtr, diag::lex_invalid_x_escape);
+
+    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
+
     // Reject \x80 and above, since it is going to encode into a multibyte
     // unicode encoding, which is something that C folks may not expect.
     if (CharValue >= 0x80)
       diagnose(CurPtr, diag::lex_invalid_hex_escape);
-    
-    CurPtr += 3;
-    break;
-    
-  case 'u':  //  \u HEX HEX HEX HEX 
-    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) ||
-        !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4])) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_u_escape);
-      return 0;
-    }
-    
-    StringRef(CurPtr+1, 4).getAsInteger(16, CharValue);
-    CurPtr += 5;
-    break;
-  case 'U':  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
-    if (!isxdigit(CurPtr[1]) || !isxdigit(CurPtr[2]) || 
-        !isxdigit(CurPtr[3]) || !isxdigit(CurPtr[4]) ||
-        !isxdigit(CurPtr[5]) || !isxdigit(CurPtr[6]) || 
-        !isxdigit(CurPtr[7]) || !isxdigit(CurPtr[8])) {
-      if (EmitDiagnostics)
-        diagnose(CurPtr, diag::lex_invalid_U_escape);
-      return 0;
-    }
-    StringRef(CurPtr+1, 8).getAsInteger(16, CharValue);
-    CurPtr += 9;
+
+    CurPtr += 1 + ValidChars;
     break;
   }
-  
+  case 'u': {  //  \u HEX HEX HEX HEX 
+    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2])
+                        + !!isxdigit(CurPtr[3]) + !!isxdigit(CurPtr[4]);
+    if (ValidChars != 4 && EmitDiagnostics)
+      diagnose(CurPtr, diag::lex_invalid_u_escape);
+
+    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
+    CurPtr += 1 + ValidChars;
+    break;
+  }
+  case 'U': {  //  \U HEX HEX HEX HEX HEX HEX HEX HEX 
+    unsigned ValidChars = !!isxdigit(CurPtr[1]) + !!isxdigit(CurPtr[2])
+                        + !!isxdigit(CurPtr[3]) + !!isxdigit(CurPtr[4])
+                        + !!isxdigit(CurPtr[5]) + !!isxdigit(CurPtr[6])
+                        + !!isxdigit(CurPtr[7]) + !!isxdigit(CurPtr[8]);
+    if (ValidChars != 8 && EmitDiagnostics)
+      diagnose(CurPtr, diag::lex_invalid_U_escape);
+
+    StringRef(CurPtr+1, ValidChars).getAsInteger(16, CharValue);
+    CurPtr += 1 + ValidChars;
+    break;
+  }
+  }
+
   // Check to see if the encoding is valid.
   llvm::SmallString<64> TempString;
   if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString)) {
