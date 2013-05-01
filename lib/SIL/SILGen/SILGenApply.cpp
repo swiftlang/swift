@@ -856,6 +856,19 @@ namespace {
     return ManagedValue(result, ManagedValue::Unmanaged);
   }
 
+  /// Specialized emitter for Builtin.typeof.
+  static ManagedValue emitBuiltinTypeOf(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        ArrayRef<Substitution> substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+    assert(args.size() == 1 && "typeof should have a single argument");
+    
+    // Get the metatype of the argument.
+    SILValue metaTy = gen.emitMetatypeOfValue(loc, args[0].getValue());
+    return ManagedValue(metaTy, ManagedValue::Unmanaged);
+  }
+  
   Callee::SpecializedEmitter
   Callee::getSpecializedEmitterForSILBuiltin(SILConstant function) {
     // Filter out non-function members and non-builtin modules.

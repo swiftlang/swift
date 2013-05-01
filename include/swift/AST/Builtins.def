@@ -144,6 +144,10 @@ BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
+/// typeof(T) -> T.metatype.
+/// Returns the runtime type of a value.
+BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.

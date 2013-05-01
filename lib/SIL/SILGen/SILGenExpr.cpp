@@ -1060,30 +1060,31 @@ RValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
                                               E->getInjectionFunction()));
 }
 
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
+  // For class, archetype, and protocol types, look up the dynamic metatype.
+  SILType metaTy = getLoweredLoadableType(
+    MetaTypeType::get(base.getType().getSwiftRValueType(), F.getContext()));
+  if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
+    return B.createClassMetatype(loc, metaTy, base);
+  } else if (base.getType().getSwiftRValueType()->is<ArchetypeType>()) {
+    return B.createArchetypeMetatype(loc, metaTy, base);
+  } else if (base.getType().getSwiftRValueType()->isExistentialType()) {
+    return B.createProtocolMetatype(loc, metaTy, base);
+  }
+  // Otherwise, ignore the base and return the static metatype.
+  return B.createMetatype(loc, metaTy);
+}
+
 RValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
   // Evaluate the base if present.
   SILValue metatype;
   
   if (E->getBase()) {
     SILValue base = visit(E->getBase()).getAsSingleValue(*this).getValue();
-    // For class, archetype, and protocol types, look up the dynamic metatype.
-    if (E->getBase()->getType()->getClassOrBoundGenericClass()) {
-      metatype = B.createClassMetatype(E, getLoweredLoadableType(E->getType()),
-                                       base);
-    } else if (E->getBase()->getType()->is<ArchetypeType>()) {
-      metatype = B.createArchetypeMetatype(E,
-                                           getLoweredLoadableType(E->getType()),
-                                           base);
-    } else if (E->getBase()->getType()->isExistentialType()) {
-      metatype = B.createProtocolMetatype(E,
-                                          getLoweredLoadableType(E->getType()),
-                                          base);
-    }
-  }
-  
-  if (!metatype)
-    // Otherwise, ignore the base and return the static metatype.
+    metatype = emitMetatypeOfValue(E, base);
+  } else {
     metatype = B.createMetatype(E, getLoweredLoadableType(E->getType()));
+  }
   
   return RValue(*this, ManagedValue(metatype, ManagedValue::Unmanaged));
 }

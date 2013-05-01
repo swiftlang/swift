@@ -397,6 +397,22 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
+  // <T> T -> T.metatype
+  Type GenericTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ParamList) = getGenericParam(Context);
+  
+  Type MetaTy = MetaTypeType::get(GenericTy, Context);
+  
+  Type FnTy = PolymorphicFunctionType::get(GenericTy, MetaTy,
+                                           ParamList,
+                                           Context);
+  return new (Context) FuncDecl(SourceLoc(), SourceLoc(), Id, SourceLoc(),
+                                ParamList, FnTy, /*init*/ nullptr,
+                                Context.TheBuiltinModule);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -726,6 +742,10 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
+      
+  case BuiltinValueKind::TypeOf:
+    if (!Types.empty()) return nullptr;
+    return getTypeOfOperation(Context, Id);
   }
   llvm_unreachable("bad builtin value!");
 }
