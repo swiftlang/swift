@@ -1869,15 +1869,6 @@ Type ConstraintSystem::simplifyType(Type type,
          });
 }
 
-/// \brief Determine whether the given type is constructible, meaning that
-/// a construction constraint on the type can enumerate constructors.
-static bool isConstructibleType(Type type) {
-  if (auto nominal = type->getNominalOrBoundGenericNominal())
-    return !isa<ProtocolDecl>(nominal);
-  
-  return false;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
                                                  unsigned flags,
