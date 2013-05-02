@@ -604,7 +604,9 @@ namespace {
     }
     
     void emit(SILGenFunction &gen) override {
-      gen.destroyLocalVariable(thisDecl);
+      // 'this' is passed in at +0 (and will be deallocated when we return),
+      // so don't release the value, only deallocate the variable.
+      gen.deallocateUninitializedLocalVariable(thisDecl);
     }
   };
 } // end anonymous namespace
@@ -623,13 +625,11 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   SILValue thisValue = new (SGM.M) SILArgument(thisType, F.begin());
   
   if (DD) {
-    // FIXME: Bump the retain count so that destruction doesn't fire
-    // recursively while passing 'this' around in the destructor body.
-    // FIXME: We have to retain it twice to counter the release that will happen
-    // when the 'this' box is released below. Gross.
-    B.createRetain(DD, thisValue);
-    B.createRetain(DD, thisValue);
-  
+    // 'this' has a fixed lifetime no matter what capture analysis says.
+    // It'll die as soon as we return.
+    // FIXME: We should enforce this somewhere.
+    thisDecl->setHasFixedLifetime(true);
+    
     // Make a local variable for 'this'.
     emitLocalVariable(thisDecl);
     SILValue thisAddr = VarLocs[thisDecl].address;

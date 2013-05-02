@@ -188,6 +188,9 @@ void swift::swift_release(HeapObject *object) {
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_slow(HeapObject *object) {
+  // Bump the retain count so that retains/releases that occur during the
+  // destructor don't recursively destroy the object.
+  swift_retain_noresult(object);
   size_t allocSize = asFullMetadata(object->metadata)->destroy(object);
   if (allocSize) {
     swift_deallocObject(object, allocSize);

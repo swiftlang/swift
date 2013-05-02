@@ -492,10 +492,11 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
       break;
     case CaptureKind::Byref: {
       // Capture the address.
-      assert(capture->getType()->is<LValueType>() &&
-             "byref capture not an lvalue?!");
+      assert((capture->getType()->is<LValueType>() ||
+              capture->hasFixedLifetime()) &&
+             "byref capture not an lvalue or fixed-lifetime var?!");
       Type objectType
-        = capture->getType()->castTo<LValueType>()->getObjectType();
+        = capture->getType()->getRValueType();
       LValueType *lvType = LValueType::get(objectType,
                                            LValueType::Qual::DefaultForType,
                                            types.Context);
