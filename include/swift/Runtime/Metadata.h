@@ -449,7 +449,7 @@ extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 struct HeapMetadataHeaderPrefix {
   /// Destroy the object, returning the allocated size of the object
   /// or 0 if the object shouldn't be deallocated.
-  size_t (*destroy)(HeapObject *);
+  void (*destroy)(HeapObject *);
 };
 
 /// The header present on all heap metadata.

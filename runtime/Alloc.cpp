@@ -117,15 +117,15 @@ static inline size_t getBoxHeaderSize(size_t align) {
 }
 
 /// Heap object destructor for a generic box allocated with swift_allocBox.
-static size_t destroyGenericBox(HeapObject *o) {
+static void destroyGenericBox(HeapObject *o) {
   auto *box = static_cast<GenericBox*>(o);
   
   // Destroy the value inside the box.
   OpaqueValue *value = box->getValuePointer();
   box->type->getValueWitnesses()->destroy(value, box->type);
   
-  // Return the size of the deallocated buffer.
-  return box->getAllocatedSize();
+  // Deallocate the buffer.
+  return swift_deallocObject(o, box->getAllocatedSize());
 }
 
 /// Generic heap metadata for generic allocBox allocations.
@@ -191,10 +191,7 @@ void _swift_release_slow(HeapObject *object) {
   // Bump the retain count so that retains/releases that occur during the
   // destructor don't recursively destroy the object.
   swift_retain_noresult(object);
-  size_t allocSize = asFullMetadata(object->metadata)->destroy(object);
-  if (allocSize) {
-    swift_deallocObject(object, allocSize);
-  }
+  asFullMetadata(object->metadata)->destroy(object);
 }
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {

@@ -126,7 +126,7 @@ public:
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
-  llvm::FunctionType *DeallocatingDtorTy; /// size_t (%swift.refcounted*)
+  llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
@@ -227,6 +227,7 @@ public:
   llvm::Constant *getAllocBoxFn();
   llvm::Constant *getRetainNoResultFn();
   llvm::Constant *getReleaseFn();
+  llvm::Constant *getDeallocObjectFn();
  
   llvm::Constant *getRawAllocFn();
   llvm::Constant *getRawDeallocFn();
@@ -269,15 +270,16 @@ public:
   ClassDecl *getSwiftRootClass();
 
 private:
-  llvm::Function *MemCpyFn;
-  llvm::Constant *AllocObjectFn;
-  llvm::Constant *AllocBoxFn;
-  llvm::Constant *RetainNoResultFn;
-  llvm::Constant *ReleaseFn;
-  llvm::Constant *RawAllocFn;
-  llvm::Constant *RawDeallocFn;
-  llvm::Constant *SlowAllocFn;
-  llvm::Constant *SlowRawDeallocFn;
+  llvm::Function *MemCpyFn = nullptr;
+  llvm::Constant *AllocObjectFn = nullptr;
+  llvm::Constant *AllocBoxFn = nullptr;
+  llvm::Constant *RetainNoResultFn = nullptr;
+  llvm::Constant *ReleaseFn = nullptr;
+  llvm::Constant *DeallocObjectFn = nullptr;
+  llvm::Constant *RawAllocFn = nullptr;
+  llvm::Constant *RawDeallocFn = nullptr;
+  llvm::Constant *SlowAllocFn = nullptr;
+  llvm::Constant *SlowRawDeallocFn = nullptr;
   llvm::Constant *DynamicCastClassFn = nullptr;
   llvm::Constant *DynamicCastClassUnconditionalFn = nullptr;
   llvm::Constant *DynamicCastFn = nullptr;

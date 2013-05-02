@@ -58,6 +58,15 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
   : StructLayout(IGM, LayoutKind::HeapObject, strategy, fields, typeToFill) {
 }
 
+void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
+                                     llvm::Value *object,
+                                     llvm::Value *size) {
+  // FIXME: We should call a fast deallocator for heap objects with
+  // known size.
+  IGF.Builder.CreateCall2(IGF.IGM.getDeallocObjectFn(),
+                          object, size);
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM,
@@ -82,8 +91,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     field.getType().destroy(IGF, field.project(IGF, structAddr, offsets));
   }
 
-  llvm::Value *size = layout.emitSize(IGF);
-  IGF.Builder.CreateRet(size);
+  emitDeallocateHeapObject(IGF, fn->arg_begin(), layout.emitSize(IGF));
+  IGF.Builder.CreateRetVoid();
 
   return fn;
 }
@@ -327,8 +336,9 @@ createArrayDtorFn(IRGenModule &IGM,
 
   llvm::Value *size =
     arrayInfo.getAllocationSize(IGF, layout, length, false, false);
-  IGF.Builder.CreateRet(size);
-
+  emitDeallocateHeapObject(IGF, fn->arg_begin(), size);
+  IGF.Builder.CreateRetVoid();
+  
   return fn;
 }
 

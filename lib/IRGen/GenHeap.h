@@ -96,6 +96,11 @@ private:
   llvm::Constant *getPrivateMetadata(IRGenModule &IGM) const;
 };
 
+/// Emit a heap object deallocation.
+void emitDeallocateHeapObject(IRGenFunction &IGF,
+                              llvm::Value *object,
+                              llvm::Value *size);
+
 } // end namespace irgen
 } // end namespace swift
 

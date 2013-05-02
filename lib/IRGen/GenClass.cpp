@@ -452,11 +452,11 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   // The destroying destructor returns the pointer back as a %swift.refcounted,
   // so we don't need to keep it live across the call.
   obj = IGF.Builder.CreateCall(destroyer, obj);
-  
-  // FIXME: the deallocating destructor should perform the deallocation instead
-  // of returning a magic value back to swift_release.
+
+  // Emit the deallocation.
   llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
-  IGF.Builder.CreateRet(size);
+  emitDeallocateHeapObject(IGF, obj, size);
+  IGF.Builder.CreateRetVoid();
 }
 
 /// Emit an allocation of a class.
