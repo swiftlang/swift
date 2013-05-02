@@ -43,7 +43,6 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
-#include "Scope.h"
 #include "TypeInfo.h"
 
 using namespace swift;
@@ -657,10 +656,6 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
   unsigned arg = 0;
   auto uncurriedInputEnds = ti->getUncurriedInputEnds();
-  
-  // FIXME: We'd like to kill Scope, but it controls the caching of calculated
-  // metadata values.
-  Scope callScope(*this);
   
   // ObjC message sends need special handling for the 'this' argument. It may
   // need to be wrapped in an objc_super struct, and the '_cmd' argument needs
