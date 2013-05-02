@@ -1197,8 +1197,6 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) return cast<llvm::Function>(entry);
 
-  // FIXME: deallocating and destroying destructors have different signatures
-
   llvm::AttributeSet attrs;
   auto cc = expandAbstractCC(*this, AbstractCC::Method);
 
@@ -1209,7 +1207,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   } else {
     const TypeInfo &info =
       getFragileTypeInfo(cd->getDeclaredTypeInContext());
-    dtorTy = llvm::FunctionType::get(VoidTy,
+    dtorTy = llvm::FunctionType::get(RefCountedPtrTy,
                                      info.getStorageType(),
                                      /*isVarArg*/ false);
   }

@@ -460,15 +460,14 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
 static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
   Type classType = cd->getDeclaredTypeInContext();
 
-  Type voidType = TupleType::getEmpty(C);
   if (cd->getGenericParams()) {
     return PolymorphicFunctionType::get(classType,
-                                        voidType,
+                                        C.TheObjectPointerType,
                                         cd->getGenericParams(),
                                         C);
   } else {
     return FunctionType::get(classType,
-                             voidType,
+                             C.TheObjectPointerType,
                              C);
   }
 }

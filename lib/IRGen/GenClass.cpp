@@ -440,15 +440,6 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
                                        ClassDecl *theClass,
                                        llvm::Function *deallocator,
                                        llvm::Function *destroyer) {
-  // FIXME: We need to move some pieces around:
-  // - swift_release should restore the retain count to one before calling the
-  //   destroying destructor
-  // - the destroying destructor should return the object pointer back so the
-  //   pointer doesn't need to be preserved across the call and it doesn't need
-  //   to be r/r-ed
-  // - the deallocating destructor should perform the deallocation instead of
-  //   swift_release
-
   IRGenFunction IGF(IGM, CanType(), nullptr,
                     ExplosionKind::Minimal, 0, deallocator, Prologue::Bare);
 
@@ -456,10 +447,14 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
   const ClassTypeInfo &info =
     IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   
-  llvm::Value *arg = deallocator->getArgumentList().begin();
-  arg = IGF.Builder.CreateBitCast(arg, info.getStorageType());
-  IGF.Builder.CreateCall(destroyer, arg);
+  llvm::Value *obj = deallocator->getArgumentList().begin();
+  obj = IGF.Builder.CreateBitCast(obj, info.getStorageType());
+  // The destroying destructor returns the pointer back as a %swift.refcounted,
+  // so we don't need to keep it live across the call.
+  obj = IGF.Builder.CreateCall(destroyer, obj);
   
+  // FIXME: the deallocating destructor should perform the deallocation instead
+  // of returning a magic value back to swift_release.
   llvm::Value *size = info.getLayout(IGM).emitSize(IGF);
   IGF.Builder.CreateRet(size);
 }

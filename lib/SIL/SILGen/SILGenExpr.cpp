@@ -1260,29 +1260,31 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
   
   // If we have a base class, invoke its destructor.
+  SILType objectPtrTy = SILType::getObjectPointerType(F.getContext());
   if (Type baseTy = cd->getBaseClass()) {
     ClassDecl *baseClass = baseTy->getClassOrBoundGenericClass();
     
     // FIXME: We can't sensibly call up to ObjC dealloc methods right now
     // because they aren't really destroying destructors.
     if (baseClass->hasClangNode() && baseClass->isObjC()) {
-      B.createReturn(dd, emitEmptyTuple(dd));
+      thisValue = B.createRefToObjectPointer(dd, thisValue, objectPtrTy);
+      B.createReturn(dd, thisValue);
       return;
     }
     
     SILConstant dtorConstant =
       SILConstant(baseClass, SILConstant::Kind::Destroyer);
-    SILValue baseThis = B.createUpcast(dd,
-                                    thisValue,
-                                    getLoweredLoadableType(baseTy));
+    SILType baseSILTy = getLoweredLoadableType(baseTy);
+    SILValue baseThis = B.createUpcast(dd, thisValue, baseSILTy);
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
                                            /*innerSubstitutions*/ {});
-    B.createApply(dd, dtorValue.forward(*this),
-                  SGM.Types.getEmptyTupleType(),
-                  baseThis);
+    thisValue = B.createApply(dd, dtorValue.forward(*this),
+                              objectPtrTy,
+                              baseThis);
+  } else {
+    thisValue = B.createRefToObjectPointer(dd, thisValue, objectPtrTy);
   }
-  
-  B.createReturn(dd, emitEmptyTuple(dd));
+  B.createReturn(dd, thisValue);
 }
 
 static void emitConstructorMetatypeArg(SILGenFunction &gen,
