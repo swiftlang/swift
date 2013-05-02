@@ -245,6 +245,14 @@ public:
     LocalTypeDataMap.insert(std::make_pair(key, data));
   }
 
+  /// Add a local type-metadata reference at a point which does not
+  /// necessarily dominate the entire function.
+  void setScopedLocalTypeData(CanType type, LocalTypeData index,
+                              llvm::Value *data) {
+    ScopedLocalTypeData.push_back(getLocalTypeDataKey(type, index));
+    setUnscopedLocalTypeData(type, index, data);
+  }
+
 private:
   typedef unsigned LocalTypeDataDepth;
   typedef std::pair<TypeBase*,unsigned> LocalTypeDataPair;
@@ -253,6 +261,15 @@ private:
   }
 
   llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
+  llvm::SmallVector<LocalTypeDataPair, 4> ScopedLocalTypeData;
+
+  void endLocalTypeDataScope(LocalTypeDataDepth depth) {
+    assert(ScopedLocalTypeData.size() >= depth);
+    while (ScopedLocalTypeData.size() != depth) {
+      LocalTypeDataMap.erase(ScopedLocalTypeData.back());
+      ScopedLocalTypeData.pop_back();
+    }
+  }
 };
 
 } // end namespace irgen

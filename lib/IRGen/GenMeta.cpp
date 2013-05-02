@@ -207,7 +207,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
                                         metadata, arguments);
   result->setDoesNotThrow();
 
-  // FIXME: Save scope type metadata.
+  IGF.setScopedLocalTypeData(theType, LocalTypeData::Metatype, result);
   return result;
 }
 
@@ -447,7 +447,7 @@ namespace {
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Value *metatype) {
-      // FIXME: Save scope type metadata.
+      IGF.setScopedLocalTypeData(type, LocalTypeData::Metatype, metatype);
       return metatype;
     }
   };
