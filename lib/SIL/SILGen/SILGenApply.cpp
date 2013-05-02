@@ -295,16 +295,22 @@ public:
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential = gen.visit(e->getBase()).getAsSingleValue(gen);
-    assert(existential.getType().isAddress() && "loadable existential?!");
-    // FIXME: Use existential_metatype if method is static.
     
-    // Attach the existential cleanup to the projection so that it gets consumed
-    // (or not) when the call is applied to it (or isn't).
-    ManagedValue projection
-      = ManagedValue(gen.B.createProjectExistential(e, existential.getValue()),
-                     existential.getCleanup());
+    if (e->getDecl()->isInstanceMember()) {
+      assert(existential.getType().isAddress() && "loadable existential?!");
+      // Attach the existential cleanup to the projection so that it gets consumed
+      // (or not) when the call is applied to it (or isn't).
+      ManagedValue projection
+        = ManagedValue(gen.B.createProjectExistential(e, existential.getValue()),
+                       existential.getCleanup());
+      
+      setThisParam(RValue(gen, projection));
+    } else {
+      assert(existential.getType().is<MetaTypeType>() &&
+             "non-existential-metatype for existential static method?!");
+      setThisParam(RValue(gen, existential));
+    }
     
-    setThisParam(RValue(gen, projection));
     ManagedValue protoMethod(gen.emitProtocolMethod(e, existential.getValue()),
                              ManagedValue::Unmanaged);
     setCallee(protoMethod,

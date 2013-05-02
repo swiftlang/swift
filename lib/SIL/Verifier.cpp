@@ -538,15 +538,31 @@ public:
     require(!methodType->isThin(),
             "result method must not be of a thin function type");
     SILType operandType = EMI->getOperand().getType();
-    require(methodType->getInput()->isEqual(
-                            operandType.getASTContext().TheOpaquePointerType),
-            "result must be a method of opaque pointer");
-    require(methodType->getResult()->is<FunctionType>(),
-            "result must be a method");
-    require(operandType.isAddress(),
-            "protocol_method must apply to an existential address");
-    require(operandType.isExistentialType(),
-            "protocol_method must apply to an existential address");
+    
+    if (EMI->getMember().getDecl()->isInstanceMember()) {
+      require(methodType->getInput()->isEqual(
+                              operandType.getASTContext().TheOpaquePointerType),
+              "result must be a method of opaque pointer");
+      require(methodType->getResult()->is<FunctionType>(),
+              "result must be a method");
+      require(operandType.isAddress(),
+              "instance protocol_method must apply to an existential address");
+      require(operandType.isExistentialType(),
+              "instance protocol_method must apply to an existential address");
+    } else {
+      require(!operandType.isAddress(),
+              "static protocol_method cannot apply to an address");
+      require(operandType.is<MetaTypeType>(),
+              "static protocol_method must apply to an existential metatype");
+      require(operandType.castTo<MetaTypeType>()
+                ->getInstanceType()->isExistentialType(),
+              "static protocol_method must apply to an existential metatype");
+      require(methodType->getResult()->is<FunctionType>(),
+              "result must be a method");
+      require(methodType->getInput()->isEqual(
+                                  EMI->getOperand().getType().getSwiftType()),
+              "result must be a method of the existential metatype");
+    }
   }
   
   static bool isClassOrClassMetatype(Type t) {
@@ -593,7 +609,8 @@ public:
   
   void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
     SILType operandType = PEI->getOperand().getType();
-    require(operandType.isAddress(), "project_existential must be applied to address");
+    require(operandType.isAddress(),
+            "project_existential must be applied to address");
     require(operandType.isExistentialType(),
             "project_existential must be applied to address of existential");
   }

@@ -781,9 +781,16 @@ RValue SILGenFunction::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
 SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
                                             SILValue existential) {
   if (isa<FuncDecl>(e->getDecl())) {
+    // 'this' for instance methods is projected out of the existential container
+    // as an OpaquePointer.
+    // 'this' for existential metatypes is the metatype itself.
+    Type thisTy = e->getDecl()->isInstanceMember()
+      ? F.getContext().TheOpaquePointerType
+      : e->getBase()->getType();
+    
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
-    Type methodType = FunctionType::get(F.getContext().TheOpaquePointerType,
+    Type methodType = FunctionType::get(thisTy,
                                         e->getType(),
                                         F.getContext());
     SILConstant c(e->getDecl());
@@ -800,7 +807,8 @@ RValue SILGenFunction::visitExistentialMemberRefExpr(
                                                  ExistentialMemberRefExpr *E,
                                                  SGFContext C) {
   SILValue existential = visit(E->getBase()).getUnmanagedSingleValue(*this);
-  assert(existential.getType().isAddress() &&
+  assert((existential.getType().isAddress() ||
+          existential.getType().is<MetaTypeType>()) &&
          "existential must be an address");
   //SILValue projection = B.createProjectExistential(E, existential);
   //SILValue method = emitProtocolMethod(E, existential);
