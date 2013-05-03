@@ -2578,6 +2578,10 @@ namespace {
       assert(TypesForDepths.size() == depth);
       TypesForDepths.push_back(type->getDecl());
 
+      auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
+      assert(params.size() >= type->getGenericArgs().size() &&
+             "generic type parameters should parallel those of its decl");
+
       for (unsigned i = 0, e = type->getGenericArgs().size(); i != e; ++i) {
         CanType arg = CanType(type->getGenericArgs()[i]);
 
@@ -2588,8 +2592,6 @@ namespace {
         //   \forall T U . Vector<T->U> -> ()
         if (auto argArchetype = dyn_cast<ArchetypeType>(arg)) {
           // Find the archetype from the generic type.
-          auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
-          assert(params.size() == e); // should be parallel
           considerArchetype(argArchetype, params[i], depth, i);
         }
       }
