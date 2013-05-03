@@ -445,6 +445,17 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
   newLoweredExplosion(SILValue(i, 0), result);
 }
 
+void IRGenSILFunction::visitProtocolMetatypeInst(
+                                               swift::ProtocolMetatypeInst *i) {
+  Address existential = getLoweredAddress(i->getOperand());
+
+  llvm::Value *metatype = emitTypeMetadataRefForExistential(*this, existential,
+                                i->getOperand().getType().getSwiftRValueType());
+  Explosion result(CurExplosionLevel);
+  result.add(metatype);
+  newLoweredExplosion(SILValue(i, 0), result);
+}
+
 void IRGenSILFunction::visitAssociatedMetatypeInst(
                                              swift::AssociatedMetatypeInst *i) {
   CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());

@@ -1174,6 +1174,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                       llvm::Function *fn,
                                       ValueWitness index,
                                       FixedPacking packing,
+                                      CanType concreteType,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
 
@@ -1286,7 +1287,14 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
       
   case ValueWitness::TypeOf: {
-    llvm_unreachable("always have a known implementation of typeof witness");
+    // Only existentials need bespoke typeof witnesses.
+    assert(concreteType->isExistentialType() &&
+           "non-existentials should have a known typeof witness");
+    Address obj = getArgAs(IGF, argv, type, "obj");
+    llvm::Value *result
+      = emitTypeMetadataRefForExistential(IGF, obj, concreteType);
+    IGF.Builder.CreateRet(result);
+    return;
   }
 
   case ValueWitness::Size:
@@ -1702,10 +1710,11 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (hasKnownSwiftMetadata(IGM, cd))
         return asOpaquePtr(IGM, IGM.getObjectTypeofFn());
       return asOpaquePtr(IGM, IGM.getObjCTypeofFn());
-    } else {
-      // Other types have static metadata.
+    } else if (!concreteType->isExistentialType()) {
+      // Other non-existential types have static metadata.
       return asOpaquePtr(IGM, IGM.getStaticTypeofFn());
     }
+    goto standard;
       
   case ValueWitness::Size: {
     if (auto value = concreteTI.getStaticSize(IGM))
@@ -1738,7 +1747,9 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   llvm::Function *fn =
     IGM.getAddrOfValueWitness(concreteType, index);
   if (fn->empty())
-    buildValueWitnessFunction(IGM, fn, index, packing, concreteTI);
+    buildValueWitnessFunction(IGM, fn, index, packing,
+                              concreteType,
+                              concreteTI);
   return asOpaquePtr(IGM, fn);
 }
 
@@ -3320,7 +3331,25 @@ irgen::getProtocolMethodValue(IRGenFunction &IGF,
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
+llvm::Value *
+irgen::emitTypeMetadataRefForExistential(IRGenFunction &IGF,
+                                         Address addr,
+                                         CanType type) {
+  assert(type->isExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(type).as<ExistentialTypeInfo>();
 
+  // Get the static metadata.
+  auto existLayout = baseTI.getLayout();
+  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, addr);
+  
+  // Get the value witness.
+  llvm::Value *vwtable = existLayout.loadValueWitnessTable(IGF, addr, metadata);
+  
+  // Project the buffer and apply the 'typeof' value witness.
+  Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
+  llvm::Value *object = emitProjectBufferCall(IGF, vwtable, metadata, buffer);
+  return emitTypeofCall(IGF, vwtable, metadata, object);
+}
 
 /// Determine the natural limits on how we can call the given protocol
 /// member function.

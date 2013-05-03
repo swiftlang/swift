@@ -497,15 +497,16 @@ namespace {
     bool visitArchetypeType(ArchetypeType *type) {
       return false;
     }
-
+    
     /// All levels of class metatypes support subtyping.
     bool visitMetaTypeType(MetaTypeType *type) {
       return visit(CanType(type->getInstanceType()));
     }
 
-    /// Everything else is trivial.
+    /// Existential metatypes have non-trivial representation because
+    /// they can refer to an arbitrary metatype. Everything else is trivial.
     bool visitType(TypeBase *type) {
-      return true;
+      return !type->isExistentialType();
     }
   };
 }

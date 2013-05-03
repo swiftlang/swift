@@ -122,6 +122,11 @@ namespace irgen {
   llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                                Address archetypeAddr,
                                                CanType archetypeType);
+  
+  /// Emit a dynamic metatype lookup for the given existential.
+  llvm::Value *emitTypeMetadataRefForExistential(IRGenFunction &IGF,
+                                                 Address addr,
+                                                 CanType type);
 } // end namespace irgen
 } // end namespace swift
 
