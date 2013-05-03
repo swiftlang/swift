@@ -54,9 +54,9 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
     consumeToken();
   }
   
-  parseBraceItemList(Items, true,
-                     IsMainModule ? BraceItemListKind::TopLevelCode
-                                  : BraceItemListKind::Brace);
+  parseBraceItems(Items, true,
+                  IsMainModule ? BraceItemListKind::TopLevelCode
+                               : BraceItemListKind::Brace);
 
 
   // If this is a MainModule, determine if we found code that needs to be
@@ -714,8 +714,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       ContextChange CC(*this, GetFn);
 
       SmallVector<ExprStmtOrDecl, 16> Entries;
-      parseBraceItemList(Entries, false /*NotTopLevel*/,
-                         BraceItemListKind::Property);
+      parseBraceItems(Entries, false /*NotTopLevel*/,
+                      BraceItemListKind::Property);
       NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
                                                       Entries, Tok.getLoc());
 
@@ -826,8 +826,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     
     // Parse the body.
     SmallVector<ExprStmtOrDecl, 16> Entries;
-    parseBraceItemList(Entries, false /*NotTopLevel*/,
-                       BraceItemListKind::Property);
+    parseBraceItems(Entries, false /*NotTopLevel*/,
+                    BraceItemListKind::Property);
     NullablePtr<BraceStmt> Body = BraceStmt::create(Context, ColonLoc,
                                                     Entries, Tok.getLoc());
 
@@ -1140,7 +1140,8 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
         return 0;
       }
     } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
-      NullablePtr<BraceStmt> Body=parseStmtBrace(diag::func_decl_without_brace);
+      NullablePtr<BraceStmt> Body =
+        parseBraceItemList(diag::func_decl_without_brace);
       if (Body.isNull()) {
         // FIXME: Should do some sort of error recovery here?
       } else {
@@ -1786,7 +1787,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
   ScopeInfo.addToScope(ThisDecl);
   ContextChange CC(*this, CD);
 
-  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+  NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
   if (!Body.isNull())
     CD->setBody(Body.get());
@@ -1822,7 +1823,7 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
   ScopeInfo.addToScope(ThisDecl);
   ContextChange CC(*this, DD);
 
-  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::invalid_diagnostic);
+  NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
 
   if (!Body.isNull())
     DD->setBody(Body.get());

@@ -40,7 +40,7 @@ namespace swift {
   
   struct OneOfElementInfo;
   
-  /// Different contexts in which BraceStmt item lists are parsed.
+  /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
     Brace,
@@ -240,9 +240,10 @@ public:
   
   bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
 
-  void parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Decls,
-                          bool IsTopLevel,
-                          BraceItemListKind Kind = BraceItemListKind::Brace);
+  void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
+                       bool IsTopLevel,
+                       BraceItemListKind Kind = BraceItemListKind::Brace);
+  NullablePtr<BraceStmt> parseBraceItemList(Diag<> ID);
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
@@ -410,7 +411,6 @@ public:
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
   bool parseExprOrStmtAssign(ExprStmtOrDecl &Results);
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
-  NullablePtr<BraceStmt> parseStmtBrace(Diag<> ID);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();
   NullablePtr<Stmt> parseStmtWhile();

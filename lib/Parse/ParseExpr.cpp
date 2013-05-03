@@ -1047,7 +1047,8 @@ NullablePtr<Expr> Parser::parseExprFunc() {
   ContextChange CC(*this, FE);
   
   // Then parse the expression.
-  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_lbrace_func_expr);
+  NullablePtr<BraceStmt> Body =
+    parseBraceItemList(diag::expected_lbrace_func_expr);
   if (Body.isNull())
     return 0;
 

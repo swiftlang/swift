@@ -579,15 +579,33 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    translation-unit ::= <a href="#stmt-brace">stmt-brace-item</a>*
+    translation-unit ::= <a href="#brace-item-list">brace-item</a>*
   </pre>
   
   <p>The top level of a swift source file is grammatically identical to the
-  contents of a <a href="#stmt-brace">brace statement</a>.  Some declarations
+  contents of a func decl.  Some declarations
   have semantic restrictions that only allow them within a translation unit
   though.
   </p>
   
+  <!-- _____________________________________________________________________ -->
+  <h4 id="brace-item-list">Brace Enclosed Items</h4>
+  
+  <pre class="grammar">
+    brace-item-list ::= '{' brace-item* '}'
+    
+    brace-item      ::= <a href="#decl">decl</a>
+    brace-item      ::= <a href="#expr">expr</a>
+    brace-item      ::= <a href="#stmt">stmt</a>
+  </pre>
+  
+  <p>The brace item list provides a sequencing operation which evaluates the
+  members of its body in order.  Function bodies and the bodies of control
+  flow statements use braces.  Also, the <a
+    href="#decl-translation-unit">translation unit</a> itself is effectively a
+  brace item list, but without the braces.
+  </p>
+
   <!-- ===================================================================== -->
   <h3 id="decl-import">import Declarations</h3>
   <!-- ===================================================================== -->
@@ -659,7 +677,7 @@
   <pre id="value-specifier" class="grammar">
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
 
-    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#stmt-brace">stmt-brace</a>
+    decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
 
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> '{' get-set '}'
   
@@ -668,9 +686,9 @@
     <a name="get-set"></a>get-set         ::= get set?
     get-set         ::= set get
 
-    get             ::= 'get:' <a href="#stmt-brace">stmt-brace-item*</a>
+    get             ::= 'get:' <a href="#brace-item-list">brace-item*</a>
 
-    set             ::= 'set' set-name? ':' <a href="#stmt-brace">stmt-brace-item*</a>
+    set             ::= 'set' set-name? ':' <a href="#brace-item-list">brace-item*</a>
 
     set-name        ::= '(' <a href="#identifier">identifier</a> ')'
 </pre>
@@ -748,7 +766,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#stmt-brace">stmt-brace</a>?
+    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -1254,7 +1272,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> <a href="#stmt-brace">stmt-brace</a>
+    decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>'constructor' declares a constructor for a class, struct, or oneof.  Such
@@ -1309,7 +1327,7 @@ if vec[3] {
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= 'destructor' <a href="#attribute-list">attribute-list</a> <a href="#stmt-brace">stmt-brace</a>
+    decl-constructor ::= 'destructor' <a href="#attribute-list">attribute-list</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>'destructor' declares a destructor for a class.  This function is called
@@ -2373,8 +2391,8 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    It would be possible to allow { expr } and { stmt-brace-item* } here - 
-    allowing the same syntax as stmt-brace.  The
+    It would be possible to allow { expr } and { brace-item* } here -
+    allowing the same syntax as func decls.  The
     intepretation of this would be that a single expression is evaluated and
     returned implicitly, but that a multi-statement sequence would require an
     explicit return.  This would mean that {4} and {return 4} both do the same
@@ -2400,13 +2418,6 @@ ill-formed if the type does not conform to the protocol.</p>
   <p>It is illegal to use these expressions when there is insufficient context
      to infer the argument and return types of the closure.</p>
   
-  <p>Note that expr-explicit-closure is ambiguous with <a 
-     href="#stmt-brace">stmt-brace</a> when used in a another stmt-brace or in
-     <a href="#decl-translation-unit">translation-unit</a> scope.  This
-     ambiguity is resolved towards stmt-brace, because these context never have
-     enough contextual information to infer the type of the closure, thus they
-     would always be a semantic error if parsed that way.</p>
-
   <pre class="example">
     <i>// Takes a closure that it calls to determine an ordering relation.</i>
     func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
@@ -2531,7 +2542,7 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
   
   <pre class="grammar">
-    expr-func ::= 'func' <a href="#func-signature">func-signature</a>? <a href="#stmt-brace">stmt-brace</a>
+    expr-func ::= 'func' <a href="#func-signature">func-signature</a>? <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>A func expression is an anonymous (unnamed) function literal definition,
@@ -2720,7 +2731,6 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="grammar">
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
     stmt ::= <a href="#stmt-assign">stmt-assign</a>
-    stmt ::= <a href="#stmt-brace">stmt-brace</a>
     stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
@@ -2787,25 +2797,6 @@ ill-formed if the type does not conform to the protocol.</p>
   
 
   <!-- ===================================================================== -->
-  <h3 id="stmt-brace">Brace Statement</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    stmt-brace      ::= '{' stmt-brace-item* '}'
-    
-    stmt-brace-item ::= <a href="#decl">decl</a>
-    stmt-brace-item ::= <a href="#expr">expr</a>
-    stmt-brace-item ::= <a href="#stmt">stmt</a>
-  </pre>
-  
-  <p>The brace statement provides a sequencing operation which evaluates the
-     members of its body in order.  Function bodies and the bodies of control
-     flow statements use braces.  Also, the <a 
-    href="#decl-translation-unit">translation unit</a> itself is effectively and
-     brace statement without the braces.  
-  </p>
-
-  <!-- ===================================================================== -->
   <h3 id="stmt-return">'return' Statement</h3>
   <!-- ===================================================================== -->
   
@@ -2838,8 +2829,8 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    stmt-if      ::= 'if' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a> stmt-if-else?
-    stmt-if-else ::= 'else' <a href="#stmt-brace">stmt-brace</a>
+    stmt-if      ::= 'if' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a> stmt-if-else?
+    stmt-if-else ::= 'else' <a href="#brace-item-list">brace-item-list</a>
     stmt-if-else ::= 'else' stmt-if
   </pre>
   
@@ -2873,7 +2864,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-while ::= 'while' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
+    stmt-while ::= 'while' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
   
   <p>'while' statements provide simple loop construct which (on each iteration
@@ -2901,7 +2892,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-do-while ::= 'do' <a href="#stmt-brace">stmt-brace</a> 'while' '<a href="#expr">expr</a>
+    stmt-do-while ::= 'do' <a href="#brace-item-list">brace-item-list</a> 'while' '<a href="#expr">expr</a>
   </pre>
   
   <p>'do-while' statements provide simple loop construct which (on each
@@ -2930,7 +2921,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#stmt-brace">stmt-brace</a>
+    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#brace-item-list">brace-item-list</a>
     expr-or-stmt-assign   ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
     stmt-for-c-style-init ::= <a href="#decl-var">decl-var</a>
     stmt-for-c-style-init ::= expr-or-stmt-assign
@@ -2960,7 +2951,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#stmt-brace">stmt-brace</a>
+    stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
   
   <p>Enumerator-based 'for' statements provide enumeration over the values in a
@@ -2988,7 +2979,7 @@ ill-formed if the type does not conform to the protocol.</p>
   
   <pre class="grammar">
     stmt-switch ::= 'switch' <a href="#expr">expr</a> '{' stmt-switch-case* '}'
-    stmt-switch-case ::= (case-label | default-label) <a href="#stmt-brace">stmt-brace-item</a>*
+    stmt-switch-case ::= (case-label | default-label) <a href="#brace-item-list">brace-item</a>*
 
     case-label ::= 'case' expr (',' expr)* ':'
     default-label ::= 'default' ':'

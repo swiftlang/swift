@@ -32,7 +32,6 @@ using namespace swift;
 bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
-  case tok::l_brace:
   case tok::kw_return:
   case tok::kw_if:
   case tok::kw_while:
@@ -125,8 +124,6 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
     return false;
   }
 
-  assert(Tok.isNot(tok::l_brace) &&
-         "expr-anon-closure should be parsed as stmt-brace here");
   return parseExprOrStmtAssign(Result);
 }
 
@@ -161,14 +158,13 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   }
 }
 
-///   stmt-brace-item:
+///   brace-item:
 ///     decl
 ///     expr
 ///     stmt
 ///   stmt:
 ///     ';'
 ///     stmt-assign
-///     stmt-brace
 ///     stmt-return
 ///     stmt-if
 ///     stmt-for-c-style
@@ -176,9 +172,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
 ///     stmt-switch
 ///   stmt-assign:
 ///     expr '=' expr
-void Parser::parseBraceItemList(SmallVectorImpl<ExprStmtOrDecl> &Entries,
-                                bool IsTopLevel,
-                                BraceItemListKind Kind) {
+void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
+                             bool IsTopLevel, BraceItemListKind Kind) {
   // This forms a lexical scope.
   Scope BraceScope(this, !IsTopLevel);
     
@@ -288,8 +283,6 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   default:
     diagnose(Tok, diag::expected_stmt);
     return 0;
-  case tok::l_brace:
-    return parseStmtBrace(diag::invalid_diagnostic).getPtrOrNull();
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
   case tok::kw_while:  return parseStmtWhile();
@@ -308,13 +301,14 @@ NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
   }
 }
 
-/// parseStmtBrace - A brace enclosed expression/statement/decl list.  For
-/// example { 1; 4+5; } or { 1; 2 }.
+/// parseBraceItemList - A brace enclosed expression/statement/decl list.  For
+/// example { 1; 4+5; } or { 1; 2 }.  Always occurs as part of some other stmt
+/// or decl.
 ///
-///   stmt-brace:
-///     '{' stmt-brace-item* '}'
+///   brace-item-list:
+///     '{' brace-item* '}'
 ///
-NullablePtr<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
+NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   if (Tok.isNot(tok::l_brace)) {
     diagnose(Tok.getLoc(), ID);
     return 0;
@@ -324,7 +318,7 @@ NullablePtr<BraceStmt> Parser::parseStmtBrace(Diag<> ID) {
   SmallVector<ExprStmtOrDecl, 16> Entries;
   SourceLoc RBLoc;
 
-  parseBraceItemList(Entries, false /*NotTopLevel*/);
+  parseBraceItems(Entries, false /*NotTopLevel*/);
   if (parseMatchingToken(tok::r_brace, RBLoc,
                          diag::expected_rbrace_in_brace_stmt, LBLoc))
     return 0;
@@ -344,8 +338,8 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', or statement keyword.
   Expr *RetExpr = nullptr;
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi)
-      && (Tok.is(tok::l_brace) || !isStartOfStmtOtherThanAssignment(Tok))) {
+  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
+      !isStartOfStmtOtherThanAssignment(Tok)) {
     NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
@@ -368,7 +362,7 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_if);
   if (Condition.isNull()) return 0;
   NullablePtr<BraceStmt> NormalBody =
-    parseStmtBrace(diag::expected_lbrace_after_if);
+    parseBraceItemList(diag::expected_lbrace_after_if);
   if (NormalBody.isNull())
     return 0;
     
@@ -378,7 +372,8 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
     if (Tok.is(tok::kw_if))
       ElseBody = parseStmtIf();
     else
-      ElseBody =parseStmtBrace(diag::expected_lbrace_after_else).getPtrOrNull();
+      ElseBody = parseBraceItemList(diag::expected_lbrace_after_else)
+        .getPtrOrNull();
     if (ElseBody.isNull())
       return 0;
   } else {
@@ -399,7 +394,7 @@ NullablePtr<Stmt> Parser::parseStmtWhile() {
   NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_while);
   if (Condition.isNull()) return 0;
   NullablePtr<BraceStmt> Body =
-    parseStmtBrace(diag::expected_lbrace_after_while);
+    parseBraceItemList(diag::expected_lbrace_after_while);
   if (Body.isNull())
     return 0;
   
@@ -414,7 +409,7 @@ NullablePtr<Stmt> Parser::parseStmtDoWhile() {
   SourceLoc DoLoc = consumeToken(tok::kw_do), WhileLoc;
 
   NullablePtr<BraceStmt> Body =
-    parseStmtBrace(diag::expected_lbrace_after_do);
+    parseBraceItemList(diag::expected_lbrace_after_do);
   if (Body.isNull()) return 0;
 
   if (parseToken(tok::kw_while, WhileLoc, diag::expected_while_in_dowhile))
@@ -500,7 +495,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
                                           diag::expected_rparen_for_stmt,LPLoc))
     return 0;
 
-  if ((Body = parseStmtBrace(diag::expected_lbrace_after_for)).isNull())
+  if ((Body = parseBraceItemList(diag::expected_lbrace_after_for)).isNull())
     return 0;
 
   PointerUnion<Expr*, AssignStmt*> Initializer, Increment;
@@ -554,7 +549,8 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
     addVarsToScope(Pattern.get(), Decls, Attributes);
   }
   // stmt-brace
-  NullablePtr<BraceStmt> Body = parseStmtBrace(diag::expected_foreach_lbrace);
+  NullablePtr<BraceStmt> Body =
+    parseBraceItemList(diag::expected_foreach_lbrace);
   
   if (Pattern.isNull() || Container.isNull() || Body.isNull())
     return nullptr;
@@ -657,9 +653,7 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
   SourceLoc colonLoc = consumeToken(tok::colon);
   
   llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
-  parseBraceItemList(bodyItems,
-                     /*isTopLevel*/ false,
-                     BraceItemListKind::Case);
+  parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);
   BraceStmt *body = BraceStmt::create(Context,
                                       colonLoc, bodyItems, Tok.getLoc());
   
