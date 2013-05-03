@@ -32,6 +32,44 @@
 
 using namespace swift;
 
+TypeChecker::TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
+  : TU(TU), Context(TU.Ctx),
+    EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
+    Diags(Diags)
+{
+  Context.addMutationListener(*this);
+
+  // Validate any external types already part of the translation unit.
+  for (auto type : Context.ExternalTypes)
+    validateTypeSimple(type);
+  
+  // Add any external definitions already part of the translation unit.
+  // Note: the underlying vector can get reallocated during this traversal.
+  // We don't want to pick up the new external definitions.
+  unsigned n = Context.ExternalDefinitions.size();
+  for (unsigned i = Context.LastCheckedExternalDefinition; i != n; ++i)
+    handleExternalDecl(Context.ExternalDefinitions[i]);
+}
+
+TypeChecker::~TypeChecker() {
+  Context.removeMutationListener(*this);
+}
+
+void TypeChecker::handleExternalDecl(Decl *decl) {
+  if (auto structDecl = dyn_cast<StructDecl>(decl)) {
+    addImplicitConstructors(structDecl);
+  }
+}
+
+void TypeChecker::addedExternalDecl(Decl *decl) {
+  handleExternalDecl(decl);
+  Context.ExternalDefinitions.insert(decl);
+}
+
+void TypeChecker::addedExternalType(Type type) {
+  Context.ExternalTypes.push_back(type);
+}
+
 /// \brief Check for circular inheritance of protocols.
 ///
 /// \param Path The circular path through the protocol inheritance hierarchy,
@@ -744,53 +782,11 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     }
   }
 
-  // Type-check any externally-sourced type definitions. We may need to
-  // add implicit constructors.
-  // FIXME: This is O(N^2), because we're not tracking new definitions.
-  llvm::SetVector<StructDecl *> externalStructs;
-  for (auto imported : TC.Context.LoadedClangModules) {
-    for (auto &def : imported->getExternalDefinitions()) {
-      switch (def.getStage()) {
-      case ExternalDefinition::TypeChecked:
-        continue;
-
-      case ExternalDefinition::NameBound:
-        break;
-      }
-
-      auto decl = def.getDecl();
-      if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-        // StructDecls should already be typed by the ClangImporter and don't
-        // need additional typechecking.
-        TC.addImplicitConstructors(structDecl);
-        def.setStage(ExternalDefinition::TypeChecked);
-        externalStructs.insert(structDecl);
-      }
-      continue;
-    }
-  }
-
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
   prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
                            TC.implicitlyDefinedFunctions.end());
   TC.implicitlyDefinedFunctions.clear();
-  
-  // For externally-defined structs, add each of the implicitly-defined
-  // constructors to the list of external definitions.
-  for (auto sd : externalStructs) {
-    for (auto member : sd->getMembers()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (ctor->isImplicit()) {
-          auto dc = sd->getDeclContext();
-          while (dc->getParent())
-            dc = dc->getParent();
-          auto clangMod = cast<ClangModule>(dc);
-          clangMod->addExternalDefinition(ctor);
-        }
-      }
-    }
-  }
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
@@ -825,7 +821,15 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   }
 
   unsigned currentFuncExpr = 0;
+  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
+  unsigned currentExternalType = 0;
   do {
+    // Validate any externally-created types.
+    for (unsigned n = TC.Context.ExternalTypes.size(); currentExternalType != n;
+         ++currentExternalType) {
+      TC.validateTypeSimple(TC.Context.ExternalTypes[currentExternalType]);
+    }
+
     // Type check the body of each of the FuncExpr in turn.  Note that outside
     // FuncExprs must be visited before nested FuncExprs for type-checking to
     // work correctly.
@@ -847,49 +851,31 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       TC.typeCheckFunctionBody(FE);
     }
 
-    // Type-check any externally-sourced definitions and types.
-    // FIXME: This is O(N^2), because we're not tracking new definitions.
-    externalStructs.clear();
-    for (auto imported : TC.Context.LoadedClangModules) {
-      for (auto &def : imported->getExternalDefinitions()) {
-        switch (def.getStage()) {
-        case ExternalDefinition::TypeChecked:
-          continue;
+    for (unsigned n = TC.Context.ExternalDefinitions.size();
+                  currentExternalDef != n;
+         ++currentExternalDef) {
+      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
 
-        case ExternalDefinition::NameBound:
-          break;
-        }
-
-        auto decl = def.getDecl();
-        if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
-          prePass.FuncExprs.push_back(constructor);
-          def.setStage(ExternalDefinition::TypeChecked);
-          continue;
-        }
-        if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
-          prePass.FuncExprs.push_back(destructor);
-          def.setStage(ExternalDefinition::TypeChecked);
-          continue;
-        }
-        if (auto func = dyn_cast<FuncDecl>(decl)) {
-          prePass.FuncExprs.push_back(func->getBody());
-          def.setStage(ExternalDefinition::TypeChecked);
-          continue;
-        }
-        if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-          // StructDecls should already be typed by the ClangImporter and don't
-          // need additional typechecking. However, we may still need to
-          // add implicitly-defined constructors.
-          TC.addImplicitConstructors(structDecl);
-          def.setStage(ExternalDefinition::TypeChecked);
-          externalStructs.insert(structDecl);
-          continue;
-        }
-
-        llvm_unreachable("Unknown externally-sourced definition");
+      if (auto constructor = dyn_cast<ConstructorDecl>(decl)) {
+        TC.typeCheckConstructorBody(constructor);
+        continue;
       }
-      for (Type t : imported->getTypes())
-        TC.validateTypeSimple(t);
+      if (auto destructor = dyn_cast<DestructorDecl>(decl)) {
+        TC.typeCheckDestructorBody(destructor);
+        continue;
+      }
+      if (auto func = dyn_cast<FuncDecl>(decl)) {
+        FuncExpr *FE = func->getBody();
+        PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
+        TC.typeCheckFunctionBody(FE);
+        continue;
+      }
+       if (isa<StructDecl>(decl)) {
+         // StructDecls should already be typed by the ClangImporter and don't
+         // need additional typechecking.
+         continue;
+      }
+      llvm_unreachable("Unhandled external definition kind");
     }
 
     // Define any pending implicitly declarations.
@@ -897,24 +883,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     prePass.FuncExprs.append(TC.implicitlyDefinedFunctions.begin(),
                              TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
+  } while (currentFuncExpr < prePass.FuncExprs.size() ||
+           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           currentExternalType < TC.Context.ExternalTypes.size());
 
-    // For externally-defined structs, add each of the implicitly-defined
-    // constructors to the list of external definitions.
-    for (auto sd : externalStructs) {
-      for (auto member : sd->getMembers()) {
-        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-          if (ctor->isImplicit()) {
-            auto dc = sd->getDeclContext();
-            while (dc->getParent())
-              dc = dc->getParent();
-            auto clangMod = cast<ClangModule>(dc);
-            clangMod->addExternalDefinition(ctor);
-          }
-        }
-      }
-    }
-  } while (currentFuncExpr < prePass.FuncExprs.size());
-  
+  // FIXME: Horrible hack. Store this somewhere more sane.
+  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+
   // Verify that we've checked types correctly.
   TU->ASTStage = TranslationUnit::TypeChecked;
   verify(TU);

@@ -22,9 +22,10 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/StringMap.h"
 #include <vector>
 #include <utility>
 
@@ -40,6 +41,7 @@ namespace clang {
 
 namespace swift {
   class ASTContext;
+  class ASTMutationListener;
   class BoundGenericType;
   class ClangModule;
   class Decl;
@@ -178,7 +180,17 @@ public:
   /// ConformsTo - Caches the results of checking whether a given (canonical)
   /// type conforms to a given protocol.
   ConformsToMap ConformsTo;
-  
+
+  /// \brief The list of external definitions imported by this context.
+  llvm::SetVector<Decl *> ExternalDefinitions;
+
+  /// FIXME: HACK HACK HACK
+  /// This state should be tracked somewhere else.
+  unsigned LastCheckedExternalDefinition = 0;
+
+  /// \brief The list of externally-created types that need validation.
+  std::vector<Type> ExternalTypes;
+
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -242,6 +254,24 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str);
+
+
+  /// \brief Add a new mutation listener to this AST context.
+  ///
+  /// Mutation listeners will receive events when the AST is updated, e.g.,
+  /// due to the module importer.
+  void addMutationListener(ASTMutationListener &listener);
+
+  /// \brief Remove the given mutation listener from this AST context.
+  void removeMutationListener(ASTMutationListener &listener);
+
+  /// \brief Notify all of the mutation listeners that the given declaration
+  /// was just added.
+  void addedExternalDecl(Decl *decl);
+
+  /// \brief Notify all of the mutation listeners that the given type
+  /// was just added.
+  void addedExternalType(Type type);
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions

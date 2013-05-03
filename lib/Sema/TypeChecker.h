@@ -18,6 +18,7 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
@@ -274,7 +275,7 @@ public:
   }
 };
 
-class TypeChecker {
+class TypeChecker : public ASTMutationListener {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
@@ -310,15 +311,9 @@ private:
   unsigned NextResponseVariableIndex = 0;
 
 public:
-  TypeChecker(TranslationUnit &TU)
-    : TU(TU), Context(TU.Ctx),
-      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
-      Diags(TU.Ctx.Diags) {}
-
-  TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
-    : TU(TU), Context(TU.Ctx),
-      EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
-      Diags(Diags) {}
+  TypeChecker(TranslationUnit &TU) : TypeChecker(TU, TU.Ctx.Diags) { }
+  TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags);
+  ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
   
@@ -851,6 +846,19 @@ public:
   /// \brief Retrieve the DictionaryLiteralConvertible protocol
   /// declaration, if it exists.
   ProtocolDecl *getDictionaryLiteralProtocol();
+
+  /// \name AST Mutation Listener Implementation
+  /// @{
+  void handleExternalDecl(Decl *decl);
+
+  /// \brief A new declaration was added to the AST.
+  virtual void addedExternalDecl(Decl *decl);
+
+  /// \brief A new type was added to the AST.
+  virtual void addedExternalType(Type type);
+
+  /// @}
+
 };
 
 } // end namespace swift

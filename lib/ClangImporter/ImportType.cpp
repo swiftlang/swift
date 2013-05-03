@@ -502,7 +502,7 @@ Type ClangImporter::Implementation::importType(clang::QualType type) {
   SwiftTypeConverter converter(*this);
   Type converted = converter.Visit(type.getTypePtr());
   if (converted)
-    firstClangModule->addType(converted);
+    SwiftContext.addedExternalType(converted);
   return converted;
 }
 

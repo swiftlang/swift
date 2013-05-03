@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/ASTWalker.h"
@@ -472,6 +473,38 @@ static void bindFuncDeclToOperator(NameBinder &Binder,
     FD->setOperatorDecl(op);
 }
 
+namespace {
+  /// \brief AST mutation listener that captures any added declarations and
+  /// types, then adds them to the translation unit.
+  class CaptureExternalsListener : public ASTMutationListener {
+    TranslationUnit *TU;
+
+    CaptureExternalsListener(const CaptureExternalsListener &) = delete;
+
+    CaptureExternalsListener &
+    operator=(const CaptureExternalsListener &) = delete;
+    
+  public:
+    explicit CaptureExternalsListener(TranslationUnit *TU) : TU(TU) {
+      TU->getASTContext().addMutationListener(*this);
+    }
+
+    ~CaptureExternalsListener() {
+      TU->getASTContext().removeMutationListener(*this);
+    }
+
+    /// \brief A new declaration was added to the AST.
+    virtual void addedExternalDecl(Decl *decl) {
+      TU->getASTContext().ExternalDefinitions.insert(decl);
+    }
+
+    /// \brief A new type was added to the AST.
+    virtual void addedExternalType(Type type) {
+      TU->getASTContext().ExternalTypes.push_back(type);
+    }
+};
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -486,6 +519,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     return;
   }
 
+  CaptureExternalsListener Capture(TU);
+  
   bool IsInitialNameBinding = TU->getImportedModules().empty();
 
   // Reset the name lookup cache so we find new decls.

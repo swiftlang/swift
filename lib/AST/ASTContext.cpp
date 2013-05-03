@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ModuleLoader.h"
@@ -27,6 +28,8 @@
 
 using namespace swift;
 
+ASTMutationListener::~ASTMutationListener() { }
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -37,6 +40,9 @@ struct ASTContext::Implementation {
   /// \brief The module loader used to load modules.
   llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ModuleLoader;
 
+  /// \brief The set of AST mutation listeners.
+  SmallVector<ASTMutationListener *, 4> MutationListeners;
+  
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
   llvm::DenseMap<swift::Decl *, ClangNode> ClangNodes;
@@ -177,6 +183,28 @@ Identifier ASTContext::getIdentifier(StringRef Str) {
   if (Str.empty()) return Identifier(0);
   
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
+}
+
+void ASTContext::addMutationListener(ASTMutationListener &listener) {
+  Impl.MutationListeners.push_back(&listener);
+}
+
+void ASTContext::removeMutationListener(ASTMutationListener &listener) {
+  auto known = std::find(Impl.MutationListeners.rbegin(),
+                         Impl.MutationListeners.rend(),
+                         &listener);
+  assert(known != Impl.MutationListeners.rend() && "listener not registered");
+  Impl.MutationListeners.erase(known.base()-1);
+}
+
+void ASTContext::addedExternalDecl(Decl *decl) {
+  for (auto listener : Impl.MutationListeners)
+    listener->addedExternalDecl(decl);
+}
+
+void ASTContext::addedExternalType(Type type) {
+  for (auto listener : Impl.MutationListeners)
+    listener->addedExternalType(type);
 }
 
 bool ASTContext::hadError() const {

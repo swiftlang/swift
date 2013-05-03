@@ -292,54 +292,9 @@ public:
   }
 };
 
-/// \brief Describes an externally-synthesized definition.
-///
-/// Externally synthesized definitions are generated when the Clang module
-/// importer generates a Swift stub definition to provide a better Swift
-/// interface for a C/Objective-C/C++ construct, such a Swift constructor
-/// implemented on top of Objective-C alloc/init.
-class ExternalDefinition {
-public:
-  /// \brief Describes the stage to which this external definition has been
-  /// processed.
-  ///
-  /// External definitions always start in the 'name-bound' stage.
-  enum Stage {
-    /// \brief All names in the definition have been bound.
-    NameBound,
-    /// \brief The definition has been type-checked.
-    TypeChecked,
-  };
-
-private:
-  llvm::PointerIntPair<Decl *, 2, Stage> Data;
-
-public:
-  ExternalDefinition(Decl *decl, Stage stage = NameBound) : Data(decl, stage) {}
-
-  Decl *getDecl() const { return Data.getPointer(); }
-  
-  Stage getStage() const { return Data.getInt(); }
-  void setStage(Stage stage) { Data.setInt(stage); }
-};
-
 /// \brief Represents a Clang module that has been imported into Swift.
 class ClangModule : public Module {
   clang::Module *clangModule;
-
-  /// \brief The list of definitions that were synthesized while importing
-  /// from the Clang module.
-  ///
-  /// Various external definitions can be synthesized by the Clang module
-  /// importer, such as a constructor in an imported Objective-C class, which
-  /// actually invokes the Objective-C alloc/init or new.
-  ///
-  /// FIXME: Make sure this gets freed.
-  std::vector<ExternalDefinition> ExternalDefs;
-  
-  /// \brief The list of types that were synthesized while importing from the
-  /// Clang module.
-  llvm::DenseSet<Type> Types;
 
 public:
   ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
@@ -347,42 +302,6 @@ public:
   /// \brief Retrieve the underlying Clang module.
   clang::Module *getClangModule() const { return clangModule; }
 
-  /// \brief Add the given external definition to this module.
-  void addExternalDefinition(Decl *def) {
-    ExternalDefs.push_back(def);
-  }
-  
-  /// \brief Add the given type to this module.
-  void addType(Type t) {
-    Types.insert(t);
-  }
-
-  /// \brief Retrieve the list of definitions that were synthesized while
-  /// importing from the Clang module.
-  ///
-  /// Various external definitions can be synthesized by the Clang module
-  /// importer, such as a constructor in an imported Objective-C class, which
-  /// actually invokes the Objective-C alloc/init or new.
-  MutableArrayRef<ExternalDefinition> getExternalDefinitions() {
-    return ExternalDefs;
-  }
-  
-  /// \brief Retrieve the list of definitions that were synthesized while
-  /// importing from the Clang module.
-  ///
-  /// Various external definitions can be synthesized by the Clang module
-  /// importer, such as a constructor in an imported Objective-C class, which
-  /// actually invokes the Objective-C alloc/init or new.
-  ArrayRef<ExternalDefinition> getExternalDefinitions() const {
-    return ExternalDefs;
-  }
-
-  /// \brief Retrieve the list of types that were synthesized while importing
-  /// from the Clang module.
-  llvm::DenseSet<Type> const &getTypes() const {
-    return Types;
-  }
-  
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::ClangModule;
   }

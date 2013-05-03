@@ -241,7 +241,7 @@ namespace {
       constructor->setBody(body);
 
       // Add this as an external definition.
-      Impl.firstClangModule->addExternalDefinition(constructor);
+      Impl.SwiftContext.addedExternalDecl(constructor);
 
       // We're done.
       return constructor;
@@ -435,7 +435,7 @@ namespace {
       // Add the struct decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
       // FIXME: There might be better ways to do this.
-      Impl.firstClangModule->addExternalDefinition(result);
+      Impl.SwiftContext.addedExternalDecl(result);
       
       return result;
     }
@@ -1179,8 +1179,8 @@ namespace {
                                         loc));
 
       // Inform the context that we have external definitions.
-      Impl.firstClangModule->addExternalDefinition(result);
-      
+      Impl.SwiftContext.addedExternalDecl(result);
+
       return result;
     }
 
@@ -1322,8 +1322,8 @@ namespace {
                                           loc));
 
       // Register this thunk as an external definition.
-      Impl.firstClangModule->addExternalDefinition(thunk);
-      
+      Impl.SwiftContext.addedExternalDecl(thunk);
+
       return thunk;
     }
 
@@ -1454,7 +1454,7 @@ namespace {
                                           loc));
 
       // Register this thunk as an external definition.
-      Impl.firstClangModule->addExternalDefinition(thunk);
+      Impl.SwiftContext.addedExternalDecl(thunk);
 
       return thunk;
     }
@@ -2460,7 +2460,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   var->setProperty(context, SourceLoc(), func, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
-  firstClangModule->addExternalDefinition(func);
+  SwiftContext.addedExternalDecl(func);
 
   return var;
 

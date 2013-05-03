@@ -784,6 +784,15 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Type-check the constructor declaration.
   tc.typeCheckDecl(ctor, /*isFirstPass=*/true);
 
+  // If the struct in which this constructor is being added was imported,
+  // add it as an external definition.
+  auto dc = structDecl->getDeclContext();
+  while (dc->getParent())
+    dc = dc->getParent();
+  if (isa<ClangModule>(dc)) {
+    tc.Context.ExternalDefinitions.insert(ctor);
+  }
+
   return ctor;
 }
 

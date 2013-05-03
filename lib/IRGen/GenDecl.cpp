@@ -477,23 +477,10 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     emitGlobalDecl(TU->Decls[i]);
   }
-  
-  // For any Clang modules imported by this translation unit, directly
-  // or indirectly, emit external definitions.  
-  // FIXME: This can be O(N^2), since we can see the same Clang module
-  // in different modules.
-  for (auto mod : TU->getASTContext().LoadedClangModules) {
-    for (auto &def : mod->getExternalDefinitions()) {
-      switch (def.getStage()) {
-      case ExternalDefinition::NameBound:
-        llvm_unreachable("external definition not type-checked");
 
-      case ExternalDefinition::TypeChecked:
-        // FIXME: We should emit this definition only if it's actually needed.
-        emitExternalDefinition(def.getDecl());
-        break;
-      }
-    }
+  // Emit external definitions used by this translation unit.
+  for (auto def : Context.ExternalDefinitions) {
+    emitExternalDefinition(def);
   }
 }
 
