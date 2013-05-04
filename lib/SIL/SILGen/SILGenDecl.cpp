@@ -894,3 +894,142 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
     B.createDeallocRef(vd, loc.box);
   }
 }
+
+namespace {
+  /// RAII class for scoping an inline function emission.
+  class InliningScope {
+    SILGenFunction &gen;
+    bool popped, savedHasVoidReturn;
+    SILValue savedIndirectReturnAddress;
+    Optional<CleanupManager::InliningScope> cleanupScope;
+    SILType returnType;
+    SILValue returnValue;
+    
+  public:
+    InliningScope(SILGenFunction &gen,
+                  FuncExpr *body,
+                  SGFContext C)
+      : gen(gen),
+        popped(false),
+        savedHasVoidReturn(gen.hasVoidReturn),
+        savedIndirectReturnAddress(gen.IndirectReturnAddress)
+    {
+      returnType = gen.getLoweredType(
+                         body->getType()->castTo<FunctionType>()->getResult());
+
+      // Create a continuation block for the function to return to.
+      // FIXME: We could avoid imploding and exploding return tuples here.
+      SILBasicBlock *returnBB
+        = new (gen.F.getModule()) SILBasicBlock(&gen.F, "inline_return");
+
+      // Set things up for the inlined function to return.
+      gen.hasVoidReturn = returnType == gen.SGM.Types.getEmptyTupleType();
+      if (returnType.isAddressOnly()) {        
+        returnValue = gen.IndirectReturnAddress
+          = gen.getBufferForExprResult(body, returnType, C);
+
+        // FIXME: Pretend to do a void return.
+        new (gen.F.getModule()) SILArgument(gen.SGM.Types.getEmptyTupleType(),
+                                            returnBB);
+      } else {
+        gen.IndirectReturnAddress = SILValue();
+        returnValue
+          = new (gen.F.getModule()) SILArgument(returnType, returnBB);
+      }
+      
+      gen.inlineReturnBBStack.push_back(returnBB);
+      
+      // Create a cleanups scope.
+      cleanupScope.emplace(gen.Cleanups);
+    }
+    
+    ManagedValue pop() {
+      SILBasicBlock *returnBB = gen.inlineReturnBBStack.back();
+
+      // Terminate the inner function, either with an implicit void return or
+      // an unreachable if there is a value return.
+      if (gen.B.hasValidInsertionPoint()) {
+        if (gen.hasVoidReturn)
+          gen.Cleanups.emitReturnAndCleanups(SILLocation(),
+                                             gen.emitEmptyTuple(SILLocation()));
+        else
+          gen.B.createUnreachable();
+      }
+      
+      assert(!gen.B.hasValidInsertionPoint() &&
+             "did not terminate inline function");
+      
+      // Unwind cleanups.
+      cleanupScope.reset();
+      
+      // Emit the continuation block.
+      // FIXME: If we have a single predecessor, we should fuse to it.
+      // FIXME: If we have no predecessors, then the function never returns and
+      // we're in dead code. Early exit from SILGen?
+      gen.B.emitBlock(returnBB);
+      
+      // Restore the outer return state.
+      gen.inlineReturnBBStack.pop_back();
+      gen.hasVoidReturn = savedHasVoidReturn;
+      gen.IndirectReturnAddress = savedIndirectReturnAddress;
+      popped = true;
+      
+      return gen.emitManagedRValueWithCleanup(returnValue);
+    }
+    
+    ~InliningScope() {
+      assert(popped && "did not pop!");
+    }
+  };
+}
+
+ManagedValue SILGenFunction::emitInlineFunction(FuncExpr *body, Expr *args,
+                                                SGFContext C) {
+  assert(body->getNumParamPatterns() == 1 &&
+         "can't inline curried functions yet");
+
+  // Create a scope for the inline function.
+  InliningScope scope(*this, body, C);
+  
+  // Emit the inlined function's argument variables.
+  // NB: We use 'InitializationForPattern::Var' because we really want new
+  // local variables for all the arguments—their values haven't been evaluated
+  // yet.
+  InitializationPtr argInit
+    = InitializationForPattern(*this, InitializationForPattern::Var)
+        .visit(body->getBodyParamPatterns()[0]);
+  // Emit the arguments into the variables.
+  emitExprInto(args, argInit.get());
+  
+  // Emit the function body.
+  visit(body->getBody());
+  
+  // Clean up and return the result as an RValue.
+  return scope.pop();
+}
+
+ManagedValue SILGenFunction::emitInlineFunction(FuncExpr *body, RValue &&args,
+                                                SGFContext C) {
+  assert(body->getNumParamPatterns() == 1 &&
+         "can't inline curried functions yet");
+  
+  // Create a scope for the inline function.
+  InliningScope scope(*this, body, C);
+  
+  // Emit the inlined function's argument variables.
+  // NB: We use 'InitializationForPattern::Var' because we really want new
+  // local variables for all the arguments—their values haven't been evaluated
+  // yet.
+  InitializationPtr argInit
+    = InitializationForPattern(*this, InitializationForPattern::Var)
+        .visit(body->getBodyParamPatterns()[0]);
+  // Emit the arguments into the variables.
+  std::move(args).forwardInto(*this, argInit.get());
+  
+  // Emit the function body.
+  visit(body->getBody());
+  
+  // Clean up and return the result as an RValue.
+  return scope.pop();
+  
+}

@@ -146,6 +146,19 @@ public:
     return mv;
   }
   
+  bool isForceInline() const {
+    if (kind == Kind::GenericValue)
+      return false;
+    if (!standaloneFunction.hasDecl())
+      return false;
+    return standaloneFunction.getDecl()->getAttrs().isForceInline();
+  }
+  
+  FuncExpr *getForceInlineBody() const {
+    assert(isForceInline() && "not force_inlineable");
+    return cast<FuncDecl>(standaloneFunction.getDecl())->getBody();
+  }
+  
   OwnershipConventions const &getOwnershipConventions() const {
     // FIXME: May need to adjust ownership conventions with uncurry level?
     return ownership;
@@ -530,6 +543,16 @@ namespace {
         return;
       }
     }
+  
+    ManagedValue emitInline(SILGenFunction &gen, FuncExpr *body,
+                            SGFContext C) && {
+      switch (kind) {
+      case Kind::Expr:
+        return gen.emitInlineFunction(body, expr, C);
+      case Kind::Value:
+        return gen.emitInlineFunction(body, std::move(value), C);
+      }
+    }
   };
   
   class CallEmission {
@@ -581,35 +604,44 @@ namespace {
       Callee::SpecializedEmitter specializedEmitter
         = callee.getSpecializedEmitter(uncurryLevel);
 
-      ManagedValue calleeValue;
-      if (!specializedEmitter)
-        calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
-      
-      // Collect the arguments to the uncurried call.
-      SmallVector<ManagedValue, 4> args;
-      SILLocation uncurriedLoc;
-      for (auto &site : uncurriedSites) {
-        uncurriedLoc = site.loc;
-        std::move(site).emit(gen, args);
-      }
-      
       // We use the context emit-into initialization only for the outermost
       // call.
       SGFContext uncurriedContext = extraSites.empty() ? C : SGFContext();
-
-      // Emit the uncurried call.
-      ManagedValue result;
       
-      if (specializedEmitter)
-        result = specializedEmitter(gen,
-                                    uncurriedLoc,
-                                    callee.getSubstitutions(),
-                                    args,
-                                    uncurriedContext);
-      else
-        result = gen.emitApply(uncurriedLoc, calleeValue, args,
-                               callee.getOwnershipConventions(),
-                               uncurriedContext);
+      SmallVector<ManagedValue, 4> args;
+      ManagedValue result;
+
+      // If the call is force-inlined, emit it inline.
+      if (callee.isForceInline()
+          && !specializedEmitter
+          && uncurriedSites.size() == 1) {
+        result = std::move(uncurriedSites[0])
+          .emitInline(gen, callee.getForceInlineBody(), uncurriedContext);
+      } else {
+        // Get the callee value.
+        ManagedValue calleeValue;
+        if (!specializedEmitter)
+          calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
+        
+        // Collect the arguments to the uncurried call.
+        SILLocation uncurriedLoc;
+        for (auto &site : uncurriedSites) {
+          uncurriedLoc = site.loc;
+          std::move(site).emit(gen, args);
+        }
+        
+        // Emit the uncurried call.
+        if (specializedEmitter)
+          result = specializedEmitter(gen,
+                                      uncurriedLoc,
+                                      callee.getSubstitutions(),
+                                      args,
+                                      uncurriedContext);
+        else
+          result = gen.emitApply(uncurriedLoc, calleeValue, args,
+                                 callee.getOwnershipConventions(),
+                                 uncurriedContext);
+      }
       
       // If there are remaining call sites, apply them to the result function.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {

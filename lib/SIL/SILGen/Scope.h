@@ -24,28 +24,29 @@ namespace Lowering {
 
 /// A Scope is a RAII object recording that a scope (e.g. a brace
 /// statement) has been entered.
-class LLVM_LIBRARY_VISIBILITY Scope {
+template<CleanupsDepth CleanupManager::*SCOPE>
+class LLVM_LIBRARY_VISIBILITY ScopeImpl {
   CleanupManager &Cleanups;
   CleanupsDepth Depth;
-  CleanupsDepth SavedInnermostScope;
+  CleanupsDepth SavedScope;
 
   void popImpl() {
     Cleanups.Stack.checkIterator(Depth);
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
-    assert(Cleanups.InnermostScope == Depth && "popping scopes out of order");
+    Cleanups.Stack.checkIterator(Cleanups.*SCOPE);
+    assert(Cleanups.*SCOPE == Depth && "popping scopes out of order");
 
-    Cleanups.InnermostScope = SavedInnermostScope;
+    Cleanups.*SCOPE = SavedScope;
     Cleanups.endScope(Depth);
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
+    Cleanups.Stack.checkIterator(Cleanups.*SCOPE);
   }
 
 public:
-  explicit Scope(CleanupManager &Cleanups)
+  explicit ScopeImpl(CleanupManager &Cleanups)
     : Cleanups(Cleanups), Depth(Cleanups.getCleanupsDepth()),
-      SavedInnermostScope(Cleanups.InnermostScope) {
+      SavedScope(Cleanups.*SCOPE) {
     assert(Depth.isValid());
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
-    Cleanups.InnermostScope = Depth;
+    Cleanups.Stack.checkIterator(Cleanups.*SCOPE);
+    Cleanups.*SCOPE = Depth;
   }
 
   void pop() {
@@ -54,10 +55,13 @@ public:
     Depth = CleanupsDepth::invalid();
   }
 
-  ~Scope() {
+  ~ScopeImpl() {
     if (Depth.isValid()) popImpl();
   }
+  
 };
+
+using Scope = CleanupManager::Scope;
 
 /// A FullExpr is a RAII object recording that a full-expression has
 /// been entered.  A full-expression is essentially a very small scope
