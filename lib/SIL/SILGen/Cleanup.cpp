@@ -51,7 +51,7 @@ void CleanupManager::popAndEmitTopCleanup() {
   // Pop now.
   Stack.pop();
 
-  if (cleanup.isActive())
+  if (cleanup.isActive() && Gen.B.hasValidInsertionPoint())
     cleanup.emit(Gen);
 }
 
