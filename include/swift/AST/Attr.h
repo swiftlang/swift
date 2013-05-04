@@ -141,6 +141,7 @@ public:
   bool AutoClosure = false;
   bool Assignment = false;
   bool Conversion = false;
+  bool ForceInline = false;
   bool ObjC = false;
   bool ObjCBlock = false;
   bool ExplicitPrefix = false;
@@ -159,6 +160,7 @@ public:
   bool isAutoClosure() const { return AutoClosure; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
+  bool isForceInline() const { return ForceInline; }
   bool isPrefix() const { return ExplicitPrefix; }
   bool isPostfix() const { return ExplicitPostfix; }
   bool isInfix() const { return ExplicitInfix; }
@@ -170,7 +172,7 @@ public:
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
-           !isPostfix() && !isPrefix() &&
+           !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction();
   }
 };

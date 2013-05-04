@@ -264,6 +264,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     Attributes.Conversion = true;
     return false;    
   }
+      
+  case AttrName::force_inline: {
+    if (Attributes.isForceInline())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    Attributes.ForceInline = true;
+    return false;
+  }
 
   case AttrName::iboutlet: {
     if (Attributes.isIBOutlet())

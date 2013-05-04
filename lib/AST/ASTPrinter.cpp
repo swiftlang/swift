@@ -107,6 +107,10 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "conversion";
   }
+  if (attrs.isForceInline()) {
+    comma();
+    OS << "force_inline";
+  }
   if (attrs.isInfix()) {
     comma();
     OS << "infix";

@@ -1273,6 +1273,23 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
   
+  if (Attrs.isForceInline()) {
+    // Only functions can be force_inline.
+    auto *FD = dyn_cast<FuncDecl>(VD);
+    if (!FD) {
+      TC.diagnose(VD->getStartLoc(), diag::force_inline_not_function);
+      VD->getMutableAttrs().ForceInline = false;
+    } else if (FD->getBody()->getNumParamPatterns() > 1) {
+      // We don't yet support force_inline of curried functions.
+      TC.diagnose(VD->getStartLoc(), diag::force_inline_curry_not_supported);
+      VD->getMutableAttrs().ForceInline = false;
+    } else if (FD->getGenericParams()) {
+      // We don't yet support force_inline of generic functions.
+      TC.diagnose(VD->getStartLoc(), diag::force_inline_generic_not_supported);
+      VD->getMutableAttrs().ForceInline = false;      
+    }
+  }
+  
   if (Attrs.isByref()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "byref");
     VD->getMutableAttrs().Byref = false;

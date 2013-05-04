@@ -887,6 +887,12 @@ ERROR(assignment_without_byref,sema_tcd,none,
 ERROR(conversion_not_instance_method,sema_tcd,none,
       "conversion function %0 is not an instance method",
       (Identifier))
+ERROR(force_inline_not_function,sema_tcd,none,
+      "force_inline can only be applied to functions", ())
+ERROR(force_inline_curry_not_supported,sema_tcd,none,
+      "force_inline not yet supported for curried functions", ())
+ERROR(force_inline_generic_not_supported,sema_tcd,none,
+      "force_inline not yet supported for generic functions", ())
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_objc_decl,sema_tcd,none,
