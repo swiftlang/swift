@@ -539,11 +539,23 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
 }
 
 Type TypeConverter::makeConstantType(SILConstant c) {
-  // FIXME: This needs to be cleaned up to switch on c.kind
-  
-  if (ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>()) {
-    Type /*nullable*/ contextType =
-      vd->getDeclContext()->getDeclaredTypeOfContext();
+  ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>();
+
+  switch (c.kind) {
+  case SILConstant::Kind::Func:
+    if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
+      auto *funcTy = e->getType()->castTo<AnyFunctionType>();
+      return getFunctionTypeWithCaptures(*this, funcTy, e->getCaptures());
+    } else {
+      FuncDecl *func = cast<FuncDecl>(vd);
+      auto *funcTy = func->getTypeOfReference()->castTo<AnyFunctionType>();
+      return getFunctionTypeWithCaptures(*this, funcTy,
+                                         func->getCaptures());
+    }
+
+  case SILConstant::Kind::Getter:
+  case SILConstant::Kind::Setter: {
+    Type contextType = vd->getDeclContext()->getDeclaredTypeOfContext();
     GenericParamList *genericParams = nullptr;
     if (contextType) {
       if (UnboundGenericType *ugt = contextType->getAs<UnboundGenericType>()) {
@@ -553,70 +565,48 @@ Type TypeConverter::makeConstantType(SILConstant c) {
         contextType = vd->getDeclContext()->getDeclaredTypeInContext();
       }
     }
+    
     if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
-      // If this is a subscript accessor, derive the accessor type.
       Type subscriptType = getSubscriptPropertyType(c.kind,
                                                     sd->getIndices()->getType(),
                                                     sd->getElementType());
       return getMethodTypeInContext(contextType, subscriptType, genericParams);
-    } else {
-      // If this is a destructor, derive the destructor type.
-      if (c.kind == SILConstant::Kind::Destroyer) {
-        return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
-      }
-      
-      // If this is a constructor initializer, derive the initializer type.
-      if (c.kind == SILConstant::Kind::Initializer) {
-        return cast<ConstructorDecl>(vd)->getInitializerType();
-      }
-      
-      // If this is a property accessor, derive the property type.
-      if (c.isProperty()) {
-        Type propertyType = getPropertyType(c.kind, vd->getType());
-        Type propertyMethodType = getMethodTypeInContext(contextType,
-                                                         propertyType,
-                                                         genericParams);
-        
-        // If this is a local variable, its property methods may be closures.
-        if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
-          if (var->isProperty()) {
-            FuncDecl *property = c.kind == SILConstant::Kind::Getter
-              ? var->getGetter()
-              : var->getSetter();
-            auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
-            return getFunctionTypeWithCaptures(*this,
-                                           propTy,
-                                           property->getCaptures());
-          }
-        }
-        return propertyMethodType;
-      }
-
-      // If it's a global var, derive the initializer/accessor function type
-      // () -> [byref] T
-      if (VarDecl *var = dyn_cast<VarDecl>(vd)) {
-        assert(!var->isProperty() && "constant ref to non-physical global var");
-        return getGlobalAccessorType(var->getType(), Context);
-      }
-      
-      // If it's a function, mangle the function type with its capture
-      // arguments.
-      if (FuncDecl *func = dyn_cast<FuncDecl>(vd)) {
-        auto *funcTy = func->getTypeOfReference()->castTo<AnyFunctionType>();
-        assert(c.kind == SILConstant::Kind::Func &&
-               "non-Func SILConstant for function");
-        return getFunctionTypeWithCaptures(*this, funcTy,
-                                           func->getCaptures());
-      }
-      
-      // Otherwise, return the Swift-level type.
-      return vd->getTypeOfReference();
     }
-  } else if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
-    assert(c.kind == SILConstant::Kind::Func &&
-           "non-Func SILConstant for local function");
-    auto *funcTy = e->getType()->castTo<AnyFunctionType>();
-    return getFunctionTypeWithCaptures(*this, funcTy, e->getCaptures());
+
+    Type propertyType = getPropertyType(c.kind, vd->getType());
+    Type propertyMethodType = getMethodTypeInContext(contextType,
+                                                     propertyType,
+                                                     genericParams);
+    
+    // If this is a local variable, its property methods may be closures.
+    if (VarDecl *var = dyn_cast<VarDecl>(c.getDecl())) {
+      if (var->isProperty()) {
+        FuncDecl *property = c.kind == SILConstant::Kind::Getter
+          ? var->getGetter()
+          : var->getSetter();
+        auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
+        return getFunctionTypeWithCaptures(*this,
+                                       propTy,
+                                       property->getCaptures());
+      }
+    }
+    return propertyMethodType;
   }
-  llvm_unreachable("unexpected constant loc");
+      
+  case SILConstant::Kind::Allocator:
+  case SILConstant::Kind::OneOfElement:
+    return vd->getTypeOfReference();
+  
+  case SILConstant::Kind::Initializer:
+    return cast<ConstructorDecl>(vd)->getInitializerType();
+  
+  case SILConstant::Kind::Destroyer:
+    return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
+  
+  case SILConstant::Kind::GlobalAccessor: {
+    VarDecl *var = cast<VarDecl>(vd);
+    assert(!var->isProperty() && "constant ref to non-physical global var");
+    return getGlobalAccessorType(var->getType(), Context);
+  }
+  }
 }
