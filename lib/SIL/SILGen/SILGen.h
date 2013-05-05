@@ -570,6 +570,8 @@ public:
   
   SILValue emitMetatypeOfValue(SILLocation loc, SILValue base);
   
+  void emitReturnExpr(SILLocation loc, Expr *ret);
+  
   /// Convert a value with a specialized representation (such as a thin function
   /// reference, or a function reference with a foreign calling convention) to
   /// the generalized representation of its Swift type, which can then be stored

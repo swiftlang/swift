@@ -1196,15 +1196,10 @@ void SILGenFunction::emitClosure(ClosureExpr *ce) {
              ce->getType()->castTo<FunctionType>()->getResult());
 
   // Closure expressions implicitly return the result of their body expression.
-  // FIXME: address-only return from closure. refactor common code from
-  // visitReturnStmt
-  SILValue result;
-  {
-    FullExpr scope(Cleanups);
-    result = visit(ce->getBody()).forwardAsSingleValue(*this);
-  }
-  if (B.hasValidInsertionPoint())
-    Cleanups.emitReturnAndCleanups(ce->getBody(), result);
+  emitReturnExpr(ce, ce->getBody());
+  
+  assert(!B.hasValidInsertionPoint() &&
+         "returning closure body did not terminate closure?!");
 }
 
 bool SILGenFunction::emitEpilogBB(SILLocation loc) {

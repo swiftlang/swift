@@ -150,24 +150,30 @@ public:
 
 } // end anonymous namespace
 
-void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
-  SILValue ArgV;
+void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
+  SILValue result;
   if (IndirectReturnAddress) {
     // Indirect return of an address-only value.
     FullExpr scope(Cleanups);
     InitializationPtr returnInit(
                        new IndirectReturnInitialization(IndirectReturnAddress));
-    emitExprInto(S->getResult(), returnInit.get());
-    ArgV = emitEmptyTuple(S);
-  } else if (S->hasResult()) {
+    emitExprInto(ret, returnInit.get());
+    result = emitEmptyTuple(loc);
+  } else {
     // SILValue return.
     FullExpr scope(Cleanups);
-    ArgV = visit(S->getResult()).forwardAsSingleValue(*this);
-  } else {
-    // Void return.
-    ArgV = emitEmptyTuple(S);
+    result = visit(ret).forwardAsSingleValue(*this);
   }
-  Cleanups.emitReturnAndCleanups(S, ArgV);
+  Cleanups.emitReturnAndCleanups(loc, result);
+}
+
+void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
+  SILValue ArgV;
+  if (!S->hasResult())
+    // Void return.
+    Cleanups.emitReturnAndCleanups(S, emitEmptyTuple(S));
+  else
+    emitReturnExpr(S, S->getResult());
 }
 
 void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
