@@ -449,10 +449,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       
       // Its subexpression should be convertible to a tuple (T.Element...).
       auto arrayElementTy = CS.createTypeVariable(expr);
-      auto arrayElementMetaTy = MetaTypeType::get(arrayElementTy, C);
       CS.addTypeMemberConstraint(arrayTy,
                                  C.getIdentifier("Element"),
-                                 arrayElementMetaTy);
+                                 arrayElementTy);
       
       Type arrayEltsTy = CS.TC.getArraySliceType(expr->getLoc(),
                                                  arrayElementTy);
@@ -503,16 +502,14 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       
       // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
       auto dictionaryKeyTy = CS.createTypeVariable(expr);
-      auto dictionaryKeyMetaTy = MetaTypeType::get(dictionaryKeyTy, C);
       CS.addTypeMemberConstraint(dictionaryTy,
                                  C.getIdentifier("Key"),
-                                 dictionaryKeyMetaTy);
+                                 dictionaryKeyTy);
 
       auto dictionaryValueTy = CS.createTypeVariable(expr);
-      auto dictionaryValueMetaTy = MetaTypeType::get(dictionaryValueTy, C);
       CS.addTypeMemberConstraint(dictionaryTy,
                                  C.getIdentifier("Value"),
-                                 dictionaryValueMetaTy);
+                                 dictionaryValueTy);
       
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };

@@ -1677,8 +1677,13 @@ public:
     assert(baseTy);
     assert(memberTy);
     assert(!name.empty());
+    
+    // The type of the type member is the metatype of the declared type.
+    Type memberMetaTy = MetaTypeType::get(memberTy, getASTContext());
+    
     addConstraint(new (*this) Constraint(ConstraintKind::TypeMember,
-                                         baseTy, memberTy, name, locator));
+                                         baseTy, memberMetaTy, name,
+                                         locator));
   }
 
   /// \brief Add an archetype constraint.
