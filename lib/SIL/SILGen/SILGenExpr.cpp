@@ -14,6 +14,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Condition.h"
@@ -1144,7 +1145,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
           ManagedValue v = emitFunctionRef(loc, SILConstant(capture,
                                                    SILConstant::Kind::Setter));
           capturedArgs.push_back(v.forward(*this));
-          [[clang::fallthrough]];
+          SWIFT_FALLTHROUGH;
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.
@@ -1684,7 +1685,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
                                                capture->getType());
     addSILArgument(gen.getLoweredType(setTy));
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.

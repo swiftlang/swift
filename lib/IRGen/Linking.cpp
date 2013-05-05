@@ -16,6 +16,7 @@
 
 #include "Linking.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/Mangle.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -173,7 +174,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     }
 
     // Otherwise, fall through into the 'other decl' case.
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
 
   case Kind::Other:
     // As a special case, Clang functions and globals don't get mangled at all.

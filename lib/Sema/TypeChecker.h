@@ -20,6 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
 
@@ -62,7 +63,7 @@ public:
 
     case CoercionResult::Unknowable:
       diagnose();
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
 
     case CoercionResult::Failed:
       return 0;

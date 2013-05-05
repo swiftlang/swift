@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -2490,7 +2491,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
     case SolutionCompareResult::Better:
       break;
 

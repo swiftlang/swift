@@ -15,6 +15,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/TypeVisitor.h"
@@ -507,7 +508,7 @@ static Type getFunctionTypeWithCaptures(TypeConverter &types,
       Type setterTy = types.getPropertyType(SILConstant::Kind::Setter,
                                             capture->getType());
       inputFields.push_back(TupleTypeElt(setterTy));
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.

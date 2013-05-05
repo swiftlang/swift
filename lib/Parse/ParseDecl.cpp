@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PathV2.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -411,7 +412,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_static:
     if (peekToken().isNot(tok::kw_func))
       goto ParseError;
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags));
     break;
@@ -427,7 +428,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       Entries.push_back(parseDeclOperator(Flags & PD_AllowTopLevel));
       break;
     }
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   default:
   ParseError:
     diagnose(Tok, diag::expected_decl);

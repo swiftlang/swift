@@ -12,6 +12,7 @@
 
 #include "SILGen.h"
 #include "swift/SIL/Mangle.h"
+#include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -59,7 +60,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
     }
 
     // Otherwise, fall through into the 'other decl' case.
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
 
   case SILConstant::Kind::OneOfElement:
     // As a special case, Clang functions and globals don't get mangled at all.

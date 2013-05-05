@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -826,7 +827,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
         diagnose(CurPtr-2, diag::lex_nul_character);
       return 0;
     }
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   case '\n':  // String literals cannot have \n or \r in them.
   case '\r':
     --CurPtr;
@@ -1232,7 +1233,7 @@ Restart:
       skipSlashStarComment();
       goto Restart;
     }
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   case '=': case '-': case '+': case '*': case '%': case '<': case '>':
   case '!': case '&': case '|': case '^': case '~':
     return lexOperatorIdentifier();

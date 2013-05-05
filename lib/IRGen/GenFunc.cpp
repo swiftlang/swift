@@ -56,6 +56,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -165,7 +166,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
 
   case AbstractCC::Method:
     //   TODO: maybe add 'inreg' to the first non-result argument.
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   case AbstractCC::Freestanding:
     return getFreestandingConvention(IGM);
   }
@@ -1159,7 +1160,7 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   case ResultDifference::Aliasable: {
     auto origTy = IGF.IGM.getStoragePointerType(CurOrigType);
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   }
 
   case ResultDifference::Identical:

@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
@@ -583,7 +584,7 @@ static bool isLocalLinkageType(CanType type) {
     auto fn = cast<PolymorphicFunctionType>(base);
     if (isLocalLinkageGenericClause(fn->getGenericParams()))
       return true;
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   }
   case TypeKind::Function: {
     AnyFunctionType *fn = cast<AnyFunctionType>(base);

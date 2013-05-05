@@ -19,6 +19,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/Fallthrough.h"
 #include <iterator>
 using namespace swift;
 using namespace Lowering;
@@ -546,7 +547,7 @@ static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin());
     gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.

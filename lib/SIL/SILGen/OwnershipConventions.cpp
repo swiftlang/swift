@@ -1,5 +1,6 @@
 #include "SILGen.h"
 #include "OwnershipConventions.h"
+#include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -64,7 +65,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
     if (c.getDecl()->isObjC())
       return getSelectorFamily(c.getDecl()->getName());
     
-    [[clang::fallthrough]];
+    SWIFT_FALLTHROUGH;
 
   // Setter selectors shouldn't belong to any family we care about.
   case SILConstant::Kind::Setter:
@@ -209,7 +210,7 @@ OwnershipConventions::getForObjCSelectorFamily(SelectorFamily family,
       // Init consumes self and returns a retained value.
     case SelectorFamily::Init:
       consumedArgs.set(0);
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
       
       // These families all return a retained value.
     case SelectorFamily::Alloc:
