@@ -765,7 +765,7 @@ public:
       OS << " captures=(";
       OS << E->getCaptures()[0]->getName();
       for (auto capture : E->getCaptures().slice(1)) {
-        OS << ' ' << capture->getName();
+        OS << ", " << capture->getName();
       }
       OS << ')';
     }
