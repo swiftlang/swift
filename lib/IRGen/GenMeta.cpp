@@ -1363,10 +1363,6 @@ namespace {
 
     void addGenericWitnessTable(ArchetypeType *argument,
                                 ProtocolDecl *protocol) {
-      argument->dump();
-      protocol->dump();
-      TargetArchetype->dump();
-      TargetProtocol->dump();
       if (argument == TargetArchetype && protocol == TargetProtocol)
         setTargetIndex();
       NextIndex++;
