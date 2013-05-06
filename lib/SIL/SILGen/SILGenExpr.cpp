@@ -1793,11 +1793,19 @@ RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {
                                  getLoweredType(E->getType()));
   
   cond.enterTrue(B);
-  SILValue trueValue = visit(E->getThenExpr()).forwardAsSingleValue(*this);
+  SILValue trueValue;
+  {
+    FullExpr trueScope(Cleanups);
+    trueValue = visit(E->getThenExpr()).forwardAsSingleValue(*this);
+  }
   cond.exitTrue(B, trueValue);
   
   cond.enterFalse(B);
-  SILValue falseValue = visit(E->getElseExpr()).forwardAsSingleValue(*this);
+  SILValue falseValue;
+  {
+    FullExpr falseScope(Cleanups);
+    falseValue = visit(E->getElseExpr()).forwardAsSingleValue(*this);
+  }
   cond.exitFalse(B, falseValue);
   
   SILBasicBlock *cont = cond.complete(B);
