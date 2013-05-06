@@ -523,6 +523,18 @@ public:
   /// types of another archetype).
   ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
 
+  /// \brief Retrieves the list containing only the primary archetypes described
+  /// by this generic parameter clause. This excludes archetypes for associated
+  /// types of the primary archetypes.
+  ArrayRef<ArchetypeType *> getPrimaryArchetypes() const {
+    return getAllArchetypes().slice(0, size());
+  }
+  
+  /// \brief Retrieves the list containing only the associated archetypes.
+  ArrayRef<ArchetypeType *> getAssociatedArchetypes() const {
+    return getAllArchetypes().slice(size());
+  }
+
   /// \brief Sets all archetypes *without* copying the source array.
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
     AllArchetypes = AA;

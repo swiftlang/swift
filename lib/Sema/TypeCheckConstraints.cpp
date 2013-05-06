@@ -482,7 +482,8 @@ Type ConstraintSystem::openType(
       // Build archetypes for each of the nested types.
       for (auto nested : archetype->getNestedTypes()) {
         auto nestedTv = (*this)(nested.second);
-        CS.addTypeMemberConstraint(tv, nested.first, nestedTv);
+        auto nestedMetatype = MetaTypeType::get(nestedTv, CS.getASTContext());
+        CS.addTypeMemberConstraint(tv, nested.first, nestedMetatype);
       }
 
       return tv;
@@ -532,8 +533,14 @@ Type ConstraintSystem::openType(
 
       auto unboundDecl = unbound->getDecl();
       SmallVector<Type, 4> arguments;
-      for (auto archetype : unboundDecl->getGenericParams()->getAllArchetypes())
+      // Open the primary archetypes and bind them to the type parameters.
+      for (auto archetype :
+             unboundDecl->getGenericParams()->getPrimaryArchetypes())
         arguments.push_back(getTypeVariable(archetype));
+      // Open the secondary archetypes.
+      for (auto archetype :
+             unboundDecl->getGenericParams()->getAssociatedArchetypes())
+        getTypeVariable(archetype);
 
       return BoundGenericType::get(unboundDecl, parentTy, arguments);
     }
