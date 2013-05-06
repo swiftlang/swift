@@ -1689,9 +1689,9 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
-    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
+    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
                                                capture->getType());
-    addSILArgument(gen.getLoweredType(setTy));
+    addSILArgument(gen.getLoweredType(getTy));
     break;
   }
   }
