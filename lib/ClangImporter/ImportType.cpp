@@ -453,6 +453,16 @@ namespace {
       if (!imported)
         return nullptr;
 
+      // When NSString* is the type of a function parameter or as a function
+      // result type, map it to String.
+      if (Impl.SwiftContext.LangOpts.NSStringIsString &&
+          (kind == ImportTypeKind::Parameter ||
+           kind == ImportTypeKind::Result) &&
+          !imported->getName().empty() &&
+          imported->getName().str() == "NSString") {
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "String");
+      }
+
       return imported->getDeclaredType();
     }
 
