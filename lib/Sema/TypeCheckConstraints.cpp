@@ -1691,9 +1691,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       (kind >= TypeMatchKind::Conversion ||
        (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    if (!type1->hasTypeVariable() && type2->isExistentialType(protocols)) {
+
+    if (type2->isExistentialType(protocols)) {
+      // Substitute all type variables in the first type
+      auto substType1 = simplifyType(type1);
+      if (substType1->hasTypeVariable()) {
+        // If type variables remain, we can't solve this now.
+        // FIXME: In many cases, we *can* solve this now, because a generic
+        // type will unconditionally conform to the named protocols.
+        return SolutionKind::Unsolved;
+      }
+
       for (auto proto : protocols) {
-        if (!TC.conformsToProtocol(type1, proto)) {
+        if (!TC.conformsToProtocol(substType1, proto)) {
           // Record this failure.
           if (flags & TMF_RecordFailures) {
             recordFailure(getConstraintLocator(locator),
