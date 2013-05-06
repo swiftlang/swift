@@ -2579,11 +2579,14 @@ namespace {
       TypesForDepths.push_back(type->getDecl());
 
       auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
-      assert(params.size() >= type->getGenericArgs().size() &&
-             "generic type parameters should parallel those of its decl");
+      assert(params.size() >= type->getSubstitutions().size() &&
+             "generic decl archetypes should parallel generic type subs");
 
-      for (unsigned i = 0, e = type->getGenericArgs().size(); i != e; ++i) {
-        CanType arg = CanType(type->getGenericArgs()[i]);
+      for (unsigned i = 0, e = type->getSubstitutions().size(); i != e; ++i) {
+        auto sub = type->getSubstitutions()[i];
+        assert(sub.Archetype == params[i] &&
+               "substitution does not match archetype!");
+        CanType arg = sub.Replacement->getCanonicalType();
 
         // Right now, we can only pull things out of the direct
         // arguments, not out of nested metadata.  For example, this
