@@ -40,12 +40,17 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
   // The type we're converting from.
   Type fromType = expr->getType();
 
+  // If the types are already equivalent, we don't have to do anything.
+  if (fromType->isEqual(toType))
+    return expr;
+
   // Save the original expression. If we fail to fully coerce the type,
   // fall back to the original.
   Expr *origExpr = expr;
   ++NumCoercions;
 
-  // Coercions from an lvalue: requalify and load.
+  // Coercions from an lvalue: requalify and load. We perform these coercions
+  // first because they are often the first step in a multi-step coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     if (auto toLValue = toType->getAs<LValueType>()) {
       // Update the qualifiers on the lvalue.
@@ -96,6 +101,38 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
         return expr;
       }
     }
+  }
+
+  // Coercions from a type to an existential type.
+  if (toType->isExistentialType()) {
+    // Compute the conformances for each of the protocols in the existential
+    // type.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    toType->isExistentialType(protocols);
+    SmallVector<ProtocolConformance *, 4> conformances;
+    bool failed = false;
+    for (auto proto : protocols) {
+      ProtocolConformance *conformance = nullptr;
+      if (!tc.conformsToProtocol(fromType, proto, &conformance)) {
+        failed = true;
+        break;
+      }
+
+      conformances.push_back(conformance);
+    }
+
+    // If we have all of the conformances we need, create an erasure expression.
+    if (!failed) {
+      expr = new (tc.Context) ErasureExpr(
+                                expr, toType,
+                                tc.Context.AllocateCopy(conformances));
+      ++NumHandledCoercions;
+      return expr;
+    }
+
+    // Fall through to handle user-defined conversions.
+    // FIXME: Can the type checker cope with the crazy case where we can
+    // call a user-defined conversion on an existential but
   }
 
   // If we succeeded, use the coerced result.
