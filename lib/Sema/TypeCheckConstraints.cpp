@@ -482,8 +482,7 @@ Type ConstraintSystem::openType(
       // Build archetypes for each of the nested types.
       for (auto nested : archetype->getNestedTypes()) {
         auto nestedTv = (*this)(nested.second);
-        auto nestedMetatype = MetaTypeType::get(nestedTv, CS.getASTContext());
-        CS.addTypeMemberConstraint(tv, nested.first, nestedMetatype);
+        CS.addTypeMemberConstraint(tv, nested.first, nestedTv);
       }
 
       return tv;
