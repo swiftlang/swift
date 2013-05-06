@@ -234,8 +234,6 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     SourceLoc LAngle, RAngle;
     MutableArrayRef<TypeLoc> GenericArgs;
     if (startsWithLess(Tok)) {
-      // FIXME: There's an ambiguity here because code could be trying to
-      // refer to a unary '<' operator.
       if (parseGenericArguments(GenericArgs, LAngle, RAngle))
         return true;
     }
@@ -615,8 +613,8 @@ bool Parser::canParseTypeIdentifier() {
     }
     
     if (startsWithLess(Tok)) {
-      if (canParseGenericArguments())
-        return true;
+      if (!canParseGenericArguments())
+        return false;
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
