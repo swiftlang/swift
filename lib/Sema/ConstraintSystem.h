@@ -1258,6 +1258,21 @@ public:
   /// type variables for their fixed types.
   Type simplifyType(TypeChecker &tc, Type type) const;
 
+  /// \brief Coerce the given expression to the given type.
+  ///
+  /// This operation cannot fail.
+  ///
+  /// \param tc The type checker.
+  /// \param expr The expression to coerce.
+  /// \param toType The type to coerce the expression to.
+  ///
+  /// \param isAssignment FIXME: Whether this is an assignment,
+  /// which is only needed by the "old" type checker fallback.
+  ///
+  /// \returns the coerced expression, which will have type \c ToType.
+  Expr *coerceToType(TypeChecker &tc, Expr *expr, Type toType,
+                     bool isAssignment = false) const;
+
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
 };
@@ -2043,13 +2058,6 @@ public:
 /// an implicit byref(settable).
 Type adjustLValueForReference(Type type, bool isAssignment,
                               ASTContext &context);
-
-/// \brief Convert the given expression to a type.
-///
-/// Note that this routine is never supposed to fail, because only
-/// already-checked conversions should be provided to it.
-Expr *convertToType(TypeChecker &tc, Expr *expr, Type toType,
-                    bool isAssignment = false);
 
 } // end namespace constraints
 

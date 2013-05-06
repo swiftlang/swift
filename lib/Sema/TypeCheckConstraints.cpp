@@ -2699,7 +2699,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
-    result = convertToType(*this, result, convertType);
+    result = solution.coerceToType(*this, result, convertType,
+                                   /*isAssignment=*/false);
     if (!result) {
       return nullptr;
     }
@@ -2859,7 +2860,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   }
 
   // Convert the source to the simplified destination type.
-  src = convertToType(*this, src, solution.simplifyType(*this, destTy));
+  src = solution.coerceToType(*this, src, solution.simplifyType(*this, destTy));
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };

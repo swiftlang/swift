@@ -27,13 +27,14 @@
 using namespace swift;
 using namespace constraints;
 
-Expr *constraints::convertToType(TypeChecker &tc, Expr *expr, Type toType,
-                                 bool isAssignment) {
+Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
+                             bool isAssignment) const {
   // FIXME: Temporary hack that uses the existing coercion logic.
   return tc.coerceToType(expr, toType,
                          isAssignment? CoercionKind::Assignment
-                         : CoercionKind::Normal);
+                                     : CoercionKind::Normal);
 }
+
 
 /// \brief Convert the object argument to the given type.
 static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
@@ -138,8 +139,7 @@ namespace {
           base = convertObjectArgumentToType(tc, base, containerTy);
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = convertToType(tc, base,
-                               MetaTypeType::get(containerTy, context));
+          base = coerceToType(base, MetaTypeType::get(containerTy, context));
           base = tc.convertToRValue(base);
         }
         assert(base && "Unable to convert base?");
@@ -214,8 +214,7 @@ namespace {
           base = convertObjectArgumentToType(tc, base, baseTy);
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = convertToType(tc, base,
-                               MetaTypeType::get(baseTy, context));
+          base = coerceToType(base, MetaTypeType::get(baseTy, context));
           base = tc.convertToRValue(base);
         }
         assert(base && "Unable to convert base?");
@@ -336,6 +335,12 @@ namespace {
     /// type variables for their fixed types.
     Type simplifyType(Type type) {
       return solution.simplifyType(cs.getTypeChecker(), type);
+    }
+
+    /// \brief Coerce the given expression to the given type.
+    Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) {
+      return solution.coerceToType(cs.getTypeChecker(), expr, toType,
+                                   isAssignment);
     }
 
     /// \brief Build a new subscript.
@@ -468,7 +473,7 @@ namespace {
       // FIXME: The existing literal coercion code should move here.
       auto type = simplifyType(expr->getType());
       expr->setType(UnstructuredUnresolvedType::get(cs.getASTContext()));
-      return convertToType(cs.getTypeChecker(), expr, type);
+      return coerceToType(expr, type);
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -897,8 +902,7 @@ namespace {
       // Convert the expression in the body to the result type of the explicit
       // closure.
       auto resultType = type->getResult();
-      if (Expr *body = convertToType(cs.getTypeChecker(), expr->getBody(),
-                                     resultType))
+      if (Expr *body = coerceToType(expr->getBody(), resultType))
         expr->setBody(body);
       expr->setType(type);
 
@@ -1002,12 +1006,8 @@ namespace {
       auto resultTy = simplifyType(expr->getType());
       expr->setType(resultTy);
 
-      expr->setThenExpr(convertToType(cs.getTypeChecker(),
-                                      expr->getThenExpr(),
-                                      resultTy));
-      expr->setElseExpr(convertToType(cs.getTypeChecker(),
-                                      expr->getElseExpr(),
-                                      resultTy));
+      expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy));
+      expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy));
 
       return expr;
     }
@@ -1025,9 +1025,7 @@ namespace {
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
       expr->setType(simplifyType(expr->getType()));
-      Expr *subExpr = convertToType(cs.getTypeChecker(),
-                                    expr->getSubExpr(),
-                                    expr->getType());
+      Expr *subExpr = coerceToType(expr->getSubExpr(), expr->getType());
       expr->setSubExpr(subExpr);
       return expr;
     }
@@ -1277,8 +1275,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (isa<ThisApplyExpr>(apply))
       arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
     else
-      arg = convertToType(tc, origArg, fnType->getInput(),
-                          isAssignmentFn(fn));
+      arg = coerceToType(origArg, fnType->getInput(), isAssignmentFn(fn));
 
     if (!arg) {
       // FIXME: Shouldn't ever happen.
@@ -1307,7 +1304,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     // FIXME: Need an AST to represent this properly.
-    return convertToType(tc, apply->getArg(), tupleTy);
+    return coerceToType(apply->getArg(), tupleTy);
   }
 
   // We're constructing a struct or oneof. Look for the constructor or oneof
@@ -1327,7 +1324,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!selected ||
       selected->first.getKind() == OverloadChoiceKind::IdentityFunction) {
     // FIXME: Need an AST to represent this properly.
-    return convertToType(tc, apply->getArg(), ty);
+    return coerceToType(apply->getArg(), ty);
   }
 
   // We have the constructor.
