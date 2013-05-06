@@ -833,6 +833,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // Type check the body of each of the FuncExpr in turn.  Note that outside
     // FuncExprs must be visited before nested FuncExprs for type-checking to
     // work correctly.
+    unsigned previousFuncExpr = currentFuncExpr;
     for (unsigned n = prePass.FuncExprs.size(); currentFuncExpr != n;
          ++currentFuncExpr) {
       auto func = prePass.FuncExprs[currentFuncExpr];
@@ -849,6 +850,17 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       PrettyStackTraceExpr StackEntry(TC.Context, "type-checking", FE);
 
       TC.typeCheckFunctionBody(FE);
+    }
+
+    // Compute captures for the function expressions we visited, in the
+    // opposite order of type checking. i.e., the nested FuncExprs will be
+    // visited before the outer FuncExprs.
+    for (unsigned i = currentFuncExpr; i > previousFuncExpr; --i) {
+      auto func = prePass.FuncExprs[i-1].dyn_cast<FuncExpr *>();
+      if (!func)
+        continue;
+
+      TC.computeCaptures(func);
     }
 
     for (unsigned n = TC.Context.ExternalDefinitions.size();

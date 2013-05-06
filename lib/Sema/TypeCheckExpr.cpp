@@ -2369,8 +2369,12 @@ void TypeChecker::computeCaptures(CapturingExpr *capturing) {
   FindCapturedVars finder(*this, Captures, capturing);
   if (auto closure = dyn_cast<ClosureExpr>(capturing))
     finder.doWalk(closure->getBody());
-  else
-    finder.doWalk(cast<FuncExpr>(capturing)->getBody());
+  else {
+    auto func = cast<FuncExpr>(capturing);
+    if (auto body = func->getBody()) {
+      finder.doWalk(body);
+    }
+  }
   ValueDecl** CaptureCopy
     = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
   capturing->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));

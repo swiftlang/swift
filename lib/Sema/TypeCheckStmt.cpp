@@ -664,9 +664,6 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
 
   StmtChecker(*this, FE).typeCheckStmt(BS);
   FE->setBody(BS);
-
-  // Compute the capture list, now that we have analyzed the expression.
-  computeCaptures(FE);
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an
