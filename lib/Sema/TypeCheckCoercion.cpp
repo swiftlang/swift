@@ -1330,7 +1330,7 @@ CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
   
   E->setBody(Result);
 
-  E->computeCaptures(TC.Context);
+  TC.computeCaptures(E);
 
   return unchanged(E);
 }
@@ -2031,7 +2031,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
       ICE->setPattern(Pat);
 
       // Compute the capture list, now that we have analyzed the expression.
-      ICE->computeCaptures(TC.Context);
+      TC.computeCaptures(ICE);
 
       return coerced(ICE, Flags);
     }

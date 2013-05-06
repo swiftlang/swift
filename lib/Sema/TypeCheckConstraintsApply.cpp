@@ -899,7 +899,7 @@ namespace {
       expr->setType(type);
 
       // Compute the capture list, now that we have analyzed the expression.
-      expr->computeCaptures(cs.getASTContext());
+      cs.getTypeChecker().computeCaptures(expr);
 
       return expr;
     }

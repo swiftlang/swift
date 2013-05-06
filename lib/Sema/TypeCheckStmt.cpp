@@ -666,7 +666,7 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   FE->setBody(BS);
 
   // Compute the capture list, now that we have analyzed the expression.
-  FE->computeCaptures(Context);
+  computeCaptures(FE);
 }
 
 /// \brief Given a pattern declaring some number of member variables, build an

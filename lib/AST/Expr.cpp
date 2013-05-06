@@ -335,52 +335,6 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
                                          UnstructuredUnresolvedType::get(C));
 }
 
-namespace {
-  class FindCapturedVars : public ASTWalker {
-    llvm::SetVector<ValueDecl*> &Captures;
-    CapturingExpr *CurExpr;
-
-  public:
-    bool walkToExprPre(Expr *E) {
-      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-        if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
-            DRE->getDecl()->getDeclContext() != CurExpr)
-          Captures.insert(DRE->getDecl());
-        return false;
-      }
-      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
-        for (auto D : SubCE->getCaptures())
-          if (D->getDeclContext() != CurExpr)
-            Captures.insert(D);
-        return false;
-      }
-      return true;
-    }
-
-    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures,
-                     CapturingExpr *curExpr)
-      : Captures(captures), CurExpr(curExpr) {}
-
-    void doWalk(Expr *E) {
-      E->walk(*this);
-    }
-    void doWalk(Stmt *S) {
-      S->walk(*this);
-    }
-  };
-}
-
-void CapturingExpr::computeCaptures(ASTContext &Context) {
-  llvm::SetVector<ValueDecl*> Captures;
-  if (isa<ClosureExpr>(this))
-    FindCapturedVars(Captures, this).doWalk(cast<ClosureExpr>(this)->getBody());
-  else
-    FindCapturedVars(Captures, this).doWalk(cast<FuncExpr>(this)->getBody());
-  ValueDecl** CaptureCopy
-    = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
-  setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
-}
-
 ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
   if (auto *func = dyn_cast<FuncExpr>(this))
     return func->getArgParamPatterns();

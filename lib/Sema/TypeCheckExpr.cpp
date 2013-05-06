@@ -2317,3 +2317,62 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     .highlight(DestDependence.OneUnresolvedExpr->getSourceRange());
   return true;
 }
+
+namespace {
+  class FindCapturedVars : public ASTWalker {
+    TypeChecker &tc;
+    llvm::SetVector<ValueDecl*> &captures;
+    CapturingExpr *curExpr;
+
+  public:
+    bool walkToExprPre(Expr *E) {
+      if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
+            DRE->getDecl()->getDeclContext() != curExpr) {
+          // A [byref] parameter cannot be captured.
+          // FIXME: As a temporary hack, ignore 'this', which is an implicit
+          // [byref] parameter for instance methods of structs.
+          if (DRE->getDecl()->getType()->is<LValueType>() && !
+              DRE->getDecl()->getName().str().equals("this")) {
+            tc.diagnose(DRE->getLoc(), diag::byref_capture,
+                        DRE->getDecl()->getName());
+          }
+          captures.insert(DRE->getDecl());
+        }
+        return false;
+      }
+      if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
+        for (auto D : SubCE->getCaptures())
+          if (D->getDeclContext() != curExpr)
+            captures.insert(D);
+        return false;
+      }
+      return true;
+    }
+
+    FindCapturedVars(TypeChecker &tc,
+                     llvm::SetVector<ValueDecl*> &captures,
+                     CapturingExpr *curExpr)
+      : tc(tc), captures(captures), curExpr(curExpr) {}
+
+    void doWalk(Expr *E) {
+      E->walk(*this);
+    }
+    void doWalk(Stmt *S) {
+      S->walk(*this);
+    }
+  };
+}
+
+void TypeChecker::computeCaptures(CapturingExpr *capturing) {
+  llvm::SetVector<ValueDecl*> Captures;
+  FindCapturedVars finder(*this, Captures, capturing);
+  if (auto closure = dyn_cast<ClosureExpr>(capturing))
+    finder.doWalk(closure->getBody());
+  else
+    finder.doWalk(cast<FuncExpr>(capturing)->getBody());
+  ValueDecl** CaptureCopy
+    = Context.AllocateCopy<ValueDecl*>(Captures.begin(), Captures.end());
+  capturing->setCaptures(llvm::makeArrayRef(CaptureCopy, Captures.size()));
+}
+

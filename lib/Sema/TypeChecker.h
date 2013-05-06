@@ -468,6 +468,9 @@ public:
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
+  
+  /// \brief Compute the set of captures for the given function or closure.
+  void computeCaptures(CapturingExpr *capturing);
 
   /// \brief Type check an assignment expression using the constraint-based
   /// type checker.
