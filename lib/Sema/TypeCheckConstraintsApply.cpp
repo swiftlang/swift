@@ -22,15 +22,53 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace constraints;
 
+//===--------------------------------------------------------------------===//
+// Constraint application statistics
+//===--------------------------------------------------------------------===//
+#define DEBUG_TYPE "Constraint application"
+STATISTIC(NumHandledCoercions, "# of coercions handled directly");
+STATISTIC(NumCoercions, "# of coercions");
+
 Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
                              bool isAssignment) const {
+  // The type we're converting from.
+  Type fromType = expr->getType();
+
+  // Save the original expression. If we fail to fully coerce the type,
+  // fall back to the original.
+  Expr *origExpr = expr;
+
+  // Coercions from an lvalue: requalify and load.
+  if (auto fromLValue = fromType->getAs<LValueType>()) {
+    if (auto toLValue = toType->getAs<LValueType>()) {
+      // Update the qualifiers on the lvalue.
+      expr = new (tc.Context) RequalifyExpr(
+                                expr,
+                                LValueType::get(fromLValue->getObjectType(),
+                                                toLValue->getQualifiers(),
+                                                tc.Context));
+    } else {
+      // Load from the lvalue.
+      expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
+    }
+    fromType = fromLValue->getObjectType();
+  }
+
+  // If we succeeded, use the coerced result.
+  ++NumCoercions;
+  if (expr->getType()->isEqual(toType)) {
+    ++NumHandledCoercions;
+    return expr;
+  }
+
   // FIXME: Temporary hack that uses the existing coercion logic.
-  return tc.coerceToType(expr, toType,
+  return tc.coerceToType(origExpr, toType,
                          isAssignment? CoercionKind::Assignment
                                      : CoercionKind::Normal);
 }
@@ -1246,7 +1284,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
                           intermediate->getStartLoc(),
                           openedType);
 
-  // Return a new call of the conversion function, passing in the (possible
+  // Return a new call of the conversion function, passing in the (possibly
   // converted) argument.
   return new (tc.Context) CallExpr(result, intermediate, type);
 
