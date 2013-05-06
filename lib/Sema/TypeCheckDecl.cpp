@@ -33,6 +33,16 @@ enum class ImplicitConstructorKind {
   Memberwise
 };
 
+/// \brief Determine whether the given pattern contains only a single variable
+/// that is a property.
+static bool isPatternProperty(Pattern *pattern) {
+  pattern = pattern->getSemanticsProvidingPattern();
+  if (auto named = dyn_cast<NamedPattern>(pattern))
+    return named->getDecl()->isProperty();
+
+  return false;
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -293,7 +303,9 @@ public:
 
       Type ty = PBD->getPattern()->getType();
       Expr *initializer = nullptr;
-      if (!TC.isDefaultInitializable(ty, &initializer)) {
+      if (isPatternProperty(PBD->getPattern())) {
+        // Properties don't have initializers.
+      } else if (!TC.isDefaultInitializable(ty, &initializer)) {
         // FIXME: Better diagnostics here.
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
         PBD->setInvalid();
