@@ -627,8 +627,8 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
-  if (numElements == 0)
-    return &_TMdT_;
+  assert(numElements != 0 &&
+         "Zero element type refs should use _TMdT_ directly");
 
   // FIXME: include labels when uniquing!
 
@@ -681,6 +681,24 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   return TupleTypes.add(entry)->getData();
 }
+
+const TupleTypeMetadata *
+swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+                                   const char *labels,
+                                   const ValueWitnessTable *proposedWitnesses) {
+  const Metadata *elts[] = { elt0, elt1 };
+  return swift_getTupleTypeMetadata(2, elts, labels, proposedWitnesses);
+}
+
+const TupleTypeMetadata *
+swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+                                   const Metadata *elt2,
+                                   const char *labels,
+                                   const ValueWitnessTable *proposedWitnesses) {
+  const Metadata *elts[] = { elt0, elt1, elt2 };
+  return swift_getTupleTypeMetadata(3, elts, labels, proposedWitnesses);
+}
+
 
 /*** Metatypes *************************************************************/
 

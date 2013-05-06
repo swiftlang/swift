@@ -747,6 +747,16 @@ swift_getTupleTypeMetadata(size_t numElements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
 
+extern "C" const TupleTypeMetadata *
+swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+                            const char *labels,
+                            const ValueWitnessTable *proposedWitnesses);
+extern "C" const TupleTypeMetadata *
+swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+                            const Metadata *elt2, const char *labels,
+                            const ValueWitnessTable *proposedWitnesses);
+
+
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);

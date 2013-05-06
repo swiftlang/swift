@@ -258,7 +258,10 @@ public:
   llvm::Constant *getGetFunctionMetadataFn();
   llvm::Constant *getGetGenericMetadataFn();
   llvm::Constant *getGetMetatypeMetadataFn();
+  llvm::Constant *getEmptyTupleMetadata();
   llvm::Constant *getGetTupleMetadataFn();
+  llvm::Constant *getGetTupleMetadata2Fn();
+  llvm::Constant *getGetTupleMetadata3Fn();
   llvm::Constant *getGetObjCClassMetadataFn();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
@@ -289,7 +292,10 @@ private:
   llvm::Constant *GetGenericMetadataFn = nullptr;
   llvm::Constant *GetMetatypeMetadataFn = nullptr;
   llvm::Constant *GetObjCClassMetadataFn = nullptr;
+  llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *GetTupleMetadataFn = nullptr;
+  llvm::Constant *GetTupleMetadata2Fn = nullptr;
+  llvm::Constant *GetTupleMetadata3Fn = nullptr;
   llvm::Constant *GetObjectClassFn = nullptr;
   llvm::Constant *GetObjectTypeFn = nullptr;
   llvm::Constant *ObjCAutoreleaseReturnValueFn = nullptr;

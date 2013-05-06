@@ -318,38 +318,69 @@ namespace {
       if (auto cached = tryGetLocal(CanType(type)))
         return cached;
 
-      auto elements = type->getFields();
-
       // I think the sanest thing to do here is drop labels, but maybe
       // that's not correct.  If so, that's really unfortunate in a
       // lot of ways.
 
       // Er, varargs bit?  Should that go in?
 
-      // For metadata purposes, we consider a singleton tuple to be
-      // isomorphic to its element type.
-      if (elements.size() == 1)
+
+      auto elements = type->getFields();
+
+      switch (elements.size()) {
+      case 0: // Special case the empty tuple, just use the global descriptor.
+        return IGF.IGM.getEmptyTupleMetadata();
+
+      case 1:
+          // For metadata purposes, we consider a singleton tuple to be
+          // isomorphic to its element type.
         return visit(CanType(elements[0].getType()));
 
-      // TODO: use a caching entrypoint (with all information
-      // out-of-line) for non-dependent tuples.
+      case 2: {
+        // Find the metadata pointer for this element.
+        llvm::Value *elt0Metadata = visit(CanType(elements[0].getType()));
+        llvm::Value *elt1Metadata = visit(CanType(elements[1].getType()));
 
-      // TODO: make a standard metadata for the empty tuple?
+        llvm::Value *args[] = {
+          elt0Metadata, elt1Metadata,
+          getTupleLabelsString(IGF.IGM, type),
+          llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
+        };
 
-      llvm::Value *pointerToFirst;
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata2Fn(),
+                                           args);
+        call->setDoesNotThrow();
+        call->setCallingConv(IGF.IGM.RuntimeCC);
+        return setLocal(CanType(type), call);
+      }
 
-      // If there are no elements, we can pass a bogus array pointer.
-      if (elements.empty()) {
-        auto metadataPtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
-        pointerToFirst = llvm::UndefValue::get(metadataPtrPtrTy);
+      case 3: {
+        // Find the metadata pointer for this element.
+        llvm::Value *elt0Metadata = visit(CanType(elements[0].getType()));
+        llvm::Value *elt1Metadata = visit(CanType(elements[1].getType()));
+        llvm::Value *elt2Metadata = visit(CanType(elements[2].getType()));
 
-      // Otherwise, we need to fill out a temporary array to pass.
-      } else {
-        pointerToFirst = nullptr; // appease -Wuninitialized
+        llvm::Value *args[] = {
+          elt0Metadata, elt1Metadata, elt2Metadata,
+          getTupleLabelsString(IGF.IGM, type),
+          llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
+        };
+
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata3Fn(),
+                                           args);
+        call->setDoesNotThrow();
+        call->setCallingConv(IGF.IGM.RuntimeCC);
+        return setLocal(CanType(type), call);
+      }
+      default:
+        // TODO: use a caching entrypoint (with all information
+        // out-of-line) for non-dependent tuples.
+
+        llvm::Value *pointerToFirst = nullptr; // appease -Wuninitialized
 
         auto arrayTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
                                             elements.size());
-        Address buffer = IGF.createAlloca(arrayTy, IGF.IGM.getPointerAlignment(),
+        Address buffer = IGF.createAlloca(arrayTy,IGF.IGM.getPointerAlignment(),
                                           "tuple-elements");
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
@@ -357,26 +388,27 @@ namespace {
 
           // GEP to the appropriate element and store.
           Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
-                                                       IGF.IGM.getPointerSize());
+                                                     IGF.IGM.getPointerSize());
           IGF.Builder.CreateStore(eltMetadata, eltPtr);
 
           // Remember the GEP to the first element.
           if (i == 0) pointerToFirst = eltPtr.getAddress();
         }
+
+        llvm::Value *args[] = {
+          llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
+          pointerToFirst,
+          getTupleLabelsString(IGF.IGM, type),
+          llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
+        };
+
+        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(),
+                                           args);
+        call->setDoesNotThrow();
+        call->setCallingConv(IGF.IGM.RuntimeCC);
+
+        return setLocal(CanType(type), call);
       }
-
-      llvm::Value *args[] = {
-        llvm::ConstantInt::get(IGF.IGM.SizeTy, elements.size()),
-        pointerToFirst,
-        getTupleLabelsString(IGF.IGM, type),
-        llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
-      };
-
-      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(), args);
-      call->setDoesNotThrow();
-      call->setCallingConv(IGF.IGM.RuntimeCC);
-
-      return setLocal(CanType(type), call);
     }
 
     llvm::Value *visitPolymorphicFunctionType(PolymorphicFunctionType *type) {

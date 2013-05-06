@@ -430,6 +430,15 @@ llvm::Constant *IRGenModule::getObjCTypeofFn() {
                       { OpaquePtrTy, TypeMetadataPtrTy });
 }
 
+llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
+  if (EmptyTupleMetadata)
+    return EmptyTupleMetadata;
+
+  return EmptyTupleMetadata =
+    Module.getOrInsertGlobal("_TMdT_",
+                             TypeMetadataPtrTy->getPointerElementType());
+}
+
 llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   // type_metadata_t *swift_getTupleMetadata(size_t numElements,
   //                                         type_metadata_t * const *pattern,
@@ -445,6 +454,42 @@ llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
                         WitnessTablePtrTy
                       });
 }
+
+llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
+  // type_metadata_t *swift_getTupleMetadata2(type_metadata_t *elt0,
+  //                                         type_metadata_t *elt1,
+  //                                         const char *labels,
+  //                                         value_witness_table_t *proposed);
+  return getRuntimeFn(*this, GetTupleMetadata2Fn, "swift_getTupleTypeMetadata2",
+                      createReadnoneRuntimeFunction,
+                      { TypeMetadataPtrTy },
+                      {
+                        TypeMetadataPtrTy, 
+                        TypeMetadataPtrTy,
+                        Int8PtrTy,
+                        WitnessTablePtrTy
+                      });
+}
+
+llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
+  // type_metadata_t *swift_getTupleMetadata3(type_metadata_t *elt0,
+  //                                         type_metadata_t *elt1,
+  //                                         type_metadata_t *elt2,
+  //                                         type_metadata_t * const *pattern,
+  //                                         const char *labels,
+  //                                         value_witness_table_t *proposed);
+  return getRuntimeFn(*this, GetTupleMetadata3Fn, "swift_getTupleTypeMetadata3",
+                      createReadnoneRuntimeFunction,
+                      { TypeMetadataPtrTy },
+                      {
+                        TypeMetadataPtrTy,
+                        TypeMetadataPtrTy,
+                        TypeMetadataPtrTy,
+                        Int8PtrTy,
+                        WitnessTablePtrTy
+                      });
+}
+
 
 llvm::Constant *IRGenModule::getGetObjectClassFn() {
   if (GetObjectClassFn) return GetObjectClassFn;
