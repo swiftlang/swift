@@ -43,6 +43,7 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
   // Save the original expression. If we fail to fully coerce the type,
   // fall back to the original.
   Expr *origExpr = expr;
+  ++NumCoercions;
 
   // Coercions from an lvalue: requalify and load.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
@@ -57,11 +58,47 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
       // Load from the lvalue.
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
     }
-    fromType = fromLValue->getObjectType();
+
+    // If we succeeded, use the coerced result.
+    if (expr->getType()->isEqual(toType)) {
+      ++NumHandledCoercions;
+      return expr;
+    }
+
+    fromType = expr->getType();
+  }
+
+  // Coercion from a subclass to a superclass.
+  if (fromType->mayHaveSuperclass() &&
+      toType->getClassOrBoundGenericClass()) {
+    for (auto fromSuperClass = tc.getSuperClassOf(fromType);
+         fromSuperClass;
+         fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
+      if (fromSuperClass->isEqual(toType)) {
+        // Coercion from archetype to its (concrete) superclass.
+        if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
+          expr = new (tc.Context) ArchetypeToSuperExpr(
+                                    expr,
+                                    fromArchetype->getSuperclass());
+
+          // If we succeeded, use the coerced result.
+          if (expr->getType()->isEqual(toType)) {
+            ++NumHandledCoercions;
+            return expr;
+          }
+
+          fromType = expr->getType();
+        }
+
+        // Coercion from subclass to superclass.
+        expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
+        ++NumHandledCoercions;
+        return expr;
+      }
+    }
   }
 
   // If we succeeded, use the coerced result.
-  ++NumCoercions;
   if (expr->getType()->isEqual(toType)) {
     ++NumHandledCoercions;
     return expr;
