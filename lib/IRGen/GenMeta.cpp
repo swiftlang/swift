@@ -1356,10 +1356,17 @@ namespace {
     FindStructWitnessTableIndex(IRGenModule &IGM, StructDecl *decl,
                                 ArchetypeType *targetArchetype,
                                 ProtocolDecl *targetProtocol)
-      : super(IGM, decl), TargetArchetype(targetArchetype) {}
+      : super(IGM, decl),
+        TargetArchetype(targetArchetype),
+        TargetProtocol(targetProtocol)
+    {}
 
     void addGenericWitnessTable(ArchetypeType *argument,
                                 ProtocolDecl *protocol) {
+      argument->dump();
+      protocol->dump();
+      TargetArchetype->dump();
+      TargetProtocol->dump();
       if (argument == TargetArchetype && protocol == TargetProtocol)
         setTargetIndex();
       NextIndex++;
