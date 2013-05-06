@@ -47,3 +47,6 @@ typedef struct {
 } CGRect;
 
 typedef CGRect NSRect;
+
+typedef void MyVoid;
+MyVoid returnsMyVoid(void);

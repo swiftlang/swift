@@ -34,6 +34,7 @@ class MacroInfo;
 class NamedDecl;
 class ObjCMethodDecl;
 class ParmVarDecl;
+class TypedefNameDecl;
 class QualType;
 }
 
@@ -59,6 +60,21 @@ enum class ConstantConvertKind {
   Construction,
   /// \brief Perform an unchecked downcast to the given type.
   Downcast
+};
+
+/// \brief Describes the kind of type import we're performing.
+enum class ImportTypeKind {
+  /// \brief A "normal' type import, with no special rules.
+  Normal,
+  /// \brief Import the result type of a function.
+  ///
+  /// This provides special treatment for 'void', among other things.
+  Result,
+  /// \brief Import the type of a function parameter.
+  ///
+  /// This provides special treatment for C++ references (which become
+  /// [byref] parameters), among other things.
+  Parameter
 };
 
 /// \brief Implementation of the Clang importer.
@@ -101,6 +117,17 @@ struct ClangImporter::Implementation {
 
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
+
+  /// \brief The set of "special" typedef-name declarations, which are
+  /// mapped to specific Swift types.
+  ///
+  /// Normal typedef-name declarations imported into Swift will maintain
+  /// equality between the imported declaration's underlying type and the
+  /// import of the underlying type. A typedef-name declaration is special
+  /// when this is not the case, e.g., Objective-C's "BOOL" has an underlying
+  /// type of "signed char", but is mapped to a special Swift struct type
+  /// ObjCBool.
+  llvm::SmallPtrSet<clang::TypedefNameDecl *, 8> SpecialTypedefNames;
 
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
@@ -288,9 +315,13 @@ public:
 
   /// \brief Import the given Clang type into Swift.
   ///
+  /// \param type The Clang type to import.
+  ///
+  /// \param kind The kind of type import we're performing.
+  ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
-  Type importType(clang::QualType type);
+  Type importType(clang::QualType type, ImportTypeKind kind);
 
   /// \brief Import the given function type.
   ///
@@ -317,6 +348,13 @@ public:
                           SmallVectorImpl<Pattern*> &bodyPatterns,
                           clang::Selector selector = clang::Selector(),
                           bool isConstructor = false);
+
+  /// \brief Determine whether the given typedef-name is "special", meaning
+  /// that it has performed some non-trivial mapping of its underlying type
+  /// based on the name of the typedef.
+  bool isSpecialTypedefName(clang::TypedefNameDecl *decl) {
+    return SpecialTypedefNames.count(decl) > 0;
+  }
 };
 
 }

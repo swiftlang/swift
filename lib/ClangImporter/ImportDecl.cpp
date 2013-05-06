@@ -131,10 +131,16 @@ namespace {
             type = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
           break;
         }
+
+        // If we swapped in a new type, note that this typedef-name is special.
+        if (type) {
+          Impl.SpecialTypedefNames.insert(decl);
+        }
       }
 
       if (!type)
-        type = Impl.importType(decl->getUnderlyingType());
+        type = Impl.importType(decl->getUnderlyingType(),
+                               ImportTypeKind::Normal);
 
       if (!type)
         return nullptr;
@@ -280,7 +286,8 @@ namespace {
           StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
         
         // Compute the underlying type of the enumeration.
-        auto underlyingType = Impl.importType(decl->getIntegerType());
+        auto underlyingType = Impl.importType(decl->getIntegerType(),
+                                              ImportTypeKind::Normal);
         if (!underlyingType)
           return nullptr;
 
@@ -484,7 +491,8 @@ namespace {
 
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
-        auto type = Impl.importType(clangContext.getTagDeclType(clangEnum));
+        auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
+                                    ImportTypeKind::Normal);
         if (!type)
           return nullptr;
         // FIXME: Importing the type will can recursively revisit this same
@@ -518,7 +526,8 @@ namespace {
 
         // Import the enumeration type.
         auto enumType = Impl.importType(
-                          Impl.getClangASTContext().getTagDeclType(clangEnum));
+                          Impl.getClangASTContext().getTagDeclType(clangEnum),
+                          ImportTypeKind::Normal);
         if (!enumType)
           return nullptr;
         // FIXME: Importing the type will can recursively revisit this same
@@ -588,7 +597,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType());
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
@@ -623,7 +632,7 @@ namespace {
                  { decl->param_begin(), decl->param_size() },
                  decl->isVariadic(), argPatterns, bodyPatterns);
       else
-        type = Impl.importType(decl->getType());
+        type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
 
       if (!type)
         return nullptr;
@@ -663,7 +672,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType());
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
@@ -704,7 +713,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType());
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
@@ -2101,14 +2110,15 @@ namespace {
           overridden = var;
       }
 
-      auto type = Impl.importType(decl->getType());
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
       // Look for an iboutletcollection attribute, which provides additional
       // typing information for known containers.
       if (auto collectionAttr = decl->getAttr<clang::IBOutletCollectionAttr>()){
-        if (auto elementType = Impl.importType(collectionAttr->getInterface())){
+        if (auto elementType = Impl.importType(collectionAttr->getInterface(),
+                                               ImportTypeKind::Normal)){
           type = getTypedCollection(type, elementType);
         }
       }

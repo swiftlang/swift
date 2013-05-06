@@ -46,7 +46,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
       // Note: all integer literals are imported with type 'int'.
       // FIXME: What if int is too small?
-      auto type = Impl.importType(clangContext.IntTy);
+      auto type = Impl.importType(clangContext.IntTy, ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
@@ -66,7 +66,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
       // Note: all integer literals are imported with type 'double'.
       // FIXME: What if double is too small?
-      auto type = Impl.importType(clangContext.DoubleTy);
+      auto type = Impl.importType(clangContext.DoubleTy,
+                                  ImportTypeKind::Normal);
       if (!type)
         return nullptr;
 
