@@ -746,7 +746,6 @@ static void setValueWitnessTable(IRGenFunction &IGF,
                                  ArchetypeType *archetype,
                                  llvm::Value *wtable) {
   assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
-  assert(archetype->getConformsTo().size() == 0);
   IGF.setUnscopedLocalTypeData(CanType(archetype),
                                LocalTypeData(0),
                                wtable);
