@@ -75,6 +75,7 @@ public:
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
+    checkSILInstruction(I);
   }
 
   void checkSILInstruction(SILInstruction *I) {
