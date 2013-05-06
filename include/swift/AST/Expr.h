@@ -27,6 +27,10 @@
 #include "llvm/ADT/NullablePtr.h"
 #include "llvm/ADT/StringRef.h"
 
+namespace llvm {
+  struct fltSemantics;
+}
+
 namespace swift {
   class ArchetypeType;
   class ASTContext;
@@ -172,6 +176,8 @@ public:
     : LiteralExpr(ExprKind::IntegerLiteral), Val(Val), Loc(Loc) {}
   
   APInt getValue() const;
+  
+  static APInt getValue(StringRef Text, unsigned BitWidth);
 
   StringRef getText() const { return Val; }
   
@@ -194,6 +200,8 @@ public:
     : LiteralExpr(ExprKind::FloatLiteral), Val(Val), Loc(Loc) {}
 
   APFloat getValue() const;
+  
+  static APFloat getValue(StringRef Text, const llvm::fltSemantics &Semantics);
 
   StringRef getText() const { return Val; }
   SourceRange getSourceRange() const { return Loc; }

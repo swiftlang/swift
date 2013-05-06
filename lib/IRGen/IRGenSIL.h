@@ -532,7 +532,6 @@ public:
   void visitIsaInst(IsaInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
-  void visitIntegerValueInst(IntegerValueInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitReturnInst(ReturnInst *i);

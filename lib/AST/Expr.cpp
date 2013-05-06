@@ -140,12 +140,9 @@ bool Expr::isImplicit() const {
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
 
-APInt IntegerLiteralExpr::getValue() const {
-  assert(!getType().isNull() && "Semantic analysis has not completed");
-  unsigned BitWidth = getType()->castTo<BuiltinIntegerType>()->getBitWidth();
-  
+APInt IntegerLiteralExpr::getValue(StringRef Text,
+                                   unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
-  auto Text = getText();
   // swift encodes octal differently than C
   bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
   bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
@@ -153,17 +150,30 @@ APInt IntegerLiteralExpr::getValue() const {
   if (Value.getBitWidth() != BitWidth)
     Value = Value.zextOrTrunc(BitWidth);
   return Value;
+  
+}
+
+APInt IntegerLiteralExpr::getValue() const {
+  assert(!getType().isNull() && "Semantic analysis has not completed");
+  return getValue(getText(),
+                  getType()->castTo<BuiltinIntegerType>()->getBitWidth());
+}
+
+APFloat FloatLiteralExpr::getValue(StringRef Text,
+                                   const llvm::fltSemantics &Semantics) {
+  APFloat Val(Semantics);
+  APFloat::opStatus Res =
+    Val.convertFromString(Text, llvm::APFloat::rmNearestTiesToEven);
+  assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
+  (void)Res;
+  return Val;
 }
 
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   
-  APFloat Val(getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
-  APFloat::opStatus Res =
-    Val.convertFromString(getText(), llvm::APFloat::rmNearestTiesToEven);
-  assert(Res != APFloat::opInvalidOp && "Sema didn't reject invalid number");
-  (void)Res;
-  return Val;
+  return getValue(getText(),
+                  getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
 MemberRefExpr::MemberRefExpr(Expr *Base, SourceLoc DotLoc, VarDecl *Value,

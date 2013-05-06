@@ -909,11 +909,6 @@ public:
             "input types of convert_function operand and result do not match");
   }
   
-  void checkIntegerValueInst(IntegerValueInst *IVI) {
-    require(IVI->getType().is<BuiltinIntegerType>(),
-            "invalid integer value type");
-  }
-
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
     

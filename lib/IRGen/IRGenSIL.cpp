@@ -1250,13 +1250,6 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   newLoweredAddress(SILValue(i, 0), Address(destValue, base.getAlignment()));
 }
 
-void IRGenSILFunction::visitIntegerValueInst(swift::IntegerValueInst *i) {
-  llvm::Value *constant = Builder.getInt64(i->getValue());
-  Explosion e(CurExplosionLevel);
-  e.add(constant);
-  newLoweredExplosion(SILValue(i, 0), e);
-}
-
 void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   CanType destType = i->getOperand().getType().getSwiftRValueType();

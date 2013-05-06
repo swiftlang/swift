@@ -579,11 +579,6 @@ public:
     OS << "index_addr " << getID(IAI->getOperand()) << ", " <<IAI->getIndex();
   }
 
-  void visitIntegerValueInst(IntegerValueInst *IVI) {
-    OS << "integer_value " << IVI->getValue() << ", $"
-       << IVI->getType();
-  }
-
   void visitUnreachableInst(UnreachableInst *UI) {
     OS << "unreachable";
   }

@@ -516,8 +516,9 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 Type baseTy,
                                 ArrayRef<ManagedValue> elements,
                                 Expr *VarargsInjectionFn) {
-  SILValue numEltsVal = gen.B.createIntegerValueInst(elements.size(),
-                      SILType::getBuiltinIntegerType(64, gen.F.getContext()));
+  SILValue numEltsVal = gen.B.createIntegerLiteral(SILLocation(),
+                      SILType::getBuiltinIntegerType(64, gen.F.getContext()),
+                      elements.size());
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
                                                   gen.getLoweredType(baseTy),
                                                   numEltsVal);

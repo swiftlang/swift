@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 
@@ -242,61 +243,112 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
     Function(F) {
 }
 
-IntegerLiteralInst::IntegerLiteralInst(IntegerLiteralExpr *E)
-  : SILInstruction(ValueKind::IntegerLiteralInst, E,
-                // Builtin integer types are always valid SIL types.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                     /*address=*/false, /*loadable=*/true)) {
+template<typename INST>
+static void *allocateLiteralInstWithTextSize(SILFunction &B, unsigned length) {
+  return B.allocate(sizeof(INST) + length, alignof(INST));
 }
 
-IntegerLiteralInst::IntegerLiteralInst(CharacterLiteralExpr *E)
-  : SILInstruction(ValueKind::IntegerLiteralInst, E,
-                // Builtin integer types are always valid SIL types.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                     /*address=*/false, /*loadable=*/true)) {
+IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,
+                                       StringRef Text)
+  : SILInstruction(ValueKind::IntegerLiteralInst, Loc, Ty),
+    length(Text.size())
+{
+  memcpy(this + 1, Text.data(), Text.size());
 }
 
-Expr *IntegerLiteralInst::getExpr() const {
-  return getLocExpr<Expr>();
+IntegerLiteralInst *
+IntegerLiteralInst::create(SILLocation Loc, SILType Ty,
+                           StringRef Text, SILFunction &B) {
+  void *buf = allocateLiteralInstWithTextSize<IntegerLiteralInst>(B,
+                                                                  Text.size());
+  return ::new (buf) IntegerLiteralInst(Loc, Ty, Text);
+}
+
+IntegerLiteralInst *
+IntegerLiteralInst::create(SILLocation Loc, SILType Ty, intmax_t Value,
+                           SILFunction &B) {
+  llvm::SmallString<12> s;
+  llvm::raw_svector_ostream ss(s);
+  ss << Value;
+  ss.flush();
+  
+  return create(Loc, Ty, s, B);
+}
+
+IntegerLiteralInst *
+IntegerLiteralInst::create(swift::IntegerLiteralExpr *E, SILFunction &B) {
+  return create(E,
+                // Builtin integer types are always valid SIL types.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                           /*address=*/false,
+                                           /*loadable=*/true),
+                E->getText(), B);
+}
+
+IntegerLiteralInst *
+IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &B) {
+  return create(E,
+                // Builtin integer types are always valid SIL types.
+                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
+                                           /*address=*/false,
+                                           /*loadable=*/true),
+                E->getValue(), B);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  auto expr = getExpr();
-  if (auto intExpr = dyn_cast<IntegerLiteralExpr>(expr)) {
-    return intExpr->getValue();
-  } else if (auto charExpr = dyn_cast<CharacterLiteralExpr>(expr)) {
-    return APInt(32, charExpr->getValue());
-  }
-  llvm_unreachable("int_literal instruction associated with unexpected "
-                   "ast node!");
+  return IntegerLiteralExpr::getValue(getText(),
+                        getType().castTo<BuiltinIntegerType>()->getBitWidth());
 }
 
-FloatLiteralInst::FloatLiteralInst(FloatLiteralExpr *E)
-  : SILInstruction(ValueKind::FloatLiteralInst, E,
+FloatLiteralInst::FloatLiteralInst(SILLocation Loc, SILType Ty, StringRef Text)
+  : SILInstruction(ValueKind::FloatLiteralInst, Loc, Ty),
+    length(Text.size())
+{
+  memcpy(this + 1, Text.data(), Text.size());
+}
+
+FloatLiteralInst *
+FloatLiteralInst::create(SILLocation Loc, SILType Ty, StringRef Text,
+                         SILFunction &B) {
+  void *buf = allocateLiteralInstWithTextSize<FloatLiteralInst>(B, Text.size());
+  return ::new (buf) FloatLiteralInst(Loc, Ty, Text);
+}
+
+FloatLiteralInst *
+FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &B) {
+  return create(E,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                     /*address=*/false, /*loadable=*/true)) {
-}
-
-FloatLiteralExpr *FloatLiteralInst::getExpr() const {
-  return getLocExpr<FloatLiteralExpr>();
+                                           /*address=*/false,
+                                           /*loadable=*/true),
+                E->getText(), B);
 }
 
 APFloat FloatLiteralInst::getValue() const {
-  return getExpr()->getValue();
+  return FloatLiteralExpr::getValue(getText(),
+                  getType().castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
-StringLiteralInst::StringLiteralInst(StringLiteralExpr *E, SILType ty)
-  : SILInstruction(ValueKind::StringLiteralInst, E, ty) {
+StringLiteralInst::StringLiteralInst(SILLocation Loc, SILType Ty,
+                                     StringRef Text)
+  : SILInstruction(ValueKind::StringLiteralInst, Loc, Ty),
+    length(Text.size())
+{
+  memcpy(this + 1, Text.data(), Text.size());
 }
 
-StringLiteralExpr *StringLiteralInst::getExpr() const {
-  return getLocExpr<StringLiteralExpr>();
+StringLiteralInst *
+StringLiteralInst::create(SILLocation Loc, SILType Ty, StringRef Text,
+                          SILFunction &B) {
+  void *buf
+    = allocateLiteralInstWithTextSize<StringLiteralInst>(B, Text.size());
+  return ::new (buf) StringLiteralInst(Loc, Ty, Text);
 }
 
-StringRef StringLiteralInst::getValue() const {
-  return getExpr()->getValue();
+StringLiteralInst *
+StringLiteralInst::create(StringLiteralExpr *E, SILType ty, SILFunction &B) {
+  return create(E, ty, E->getValue(), B);
 }
 
 StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)
@@ -386,13 +438,6 @@ UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
     Conformances(Conformances)
 {
 }
-
-//===----------------------------------------------------------------------===//
-// SIL-only instructions that don't have an AST analog
-//===----------------------------------------------------------------------===//
-
-IntegerValueInst::IntegerValueInst(uint64_t Val, SILType Ty)
-  : SILInstruction(ValueKind::IntegerValueInst, SILLocation(), Ty), Val(Val) {}
 
 
 //===----------------------------------------------------------------------===//

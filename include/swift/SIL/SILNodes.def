@@ -126,7 +126,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // SIL-only instructions that don't have an AST analog.
   INST(IndexAddrInst, SILInstruction)
-  INST(IntegerValueInst, SILInstruction)
 
   // Terminators.
   ABSTRACT_VALUE(TermInst, SILInstruction)

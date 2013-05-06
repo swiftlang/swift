@@ -154,16 +154,34 @@ public:
   }
 
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
-    return insert(new IntegerLiteralInst(E));
+    return insert(IntegerLiteralInst::create(E, F));
   }
   IntegerLiteralInst *createIntegerLiteral(CharacterLiteralExpr *E) {
-    return insert(new IntegerLiteralInst(E));
+    return insert(IntegerLiteralInst::create(E, F));
   }
+  IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
+                                           StringRef Text) {
+    return insert(IntegerLiteralInst::create(Loc, Ty, Text, F));
+  }
+  IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
+                                           intmax_t Value) {
+    return insert(IntegerLiteralInst::create(Loc, Ty, Value, F));
+  }
+
   FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
-    return insert(new FloatLiteralInst(E));
+    return insert(FloatLiteralInst::create(E, F));
   }
+  FloatLiteralInst *createFloatLiteral(SILLocation Loc, SILType Ty,
+                                       StringRef Text) {
+    return insert(FloatLiteralInst::create(Loc, Ty, Text, F));
+  }
+  
   StringLiteralInst *createStringLiteral(StringLiteralExpr *E, SILType Ty) {
-    return insert(new StringLiteralInst(E, Ty));
+    return insert(StringLiteralInst::create(E, Ty, F));
+  }
+  StringLiteralInst *createStringLiteral(SILLocation Loc, SILType Ty,
+                                         StringRef Text) {
+    return insert(StringLiteralInst::create(Loc, Ty, Text, F));
   }
 
   LoadInst *createLoad(SILLocation Loc, SILValue LV) {
@@ -430,10 +448,6 @@ public:
   IndexAddrInst *createIndexAddr(SILLocation loc, SILValue Operand,
                                  unsigned Index) {
     return insert(new IndexAddrInst(loc, Operand, Index));
-  }
-
-  IntegerValueInst *createIntegerValueInst(uint64_t Val, SILType Ty) {
-    return insert(new IntegerValueInst(Val, Ty));
   }
 
   //===--------------------------------------------------------------------===//

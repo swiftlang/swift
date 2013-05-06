@@ -37,7 +37,6 @@ class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
 class IntegerLiteralExpr;
-class MetatypeExpr;
 class StringLiteralExpr;
 class Stmt;
 class VarDecl;
@@ -421,11 +420,21 @@ public:
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public SILInstruction {
-public:
-  IntegerLiteralInst(IntegerLiteralExpr *E);
-  IntegerLiteralInst(CharacterLiteralExpr *E);
+  unsigned length;
   
-  Expr *getExpr() const;
+  StringRef getText() const {
+    return {reinterpret_cast<char const *>(this + 1), length};
+  }
+  
+  IntegerLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  
+public:
+  static IntegerLiteralInst *create(IntegerLiteralExpr *E, SILFunction &B);
+  static IntegerLiteralInst *create(CharacterLiteralExpr *E, SILFunction &B);
+  static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
+                                    StringRef Text, SILFunction &B);
+  static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
+                                    intmax_t Value, SILFunction &B);
   
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
@@ -433,7 +442,7 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IntegerLiteralInst;
@@ -443,10 +452,18 @@ public:
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
 class FloatLiteralInst : public SILInstruction {
+  unsigned length;
+  
+  StringRef getText() const {
+    return {reinterpret_cast<char const *>(this + 1), length};
+  }
+  
+  FloatLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  
 public:
-  FloatLiteralInst(FloatLiteralExpr *E);
-
-  FloatLiteralExpr *getExpr() const;
+  static FloatLiteralInst *create(FloatLiteralExpr *E, SILFunction &B);
+  static FloatLiteralInst *create(SILLocation Loc, SILType Ty,
+                                  StringRef Text, SILFunction &B);
 
   /// getValue - Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
@@ -464,13 +481,20 @@ public:
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
 /// a StringLiteralExpr.
 class StringLiteralInst : public SILInstruction {
+  unsigned length;
+  
+  StringLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  
 public:
-  StringLiteralInst(StringLiteralExpr *E, SILType ty);
-
-  StringLiteralExpr *getExpr() const;
+  static StringLiteralInst *create(StringLiteralExpr *E, SILType ty,
+                                   SILFunction &B);
+  static StringLiteralInst *create(SILLocation Loc, SILType ty,
+                                   StringRef Text, SILFunction &B);
 
   /// getValue - Return the string data for the literal.
-  StringRef getValue() const;
+  StringRef getValue() const {
+    return {reinterpret_cast<char const *>(this + 1), length};
+  }
 
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -1274,26 +1298,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Operand.getType()), Index(Index) {}
   
   unsigned getIndex() const { return Index; }
-};
-
-/// IntegerValueInst - Always produces an integer of the specified value.  These
-/// always have Builtin.Integer type.
-/// FIXME: This should be combined with IntegerLiteralInst.
-class IntegerValueInst : public SILInstruction {
-  uint64_t Val;
-public:
-  IntegerValueInst(uint64_t Val, SILType Ty);
-
-  uint64_t getValue() const { return Val; }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::IntegerValueInst;
-  }
 };
 
 //===----------------------------------------------------------------------===//
