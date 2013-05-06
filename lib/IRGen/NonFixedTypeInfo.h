@@ -68,6 +68,8 @@ public:
     llvm::Value *metadata = asImpl().getMetadataRef(IGF);
     llvm::Value *address =
       emitAllocateBufferCall(IGF, wtable, metadata, buffer);
+    address = IGF.Builder.CreateBitCast(address,
+                                        getStorageType()->getPointerTo());
     return OwnedAddress(getAddressForPointer(address), IGF.IGM.RefCountedNull);
   }
 

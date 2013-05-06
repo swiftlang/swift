@@ -288,11 +288,6 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
   elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceScope::Local));
-
-  // Add the storage type to make the type unsized.  We can't GEP to
-  // this element, though, because LLVM forbids even 'gep 0' on an
-  // unsized type.
-  StructFields.push_back(elt.getType().getStorageType());
 }
 
 /// Produce the current fields as an anonymous structure.
