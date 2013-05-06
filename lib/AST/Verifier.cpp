@@ -893,6 +893,12 @@ namespace {
           abort();
         }
 
+        if (BGT->getDecl()->getGenericParams()->size() !=
+            BGT->getGenericArgs().size()) {
+          Out << "BoundGenericType has the wrong number of arguments!\n";
+          abort();
+        }
+
         checkBoundGenericTypes(BGT->getParent());
         for (Type Arg : BGT->getGenericArgs())
           checkBoundGenericTypes(Arg);

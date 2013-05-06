@@ -88,6 +88,10 @@ namespace {
               return type;
             });
 
+      // Validate the generated type, now that we've substituted in for
+      // type variables.
+      tc.validateTypeSimple(type);
+
       // Check that the substitutions we've produced actually work.
       // FIXME: We'd like the type checker to ensure that this always
       // succeeds.
@@ -1299,7 +1303,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We have a type constructor.
   auto metaTy = fn->getType()->castTo<MetaTypeType>();
   auto ty = metaTy->getInstanceType();
-  
+
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     // FIXME: Need an AST to represent this properly.
