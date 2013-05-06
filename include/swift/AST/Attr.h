@@ -137,7 +137,6 @@ public:
   ResilienceData Resilience;
   StringRef AsmName;
   bool Byref = false;
-  bool ByrefHeap = false;
   bool AutoClosure = false;
   bool Assignment = false;
   bool Conversion = false;
@@ -156,7 +155,6 @@ public:
 
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
-  bool isByrefHeap() const { assert(isByref()); return ByrefHeap; }
   bool isAutoClosure() const { return AutoClosure; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }

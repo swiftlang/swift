@@ -638,11 +638,7 @@ namespace {
       }
 
       if (isLValue0 && Q0 != Q1) {
-        Out << "qualification of " << what << " do not match: ";
-        printQualifiers(Q0);
-        Out << ", ";
-        printQualifiers(Q1);
-        Out << "\n";
+        Out << "qualification of " << what << " do not match\n";
         abort();
       }
 
@@ -861,10 +857,6 @@ namespace {
         Out << "\n";
         abort();
       }
-    }
-
-    void printQualifiers(LValueType::Qual qs) {
-      if (qs & LValueType::Qual::NonHeap) Out << "|nonheap";
     }
 
     void checkBoundGenericTypes(Type type) {

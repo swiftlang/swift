@@ -726,8 +726,8 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
 
-  // 'this' is accepts implicit l-values and doesn't force them to the heap.
-  return LValueType::get(ContainerType, LValueType::Qual::NonHeap,
+  // 'this' is accepts implicit l-values.
+  return LValueType::get(ContainerType, LValueType::Qual::DefaultForVar,
                          getASTContext());
 }
 

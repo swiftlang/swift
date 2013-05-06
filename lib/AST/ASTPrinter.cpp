@@ -134,9 +134,6 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
   if (attrs.isByref()) {
     comma();
     OS << "byref";
-    if (attrs.isByrefHeap()) {
-      OS << "(heap)";
-    }
   }
   if (attrs.isAutoClosure()) {
     comma();

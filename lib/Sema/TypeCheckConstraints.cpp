@@ -562,7 +562,7 @@ Type ConstraintSystem::openBindingType(Type type) {
 
 Type constraints::adjustLValueForReference(Type type, bool isAssignment,
                                            ASTContext &context) {
-  LValueType::Qual quals = LValueType::Qual::NonHeap|LValueType::Qual::Implicit;
+  LValueType::Qual quals = LValueType::Qual::Implicit;
   if (auto lv = type->getAs<LValueType>()) {
     // FIXME: The introduction of 'non-heap' here is an artifact of the type
     // checker's inability to model the address-of operator that carries the
@@ -2730,8 +2730,7 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
     // will be the object type of this particular expression type.
     auto objectTv = cs.createTypeVariable(dest);
     auto refTv = LValueType::get(objectTv,
-                                 LValueType::Qual::Implicit|
-                                 LValueType::Qual::NonHeap,
+                                 LValueType::Qual::Implicit,
                                  cs.getASTContext());
     cs.addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;

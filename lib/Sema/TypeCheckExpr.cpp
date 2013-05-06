@@ -2305,7 +2305,7 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
     Type SrcTy = Src->getType();
     Dest = coerceToType(Dest,
                         LValueType::get(SrcTy,
-                                        LValueType::Qual::NonHeap,
+                                        LValueType::Qual::DefaultForVar,
                                         Context),
                         CoercionKind::ImplicitLValue);
     return Dest == nullptr;

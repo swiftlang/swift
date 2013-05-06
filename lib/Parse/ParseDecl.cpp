@@ -169,21 +169,11 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::identifier);
 
     Attributes.Byref = true;
-    Attributes.ByrefHeap = false;
 
     // Permit "qualifiers" on the byref.
     SourceLoc beginLoc = Tok.getLoc();
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!Tok.is(tok::identifier)) {
-        diagnose(Tok, diag::byref_attribute_expected_identifier);
-        skipUntil(tok::r_paren);
-      } else if (Tok.getText() == "heap") {
-        Attributes.ByrefHeap = true;
-        consumeToken(tok::identifier);
-      } else {
-        diagnose(Tok, diag::byref_attribute_unknown_qualifier);
-        consumeToken(tok::identifier);
-      }
+      diagnose(Tok, diag::byref_attribute_unknown_qualifier);
       SourceLoc endLoc;
       parseMatchingToken(tok::r_paren, endLoc,
                          diag::byref_attribute_expected_rparen,

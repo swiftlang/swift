@@ -298,7 +298,7 @@ public:
       // FIXME: Deal with substitution here!
       SubscriptDecl *BestSub = cast<SubscriptDecl>(Best.getDecl());
       Type ResultTy = LValueType::get(BestSub->getElementType(),
-                                      LValueType::Qual::NonHeap,
+                                      LValueType::Qual::DefaultForVar,
                                       TC.Context);
       if (!(Flags & CF_Apply))
         return ResultTy;
@@ -615,7 +615,18 @@ public:
     TypeChecker &TC = CC.TC;
     
     assert(E->getType()->isEqual(LValue));
-    
+
+    if (E->getType()->isUnresolvedType()) {
+      if (Flags & CF_Apply) {
+        TC.diagnose(E->getLoc(), diag::invalid_conversion, E->getType(), LValue)
+          .highlight(E->getSourceRange());
+
+        return nullptr;
+      }
+
+      return unchanged(E, Flags);
+    }
+
     // Can't load from an explicit lvalue.
     if (auto AddrOf = dyn_cast<AddressOfExpr>(E->getSemanticsProvidingExpr())) {
       if (Flags & CF_Apply) {
@@ -627,7 +638,7 @@ public:
       
       return nullptr;
     }
-    
+
     if (!(Flags & CF_Apply)) {
       // If we're not going to apply the result anyway, just return the
       // appropriate type.

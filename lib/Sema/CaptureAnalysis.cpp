@@ -86,10 +86,7 @@ namespace {
 // This recursive visitor implements two rules:
 //
 // 1. A local variable's lifetime is fixed (i.e. the variable can be
-//    emitted on the stack) if it isn't captured by a CapturingExpr
-//    and all DeclRefExprs are operands of known-safe operations
-//    (specifically, LoadExprs, RequalifyExprs which strip off the
-//    heap qualifier, and AssignStmts).
+//    emitted on the stack) if it isn't captured by a CapturingExpr.
 //
 // 2. A DeclRefExpr referring to a variable is an "lvalue use" if it is not
 //    the operand of a LoadExpr.
@@ -100,24 +97,21 @@ class CaptureAnalysisVisitor : public ASTWalker {
       // a variable, and can't modify it.
       if (FindValueDecl(LE->getSubExpr()))
         return false;
-    } else if (RequalifyExpr *RE = dyn_cast<RequalifyExpr>(E)) {
-      // A DeclRefExpr which has the heap qualifier stripped off can't extend
-      // the lifetime of a variable.
-      LValueType *SrcLT = RE->getSubExpr()->getType()->castTo<LValueType>();
-      LValueType *DstLT = RE->getType()->castTo<LValueType>();
-      if ((DstLT->getQualifiers() & LValueType::Qual::NonHeap) &&
-          !(SrcLT->getQualifiers() & LValueType::Qual::NonHeap))
-      if (ValueDecl *D = FindValueDecl(RE->getSubExpr())) {
+    } else if (AddressOfExpr *AOE = dyn_cast<AddressOfExpr>(E)) {
+      // A DeclRefExpr passed byref can't extend the lifetime of a variable.
+      // FIXME: Doesn't handle implicit address-of operations. We need
+      // an AST for that case.
+      if (ValueDecl *D = FindValueDecl(AOE->getSubExpr())) {
         if (D->getDeclContext()->isLocalContext())
           D->setNeverUsedAsLValue(false);
         return false;
       }
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       // We can't reason about the decl referred to by a general DeclRefExpr.
+      // We may have implicitly taken it's address.
       ValueDecl *D = DRE->getDecl();
       if (D->getDeclContext()->isLocalContext()) {
         D->setNeverUsedAsLValue(false);
-        D->setHasFixedLifetime(false);
       }
     } else if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E)) {
       // Initialize flags for the function arguments.

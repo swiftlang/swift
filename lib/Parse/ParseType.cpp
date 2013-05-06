@@ -45,7 +45,6 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
 
   if (attrs.isByref()) {
     LValueType::Qual quals;
-    if (!attrs.isByrefHeap()) quals |= LValueType::Qual::NonHeap;
     Type resultType = LValueType::get(result.getType(), quals, Context);
     SourceRange resultRange = { attrs.LSquareLoc,
                                 result.getSourceRange().End };

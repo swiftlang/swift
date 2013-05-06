@@ -1341,36 +1341,27 @@ public:
       // as possible.  Basically, we want the subtypes to involve
       // fewer bits.
 
-      /// A heap l-value is one which is located on, or at least
-      /// capable of being located on, the heap.  Heap l-values are
-      /// more than just references to logical objects; they also
-      /// embed a reference-countable pointer (possibly null) which
-      /// keeps all the necessary components of the l-value alive.  A
-      /// heap l-value can be used as a non-heap one, but not
-      /// vice-versa.
-      NonHeap = 0x1,
-
       /// An implicit lvalue is an lvalue that has not been explicitly written
       /// in the source as '&'.
       ///
       /// This qualifier is only used by the (constraint-based) type checker.
-      Implicit = 0x2,
+      Implicit = 0x1,
       
       /// A non-settable lvalue is an lvalue that cannot be assigned to because
       /// it is a property with a `get` but no `set` method, a property of a
       /// non-settable lvalue, or a property of an rvalue. Non-settable
       /// lvalues cannot be used as the destination of an assignment or as
       /// [byref] arguments.
-      NonSettable = 0x4,
+      NonSettable = 0x2,
       
       /// The default for a [byref] type.
-      DefaultForType = NonHeap,
+      DefaultForType = 0,
 
       /// The default for a variable reference.
       DefaultForVar = 0,
   
       /// The default for the base of a member access.
-      DefaultForMemberAccess = NonHeap
+      DefaultForMemberAccess = 0
     };
 
   private:
@@ -1385,7 +1376,6 @@ public:
     /// The result is hashable by DenseMap.
     opaque_type getOpaqueData() const { return Bits; }
 
-    bool isHeap() const { return !(*this & NonHeap); }
     bool isSettable() const { return !(*this & NonSettable); }
     bool isImplicit() const { return (*this & Implicit); }
     
@@ -1466,12 +1456,6 @@ public:
 
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
-
-  /// Is this a 'heap' l-value type?  Certain l-values are usable as
-  /// heap l-values, i.e. they can be arbitrarily persisted.
-  bool isHeap() const {
-    return getQualifiers().isHeap();
-  }
 
   /// Is this lvalue settable?
   bool isSettable() const {

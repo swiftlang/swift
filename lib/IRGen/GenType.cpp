@@ -422,8 +422,6 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
   
   // If it's not a heap l-value, just use the reference type as a
   // primitive pointer.
-  assert(!T->isHeap());
-  
   return createPrimitive(referenceType, IGM.getPointerSize(),
                          IGM.getPointerAlignment());
 }
