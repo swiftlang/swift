@@ -43,7 +43,6 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
-#include "Scope.h"
 #include "TypeInfo.h"
 
 using namespace swift;
@@ -246,11 +245,8 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
   // Emit the function body.
-  for (SILBasicBlock &bb : *f) {
-    // Provide a scope for local metadata within this block.
-    Scope metadataScope(*this);
+  for (SILBasicBlock &bb : *f)
     visitSILBasicBlock(&bb);
-  }
 }
 
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
