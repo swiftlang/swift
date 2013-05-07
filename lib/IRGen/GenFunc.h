@@ -26,6 +26,11 @@ namespace swift {
   class FuncDecl;
   template <class T> class Optional;
   class Substitution;
+  class SILType;
+  
+namespace Mangle {
+  enum class ExplosionKind : unsigned;
+}
 
 namespace irgen {
   class Address;
@@ -47,6 +52,15 @@ namespace irgen {
                                       CanType outType,
                                       Explosion &out);
   
+  /// Emit a specialization thunk from a generic function to a specialized
+  /// function type.
+  llvm::Function *emitFunctionSpecialization(IRGenModule &IGM,
+                                          llvm::Function *fnPtr,
+                                          SILType genericType,
+                                          SILType substType,
+                                          ArrayRef<Substitution> substitutions,
+                                          Mangle::ExplosionKind explosionLevel);
+
   /// Emit all the parameter clauses of the given function type.  This
   /// is basically making sure that we have mappings for all the
   /// VarDecls bound by the pattern.

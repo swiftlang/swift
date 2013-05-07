@@ -44,6 +44,12 @@ namespace swift {
     return {begin, end};
   }
   
+  template<typename T>
+  inline auto reversed(T &&container)
+  -> decltype(make_range(container.rbegin(), container.rend())) {
+    return make_range(container.rbegin(), container.rend());
+  }
+  
   // Wrapper for std::transform that creates a new back-insertable container
   // and transforms a range into it.
   template<typename T, typename InputRange, typename MapFn>

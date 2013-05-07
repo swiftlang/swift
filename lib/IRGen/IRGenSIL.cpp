@@ -1421,6 +1421,26 @@ void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
                                   i->getSubstitutions());
   }
   
+  // If the specialization is used as a value and not just called, we need to
+  // emit the thunk.
+  for (auto *use : i->getUses())
+    if (!isa<ApplyInst>(use->getUser())) {
+      assert(operand.kind == LoweredValue::Kind::StaticFunction &&
+         "specialization thunks for dynamic function values not yet supported");
+      
+      llvm::Function *thunk = emitFunctionSpecialization(IGM,
+                                 operand.getStaticFunction().getFunction(),
+                                 i->getOperand().getType(),
+                                 i->getType(),
+                                 i->getSubstitutions(),
+                                 CurExplosionLevel);
+      
+      Explosion result(CurExplosionLevel);
+      result.add(Builder.CreateBitCast(thunk, IGM.Int8PtrTy));
+      return newLoweredExplosion(SILValue(i, 0), result);
+    }
+  
+  // If it's only called, we can just emit calls to the generic inline.
   return newLoweredSpecializedValue(SILValue(i, 0),
                                     i->getOperand(),
                                     i->getSubstitutions());

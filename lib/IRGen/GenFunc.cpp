@@ -1747,7 +1747,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // be multiple same-type closures off the same 
   llvm::Function *fwd =
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
-                           "closureinst", &IGM.Module);
+                           "partial_apply", &IGM.Module);
   fwd->setAttributes(attrs);
 
   IRGenFunction subIGF(IGM, outType, {}, explosionLevel, /*curryLevel=*/ 0,
@@ -1829,6 +1829,102 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                           IGF.IGM.Int8PtrTy);
   out.add(forwarderValue);
   out.add(data);
+}
+
+/// Emit a specialization thunk from a generic function to a specialized
+/// function type.
+llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
+                                        llvm::Function *fnPtr,
+                                        SILType genericType,
+                                        SILType substType,
+                                        ArrayRef<Substitution> substitutions,
+                                        ExplosionKind explosionLevel) {
+  // FIXME: Specializations to local archetypes need to take metadata/wtable
+  // arguments, either as a closure box or as additional parameters.
+  
+  // Create the thunk function.
+  llvm::AttributeSet attrs;
+  AbstractCC cc = substType.getFunctionTypeInfo()->getAbstractCC();
+  llvm::FunctionType *specTy = IGM.getFunctionType(cc,
+                                                   substType.getSwiftType(),
+                                                   explosionLevel,
+                                                   /*curryLevel=*/ 0,
+                                                   ExtraData::None,
+                                                   attrs);
+  // FIXME: Give the thunk a real name.
+  // FIXME: Cache the thunk by to/from types
+  llvm::Function *spec =
+    llvm::Function::Create(specTy, llvm::Function::InternalLinkage,
+                           "specialize", &IGM.Module);
+  spec->setAttributes(attrs);
+  
+  IRGenFunction subIGF(IGM, substType.getSwiftType(), {},
+                       explosionLevel, /*curryLevel=*/ 0,
+                       spec, Prologue::Bare);
+
+  // Unravel the substituted function types for each uncurry level.
+  unsigned level = substType.getUncurryLevel();
+  llvm::SmallVector<FunctionType*, 4> uncurriedTypes;
+  FunctionType *uncurriedType = substType.castTo<FunctionType>();
+  for (;;) {
+    uncurriedTypes.push_back(uncurriedType);
+    if (level-- != 0)
+      uncurriedType = uncurriedType->getResult()->castTo<FunctionType>();
+    else
+      break;
+  }
+
+  Explosion params = subIGF.collectParameters();
+  
+  // Collect the indirect return address, if present.
+  Address indirectReturn;
+  CanType retTy(substType.castTo<FunctionType>()->getResult());
+  TypeInfo const &retTI = IGM.getFragileTypeInfo(retTy);
+                
+  ExplosionSchema schema = retTI.getSchema(explosionLevel);
+  if (schema.requiresIndirectResult())
+    indirectReturn = retTI.getAddressForPointer(params.claimNext());
+  
+  // Collect the LLVM arguments from the thunk, in reverse curry level order.
+  llvm::SmallVector<Explosion, 2> paramLevels;
+  
+  for (FunctionType *uncurriedType : reversed(uncurriedTypes)) {
+    TypeInfo const &argTI = IGM.getFragileTypeInfo(uncurriedType->getInput());
+    paramLevels.push_back(Explosion(explosionLevel));
+    argTI.reexplode(subIGF, params, paramLevels.back());
+  }
+
+  assert(params.empty() && "did not claim all parameters?!");
+  
+  // Apply the arguments in a call to the generic function.
+  Callee callee = Callee::forKnownFunction(cc,
+                                           genericType.getSwiftType(),
+                                           retTy,
+                                           substitutions,
+                                           fnPtr,
+                                           nullptr,
+                                           explosionLevel,
+                                           genericType.getUncurryLevel());
+  CallEmission emission(subIGF, callee);
+  
+  for (size_t i = 0; i < paramLevels.size(); ++i) {
+    Explosion &paramLevel = paramLevels.rbegin()[i];
+    FunctionType *uncurriedType = uncurriedTypes[i];
+    emission.addSubstitutedArg(CanType(uncurriedType->getInput()), paramLevel);
+  }
+  
+  // Return the result of the call.
+  if (indirectReturn.isValid()) {
+    emission.emitToMemory(indirectReturn, retTI);
+    subIGF.Builder.CreateRetVoid();
+  } else {
+    Explosion result(explosionLevel);
+    emission.emitToExplosion(result);
+    subIGF.emitScalarReturn(result);
+  }
+  
+  // Return the specialization thunk, cast to the void pointer type.
+  return spec;
 }
 
 /// Fetch the declaration of the given block-to-
