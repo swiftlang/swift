@@ -65,7 +65,9 @@ private:
   
 public:
   /// Derive the ownership conventions for a SILConstant.
-  static OwnershipConventions get(SILGenFunction &gen, SILConstant c);
+  static OwnershipConventions get(SILGenFunction &gen,
+                                  SILConstant c,
+                                  SILType ty);
   
   /// Derive the default Swift ownership conventions for a SILType, which must
   /// represent a function type.

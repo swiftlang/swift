@@ -70,7 +70,8 @@ public:
   Callee(SILGenFunction &gen, SILConstant standaloneFunction)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
       specializedType(gen.SGM.getConstantType(standaloneFunction)),
-      ownership(OwnershipConventions::get(gen, standaloneFunction))
+      ownership(OwnershipConventions::get(gen, standaloneFunction,
+                                          specializedType))
   {}
   
   Callee(Callee &&) = default;
@@ -110,6 +111,12 @@ public:
                                              specializedType.getUncurryLevel());
     }
     specializeLoc = e;
+    
+    // Recalculate the ownership conventions because the substitutions may
+    // have changed the function signature.
+    // FIXME: Currently only native methods can be specialized, so always use
+    // default ownership semantics.
+    ownership = OwnershipConventions::getDefault(specializedType);
   }
   
   unsigned getNaturalUncurryLevel() const {
@@ -277,7 +284,8 @@ public:
                                              constant,
                                              gen.SGM.getConstantType(constant));
         setCallee(ManagedValue(classMethod, ManagedValue::Unmanaged),
-                  OwnershipConventions::get(gen, constant));
+                  OwnershipConventions::get(gen, constant,
+                                            classMethod.getType()));
         // setThisParam bumps the callDepth, but we aren't really past the
         // 'this' call depth in this case.
         --callDepth;
@@ -406,7 +414,8 @@ public:
       superMethod = gen.emitGlobalFunctionRef(apply, constant);
     }
     setCallee(ManagedValue(superMethod, ManagedValue::Unmanaged),
-              OwnershipConventions::get(gen, constant));
+              OwnershipConventions::get(gen, constant,
+                                        superMethod.getType()));
   }
   
   Callee getCallee() {
@@ -1060,7 +1069,8 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
                                                            propType);
   
   CallEmission emission(*this, Callee(getter,
-                                      OwnershipConventions::get(*this, get)));
+                                      OwnershipConventions::get(*this, get,
+                                                            getter.getType())));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));
@@ -1099,7 +1109,8 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
                                                            propType);
 
   CallEmission emission(*this, Callee(setter,
-                                      OwnershipConventions::get(*this, set)));
+                                      OwnershipConventions::get(*this, set,
+                                                            setter.getType())));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));

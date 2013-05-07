@@ -95,8 +95,8 @@ static clang::Decl *findClangMethod(ValueDecl *method) {
 }
 
 OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
-                                               SILConstant c) {
-  SILType ty = gen.SGM.getConstantType(c);
+                                               SILConstant c,
+                                               SILType ty) {
   SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo();
   
   // If we have a clang decl associated with the Swift decl, derive its
