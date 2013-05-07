@@ -35,6 +35,90 @@ using namespace constraints;
 STATISTIC(NumHandledCoercions, "# of coercions handled directly");
 STATISTIC(NumCoercions, "# of coercions");
 
+/// \brief Coerce the given scalar value to the given tuple type.
+///
+/// \param solution The solution in which the coercion is performed.
+/// \param tc The type checker.
+/// \param expr The expression to be coerced.
+/// \param toTuple The tuple type to which the expression will be coerced.
+/// \param toScalarIdx The index of the scalar field within the tuple type
+/// \c toType.
+///
+/// \returns The coerced expression, whose type will be equivalent to
+/// \c toTuple.
+static Expr *coerceScalarToTuple(const Solution &solution, TypeChecker &tc,
+                                 Expr *expr, TupleType *toTuple,
+                                 int toScalarIdx) {
+  // If the destination type is variadic, compute the injection function to use.
+  Expr *injectionFn = nullptr;
+  const auto &lastField = toTuple->getFields().back();
+
+  if (lastField.isVararg()) {
+    // Find the appropriate injection function.
+    ArraySliceType *sliceType
+      = cast<ArraySliceType>(lastField.getType().getPointer());
+    Type boundType = BuiltinIntegerType::get(64, tc.Context);
+    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
+                                              expr->getStartLoc());
+    if (!injectionFn)
+      return nullptr;
+  }
+
+  // If we're initializing the varargs list, use its base type.
+  const auto &field = toTuple->getFields()[toScalarIdx];
+  Type toScalarType;
+  if (field.isVararg())
+    toScalarType = field.getVarargBaseTy();
+  else
+    toScalarType = field.getType();
+
+  // Coerce the expression to the type to the scalar type.
+  expr = solution.coerceToType(tc, expr, toScalarType);
+  if (!expr)
+    return nullptr;
+
+  // Preserve the sugar of the scalar field.
+  // FIXME: This doesn't work if the type has default values because they fail
+  // to canonicalize.
+  SmallVector<TupleTypeElt, 4> sugarFields;
+  bool hasInit = false;
+  int i = 0;
+  for (auto &field : toTuple->getFields()) {
+    if (field.hasInit()) {
+      hasInit = true;
+      break;
+    }
+    if (i == toScalarIdx) {
+      if (field.isVararg()) {
+        assert((field.getVarargBaseTy()->isUnresolvedType() ||
+                expr->getType()->isEqual(field.getVarargBaseTy())) &&
+               "scalar field is not equivalent to dest vararg field?!");
+
+        sugarFields.push_back(TupleTypeElt(field.getType(),
+                                           field.getName(),
+                                           field.getInit(),
+                                           expr->getType()));
+      }
+      else {
+        assert((field.getType()->isUnresolvedType() ||
+                expr->getType()->isEqual(field.getType())) &&
+               "scalar field is not equivalent to dest tuple field?!");
+        sugarFields.push_back(TupleTypeElt(expr->getType(),
+                                           field.getName()));
+      }
+    } else {
+      sugarFields.push_back(field);
+    }
+    ++i;
+  }
+
+  Type destSugarTy = hasInit? toTuple
+                            : TupleType::get(sugarFields, tc.Context);
+
+  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy, toScalarIdx,
+                                            injectionFn);
+}
+
 Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
                              bool isAssignment) const {
   // The type we're converting from.
@@ -48,6 +132,19 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
   // fall back to the original.
   Expr *origExpr = expr;
   ++NumCoercions;
+
+  // Coercions to tuple type.
+  if (auto toTuple = toType->getAs<TupleType>()) {
+    int toScalarIdx = toTuple->getFieldForScalarInit();
+    // Coerce scalar to tuple.
+    // FIXME: The is<TupleType> check is overly conservative, and misses
+    // cases that matter  (e.g., when the scalar field is itself a tuple).
+    if (toScalarIdx != -1 && !fromType->is<TupleType>()) {
+      return coerceScalarToTuple(*this, tc, expr, toTuple, toScalarIdx);
+    }
+
+    // FIXME: Handle tuple -> tuple coercion.
+  }
 
   // Coercions from an lvalue: requalify and load. We perform these coercions
   // first because they are often the first step in a multi-step coercion.
@@ -843,7 +940,8 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
-      return simplifyExprType(expr);
+      expr->setType(expr->getSubExpr()->getType());
+      return expr;
     }
 
     Expr *visitTupleExpr(TupleExpr *expr) {
