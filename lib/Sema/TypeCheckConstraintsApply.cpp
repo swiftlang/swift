@@ -1260,7 +1260,14 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   Type defaultLiteralTy = tc.getDefaultLiteralType(kind);
   if (type->isEqual(defaultLiteralTy))
     type = defaultLiteralTy;
-
+  // Additionally, if an integer literal gets used as the default floating-point
+  // type, use the default floating-point literal type as the sugared type.
+  else if (kind == LiteralKind::Int) {
+    Type defaultFloatLiteralTy = tc.getDefaultLiteralType(LiteralKind::Float);
+    if (type->isEqual(defaultFloatLiteralTy))
+      type = defaultFloatLiteralTy;
+  }
+  
   // The argument type must either be a Builtin:: type (in which case
   // this is a type in the standard library) or some other type that itself has
   // a conversion function from a builtin type (in which case we have
