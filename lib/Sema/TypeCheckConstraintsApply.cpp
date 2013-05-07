@@ -103,6 +103,33 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
     }
   }
 
+  // Coercions to function type.
+  if (auto toFunc = toType->getAs<FunctionType>()) {
+    // Coercion to an autoclosure type produces an implicit closure.
+    // FIXME: The type checker is more lenient, and allows [auto_closure]s to
+    // be subtypes of non-[auto_closures], which is bogus.
+    if (toFunc->isAutoClosure()) {
+      // Convert the value to the expected result type of the function.
+      expr = coerceToType(tc, expr, toFunc->getResult());
+
+      // FIXME: Bogus declaration context.
+      auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
+      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
+                                              ArrayRef<TuplePatternElt>(),
+                                              expr->getLoc());
+      pattern->setType(TupleType::getEmpty(tc.Context));
+      ice->setPattern(pattern);
+
+      // Compute the capture list, now that we have analyzed the expression.
+      tc.computeCaptures(ice);
+      
+      ++NumHandledCoercions;
+      return ice;
+    }
+
+    // FIXME: block and other function conversions.
+  }
+
   // Coercions from a type to an existential type.
   if (toType->isExistentialType()) {
     // Compute the conformances for each of the protocols in the existential
