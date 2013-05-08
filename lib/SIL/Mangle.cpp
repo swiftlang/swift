@@ -182,7 +182,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     // but they aren't reflected into Swift anyway.
     return;
 
-  case DeclContextKind::TranslationUnit: {
+  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::SerializedModule: {
     Module *module = cast<Module>(ctx);
 
     // Try the special 'swift' substitution.

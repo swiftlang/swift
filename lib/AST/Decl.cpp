@@ -40,6 +40,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::TranslationUnit:
+  case DeclContextKind::SerializedModule:
   case DeclContextKind::ClangModule:
   case DeclContextKind::ConstructorDecl:
   case DeclContextKind::DestructorDecl:
@@ -59,6 +60,7 @@ Type DeclContext::getDeclaredTypeInContext() {
     case DeclContextKind::CapturingExpr:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::TranslationUnit:
+    case DeclContextKind::SerializedModule:
     case DeclContextKind::ClangModule:
     case DeclContextKind::ConstructorDecl:
     case DeclContextKind::DestructorDecl:
@@ -86,6 +88,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     case DeclContextKind::BuiltinModule:
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::TranslationUnit:
+    case DeclContextKind::SerializedModule:
     case DeclContextKind::ClangModule:
       return nullptr;
 
@@ -659,6 +662,7 @@ Type FuncDecl::getExtensionType() const {
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
+  case DeclContextKind::SerializedModule:
   case DeclContextKind::ClangModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:

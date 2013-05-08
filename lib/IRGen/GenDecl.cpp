@@ -1253,6 +1253,7 @@ static AbstractCC addOwnerArgument(ASTContext &ctx, ValueDecl *value,
   switch (DC->getContextKind()) {
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::BuiltinModule:
+  case DeclContextKind::SerializedModule:
   case DeclContextKind::ClangModule:
   case DeclContextKind::CapturingExpr:
   case DeclContextKind::TopLevelCodeDecl:

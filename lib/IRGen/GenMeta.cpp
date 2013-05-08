@@ -1824,6 +1824,7 @@ namespace {
       switch (DC->getContextKind()) {
       case DeclContextKind::TranslationUnit:
       case DeclContextKind::BuiltinModule:
+      case DeclContextKind::SerializedModule:
       case DeclContextKind::ClangModule:
       case DeclContextKind::CapturingExpr:
       case DeclContextKind::TopLevelCodeDecl:

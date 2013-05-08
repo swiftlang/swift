@@ -55,9 +55,10 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     // Global declarations are resilient according to whether the module
     // is resilient in this translation unit.
     case DeclContextKind::TranslationUnit:
+    case DeclContextKind::SerializedModule:
       if (explicitResilience != invalidResilience)
         return explicitResilience;
-      return C->isResilient(cast<TranslationUnit>(DC))
+      return C->isResilient(cast<Module>(DC))
                   ? Resilience::Resilient : Resilience::Fragile;
 
     // Local declarations are always inherently fragile.
