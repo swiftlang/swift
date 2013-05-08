@@ -161,7 +161,7 @@ Solution ConstraintSystem::createSolution() {
   PotentialBindings.clear();
   decltype(ExternallySolved)().swap(ExternallySolved);
 
-  Solution solution;
+  Solution solution(getTopConstraintSystem());
   for (auto cs = this; cs; cs = cs->Parent) {
     // For each of the type variables, get its fixed type.
     for (auto tv : cs->TypeVariables) {

@@ -1727,7 +1727,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                FunctionType::get(inputTV, outputTV, context),
                                getConstraintLocator(
                                   locator.withPathElement(
-                                    ConstraintLocator::ConstructorMember)));
+                                    ConstraintLocator::ConversionMember)));
 
       // A conversion function must accept an empty parameter list ().
       // Note: This should never fail, because the declaration checker
@@ -2688,8 +2688,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
-    result = solution.coerceToType(*this, result, convertType,
-                                   /*isAssignment=*/false);
+    result = solution.coerceToType(result, convertType, /*isAssignment=*/false);
     if (!result) {
       return nullptr;
     }
@@ -2849,7 +2848,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   }
 
   // Convert the source to the simplified destination type.
-  src = solution.coerceToType(*this, src, solution.simplifyType(*this, destTy));
+  src = solution.coerceToType(src, solution.simplifyType(*this, destTy));
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };

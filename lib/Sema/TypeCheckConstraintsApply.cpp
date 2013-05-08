@@ -35,11 +35,29 @@ using namespace constraints;
 STATISTIC(NumMissedCoercions, "# of coercions not handled directly");
 STATISTIC(NumCoercions, "# of coercions");
 
-static Expr *coerceTupleToTuple(const Solution &solution, TypeChecker &tc,
+/// \brief Coerce the given tuple to another tuple type.
+///
+/// \param solution The solution in which we're performing the coercion.
+///
+/// \param expr The expression we're converting.
+///
+/// \param fromTuple The tuple type we're converting from, which is the same
+/// as \c expr->getType().
+///
+/// \param toTuple The tuple type we're converting to.
+///
+/// \param sources The sources of each of the elements to be used in the
+/// resulting tuple, as provided by \c computeTupleShuffle.
+///
+/// \param variadicArgs The source indices that are mapped to the variadic
+/// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
+static Expr *coerceTupleToTuple(const Solution &solution,
                                 Expr *expr, TupleType *fromTuple,
                                 TupleType *toTuple,
                                 SmallVectorImpl<int> &sources,
                                 SmallVectorImpl<unsigned> &variadicArgs) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+  
   // Capture the tuple expression, if there is one.
   TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(expr);
 
@@ -106,8 +124,7 @@ static Expr *coerceTupleToTuple(const Solution &solution, TypeChecker &tc,
 
     // Actually convert the source element.
     auto convertedElt
-      = solution.coerceToType(tc, fromTupleExpr->getElement(sources[i]),
-                              toEltType);
+      = solution.coerceToType(fromTupleExpr->getElement(sources[i]), toEltType);
     if (!convertedElt)
       return nullptr;
 
@@ -151,7 +168,7 @@ static Expr *coerceTupleToTuple(const Solution &solution, TypeChecker &tc,
 
       // Actually convert the source element.
       auto convertedElt
-        = solution.coerceToType(tc, fromTupleExpr->getElement(fromFieldIdx),
+        = solution.coerceToType(fromTupleExpr->getElement(fromFieldIdx),
                                 toEltType);
       if (!convertedElt)
         return nullptr;
@@ -203,7 +220,6 @@ static Expr *coerceTupleToTuple(const Solution &solution, TypeChecker &tc,
 /// \brief Coerce the given scalar value to the given tuple type.
 ///
 /// \param solution The solution in which the coercion is performed.
-/// \param tc The type checker.
 /// \param expr The expression to be coerced.
 /// \param toTuple The tuple type to which the expression will be coerced.
 /// \param toScalarIdx The index of the scalar field within the tuple type
@@ -211,9 +227,11 @@ static Expr *coerceTupleToTuple(const Solution &solution, TypeChecker &tc,
 ///
 /// \returns The coerced expression, whose type will be equivalent to
 /// \c toTuple.
-static Expr *coerceScalarToTuple(const Solution &solution, TypeChecker &tc,
+static Expr *coerceScalarToTuple(const Solution &solution,
                                  Expr *expr, TupleType *toTuple,
                                  int toScalarIdx) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+  
   // If the destination type is variadic, compute the injection function to use.
   Expr *injectionFn = nullptr;
   const auto &lastField = toTuple->getFields().back();
@@ -238,7 +256,7 @@ static Expr *coerceScalarToTuple(const Solution &solution, TypeChecker &tc,
     toScalarType = field.getType();
 
   // Coerce the expression to the type to the scalar type.
-  expr = solution.coerceToType(tc, expr, toScalarType);
+  expr = solution.coerceToType(expr, toScalarType);
   if (!expr)
     return nullptr;
 
@@ -284,8 +302,9 @@ static Expr *coerceScalarToTuple(const Solution &solution, TypeChecker &tc,
                                             injectionFn);
 }
 
-Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
-                             bool isAssignment) const {  
+Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
+  auto &tc = getConstraintSystem().getTypeChecker();
+
   // The type we're converting from.
   Type fromType = expr->getType();
 
@@ -306,7 +325,7 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
       if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
-        return coerceTupleToTuple(*this, tc, expr, fromTuple, toTuple,
+        return coerceTupleToTuple(*this, expr, fromTuple, toTuple,
                                   sources, variadicArgs);
       }
     }
@@ -314,7 +333,7 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
     // Coerce scalar to tuple.
     int toScalarIdx = toTuple->getFieldForScalarInit();
     if (toScalarIdx != -1) {
-      return coerceScalarToTuple(*this, tc, expr, toTuple, toScalarIdx);
+      return coerceScalarToTuple(*this, expr, toTuple, toScalarIdx);
     }
   }
 
@@ -376,7 +395,7 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
     // be subtypes of non-[auto_closures], which is bogus.
     if (toFunc->isAutoClosure()) {
       // Convert the value to the expected result type of the function.
-      expr = coerceToType(tc, expr, toFunc->getResult());
+      expr = coerceToType(expr, toFunc->getResult());
 
       // FIXME: Bogus declaration context.
       auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
@@ -751,8 +770,7 @@ namespace {
 
     /// \brief Coerce the given expression to the given type.
     Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) {
-      return solution.coerceToType(cs.getTypeChecker(), expr, toType,
-                                   isAssignment);
+      return solution.coerceToType(expr, toType, isAssignment);
     }
 
     /// \brief Build a new subscript.

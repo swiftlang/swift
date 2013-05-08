@@ -1228,24 +1228,33 @@ public:
 /// system along with a set of mappings from each constraint locator
 /// involving an overload set to the selected overload.
 class Solution {
+  /// \brief The constraint system this solution solves.
+  ConstraintSystem *constraintSystem;
+
 public:
-  Solution() {}
+  /// \brief Create a solution for the given constraint system.
+  Solution(ConstraintSystem &cs) : constraintSystem(&cs) {}
 
   // Solution is a non-copyable type for performance reasons.
   Solution(const Solution &other) = delete;
   Solution &operator=(const Solution &other) = delete;
 
   Solution(Solution &&other)
-    : typeBindings(std::move(other.typeBindings)),
+    : constraintSystem(other.constraintSystem),
+      typeBindings(std::move(other.typeBindings)),
       overloadChoices(std::move(other.overloadChoices))
   {
   }
 
   Solution &operator=(Solution &&other) {
+    constraintSystem = other.constraintSystem;
     typeBindings = std::move(other.typeBindings);
     overloadChoices = std::move(other.overloadChoices);
     return *this;
   }
+
+  /// \brief Retrieve the constraint system that this solution solves.
+  ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
   /// \brief The set of type bindings.
   llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
@@ -1262,7 +1271,6 @@ public:
   ///
   /// This operation cannot fail.
   ///
-  /// \param tc The type checker.
   /// \param expr The expression to coerce.
   /// \param toType The type to coerce the expression to.
   ///
@@ -1270,8 +1278,7 @@ public:
   /// which is only needed by the "old" type checker fallback.
   ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(TypeChecker &tc, Expr *expr, Type toType,
-                     bool isAssignment = false) const;
+  Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) const;
 
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
