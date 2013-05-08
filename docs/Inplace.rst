@@ -6,7 +6,7 @@
 :Author: Dave Abrahams
 :Author: Joe Groff
 
-**Abstract**: The design of Strings has revealed some misconceptions
+:Abstract: The design of Strings has revealed some misconceptions
   we held in the past, and leads us to a general design for handling
   in-place operations analgous to ``+=``.  This paper discusses the
   thinking behind the current design and proposes a language extension
@@ -55,6 +55,8 @@ does it create a new string value that can only be used to overwrite
           like the one we have for the (inplace) operators.  We'll
           explore that approach—which has the obvious downside of
           complicating the API—after working through this one.
+
+.. _creating-or-mutating:
 
 Creating or Mutating?
 =====================
@@ -209,7 +211,7 @@ Because the creating interface is the right choice `in so many
 cases`__ and because it will appear repeatedly in a single statement
 compositions, we favor design #2.
 
-__ creating-or-mutating-_
+__ creating-or-mutating_
 
 Optimization and Convenience
 ============================
