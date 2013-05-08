@@ -335,11 +335,9 @@ namespace {
     /// type checking, which will be used to specialize the resulting,
     /// type-checked expression appropriately.
     ///
-    /// \param origExpr The original expression that resulted in this
-    /// application. This is only needed when the application could be a
-    /// constructor.
+    /// \param locator The locator for the original expression.
     Expr *finishApply(ApplyExpr *apply, Type openedType,
-                      Expr *origExpr);
+                      ConstraintLocatorBuilder locator);
 
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
@@ -618,7 +616,9 @@ namespace {
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
-      return finishApply(call, expr->getType(), expr);
+      return finishApply(call, expr->getType(),
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr, { })));
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -809,7 +809,9 @@ namespace {
                                        selected.second);
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType, expr));
+      expr->setSemanticExpr(finishApply(apply, openedType,
+                                        ConstraintLocatorBuilder(
+                                          cs.getConstraintLocator(expr, { }))));
       if (!expr->getSemanticExpr()) {
         // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(arrayProto->getLoc(),
@@ -853,7 +855,9 @@ namespace {
                                        selected.second);
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType, expr));
+      expr->setSemanticExpr(finishApply(apply, openedType,
+                                        ConstraintLocatorBuilder(
+                                          cs.getConstraintLocator(expr, { }))));
       if (!expr->getSemanticExpr()) {
         // FIXME: Should never happen.
         cs.getTypeChecker().diagnose(dictionaryProto->getLoc(),
@@ -1055,7 +1059,9 @@ namespace {
     }
 
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      return finishApply(expr, expr->getType(), expr);
+      return finishApply(expr, expr->getType(),
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr, { })));
     }
 
     Expr *visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {
@@ -1547,6 +1553,37 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
     // existential of some related kind?
   }
 
+  // Check for user-defined conversions.
+  if (fromType->getNominalOrBoundGenericNominal()) {
+    // Determine the locator that corresponds to the conversion member.
+    auto storedLocator
+      = cs.getConstraintLocator(
+          locator.withPathElement(ConstraintLocator::ConversionMember));
+    auto knownOverload = solution.overloadChoices.find(storedLocator);
+    if (knownOverload != solution.overloadChoices.end()) {
+      auto selected = knownOverload->second;
+      
+      // FIXME: Location information is suspect throughout.
+      // Form a reference to the conversion member.
+      auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
+                                      selected.first.getDecl(),
+                                      expr->getEndLoc(),
+                                      selected.second);
+
+      // Form an empty tuple.
+      Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
+                                              nullptr, expr->getEndLoc(),
+                                              TupleType::getEmpty(tc.Context));
+
+      // Call the conversion function with an empty tuple.
+      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
+      auto openedType = selected.second->castTo<FunctionType>()->getResult();
+      expr = finishApply(apply, openedType,
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr, { })));
+    }
+  }
+
   // If we succeeded, use the coerced result.
   if (expr->getType()->isEqual(toType)) {
     return expr;
@@ -1740,7 +1777,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
 }
 
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
-                                Expr *origExpr) {
+                                ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
 
   // The function is always an rvalue.
@@ -1762,7 +1799,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (isa<ThisApplyExpr>(apply))
       arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
     else
-      arg = coerceToType(origArg, fnType->getInput(), isAssignmentFn(fn));
+      arg = coerceToType(origArg, fnType->getInput(), isAssignmentFn(fn),
+                         locator.withPathElement(
+                           ConstraintLocator::ApplyArgument));
 
     if (!arg) {
       // FIXME: Shouldn't ever happen.
@@ -1799,11 +1838,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Note: we also allow class types here, for now, because T(x) is still
   // allowed to use coercion syntax.
   assert(ty->getNominalOrBoundGenericNominal());
-  assert(origExpr && "Missing original expression for construction");
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
-                      origExpr,
-                      ConstraintLocator::ConstructorMember));
+                      locator.withPathElement(
+                        ConstraintLocator::ConstructorMember)));
 
   // If there is no overload choice, or it was simply the identity function,
   // it's because this was a coercion rather than a construction. Just perform
