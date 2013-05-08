@@ -613,6 +613,94 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
   return type;
 }
 
+bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
+                                      SmallVectorImpl<int> &sources,
+                                      SmallVectorImpl<unsigned> &variadicArgs) {
+  const int unassigned = -3;
+  
+  SmallVector<bool, 4> consumed(fromTuple->getFields().size(), false);
+  sources.clear();
+  variadicArgs.clear();
+  sources.assign(toTuple->getFields().size(), unassigned);
+
+  // Match up any named elements.
+  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
+    const auto &toElt = toTuple->getFields()[i];
+
+    // Skip unnamed elements.
+    if (toElt.getName().empty())
+      continue;
+
+    // Find the corresponding named element.
+    int matched = -1;
+    {
+      int index = 0;
+      for (auto field : fromTuple->getFields()) {
+        if (field.getName() == toElt.getName() && !consumed[index]) {
+          matched = index;
+          break;
+        }
+        ++index;
+      }
+    }
+    if (matched == -1)
+      continue;
+
+    // Record this match.
+    sources[i] = matched;
+    consumed[matched] = true;
+  }
+
+  // Resolve any unmatched elements.
+  unsigned fromNext = 0, fromLast = fromTuple->getFields().size();
+  auto skipToNextUnnamedInput = [&] {
+    while (fromNext != fromLast &&
+           (consumed[fromNext] ||
+            !fromTuple->getFields()[fromNext].getName().empty()))
+      ++fromNext;
+  };
+  skipToNextUnnamedInput();
+
+  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
+    // Check whether we already found a value for this element.
+    if (sources[i] != unassigned)
+      continue;
+
+    const auto &elt2 = toTuple->getFields()[i];
+
+    // Variadic tuple elements match the rest of the input elements.
+    if (elt2.isVararg()) {
+      // Collect the remaining (unnamed) inputs.
+      while (fromNext != fromLast) {
+        variadicArgs.push_back(fromNext);
+        consumed[fromNext] = true;
+        skipToNextUnnamedInput();
+      }
+      sources[i] = TupleShuffleExpr::FirstVariadic;
+      break;
+    }
+
+    // If there aren't any more inputs, we can use a default argument.
+    if (fromNext == fromLast) {
+      if (elt2.hasInit()) {
+        sources[i] = TupleShuffleExpr::DefaultInitialize;
+        continue;
+      }
+
+      return true;
+    }
+
+    sources[i] = fromNext;
+    consumed[fromNext] = true;
+    skipToNextUnnamedInput();
+  }
+
+  // Check whether there were any unused input values.
+  // FIXME: Could short-circuit this check, above, by not skipping named
+  // input values.
+  return std::find(consumed.begin(), consumed.end(), false) != consumed.end();
+}
+
 // A property or subscript is settable if:
 // - its base type (the type of the 'a' in 'a[n]' or 'a.b') either has
 //   reference semantics or has value semantics and is settable, AND

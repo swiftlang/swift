@@ -353,7 +353,7 @@ namespace {
       CanType InputExprTy = E->getArg()->getType()->getCanonicalType();
       CanType ResultExprTy = E->getType()->getCanonicalType();
       if (ResultExprTy != FT->getResult()->getCanonicalType()) {
-        Out << "Type of callee does not match type of ApplyExpr:";
+        Out << "result of ApplyExpr does not match result type of callee:";
         E->getType()->print(Out);
         Out << " vs. ";
         FT->getResult()->print(Out);

@@ -2059,6 +2059,29 @@ public:
 Type adjustLValueForReference(Type type, bool isAssignment,
                               ASTContext &context);
 
+/// \brief Compute the shuffle required to map from a given tuple type to
+/// another tuple type.
+///
+/// \param fromTuple The tuple type we're converting from.
+///
+/// \param toTuple The tuple type we're converting to.
+///
+/// \param sources Will be populated with information about the source of each
+/// of the elements for the result tuple. The indices into this array are the
+/// indices of the tuple type we're converting to, while the values are
+/// either one of the \c TupleShuffleExpr constants or are an index into the
+/// source tuple.
+///
+/// \param variadicArgs Will be populated with all of the variadic arguments
+/// that will be placed into the variadic tuple element (i.e., at the index
+/// \c where \c consumed[i] is \c TupleShuffleExpr::FirstVariadic). The values
+/// are indices into the source tuple.
+///
+/// \returns true if no tuple conversion is possible, false otherwise.
+bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
+                         SmallVectorImpl<int> &sources,
+                         SmallVectorImpl<unsigned> &variadicArgs);
+
 } // end namespace constraints
 
 template<typename ...Args>
