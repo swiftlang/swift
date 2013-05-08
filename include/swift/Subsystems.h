@@ -80,7 +80,12 @@ namespace swift {
   /// Turn the given translation unit into SIL IR. The returned SILModule must
   /// be deleted by the caller.
   SILModule *performSILGeneration(TranslationUnit *TU, unsigned StartElem = 0);
-  
+
+  /// Serializes a translation unit to the given output file.
+  ///
+  /// This interface is still prone to change!
+  void serialize(const TranslationUnit *TU, const char *outputPath);
+
   /// Turn the given translation unit into either LLVM IR or native code.
   ///
   /// \param SILMod  A SIL module to translate to LLVM IR. If null, IRGen works
