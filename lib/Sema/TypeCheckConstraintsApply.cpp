@@ -35,460 +35,6 @@ using namespace constraints;
 STATISTIC(NumMissedCoercions, "# of coercions not handled directly");
 STATISTIC(NumCoercions, "# of coercions");
 
-/// \brief Coerce the given tuple to another tuple type.
-///
-/// \param solution The solution in which we're performing the coercion.
-///
-/// \param expr The expression we're converting.
-///
-/// \param fromTuple The tuple type we're converting from, which is the same
-/// as \c expr->getType().
-///
-/// \param toTuple The tuple type we're converting to.
-///
-/// \param locator Locator describing where this tuple conversion occurs.
-///
-/// \param sources The sources of each of the elements to be used in the
-/// resulting tuple, as provided by \c computeTupleShuffle.
-///
-/// \param variadicArgs The source indices that are mapped to the variadic
-/// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
-static Expr *coerceTupleToTuple(const Solution &solution,
-                                Expr *expr, TupleType *fromTuple,
-                                TupleType *toTuple,
-                                ConstraintLocatorBuilder locator,
-                                SmallVectorImpl<int> &sources,
-                                SmallVectorImpl<unsigned> &variadicArgs) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-  
-  // Capture the tuple expression, if there is one.
-  TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(expr);
-
-  /// Check each of the tuple elements in the destination.
-  bool hasVarArg = false;
-  bool anythingShuffled = false;
-  bool hasInits = false;
-  SmallVector<TupleTypeElt, 4> toSugarFields;
-  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
-                                 fromTuple->getFields().size());
-  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
-    const auto &toElt = toTuple->getFields()[i];
-    auto toEltType = toElt.getType();
-
-    // If we're default-initializing this member, there's nothing to do.
-    if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      anythingShuffled = true;
-      hasInits = true;
-      toSugarFields.push_back(toElt);
-      continue;
-    }
-
-    // If this is the variadic argument, note it.
-    if (sources[i] == TupleShuffleExpr::FirstVariadic) {
-      assert(i == n-1 && "Vararg not at the end?");
-      toSugarFields.push_back(toElt);
-      hasVarArg = true;
-      anythingShuffled = true;
-      continue;
-    }
-
-    // If the source and destination index are different, we'll be shuffling.
-    if ((unsigned)sources[i] != i) {
-      anythingShuffled = true;
-    }
-
-    // We're matching one element to another. If the types already
-    // match, there's nothing to do.
-    const auto &fromElt = fromTuple->getFields()[sources[i]];
-    auto fromEltType = fromElt.getType();
-    if (fromEltType->isEqual(toEltType)) {
-      // Get the sugared type directly from the tuple expression, if there
-      // is one.
-      if (fromTupleExpr)
-        fromEltType = fromTupleExpr->getElement(sources[i])->getType();
-
-      toSugarFields.push_back(TupleTypeElt(fromEltType,
-                                           toElt.getName(),
-                                           toElt.getInit(),
-                                           toElt.getVarargBaseTy()));
-      fromTupleExprFields[sources[i]] = fromElt;
-      hasInits |= toElt.hasInit();
-      continue;
-    }
-
-    // We need to convert the source element to the destination type.
-    if (!fromTupleExpr) {
-      // FIXME: Lame! We can't express this in the AST.
-      tc.diagnose(expr->getLoc(),
-                  diag::tuple_conversion_not_expressible,
-                  fromTuple, toTuple);
-      return nullptr;
-    }
-
-    // Actually convert the source element.
-    auto convertedElt
-      = solution.coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
-                              /*isAssignment=*/false,
-                              locator.withPathElement(
-                                LocatorPathElt::getTupleElement(sources[i])));
-    if (!convertedElt)
-      return nullptr;
-
-    fromTupleExpr->setElement(sources[i], convertedElt);
-
-    // Record the sugared field name.
-    toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
-                                         toElt.getName(),
-                                         toElt.getInit(),
-                                         toElt.getVarargBaseTy()));
-    fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
-                                                   fromElt.getName(),
-                                                   fromElt.getInit(),
-                                                   fromElt.getVarargBaseTy());
-    hasInits |= toElt.hasInit();
-  }
-
-  // Convert all of the variadic arguments to the destination type.
-  Expr *injectionFn = nullptr;
-  if (hasVarArg) {
-    Type toEltType = toTuple->getFields().back().getVarargBaseTy();
-    for (int fromFieldIdx : variadicArgs) {
-      const auto &fromElt = fromTuple->getFields()[fromFieldIdx];
-      Type fromEltType = fromElt.getType();
-
-      // If the source and destination types match, there's nothing to do.
-      if (toEltType->isEqual(fromEltType)) {
-        sources.push_back(fromFieldIdx);
-        fromTupleExprFields[fromFieldIdx] = fromElt;
-        continue;
-      }
-
-      // We need to convert the source element to the destination type.
-      if (!fromTupleExpr) {
-        // FIXME: Lame! We can't express this in the AST.
-        tc.diagnose(expr->getLoc(),
-                    diag::tuple_conversion_not_expressible,
-                    fromTuple, toTuple);
-        return nullptr;
-      }
-
-      // Actually convert the source element.
-      auto convertedElt = solution.coerceToType(
-                            fromTupleExpr->getElement(fromFieldIdx),
-                            toEltType,
-                            /*isAssignment=*/false,
-                            locator.withPathElement(
-                              LocatorPathElt::getTupleElement(fromFieldIdx)));
-      if (!convertedElt)
-        return nullptr;
-
-      fromTupleExpr->setElement(fromFieldIdx, convertedElt);
-      sources.push_back(fromFieldIdx);
-
-      fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
-                                            convertedElt->getType(),
-                                            fromElt.getName(),
-                                            fromElt.getInit(),
-                                            fromElt.getVarargBaseTy());
-    }
-
-    // Find the appropriate injection function.
-    ArraySliceType *sliceType
-      = cast<ArraySliceType>(
-          toTuple->getFields().back().getType().getPointer());
-    Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
-                                              expr->getStartLoc());
-    if (!injectionFn)
-      return nullptr;
-  }
-
-  // Compute the updated 'from' tuple type, since we may have
-  // performed some conversions in place.
-  Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-  if (fromTupleExpr)
-    fromTupleExpr->setType(fromTupleType);
-
-  // Compute the re-sugared tuple type.
-  Type toSugarType = hasInits? toTuple
-                             : TupleType::get(toSugarFields, tc.Context);
-
-  // If we don't have to shuffle anything, we're done.
-  if (!anythingShuffled && fromTupleExpr) {
-    expr->setType(toSugarType);
-    return expr;
-  }
-
-  // Create the tuple shuffle.
-  ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
-  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, toSugarType);
-  shuffle->setVarargsInjectionFunction(injectionFn);
-  return shuffle;
-}
-
-/// \brief Coerce the given scalar value to the given tuple type.
-///
-/// \param solution The solution in which the coercion is performed.
-/// \param expr The expression to be coerced.
-/// \param toTuple The tuple type to which the expression will be coerced.
-/// \param toScalarIdx The index of the scalar field within the tuple type
-/// \c toType.
-/// \param locator Locator describing where this conversion occurs.
-///
-/// \returns The coerced expression, whose type will be equivalent to
-/// \c toTuple.
-static Expr *coerceScalarToTuple(const Solution &solution,
-                                 Expr *expr, TupleType *toTuple,
-                                 int toScalarIdx,
-                                 ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-  
-  // If the destination type is variadic, compute the injection function to use.
-  Expr *injectionFn = nullptr;
-  const auto &lastField = toTuple->getFields().back();
-
-  if (lastField.isVararg()) {
-    // Find the appropriate injection function.
-    ArraySliceType *sliceType
-      = cast<ArraySliceType>(lastField.getType().getPointer());
-    Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
-                                              expr->getStartLoc());
-    if (!injectionFn)
-      return nullptr;
-  }
-
-  // If we're initializing the varargs list, use its base type.
-  const auto &field = toTuple->getFields()[toScalarIdx];
-  Type toScalarType;
-  if (field.isVararg())
-    toScalarType = field.getVarargBaseTy();
-  else
-    toScalarType = field.getType();
-
-  // Coerce the expression to the type to the scalar type.
-  expr = solution.coerceToType(expr, toScalarType,
-                               /*isAssignment=*/false,
-                               locator.withPathElement(
-                                 ConstraintLocator::ScalarToTuple));
-  if (!expr)
-    return nullptr;
-
-  // Preserve the sugar of the scalar field.
-  // FIXME: This doesn't work if the type has default values because they fail
-  // to canonicalize.
-  SmallVector<TupleTypeElt, 4> sugarFields;
-  bool hasInit = false;
-  int i = 0;
-  for (auto &field : toTuple->getFields()) {
-    if (field.hasInit()) {
-      hasInit = true;
-      break;
-    }
-    if (i == toScalarIdx) {
-      if (field.isVararg()) {
-        assert((field.getVarargBaseTy()->isUnresolvedType() ||
-                expr->getType()->isEqual(field.getVarargBaseTy())) &&
-               "scalar field is not equivalent to dest vararg field?!");
-
-        sugarFields.push_back(TupleTypeElt(field.getType(),
-                                           field.getName(),
-                                           field.getInit(),
-                                           expr->getType()));
-      }
-      else {
-        assert((field.getType()->isUnresolvedType() ||
-                expr->getType()->isEqual(field.getType())) &&
-               "scalar field is not equivalent to dest tuple field?!");
-        sugarFields.push_back(TupleTypeElt(expr->getType(),
-                                           field.getName()));
-      }
-    } else {
-      sugarFields.push_back(field);
-    }
-    ++i;
-  }
-
-  Type destSugarTy = hasInit? toTuple
-                            : TupleType::get(sugarFields, tc.Context);
-
-  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy, toScalarIdx,
-                                            injectionFn);
-}
-
-Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
-  return coerceToType(expr, toType, isAssignment,
-                      ConstraintLocatorBuilder(
-                        constraintSystem->getConstraintLocator(expr, { })));
-}
-
-Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment,
-                             ConstraintLocatorBuilder locator) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-
-  // The type we're converting from.
-  Type fromType = expr->getType();
-
-  // If the types are already equivalent, we don't have to do anything.
-  if (fromType->isEqual(toType))
-    return expr;
-
-  ++NumCoercions;
-
-  // Save the original expression. If we fail to fully coerce the type,
-  // fall back to the original.
-  Expr *origExpr = expr;
-
-  // Coercions to tuple type.
-  if (auto toTuple = toType->getAs<TupleType>()) {
-    // Coerce from a tuple to a tuple.
-    if (auto fromTuple = fromType->getAs<TupleType>()) {
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
-        return coerceTupleToTuple(*this, expr, fromTuple, toTuple,
-                                  locator, sources, variadicArgs);
-      }
-    }
-
-    // Coerce scalar to tuple.
-    int toScalarIdx = toTuple->getFieldForScalarInit();
-    if (toScalarIdx != -1) {
-      return coerceScalarToTuple(*this, expr, toTuple, toScalarIdx, locator);
-    }
-  }
-
-  // Coercions from an lvalue: requalify and load. We perform these coercions
-  // first because they are often the first step in a multi-step coercion.
-  if (auto fromLValue = fromType->getAs<LValueType>()) {
-    if (auto toLValue = toType->getAs<LValueType>()) {
-      // Update the qualifiers on the lvalue.
-      expr = new (tc.Context) RequalifyExpr(
-                                expr,
-                                LValueType::get(fromLValue->getObjectType(),
-                                                toLValue->getQualifiers(),
-                                                tc.Context));
-    } else {
-      // Load from the lvalue.
-      expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
-    }
-
-    // If we succeeded, use the coerced result.
-    if (expr->getType()->isEqual(toType)) {
-      return expr;
-    }
-
-    fromType = expr->getType();
-  }
-
-  // Coercion from a subclass to a superclass.
-  if (fromType->mayHaveSuperclass() &&
-      toType->getClassOrBoundGenericClass()) {
-    for (auto fromSuperClass = tc.getSuperClassOf(fromType);
-         fromSuperClass;
-         fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
-      if (fromSuperClass->isEqual(toType)) {
-        // Coercion from archetype to its (concrete) superclass.
-        if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-          expr = new (tc.Context) ArchetypeToSuperExpr(
-                                    expr,
-                                    fromArchetype->getSuperclass());
-
-          // If we succeeded, use the coerced result.
-          if (expr->getType()->isEqual(toType)) {
-            return expr;
-          }
-
-          fromType = expr->getType();
-        }
-
-        // Coercion from subclass to superclass.
-        expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
-        return expr;
-      }
-    }
-  }
-
-  // Coercions to function type.
-  if (auto toFunc = toType->getAs<FunctionType>()) {
-    // Coercion to an autoclosure type produces an implicit closure.
-    // FIXME: The type checker is more lenient, and allows [auto_closure]s to
-    // be subtypes of non-[auto_closures], which is bogus.
-    if (toFunc->isAutoClosure()) {
-      // Convert the value to the expected result type of the function.
-      expr = coerceToType(expr, toFunc->getResult(), /*isAssignment=*/false,
-                          locator.withPathElement(ConstraintLocator::Load));
-
-      // FIXME: Bogus declaration context.
-      auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
-      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
-                                              ArrayRef<TuplePatternElt>(),
-                                              expr->getLoc());
-      pattern->setType(TupleType::getEmpty(tc.Context));
-      ice->setPattern(pattern);
-
-      // Compute the capture list, now that we have analyzed the expression.
-      tc.computeCaptures(ice);
-      
-      return ice;
-    }
-
-    // Coercion from one function type to another.
-    auto fromFunc = fromType->getAs<FunctionType>();
-    if (fromFunc) {
-      bool trivial = false;
-      bool isSubtype = tc.isSubtypeOf(fromType, toType, trivial);
-      (void)isSubtype;
-      assert(isSubtype && "No subtyping relationship between function types?");
-      return new (tc.Context) FunctionConversionExpr(expr, toType, trivial);
-    }
-  }
-
-  // Coercions from a type to an existential type.
-  if (toType->isExistentialType()) {
-    // Compute the conformances for each of the protocols in the existential
-    // type.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    toType->isExistentialType(protocols);
-    SmallVector<ProtocolConformance *, 4> conformances;
-    bool failed = false;
-    for (auto proto : protocols) {
-      ProtocolConformance *conformance = nullptr;
-      if (!tc.conformsToProtocol(fromType, proto, &conformance)) {
-        failed = true;
-        break;
-      }
-
-      conformances.push_back(conformance);
-    }
-
-    // If we have all of the conformances we need, create an erasure expression.
-    if (!failed) {
-      expr = new (tc.Context) ErasureExpr(
-                                expr, toType,
-                                tc.Context.AllocateCopy(conformances));
-      return expr;
-    }
-
-    // Fall through to handle user-defined conversions.
-    // FIXME: Can the type checker cope with the crazy case where we can
-    // call a user-defined conversion on an existential to produce an
-    // existential of some related kind?
-  }
-
-  // If we succeeded, use the coerced result.
-  if (expr->getType()->isEqual(toType)) {
-    return expr;
-  }
-
-  // FIXME: Temporary hack that uses the existing coercion logic.
-  ++NumMissedCoercions;
-  return tc.coerceToType(origExpr, toType,
-                         isAssignment? CoercionKind::Assignment
-                                     : CoercionKind::Normal);
-}
-
-
 /// \brief Convert the object argument to the given type.
 static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
                                          Type toType) {
@@ -521,6 +67,42 @@ namespace {
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
     ConstraintSystem &cs;
     const Solution &solution;
+
+    /// \brief Coerce the given tuple to another tuple type.
+    ///
+    /// \param expr The expression we're converting.
+    ///
+    /// \param fromTuple The tuple type we're converting from, which is the same
+    /// as \c expr->getType().
+    ///
+    /// \param toTuple The tuple type we're converting to.
+    ///
+    /// \param locator Locator describing where this tuple conversion occurs.
+    ///
+    /// \param sources The sources of each of the elements to be used in the
+    /// resulting tuple, as provided by \c computeTupleShuffle.
+    ///
+    /// \param variadicArgs The source indices that are mapped to the variadic
+    /// parameter of the resulting tuple, as provided by \c computeTupleShuffle.
+    Expr *coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
+                             TupleType *toTuple,
+                             ConstraintLocatorBuilder locator,
+                             SmallVectorImpl<int> &sources,
+                             SmallVectorImpl<unsigned> &variadicArgs);
+
+    /// \brief Coerce the given scalar value to the given tuple type.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toTuple The tuple type to which the expression will be coerced.
+    /// \param toScalarIdx The index of the scalar field within the tuple type
+    /// \c toType.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \returns The coerced expression, whose type will be equivalent to
+    /// \c toTuple.
+    Expr *coerceScalarToTuple(Expr *expr, TupleType *toTuple,
+                              int toScalarIdx,
+                              ConstraintLocatorBuilder locator);
 
     Expr *specialize(Expr *expr, PolymorphicFunctionType *polyFn,
                      Type openedType) {
@@ -790,11 +372,41 @@ namespace {
       return solution.simplifyType(cs.getTypeChecker(), type);
     }
 
+  public:
     /// \brief Coerce the given expression to the given type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The expression to coerce.
+    /// \param toType The type to coerce the expression to.
+    ///
+    /// \param isAssignment FIXME: Whether this is an assignment,
+    /// which is only needed by the "old" type checker fallback.
+    ///
+    /// \returns the coerced expression, which will have type \c ToType.
     Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) {
-      return solution.coerceToType(expr, toType, isAssignment);
+      return coerceToType(expr, toType, isAssignment,
+                          ConstraintLocatorBuilder(
+                            cs.getConstraintLocator(expr, { })));
     }
 
+    /// \brief Coerce the given expression to the given type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The expression to coerce.
+    /// \param toType The type to coerce the expression to.
+    ///
+    /// \param isAssignment FIXME: Whether this is an assignment,
+    /// which is only needed by the "old" type checker fallback.
+    ///
+    /// \param locator Locator used to describe where in this expression we are.
+    ///
+    /// \returns the coerced expression, which will have type \c ToType.
+    Expr *coerceToType(Expr *expr, Type toType, bool isAssignment,
+                       ConstraintLocatorBuilder locator);
+
+  private:
     /// \brief Build a new subscript.
     Expr *buildSubscript(Expr *expr, Expr *base, Expr *index) {
       // Determine the declaration selected for this subscript operation.
@@ -1532,6 +1144,421 @@ namespace {
   };
 }
 
+Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
+                                       TupleType *toTuple,
+                                       ConstraintLocatorBuilder locator,
+                                       SmallVectorImpl<int> &sources,
+                                       SmallVectorImpl<unsigned> &variadicArgs){
+  auto &tc = cs.getTypeChecker();
+
+  // Capture the tuple expression, if there is one.
+  TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(expr);
+
+  /// Check each of the tuple elements in the destination.
+  bool hasVarArg = false;
+  bool anythingShuffled = false;
+  bool hasInits = false;
+  SmallVector<TupleTypeElt, 4> toSugarFields;
+  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
+                                 fromTuple->getFields().size());
+  for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
+    const auto &toElt = toTuple->getFields()[i];
+    auto toEltType = toElt.getType();
+
+    // If we're default-initializing this member, there's nothing to do.
+    if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
+      anythingShuffled = true;
+      hasInits = true;
+      toSugarFields.push_back(toElt);
+      continue;
+    }
+
+    // If this is the variadic argument, note it.
+    if (sources[i] == TupleShuffleExpr::FirstVariadic) {
+      assert(i == n-1 && "Vararg not at the end?");
+      toSugarFields.push_back(toElt);
+      hasVarArg = true;
+      anythingShuffled = true;
+      continue;
+    }
+
+    // If the source and destination index are different, we'll be shuffling.
+    if ((unsigned)sources[i] != i) {
+      anythingShuffled = true;
+    }
+
+    // We're matching one element to another. If the types already
+    // match, there's nothing to do.
+    const auto &fromElt = fromTuple->getFields()[sources[i]];
+    auto fromEltType = fromElt.getType();
+    if (fromEltType->isEqual(toEltType)) {
+      // Get the sugared type directly from the tuple expression, if there
+      // is one.
+      if (fromTupleExpr)
+        fromEltType = fromTupleExpr->getElement(sources[i])->getType();
+
+      toSugarFields.push_back(TupleTypeElt(fromEltType,
+                                           toElt.getName(),
+                                           toElt.getInit(),
+                                           toElt.getVarargBaseTy()));
+      fromTupleExprFields[sources[i]] = fromElt;
+      hasInits |= toElt.hasInit();
+      continue;
+    }
+
+    // We need to convert the source element to the destination type.
+    if (!fromTupleExpr) {
+      // FIXME: Lame! We can't express this in the AST.
+      tc.diagnose(expr->getLoc(),
+                  diag::tuple_conversion_not_expressible,
+                  fromTuple, toTuple);
+      return nullptr;
+    }
+
+    // Actually convert the source element.
+    auto convertedElt
+      = coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
+                     /*isAssignment=*/false,
+                     locator.withPathElement(
+                       LocatorPathElt::getTupleElement(sources[i])));
+    if (!convertedElt)
+      return nullptr;
+
+    fromTupleExpr->setElement(sources[i], convertedElt);
+
+    // Record the sugared field name.
+    toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
+                                         toElt.getName(),
+                                         toElt.getInit(),
+                                         toElt.getVarargBaseTy()));
+    fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
+                                                   fromElt.getName(),
+                                                   fromElt.getInit(),
+                                                   fromElt.getVarargBaseTy());
+    hasInits |= toElt.hasInit();
+  }
+
+  // Convert all of the variadic arguments to the destination type.
+  Expr *injectionFn = nullptr;
+  if (hasVarArg) {
+    Type toEltType = toTuple->getFields().back().getVarargBaseTy();
+    for (int fromFieldIdx : variadicArgs) {
+      const auto &fromElt = fromTuple->getFields()[fromFieldIdx];
+      Type fromEltType = fromElt.getType();
+
+      // If the source and destination types match, there's nothing to do.
+      if (toEltType->isEqual(fromEltType)) {
+        sources.push_back(fromFieldIdx);
+        fromTupleExprFields[fromFieldIdx] = fromElt;
+        continue;
+      }
+
+      // We need to convert the source element to the destination type.
+      if (!fromTupleExpr) {
+        // FIXME: Lame! We can't express this in the AST.
+        tc.diagnose(expr->getLoc(),
+                    diag::tuple_conversion_not_expressible,
+                    fromTuple, toTuple);
+        return nullptr;
+      }
+
+      // Actually convert the source element.
+      auto convertedElt = coerceToType(
+                            fromTupleExpr->getElement(fromFieldIdx),
+                            toEltType,
+                            /*isAssignment=*/false,
+                            locator.withPathElement(
+                              LocatorPathElt::getTupleElement(fromFieldIdx)));
+      if (!convertedElt)
+        return nullptr;
+
+      fromTupleExpr->setElement(fromFieldIdx, convertedElt);
+      sources.push_back(fromFieldIdx);
+
+      fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
+                                            convertedElt->getType(),
+                                            fromElt.getName(),
+                                            fromElt.getInit(),
+                                            fromElt.getVarargBaseTy());
+    }
+
+    // Find the appropriate injection function.
+    ArraySliceType *sliceType
+      = cast<ArraySliceType>(
+          toTuple->getFields().back().getType().getPointer());
+    Type boundType = BuiltinIntegerType::get(64, tc.Context);
+    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
+                                              expr->getStartLoc());
+    if (!injectionFn)
+      return nullptr;
+  }
+
+  // Compute the updated 'from' tuple type, since we may have
+  // performed some conversions in place.
+  Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+  if (fromTupleExpr)
+    fromTupleExpr->setType(fromTupleType);
+
+  // Compute the re-sugared tuple type.
+  Type toSugarType = hasInits? toTuple
+                             : TupleType::get(toSugarFields, tc.Context);
+
+  // If we don't have to shuffle anything, we're done.
+  if (!anythingShuffled && fromTupleExpr) {
+    expr->setType(toSugarType);
+    return expr;
+  }
+  
+  // Create the tuple shuffle.
+  ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
+  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, toSugarType);
+  shuffle->setVarargsInjectionFunction(injectionFn);
+  return shuffle;
+}
+
+Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
+                                        int toScalarIdx,
+                                        ConstraintLocatorBuilder locator) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+
+  // If the destination type is variadic, compute the injection function to use.
+  Expr *injectionFn = nullptr;
+  const auto &lastField = toTuple->getFields().back();
+
+  if (lastField.isVararg()) {
+    // Find the appropriate injection function.
+    ArraySliceType *sliceType
+    = cast<ArraySliceType>(lastField.getType().getPointer());
+    Type boundType = BuiltinIntegerType::get(64, tc.Context);
+    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
+                                              expr->getStartLoc());
+    if (!injectionFn)
+      return nullptr;
+  }
+
+  // If we're initializing the varargs list, use its base type.
+  const auto &field = toTuple->getFields()[toScalarIdx];
+  Type toScalarType;
+  if (field.isVararg())
+    toScalarType = field.getVarargBaseTy();
+  else
+    toScalarType = field.getType();
+
+  // Coerce the expression to the type to the scalar type.
+  expr = coerceToType(expr, toScalarType, /*isAssignment=*/false,
+                      locator.withPathElement(
+                        ConstraintLocator::ScalarToTuple));
+  if (!expr)
+    return nullptr;
+
+  // Preserve the sugar of the scalar field.
+  // FIXME: This doesn't work if the type has default values because they fail
+  // to canonicalize.
+  SmallVector<TupleTypeElt, 4> sugarFields;
+  bool hasInit = false;
+  int i = 0;
+  for (auto &field : toTuple->getFields()) {
+    if (field.hasInit()) {
+      hasInit = true;
+      break;
+    }
+    if (i == toScalarIdx) {
+      if (field.isVararg()) {
+        assert((field.getVarargBaseTy()->isUnresolvedType() ||
+                expr->getType()->isEqual(field.getVarargBaseTy())) &&
+               "scalar field is not equivalent to dest vararg field?!");
+
+        sugarFields.push_back(TupleTypeElt(field.getType(),
+                                           field.getName(),
+                                           field.getInit(),
+                                           expr->getType()));
+      }
+      else {
+        assert((field.getType()->isUnresolvedType() ||
+                expr->getType()->isEqual(field.getType())) &&
+               "scalar field is not equivalent to dest tuple field?!");
+        sugarFields.push_back(TupleTypeElt(expr->getType(),
+                                           field.getName()));
+      }
+    } else {
+      sugarFields.push_back(field);
+    }
+    ++i;
+  }
+
+  Type destSugarTy = hasInit? toTuple
+                            : TupleType::get(sugarFields, tc.Context);
+
+  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy, toScalarIdx,
+                                            injectionFn);
+}
+
+Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
+                                 ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+
+  // The type we're converting from.
+  Type fromType = expr->getType();
+
+  // If the types are already equivalent, we don't have to do anything.
+  if (fromType->isEqual(toType))
+    return expr;
+
+  ++NumCoercions;
+
+  // Save the original expression. If we fail to fully coerce the type,
+  // fall back to the original.
+  Expr *origExpr = expr;
+
+  // Coercions to tuple type.
+  if (auto toTuple = toType->getAs<TupleType>()) {
+    // Coerce from a tuple to a tuple.
+    if (auto fromTuple = fromType->getAs<TupleType>()) {
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
+        return coerceTupleToTuple(expr, fromTuple, toTuple,
+                                  locator, sources, variadicArgs);
+      }
+    }
+
+    // Coerce scalar to tuple.
+    int toScalarIdx = toTuple->getFieldForScalarInit();
+    if (toScalarIdx != -1) {
+      return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
+    }
+  }
+
+  // Coercions from an lvalue: requalify and load. We perform these coercions
+  // first because they are often the first step in a multi-step coercion.
+  if (auto fromLValue = fromType->getAs<LValueType>()) {
+    if (auto toLValue = toType->getAs<LValueType>()) {
+      // Update the qualifiers on the lvalue.
+      expr = new (tc.Context) RequalifyExpr(
+                                expr,
+                                LValueType::get(fromLValue->getObjectType(),
+                                                toLValue->getQualifiers(),
+                                                tc.Context));
+    } else {
+      // Load from the lvalue.
+      expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
+    }
+
+    // If we succeeded, use the coerced result.
+    if (expr->getType()->isEqual(toType)) {
+      return expr;
+    }
+
+    fromType = expr->getType();
+  }
+
+  // Coercion from a subclass to a superclass.
+  if (fromType->mayHaveSuperclass() &&
+      toType->getClassOrBoundGenericClass()) {
+    for (auto fromSuperClass = tc.getSuperClassOf(fromType);
+         fromSuperClass;
+         fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
+      if (fromSuperClass->isEqual(toType)) {
+        // Coercion from archetype to its (concrete) superclass.
+        if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
+          expr = new (tc.Context) ArchetypeToSuperExpr(
+                                    expr,
+                                    fromArchetype->getSuperclass());
+
+          // If we succeeded, use the coerced result.
+          if (expr->getType()->isEqual(toType)) {
+            return expr;
+          }
+
+          fromType = expr->getType();
+        }
+
+        // Coercion from subclass to superclass.
+        expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
+        return expr;
+      }
+    }
+  }
+
+  // Coercions to function type.
+  if (auto toFunc = toType->getAs<FunctionType>()) {
+    // Coercion to an autoclosure type produces an implicit closure.
+    // FIXME: The type checker is more lenient, and allows [auto_closure]s to
+    // be subtypes of non-[auto_closures], which is bogus.
+    if (toFunc->isAutoClosure()) {
+      // Convert the value to the expected result type of the function.
+      expr = coerceToType(expr, toFunc->getResult(), /*isAssignment=*/false,
+                          locator.withPathElement(ConstraintLocator::Load));
+
+      // FIXME: Bogus declaration context.
+      auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
+      Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
+                                              ArrayRef<TuplePatternElt>(),
+                                              expr->getLoc());
+      pattern->setType(TupleType::getEmpty(tc.Context));
+      ice->setPattern(pattern);
+
+      // Compute the capture list, now that we have analyzed the expression.
+      tc.computeCaptures(ice);
+
+      return ice;
+    }
+
+    // Coercion from one function type to another.
+    auto fromFunc = fromType->getAs<FunctionType>();
+    if (fromFunc) {
+      bool trivial = false;
+      bool isSubtype = tc.isSubtypeOf(fromType, toType, trivial);
+      (void)isSubtype;
+      assert(isSubtype && "No subtyping relationship between function types?");
+      return new (tc.Context) FunctionConversionExpr(expr, toType, trivial);
+    }
+  }
+
+  // Coercions from a type to an existential type.
+  if (toType->isExistentialType()) {
+    // Compute the conformances for each of the protocols in the existential
+    // type.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    toType->isExistentialType(protocols);
+    SmallVector<ProtocolConformance *, 4> conformances;
+    bool failed = false;
+    for (auto proto : protocols) {
+      ProtocolConformance *conformance = nullptr;
+      if (!tc.conformsToProtocol(fromType, proto, &conformance)) {
+        failed = true;
+        break;
+      }
+
+      conformances.push_back(conformance);
+    }
+
+    // If we have all of the conformances we need, create an erasure expression.
+    if (!failed) {
+      expr = new (tc.Context) ErasureExpr(
+                                expr, toType,
+                                tc.Context.AllocateCopy(conformances));
+      return expr;
+    }
+
+    // Fall through to handle user-defined conversions.
+    // FIXME: Can the type checker cope with the crazy case where we can
+    // call a user-defined conversion on an existential to produce an
+    // existential of some related kind?
+  }
+
+  // If we succeeded, use the coerced result.
+  if (expr->getType()->isEqual(toType)) {
+    return expr;
+  }
+
+  // FIXME: Temporary hack that uses the existing coercion logic.
+  ++NumMissedCoercions;
+  return tc.coerceToType(origExpr, toType,
+                         isAssignment? CoercionKind::Assignment
+                         : CoercionKind::Normal);
+}
+
 /// \brief Determine if this literal kind is a string literal.
 static bool isStringLiteralKind(LiteralKind kind) {
   return kind == LiteralKind::UTFString ||
@@ -1861,4 +1888,9 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   ExprRewriter rewriter(*this, solution);
   ExprWalker walker(rewriter);
   return expr->walk(walker);
+}
+
+Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
+  ExprRewriter rewriter(getConstraintSystem(), *this);
+  return rewriter.coerceToType(expr, toType, isAssignment);
 }

@@ -1280,22 +1280,6 @@ public:
   /// \returns the coerced expression, which will have type \c ToType.
   Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) const;
 
-  /// \brief Coerce the given expression to the given type.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce.
-  /// \param toType The type to coerce the expression to.
-  ///
-  /// \param isAssignment FIXME: Whether this is an assignment,
-  /// which is only needed by the "old" type checker fallback.
-  ///
-  /// \param locator Locator used to describe where in this expression we are.
-  ///
-  /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, bool isAssignment,
-                     ConstraintLocatorBuilder locator) const;
-
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
 };
