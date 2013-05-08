@@ -105,6 +105,10 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
       out << "apply function";
       break;
 
+    case AssignSource:
+      out << "assignment source";
+      break;
+        
     case ClosureResult:
       out << "closure result";
       break;
@@ -115,10 +119,6 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
 
     case ConversionResult:
       out << "conversion result";
-      break;
-
-    case ConstructionArgument:
-      out << "construction argument";
       break;
 
     case ConstructorMember:
@@ -135,6 +135,14 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
 
     case GenericArgument:
       out << "generic argument #" << llvm::utostr(elt.getValue());
+      break;
+
+    case IfElse:
+      out << "'else' branch of ternary" ;
+      break;
+
+    case IfThen:
+      out << "'then' branch of ternary" ;
       break;
 
     case InstanceType:
@@ -189,10 +197,6 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
       out << "subscript result";
       break;
 
-    case UnresolvedMemberRefBase:
-      out << "unresolved member reference base";
-      break;
-      
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
       break;
@@ -1976,7 +1980,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   // The first type must be convertible to the constructor's argument type.
   addConstraint(ConstraintKind::Conversion, argType, tv,
                 getConstraintLocator(locator,
-                                     ConstraintLocator::ConstructionArgument));
+                                     ConstraintLocator::ApplyArgument));
 
   return SolutionKind::Solved;
 }
@@ -2625,7 +2629,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   if (convertType) {
-    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType);
+    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
+                     cs.getConstraintLocator(expr, { }));
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -2781,7 +2786,10 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
     return { nullptr, nullptr };
 
   // The source must be convertible to the destination.
-  cs.addConstraint(ConstraintKind::Conversion, src->getType(), destTy);
+  auto assignLocator = cs.getConstraintLocator(src,
+                                               ConstraintLocator::AssignSource);
+  cs.addConstraint(ConstraintKind::Conversion, src->getType(), destTy,
+                   assignLocator);
 
   if (getLangOpts().DebugConstraintSolver) {
     log << "---Initial constraints for the given assignment---\n";
@@ -2848,7 +2856,8 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   }
 
   // Convert the source to the simplified destination type.
-  src = solution.coerceToType(src, solution.simplifyType(*this, destTy));
+  src = solution.coerceToType(src, solution.simplifyType(*this, destTy),
+                              /*isAssignment=*/false, assignLocator);
   if (!src) {
     // Failure already diagnosed, above, as part of applying the solution.
     return { nullptr, nullptr };
@@ -2872,7 +2881,7 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
 
-void Solution::dump(llvm::SourceMgr *sm) {
+void Solution::dump(llvm::SourceMgr *sm) const {
   llvm::raw_ostream &out = llvm::errs();
 
   out << "Type variables:\n";

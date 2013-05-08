@@ -333,7 +333,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       };
       auto locator = CS.getConstraintLocator(
                          expr,
-                         ConstraintLocator::UnresolvedMemberRefBase);
+                         ConstraintLocator::MemberRefBase);
       CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, locator, choices));
       return memberTy;
     }
@@ -825,11 +825,17 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
                               getLogicValueTy);
       
       // The branches must be convertible to a common type.
+      ConstraintLocatorBuilder locatorBuilder(CS.getConstraintLocator(expr,
+                                                                      { }));
       auto resultTy = CS.createTypeVariable(expr);
       CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getThenExpr()->getType(), resultTy);
+                       expr->getThenExpr()->getType(), resultTy,
+                       CS.getConstraintLocator(expr,
+                                               ConstraintLocator::IfThen));
       CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getElseExpr()->getType(), resultTy);
+                       expr->getElseExpr()->getType(), resultTy,
+                       CS.getConstraintLocator(expr,
+                                               ConstraintLocator::IfElse));
       return resultTy;
     }
     
@@ -847,7 +853,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     Type visitCoerceExpr(CoerceExpr *expr) {
       Type ty = expr->getTypeLoc().getType();
       CS.addConstraint(ConstraintKind::Conversion,
-                       expr->getSubExpr()->getType(), ty);
+                       expr->getSubExpr()->getType(), ty,
+                       CS.getConstraintLocator(expr, { }));
       return ty;
     }
 

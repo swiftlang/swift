@@ -342,10 +342,6 @@ public:
     InterpolationArgument,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
-    /// \brief The argument for construction of an object.
-    ConstructionArgument,
-    /// \brief The base of an unresolved member expression.
-    UnresolvedMemberRefBase,
     /// \brief Address of subexpression.
     AddressOf,
     /// \brief Rvalue adjustment.
@@ -368,6 +364,12 @@ public:
     ConversionMember,
     /// \brief The conversion result.
     ConversionResult,
+    /// \brief The 'then' branch of a ternary expression.
+    IfThen,
+    /// \brief The 'else' branch of a ternary expression.
+    IfElse,
+    /// \brief The source of an assignment.
+    AssignSource
   };
 
   /// \brief Determine whether the given path element kind has an associated
@@ -384,8 +386,6 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case ConstructionArgument:
-    case UnresolvedMemberRefBase:
     case AddressOf:
     case RvalueAdjustment:
     case ClosureResult:
@@ -397,6 +397,9 @@ public:
     case Load:
     case ConversionMember:
     case ConversionResult:
+    case IfThen:
+    case IfElse:
+    case AssignSource:
       return false;
 
     case GenericArgument:
@@ -483,7 +486,6 @@ public:
       case ApplyFunction:
       case ArrayElementType:
       case ClosureResult:
-      case ConstructionArgument:
       case ConstructorMember:
       case ConversionMember:
       case ConversionResult:
@@ -500,7 +502,9 @@ public:
       case SubscriptIndex:
       case SubscriptMember:
       case SubscriptResult:
-      case UnresolvedMemberRefBase:
+      case IfThen:
+      case IfElse:
+      case AssignSource:
         continue;
 
       case GenericArgument:
@@ -1280,8 +1284,24 @@ public:
   /// \returns the coerced expression, which will have type \c ToType.
   Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) const;
 
+  /// \brief Coerce the given expression to the given type.
+  ///
+  /// This operation cannot fail.
+  ///
+  /// \param expr The expression to coerce.
+  /// \param toType The type to coerce the expression to.
+  ///
+  /// \param isAssignment FIXME: Whether this is an assignment,
+  /// which is only needed by the "old" type checker fallback.
+  ///
+  /// \param locator Locator used to describe the location of this expression.
+  ///
+  /// \returns the coerced expression, which will have type \c ToType.
+  Expr *coerceToType(Expr *expr, Type toType, bool isAssignment,
+                     ConstraintLocator *locator) const;
+
   /// \brief Dump this solution to standard error.
-  void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
+  void dump(llvm::SourceMgr *sm) const LLVM_ATTRIBUTE_USED;
 };
 
 /// \brief Describes a system of constraints on type variables, the

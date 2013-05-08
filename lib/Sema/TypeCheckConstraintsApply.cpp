@@ -146,7 +146,8 @@ namespace {
 
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
-                         SourceLoc memberLoc, Type openedType) {
+                         SourceLoc memberLoc, Type openedType,
+                         ConstraintLocatorBuilder locator) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -174,7 +175,10 @@ namespace {
           base = convertObjectArgumentToType(tc, base, containerTy);
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(containerTy, context));
+          base = coerceToType(base, MetaTypeType::get(containerTy, context),
+                              /*isAssignment=*/false,
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
           base = tc.convertToRValue(base);
         }
         assert(base && "Unable to convert base?");
@@ -249,7 +253,10 @@ namespace {
           base = convertObjectArgumentToType(tc, base, baseTy);
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(baseTy, context));
+          base = coerceToType(base, MetaTypeType::get(baseTy, context),
+                              /*isAssignment=*/false,
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
           base = tc.convertToRValue(base);
         }
         assert(base && "Unable to convert base?");
@@ -381,23 +388,6 @@ namespace {
     /// \param isAssignment FIXME: Whether this is an assignment,
     /// which is only needed by the "old" type checker fallback.
     ///
-    /// \returns the coerced expression, which will have type \c ToType.
-    Expr *coerceToType(Expr *expr, Type toType, bool isAssignment = false) {
-      return coerceToType(expr, toType, isAssignment,
-                          ConstraintLocatorBuilder(
-                            cs.getConstraintLocator(expr, { })));
-    }
-
-    /// \brief Coerce the given expression to the given type.
-    ///
-    /// This operation cannot fail.
-    ///
-    /// \param expr The expression to coerce.
-    /// \param toType The type to coerce the expression to.
-    ///
-    /// \param isAssignment FIXME: Whether this is an assignment,
-    /// which is only needed by the "old" type checker fallback.
-    ///
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
@@ -448,7 +438,8 @@ namespace {
 
     /// \brief Build a reference to an operator within a protocol.
     Expr *buildProtocolOperatorRef(ProtocolDecl *proto, ValueDecl *value,
-                                   SourceLoc nameLoc, Type openedType) {
+                                   SourceLoc nameLoc, Type openedType,
+                                   ConstraintLocatorBuilder locator) {
       assert(isa<FuncDecl>(value) && "Only functions allowed");
       assert(cast<FuncDecl>(value)->isOperator() && "Only operators allowed");
 
@@ -477,7 +468,8 @@ namespace {
       auto &ctx = cs.getASTContext();
       auto base = new (ctx) MetatypeExpr(nullptr, nameLoc,
                                          MetaTypeType::get(baseTy, ctx));
-      return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType);
+      return buildMemberRef(base, SourceLoc(), value, nameLoc, openedType,
+                            locator);
     }
 
   public:
@@ -535,7 +527,8 @@ namespace {
       // FIXME: The existing literal coercion code should move here.
       auto type = simplifyType(expr->getType());
       expr->setType(UnstructuredUnresolvedType::get(cs.getASTContext()));
-      return coerceToType(expr, type);
+      return coerceToType(expr, type, /*isAssignment=*/false,
+                          cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -546,7 +539,8 @@ namespace {
         // If this a member of a protocol, build an appropriate operator
         // reference.
         return buildProtocolOperatorRef(proto, expr->getDecl(), expr->getLoc(),
-                                        fromType);
+                                        fromType,
+                                        cs.getConstraintLocator(expr, { }));
       }
 
       // Set the type of this expression to the actual type of the reference.
@@ -636,7 +630,8 @@ namespace {
         // If this a member of a protocol, build an appropriate operator
         // reference.
         return buildProtocolOperatorRef(proto, decl, expr->getLoc(),
-                                        selected.second);
+                                        selected.second,
+                                        cs.getConstraintLocator(expr, { }));
       }
 
       // Normal path: build a declaration reference.
@@ -657,7 +652,8 @@ namespace {
                                                 ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getMemberLoc(),
-                            selected.second);
+                            selected.second,
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -674,7 +670,8 @@ namespace {
 
     Expr *visitMemberRefExpr(MemberRefExpr *expr) {
       return buildMemberRef(expr->getBase(), expr->getDotLoc(), expr->getDecl(),
-                            expr->getNameLoc(), expr->getType());
+                            expr->getNameLoc(), expr->getType(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -687,7 +684,8 @@ namespace {
                                                 ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getNameLoc(),
-                            selected.second);
+                            selected.second,
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitGenericMemberRefExpr(GenericMemberRefExpr *expr) {
@@ -696,7 +694,8 @@ namespace {
                                                 ConstraintLocator::Member));
       return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                             selected.first.getDecl(), expr->getNameLoc(),
-                            selected.second);
+                            selected.second,
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -722,7 +721,8 @@ namespace {
 
       // Build the member reference.
       return buildMemberRef(base, expr->getDotLoc(), member, expr->getNameLoc(),
-                            selected.second);
+                            selected.second,
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
@@ -736,7 +736,8 @@ namespace {
       case OverloadChoiceKind::Decl:
         return buildMemberRef(expr->getBase(), expr->getDotLoc(),
                               selected.first.getDecl(), expr->getNameLoc(),
-                              selected.second);
+                              selected.second,
+                              cs.getConstraintLocator(expr, { }));
 
       case OverloadChoiceKind::TupleIndex: {
         auto base = expr->getBase();
@@ -806,7 +807,8 @@ namespace {
       Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
                                        converterDecl,
                                        expr->getLoc(),
-                                       selected.second);
+                                       selected.second,
+                                       cs.getConstraintLocator(expr, { }));
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
       expr->setSemanticExpr(finishApply(apply, openedType,
@@ -852,7 +854,8 @@ namespace {
       Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
                                        converterDecl,
                                        expr->getLoc(),
-                                       selected.second);
+                                       selected.second,
+                                       cs.getConstraintLocator(expr, { }));
 
       ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
       expr->setSemanticExpr(finishApply(apply, openedType,
@@ -971,7 +974,11 @@ namespace {
       // Convert the expression in the body to the result type of the explicit
       // closure.
       auto resultType = type->getResult();
-      if (Expr *body = coerceToType(expr->getBody(), resultType))
+      if (Expr *body = coerceToType(expr->getBody(), resultType,
+                                    /*isAssignment=*/false,
+                                    cs.getConstraintLocator(
+                                      expr,
+                                      ConstraintLocator::ClosureResult)))
         expr->setBody(body);
       expr->setType(type);
 
@@ -1077,8 +1084,18 @@ namespace {
       auto resultTy = simplifyType(expr->getType());
       expr->setType(resultTy);
 
-      expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy));
-      expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy));
+      expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
+                                     /*isAssignment=*/false,
+                                     ConstraintLocatorBuilder(
+                                       cs.getConstraintLocator(expr, { }))
+                                     .withPathElement(
+                                       ConstraintLocator::IfThen)));
+      expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
+                                     /*isAssignment=*/false,
+                                     ConstraintLocatorBuilder(
+                                       cs.getConstraintLocator(expr, { }))
+                                     .withPathElement(
+                                       ConstraintLocator::IfElse)));
 
       return expr;
     }
@@ -1096,7 +1113,9 @@ namespace {
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
       expr->setType(simplifyType(expr->getType()));
-      Expr *subExpr = coerceToType(expr->getSubExpr(), expr->getType());
+      Expr *subExpr = coerceToType(expr->getSubExpr(), expr->getType(),
+                                   /*isAssignment=*/false,
+                                   cs.getConstraintLocator(expr, { }));
       expr->setSubExpr(subExpr);
       return expr;
     }
@@ -1560,28 +1579,28 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       = cs.getConstraintLocator(
           locator.withPathElement(ConstraintLocator::ConversionMember));
     auto knownOverload = solution.overloadChoices.find(storedLocator);
-    if (knownOverload != solution.overloadChoices.end()) {
-      auto selected = knownOverload->second;
-      
-      // FIXME: Location information is suspect throughout.
-      // Form a reference to the conversion member.
-      auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
-                                      selected.first.getDecl(),
-                                      expr->getEndLoc(),
-                                      selected.second);
+    assert(knownOverload != solution.overloadChoices.end());
+    auto selected = knownOverload->second;
+    
+    // FIXME: Location information is suspect throughout.
+    // Form a reference to the conversion member.
+    auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
+                                    selected.first.getDecl(),
+                                    expr->getEndLoc(),
+                                    selected.second,
+                                    locator);
 
-      // Form an empty tuple.
-      Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
-                                              nullptr, expr->getEndLoc(),
-                                              TupleType::getEmpty(tc.Context));
+    // Form an empty tuple.
+    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
+                                            nullptr, expr->getEndLoc(),
+                                            TupleType::getEmpty(tc.Context));
 
-      // Call the conversion function with an empty tuple.
-      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
-      auto openedType = selected.second->castTo<FunctionType>()->getResult();
-      expr = finishApply(apply, openedType,
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr, { })));
-    }
+    // Call the conversion function with an empty tuple.
+    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
+    auto openedType = selected.second->castTo<FunctionType>()->getResult();
+    expr = finishApply(apply, openedType,
+                       ConstraintLocatorBuilder(
+                         cs.getConstraintLocator(expr, { })));
   }
 
   // If we succeeded, use the coerced result.
@@ -1593,7 +1612,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
   ++NumMissedCoercions;
   return tc.coerceToType(origExpr, toType,
                          isAssignment? CoercionKind::Assignment
-                         : CoercionKind::Normal);
+                                     : CoercionKind::Normal);
 }
 
 /// \brief Determine if this literal kind is a string literal.
@@ -1768,7 +1787,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
                                                method->computeThisType());
   result = buildMemberRef(result, SourceLoc(), method,
                           intermediate->getStartLoc(),
-                          openedType);
+                          openedType,
+                          cs.getConstraintLocator(literal, { }));
 
   // Return a new call of the conversion function, passing in the (possibly
   // converted) argument.
@@ -1830,7 +1850,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), tupleTy);
+    return coerceToType(apply->getArg(), tupleTy, /*isAssignment=*/false,
+                        locator);
   }
 
   // We're constructing a struct or oneof. Look for the constructor or oneof
@@ -1849,7 +1870,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!selected ||
       selected->first.getKind() == OverloadChoiceKind::IdentityFunction) {
     // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), ty);
+    return coerceToType(apply->getArg(), ty, /*isAssignment=*/false, locator);
   }
 
   // We have the constructor.
@@ -1861,11 +1882,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                                  metaTy);
   Expr *declRef = buildMemberRef(typeBase, apply->getLoc(),
                                  decl, apply->getLoc(),
-                                 selected->second);
+                                 selected->second, locator);
   apply->setFn(declRef);
 
   // Tail-recurse to actually call the constructor.
-  return finishApply(apply, openedType, nullptr);
+  return finishApply(apply, openedType, locator);
 }
 
 /// \brief Apply a given solution to the expression, producing a fully
@@ -1929,6 +1950,15 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
-  ExprRewriter rewriter(getConstraintSystem(), *this);
-  return rewriter.coerceToType(expr, toType, isAssignment);
+  auto &cs = getConstraintSystem();
+  ExprRewriter rewriter(cs, *this);
+  return rewriter.coerceToType(expr, toType, isAssignment,
+                               cs.getConstraintLocator(expr, { }));
+}
+
+Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment,
+                             ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+  ExprRewriter rewriter(cs, *this);
+  return rewriter.coerceToType(expr, toType, isAssignment, locator);
 }
