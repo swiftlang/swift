@@ -1038,165 +1038,38 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   assert(kind == TypeMatchKind::Conversion);
 
   // Compute the element shuffles for conversions.
-  enum {
-    unassigned = -1,
-    defaultValue = -2,
-    variadic = -3
-  };
-  SmallVector<int, 16> elementSources(tuple2->getFields().size(), unassigned);
-  SmallVector<bool, 16> consumed(tuple1->getFields().size(), false);
+  SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
-  
-  // Match up any named elements.
-  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
-    const auto &elt2 = tuple2->getFields()[i];
-
-    // Skip unnamed elements.
-    if (elt2.getName().empty())
-      continue;
-
-    // Find the corresponding named element.
-    int matched = -1;
-    {
-      int index = 0;
-      for (auto field : tuple1->getFields()) {
-        if (field.getName() == elt2.getName() && !consumed[index]) {
-          matched = index;
-          break;
-        }
-        ++index;
-      }
-    }
-    if (matched == -1)
-      continue;
-
-    // If this is not a conversion constraint, shuffles are not permitted.
-    if (i != (unsigned)matched && kind < TypeMatchKind::Conversion) {
-      // Record this failure.
-      if (flags & TMF_RecordFailures) {
-        recordFailure(getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getNamedTupleElement(i))),
-                      Failure::TupleNamePositionMismatch, tuple1, tuple2);
-      }
-
-      return SolutionKind::Error;
-    }
-
-    // Record this match.
-    elementSources[i] = matched;
-    consumed[matched] = true;
-  }
-
-  // Resolve any unmatched elements.
-  unsigned next1 = 0, last1 = tuple1->getFields().size();
-  auto skipToNextUnnamedInput = [&] {
-    while (next1 != last1 &&
-           (consumed[next1] || !tuple1->getFields()[next1].getName().empty()))
-      ++next1;
-  };
-  skipToNextUnnamedInput();
-
-  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
-    // Check whether we already found a value for this element.
-    if (elementSources[i] != unassigned)
-      continue;
-
-    const auto &elt2 = tuple2->getFields()[i];
-
-    // Variadic tuple elements match the rest of the input elements.
-    if (elt2.isVararg()) {
-      // Collect the remaining (unnamed) inputs.
-      while (next1 != last1) {
-        variadicArguments.push_back(next1);
-        consumed[next1] = true;
-        skipToNextUnnamedInput();
-      }
-      elementSources[i] = variadic;
-      break;
-    }
-
-    // If there aren't any more inputs, we can use a default argument.
-    if (next1 == last1) {
-      if (elt2.hasInit()) {
-        elementSources[i] = defaultValue;
-        continue;
-      }
-
-      return SolutionKind::Error;
-    }
-
-    elementSources[i] = next1;
-    consumed[next1] = true;
-    skipToNextUnnamedInput();
-  }
-
-  // Check whether there were any unused input values.
-  // FIXME: Could short-circuit this check, above, by not skipping named
-  // input values.
-  auto notConsumed = std::find(consumed.begin(), consumed.end(), false);
-  if (notConsumed != consumed.end()) {
-    // Record this failure.
-    if (flags & TMF_RecordFailures) {
-      unsigned index = notConsumed - consumed.begin();
-      recordFailure(getConstraintLocator(
-                      locator.withPathElement(
-                        LocatorPathElt::getTupleElement(index))),
-                    Failure::TupleUnused, tuple1->getElementType(index),
-                    tuple2);
-    }
-
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments)) {
+    // FIXME: Record why the tuple shuffle couldn't be computed.
     return SolutionKind::Error;
   }
 
-  // Check conversion constraints on the individual elements.
+  // Check each of the elements.
+  bool hasVarArg = false;
   SolutionKind result = SolutionKind::TriviallySolved;
-  for (unsigned i = 0, n = tuple2->getFields().size(); i != n; ++i) {
-    int source = elementSources[i];
-    const auto &elt2 = tuple2->getFields()[i];
-
-    assert(source != unassigned && "Cannot have unassigned source here");
-
-    // Default values always work.
-    if (source == defaultValue) {
-      assert(elt2.hasInit() && "Bogus default value source");
+  for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
+    // Default-initialization always allowed for conversions.
+    if (sources[idx2] == TupleShuffleExpr::DefaultInitialize) {
       continue;
     }
 
-    // For variadic elements, check the list of variadic arguments.
-    if (source == variadic) {
-      assert(elt2.isVararg() && "Bogus variadic argument source");
-      Type variadicBaseType = elt2.getVarargBaseTy();
-      for (unsigned variadicSrc : variadicArguments) {
-        switch (matchTypes(tuple1->getElementType(variadicSrc),
-                           variadicBaseType, TypeMatchKind::Conversion, subFlags,
-                           locator.withPathElement(
-                             LocatorPathElt::getTupleElement(variadicSrc)),
-                           trivial)) {
-        case SolutionKind::Error:
-          return SolutionKind::Error;
-
-        case SolutionKind::TriviallySolved:
-          break;
-
-        case SolutionKind::Solved:
-          result = SolutionKind::Solved;
-          break;
-
-        case SolutionKind::Unsolved:
-          result = SolutionKind::Unsolved;
-          break;
-        }
-      }
+    // Variadic arguments handled below.
+    if (sources[idx2] == TupleShuffleExpr::FirstVariadic) {
+      hasVarArg = true;
       continue;
     }
 
-    const auto &elt1 = tuple1->getFields()[source];
+    assert(sources[idx2] >= 0);
+    unsigned idx1 = sources[idx2];
 
+    // Match up the types.
+    const auto &elt1 = tuple1->getFields()[idx1];
+    const auto &elt2 = tuple2->getFields()[idx2];
     switch (matchTypes(elt1.getType(), elt2.getType(),
                        TypeMatchKind::Conversion, subFlags,
                        locator.withPathElement(
-                         LocatorPathElt::getTupleElement(source)),
+                         LocatorPathElt::getTupleElement(idx1)),
                        trivial)) {
     case SolutionKind::Error:
       return SolutionKind::Error;
@@ -1211,6 +1084,35 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     case SolutionKind::Unsolved:
       result = SolutionKind::Unsolved;
       break;
+    }
+
+  }
+
+  // If we have variadic arguments to check, do so now.
+  if (hasVarArg) {
+    const auto &elt2 = tuple2->getFields().back();
+    auto eltType2 = elt2.getVarargBaseTy();
+
+    for (unsigned idx1 : variadicArguments) {
+      switch (matchTypes(tuple1->getElementType(idx1),
+                         eltType2, TypeMatchKind::Conversion, subFlags,
+                         locator.withPathElement(
+                           LocatorPathElt::getTupleElement(idx1)),
+                         trivial)) {
+      case SolutionKind::Error:
+        return SolutionKind::Error;
+
+      case SolutionKind::TriviallySolved:
+        break;
+
+      case SolutionKind::Solved:
+        result = SolutionKind::Solved;
+        break;
+
+      case SolutionKind::Unsolved:
+        result = SolutionKind::Unsolved;
+        break;
+      }
     }
   }
 
