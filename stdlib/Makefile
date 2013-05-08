@@ -33,7 +33,7 @@ SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
 		 CString.swift \
 		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
 		 REPL.swift Environment.swift GenericIVar.swift \
-	   Optional.swift Zip.swift
+	   Optional.swift Generator.swift Zip.swift
 ifeq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES += Assert.swift
 else
