@@ -514,10 +514,19 @@ add_subdirectory(docs)
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
-add_custom_target(Documentation
-  SOURCES README.txt
-  docs/LangRef.html
-  docs/toc.js)
+if(XCODE)
+  add_custom_target(Documentation
+    SOURCES README.txt
+    docs/LangRef.html
+    docs/toc.js)
+
+  file(GLOB SWIFT_TOPLEVEL_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.td
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.def)
+  add_custom_target(Miscellaneous
+    SOURCES ${SWIFT_TOPLEVEL_HEADERS})
+endif()
 
 # Configure CPack.
 set(CPACK_GENERATOR "TGZ")
