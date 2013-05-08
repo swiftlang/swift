@@ -18,5 +18,41 @@
 #define SWIFT_SERIALIZATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/Bitcode/BitCodes.h"
+
+namespace swift {
+namespace serialization {
+
+/// Serialized module format major version number.
+///
+/// When the format changes in such a way that older compilers will not be
+/// able to read the file at all, this number should be incremented.
+const unsigned VERSION_MAJOR = 1;
+
+/// Serialized module format minor version number.
+///
+/// When the format changes in a backwards-compatible way, this number should
+/// be incremented.
+const unsigned VERSION_MINOR = 0;
+
+/// The various types of blocks that can occur within a serialized Swift
+/// module.
+enum BlockID {
+  /// The control block, which contains all of the information that needs to
+  /// be validated prior to committing to loading the serialized module.
+  ///
+  /// \sa ControlRecordType
+  CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID
+};
+
+/// The record types within the control block.
+///
+/// \sa CONTROL_BLOCK_ID
+enum ControlRecordType {
+  METADATA = 1
+};
+
+} // end namespace serialization
+} // end namespace swift
 
 #endif
