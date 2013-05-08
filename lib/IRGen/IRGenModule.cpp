@@ -187,6 +187,16 @@ static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
   return addr;
 }
 
+/// Create a nounwind function using swift's runtime calling convention.
+static llvm::Constant *createNounwindRuntimeFunction(IRGenModule &IGM,
+                                                     StringRef name,
+                                               llvm::FunctionType *fnType) {
+  auto addr = createRuntimeFunction(IGM, name, fnType);
+  if (auto fn = dyn_cast<llvm::Function>(addr))
+    fn->setDoesNotThrow();
+  return addr;
+}
+
 /// Create a readonly runtime function.
 ///
 /// 'readonly' permits calls to this function to be removed, GVN'ed,
@@ -200,7 +210,7 @@ static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
 static llvm::Constant *createReadonlyRuntimeFunction(IRGenModule &IGM,
                                                      StringRef name,
                                                llvm::FunctionType *fnType) {
-  llvm::Constant *addr = createRuntimeFunction(IGM, name, fnType);
+  llvm::Constant *addr = createNounwindRuntimeFunction(IGM, name, fnType);
   if (auto fn = dyn_cast<llvm::Function>(addr)) {
     fn->setOnlyReadsMemory();
   }
@@ -223,7 +233,7 @@ static llvm::Constant *createReadonlyRuntimeFunction(IRGenModule &IGM,
 static llvm::Constant *createReadnoneRuntimeFunction(IRGenModule &IGM,
                                                      StringRef name,
                                                llvm::FunctionType *fnType) {
-  llvm::Constant *addr = createRuntimeFunction(IGM, name, fnType);
+  llvm::Constant *addr = createNounwindRuntimeFunction(IGM, name, fnType);
   if (auto fn = dyn_cast<llvm::Function>(addr)) {
     fn->setDoesNotAccessMemory();
   }
@@ -260,7 +270,7 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
 llvm::Constant *IRGenModule::getAllocBoxFn() {
   // struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
   return getRuntimeFn(*this, AllocBoxFn,
-                      "swift_allocBox", createRuntimeFunction,
+                      "swift_allocBox", createNounwindRuntimeFunction,
                       { RefCountedPtrTy, OpaquePtrTy },
                       { TypeMetadataPtrTy });
 }
@@ -268,7 +278,7 @@ llvm::Constant *IRGenModule::getAllocBoxFn() {
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t align);
   return getRuntimeFn(*this, AllocObjectFn,
-                      "swift_allocObject", createRuntimeFunction,
+                      "swift_allocObject", createNounwindRuntimeFunction,
                       { RefCountedPtrTy },
                       { TypeMetadataPtrTy, SizeTy, SizeTy });
 }
@@ -276,7 +286,7 @@ llvm::Constant *IRGenModule::getAllocObjectFn() {
 llvm::Constant *IRGenModule::getDeallocObjectFn() {
   // void swift_deallocObject(RefCounted *obj, size_t size);
   return getRuntimeFn(*this, DeallocObjectFn,
-                      "swift_deallocObject", createRuntimeFunction,
+                      "swift_deallocObject", createNounwindRuntimeFunction,
                       { VoidTy },
                       { RefCountedPtrTy, SizeTy });
 }
@@ -284,7 +294,7 @@ llvm::Constant *IRGenModule::getDeallocObjectFn() {
 llvm::Constant *IRGenModule::getRawAllocFn() {
   /// void *swift_rawAlloc(SwiftAllocIndex index);
   return getRuntimeFn(*this, RawAllocFn,
-                      "swift_rawAlloc", createRuntimeFunction,
+                      "swift_rawAlloc", createNounwindRuntimeFunction,
                       { Int8PtrTy },
                       { SizeTy });
 }
@@ -292,7 +302,7 @@ llvm::Constant *IRGenModule::getRawAllocFn() {
 llvm::Constant *IRGenModule::getRawDeallocFn() {
   /// void swift_rawDealloc(void *ptr, SwiftAllocIndex index);
   return getRuntimeFn(*this, RawDeallocFn,
-                      "swift_rawDealloc", createRuntimeFunction,
+                      "swift_rawDealloc", createNounwindRuntimeFunction,
                       { VoidTy },
                       { Int8PtrTy, SizeTy });
 }
@@ -300,7 +310,7 @@ llvm::Constant *IRGenModule::getRawDeallocFn() {
 llvm::Constant *IRGenModule::getSlowAllocFn() {
   /// void *swift_slowAlloc(size_t size, size_t flags);
   return getRuntimeFn(*this, SlowAllocFn,
-                      "swift_slowAlloc", createRuntimeFunction,
+                      "swift_slowAlloc", createNounwindRuntimeFunction,
                       { Int8PtrTy },
                       { SizeTy, SizeTy });
 }
@@ -308,14 +318,14 @@ llvm::Constant *IRGenModule::getSlowAllocFn() {
 llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   /// void swift_slowRawDealloc(void *ptr, size_t size);
   return getRuntimeFn(*this, SlowRawDeallocFn, "swift_slowRawDealloc",
-                      createRuntimeFunction,
+                      createNounwindRuntimeFunction,
                       { VoidTy },
                       { Int8PtrTy, SizeTy });
 }
 
 llvm::Constant *IRGenModule::getCopyPODFn() {
   /// void *swift_copyPOD(void *dest, void *src, Metadata *self);
-  return getRuntimeFn(*this, CopyPODFn, "swift_copyPOD", createRuntimeFunction,
+  return getRuntimeFn(*this, CopyPODFn, "swift_copyPOD", createNounwindRuntimeFunction,
                       { OpaquePtrTy },
                       { OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy });
 }
@@ -355,7 +365,7 @@ llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
 llvm::Constant *IRGenModule::getRetainNoResultFn() {
   // void swift_retainNoResult(void *ptr);
   getRuntimeFn(*this, RetainNoResultFn, "swift_retain_noresult",
-               createRuntimeFunction,
+               createNounwindRuntimeFunction,
                { VoidTy }, { RefCountedPtrTy });
   if (auto fn = dyn_cast<llvm::Function>(RetainNoResultFn))
     fn->setDoesNotCapture(1);
@@ -365,7 +375,7 @@ llvm::Constant *IRGenModule::getRetainNoResultFn() {
 llvm::Constant *IRGenModule::getReleaseFn() {
   // void swift_release(void *ptr);
   getRuntimeFn(*this, ReleaseFn, "swift_release",
-               createRuntimeFunction,
+               createNounwindRuntimeFunction,
                { VoidTy }, { RefCountedPtrTy });
   if (auto fn = dyn_cast<llvm::Function>(ReleaseFn))
     fn->setDoesNotCapture(1);
@@ -417,7 +427,7 @@ llvm::Constant *IRGenModule::getStaticTypeofFn() {
 llvm::Constant *IRGenModule::getObjectTypeofFn() {
   // type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
   return getRuntimeFn(*this, ObjectTypeofFn, "swift_objectTypeof",
-                      createRuntimeFunction,
+                      createNounwindRuntimeFunction,
                       { TypeMetadataPtrTy },
                       { OpaquePtrTy, TypeMetadataPtrTy });
 }
@@ -425,7 +435,7 @@ llvm::Constant *IRGenModule::getObjectTypeofFn() {
 llvm::Constant *IRGenModule::getObjCTypeofFn() {
   // type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
   return getRuntimeFn(*this, ObjCTypeofFn, "swift_objcTypeof",
-                      createRuntimeFunction,
+                      createNounwindRuntimeFunction,
                       { TypeMetadataPtrTy },
                       { OpaquePtrTy, TypeMetadataPtrTy });
 }
@@ -441,7 +451,7 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
 
 llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   // type_metadata_t *swift_getTupleMetadata(size_t numElements,
-  //                                         type_metadata_t * const *pattern,
+  //                                         type_metadata_t * const *elements,
   //                                         const char *labels,
   //                                         value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadataFn, "swift_getTupleTypeMetadata",
@@ -457,9 +467,9 @@ llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
 
 llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
   // type_metadata_t *swift_getTupleMetadata2(type_metadata_t *elt0,
-  //                                         type_metadata_t *elt1,
-  //                                         const char *labels,
-  //                                         value_witness_table_t *proposed);
+  //                                          type_metadata_t *elt1,
+  //                                          const char *labels,
+  //                                          value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadata2Fn, "swift_getTupleTypeMetadata2",
                       createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
@@ -473,11 +483,10 @@ llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
 
 llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
   // type_metadata_t *swift_getTupleMetadata3(type_metadata_t *elt0,
-  //                                         type_metadata_t *elt1,
-  //                                         type_metadata_t *elt2,
-  //                                         type_metadata_t * const *pattern,
-  //                                         const char *labels,
-  //                                         value_witness_table_t *proposed);
+  //                                          type_metadata_t *elt1,
+  //                                          type_metadata_t *elt2,
+  //                                          const char *labels,
+  //                                          value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadata3Fn, "swift_getTupleTypeMetadata3",
                       createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
