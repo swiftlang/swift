@@ -103,7 +103,6 @@ public:
       Type newSpecialized = FunctionType::get(outerInput,
                                               e->getType(),
                                               /*isAutoClosure*/ false,
-                                              /*isBlock*/ false,
                                               /*isThin*/ true,
                                               outerInput->getASTContext());
       specializedType = gen.getLoweredLoadableType(newSpecialized,

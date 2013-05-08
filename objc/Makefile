@@ -22,7 +22,9 @@ SWIFT_SOURCES := ObjectiveC.swift
 SOURCES := ObjectiveC.swift
 NO_BUILD_ARCHIVE := 1
 
-DIRS := Foundation AppKit
+# swiftAppKit temporarily disabled while we move block bridging to SILGen -Joe
+#DIRS := Foundation AppKit
+DIRS := Foundation
 include $(SWIFT_LEVEL)/Makefile
 
 SWIFT_OPTFLAG := -O3

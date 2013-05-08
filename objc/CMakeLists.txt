@@ -9,4 +9,7 @@ target_link_libraries(swiftObjectiveC
   "-lobjc")
 
 add_subdirectory(Foundation)
-add_subdirectory(AppKit)
+
+# FIXME: swiftAppKit temporarily disabled while we move block bridging to
+# SILGen.
+#add_subdirectory(AppKit)

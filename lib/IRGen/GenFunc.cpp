@@ -456,10 +456,12 @@ namespace {
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(AnyFunctionType *T) {
+  /* FIXME: Get block-ness from the SILType.
   if (T->isBlock())
     return new BlockTypeInfo(IGM.ObjCPtrTy,
                              IGM.getPointerSize(),
                              IGM.getPointerAlignment());
+   */
   
   return FuncTypeInfo::create(T, IGM.FunctionPairTy,
                               IGM.getPointerSize() * 2,

@@ -1175,18 +1175,6 @@ public:
   }
 };
   
-/// BridgeToBlockExpr - FIXME: A hack to represent limited Swift closure to
-/// ObjC block conversion.
-class BridgeToBlockExpr : public ImplicitConversionExpr {
-public:
-  BridgeToBlockExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::BridgeToBlock, subExpr, ty) {}
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::BridgeToBlock;
-  }
-};
-
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.

@@ -1069,9 +1069,6 @@ public:
   /// expression of type T to a function of type () -> T.
   bool isAutoClosure() const;
   
-  /// True if this type is an Objective-C-compatible block type.
-  bool isBlock() const;
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
@@ -1088,34 +1085,23 @@ public:
 ///   var x : [auto_closure] () -> int = 4
 class FunctionType : public AnyFunctionType {
   bool AutoClosure : 1;
-  
-  /// True if this type represents an ObjC-compatible block value. This is a
-  /// temporary hack to make simple demo-quality block interop easy.
-  bool Block : 1;
+
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, ASTContext &C) {
-    return get(Input, Result, false, false, false, C);
+    return get(Input, Result, false, false, C);
   }
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
                            ASTContext &C) {
-    return get(Input, Result, isAutoClosure, false, false, C);
+    return get(Input, Result, isAutoClosure, false, C);
   }
   static FunctionType *get(Type Input, Type Result,
-                           bool isAutoClosure, bool isBlock,
-                           ASTContext &C) {
-    return get(Input, Result, isAutoClosure, isBlock, false, C);
-  }
-  static FunctionType *get(Type Input, Type Result,
-                           bool isAutoClosure, bool isBlock, bool isThin,
+                           bool isAutoClosure, bool isThin,
                            ASTContext &C);
 
   /// True if this type allows an implicit conversion from a function argument
   /// expression of type T to a function of type () -> T.
   bool isAutoClosure() const { return AutoClosure; }
-  
-  /// True if this type is an Objective-C-compatible block type.
-  bool isBlock() const { return Block; }
   
   void print(raw_ostream &OS) const;
   
@@ -1127,7 +1113,6 @@ public:
 private:
   FunctionType(Type Input, Type Result,
                bool isAutoClosure,
-               bool isBlock,
                bool HasTypeVariable,
                bool isThin);
 };

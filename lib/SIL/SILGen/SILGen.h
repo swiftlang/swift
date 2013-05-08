@@ -495,7 +495,6 @@ public:
   RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
   RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
                                                 SGFContext C);
-  RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
   RValue visitIfExpr(IfExpr *E, SGFContext C);
   RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
   RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);

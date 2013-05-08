@@ -201,8 +201,6 @@ namespace {
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
-      // FIXME: As a temporary hack, block function types are annotated with
-      // an [objc_block] attribute.
       Type pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Normal);
       if (!pointeeType)
@@ -211,7 +209,6 @@ namespace {
       return FunctionType::get(fTy->getInput(),
                                fTy->getResult(),
                                /*isAutoClosure*/ false,
-                               /*isBlock*/ true,
                                /*isThin*/ false,
                                fTy->getASTContext());
     }

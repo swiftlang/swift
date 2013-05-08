@@ -32,7 +32,6 @@ ATTR(asmname)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(objc)
-ATTR(objc_block)
 ATTR(iboutlet)
 ATTR(ibaction)
 

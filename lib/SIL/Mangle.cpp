@@ -719,11 +719,7 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
                                  unsigned uncurryLevel) {
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
-  // type ::= 'b' type type (objc block)
-  if (fn->isBlock())
-    Buffer << 'b';
-  else
-    Buffer << (uncurryLevel > 0 ? 'f' : 'F');
+  Buffer << (uncurryLevel > 0 ? 'f' : 'F');
   mangleType(fn->getInput(), explosion, 0);
   mangleType(fn->getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));

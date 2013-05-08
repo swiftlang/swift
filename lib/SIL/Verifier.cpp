@@ -688,10 +688,12 @@ public:
             "[objc_block]-ness");
     require(!operandFTy->isThin(), "bridge_to_block operand cannot be [thin]");
     require(!resultFTy->isThin(), "bridge_to_block result cannot be [thin]");
+    /* FIXME: Verify these in the SILFunctionTypeInfo.
     require(!operandFTy->isBlock(),
             "bridge_to_block operand cannot be [objc_block]");
     require(resultFTy->isBlock(),
             "bridge_to_block result must be [objc_block]");
+     */
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
@@ -713,8 +715,7 @@ public:
       require(resFTy &&
               opFTy->getInput()->isEqual(resFTy->getInput()) &&
               opFTy->getResult()->isEqual(resFTy->getResult()) &&
-              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-              opFTy->isBlock() == resFTy->isBlock(),
+              opFTy->isAutoClosure() == resFTy->isAutoClosure(),
               "thin_to_thick_function operand and result type must differ only "
               " in thinness");
       require(!resFTy->isThin(),
@@ -758,8 +759,7 @@ public:
       require(resFTy &&
               opFTy->getInput()->isEqual(resFTy->getInput()) &&
               opFTy->getResult()->isEqual(resFTy->getResult()) &&
-              opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-              opFTy->isBlock() == resFTy->isBlock(),
+              opFTy->isAutoClosure() == resFTy->isAutoClosure(),
               "convert_cc operand and result type must differ only "
               " in calling convention");
       require(!resFTy->isThin(),
