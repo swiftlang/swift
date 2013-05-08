@@ -225,6 +225,34 @@ SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
                  /*isLoadable=*/true);
 }
 
+SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
+                                     ASTContext &C) {
+  Type ty;
+  switch (Kind) {
+  case BuiltinFloatType::IEEE16:
+    ty = C.TheIEEE16Type;
+    break;
+  case BuiltinFloatType::IEEE32:
+    ty = C.TheIEEE32Type;
+    break;
+  case BuiltinFloatType::IEEE64:
+    ty = C.TheIEEE64Type;
+    break;
+  case BuiltinFloatType::IEEE80:
+    ty = C.TheIEEE80Type;
+    break;
+  case BuiltinFloatType::IEEE128:
+    ty = C.TheIEEE128Type;
+    break;
+  case BuiltinFloatType::PPC128:
+    ty = C.ThePPC128Type;
+    break;
+  }
+  return SILType(CanType(ty),
+                 /*isAddress=*/false,
+                 /*isLoadable=*/true);
+}
+
 ASTContext &SILFunction::getContext() const {
   return getModule().Context;
 }

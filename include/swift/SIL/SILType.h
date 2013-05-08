@@ -280,27 +280,6 @@ public:
     return getSwiftRValueType()->getASTContext();
   }
   
-  /// Get a SILType from a Swift Type that has already been lowered. This is
-  /// dangerous. User code should instead use SILGen's
-  /// TypeInfo::getLoweredType().
-  static SILType getPreLoweredType(TypeBase *t,
-                                   bool address,
-                                   bool loadable) {
-    return SILType(CanType(t), address, loadable);
-  }
-
-  static SILType getPreLoweredType(CanType t,
-                                   bool address,
-                                   bool loadable) {
-    return SILType(t, address, loadable);
-  }
-
-  static SILType getPreLoweredType(SILTypeInfo *info,
-                                   bool address,
-                                   bool loadable) {
-    return SILType(info, address, loadable);
-  }
-  
   //
   // Accessors for types used in SIL instructions:
   //
@@ -313,6 +292,9 @@ public:
   static SILType getOpaquePointerType(ASTContext &C);
   /// Get a builtin integer type as a SILType.
   static SILType getBuiltinIntegerType(unsigned bitWidth, ASTContext &C);
+  /// Get a builtin floating-point type as a SILType.
+  static SILType getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
+                                     ASTContext &C);
   
   //
   // Utilities for treating SILType as a pointer-like type.

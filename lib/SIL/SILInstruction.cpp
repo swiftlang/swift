@@ -278,20 +278,18 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty, intmax_t Value,
 IntegerLiteralInst *
 IntegerLiteralInst::create(swift::IntegerLiteralExpr *E, SILFunction &B) {
   return create(E,
-                // Builtin integer types are always valid SIL types.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                           /*address=*/false,
-                                           /*loadable=*/true),
+                SILType::getBuiltinIntegerType(
+                     E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
+                     B.getContext()),
                 E->getText(), B);
 }
 
 IntegerLiteralInst *
 IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &B) {
   return create(E,
-                // Builtin integer types are always valid SIL types.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                           /*address=*/false,
-                                           /*loadable=*/true),
+                SILType::getBuiltinIntegerType(
+                     E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
+                     B.getContext()),
                 E->getValue(), B);
 }
 
@@ -319,9 +317,9 @@ FloatLiteralInst *
 FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &B) {
   return create(E,
                 // Builtin floating-point types are always valid SIL types.
-                SILType::getPreLoweredType(E->getType()->getCanonicalType(),
-                                           /*address=*/false,
-                                           /*loadable=*/true),
+                SILType::getBuiltinFloatType(
+                         E->getType()->castTo<BuiltinFloatType>()->getFPKind(),
+                         B.getContext()),
                 E->getText(), B);
 }
 
