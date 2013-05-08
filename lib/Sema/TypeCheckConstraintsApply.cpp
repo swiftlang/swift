@@ -392,7 +392,27 @@ Expr *Solution::coerceToType(TypeChecker &tc, Expr *expr, Type toType,
       return ice;
     }
 
-    // FIXME: block and other function conversions.
+    // Coercion to a block function type from non-block function type.
+    auto fromFunc = fromType->getAs<FunctionType>();
+    if (toFunc->isBlock() && (!fromFunc || !fromFunc->isBlock())) {
+      // Coerce the expression to the non-block form of the function type.
+      auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
+                                            toFunc->getResult(),
+                                            tc.Context);
+      expr = coerceToType(tc, expr, toNonBlockTy);
+
+      // Bridge to the block form of this function type.
+      return new (tc.Context) BridgeToBlockExpr(expr, toType);
+    }
+
+    // Coercion from one function type to another.
+    if (fromFunc) {
+      bool trivial = false;
+      bool isSubtype = tc.isSubtypeOf(fromType, toType, trivial);
+      (void)isSubtype;
+      assert(isSubtype && "No subtyping relationship between function types?");
+      return new (tc.Context) FunctionConversionExpr(expr, toType, trivial);
+    }
   }
 
   // Coercions from a type to an existential type.
