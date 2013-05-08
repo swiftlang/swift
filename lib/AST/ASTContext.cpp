@@ -424,7 +424,7 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         Type Parent,
-                                        ArrayRef<Type> GenericArgs) {
+                                        ArrayRef<Type> GenericArgs) {  
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   bool HasTypeVariable = false;

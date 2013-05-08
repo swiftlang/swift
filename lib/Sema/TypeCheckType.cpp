@@ -239,6 +239,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         case UnqualifiedLookupResult::ExistentialMember:
         case UnqualifiedLookupResult::ArchetypeMember:
           TD = dyn_cast<TypeDecl>(Globals.Results[0].getValueDecl());
+          BaseTy = TD->getDeclContext()->getDeclaredTypeInContext();
           break;
         case UnqualifiedLookupResult::ModuleName:
           C.Value = Globals.Results[0].getNamedModule();
