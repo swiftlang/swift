@@ -234,8 +234,7 @@ ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
     return Cache.getExtensions(T->getCanonicalType());
   }
 
-  assert(isa<ClangModule>(this));
-  return Ctx.getClangModuleLoader()->lookupExtensions(this, T);
+  return cast<LoadedModule>(this)->lookupExtensions(T);
 }
 
 //===----------------------------------------------------------------------===//
@@ -261,9 +260,8 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
       .lookupValue(AccessPath, Name, LookupKind, *TU, Result);
   }
 
-  assert(isa<ClangModule>(this));
-  return Ctx.getClangModuleLoader()->lookupValue(this, AccessPath,
-                                                 Name, LookupKind, Result);
+  return cast<LoadedModule>(this)->lookupValue(AccessPath, Name, LookupKind,
+                                               Result);
 }
 
 /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
@@ -396,13 +394,28 @@ void TranslationUnit::clearLookupCache() {
 }
 
 //===----------------------------------------------------------------------===//
+// LoadedModule Implementation
+//===----------------------------------------------------------------------===//
+
+void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
+                               NLKind lookupKind,
+                               SmallVectorImpl<ValueDecl*> &result) {
+  return Owner.lookupValue(this, accessPath, name, lookupKind, result);
+}
+
+ArrayRef<ExtensionDecl*> LoadedModule::lookupExtensions(Type T) {
+  return Owner.lookupExtensions(this, T);
+}
+
+
+//===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
-ClangModule::ClangModule(ASTContext &ctx, Component *comp,
+ClangModule::ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
                          clang::Module *clangModule)
-  : Module(DeclContextKind::ClangModule,
-           ctx.getIdentifier(clangModule->getFullModuleName()),
-           comp, ctx),
+  : LoadedModule(DeclContextKind::ClangModule,
+                 ctx.getIdentifier(clangModule->Name),
+                 comp, ctx, owner),
     clangModule(clangModule)
 {
   // Clang modules are always well-formed.

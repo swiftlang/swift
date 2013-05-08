@@ -39,6 +39,7 @@ namespace swift {
   class IdentifierType;
   class InfixOperatorDecl;
   class LookupCache;
+  class ModuleLoader;
   class NameAliasType;
   class OneOfElementDecl;
   class OperatorDecl;
@@ -292,12 +293,44 @@ public:
   }
 };
 
+
+/// Represents a serialized module that has been imported into Swift.
+///
+/// This may be a Swift module or a Clang module.
+class LoadedModule : public Module {
+  ModuleLoader &Owner;
+
+public:
+  LoadedModule(DeclContextKind kind, Identifier name, Component *comp,
+               ASTContext &ctx, ModuleLoader &owner)
+    : Module(kind, name, comp, ctx), Owner(owner) {
+    // Loaded modules are always well-formed.
+    ASTStage = TypeChecked;
+  }
+
+  // Inherited from Module.
+  void lookupValue(AccessPathTy accessPath, Identifier name, NLKind lookupKind,
+                   SmallVectorImpl<ValueDecl*> &result);
+
+  // Inherited from Module.
+  ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
+           DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
+  }
+};
+
 /// \brief Represents a Clang module that has been imported into Swift.
-class ClangModule : public Module {
+///
+/// This is exposed at the AST level because we want to do special things with
+/// the module's synthesized definitions.
+class ClangModule : public LoadedModule {
   clang::Module *clangModule;
 
 public:
-  ClangModule(ASTContext &ctx, Component *comp, clang::Module *clangModule);
+  ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
+              clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
   clang::Module *getClangModule() const { return clangModule; }

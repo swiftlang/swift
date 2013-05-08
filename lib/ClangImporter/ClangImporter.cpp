@@ -269,7 +269,7 @@ Module *ClangImporter::loadModule(
   auto component = new (Impl.SwiftContext.Allocate<Component>(1)) Component();
 
   // Build the representation of the Clang module in Swift.
-  auto result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext,
+  auto result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, *this,
                                                     component, clangModule);
 
   // FIXME: Total hacks.
