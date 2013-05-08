@@ -90,6 +90,11 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   auto clangDiags(CompilerInstance::createDiagnostics(
                     new clang::DiagnosticOptions, 0, nullptr));
 
+  // Don't stop emitting messages if we ever can't find a file.
+  // FIXME: This is actually a general problem: any "fatal" error could mess up
+  // the CompilerInvocation.
+  clangDiags->setDiagnosticErrorAsFatal(clang::diag::err_module_not_found,
+                                        false);
 
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
@@ -245,6 +250,9 @@ Module *ClangImporter::loadModule(
   // FIXME: The source location here is completely bogus. It can't be
   // invalid, and it can't be the same thing twice in a row, so we just use
   // a counter. Having real source locations would be far, far better.
+  // FIXME: This should not print a message if we just can't find a Clang
+  // module -- that's Swift's responsibility, since there could in theory be a
+  // later module loader.
   auto &srcMgr = clangContext.getSourceManager();
   clang::SourceLocation clangImportLoc
     = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())

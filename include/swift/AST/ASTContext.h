@@ -305,14 +305,28 @@ public:
   const Type TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
   const Type ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
 
-  /// \brief Determine whether this ASTContext has a module loader.
-  bool hasModuleLoader() const;
+  /// \brief Adds a module loader to this AST context.
+  ///
+  /// \param loader The new module loader, which will be added after any
+  ///               existing module loaders.
+  /// \param isClang \c true if this module loader is responsible for loading
+  ///                Clang modules, which are special-cased in some parts of the
+  ///                compiler.
+  void addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
+                       bool isClang = false);
 
-  /// \brief Set the module loader for this ASTContext.
-  void setModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader);
+  /// \brief Retrieve the Clang module loader for this ASTContext.
+  ///
+  /// If there is no Clang module loader, returns a null smart pointer.
+  llvm::IntrusiveRefCntPtr<ModuleLoader> getClangModuleLoader() const;
 
-  /// \brief Retrieve the module loader for this ASTContext.
-  ModuleLoader &getModuleLoader() const;
+  /// \brief Attempts to load a module into this ASTContext.
+  ///
+  /// If a module by this name has already been loaded, the existing module will
+  /// be returned.
+  ///
+  /// \returns The requested module, or NULL if the module cannot be found.
+  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath);
 
 private:
   friend class Decl;

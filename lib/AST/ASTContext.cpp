@@ -37,8 +37,13 @@ struct ASTContext::Implementation {
   llvm::BumpPtrAllocator Allocator; // used in later initializations
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
-  /// \brief The module loader used to load modules.
-  llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ModuleLoader;
+  /// \brief The various module loaders that import external modules into this
+  /// ASTContext.
+  SmallVector<llvm::IntrusiveRefCntPtr<swift::ModuleLoader>, 4> ModuleLoaders;
+
+  /// \brief The module loader used to load Clang modules.
+  // FIXME: We shouldn't be special-casing Clang.
+  llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ClangModuleLoader;
 
   /// \brief The set of AST mutation listeners.
   SmallVector<ASTMutationListener *, 4> MutationListeners;
@@ -229,21 +234,36 @@ void ASTContext::setSubstitutions(BoundGenericType* Bound,
   Impl.BoundGenericSubstitutions[Bound] = Subs;
 }
 
-/// \brief Determine whether this ASTContext has a module loader.
-bool ASTContext::hasModuleLoader() const {
-  return Impl.ModuleLoader;
+void ASTContext::addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
+                                 bool IsClang) {
+  Impl.ModuleLoaders.push_back(loader);
+  if (IsClang) {
+    assert(!Impl.ClangModuleLoader && "Already have a Clang module loader");
+    Impl.ClangModuleLoader = std::move(loader);
+  }
 }
 
-/// \brief Set the module loader for this ASTContext.
-void ASTContext::setModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader){
-  assert(!hasModuleLoader() && "Already has a module loader");
-  Impl.ModuleLoader = loader;
+llvm::IntrusiveRefCntPtr<ModuleLoader> ASTContext::getClangModuleLoader() const{
+  return Impl.ClangModuleLoader;
 }
 
-/// \brief Retrieve the module loader for this ASTContext.
-ModuleLoader &ASTContext::getModuleLoader() const {
-  assert(hasModuleLoader() && "No module loader!");
-  return *Impl.ModuleLoader;
+Module *
+ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
+  assert(!modulePath.empty());
+  auto moduleID = modulePath[0];
+
+  // TODO: Swift submodules.
+  if (modulePath.size() == 1) {
+    if (Module *M = LoadedModules.lookup(moduleID.first.str()))
+      return M;
+  }
+
+  for (auto importer : Impl.ModuleLoaders) {
+    if (Module *M = importer->loadModule(moduleID.second, modulePath))
+      return M;
+  }
+
+  return nullptr;
 }
 
 ClangNode ASTContext::getClangNode(Decl *decl) {

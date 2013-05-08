@@ -77,72 +77,24 @@ namespace {
     /// fills in the Components.
     bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC);
 
-    llvm::error_code findModule(StringRef Module,
-                                SourceLoc ImportLoc,
-                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer);
-
-  private:
-    /// getModule - Load a module referenced by an import statement,
-    /// emitting an error at the specified location and returning null on
-    /// failure.
+    /// Load a module referenced by an import statement.
+    ///
+    /// Returns null if no module can be loaded.
     Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
 }
 
-llvm::error_code NameBinder::findModule(StringRef Module, 
-                                        SourceLoc ImportLoc,
-                                llvm::OwningPtr<llvm::MemoryBuffer> &Buffer) {
-  std::string ModuleFilename = Module.str() + std::string(".swift");
-  
-  llvm::SmallString<128> InputFilename;
-  
-  // First, search in the directory corresponding to the import location.
-  // FIXME: This screams for a proper FileManager abstraction.
-  llvm::SourceMgr &SourceMgr = Context.SourceMgr;
-  int CurrentBufferID = SourceMgr.FindBufferContainingLoc(ImportLoc.Value);
-  if (CurrentBufferID >= 0) {
-    const llvm::MemoryBuffer *ImportingBuffer 
-      = SourceMgr.getBufferInfo(CurrentBufferID).Buffer;
-    StringRef CurrentDirectory 
-      = llvm::sys::path::parent_path(ImportingBuffer->getBufferIdentifier());
-    if (!CurrentDirectory.empty()) {
-      InputFilename = CurrentDirectory;
-      llvm::sys::path::append(InputFilename, ModuleFilename);
-      llvm::error_code Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
-      if (!Err)
-        return Err;
-    }
-  }
-  
-  // Second, search in the current directory.
-  llvm::error_code Err = llvm::MemoryBuffer::getFile(ModuleFilename, Buffer);
-  if (!Err)
-    return Err;
-
-  // If we fail, search each import search path.
-  for (auto Path : Context.ImportSearchPaths) {
-    InputFilename = Path;
-    llvm::sys::path::append(InputFilename, ModuleFilename);
-    Err = llvm::MemoryBuffer::getFile(InputFilename, Buffer);
-    if (!Err)
-      return Err;
-  }
-
-  return Err;
-}
-
-Module *NameBinder::getModule(
-                        ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
-  // TODO: Swift submodules.
-  assert(ModulePath.size() >= 1 && "empty import path");
-  auto ModuleID = ModulePath[0];
+Module *
+NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
+  assert(!modulePath.empty());
+  auto moduleID = modulePath[0];
   
   // TODO: We currently just recursively parse referenced modules.  This works
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
 
   // FIXME: We shouldn't really allow arbitrary modules to import Builtin.
-  if (ModuleID.first.str() == "Builtin") {
+  if (moduleID.first.str() == "Builtin") {
     ImportedBuiltinModule = true;
     return TU->Ctx.TheBuiltinModule;
   }
@@ -150,84 +102,32 @@ Module *NameBinder::getModule(
   // If the imported module name is the same as the current translation unit,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
-  bool useClangModule = false;
-  if (ModuleID.first == TU->Name && Context.hasModuleLoader())
-    useClangModule = true;
-
-  Module *M = nullptr;
+  if (moduleID.first == TU->Name && modulePath.size() == 1) {
+    if (auto importer = Context.getClangModuleLoader())
+      return importer->loadModule(moduleID.second, modulePath);
+    return nullptr;
+  }
   
-  // FIXME: For now, ignore submodule paths except for Clang modules.
-  if (ModulePath.size() > 1 && Context.hasModuleLoader()) {
-    useClangModule = true;
-  } else {
-    M = Context.LoadedModules.lookup(ModuleID.first.str());
-    if (M && !(useClangModule && !isa<ClangModule>(M)))
-      return M;
-  }
-
-  // Open the input file.
-  llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
-  if (!useClangModule) {
-    if (llvm::error_code Err = findModule(ModuleID.first.str(), ModuleID.second,
-                                          InputFile)) {
-      if (Err.value() != llvm::errc::no_such_file_or_directory ||
-          !Context.hasModuleLoader()) {
-        diagnose(ModuleID.second, diag::sema_opening_import,
-                 ModuleID.first.str(), Err.message());
-        return 0;
-      }
-
-      // There was no Swift module with this name, so try a Clang module.
-      useClangModule = true;
-    }
-  }
-
-  if (useClangModule) {
-    // FIXME: We're assuming that 'externally loaded module' == 'clang module',
-    // which is clearly nonsense. We almost certainy want to have a chain
-    // of external module loaders, with the Swift one first and the Clang one
-    // as a fallback.
-    // FIXME: Bad location info?
-    return Context.getModuleLoader().loadModule(ModuleID.second,
-                                                ModulePath);
-  }
-
-  unsigned BufferID =
-    Context.SourceMgr.AddNewSourceBuffer(InputFile.take(),
-                                         ModuleID.second.Value);
-
-  // FIXME: Turn off the constraint-based type checker for the imported 'swift'
-  // module.
-  llvm::SaveAndRestore<bool> saveUseCS(Context.LangOpts.UseConstraintSolver,
-                                       (Context.LangOpts.UseConstraintSolver &&
-                                        ModuleID.first.str() != "swift"));
-
-  // For now, treat all separate modules as unique components.
-  Component *Comp = new (Context.Allocate<Component>(1)) Component();
-  TranslationUnit *ImportedTU;
-  ImportedTU = new (Context) TranslationUnit(ModuleID.first, Comp, Context,
-                                             /*IsMainModule*/false,
-                                             /*IsReplModule*/false);
-
-  Context.LoadedModules[ModuleID.first.str()] = ImportedTU;
-  parseIntoTranslationUnit(ImportedTU, BufferID);
-
-  // We have to do name binding on it to ensure that types are fully resolved.
-  // This should eventually be eliminated by having actual fully resolved binary
-  // dumps of the code instead of reparsing though.
-  // FIXME: We also need to deal with circular imports!
-  performNameBinding(ImportedTU);
-  performTypeChecking(ImportedTU);
-  
-  return ImportedTU;
+  return Context.getModule(modulePath);
 }
 
 
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
   ArrayRef<ImportDecl::AccessPathElement> Path = ID->getAccessPath();
-  Module *M = getModule(Path);
-  if (M == 0) return;
+
+  // FIXME: This is a hack to allow /either/ Clang submodules /or/ importing
+  // declarations from within Swift translation units...but not both. We may
+  // need to design this carefully: what does "Foundation.NSString" refer to?
+  auto importPath = Path;
+  if (!Context.getClangModuleLoader())
+    importPath = importPath.slice(0, 1);
+
+  Module *M = getModule(importPath);
+  if (M == 0) {
+    diagnose(Path[0].second, diag::sema_no_import, Path[0].first.str());
+    return;
+  }
   
   // FIXME: Validate the access path against the module.  Reject things like
   // import swift.aslkdfja
@@ -242,7 +142,7 @@ void NameBinder::addImport(ImportDecl *ID,
   // module with the same name, add that Clang module to our own set of imports.
   // FIXME: This is a horrible, horrible way to provide transitive inclusion.
   // We really need a re-export syntax.
-  if (Context.hasModuleLoader()) {
+  if (Context.getClangModuleLoader()) {
     if (auto tu = dyn_cast<TranslationUnit>(M)) {
       for (auto imported : tu->getImportedModules()) {
         // Only check for Clang modules.
@@ -570,6 +470,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
                                     visited);
     }
 
+    ASTContext &ctx = TU->getASTContext();
     llvm::DenseMap<clang::Module *, bool> topModules;
     for (auto clangImport : importedClangModules) {
       // Look at the top-level module.
@@ -579,13 +480,15 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       if (knownTop == topModules.end()) {
         // If we haven't looked for a Swift module corresponding to the
         // top-level module yet, do so now.
-        llvm::OwningPtr<llvm::MemoryBuffer> buffer; // FIXME: wasteful!
-        if (Binder.findModule(topClangMod->Name, clangImport.second, buffer)) {
-          hasSwiftModule = false;
-        } else {
-          hasSwiftModule = true;
-        }
 
+        ImportDecl::AccessPathElement importPair =
+          { ctx.getIdentifier(topClangMod->Name), clangImport.second };
+
+        // It's a little wasteful to load the module here and then again below,
+        // but the one below should pick up the same (already-loaded) module.
+        auto module = ctx.getModule(importPair);
+
+        hasSwiftModule = !isa<ClangModule>(module);
         topModules[topClangMod] = hasSwiftModule;
       } else {
         hasSwiftModule = knownTop->second;
@@ -596,9 +499,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
       // Form an implicit import of the Swift module.
       SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
-      ASTContext &context = TU->getASTContext();
       for (auto mod = clangImport.first; mod; mod = mod->Parent) {
-        accessPath.push_back({ context.getIdentifier(mod->Name),
+        accessPath.push_back({ ctx.getIdentifier(mod->Name),
                                clangImport.second });
       }
       std::reverse(accessPath.begin(), accessPath.end());
@@ -606,7 +508,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       // Create an implicit import declaration and import it.
       // FIXME: Mark as implicit!
       // FIXME: Actually pass through the whole access path.
-      auto import = ImportDecl::create(context, TU, clangImport.second,
+      auto import = ImportDecl::create(ctx, TU, clangImport.second,
                                        accessPath[0]);
       TU->Decls.push_back(import);
       Binder.addImport(import, ImportedModules);

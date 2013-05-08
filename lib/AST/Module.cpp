@@ -234,7 +234,8 @@ ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
     return Cache.getExtensions(T->getCanonicalType());
   }
 
-  return Ctx.getModuleLoader().lookupExtensions(cast<ClangModule>(this), T);
+  assert(isa<ClangModule>(this));
+  return Ctx.getClangModuleLoader()->lookupExtensions(this, T);
 }
 
 //===----------------------------------------------------------------------===//
@@ -260,8 +261,9 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
       .lookupValue(AccessPath, Name, LookupKind, *TU, Result);
   }
 
-  return Ctx.getModuleLoader().lookupValue(cast<ClangModule>(this), AccessPath,
-                                           Name, LookupKind, Result);
+  assert(isa<ClangModule>(this));
+  return Ctx.getClangModuleLoader()->lookupValue(this, AccessPath,
+                                                 Name, LookupKind, Result);
 }
 
 /// lookupVisibleDecls - Find ValueDecls in the module and pass them to the
