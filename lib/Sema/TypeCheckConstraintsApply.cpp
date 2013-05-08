@@ -46,6 +46,8 @@ STATISTIC(NumCoercions, "# of coercions");
 ///
 /// \param toTuple The tuple type we're converting to.
 ///
+/// \param locator Locator describing where this tuple conversion occurs.
+///
 /// \param sources The sources of each of the elements to be used in the
 /// resulting tuple, as provided by \c computeTupleShuffle.
 ///
@@ -54,6 +56,7 @@ STATISTIC(NumCoercions, "# of coercions");
 static Expr *coerceTupleToTuple(const Solution &solution,
                                 Expr *expr, TupleType *fromTuple,
                                 TupleType *toTuple,
+                                ConstraintLocatorBuilder locator,
                                 SmallVectorImpl<int> &sources,
                                 SmallVectorImpl<unsigned> &variadicArgs) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
@@ -124,7 +127,10 @@ static Expr *coerceTupleToTuple(const Solution &solution,
 
     // Actually convert the source element.
     auto convertedElt
-      = solution.coerceToType(fromTupleExpr->getElement(sources[i]), toEltType);
+      = solution.coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
+                              /*isAssignment=*/false,
+                              locator.withPathElement(
+                                LocatorPathElt::getTupleElement(sources[i])));
     if (!convertedElt)
       return nullptr;
 
@@ -167,9 +173,12 @@ static Expr *coerceTupleToTuple(const Solution &solution,
       }
 
       // Actually convert the source element.
-      auto convertedElt
-        = solution.coerceToType(fromTupleExpr->getElement(fromFieldIdx),
-                                toEltType);
+      auto convertedElt = solution.coerceToType(
+                            fromTupleExpr->getElement(fromFieldIdx),
+                            toEltType,
+                            /*isAssignment=*/false,
+                            locator.withPathElement(
+                              LocatorPathElt::getTupleElement(fromFieldIdx)));
       if (!convertedElt)
         return nullptr;
 
@@ -224,12 +233,14 @@ static Expr *coerceTupleToTuple(const Solution &solution,
 /// \param toTuple The tuple type to which the expression will be coerced.
 /// \param toScalarIdx The index of the scalar field within the tuple type
 /// \c toType.
+/// \param locator Locator describing where this conversion occurs.
 ///
 /// \returns The coerced expression, whose type will be equivalent to
 /// \c toTuple.
 static Expr *coerceScalarToTuple(const Solution &solution,
                                  Expr *expr, TupleType *toTuple,
-                                 int toScalarIdx) {
+                                 int toScalarIdx,
+                                 ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   
   // If the destination type is variadic, compute the injection function to use.
@@ -256,7 +267,10 @@ static Expr *coerceScalarToTuple(const Solution &solution,
     toScalarType = field.getType();
 
   // Coerce the expression to the type to the scalar type.
-  expr = solution.coerceToType(expr, toScalarType);
+  expr = solution.coerceToType(expr, toScalarType,
+                               /*isAssignment=*/false,
+                               locator.withPathElement(
+                                 ConstraintLocator::ScalarToTuple));
   if (!expr)
     return nullptr;
 
@@ -303,6 +317,13 @@ static Expr *coerceScalarToTuple(const Solution &solution,
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
+  return coerceToType(expr, toType, isAssignment,
+                      ConstraintLocatorBuilder(
+                        constraintSystem->getConstraintLocator(expr, { })));
+}
+
+Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment,
+                             ConstraintLocatorBuilder locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
   // The type we're converting from.
@@ -326,14 +347,14 @@ Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
       SmallVector<unsigned, 4> variadicArgs;
       if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
         return coerceTupleToTuple(*this, expr, fromTuple, toTuple,
-                                  sources, variadicArgs);
+                                  locator, sources, variadicArgs);
       }
     }
 
     // Coerce scalar to tuple.
     int toScalarIdx = toTuple->getFieldForScalarInit();
     if (toScalarIdx != -1) {
-      return coerceScalarToTuple(*this, expr, toTuple, toScalarIdx);
+      return coerceScalarToTuple(*this, expr, toTuple, toScalarIdx, locator);
     }
   }
 
@@ -395,7 +416,8 @@ Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
     // be subtypes of non-[auto_closures], which is bogus.
     if (toFunc->isAutoClosure()) {
       // Convert the value to the expected result type of the function.
-      expr = coerceToType(expr, toFunc->getResult());
+      expr = coerceToType(expr, toFunc->getResult(), /*isAssignment=*/false,
+                          locator.withPathElement(ConstraintLocator::Load));
 
       // FIXME: Bogus declaration context.
       auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
