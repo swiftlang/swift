@@ -35,7 +35,11 @@ namespace {
     /// A reusable buffer for emitting records.
     SmallVector<uint64_t, 64> ScratchRecord;
 
-    /// Writes the Swift module file header and BLOCKINFO block.
+    /// Writes the BLOCKINFO block.
+    void writeBlockInfoBlock();
+
+    /// Writes the Swift module file header, BLOCKINFO block, and
+    /// non-TU-specific metadata.
     void writeHeader();
 
     /// Writes the input file paths.
@@ -53,6 +57,51 @@ namespace {
   };
 } // end anonymous namespace
 
+
+/// Record the name of a block.
+static void emitBlockID(llvm::BitstreamWriter &out, unsigned ID,
+                        StringRef name,
+                        SmallVectorImpl<unsigned char> &nameBuffer) {
+  SmallVector<unsigned, 1> idBuffer;
+  idBuffer.push_back(ID);
+  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
+
+  // Emit the block name if present.
+  if (name.empty())
+    return;
+  nameBuffer.resize(name.size());
+  memcpy(nameBuffer.data(), name.data(), name.size());
+  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
+}
+
+/// Record the name of a record within a block.
+static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
+                         StringRef name,
+                         SmallVectorImpl<unsigned char> &nameBuffer) {
+  assert(ID < 256 && "can't fit record ID in next to name");
+  nameBuffer.resize(name.size()+1);
+  nameBuffer[0] = ID;
+  memcpy(nameBuffer.data()+1, name.data(), name.size());
+  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+}
+
+void Serializer::writeBlockInfoBlock() {
+  BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
+  SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
+#define RECORD(X) emitRecordID(Out, X, #X, nameBuffer)
+
+  BLOCK(CONTROL_BLOCK);
+  RECORD(METADATA);
+
+  BLOCK(INPUT_BLOCK);
+  RECORD(SOURCE_FILE);
+
+#undef BLOCK
+#undef RECORD
+}
+
 void Serializer::writeHeader() {
   // Swift module file type: 'SMod'.
   Out.Emit((unsigned)'S', 8);
@@ -60,9 +109,7 @@ void Serializer::writeHeader() {
   Out.Emit((unsigned)'o', 8);
   Out.Emit((unsigned)'d', 8);
 
-  {
-    BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
-  }
+  writeBlockInfoBlock();
 
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
