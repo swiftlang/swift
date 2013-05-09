@@ -1,4 +1,4 @@
-//===--- Serialization.h - Read and write Swift modules ---------*- C++ -*-===//
+//===--- ModuleFormat.h - The internals of serialized modules ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file A catch-all header file for Swift module reading and writing.
+/// \file Contains various constants and helper types to deal with serialized
+/// modules.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SERIALIZATION_H
-#define SWIFT_SERIALIZATION_H
+#ifndef SWIFT_SERIALIZATION_MODULEFORMAT_H
+#define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
-#include "swift/Basic/LLVM.h"
+#include "swift/Serialization/BCRecordLayout.h"
 #include "llvm/Bitcode/BitCodes.h"
 
 namespace swift {
@@ -44,28 +45,44 @@ enum BlockID {
   /// The control block, which contains all of the information that needs to
   /// be validated prior to committing to loading the serialized module.
   ///
-  /// \sa ControlRecordType
+  /// \sa control_block
   CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
 
   /// The input block, which contains all the files this module depends on.
   ///
-  /// \sa InputRecordType
+  /// \sa input_block
   INPUT_BLOCK_ID
 };
 
 /// The record types within the control block.
 ///
 /// \sa CONTROL_BLOCK_ID
-enum ControlRecordType {
-  METADATA = 1
-};
+namespace control_block {
+  enum {
+    METADATA = 1
+  };
+
+  using MetadataLayout = BCRecordLayout<
+    METADATA, // ID
+    BCFixed<16>, // Module format major version
+    BCFixed<16>, // Module format minor version
+    BCBlob // misc. version information
+  >;
+}
 
 /// The record types within the input block.
 ///
 /// \sa INPUT_BLOCK_ID
-enum InputRecordType {
-  SOURCE_FILE = 1
-};
+namespace input_block {
+  enum {
+    SOURCE_FILE = 1
+  };
+
+  using SourceFileLayout = BCRecordLayout<
+    SOURCE_FILE, // ID
+    BCBlob // path
+  >;
+}
 
 } // end namespace serialization
 } // end namespace swift

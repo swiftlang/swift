@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/Serialization.h"
+#include "swift/Subsystems.h"
+#include "ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Serialization/BCRecordLayout.h"
-#include "swift/Subsystems.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/Config.h"
 #include "llvm/Support/FileSystem.h"
@@ -90,13 +90,13 @@ void Serializer::writeBlockInfoBlock() {
 
   SmallVector<unsigned char, 64> nameBuffer;
 #define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define RECORD(X) emitRecordID(Out, X, #X, nameBuffer)
+#define RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
 
   BLOCK(CONTROL_BLOCK);
-  RECORD(METADATA);
+  RECORD(control_block, METADATA);
 
   BLOCK(INPUT_BLOCK);
-  RECORD(SOURCE_FILE);
+  RECORD(input_block, SOURCE_FILE);
 
 #undef BLOCK
 #undef RECORD
@@ -107,13 +107,7 @@ void Serializer::writeHeader() {
 
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
-
-    BCRecordLayout<
-      METADATA, // ID
-      BCFixed<16>, // Module format major version
-      BCFixed<16>, // Module format minor version
-      BCBlob // misc. version information
-    > Metadata(Out);
+    control_block::MetadataLayout Metadata(Out);
 
     // FIXME: put a real version in here.
 #ifdef LLVM_VERSION_INFO
@@ -130,11 +124,7 @@ void Serializer::writeHeader() {
 void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
                                  FileBufferIDs inputFiles) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
-
-  BCRecordLayout<
-    SOURCE_FILE,
-    BCBlob // path
-  > SourceFile(Out);
+  input_block::SourceFileLayout SourceFile(Out);
 
   for (auto bufferID : inputFiles) {
     // FIXME: We could really use a real FileManager here.

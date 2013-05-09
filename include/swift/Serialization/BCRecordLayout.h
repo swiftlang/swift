@@ -264,6 +264,11 @@ class BCRecordLayout {
   unsigned AbbrevCode;
 
 public:
+  enum : unsigned {
+    /// The record code associated with this layout.
+    Code = RecordCode
+  };
+
   /// Create a layout and register it with the given bitstream writer.
   explicit BCRecordLayout(llvm::BitstreamWriter &out)
     : Out(out), AbbrevCode(emitAbbrev(out)) {}
