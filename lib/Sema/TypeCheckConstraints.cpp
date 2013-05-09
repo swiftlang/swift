@@ -2878,6 +2878,12 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   return { dest, src };
 }
 
+bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
+                                         bool &isTrivial) {
+  ConstraintSystem cs(*this);
+  return cs.isSubtypeOf(type1, type2, isTrivial);
+}
+
 //===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//

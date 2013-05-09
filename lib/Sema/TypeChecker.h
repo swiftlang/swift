@@ -369,12 +369,37 @@ public:
   Type getSuperClassOf(Type type);
 
   bool isSubtypeOf(Type T1, Type T2, bool &Trivial,
-                   CoercionContext *CC = nullptr);
-  bool isSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr) {
+                   CoercionContext *CC);
+  bool isSubtypeOf(Type T1, Type T2, CoercionContext *CC) {
     bool Trivial = false;
     return isSubtypeOf(T1, T2, Trivial, CC);
   }
   bool isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr);
+
+  /// \brief Determine whether one type is a subtype of another.
+  ///
+  /// \param t1 The first type.
+  /// \param t2 The second type.
+  ///
+  /// \returns true if \c t1 is a subtype of \c t2.
+  bool isSubtypeOf(Type t1, Type t2) {
+    bool isTrivial;
+    return isSubtypeOf(t1, t2, isTrivial);
+  }
+
+  /// \brief Determine whether one type is a subtype of another.
+  ///
+  /// \param t1 The first type.
+  ///
+  /// \param t2 The second type.
+  ///
+  /// \param isTrivial Will indicate whether this is a trivial subtyping
+  /// relationship.
+  ///
+  /// \returns true if \c t1 is a subtype of \c t2.
+  bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
+  
+  bool isSubtypeOfConstraints(Type t1, Type t2, bool &isTrivial);
 
   /// \brief Determine whether T1 and T2 are the same type (structureally)
   /// within the given coercion context, deducing generic arguments if needed.
