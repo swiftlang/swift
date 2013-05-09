@@ -27,16 +27,6 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Convert the object argument to the given type.
-static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
-                                         Type toType) {
-  // FIXME: Disable the constraint-based type checker here, because we are
-  // falling back to the existing type checker.
-  llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts().UseConstraintSolver,
-                                        false);
-  return tc.coerceObjectArgument(expr, toType);
-}
-
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -148,7 +138,9 @@ namespace {
         if (baseIsInstance) {
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
-          base = convertObjectArgumentToType(tc, base, containerTy);
+          base = coerceObjectArgumentToType(
+                   base, containerTy,
+                   locator.withPathElement(ConstraintLocator::MemberRefBase));
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base, MetaTypeType::get(containerTy, context),
@@ -225,7 +217,9 @@ namespace {
         if (baseIsInstance) {
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
-          base = convertObjectArgumentToType(tc, base, baseTy);
+          base = coerceObjectArgumentToType(
+                   base, baseTy,
+                   locator.withPathElement(ConstraintLocator::MemberRefBase));
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base, MetaTypeType::get(baseTy, context),
@@ -258,7 +252,7 @@ namespace {
 
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
-          base = convertObjectArgumentToType(tc, base, containerTy);
+          base = coerceObjectArgumentToType(base, containerTy, nullptr);
 
           auto result
             = new (context) MemberRefExpr(base, dotLoc, var, memberLoc);
@@ -363,6 +357,19 @@ namespace {
     /// \returns the coerced expression, which will have type \c ToType.
     Expr *coerceToType(Expr *expr, Type toType,
                        ConstraintLocatorBuilder locator);
+
+    /// \brief Coerce the given object argument (e.g., for the base of a
+    /// member expression) to the given type.
+    ///
+    /// \param expr The expression to coerce.
+    ///
+    /// \param toType The type to coerce to. This function ignores whether
+    /// the 'to' type is an lvalue type or not, and produces an expression
+    /// with the correct type for use as an lvalue.
+    ///
+    /// \param locator Locator used to describe where in this expression we are.
+    Expr *coerceObjectArgumentToType(Expr *expr, Type toType,
+                                     ConstraintLocatorBuilder locator);
 
   private:
     /// \brief Build a new subscript.
@@ -1699,6 +1706,48 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   llvm_unreachable("Unhandled coercion");
 }
 
+Expr *
+ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
+                                         ConstraintLocatorBuilder locator) {
+  // Map down to the underlying object type. We'll build an lvalue
+  Type containerType = toType->getRValueType();
+
+  // If the container type has reference semantics or is a metatype,
+  // just perform the coercion to that type.
+  if (containerType->hasReferenceSemantics() ||
+      containerType->is<MetaTypeType>()) {
+    return coerceToType(expr, containerType, locator);
+  }
+
+  // Types with value semantics are passed by reference.
+
+  // Form the lvalue type we will be producing.
+  auto &tc = cs.getTypeChecker();
+  Type destType = LValueType::get(containerType,
+                                  LValueType::Qual::DefaultForMemberAccess,
+                                  tc.Context);
+
+  // If our expression already has the right type, we're done.
+  Type fromType = expr->getType();
+  if (fromType->isEqual(destType))
+    return expr;
+
+  // If the source is an lvalue...
+  if (auto fromLValue = fromType->getAs<LValueType>()) {
+    // If the object types are the same, just requalify it.
+    if (fromLValue->getObjectType()->isEqual(containerType))
+      return new (tc.Context) RequalifyExpr(expr, destType);
+
+    // If the object types are different, coerce to the container type.
+    expr = coerceToType(expr, containerType, locator);
+
+    // Fall through to materialize.
+  }
+
+  // If the source is not an lvalue, materialize it.
+  return new (tc.Context) MaterializeExpr(expr, destType);
+}
+
 /// \brief Determine if this literal kind is a string literal.
 static bool isStringLiteralKind(LiteralKind kind) {
   return kind == LiteralKind::UTFString ||
@@ -1901,7 +1950,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     auto origArg = apply->getArg();
     Expr *arg = nullptr;
     if (isa<ThisApplyExpr>(apply))
-      arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
+      arg = coerceObjectArgumentToType(origArg, fnType->getInput(), nullptr);
     else
       arg = coerceToType(origArg, fnType->getInput(),
                          locator.withPathElement(
