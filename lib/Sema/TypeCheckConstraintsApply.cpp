@@ -1593,9 +1593,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another.
     if (fromFunc) {
       bool trivial = false;
-      bool isSubtype = tc.isSubtypeOf(fromType, toType, trivial);
-      (void)isSubtype;
-      assert(isSubtype && "No subtyping relationship between function types?");
+      bool isConvertible = cs.isConvertibleTo(fromType, toType, trivial);
+      (void)isConvertible;
+      assert(isConvertible && "No conversion between function types?");
       return new (tc.Context) FunctionConversionExpr(expr, toType, trivial);
     }
   }
