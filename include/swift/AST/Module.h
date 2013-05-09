@@ -300,7 +300,7 @@ public:
 class LoadedModule : public Module {
   ModuleLoader &Owner;
 
-public:
+protected:
   LoadedModule(DeclContextKind kind, Identifier name, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
     : Module(kind, name, comp, ctx), Owner(owner) {
@@ -308,6 +308,7 @@ public:
     ASTStage = TypeChecked;
   }
 
+public:
   // Inherited from Module.
   void lookupValue(AccessPathTy accessPath, Identifier name, NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result);

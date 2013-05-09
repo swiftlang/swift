@@ -103,12 +103,6 @@ void Serializer::writeBlockInfoBlock() {
 }
 
 void Serializer::writeHeader() {
-  // Swift module file type: 'SMod'.
-  Out.Emit((unsigned)'S', 8);
-  Out.Emit((unsigned)'M', 8);
-  Out.Emit((unsigned)'o', 8);
-  Out.Emit((unsigned)'d', 8);
-
   writeBlockInfoBlock();
 
   {
@@ -162,6 +156,8 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
                                FileBufferIDs inputFiles){
+  os << Signature;
+
   writeHeader();
   writeInputFiles(TU->Ctx.SourceMgr, inputFiles);
   writeTranslationUnit(TU);
