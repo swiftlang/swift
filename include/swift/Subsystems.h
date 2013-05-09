@@ -17,10 +17,13 @@
 #ifndef SWIFT_SUBSYSTEMS_H
 #define SWIFT_SUBSYSTEMS_H
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
+
 namespace llvm {
+  class MemoryBuffer;
   class Module;
   class FunctionPass;
-  class StringRef;
 }
 
 namespace swift {
@@ -52,8 +55,7 @@ namespace swift {
   /// Attempt to parse a StringRef as a code completion context expression.
   /// Returns the parsed expression if successful, or null if an expression
   /// could not be parsed.
-  Expr *parseCompletionContextExpr(TranslationUnit *TU,
-                                   llvm::StringRef expr);
+  Expr *parseCompletionContextExpr(TranslationUnit *TU, StringRef expr);
 
   /// performNameBinding - Once parsing is complete, this walks the AST to
   /// resolve names and do other top-level validation.  StartElem indicates
@@ -84,7 +86,8 @@ namespace swift {
   /// Serializes a translation unit to the given output file.
   ///
   /// This interface is still prone to change!
-  void serialize(const TranslationUnit *TU, const char *outputPath);
+  void serialize(const TranslationUnit *TU, const char *outputPath,
+                 ArrayRef<unsigned> inputFileBufferIDs = {});
 
   /// Turn the given translation unit into either LLVM IR or native code.
   ///

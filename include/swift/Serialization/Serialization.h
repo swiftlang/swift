@@ -42,7 +42,12 @@ enum BlockID {
   /// be validated prior to committing to loading the serialized module.
   ///
   /// \sa ControlRecordType
-  CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID
+  CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
+
+  /// The input block, which contains all the files this module depends on.
+  ///
+  /// \sa InputRecordType
+  INPUT_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -50,6 +55,13 @@ enum BlockID {
 /// \sa CONTROL_BLOCK_ID
 enum ControlRecordType {
   METADATA = 1
+};
+
+/// The record types within the input block.
+///
+/// \sa INPUT_BLOCK_ID
+enum InputRecordType {
+  SOURCE_FILE = 1
 };
 
 } // end namespace serialization
