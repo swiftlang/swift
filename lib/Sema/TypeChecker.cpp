@@ -288,7 +288,7 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
 ///
 /// \param TC The type checker.
 ///
-/// \param ClassDecl The class for which we're checking overrides.
+/// \param CD The class for which we're checking overrides.
 ///
 /// \param Members The set of members for which we are checking overrides.
 static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,

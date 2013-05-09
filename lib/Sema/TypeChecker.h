@@ -639,9 +639,6 @@ public:
   ///
   /// \param OnlyInnermostParams Whether we should only up the innermost
   /// generic parameters. Otherwise, parameters from all levels will be opened.
-  ///
-  /// \returns The type T, with each of the archetypes in \c GenericParams
-  /// substitued for deducible types.
   void openPolymorphicTypes(MutableArrayRef<Type> Types,
                             const GenericParamList &GenericParams,
                             CoercionContext &CC, bool OnlyInnermostParams);

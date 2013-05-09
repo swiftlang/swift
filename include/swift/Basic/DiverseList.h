@@ -30,9 +30,9 @@ template <class T> class DiverseListImpl;
 
 /// DiverseList - A list of heterogenously-typed objects.
 ///
-/// \param T - A common base class of the objects in the list; must
+/// \tparam T - A common base class of the objects in the list; must
 ///   provide an allocated_size() const method.
-/// \param InlineCapacity - the amount of inline storage to provide, in bytes
+/// \tparam InlineCapacity - the amount of inline storage to provide, in bytes
 template <class T, unsigned InlineCapacity>
 class DiverseList : public DiverseListImpl<T> {
   char InlineStorage[InlineCapacity];

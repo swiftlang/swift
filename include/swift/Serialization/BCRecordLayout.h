@@ -93,7 +93,7 @@ public:
   template<typename T>
   static void assertValid(const T &data) {
     assert(data >= 0 && "cannot encode signed integers");
-    assert(llvm::isUIntN(Width, data) &&
+    assert(llvm::isUInt<Width>(data) &&
            "data value does not fit in the given bit width");
   }
 };

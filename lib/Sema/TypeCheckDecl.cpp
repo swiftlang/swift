@@ -737,7 +737,7 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 
 /// \brief Create an implicit struct constructor.
 ///
-/// \param SD The struct for which a constructor will be created.
+/// \param structDecl The struct for which a constructor will be created.
 /// \param ICK The kind of implicit constructor to create.
 ///
 /// \returns The newly-created constructor, which has already been type-checked

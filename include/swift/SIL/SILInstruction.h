@@ -514,7 +514,7 @@ class LoadInst
 public:
   /// Constructs a LoadInst.
   ///
-  /// \param Expr The backing LoadExpr in the AST.
+  /// \param Loc The location of the expression that caused the load.
   ///
   /// \param LValue The SILValue representing the lvalue (address) to
   ///        use for the load.

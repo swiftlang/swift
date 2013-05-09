@@ -178,7 +178,7 @@ public:
 
   /// \brief Pretty-print the given declaration.
   ///
-  /// \param os Output stream to which the declaration will be printed.
+  /// \param OS Output stream to which the declaration will be printed.
   void print(raw_ostream &OS) const;
 
   /// \brief Pretty-print the given declaration.
