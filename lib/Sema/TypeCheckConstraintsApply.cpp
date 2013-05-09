@@ -38,7 +38,10 @@ STATISTIC(NumCoercions, "# of coercions");
 /// \brief Convert the object argument to the given type.
 static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
                                          Type toType) {
-  // FIXME: Temporary hack that uses the existing coercion logic.
+  // FIXME: Disable the constraint-based type checker here, because we are
+  // falling back to the existing type checker.
+  llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts().UseConstraintSolver,
+                                        false);
   return tc.coerceObjectArgument(expr, toType);
 }
 
@@ -1154,10 +1157,19 @@ namespace {
     }
 
     Expr *visitIfExpr(IfExpr *expr) {
-      Expr *condExpr = expr->getCondExpr();
-      if (cs.getTypeChecker().typeCheckCondition(condExpr))
-        return nullptr;
-      expr->setCondExpr(condExpr);
+      {
+        // FIXME: Disable the constraint-based type checker here, because we are
+        // falling back to the existing type checker.
+        auto &tc = cs.getTypeChecker();
+        llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts()
+                                                .UseConstraintSolver,
+                                              false);
+
+        Expr *condExpr = expr->getCondExpr();
+        if (tc.typeCheckCondition(condExpr))
+          return nullptr;
+        expr->setCondExpr(condExpr);
+      }
 
       auto resultTy = simplifyType(expr->getType());
       expr->setType(resultTy);
@@ -1717,7 +1729,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
     return expr;
   }
 
-  // FIXME: Temporary hack that uses the existing coercion logic.
+  // FIXME: Disable the constraint-based type checker here, because we are
+  // falling back to the existing type checker.
+  llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts().UseConstraintSolver,
+                                        false);
   ++NumMissedCoercions;
   return tc.coerceToType(origExpr, toType,
                          isAssignment? CoercionKind::Assignment
@@ -2048,11 +2063,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     virtual bool walkToDeclPre(Decl *decl) { return false; }
   };
 
-  // FIXME: Disable the constraint-based type checker here, because we depend
-  // heavily on the existing type checker.
-  llvm::SaveAndRestore<bool> savedUseCS(getTypeChecker().getLangOpts()
-                                          .UseConstraintSolver,
-                                        false);
   ExprRewriter rewriter(*this, solution);
   ExprWalker walker(rewriter);
   return expr->walk(walker);
