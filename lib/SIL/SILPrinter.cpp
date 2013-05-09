@@ -103,11 +103,22 @@ void SILType::print(raw_ostream &OS) const {
   }
   CanType swiftTy = getSwiftRValueType();
 
-  if (isa<AnyFunctionType>(swiftTy)) {
-    // Print function attributes relevant to SIL.
+  // Print function types with their mangled SIL arguments and returns.
+  if (auto *fTy = getAs<AnyFunctionType>()) {
     auto info = getFunctionTypeInfo();
+
+    // Print function attributes relevant to SIL.
+    unsigned attrCount = 0;
+    auto nextAttr = [&]{
+      if (attrCount++ == 0)
+        OS << '[';
+      else
+        OS << ", ";
+    };
+    
     if (info->getAbstractCC() != AbstractCC::Freestanding) {
-      OS << "[sil_cc=";
+      nextAttr();
+      OS << "sil_cc=";
       switch (info->getAbstractCC()) {
       case AbstractCC::C:
         OS << "c";
@@ -119,22 +130,47 @@ void SILType::print(raw_ostream &OS) const {
         OS << "freestanding";
         break;
       }
-      OS << "] ";
+      
     }
+    if (fTy->isThin()) {
+      nextAttr();
+      OS << "thin";
+    }
+    
+    if (attrCount != 0)
+      OS << "] ";
+
+    AnyFunctionType *levelTy = fTy;
+    for (unsigned level = 0; level <= getUncurryLevel(); ++level) {
+      if (auto *polyTy = levelTy->getAs<PolymorphicFunctionType>()) {
+        polyTy->printGenericParams(OS);
+      }
+      OS << "(";
+      auto inputsForLevel = info->getInputTypesForCurryLevel(level);
+      interleave(inputsForLevel.begin(), inputsForLevel.end(),
+                 [&](SILType t) {
+                   t.print(OS);
+                 },
+                 [&] {
+                   OS << ", ";
+                 });
+      OS << ")";
+      if (level < getUncurryLevel())
+        levelTy = levelTy->getResult()->castTo<AnyFunctionType>();
+    }
+    
+    if (info->hasIndirectReturn()) {
+      OS << "([sret] ";
+      info->getIndirectReturnType().print(OS);
+      OS << ")";
+    }
+    
+    OS << " -> ";
+    info->getResultType().print(OS);
+    return;
   }
-  
-  unsigned uncurries = getUncurryLevel();
-  while (uncurries-- > 0) {
-    AnyFunctionType *fTy = cast<AnyFunctionType>(swiftTy);
-    if (auto *pfTy = dyn_cast<PolymorphicFunctionType>(fTy))
-      pfTy->printGenericParams(OS);
-    bool hasParens = fTy->getInput()->is<TupleType>()
-                  || fTy->getInput()->is<ParenType>();
-    if (!hasParens) OS << '(';
-    fTy->getInput()->print(OS);
-    if (!hasParens) OS << ')';
-    swiftTy = CanType(fTy->getResult());
-  }
+
+  // Print other types as their Swift representation.
   swiftTy->print(OS);
 }
 

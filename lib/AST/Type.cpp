@@ -1421,9 +1421,6 @@ void FunctionType::print(raw_ostream &OS) const {
 }
 
 void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
-  if (isThin())
-    OS << "[thin] ";
-  
   OS << '<';
   auto params = getGenericParams().getParams();
   for (unsigned i = 0, e = params.size(); i != e; ++i) {
@@ -1440,6 +1437,9 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
 }
 
 void PolymorphicFunctionType::print(raw_ostream &OS) const {
+  if (isThin())
+    OS << "[thin] ";
+    
   printGenericParams(OS);
   OS << ' ' << getInput() << " -> " << getResult();
 }
