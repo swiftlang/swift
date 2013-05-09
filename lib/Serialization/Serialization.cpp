@@ -146,7 +146,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
                                FileBufferIDs inputFiles){
-  os << Signature;
+  os << SIGNATURE;
 
   writeHeader();
   writeInputFiles(TU->Ctx.SourceMgr, inputFiles);

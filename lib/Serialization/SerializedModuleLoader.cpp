@@ -104,8 +104,7 @@ Module *SerializedModuleLoader::loadModule(
   }
 
   assert(inputFile);
-  if (inputFile->getBufferSize() < 4 ||
-      !inputFile->getBuffer().startswith(serialization::Signature)) {
+  if (!inputFile->getBuffer().startswith(serialization::SIGNATURE)) {
     // FIXME: Diagnose malformed module? Right now we silently skip it and
     // continue searching.
     return nullptr;

@@ -25,7 +25,7 @@ namespace swift {
 namespace serialization {
 
 /// Magic number for serialized module files.
-const char Signature[] = "SMod";
+const char SIGNATURE[] = "\xE2\x9C\xA8\x0E";
 
 /// Serialized module format major version number.
 ///
