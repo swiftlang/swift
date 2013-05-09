@@ -109,7 +109,7 @@ void Serializer::writeHeader() {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
 
     BCRecordLayout<
-      BCLiteral<METADATA>, // ID
+      METADATA, // ID
       BCFixed<16>, // Module format major version
       BCFixed<16>, // Module format minor version
       BCBlob // misc. version information
@@ -122,7 +122,7 @@ void Serializer::writeHeader() {
 # define EXTRA_VERSION_STRING PACKAGE_STRING
 #endif
     Metadata.emit(ScratchRecord,
-                  METADATA, VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
+                  VERSION_MAJOR, VERSION_MINOR, EXTRA_VERSION_STRING);
 #undef EXTRA_VERSION_STRING
   }
 }
@@ -132,7 +132,7 @@ void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
 
   BCRecordLayout<
-    BCLiteral<SOURCE_FILE>, // ID
+    SOURCE_FILE,
     BCBlob // path
   > SourceFile(Out);
 
@@ -146,7 +146,7 @@ void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
     if (err)
       continue;
     
-    SourceFile.emit(ScratchRecord, SOURCE_FILE, path);
+    SourceFile.emit(ScratchRecord, path);
   }
 }
 

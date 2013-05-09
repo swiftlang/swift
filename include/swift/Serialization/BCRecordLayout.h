@@ -17,15 +17,14 @@
 ///
 /// \code
 ///     using Metadata = BCRecordLayout<
-///       BCLiteral<METADATA_ID>, // ID
+///       METADATA_ID, // ID
 ///       BCFixed<16>, // Module format major version
 ///       BCFixed<16>, // Module format minor version
 ///       BCBlob // misc. version information
 ///     >;
 ///     unsigned MetadataAbbrevCode = Metadata::emitAbbrev(Out);
 ///     Metadata::emitRecord(Out, ScratchRecord, MetadataAbbrevCode,
-///                          METADATA_ID, VERSION_MAJOR, VERSION_MINOR,
-///                          extraData);
+///                          VERSION_MAJOR, VERSION_MINOR, extraData);
 /// \endcode
 ///
 /// For details on the bitcode format, see
@@ -259,7 +258,7 @@ namespace impl {
 ///
 /// This class template is meant to be instantiated and then given a name,
 /// so that from then on that name can be used 
-template<typename... Fields>
+template<unsigned RecordCode, typename... Fields>
 class BCRecordLayout {
   llvm::BitstreamWriter &Out;
   unsigned AbbrevCode;
@@ -284,7 +283,7 @@ public:
   /// \returns The abbreviation code for the newly-registered record type.
   static unsigned emitAbbrev(llvm::BitstreamWriter &out) {
     auto *abbrev = new llvm::BitCodeAbbrev();
-    impl::emitOps<Fields...>(*abbrev);
+    impl::emitOps<BCLiteral<RecordCode>, Fields...>(*abbrev);
     return out.EmitAbbrev(abbrev);
   }
 
@@ -296,7 +295,12 @@ public:
   template <typename BufferTy, typename... Data>
   static void emitRecord(llvm::BitstreamWriter &out, BufferTy &buffer,
                          unsigned abbrCode, Data... data) {
+    static_assert(sizeof...(data) <= sizeof...(Fields),
+                  "Too many record elements");
+    static_assert(sizeof...(data) >= sizeof...(Fields),
+                  "Too few record elements");
     buffer.clear();
+    buffer.push_back(RecordCode);
     impl::BCRecordWriter<Fields...>::emit(out, buffer, abbrCode, data...);
   }
 };
