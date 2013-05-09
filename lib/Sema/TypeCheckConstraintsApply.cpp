@@ -146,7 +146,7 @@ namespace {
           base = coerceToType(base, MetaTypeType::get(containerTy, context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
-          base = tc.convertToRValue(base);
+          base = coerceToRvalue(base);
         }
         assert(base && "Unable to convert base?");
 
@@ -225,7 +225,7 @@ namespace {
           base = coerceToType(base, MetaTypeType::get(baseTy, context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
-          base = tc.convertToRValue(base);
+          base = coerceToRvalue(base);
         }
         assert(base && "Unable to convert base?");
 
@@ -370,6 +370,9 @@ namespace {
     /// \param locator Locator used to describe where in this expression we are.
     Expr *coerceObjectArgumentToType(Expr *expr, Type toType,
                                      ConstraintLocatorBuilder locator);
+
+    /// \brief Coerce the given expression to an rvalue.
+    Expr *coerceToRvalue(Expr *expr);
 
   private:
     /// \brief Build a new subscript.
@@ -1098,7 +1101,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       if (Expr *base = expr->getBase()) {
-        base = tc.convertToRValue(base);
+        base = coerceToRvalue(base);
         if (!base) return nullptr;
         expr->setBase(base);
         expr->setType(MetaTypeType::get(base->getType(), tc.Context));
@@ -1748,6 +1751,17 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   return new (tc.Context) MaterializeExpr(expr, destType);
 }
 
+Expr *ExprRewriter::coerceToRvalue(Expr *expr) {
+  // If we already have an rvalue, we're done.
+  auto lvalueTy = expr->getType()->getAs<LValueType>();
+  if (!lvalueTy)
+    return expr;
+
+  // Load the lvalue.
+  auto &tc = cs.getTypeChecker();
+  return new (tc.Context) LoadExpr(expr, lvalueTy->getObjectType());
+}
+
 /// \brief Determine if this literal kind is a string literal.
 static bool isStringLiteralKind(LiteralKind kind) {
   return kind == LiteralKind::UTFString ||
@@ -1935,7 +1949,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // The function is always an rvalue.
   // FIXME: Bring convertToRvalue into the application step.
-  auto fn = tc.convertToRValue(apply->getFn());
+  auto fn = coerceToRvalue(apply->getFn());
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;
