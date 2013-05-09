@@ -298,6 +298,10 @@ private:
   /// \brief The 'DictionaryLiteralConvertible' protocol, used by []
   /// dictionary literals.
   ProtocolDecl *DictionaryLiteralProto = nullptr;
+
+  /// \brief The 'StringInterpolationConvertible' protocol, used by
+  /// string interpolation.
+  ProtocolDecl *StringInterpolationConvertibleProto = nullptr;
   
   Type IntLiteralType;
   Type FloatLiteralType;
@@ -851,6 +855,10 @@ public:
   /// declaration, if it exists.
   ProtocolDecl *getDictionaryLiteralProtocol();
 
+  /// \brief Retrieve the StringInterpolationConvertible protocol declaration,
+  /// if it exists.
+  ProtocolDecl *getStringInterpolationConvertibleProtocol();
+  
   /// \name AST Mutation Listener Implementation
   /// @{
   void handleExternalDecl(Decl *decl);

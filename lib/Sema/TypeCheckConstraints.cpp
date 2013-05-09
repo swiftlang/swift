@@ -1679,7 +1679,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   // For a subtyping relation involving two existential types, or a conversion
-  // from any type, check whether the first type conforms to each of
+  // from any type, check whether the first type conforms to each of the
+  // protocols in the second type.
   if (concrete &&
       (kind >= TypeMatchKind::Conversion ||
        (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {

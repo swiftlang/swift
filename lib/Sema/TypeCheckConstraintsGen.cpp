@@ -178,9 +178,27 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
+      // Dig out the StringInterpolationConvertible protocol.
+      auto &tc = CS.getTypeChecker();
+      auto interpolationProto = tc.getStringInterpolationConvertibleProtocol();
+      if (!interpolationProto) {
+        tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
+        return nullptr;
+      }
+
+      // The type of the expression must conform to the
+      // StringInterpolationConvertible protocol.
       auto tv = CS.createTypeVariable(expr);
+      CS.addConstraint(ConstraintKind::Conversion, tv,
+                       interpolationProto->getDeclaredType());
+
+      // The interpolated string type must also be a string literal type.
+      // FIXME: This could come from the protocol definition itself.
       CS.addLiteralConstraint(tv, LiteralKind::UTFString,
                               CS.getConstraintLocator(expr, { }));
+
+      // Each of the segments needs to be convertible to a constructor argument
+      // for the underlying string type.
       unsigned index = 0;
       for (auto segment : expr->getSegments()) {
         CS.addConstraint(ConstraintKind::Construction, segment->getType(), tv,

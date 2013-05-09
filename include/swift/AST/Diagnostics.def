@@ -1123,6 +1123,13 @@ ERROR(string_interpolation_convert_fail,sema_tce,none,
       "could not coerce expression %0 to string type %1", (Type, Type))
 ERROR(nonstring_interpolation_type,sema_tce,none,
       "string interpolation coerced to non-string type %0", (Type))
+ERROR(interpolation_missing_proto,sema_tce,none,
+      "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
+      ())
+ERROR(interpolation_broken_proto,sema_tce,none,
+      "protocol 'StringInterpolationConvertible' is broken",
+      ())
+
 
 // Array literals
 ERROR(array_expr_missing_proto,sema_tce,none,

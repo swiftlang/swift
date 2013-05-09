@@ -524,11 +524,89 @@ namespace {
 
     Expr *
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
-      // FIXME: The existing literal coercion code should move here.
-      auto type = simplifyType(expr->getType());
-      expr->setType(UnstructuredUnresolvedType::get(cs.getASTContext()));
-      return coerceToType(expr, type, /*isAssignment=*/false,
-                          cs.getConstraintLocator(expr, { }));
+      // Figure out the string type we're converting to.
+      auto openedType = expr->getType();
+      auto type = simplifyType(openedType);
+      expr->setType(type);
+
+      // Find the string interpolation protocol we need.
+      auto &tc = cs.getTypeChecker();
+      auto interpolationProto = tc.getStringInterpolationConvertibleProtocol();
+      assert(interpolationProto && "Missing string interpolation protocol?");
+
+      // Find the 'convertFromStringInterpolation' requirement.
+      FuncDecl *requirement = nullptr;
+      for (auto member : interpolationProto->getMembers()) {
+        auto fd = dyn_cast<FuncDecl>(member);
+        if (!fd || fd->getName().empty())
+          continue;
+
+        if (fd->getName().str() == "convertFromStringInterpolation") {
+          requirement = fd;
+          break;
+        }
+      }
+      if (!requirement) {
+        tc.diagnose(interpolationProto->getLoc(),
+                    diag::interpolation_broken_proto);
+        return nullptr;
+      }
+
+      // Find the member used to satisfy the 'convertFromStringInterpolation'
+      // requirement.
+      ProtocolConformance *conformance = 0;
+      bool conforms = tc.conformsToProtocol(type, interpolationProto,
+                                            &conformance);
+      (void)conforms;
+      assert(conforms && conformance && "Interpolation conformance broken?");
+      assert(conformance->Mapping.count(requirement) && "Missing conformance");
+      auto member = conformance->Mapping[requirement];
+
+      // Build a reference to the convertFromStringInterpolation member.
+      // FIXME: Dubious source location information.
+      auto typeRef = new (tc.Context) MetatypeExpr(
+                                        nullptr, expr->getStartLoc(),
+                                        MetaTypeType::get(type, tc.Context));
+      // FIXME: The openedType is wrong for generic string types.
+      Expr *memberRef = buildMemberRef(typeRef, expr->getStartLoc(), member,
+                                       expr->getStartLoc(),
+                                       member->getTypeOfReference(),
+                                       cs.getConstraintLocator(expr, { }));
+
+      // Create a tuple containing all of the coerced segments.
+      SmallVector<Expr *, 4> segments;
+      unsigned index = 0;
+      ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr,
+                                                                      { }));
+      for (auto segment : expr->getSegments()) {
+        segment = coerceToType(segment, type, /*isAssignment=*/false,
+                               locatorBuilder.withPathElement(
+                                 LocatorPathElt::getInterpolationArgument(
+                                   index++)));
+        if (!segment)
+          return nullptr;
+
+        segments.push_back(segment);
+      }
+
+      Expr *argument = nullptr;
+      if (segments.size() == 1)
+        argument = segments.front();
+      else {
+        SmallVector<TupleTypeElt, 4> tupleElements(segments.size(),
+                                                   TupleTypeElt(type));
+        argument = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                              tc.Context.AllocateCopy(segments),
+                                              nullptr,
+                                              expr->getStartLoc(),
+                                              TupleType::get(tupleElements,
+                                                             tc.Context));
+      }
+
+      // Call the convertFromStringInterpolation member with the arguments.
+      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument);
+      expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
+      return expr;
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -1573,34 +1651,65 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
   }
 
   // Check for user-defined conversions.
-  if (fromType->getNominalOrBoundGenericNominal()) {
+  if (fromType->getNominalOrBoundGenericNominal() ||
+      toType->getNominalOrBoundGenericNominal()) {
     // Determine the locator that corresponds to the conversion member.
     auto storedLocator
       = cs.getConstraintLocator(
           locator.withPathElement(ConstraintLocator::ConversionMember));
     auto knownOverload = solution.overloadChoices.find(storedLocator);
-    assert(knownOverload != solution.overloadChoices.end());
-    auto selected = knownOverload->second;
-    
-    // FIXME: Location information is suspect throughout.
-    // Form a reference to the conversion member.
-    auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
-                                    selected.first.getDecl(),
-                                    expr->getEndLoc(),
-                                    selected.second,
-                                    locator);
+    if (knownOverload != solution.overloadChoices.end()) {
+      auto selected = knownOverload->second;
+      
+      // FIXME: Location information is suspect throughout.
+      // Form a reference to the conversion member.
+      auto memberRef = buildMemberRef(expr, expr->getStartLoc(),
+                                      selected.first.getDecl(),
+                                      expr->getEndLoc(),
+                                      selected.second,
+                                      locator);
 
-    // Form an empty tuple.
-    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
-                                            nullptr, expr->getEndLoc(),
-                                            TupleType::getEmpty(tc.Context));
+      // Form an empty tuple.
+      Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
+                                              nullptr, expr->getEndLoc(),
+                                              TupleType::getEmpty(tc.Context));
 
-    // Call the conversion function with an empty tuple.
-    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
-    auto openedType = selected.second->castTo<FunctionType>()->getResult();
-    expr = finishApply(apply, openedType,
-                       ConstraintLocatorBuilder(
-                         cs.getConstraintLocator(expr, { })));
+      // Call the conversion function with an empty tuple.
+      ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args);
+      auto openedType = selected.second->castTo<FunctionType>()->getResult();
+      expr = finishApply(apply, openedType,
+                         ConstraintLocatorBuilder(
+                           cs.getConstraintLocator(expr, { })));
+    } else {
+      // If there was no conversion member, look for a constructor member.
+      // This is only used for handling interpolated string literals, where
+      // we allow construction or conversion.
+      storedLocator
+        = cs.getConstraintLocator(
+            locator.withPathElement(ConstraintLocator::ConstructorMember));
+      knownOverload = solution.overloadChoices.find(storedLocator);
+      assert(knownOverload != solution.overloadChoices.end());
+
+      auto selected = knownOverload->second;
+
+      // FIXME: Location information is suspect throughout.
+      // Form a reference to the constructor.
+      
+      // Form a reference to the constructor or oneof declaration.
+      Expr *typeBase = new (tc.Context) MetatypeExpr(
+                                          nullptr,
+                                          expr->getStartLoc(),
+                                          MetaTypeType::get(toType,tc.Context));
+      Expr *declRef = buildMemberRef(typeBase, expr->getStartLoc(),
+                                     selected.first.getDecl(),
+                                     expr->getStartLoc(),
+                                     selected.second,
+                                     storedLocator);
+
+      // FIXME: Lack of openedType here is an issue.
+      ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr);
+      expr = finishApply(apply, toType, locator);
+    }
   }
 
   // If we succeeded, use the coerced result.

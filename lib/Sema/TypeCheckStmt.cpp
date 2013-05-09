@@ -919,3 +919,15 @@ ProtocolDecl *TypeChecker::getDictionaryLiteralProtocol() {
   
   return DictionaryLiteralProto;
 }
+
+ProtocolDecl *TypeChecker::getStringInterpolationConvertibleProtocol() {
+  if (!StringInterpolationConvertibleProto) {
+    UnqualifiedLookup Globals(
+                        Context.getIdentifier("StringInterpolationConvertible"),
+                        &TU);
+    StringInterpolationConvertibleProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+
+  return StringInterpolationConvertibleProto;
+}
