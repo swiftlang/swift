@@ -22,18 +22,10 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace constraints;
-
-//===--------------------------------------------------------------------===//
-// Constraint application statistics
-//===--------------------------------------------------------------------===//
-#define DEBUG_TYPE "Constraint application"
-STATISTIC(NumMissedCoercions, "# of coercions not handled directly");
-STATISTIC(NumCoercions, "# of coercions");
 
 /// \brief Convert the object argument to the given type.
 static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
@@ -1519,12 +1511,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
   if (fromType->isEqual(toType))
     return expr;
 
-  ++NumCoercions;
-
-  // Save the original expression. If we fail to fully coerce the type,
-  // fall back to the original.
-  Expr *origExpr = expr;
-
   // Coercions to tuple type.
   if (auto toTuple = toType->getAs<TupleType>()) {
     // Coerce from a tuple to a tuple.
@@ -1559,12 +1545,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
     }
 
-    // If we succeeded, use the coerced result.
-    if (expr->getType()->isEqual(toType)) {
-      return expr;
-    }
-
-    fromType = expr->getType();
+    // Coerce the result.
+    return coerceToType(expr, toType, /*isAssignment=*/false, locator);
   }
 
   // Coercion from a subclass to a superclass.
@@ -1626,7 +1608,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
                                             toFunc->getResult(),
                                             tc.Context);
-      expr = coerceToType(tc, expr, toNonBlockTy);
+      expr = coerceToType(expr, toNonBlockTy, /*isAssignment=*/false,
+                          locator);
 
       // Bridge to the block form of this function type.
       return new (tc.Context) BridgeToBlockExpr(expr, toType);
@@ -1674,7 +1657,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
     // existential of some related kind?
   }
 
-  // Check for user-defined conversions.
+  // Coerce via conversion function or constructor.
   if (fromType->getNominalOrBoundGenericNominal() ||
       toType->getNominalOrBoundGenericNominal()) {
     // Determine the locator that corresponds to the conversion member.
@@ -1734,21 +1717,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr);
       expr = finishApply(apply, toType, locator);
     }
+
+    return coerceToType(expr, toType, /*isAssignment=*/false, locator);
   }
 
-  // If we succeeded, use the coerced result.
-  if (expr->getType()->isEqual(toType)) {
-    return expr;
+  // Coercion from one metatype to another.
+  if (fromType->is<MetaTypeType>()) {
+    if (auto toMeta = toType->getAs<MetaTypeType>()) {
+      return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
+    }
   }
 
-  // FIXME: Disable the constraint-based type checker here, because we are
-  // falling back to the existing type checker.
-  llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts().UseConstraintSolver,
-                                        false);
-  ++NumMissedCoercions;
-  return tc.coerceToType(origExpr, toType,
-                         isAssignment? CoercionKind::Assignment
-                                     : CoercionKind::Normal);
+  llvm_unreachable("Unhandled coercion");
 }
 
 /// \brief Determine if this literal kind is a string literal.
