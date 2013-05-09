@@ -28,6 +28,7 @@ Type Lowering::getThinFunctionType(Type t) {
   if (auto *ft = t->getAs<FunctionType>()) {
     return FunctionType::get(ft->getInput(), ft->getResult(),
                              ft->isAutoClosure(),
+                             ft->isBlock(),
                              /*isThin*/ true,
                              ft->getASTContext());
   } else if (auto *pft = t->getAs<PolymorphicFunctionType>()) {
@@ -45,6 +46,7 @@ Type Lowering::getThickFunctionType(Type t) {
     return FunctionType::get(fTy->getInput(),
                              fTy->getResult(),
                              fTy->isAutoClosure(),
+                             fTy->isBlock(),
                              /*isThin*/ false,
                              fTy->getASTContext());
   } else if (auto *pfTy = t->getAs<PolymorphicFunctionType>()) {

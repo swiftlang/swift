@@ -707,6 +707,7 @@ CanType TypeBase::getCanonicalType() {
     Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out,
                                FT->isAutoClosure(),
+                               FT->isBlock(),
                                FT->isThin(),
                                In->getASTContext());
     break;
@@ -927,6 +928,8 @@ bool TypeBase::isSpelledLike(Type other) {
     auto fMe = cast<FunctionType>(me);
     auto fThem = cast<FunctionType>(them);
     if (fMe->isAutoClosure() != fThem->isAutoClosure())
+      return false;
+    if (fMe->isBlock() != fThem->isBlock())
       return false;
     if (fMe->isThin() != fThem->isThin())
       return false;
@@ -1219,6 +1222,12 @@ bool AnyFunctionType::isAutoClosure() const {
   return false;
 }
 
+bool AnyFunctionType::isBlock() const {
+  if (auto *ft = dyn_cast<FunctionType>(this))
+    return ft->isBlock();
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -1400,6 +1409,8 @@ void FunctionType::print(raw_ostream &OS) const {
   
   if (isAutoClosure())
     printAttr("auto_closure");
+  if (isBlock())
+    printAttr("objc_block");
   if (isThin())
     printAttr("thin");
   

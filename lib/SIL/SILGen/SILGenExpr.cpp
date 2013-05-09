@@ -692,6 +692,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
   Type outerMethodTy = FunctionType::get(thisValue.getType().getSwiftType(),
                                          innerMethodTy,
                                          /*isAutoClosure*/ false,
+                                         /*isBlock*/ false,
                                          /*isThin*/ true,
                                          F.getContext());
 
@@ -1766,6 +1767,20 @@ RValue SILGenFunction::visitArchetypeSubscriptExpr(
 RValue SILGenFunction::visitExistentialSubscriptExpr(
                                    ExistentialSubscriptExpr *E, SGFContext C) {
   llvm_unreachable("not implemented");
+}
+
+RValue SILGenFunction::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
+                                              SGFContext C) {
+  SILValue func = visit(E->getSubExpr()).forwardAsSingleValue(*this);
+  // Thicken thin function value if necessary.
+  // FIXME: This should go away when Swift typechecking learns how to handle
+  // thin functions.
+  func = emitGeneralizedValue(E, func);
+  
+  // Emit the bridge_to_block instruction.
+  SILValue block = B.createBridgeToBlock(E, func,
+                                         getLoweredLoadableType(E->getType()));
+  return RValue(*this, emitManagedRValueWithCleanup(block));
 }
 
 RValue SILGenFunction::visitIfExpr(IfExpr *E, SGFContext C) {

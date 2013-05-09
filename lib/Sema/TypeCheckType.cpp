@@ -777,6 +777,7 @@ Type TypeChecker::transformType(Type type,
       auto fn = cast<FunctionType>(base);
       return FunctionType::get(InputTy, ResultTy,
                                fn->isAutoClosure(),
+                               fn->isBlock(),
                                fn->isThin(),
                                Context);
     }

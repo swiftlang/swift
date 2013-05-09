@@ -1311,4 +1311,9 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "auto_closure");
     VD->getMutableAttrs().AutoClosure = false;
   }
+
+  if (Attrs.isObjCBlock()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
+    VD->getMutableAttrs().ObjCBlock = false;
+  }
 }

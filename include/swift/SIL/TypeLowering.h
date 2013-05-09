@@ -181,6 +181,7 @@ public:
     auto t = FunctionType::get(TupleType::getEmpty(Context),
                                TupleType::getEmpty(Context),
                                /*isAutoClosure=*/ false,
+                               /*isBlock=*/ false,
                                /*isThin=*/ true,
                                Context);
 

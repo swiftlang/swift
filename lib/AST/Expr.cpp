@@ -739,6 +739,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitBridgeToBlockExpr(BridgeToBlockExpr *E) {
+    printCommon(E, "bridge_to_block") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitAddressOfExpr(AddressOfExpr *E) {
     printCommon(E, "address_of_expr") << '\n';

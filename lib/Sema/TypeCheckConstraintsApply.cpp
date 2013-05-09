@@ -1619,8 +1619,20 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       return ice;
     }
 
-    // Coercion from one function type to another.
+    // Coercion to a block function type from non-block function type.
     auto fromFunc = fromType->getAs<FunctionType>();
+    if (toFunc->isBlock() && (!fromFunc || !fromFunc->isBlock())) {
+      // Coerce the expression to the non-block form of the function type.
+      auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
+                                            toFunc->getResult(),
+                                            tc.Context);
+      expr = coerceToType(tc, expr, toNonBlockTy);
+
+      // Bridge to the block form of this function type.
+      return new (tc.Context) BridgeToBlockExpr(expr, toType);
+    }
+
+    // Coercion from one function type to another.
     if (fromFunc) {
       bool trivial = false;
       bool isSubtype = tc.isSubtypeOf(fromType, toType, trivial);
