@@ -37,25 +37,6 @@ static Expr *convertObjectArgumentToType(TypeChecker &tc, Expr *expr,
   return tc.coerceObjectArgument(expr, toType);
 }
 
-/// \brief Determine whether the given expression refers to an assignment
-/// function.
-static bool isAssignmentFn(Expr *expr) {
-  expr = expr->getSemanticsProvidingExpr();
-  if (auto spec = dyn_cast<SpecializeExpr>(expr))
-    expr = spec->getSubExpr()->getSemanticsProvidingExpr();
-  if (auto dre = dyn_cast<DeclRefExpr>(expr))
-    return dre->getDecl()->getAttrs().isAssignment();
-  if (auto dotCall = dyn_cast<DotSyntaxCallExpr>(expr))
-    return isAssignmentFn(dotCall->getFn());
-  if (auto emr = dyn_cast<ExistentialMemberRefExpr>(expr))
-    return emr->getDecl()->getAttrs().isAssignment();
-  if (auto amr = dyn_cast<ArchetypeMemberRefExpr>(expr))
-    return amr->getDecl()->getAttrs().isAssignment();
-  if (auto gmr = dyn_cast<GenericMemberRefExpr>(expr))
-    return gmr->getDecl()->getAttrs().isAssignment();
-  return false;
-}
-
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -171,7 +152,6 @@ namespace {
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base, MetaTypeType::get(containerTy, context),
-                              /*isAssignment=*/false,
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
           base = tc.convertToRValue(base);
@@ -249,7 +229,6 @@ namespace {
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
           base = coerceToType(base, MetaTypeType::get(baseTy, context),
-                              /*isAssignment=*/false,
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
           base = tc.convertToRValue(base);
@@ -379,14 +358,10 @@ namespace {
     ///
     /// \param expr The expression to coerce.
     /// \param toType The type to coerce the expression to.
-    ///
-    /// \param isAssignment FIXME: Whether this is an assignment,
-    /// which is only needed by the "old" type checker fallback.
-    ///
     /// \param locator Locator used to describe where in this expression we are.
     ///
     /// \returns the coerced expression, which will have type \c ToType.
-    Expr *coerceToType(Expr *expr, Type toType, bool isAssignment,
+    Expr *coerceToType(Expr *expr, Type toType,
                        ConstraintLocatorBuilder locator);
 
   private:
@@ -574,7 +549,7 @@ namespace {
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr,
                                                                       { }));
       for (auto segment : expr->getSegments()) {
-        segment = coerceToType(segment, type, /*isAssignment=*/false,
+        segment = coerceToType(segment, type,
                                locatorBuilder.withPathElement(
                                  LocatorPathElt::getInterpolationArgument(
                                    index++)));
@@ -1048,7 +1023,6 @@ namespace {
       // closure.
       auto resultType = type->getResult();
       if (Expr *body = coerceToType(expr->getBody(), resultType,
-                                    /*isAssignment=*/false,
                                     cs.getConstraintLocator(
                                       expr,
                                       ConstraintLocator::ClosureResult)))
@@ -1167,13 +1141,11 @@ namespace {
       expr->setType(resultTy);
 
       expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
-                                     /*isAssignment=*/false,
                                      ConstraintLocatorBuilder(
                                        cs.getConstraintLocator(expr, { }))
                                      .withPathElement(
                                        ConstraintLocator::IfThen)));
       expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
-                                     /*isAssignment=*/false,
                                      ConstraintLocatorBuilder(
                                        cs.getConstraintLocator(expr, { }))
                                      .withPathElement(
@@ -1196,7 +1168,6 @@ namespace {
     Expr *visitCoerceExpr(CoerceExpr *expr) {
       expr->setType(simplifyType(expr->getType()));
       Expr *subExpr = coerceToType(expr->getSubExpr(), expr->getType(),
-                                   /*isAssignment=*/false,
                                    cs.getConstraintLocator(expr, { }));
       expr->setSubExpr(subExpr);
       return expr;
@@ -1325,7 +1296,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // Actually convert the source element.
     auto convertedElt
       = coerceToType(fromTupleExpr->getElement(sources[i]), toEltType,
-                     /*isAssignment=*/false,
                      locator.withPathElement(
                        LocatorPathElt::getTupleElement(sources[i])));
     if (!convertedElt)
@@ -1373,7 +1343,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       auto convertedElt = coerceToType(
                             fromTupleExpr->getElement(fromFieldIdx),
                             toEltType,
-                            /*isAssignment=*/false,
                             locator.withPathElement(
                               LocatorPathElt::getTupleElement(fromFieldIdx)));
       if (!convertedElt)
@@ -1452,7 +1421,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     toScalarType = field.getType();
 
   // Coerce the expression to the type to the scalar type.
-  expr = coerceToType(expr, toScalarType, /*isAssignment=*/false,
+  expr = coerceToType(expr, toScalarType,
                       locator.withPathElement(
                         ConstraintLocator::ScalarToTuple));
   if (!expr)
@@ -1500,7 +1469,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                             injectionFn);
 }
 
-Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
+Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
   auto &tc = cs.getTypeChecker();
 
@@ -1546,7 +1515,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
     }
 
     // Coerce the result.
-    return coerceToType(expr, toType, /*isAssignment=*/false, locator);
+    return coerceToType(expr, toType, locator);
   }
 
   // Coercion from a subclass to a superclass.
@@ -1584,7 +1553,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
     // be subtypes of non-[auto_closures], which is bogus.
     if (toFunc->isAutoClosure()) {
       // Convert the value to the expected result type of the function.
-      expr = coerceToType(expr, toFunc->getResult(), /*isAssignment=*/false,
+      expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
       // FIXME: Bogus declaration context.
@@ -1608,8 +1577,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
                                             toFunc->getResult(),
                                             tc.Context);
-      expr = coerceToType(expr, toNonBlockTy, /*isAssignment=*/false,
-                          locator);
+      expr = coerceToType(expr, toNonBlockTy, locator);
 
       // Bridge to the block form of this function type.
       return new (tc.Context) BridgeToBlockExpr(expr, toType);
@@ -1718,7 +1686,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType, bool isAssignment,
       expr = finishApply(apply, toType, locator);
     }
 
-    return coerceToType(expr, toType, /*isAssignment=*/false, locator);
+    return coerceToType(expr, toType, locator);
   }
 
   // Coercion from one metatype to another.
@@ -1935,7 +1903,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     if (isa<ThisApplyExpr>(apply))
       arg = convertObjectArgumentToType(tc, origArg, fnType->getInput());
     else
-      arg = coerceToType(origArg, fnType->getInput(), isAssignmentFn(fn),
+      arg = coerceToType(origArg, fnType->getInput(),
                          locator.withPathElement(
                            ConstraintLocator::ApplyArgument));
 
@@ -1966,8 +1934,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
     // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), tupleTy, /*isAssignment=*/false,
-                        locator);
+    return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
   // We're constructing a struct or oneof. Look for the constructor or oneof
@@ -1986,7 +1953,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!selected ||
       selected->first.getKind() == OverloadChoiceKind::IdentityFunction) {
     // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), ty, /*isAssignment=*/false, locator);
+    return coerceToType(apply->getArg(), ty, locator);
   }
 
   // We have the constructor.
@@ -2060,16 +2027,16 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   return expr->walk(walker);
 }
 
-Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment) const {
+Expr *Solution::coerceToType(Expr *expr, Type toType) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this);
-  return rewriter.coerceToType(expr, toType, isAssignment,
+  return rewriter.coerceToType(expr, toType,
                                cs.getConstraintLocator(expr, { }));
 }
 
-Expr *Solution::coerceToType(Expr *expr, Type toType, bool isAssignment,
+Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this);
-  return rewriter.coerceToType(expr, toType, isAssignment, locator);
+  return rewriter.coerceToType(expr, toType, locator);
 }
