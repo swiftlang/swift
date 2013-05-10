@@ -43,12 +43,6 @@ namespace irgen {
                                        llvm::Value *table,
                                        WitnessIndex index);
 
-  /// Given a value witness table, load one of the value witnesses.
-  /// The result has the appropriate type for the witness.
-  llvm::Value *emitLoadOfValueWitness(IRGenFunction &IGF,
-                                      llvm::Value *wtable,
-                                      ValueWitness witness);
-
   /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
   llvm::Value *emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
                                                         llvm::Value *witnessTable,

@@ -701,7 +701,7 @@ namespace {
 
     llvm::Value *getStride(IRGenFunction &IGF) const {
       llvm::Value *wtable = getValueWitnessTable(IGF);
-      return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Stride);
+      return emitLoadOfStride(IGF, wtable);
     }
 
     llvm::Constant *getStaticSize(IRGenModule &IGM) const { return nullptr; }

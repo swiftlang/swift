@@ -202,7 +202,7 @@ llvm::Value *irgen::emitLoadOfOpaqueWitness(IRGenFunction &IGF,
 
 /// Given a witness table, load one of the value witnesses.
 /// The result has the appropriate type for the witness.
-llvm::Value *irgen::emitLoadOfValueWitness(IRGenFunction &IGF,
+static llvm::Value *emitLoadOfValueWitness(IRGenFunction &IGF,
                                            llvm::Value *table,
                                            ValueWitness index) {
   llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, table, index);
