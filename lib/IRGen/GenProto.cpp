@@ -3256,12 +3256,10 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
 }
 
 void
-irgen::getArchetypeMethodValue(IRGenFunction &IGF,
-                               CanType baseTy,
-                               SILConstant member,
-                               CanType substResultType,
-                               ArrayRef<Substitution> subs,
-                               Explosion &out) {
+irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
+                                SILType baseTy,
+                                SILConstant member,
+                                Explosion &out) {
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
   assert(member.kind == SILConstant::Kind::Func
@@ -3271,7 +3269,7 @@ irgen::getArchetypeMethodValue(IRGenFunction &IGF,
   
   // Find the archetype we're calling on.
   // FIXME: static methods
-  ArchetypeType *archetype = cast<ArchetypeType>(baseTy);
+  ArchetypeType *archetype = cast<ArchetypeType>(baseTy.getSwiftRValueType());
   
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
@@ -3309,16 +3307,14 @@ irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
 /// Extract the method pointer and metadata from a protocol witness table
 /// as a function value.
 void
-irgen::getProtocolMethodValue(IRGenFunction &IGF,
-                              Address existAddr,
-                              CanType baseTy,
-                              SILConstant member,
-                              CanType substResultType,
-                              ArrayRef<Substitution> subs,
-                              Explosion &out) {
+irgen::emitProtocolMethodValue(IRGenFunction &IGF,
+                               Address existAddr,
+                               SILType baseTy,
+                               SILConstant member,
+                               Explosion &out) {
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
-  assert(baseTy->isExistentialType());
+  assert(baseTy.getSwiftRValueType()->isExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
   
   // The function we're going to call.

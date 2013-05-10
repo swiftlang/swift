@@ -1695,12 +1695,12 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
 }
 
 /// Load the correct virtual function for the given class method.
-llvm::Value *irgen::emitVirtualMethod(IRGenFunction &IGF,
-                                      llvm::Value *base,
-                                      SILType baseType,
-                                      SILConstant method,
-                                      SILType methodType,
-                                      ExplosionKind maxExplosion) {
+llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
+                                           llvm::Value *base,
+                                           SILType baseType,
+                                           SILConstant method,
+                                           SILType methodType,
+                                           ExplosionKind maxExplosion) {
   // TODO: maybe use better versions in the v-table sometimes?
   ExplosionKind bestExplosion = ExplosionKind::Minimal;
 

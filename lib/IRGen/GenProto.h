@@ -70,22 +70,18 @@ namespace irgen {
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  void getArchetypeMethodValue(IRGenFunction &IGF,
-                               CanType baseTy,
-                               SILConstant member,
-                               CanType substResultType,
-                               ArrayRef<Substitution> subs,
-                               Explosion &out);
+  void emitArchetypeMethodValue(IRGenFunction &IGF,
+                                SILType baseTy,
+                                SILConstant member,
+                                Explosion &out);
   
   /// Extract the method pointer and metadata from a protocol witness table
   /// as a function value.
-  void getProtocolMethodValue(IRGenFunction &IGF,
-                              Address existAddr,
-                              CanType baseTy,
-                              SILConstant member,
-                              CanType substResultType,
-                              ArrayRef<Substitution> subs,
-                              Explosion &out);
+  void emitProtocolMethodValue(IRGenFunction &IGF,
+                               Address existAddr,
+                               SILType baseTy,
+                               SILConstant member,
+                               Explosion &out);
   /// Determine the natural limits on how we can call the given
   /// protocol member function.
   AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);

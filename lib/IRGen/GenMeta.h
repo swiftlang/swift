@@ -141,12 +141,12 @@ namespace irgen {
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  llvm::Value *emitVirtualMethod(IRGenFunction &IGF,
-                                 llvm::Value *base,
-                                 SILType baseType,
-                                 SILConstant method,
-                                 SILType methodType,
-                                 Mangle::ExplosionKind maxExplosion);
+  llvm::Value *emitVirtualMethodValue(IRGenFunction &IGF,
+                                      llvm::Value *base,
+                                      SILType baseType,
+                                      SILConstant method,
+                                      SILType methodType,
+                                      Mangle::ExplosionKind maxExplosion);
 
 } // end namespace irgen
 } // end namespace swift

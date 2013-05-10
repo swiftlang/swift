@@ -736,7 +736,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
       to = ti->getUncurriedInputEnds()[uncurryLevel];
     for (SILValue arg : i->getArguments().slice(from, to - from)) {
       emitApplyArgument(*this, args, arg);
-      // FIXME: Need to carry the address-ness of each argument along side
+      // FIXME: Need to carry the address-ness of each argument alongside
       // the object type's TypeInfo.
       argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
     }
@@ -1250,39 +1250,27 @@ void IRGenSILFunction::visitProjectExistentialInst(
 
 void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   Address base = getLoweredAddress(i->getOperand());
-  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
-  CanType resultTy = getResultType(i->getType(0).getSwiftType(),
-                                   /*uncurryLevel=*/1);
+  SILType baseTy = i->getOperand().getType();
   SILConstant member = i->getMember();
   
   Explosion lowered(CurExplosionLevel);
-  getProtocolMethodValue(*this, base, baseTy, member, resultTy,
-                         /*FIXME substitutions*/ {},
-                         lowered);
+  emitProtocolMethodValue(*this, base, baseTy, member, lowered);
   
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
 
 void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
-  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
-  if (auto *metaTy = dyn_cast<MetaTypeType>(baseTy))
-    baseTy = CanType(metaTy->getInstanceType());
-  
-  CanType resultTy = getResultType(i->getType(0).getSwiftType(),
-                                   /*uncurryLevel=*/1);
+  SILType baseTy = i->getLookupArchetype();
   SILConstant member = i->getMember();
 
   Explosion lowered(CurExplosionLevel);
-  
-  getArchetypeMethodValue(*this, baseTy, member, resultTy,
-                          /*FIXME substitutions*/ {},
-                          lowered);
+  emitArchetypeMethodValue(*this, baseTy, member, lowered);
   
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
 
 void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
-  CanType ty = i->getOperand().getType().getSwiftRValueType();
+  SILType ty = i->getOperand().getType();
   TypeInfo const &ti = getFragileTypeInfo(ty);
   Address dest = getLoweredAddress(i->getOperand());
   Builder.CreateMemSet(Builder.CreateBitCast(dest.getAddress(),
@@ -1294,7 +1282,7 @@ void IRGenSILFunction::visitInitializeVarInst(swift::InitializeVarInst *i) {
 }
 
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
-  CanType addrTy = i->getSrc().getType().getSwiftRValueType();
+  SILType addrTy = i->getSrc().getType();
   Address src = getLoweredAddress(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
   TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
@@ -1322,7 +1310,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
 }
 
 void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
-  CanType addrTy = i->getOperand().getType().getSwiftRValueType();
+  SILType addrTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
   TypeInfo const &addrTI = getFragileTypeInfo(addrTy);
   addrTI.destroy(*this, base);
@@ -1362,10 +1350,10 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   SILConstant method = i->getMember();
   
   // For Swift classes, get the method implementation from the vtable.
-  llvm::Value *fnValue = emitVirtualMethod(*this, baseValue,
-                                           i->getOperand().getType(),
-                                           method, i->getType(),
-                                           CurExplosionLevel);
+  llvm::Value *fnValue = emitVirtualMethodValue(*this, baseValue,
+                                                i->getOperand().getType(),
+                                                method, i->getType(),
+                                                CurExplosionLevel);
   fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
   Explosion e(CurExplosionLevel);
   e.add(fnValue);
