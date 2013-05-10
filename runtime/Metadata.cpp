@@ -474,22 +474,31 @@ static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype
 }
 
 /// Generic tuple value witness for 'projectBuffer'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
                                         const Metadata *metatype) {
-  if (tuple_getValueWitnesses(metatype)->isValueInline())
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
-  return *reinterpret_cast<OpaqueValue**>(buffer);
+  else
+    return *reinterpret_cast<OpaqueValue**>(buffer);
 }
 
-/// Generic tuple value witness for 'allocateBuffer'.
+/// Generic tuple value witness for 'allocateBuffer'
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
                                          const Metadata *metatype) {
-  auto wtable = tuple_getValueWitnesses(metatype);
-  if (wtable->isValueInline())
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
 
   // It's important to use 'stride' instead of 'size' because slowAlloc
   // only guarantees alignment up to a multiple of the value passed.
+  auto wtable = tuple_getValueWitnesses(metatype);
   auto value = (OpaqueValue*) swift_slowAlloc(wtable->stride, SWIFT_RAWALLOC);
 
   *reinterpret_cast<OpaqueValue**>(buffer) = value;
@@ -497,19 +506,29 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 }
 
 /// Generic tuple value witness for 'deallocateBuffer'.
+template <bool IsPOD, bool IsInline>
 static void tuple_deallocateBuffer(ValueBuffer *buffer,
                                    const Metadata *metatype) {
-  auto wtable = tuple_getValueWitnesses(metatype);
-  if (wtable->isValueInline())
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline)
     return;
 
+  auto wtable = tuple_getValueWitnesses(metatype);
   auto value = *reinterpret_cast<OpaqueValue**>(buffer);
   swift_slowRawDealloc(value, wtable->stride);
 }
 
 /// Generic tuple value witness for 'destroy'.
-static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metatype) {
-  auto &metadata = *(const TupleTypeMetadata*) _metatype;
+template <bool IsPOD, bool IsInline>
+static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
+  auto &metadata = *(const TupleTypeMetadata*) _metadata;
+  assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
+
+  if (IsPOD) return;
+
   for (size_t i = 0, e = metadata.NumElements; i != e; ++i) {
     auto &eltInfo = metadata.getElements()[i];
     OpaqueValue *elt = eltInfo.findIn(tuple);
@@ -519,10 +538,14 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metatype) {
 }
 
 /// Generic tuple value witness for 'destroyBuffer'.
+template <bool IsPOD, bool IsInline>
 static void tuple_destroyBuffer(ValueBuffer *buffer, const Metadata *metatype) {
-  auto tuple = tuple_projectBuffer(buffer, metatype);
-  tuple_destroy(tuple, metatype);
-  tuple_deallocateBuffer(buffer, metatype);
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  auto tuple = tuple_projectBuffer<IsPOD, IsInline>(buffer, metatype);
+  tuple_destroy<IsPOD, IsInline>(tuple, metatype);
+  tuple_deallocateBuffer<IsPOD, IsInline>(buffer, metatype);
 }
 
 // The operation doesn't have to be initializeWithCopy, but they all
@@ -548,77 +571,143 @@ static OpaqueValue *tuple_forEachField(OpaqueValue *destTuple,
   return destTuple;
 }
 
+/// Perform a naive memcpy of src into dest.
+static OpaqueValue *tuple_memcpy(OpaqueValue *dest,
+                                 OpaqueValue *src,
+                                 const Metadata *metatype) {
+  assert(metatype->getValueWitnesses()->isPOD());
+  return (OpaqueValue*)
+    memcpy(dest, src, metatype->getValueWitnesses()->getSize());
+}
+
 /// Generic tuple value witness for 'initializeWithCopy'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::initializeWithCopy);
 }
 
 /// Generic tuple value witness for 'initializeWithTake'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::initializeWithTake);
 }
 
 /// Generic tuple value witness for 'assignWithCopy'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_assignWithCopy(OpaqueValue *dest,
                                          OpaqueValue *src,
                                          const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::assignWithCopy);
 }
 
 /// Generic tuple value witness for 'assignWithTake'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_assignWithTake(OpaqueValue *dest,
                                          OpaqueValue *src,
                                          const Metadata *metatype) {
+  if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::assignWithTake);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithCopy'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithCopy(ValueBuffer *dest,
                                                    OpaqueValue *src,
                                                    const Metadata *metatype) {
-  return tuple_initializeWithCopy(tuple_allocateBuffer(dest, metatype),
-                                  src,
-                                  metatype);
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  return tuple_initializeWithCopy<IsPOD, IsInline>(
+                        tuple_allocateBuffer<IsPOD, IsInline>(dest, metatype),
+                        src,
+                        metatype);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithTake'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithTake(ValueBuffer *dest,
                                                    OpaqueValue *src,
                                                    const Metadata *metatype) {
-  return tuple_initializeWithTake(tuple_allocateBuffer(dest, metatype),
-                                  src,
-                                  metatype);
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  return tuple_initializeWithTake<IsPOD, IsInline>(
+                        tuple_allocateBuffer<IsPOD, IsInline>(dest, metatype),
+                        src,
+                        metatype);
 }
 
 /// Generic tuple value witness for 'initializeBufferWithCopyOfBuffer'.
+template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                            ValueBuffer *src,
                                                      const Metadata *metatype) {
-  return tuple_initializeBufferWithCopy(dest,
-                                        tuple_projectBuffer(src, metatype),
-                                        metatype);
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  return tuple_initializeBufferWithCopy<IsPOD, IsInline>(
+                            dest,
+                            tuple_projectBuffer<IsPOD, IsInline>(src, metatype),
+                            metatype);
 }
 
+template <bool IsPOD, bool IsInline>
 static const Metadata *tuple_typeOf(OpaqueValue *obj,
                                     const Metadata *metatype) {
   return metatype;
 }
 
-/// Standard, inefficient witness table for tuples.
-static const ValueWitnessTable tuple_witnesses = {
-#define TUPLE_WITNESS(NAME) &tuple_##NAME,
+/// Various standard witness table for tuples.
+static const ValueWitnessTable tuple_witnesses_pod_inline = {
+#define TUPLE_WITNESS(NAME) &tuple_##NAME<true, true>,
   FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
 #undef TUPLE_WITNESS
   0,
+  ValueWitnessFlags(),
+  0
+};
+static const ValueWitnessTable tuple_witnesses_nonpod_inline = {
+#define TUPLE_WITNESS(NAME) &tuple_##NAME<false, true>,
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
+#undef TUPLE_WITNESS
   0,
+  ValueWitnessFlags(),
+  0
+};
+static const ValueWitnessTable tuple_witnesses_pod_noninline = {
+#define TUPLE_WITNESS(NAME) &tuple_##NAME<true, false>,
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
+#undef TUPLE_WITNESS
+  0,
+  ValueWitnessFlags(),
+  0
+};
+static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
+#define TUPLE_WITNESS(NAME) &tuple_##NAME<false, false>,
+  FOR_ALL_FUNCTION_VALUE_WITNESSES(TUPLE_WITNESS)
+#undef TUPLE_WITNESS
+  0,
+  ValueWitnessFlags(),
   0
 };
 
@@ -627,15 +716,16 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
-  assert(numElements != 0 &&
-         "Zero element type refs should use _TMdT_ directly");
-
   // FIXME: include labels when uniquing!
-
   auto genericArgs = (const void * const *) elements;
   if (auto entry = TupleTypes.find(genericArgs, numElements)) {
     return entry->getData();
   }
+
+  // We might reasonably get called by generic code, like a demangler
+  // that produces type objects.  As long as we sink this below the
+  // fast-path map lookup, it doesn't really cost us anything.
+  if (numElements == 0) return &_TMdT_;
 
   typedef TupleTypeMetadata::Element Element;
 
@@ -652,8 +742,10 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   metadata->NumElements = numElements;
   metadata->Labels = labels;
 
+  // Perform basic layout.
   size_t size = 0;
-  size_t alignment = 0;
+  size_t alignment = 1;
+  bool isPOD = true;
   for (unsigned i = 0; i != numElements; ++i) {
     auto elt = elements[i];
 
@@ -665,15 +757,43 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
     size = llvm::RoundUpToAlignment(size, eltVWT->getAlignment());
     size += eltVWT->size;
     alignment = std::max(alignment, eltVWT->getAlignment());
+
+    if (!eltVWT->isPOD()) isPOD = false;
   }
 
+  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
+
   witnesses->size = size;
-  witnesses->alignmentMask = (alignment - 1);
+  witnesses->flags = ValueWitnessFlags().withAlignment(alignment)
+                                        .withPOD(isPOD)
+                                        .withInlineStorage(isInline);
   witnesses->stride = llvm::RoundUpToAlignment(size, alignment);
 
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
-  if (!proposedWitnesses) proposedWitnesses = &tuple_witnesses;
+  if (!proposedWitnesses) {
+    // For a tuple with a single element, just use the witnesses for
+    // the element type.
+    if (numElements == 1) {
+      proposedWitnesses = elements[0]->getValueWitnesses();
+
+    // Otherwise, use generic witnesses (when we can't pattern-match
+    // into something better).
+    } else if (isInline && isPOD) {
+      if (size == 8) proposedWitnesses = &_TWVBi64_;
+      else if (size == 4) proposedWitnesses = &_TWVBi32_;
+      else if (size == 2) proposedWitnesses = &_TWVBi16_;
+      else if (size == 1) proposedWitnesses = &_TWVBi8_;
+      else proposedWitnesses = &tuple_witnesses_pod_inline;
+    } else if (isInline && !isPOD) {
+      proposedWitnesses = &tuple_witnesses_nonpod_inline;
+    } else if (!isInline && isPOD) {
+      proposedWitnesses = &tuple_witnesses_pod_noninline;
+    } else {
+      assert(!isInline && !isPOD);
+      proposedWitnesses = &tuple_witnesses_nonpod_noninline;
+    }
+  }
 #define ASSIGN_TUPLE_WITNESS(NAME) \
   witnesses->NAME = proposedWitnesses->NAME;
   FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)

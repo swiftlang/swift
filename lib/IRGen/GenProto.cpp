@@ -1300,7 +1300,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   case ValueWitness::Size:
-  case ValueWitness::AlignmentMask:
+  case ValueWitness::Flags:
   case ValueWitness::Stride:
     llvm_unreachable("these value witnesses aren't functions");
   }
@@ -1726,9 +1726,20 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
 
-  case ValueWitness::AlignmentMask: {
-    if (auto value = concreteTI.getStaticAlignmentMask(IGM))
+  case ValueWitness::Flags: {
+    // If we locally know that the type has fixed layout, we can emit
+    // meaningful flags for it.
+    if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
+      uint64_t flags = fixedTI->getFixedAlignment().getValue() - 1;
+      if (!fixedTI->isPOD(ResilienceScope::Local))
+        flags |= ValueWitnessFlags::IsNonPOD;
+      assert(packing == FixedPacking::OffsetZero ||
+             packing == FixedPacking::Allocate);
+      if (packing != FixedPacking::OffsetZero)
+        flags |= ValueWitnessFlags::IsNonInline;
+      auto value = IGM.getSize(Size(flags));
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+    }
 
     // Just fill in null here if the type can't be statically laid out.
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);

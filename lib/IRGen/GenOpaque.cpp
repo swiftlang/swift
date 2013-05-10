@@ -119,7 +119,7 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   }
       
   case ValueWitness::Size:
-  case ValueWitness::AlignmentMask:
+  case ValueWitness::Flags:
   case ValueWitness::Stride:
     llvm_unreachable("these witnesses aren't value witness functions!");
   }
@@ -175,8 +175,8 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
     return "typeof";
   case ValueWitness::Size:
     return "size";
-  case ValueWitness::AlignmentMask:
-    return "alignmentMask";
+  case ValueWitness::Flags:
+    return "flags";
   case ValueWitness::Stride:
     return "stride";
   }
@@ -384,18 +384,40 @@ llvm::Value *irgen::emitTypeofCall(IRGenFunction &IGF,
   return call;
 }
 
-/// Emit a load of the 'size' value witness.
+/// Load the 'size' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable) {
   return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Size);
 }
 
-/// Emit a load of the 'alignmentMask' value witness.
+/// Load the 'alignmentMask' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfAlignmentMask(IRGenFunction &IGF,
-                                        llvm::Value *wtable) {
-  return emitLoadOfValueWitness(IGF, wtable, ValueWitness::AlignmentMask);
+                                            llvm::Value *wtable) {
+  auto flags = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::AlignmentMask));
+  return IGF.Builder.CreateAnd(flags, mask,
+                               wtable->getName() + ".alignmentMask");
 }
 
-/// Emit a load of the 'stride' value witness.
+/// Load the 'isPOD' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsPOD(IRGenFunction &IGF, llvm::Value *wtable) {
+  auto flags = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonPOD));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+                                  wtable->getName() + ".isPOD");
+}
+
+/// Load the 'isInline' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF,
+                                       llvm::Value *wtable) {
+  auto flags = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonInline));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+                                  wtable->getName() + ".isInline");
+}
+
+/// Load the 'stride' value witness from the given table as a size_t.
 llvm::Value *irgen::emitLoadOfStride(IRGenFunction &IGF, llvm::Value *wtable) {
   return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Stride);
 }

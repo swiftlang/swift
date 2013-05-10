@@ -66,6 +66,65 @@ struct ValueBuffer {
 
 struct ValueWitnessTable;
 
+/// Types stored in the value-witness table.
+class ValueWitnessFlags {
+  typedef size_t int_type;
+  enum : int_type {
+    AlignmentMask = 0x0000FFFF,
+    IsNonPOD =      0x00010000,
+    IsNonInline =   0x00020000,
+    // Everything else is reserved.
+  };
+  int_type Data;
+
+  constexpr ValueWitnessFlags(int_type data) : Data(data) {}
+public:
+  constexpr ValueWitnessFlags() : Data(0) {}
+
+  /// The required alignment of the first byte of an object of this
+  /// type, expressed as a mask of the low bits that must not be set
+  /// in the pointer.
+  ///
+  /// This representation can be easily converted to the 'alignof'
+  /// result by merely adding 1, but it is more directly useful for
+  /// performing dynamic structure layouts, and it grants an
+  /// additional bit of precision in a compact field without needing
+  /// to switch to an exponent representation.
+  ///
+  /// For example, if the type needs to be 8-byte aligned, the
+  /// appropriate alignment mask should be 0x7.
+  size_t getAlignmentMask() const {
+    return (Data & AlignmentMask);
+  }
+  constexpr ValueWitnessFlags withAlignmentMask(size_t alignMask) const {
+    return ValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
+  }
+
+  size_t getAlignment() const { return getAlignmentMask() + 1; }
+  constexpr ValueWitnessFlags withAlignment(size_t alignment) const {
+    return withAlignmentMask(alignment - 1);
+  }
+
+  /// True if the type requires out-of-line allocation of its storage.
+  bool isInlineStorage() const { return !(Data & IsNonInline); }
+  constexpr ValueWitnessFlags withInlineStorage(bool isInline) const {
+    return ValueWitnessFlags((Data & ~IsNonInline) |
+                               (isInline ? 0 : IsNonInline));
+  }
+
+  /// True if values of this type can be copied with memcpy and
+  /// destroyed with a no-op.
+  ///
+  /// Unlike C++, non-POD types in Swift are still required to be
+  /// address-invariant, so a value can always be "moved" from place
+  /// to place with a memcpy.
+  bool isPOD() const { return !(Data & IsNonPOD); }
+  constexpr ValueWitnessFlags withPOD(bool isPOD) const {
+    return ValueWitnessFlags((Data & ~IsNonPOD) |
+                               (isPOD ? 0 : IsNonPOD));
+  }
+};
+
 namespace value_witness_types {
 
 /// Given an initialized buffer, destroy its value and deallocate
@@ -257,17 +316,8 @@ typedef const Metadata *typeOf(OpaqueValue *src,
 /// multiple of the alignment.
 typedef size_t size;
 
-/// The required alignment of the first byte of an object of this
-/// type, expressed as a mask of the low bits that must not be set
-/// in the pointer.  This representation can be easily converted to
-/// the 'alignof' result by merely adding 1, but it is more directly
-/// useful for performing dynamic structure layouts, and it grants
-/// an additional bit of precision in a compact field without
-/// needing to switch to an exponent representation.
-///
-/// For example, if the type needs to be 8-byte aligned, the value
-/// of this witness is 0x7.
-typedef size_t alignmentMask;
+/// Flags which apply to the type here.
+typedef ValueWitnessFlags flags;
 
 /// When allocating an array of objects of this type, the number of bytes
 /// between array elements.  This value may be zero.  This value is always
@@ -311,18 +361,42 @@ struct ValueWitnessTable {
 #undef DECLARE_WITNESS
 
   value_witness_types::size size;
-  value_witness_types::alignmentMask alignmentMask;
+  value_witness_types::flags flags;
   value_witness_types::stride stride;
+
+  /// Would values of a type with the given layout requirements be
+  /// allocated inline?
+  static bool isValueInline(size_t size, size_t alignment) {
+    return (size <= sizeof(ValueBuffer) &&
+            alignment <= alignof(ValueBuffer));
+  }
 
   /// Are values of this type allocated inline?
   bool isValueInline() const {
-    return (size <= sizeof(ValueBuffer) &&
-            alignmentMask < alignof(ValueBuffer));
+    return flags.isInlineStorage();
+  }
+
+  /// Is this type POD?
+  bool isPOD() const {
+    return flags.isPOD();
+  }
+
+  /// Return the size of this type.  Unlike in C, this has not been
+  /// padded up to the alignment; that value is maintained as
+  /// 'stride'.
+  size_t getSize() const {
+    return size;
+  }
+
+  /// Return the stride of this type.  This is the size rounded up to
+  /// be a multiple of the alignment.
+  size_t getStride() const {
+    return stride;
   }
 
   /// Return the alignment required by this type, in bytes.
   size_t getAlignment() const {
-    return alignmentMask + 1;
+    return flags.getAlignment();
   }
 
   /// The alignment mask of this type.  An offset may be rounded up to
@@ -332,7 +406,7 @@ struct ValueWitnessTable {
   /// For example, if the type needs to be 8-byte aligned, the value
   /// of this witness is 0x7.
   size_t getAlignmentMask() const {
-    return alignmentMask;
+    return flags.getAlignmentMask();
   }
 };
 

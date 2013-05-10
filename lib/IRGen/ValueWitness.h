@@ -164,25 +164,39 @@ enum class ValueWitness : unsigned {
   /// The required storage size of a single object of this type.
   Size,
 
-  ///   size_t alignmentMask;
+  ///   size_t flags;
   ///
-  /// The required alignment of the first byte of an object of this
-  /// type, expressed as a mask of the low bits that must not be set
-  /// in the pointer.  This representation can be easily converted to
-  /// the 'alignof' result by merely adding 1, but it is more directly
-  /// useful for performing dynamic structure layouts, and it grants
-  /// an additional bit of precision in a compact field without
-  /// needing to switch to an exponent representation.
+  /// The ValueWitnessAlignmentMask bits represent the required
+  /// alignment of the first byte of an object of this type, expressed
+  /// as a mask of the low bits that must not be set in the pointer.
+  /// This representation can be easily converted to the 'alignof'
+  /// result by merely adding 1, but it is more directly useful for
+  /// performing dynamic structure layouts, and it grants an
+  /// additional bit of precision in a compact field without needing
+  /// to switch to an exponent representation.
   ///
-  /// For example, if the type needs to be 8-byte aligned, the value
-  /// of this field is 0x7.
-  AlignmentMask,
+  /// The ValueWitnessIsNonPOD bit is set if the type is not POD.
+  ///
+  /// The ValueWitnessIsNonInline bit is set if the type cannot be
+  /// represented in a fixed-size buffer.
+  Flags,
 
   ///   size_t stride;
   ///
   /// The required size per element of an array of this type.
   Stride
 };
+
+// The namespace here is to force these to be scoped.  We can't just
+// use 'enum class' because we want the enumerators to convert freely
+// to uint64_t.
+namespace ValueWitnessFlags {
+  enum : uint64_t {
+    AlignmentMask = 0x0FFFF,
+    IsNonPOD      = 0x10000,
+    IsNonInline   = 0x20000
+  };
+}
  
 enum {
   NumValueWitnesses = unsigned(ValueWitness::Stride) + 1,

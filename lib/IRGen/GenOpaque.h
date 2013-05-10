@@ -111,12 +111,18 @@ namespace irgen {
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable);
 
+  /// Emit a load of the 'stride' value witness.
+  llvm::Value *emitLoadOfStride(IRGenFunction &IGF, llvm::Value *wtable);
+
   /// Emit a load of the 'alignmentMask' value witness.
   llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF,
                                        llvm::Value *wtable);
 
-  /// Emit a load of the 'stride' value witness.
-  llvm::Value *emitLoadOfStride(IRGenFunction &IGF, llvm::Value *wtable);
+  /// Emit a load of the 'isPOD' value witness.
+  llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, llvm::Value *wtable);
+
+  /// Emit a load of the 'isInline' value witness.
+  llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *wtable);
 
 } // end namespace irgen
 } // end namespace swift
