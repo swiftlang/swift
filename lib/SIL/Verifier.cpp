@@ -510,14 +510,20 @@ public:
             "result method must be of a concrete function type");
     require(!methodType->isThin(),
             "result method must not be of a thin function type");
-    SILType operandType = AMI->getOperand().getType();
+    SILType operandType = AMI->getLookupArchetype();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
           llvm::dbgs() << "\n");
-    require(methodType->getInput()->isEqual(operandType.getSwiftType()),
-            "result must be a method of the operand");
+    require(operandType.is<ArchetypeType>(),
+            "operand type must be an archetype");
     require(methodType->getResult()->is<FunctionType>(),
             "result must be a method");
+            
+    require(methodType->getInput()->isEqual(operandType.getSwiftType())
+            || methodType->getInput()->isEqual(
+                            MetaTypeType::get(operandType.getSwiftRValueType(),
+                                              operandType.getASTContext())),
+            "result must be method of operand type");
     if (operandType.isAddress()) {
       require(operandType.is<ArchetypeType>(),
               "archetype_method must apply to an archetype address");

@@ -1099,14 +1099,22 @@ public:
 
 /// ArchetypeMethodInst - Given the address of an archetype value and a method
 /// constant, extracts the implementation of that method for the archetype.
-class ArchetypeMethodInst
-  : public UnaryInstructionBase<ValueKind::ArchetypeMethodInst,
-                                DynamicMethodInst>
-{
+class ArchetypeMethodInst : public DynamicMethodInst {
+  SILType LookupType;
 public:
-  ArchetypeMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
+  ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILConstant Member,
                       SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member) {}
+    : DynamicMethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member),
+      LookupType(LookupType)
+  {}
+  
+  SILType getLookupArchetype() const { return LookupType; }
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ArchetypeMethodInst;
+  }
 };
   
 /// ProtocolMethodInst - Given the address of an existential and a method

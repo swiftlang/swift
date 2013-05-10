@@ -336,11 +336,12 @@ public:
     return insert(new SuperMethodInst(Loc, Operand, Member, MethodTy));
   }
   
-  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, SILValue Operand,
+  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc,
+                                             SILType LookupTy,
                                              SILConstant Member,
                                              SILType MethodTy)
   {
-    return insert(new ArchetypeMethodInst(Loc, Operand, Member, MethodTy));
+    return insert(new ArchetypeMethodInst(Loc, LookupTy, Member, MethodTy));
   }
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc,

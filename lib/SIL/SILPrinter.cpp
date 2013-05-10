@@ -528,6 +528,8 @@ public:
     OS << "builtin_zero $" << ZI->getType();
   }
   
+  
+  
   void printDynamicMethodInst(DynamicMethodInst *I,
                               SILValue Operand,
                               StringRef Name) {
@@ -546,7 +548,13 @@ public:
     printDynamicMethodInst(AMI, AMI->getOperand(), "super_method");
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-    printDynamicMethodInst(AMI, AMI->getOperand(), "archetype_method");
+    OS << "archetype_method ";
+    if (AMI->isVolatile())
+      OS << "[volatile] ";
+    OS << "$";
+    AMI->getLookupArchetype().print(OS);
+    OS << ", @";
+    AMI->getMember().print(OS);
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
     printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");

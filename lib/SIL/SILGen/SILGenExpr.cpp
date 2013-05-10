@@ -760,7 +760,12 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
                                         e->getType(),
                                         F.getContext());
     SILConstant c(e->getDecl());
-    return B.createArchetypeMethod(e, archetype, c,
+    
+    CanType archetypeType = archetype.getType().getSwiftType();
+    if (auto *metaType = dyn_cast<MetaTypeType>(archetypeType))
+      archetypeType = CanType(metaType->getInstanceType());
+    
+    return B.createArchetypeMethod(e, getLoweredType(archetypeType), c,
                                    getLoweredLoadableType(methodType,
                                                           SGM.getConstantCC(c),
                                                           c.uncurryLevel));
