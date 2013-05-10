@@ -511,6 +511,10 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type) {
   return EmitTypeMetadataRef(IGF).visitBoundGenericClassType(classType);
 }
 
+llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, SILType type) {
+  return emitClassHeapMetadataRef(IGF, type.getSwiftRValueType());
+}
+
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// has trivial representation.
@@ -1551,14 +1555,23 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
   return metadata;
 }
 
+llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                     llvm::Value *object,
+                                                     SILType objectType,
+                                                     bool suppressCast) {
+  return emitHeapMetadataRefForHeapObject(IGF, object,
+                                          objectType.getSwiftRValueType(),
+                                          suppressCast);
+}
+
 /// Given an object of class type, produce the type metadata reference
 /// as a %type*.
 llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
-                                                     CanType objectType,
+                                                     SILType objectType,
                                                      bool suppressCast) {
   // If it is known to have swift metadata, just load.
-  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if (hasKnownSwiftMetadata(IGF.IGM, theClass)) {
     assert(isKnownNotTaggedPointer(IGF.IGM, theClass));
     return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
@@ -1682,25 +1695,26 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
 }
 
 /// Load the correct virtual function for the given class method.
-Callee irgen::emitVirtualCallee(IRGenFunction &IGF,
-                                llvm::Value *base, CanType baseType,
-                                FuncDecl *method, CanType substResultType,
-                                llvm::ArrayRef<Substitution> substitutions,
-                                ExplosionKind maxExplosion,
-                                unsigned bestUncurry) {
+llvm::Value *irgen::emitVirtualMethod(IRGenFunction &IGF,
+                                      llvm::Value *base,
+                                      SILType baseType,
+                                      SILConstant method,
+                                      SILType methodType,
+                                      ExplosionKind maxExplosion) {
   // TODO: maybe use better versions in the v-table sometimes?
   ExplosionKind bestExplosion = ExplosionKind::Minimal;
 
-  unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
-  bestUncurry = std::min(bestUncurry, naturalUncurry);
+  // FIXME: Support property accessors.
+  FuncDecl *methodDecl = cast<FuncDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
   FuncDecl *overridden =
-    findOverriddenFunction(IGF.IGM, method, bestExplosion, bestUncurry);
+    findOverriddenFunction(IGF.IGM, methodDecl,
+                           bestExplosion, method.uncurryLevel);
 
   // Find the metadata.
   llvm::Value *metadata;
-  if (method->isStatic()) {
+  if (methodDecl->isStatic()) {
     metadata = base;
   } else {
     metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
@@ -1709,27 +1723,14 @@ Callee irgen::emitVirtualCallee(IRGenFunction &IGF,
 
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
-  auto formalType = method->getType()->getCanonicalType();
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::Method,
-                                      formalType, bestExplosion, bestUncurry,
-                                      ExtraData::None,
-                                      attrs)->getPointerTo();
+  auto fnTy = IGF.IGM.getFunctionType(methodType, bestExplosion,
+                                      ExtraData::None, attrs)->getPointerTo();
 
-  llvm::Value *fn;
-  if (bestUncurry != naturalUncurry) {
-    IGF.unimplemented(method->getLoc(), "not-fully-applied method reference");
-    fn = nullptr;
-  } else {
-    FunctionRef fnRef(overridden, bestExplosion, bestUncurry);
-    auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
+  FunctionRef fnRef(overridden, bestExplosion, method.uncurryLevel);
+  auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
 
-    fn = emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
-  }
-
-  return Callee::forKnownFunction(AbstractCC::Method, formalType,
-                                  substResultType, substitutions,
-                                  fn, nullptr, bestExplosion, bestUncurry);
+  return emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
 }
 
 // Structs

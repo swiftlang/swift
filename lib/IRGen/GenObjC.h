@@ -24,6 +24,8 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
+  struct SILConstant;
+  class SILType;
   class Substitution;
   
 namespace Mangle {
@@ -41,18 +43,18 @@ namespace irgen {
   AbstractCallee getAbstractObjCMethodCallee(IRGenFunction &IGF, ValueDecl *fn);
 
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                         ValueDecl *method,
-                                         CanType substResultType,
-                                         llvm::ArrayRef<Substitution> subs,
-                                         Mangle::ExplosionKind bestExplosion,
-                                         unsigned bestUncurry,
+                                         SILConstant method,
+                                         SILType origType,
+                                         SILType substResultType,
+                                         ArrayRef<Substitution> subs,
+                                         ExplosionKind maxExplosion,
                                          bool isSuper);
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                           CallEmission &emission,
-                                          ValueDecl *method,
+                                          SILConstant method,
                                           llvm::Value *self,
-                                          CanType searchType);
+                                          SILType searchType);
 
   /// Reclaim an autoreleased return value.
   llvm::Value *emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,

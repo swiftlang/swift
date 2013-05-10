@@ -28,6 +28,8 @@ namespace swift {
   class ClassDecl;
   class FuncDecl;
   class NominalTypeDecl;
+  struct SILConstant;
+  class SILType;
   class StructDecl;
   class Substitution;
   
@@ -63,6 +65,8 @@ namespace irgen {
 
   /// Emit a reference to the heap metadata for a class.
   llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type);
+
+  llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, SILType type);
 
   /// Given a class metadata reference, produce the appropriate heap
   /// metadata reference for it.
@@ -114,7 +118,7 @@ namespace irgen {
   /// produce a reference to its type metadata.
   llvm::Value *emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
                                             llvm::Value *object,
-                                            CanType objectType,
+                                            SILType objectType,
                                             bool suppressCast = false);
 
   /// Given a heap-object instance, with some heap-object type,
@@ -124,19 +128,25 @@ namespace irgen {
                                                 CanType objectType,
                                                 bool suppressCast = false);
 
+  /// Given a heap-object instance, with some heap-object type,
+  /// produce a reference to its heap metadata.
+  llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
+                                                llvm::Value *object,
+                                                SILType objectType,
+                                                bool suppressCast = false);
+
   /// Derive the abstract callee for a virtual call to the given method.
   AbstractCallee getAbstractVirtualCallee(IRGenFunction &IGF,
                                           FuncDecl *method);
 
   /// Given an instance pointer (or, for a static method, a class
   /// pointer), emit the callee for the given method.
-  Callee emitVirtualCallee(IRGenFunction &IGF,
-                           llvm::Value *base, CanType baseType,
-                           FuncDecl *method, CanType substResultType,
-                           llvm::ArrayRef<Substitution> substitutions,
-                           Mangle::ExplosionKind maxExplosion,
-                           unsigned bestUncurry);
-                           
+  llvm::Value *emitVirtualMethod(IRGenFunction &IGF,
+                                 llvm::Value *base,
+                                 SILType baseType,
+                                 SILConstant method,
+                                 SILType methodType,
+                                 Mangle::ExplosionKind maxExplosion);
 
 } // end namespace irgen
 } // end namespace swift

@@ -57,19 +57,19 @@ public:
 /// Represents an ObjC method reference that will be invoked by a form of
 /// objc_msgSend.
 class ObjCMethod {
-  /// The ValueDecl declaring the method.
-  ValueDecl *method;
+  /// The SILConstant declaring the method.
+  SILConstant method;
   /// For a super call, the type to pass to msgSendSuper2 dispatch.
   /// Null for non-super calls.
-  CanType superSearchType;
+  SILType superSearchType;
 
 public:
-  ObjCMethod(ValueDecl *method, CanType superSearchType)
+  ObjCMethod(SILConstant method, SILType superSearchType)
     : method(method), superSearchType(superSearchType)
   {}
   
-  ValueDecl *getMethodDecl() const { return method; }
-  CanType getSuperSearchType() const { return superSearchType; }
+  SILConstant getMethod() const { return method; }
+  SILType getSuperSearchType() const { return superSearchType; }
   
   /// FIXME: Thunk down to a Swift function value?
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
@@ -389,8 +389,8 @@ public:
     newLoweredValue(v, StaticFunction{f, cc});
   }
   
-  void newLoweredObjCMethod(SILValue v, ValueDecl *method,
-                            CanType superSearchType = CanType()) {
+  void newLoweredObjCMethod(SILValue v, SILConstant method,
+                            SILType superSearchType = SILType()) {
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");

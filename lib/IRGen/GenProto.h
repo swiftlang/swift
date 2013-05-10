@@ -33,6 +33,7 @@ namespace swift {
   class PolymorphicFunctionType;
   class ProtocolConformance;
   struct SILConstant;
+  class SILType;
 
 namespace irgen {
   class AbstractCallee;
@@ -121,7 +122,12 @@ namespace irgen {
   /// Emit a dynamic metatype lookup for the given archetype.
   llvm::Value *emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                                Address archetypeAddr,
-                                               CanType archetypeType);
+                                               SILType archetypeType);
+  
+  /// Emit a dynamic metatype lookup for the given existential.
+  llvm::Value *emitTypeMetadataRefForExistential(IRGenFunction &IGF,
+                                                 Address addr,
+                                                 SILType type);
   
   /// Emit a dynamic metatype lookup for the given existential.
   llvm::Value *emitTypeMetadataRefForExistential(IRGenFunction &IGF,

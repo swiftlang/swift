@@ -3292,8 +3292,8 @@ irgen::getArchetypeMethodValue(IRGenFunction &IGF,
 llvm::Value *
 irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                        Address addr,
-                                       CanType type) {
-  ArchetypeType *archetype = cast<ArchetypeType>(type);
+                                       SILType type) {
+  ArchetypeType *archetype = type.castTo<ArchetypeType>();
   auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
   
   // Acquire the archetype's static metadata.
@@ -3338,6 +3338,13 @@ irgen::getProtocolMethodValue(IRGenFunction &IGF,
 
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
+}
+
+llvm::Value *
+irgen::emitTypeMetadataRefForExistential(IRGenFunction &IGF, Address addr,
+                                         SILType type) {
+  return emitTypeMetadataRefForExistential(IGF, addr,
+                                           type.getSwiftRValueType());
 }
 
 llvm::Value *

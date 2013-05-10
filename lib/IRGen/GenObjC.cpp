@@ -557,7 +557,7 @@ static const OwnershipConventions &setOwnershipConventions(Callee &callee,
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,
                               Explosion &selfValues,
-                              CanType searchClass) {
+                              SILType searchClass) {
   // Allocate an objc_super struct.
   Address super = IGF.createAlloca(IGF.IGM.ObjCSuperStructTy,
                                    IGF.IGM.getPointerAlignment(),
@@ -571,7 +571,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     searchValue = emitClassHeapMetadataRef(IGF, searchClass);
   } else {
     ClassDecl *searchClassDecl =
-      cast<MetaTypeType>(searchClass)->getInstanceType()
+      searchClass.castTo<MetaTypeType>()->getInstanceType()
         ->getClassOrBoundGenericClass();
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl);
   }
@@ -602,22 +602,16 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
 /// '_cmd' arguments.
 CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                              ValueDecl *method,
-                                              CanType substResultType,
+                                              SILConstant method,
+                                              SILType origType,
+                                              SILType substResultType,
                                               ArrayRef<Substitution> subs,
                                               ExplosionKind maxExplosion,
-                                              unsigned maxUncurry,
                                               bool isSuper) {
-  assert((isa<FuncDecl>(method) || isa<ConstructorDecl>(method))
+  assert((method.kind == SILConstant::Kind::Initializer
+          || method.kind == SILConstant::Kind::Func)
          && "objc method call must be to a func or constructor decl");
-  Type formalType;
-  if (auto *ctor = dyn_cast<ConstructorDecl>(method)) {
-    formalType = ctor->getInitializerType();
-  } else {
-    formalType = method->getType();
-  }
-  CanType origFormalType = formalType->getCanonicalType();
-  ObjCMethodSignature sig(IGF.IGM, origFormalType, isSuper);
+  ObjCMethodSignature sig(IGF.IGM, origType.getSwiftRValueType(), isSuper);
 
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
@@ -636,19 +630,19 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   messenger = llvm::ConstantExpr::getBitCast(messenger,
                                              sig.FnTy->getPointerTo());
 
+  // FIXME: ObjC method constants should get SILGen-ed with a [sil_cc=c] type.
   CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::C,
-                                                      origFormalType,
-                                                      substResultType,
-                                                      subs, messenger, nullptr,
-                                                      ExplosionKind::Minimal,
-                                                      /*uncurry*/ 1));
-  
+                                          origType.getSwiftRValueType(),
+                                          substResultType.getSwiftRValueType(),
+                                          subs, messenger, nullptr,
+                                          ExplosionKind::Minimal,
+                                          /*uncurry*/ 1));
   // Compute the selector.
-  Selector selector(method);
+  Selector selector(method.getDecl());
   
   // Respect conventions.
   Callee &callee = emission.getMutableCallee();
-  setOwnershipConventions(callee, method, selector);
+  setOwnershipConventions(callee, method.getDecl(), selector);
 
   return emission;
 }
@@ -656,22 +650,22 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
 /// Emit the 'self'/'super' and '_cmd' arguments for an ObjC method dispatch.
 void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                CallEmission &emission,
-                                               ValueDecl *method,
+                                               SILConstant method,
                                                llvm::Value *self,
-                                               CanType searchType) {
+                                               SILType searchType) {
   // Compute the selector.
-  Selector selector(method);
+  Selector selector(method.getDecl());
   
   Explosion args(ExplosionKind::Minimal);
   
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member).
   bool isInstanceMethod
-    = isa<ConstructorDecl>(method) || method->isInstanceMember();
+    = method.kind == SILConstant::Kind::Initializer
+      || method.getDecl()->isInstanceMember();
 
   if (searchType) {
-    emitSuperArgument(IGF, isInstanceMethod, self, args,
-                      searchType);
+    emitSuperArgument(IGF, isInstanceMethod, self, args, searchType);
   } else {
     args.add(self);
   }

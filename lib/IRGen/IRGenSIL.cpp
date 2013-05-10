@@ -400,7 +400,7 @@ void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
   bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
   getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
   
-  CanType instanceType = i->getOperand().getType().getSwiftType();
+  SILType instanceType = i->getOperand().getType();
   
   llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
   if (isUsedAsSwiftMetatype)
@@ -418,7 +418,7 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
   Address base = getLoweredAddress(i->getOperand());
   
   llvm::Value *metatype = emitTypeMetadataRefForArchetype(*this, base,
-                              i->getOperand().getType().getSwiftRValueType());
+                                                    i->getOperand().getType());
   Explosion result(CurExplosionLevel);
   result.add(metatype);
   newLoweredExplosion(SILValue(i, 0), result);
@@ -429,7 +429,7 @@ void IRGenSILFunction::visitProtocolMetatypeInst(
   Address existential = getLoweredAddress(i->getOperand());
 
   llvm::Value *metatype = emitTypeMetadataRefForExistential(*this, existential,
-                                i->getOperand().getType().getSwiftRValueType());
+                                                    i->getOperand().getType());
   Explosion result(CurExplosionLevel);
   result.add(metatype);
   newLoweredExplosion(SILValue(i, 0), result);
@@ -470,11 +470,11 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       
   case LoweredValue::Kind::ObjCMethod: {
     auto &objcMethod = lv.getObjCMethod();
-    return prepareObjCMethodRootCall(IGF, objcMethod.getMethodDecl(),
-                                     resultTy.getSwiftType(),
+    return prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
+                                     calleeTy,
+                                     resultTy,
                                      substitutions,
                                      IGF.CurExplosionLevel,
-                                     1,
                                      bool(objcMethod.getSuperSearchType()));
   }
       
@@ -659,7 +659,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     }
 
     addObjCMethodCallImplicitArguments(*this, emission,
-                                 calleeLV.getObjCMethod().getMethodDecl(),
+                                 calleeLV.getObjCMethod().getMethod(),
                                  selfArg,
                                  calleeLV.getObjCMethod().getSuperSearchType());
     
@@ -1340,8 +1340,8 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSendSuper2
   // to happen when the method is called.
   if (silMethodIsObjC(i->getMember())) {
-    newLoweredObjCMethod(SILValue(i, 0), i->getMember().getDecl(),
-                         i->getOperand().getType().getSwiftType());
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember(),
+                         i->getOperand().getType());
     return;
   }
 
@@ -1352,7 +1352,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
   if (silMethodIsObjC(i->getMember())) {
-    newLoweredObjCMethod(SILValue(i, 0), i->getMember().getDecl());
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember());
     return;
   }
   
@@ -1362,18 +1362,11 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   SILConstant method = i->getMember();
   
   // For Swift classes, get the method implementation from the vtable.
-  Callee callee = emitVirtualCallee(*this,
-                                  baseValue,
-                                  i->getOperand().getType().getSwiftType(),
-                                  cast<FuncDecl>(method.loc.get<ValueDecl*>()),
-                                  i->getType(0).getFunctionResultType(),
-                                  /*FIXME substitutions*/ {},
-                                  CurExplosionLevel,
-                                  method.uncurryLevel);
-
-  // Bitcast the callee pointer to i8*.
-  llvm::Value *fnValue = Builder.CreateBitCast(
-                                   callee.getFunctionPointer(), IGM.Int8PtrTy);
+  llvm::Value *fnValue = emitVirtualMethod(*this, baseValue,
+                                           i->getOperand().getType(),
+                                           method, i->getType(),
+                                           CurExplosionLevel);
+  fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
   Explosion e(CurExplosionLevel);
   e.add(fnValue);
   newLoweredExplosion(SILValue(i, 0), e);

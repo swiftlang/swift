@@ -247,15 +247,21 @@ public:
   /// Cast the Swift type referenced by this SIL type, or return null if the
   /// cast fails.
   template<typename TYPE>
-  TYPE *getAs() const { return getSwiftRValueType()->getAs<TYPE>(); }
+  TYPE *getAs() const { return dyn_cast<TYPE>(getSwiftRValueType()); }
   /// Cast the Swift type referenced by this SIL type, which must be of the
   /// specified subtype.
   template<typename TYPE>
-  TYPE *castTo() const { return getSwiftRValueType()->castTo<TYPE>(); }
+  TYPE *castTo() const { return cast<TYPE>(getSwiftRValueType()); }
   /// Returns true if the Swift type referenced by this SIL type is of the
   /// specified subtype.
   template<typename TYPE>
-  bool is() const { return getSwiftRValueType()->is<TYPE>(); }
+  bool is() const { return isa<TYPE>(getSwiftRValueType()); }
+  
+  /// Retrieve the ClassDecl for a type that maps to a Swift class or
+  /// bound generic class type.
+  ClassDecl *getClassOrBoundGenericClass() const {
+    return getSwiftRValueType()->getClassOrBoundGenericClass();
+  }
   
   /// True if the type is an address type.
   bool isAddress() const { return value.getInt() & IsAddressFlag; }
