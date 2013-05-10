@@ -2173,7 +2173,9 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
   // Otherwise, apply .getArrayBoundValue() until we get an acceptable
   // integer type.
   Identifier methodName = Context.getIdentifier("getArrayBoundValue");
-  return convertWithMethod(*this, E, methodName, methodName,
+  Identifier builtinMethodName
+    = Context.getIdentifier("_getBuiltinArrayBoundValue");
+  return convertWithMethod(*this, E, methodName, builtinMethodName,
                            &isBuiltinIntegerType,
                            diag::array_bound_convert_limit_reached);
 }
