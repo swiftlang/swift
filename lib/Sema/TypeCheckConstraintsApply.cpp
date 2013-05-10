@@ -445,28 +445,16 @@ namespace {
                             ConstraintLocator::SubscriptMember)));
       auto choice = selected.first;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
-      auto subscriptTy = simplifyType(selected.second);
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = base->getType()->getRValueType();
 
-      // Subscripting an existential type.
-      if (baseTy->isExistentialType()) {
-        // FIXME: Falls back to existing type checker to actually populate
-        // these nodes.
-        auto result
-          = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
-        return tc.semaSubscriptExpr(result);
-      }
-
-      // Subscripting an archetype.
-      if (baseTy->is<ArchetypeType>()) {
-        // FIXME: Falls back to existing type checker to actually populate
-        // these nodes.
-        auto result
-          = new (tc.Context) ArchetypeSubscriptExpr(base, index, subscript);
-        return tc.semaSubscriptExpr(result);
-      }
+      // Figure out the index and result types.
+      auto containerTy
+        = subscript->getDeclContext()->getDeclaredTypeOfContext();
+      auto subscriptTy = simplifyType(selected.second);
+      auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
+      auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
       // Subscripting a specialization of a generic type.
       if (baseTy->isSpecialized()) {
@@ -477,24 +465,43 @@ namespace {
         return tc.semaSubscriptExpr(result);
       }
 
-      // Subscripting a normal, nominal type.
-
-      // Coerce the base to the container type.
-      auto containerTy
-        = subscript->getDeclContext()->getDeclaredTypeOfContext();
-      base = coerceObjectArgumentToType(base, containerTy, locator);
-
       // Coerce the index argument.
-      auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       index = coerceToType(index, indexTy,
                            locator.withPathElement(
                              ConstraintLocator::SubscriptIndex));
 
-      // Form the subscript expression.
-      auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
+      // Determine the result type of the subscript expression.
       resultTy = LValueType::get(resultTy->getRValueType(),
                                  LValueType::Qual::DefaultForMemberAccess,
                                  tc.Context);
+
+      // Form the subscript expression.
+
+      // Handle subscripting of archetypes.
+      if (baseTy->is<ArchetypeType>() && containerTy->is<ProtocolType>()) {
+        // Coerce as an object argument.
+        base = coerceObjectArgumentToType(base, baseTy, locator);
+
+        // Create the archetype subscript operation.
+        auto subscriptExpr = new (tc.Context) ArchetypeSubscriptExpr(base,
+                                                                     index,
+                                                                     subscript);
+        subscriptExpr->setType(resultTy);
+        return subscriptExpr;
+      }
+
+      // Coerce the base to the container type.
+      base = coerceObjectArgumentToType(base, containerTy, locator);
+
+      // Handle subscripting of existential types.
+      if (baseTy->isExistentialType()) {
+        auto subscriptExpr
+          = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
+        subscriptExpr->setType(resultTy);
+        return subscriptExpr;
+      }
+
+      // Form a normal subscript.
       SubscriptExpr *subscriptExpr = new (tc.Context) SubscriptExpr(base,index);
       subscriptExpr->setType(resultTy);
       subscriptExpr->setDecl(subscript);
