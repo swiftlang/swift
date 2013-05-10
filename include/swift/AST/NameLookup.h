@@ -122,6 +122,9 @@ class MemberLookup {
   MemberLookup(const MemberLookup&) = delete;
   void operator=(const MemberLookup&) = delete;
 public:
+  MemberLookup(MemberLookup&&) = default;
+  MemberLookup &operator=(MemberLookup&&) = default;
+
   /// MemberLookup ctor - Lookup a member 'Name' in 'BaseTy' within the context
   /// of a given module 'M'.  This operation corresponds to a standard "dot" 
   /// lookup operation like "a.b" where 'this' is the type of 'a'.  This

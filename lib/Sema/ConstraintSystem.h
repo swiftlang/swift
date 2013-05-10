@@ -1304,6 +1304,19 @@ public:
   /// \returns the expression converted to a logic value (Builtin i1).
   Expr *convertToLogicValue(Expr *expr, ConstraintLocator *locator) const;
 
+  /// \brief Convert the given expression to an array bound.
+  ///
+  /// This operation cannot fail.
+  ///
+  /// \param expr The expression to coerce. The type of this expression
+  /// must conform to the ArrayBound protocol.
+  ///
+  /// \param locator Locator used to describe the location of this expression.
+  ///
+  /// \returns the expression converted to an array bound (Builtin integral
+  /// type).
+  Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
+
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) const LLVM_ATTRIBUTE_USED;
 };

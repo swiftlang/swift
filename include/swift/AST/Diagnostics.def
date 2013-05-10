@@ -1122,6 +1122,12 @@ ERROR(new_array_bound_zero,sema_tce,none,
 ERROR(array_bound_convert_limit_reached,sema_tce,none,
       "getArrayBoundValue() for type %0 used as an array size does not return "
       "an integer type", (Type))
+ERROR(array_bound_missing_proto,sema_tce,none,
+      "array bound requires the missing protocol 'ArrayBound' to be defined", ())
+ERROR(broken_array_bound_proto,sema_tce,none,
+      "protocol 'ArrayBound' is broken", ())
+ERROR(broken_builtin_array_bound,sema_tce,none,
+      "builtin 'ArrayBound' type is broken", ())
 
 ERROR(new_reference_not_class,sema_tce,none,
       "new expression used with non-class type", ())

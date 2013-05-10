@@ -932,6 +932,16 @@ ProtocolDecl *TypeChecker::getStringInterpolationConvertibleProtocol() {
   return StringInterpolationConvertibleProto;
 }
 
+ProtocolDecl *TypeChecker::getArrayBoundProtocol() {
+  if (!ArrayBoundProto) {
+    UnqualifiedLookup Globals(Context.getIdentifier("ArrayBound"), &TU);
+    ArrayBoundProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+
+  return ArrayBoundProto;
+}
+
 ProtocolDecl *TypeChecker::getLogicValueProtocol() {
   if (!LogicValueProto) {
     UnqualifiedLookup Globals(Context.getIdentifier("LogicValue"), &TU);

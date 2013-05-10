@@ -2166,6 +2166,10 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
     return true;
   }
 
+  if (getLangOpts().UseConstraintSolver) {
+    return typeCheckArrayBoundConstraints(E);
+  }
+
   // Just quietly accept if the type is unresolved.
   if (E->getType()->isUnresolvedType())
     return false;

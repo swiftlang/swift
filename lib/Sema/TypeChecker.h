@@ -303,6 +303,8 @@ private:
   /// string interpolation.
   ProtocolDecl *StringInterpolationConvertibleProto = nullptr;
 
+  /// \brief The 'ArrayBound' protocol, used by array bounds.
+  ProtocolDecl *ArrayBoundProto = nullptr;
 
   /// \brief The 'LogicValue' protocol, used by conditions.
   ProtocolDecl *LogicValueProto = nullptr;
@@ -502,7 +504,8 @@ public:
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
 
-  bool typeCheckConditionConstraints(Expr *&E);
+  bool typeCheckConditionConstraints(Expr *&expr);
+  bool typeCheckArrayBoundConstraints(Expr *&expr);
 
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
@@ -886,6 +889,9 @@ public:
   /// \brief Retrieve the StringInterpolationConvertible protocol declaration,
   /// if it exists.
   ProtocolDecl *getStringInterpolationConvertibleProtocol();
+
+  /// \brief Retrieve the ArrayBound protocol declaration, if it exists.
+  ProtocolDecl *getArrayBoundProtocol();
 
   /// \brief Retrieve the LogicValue protocol declaration, if it exists.
   ProtocolDecl *getLogicValueProtocol();

@@ -68,7 +68,15 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
   ProtocolConformance *conformance = 0;
   bool conforms = tc.conformsToProtocol(type, proto, &conformance);
   (void)conforms;
-  assert(conforms && conformance && "Protocol conformance broken?");
+  assert(conforms && "Protocol conformance broken?");
+
+  // For an archetype, just return the requirement from the protocol. There
+  // are no protocol conformance tables.
+  if (type->is<ArchetypeType>()) {
+    return requirement;
+  }
+
+  assert(conformance && "Missing conformance information");
   assert(conformance->Mapping.count(requirement) && "Missing conformance");
   return cast<FuncDecl>(conformance->Mapping[requirement]);
 }
@@ -2129,27 +2137,99 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   return rewriter.coerceToType(expr, toType, locator);
 }
 
-/// \brief Determine whether the given type is the standard library's 'Bool'.
-static bool isBool(TypeChecker &tc, Type type) {
-  auto oneofType = type->getAs<OneOfType>();
-  if (!oneofType)
-    return false;
-
-  // Check whether this type is named 'Bool'.
-  // FIXME: Cache names.
-  auto structDecl = oneofType->getDecl();
-  auto boolName = tc.Context.getIdentifier("Bool");
-  if (structDecl->getName() != boolName)
-    return false;
-
-  // Check whether this type resides in the 'swift' module.
-  auto module = dyn_cast<Module>(structDecl->getDeclContext());
-  if (!module)
-    return false;
+/// \brief Convert an expression via a builtin protocol.
+///
+/// \param solution The solution to the expression's constraint system,
+/// which must have included a constraint that the expression's type
+/// conforms to the give \c protocol.
+/// \param expr The expression to convert.
+/// \param locator The locator describing where the conversion occurs.
+/// \param protocol The protocol to use for conversion.
+/// \param generalName The name of the protocol method to use for the
+/// conversion.
+/// \param builtinName The name of the builtin method to use for the
+/// last step of the conversion.
+/// \param brokenProtocolDiag Diagnostic to emit if the protocol
+/// definition is missing.
+/// \param brokenBuiltinDiag Diagnostic to emit if the builtin definition
+/// is broken.
+///
+/// \returns the converted expression.
+static Expr *convertViaBuiltinProtocol(const Solution &solution,
+                                       Expr *expr,
+                                       ConstraintLocator *locator,
+                                       ProtocolDecl *protocol,
+                                       Identifier generalName,
+                                       Identifier builtinName,
+                                       Diag<> brokenProtocolDiag,
+                                       Diag<> brokenBuiltinDiag) {
+  auto &cs = solution.getConstraintSystem();
+  ExprRewriter rewriter(cs, solution);
 
   // FIXME: Cache name.
-  auto swiftName = tc.Context.getIdentifier("swift");
-  return module->Name == swiftName;
+  auto &tc = cs.getTypeChecker();
+  auto type = expr->getType();
+
+  // Look for the builtin name. If we don't have it, we need to call the
+  // general name via the witness table.
+  MemberLookup lookup(type->getRValueType(), builtinName, tc.TU);
+  if (!lookup.isSuccess()) {
+    // Find the getLogicValue witness we need to use.
+    auto witness = findNamedWitness(tc, type->getRValueType(), protocol,
+                                    generalName, brokenProtocolDiag);
+
+    // Form a reference to getLogicValue.
+    // FIXME: openedType won't capture generics. The protocol definition
+    // prevents this, but it feels hacky.
+    auto openedType
+      = witness->getType()->castTo<AnyFunctionType>()->getResult();
+    auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
+                                             witness, expr->getEndLoc(),
+                                             openedType, locator);
+
+    // Call the witness.
+    Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                           { }, nullptr,
+                                           expr->getEndLoc(),
+                                           TupleType::getEmpty(tc.Context));
+    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+    expr = rewriter.finishApply(apply, openedType, locator);
+
+    // At this point, we must have a type with the builtin member.
+    type = expr->getType();
+    lookup = MemberLookup(type->getRValueType(), builtinName, tc.TU);
+    if (!lookup.isSuccess()) {
+      tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
+      return nullptr;
+    }
+  }
+
+  // Find the builtin method.
+  if (lookup.Results.size() != 1) {
+    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+    return nullptr;
+  }
+  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(lookup.Results[0].D);
+  if (!builtinMethod) {
+    tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
+    return nullptr;
+
+  }
+
+  // Form a reference to the builtin method.
+  auto openedType
+    = builtinMethod->getType()->castTo<AnyFunctionType>()->getResult();
+  auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
+                                           builtinMethod, expr->getEndLoc(),
+                                           openedType, locator);
+
+  // Call the builtin method.
+  Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                         { }, nullptr,
+                                         expr->getEndLoc(),
+                                         TupleType::getEmpty(tc.Context));
+  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+  return rewriter.finishApply(apply, openedType, locator);
 }
 
 /// b\rief Determine whether the given type is a Builtin i1.
@@ -2162,83 +2242,39 @@ static bool isBuiltinI1(Type type) {
 
 Expr *
 Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this);
-
-  // FIXME: Cache name.
-  auto &tc = cs.getTypeChecker();
-  auto type = expr->getType();
-
-  // If the expression isn't Bool-typed, call getLogicValue() to get a bool.
-  if (!isBool(tc, type->getRValueType())) {
-    // Find the getLogicValue witness we need to use.
-    auto name = tc.Context.getIdentifier("getLogicValue");
-    auto getLogicValue = findNamedWitness(tc, type, tc.getLogicValueProtocol(),
-                                          name, diag::condition_broken_proto);
-
-    // Form a reference to getLogicValue.
-    // FIXME: openedType won't capture generics. The protocol definition
-    // prevents this, but it feels hacky.
-    auto openedType
-      = getLogicValue->getType()->castTo<AnyFunctionType>()->getResult();
-    auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
-                                             getLogicValue, expr->getEndLoc(),
-                                             openedType, locator);
-
-    // Call getLogicValue.
-    Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                           { }, nullptr,
-                                           expr->getEndLoc(),
-                                           TupleType::getEmpty(tc.Context));
-    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
-    expr = rewriter.finishApply(apply, openedType, locator);
-
-    // At this point, we must have a Bool.
-    type = expr->getType();
-    if (!isBool(tc, type->getRValueType())) {
-      tc.diagnose(tc.getLogicValueProtocol()->getLoc(),
-                  diag::condition_broken_proto);
-      return nullptr;
-    }
-  }
-
-  // Find the Bool.getBuiltinLogicValue that returns a Builtin i1.
-  auto name = tc.Context.getIdentifier("_getBuiltinLogicValue");
-  FuncDecl *getLogicValue = nullptr;
-  MemberLookup lookup(type->getRValueType(), name, tc.TU);
-  for (auto &result : lookup.Results) {
-    // Make sure we have a function.
-    auto func = dyn_cast<FuncDecl>(result.D);
-    if (!func)
-      continue;
-
-    // Make sure the function returns a builtin i1.
-    auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-    if (isBuiltinI1(resultTy)) {
-      getLogicValue = func;
-      break;
-    }
-  }
-
-  if (!getLogicValue) {
+  auto &tc = getConstraintSystem().getTypeChecker();
+  // FIXME: Cache names.
+  auto result = convertViaBuiltinProtocol(
+                  *this, expr, locator,
+                  tc.getLogicValueProtocol(),
+                  tc.Context.getIdentifier("getLogicValue"),
+                  tc.Context.getIdentifier("_getBuiltinLogicValue"),
+                  diag::condition_broken_proto,
+                  diag::broken_bool);
+  if (result && !isBuiltinI1(result->getType())) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
 
-  // Form a reference to getLogicValue.
-  auto openedType
-    = getLogicValue->getType()->castTo<AnyFunctionType>()->getResult();
-  auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
-                                           getLogicValue, expr->getEndLoc(),
-                                           openedType, locator);
+  return result;
+}
 
-  // Call getLogicValue.
-  Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                         { }, nullptr,
-                                         expr->getEndLoc(),
-                                         TupleType::getEmpty(tc.Context));
-  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
-  return rewriter.finishApply(apply, openedType, locator);
+Expr *
+Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
+  // FIXME: Cache names.
+  auto &tc = getConstraintSystem().getTypeChecker();
+  auto result = convertViaBuiltinProtocol(
+                  *this, expr, locator,
+                  tc.getArrayBoundProtocol(),
+                  tc.Context.getIdentifier("getArrayBoundValue"),
+                  tc.Context.getIdentifier("_getBuiltinArrayBoundValue"),
+                  diag::broken_array_bound_proto,
+                  diag::broken_builtin_array_bound);
+  if (result && !result->getType()->is<BuiltinIntegerType>()) {
+    tc.diagnose(expr->getLoc(), diag::broken_builtin_array_bound);
+    return nullptr;
+  }
+  
+  return result;
 }
 
