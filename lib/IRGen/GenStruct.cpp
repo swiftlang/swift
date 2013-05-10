@@ -97,9 +97,9 @@ namespace {
 
 OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,
-                                                       CanType baseType,
+                                                       SILType baseType,
                                                        unsigned fieldIndex) {
-  assert((baseType->is<StructType>() || baseType->is<BoundGenericStructType>())
+  assert((baseType.is<StructType>() || baseType.is<BoundGenericStructType>())
          && "not a struct type");
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
   auto &fieldI = baseTI.getFields()[fieldIndex];
@@ -109,7 +109,7 @@ OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
 }
 
 void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
-                                                     CanType baseType,
+                                                     SILType baseType,
                                                      Explosion &base,
                                                      unsigned fieldNo,
                                                      Explosion &out) {

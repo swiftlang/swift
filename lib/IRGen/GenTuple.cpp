@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
+#include "swift/SIL/SILType.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -224,19 +225,20 @@ const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
 } while(0)
 
 void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
-                                             CanType tupleType,
+                                             SILType tupleType,
                                              Explosion &tuple,
                                              unsigned fieldNo,
                                              Explosion &out) {
-  FOR_TUPLE_IMPL(IGF, tupleType, projectElementFromExplosion,
+  FOR_TUPLE_IMPL(IGF, tupleType.getSwiftRValueType(),
+                 projectElementFromExplosion,
                  tuple, fieldNo, out);
 }
 
 OwnedAddress irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                                OwnedAddress tuple,
-                                               CanType tupleType,
+                                               SILType tupleType,
                                                unsigned fieldNo) {
-  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress,
+  FOR_TUPLE_IMPL(IGF, tupleType.getSwiftRValueType(), projectElementAddress,
                  tuple, fieldNo);
 }
 

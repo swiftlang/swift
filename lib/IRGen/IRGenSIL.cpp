@@ -850,18 +850,17 @@ void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
   SILValue v(i, 0);
   Explosion lowered(CurExplosionLevel);
   Explosion operand = getLoweredExplosion(i->getOperand());
-  CanType baseType = i->getOperand().getType().getSwiftRValueType();
-  CanType refType = i->getOperand().getType().getSwiftType();
+  SILType baseType = i->getOperand().getType();
   
-  if (baseType->is<TupleType>()) {
+  if (baseType.is<TupleType>()) {
     projectTupleElementFromExplosion(*this,
-                                     refType,
+                                     baseType,
                                      operand,
                                      i->getFieldNo(),
                                      lowered);
   } else {
     projectPhysicalStructMemberFromExplosion(*this,
-                                             refType,
+                                             baseType,
                                              operand,
                                              i->getFieldNo(),
                                              lowered);
@@ -872,10 +871,10 @@ void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
 
 void IRGenSILFunction::visitElementAddrInst(swift::ElementAddrInst *i) {
   Address base = getLoweredAddress(i->getOperand());
-  CanType baseType = i->getOperand().getType().getSwiftRValueType();
+  SILType baseType = i->getOperand().getType();
 
   Address field;
-  if (baseType->is<TupleType>()) {
+  if (baseType.is<TupleType>()) {
     field = projectTupleElementAddress(*this,
                                        OwnedAddress(base, nullptr),
                                        baseType,
@@ -893,7 +892,7 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *value = base.claimNext();
   
-  CanType baseTy = i->getOperand().getType().getSwiftType();
+  SILType baseTy = i->getOperand().getType();
   Address field = projectPhysicalClassMemberAddress(*this,
                                                     value,
                                                     baseTy,

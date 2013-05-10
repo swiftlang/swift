@@ -30,6 +30,7 @@ namespace swift {
   class MemberRefExpr;
   class CanType;
   class VarDecl;
+  class SILType;
 
 namespace irgen {
   class HeapLayout;
@@ -37,6 +38,10 @@ namespace irgen {
   class IRGenModule;
   class OwnedAddress;
 
+  OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
+                                                 llvm::Value *base,
+                                                 SILType baseType,
+                                                 VarDecl *field);
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
                                                  CanType baseType,

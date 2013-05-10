@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -381,6 +382,15 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   auto addr = IGF.emitByteOffsetGEP(base, offset, fieldTI,
                               base->getName() + "." + field->getName().str());
   return OwnedAddress(addr, base);
+}
+
+OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
+                                                      llvm::Value *base,
+                                                      SILType baseType,
+                                                      VarDecl *field) {
+  return projectPhysicalClassMemberAddress(IGF, base,
+                                           baseType.getSwiftRValueType(),
+                                           field);
 }
 
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
