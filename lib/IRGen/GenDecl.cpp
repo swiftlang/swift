@@ -67,8 +67,7 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "_swift_initObjCClasses", &IGM.Module);
 
-  IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
-                        /*uncurry*/ 0, initFn);
+  IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
 
   llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
   llvm::Value *loadSel =
@@ -210,8 +209,7 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
     llvm::Function::Create(fnType, llvm::GlobalValue::InternalLinkage,
                            "_swift_initObjCCategories", &IGM.Module);
   
-  IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
-                        /*uncurry*/ 0, initFn);
+  IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
   
   for (ExtensionDecl *ext : categories) {
     CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
@@ -253,8 +251,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     initFn->setAttributes(attrs);
     
     // Insert a call to the top_level_code symbol from the SIL module.
-    IRGenFunction initIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
-                          /*uncurry*/ 0, initFn);
+    IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
     initIGF.Builder.CreateCall(topLevelCodeFn);
     initIGF.Builder.CreateRetVoid();
   }
@@ -309,9 +306,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
         llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
           llvm::GlobalValue::ExternalLinkage, "main", &Module);
     
-    IRGenFunction mainIGF(
-      *this, CanType(), nullptr, ExplosionKind::Minimal,
-        /*uncurry*/ 0, mainFn);
+    IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();

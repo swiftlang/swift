@@ -465,8 +465,7 @@ static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,
                                   OneOfElementDecl *elt) {
   ExplosionKind explosionKind = ExplosionKind::Minimal;
-  IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(), explosionKind,
-                    /*uncurry level*/ 0, fn);
+  IRGenFunction IGF(IGM, explosionKind, fn);
   if (elt->hasArgumentType()) {
     // FIXME: Implement!
     IGF.Builder.CreateUnreachable();

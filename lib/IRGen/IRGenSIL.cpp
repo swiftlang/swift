@@ -105,15 +105,10 @@ ExplosionKind LoweredValue::getExplosionKind() const {
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f,
                                    ExplosionKind explosionLevel)
-  : IRGenFunction(IGM, f->getLoweredType().getSwiftType(),
-                  /*paramPatterns*/ nullptr,
-                  explosionLevel,
-                  0,
+  : IRGenFunction(IGM, explosionLevel,
                   IGM.getAddrOfSILFunction(f, explosionLevel)),
     CurSILFn(f)
-{
-  
-}
+{}
 
 IRGenSILFunction::~IRGenSILFunction() {
   DEBUG(CurFn->print(llvm::dbgs()));

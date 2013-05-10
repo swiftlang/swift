@@ -28,17 +28,13 @@
 using namespace swift;
 using namespace irgen;
 
-IRGenFunction::IRGenFunction(IRGenModule &IGM, CanType fnType,
-                             ArrayRef<Pattern*> p,
+IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              ExplosionKind explosionLevel,
-                             unsigned uncurryLevel, llvm::Function *Fn)
+                             llvm::Function *Fn)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
     ContextPtr(nullptr) {
-      
-  if (fnType) CurResultType = getResultType(fnType, uncurryLevel);
-      
-  emitPrologue(fnType, p, uncurryLevel);
+  emitPrologue();
 }
 
 IRGenFunction::~IRGenFunction() {

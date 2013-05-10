@@ -147,10 +147,6 @@ CanType irgen::getResultType(CanType type, unsigned uncurryLevel) {
   return type;
 }
 
-const TypeInfo &IRGenFunction::getResultTypeInfo() const {
-  return IGM.getFragileTypeInfo(CurResultType);
-}
-
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
   // TODO: use a custom CC that returns three scalars efficiently
   return llvm::CallingConv::C;
@@ -1492,9 +1488,7 @@ void IRGenFunction::emitBBForReturn() {
 }
 
 /// Emit the prologue for the function.
-void IRGenFunction::emitPrologue(CanType CurFuncType,
-                                 ArrayRef<Pattern*> CurFuncParamPatterns,
-                                 unsigned CurUncurryLevel) {
+void IRGenFunction::emitPrologue() {
   // Set up the IRBuilder.
   llvm::BasicBlock *EntryBB = createBasicBlock("entry");
   assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
@@ -1597,8 +1591,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                            "partial_apply", &IGM.Module);
   fwd->setAttributes(attrs);
 
-  IRGenFunction subIGF(IGM, outType, {}, explosionLevel, /*curryLevel=*/ 0,
-                       fwd);
+  IRGenFunction subIGF(IGM, explosionLevel, fwd);
   
   Explosion params = subIGF.collectParameters();
 
@@ -1702,9 +1695,7 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
                            "specialize", &IGM.Module);
   spec->setAttributes(attrs);
   
-  IRGenFunction subIGF(IGM, substType.getSwiftType(), {},
-                       explosionLevel, /*curryLevel=*/ 0,
-                       spec);
+  IRGenFunction subIGF(IGM, explosionLevel, spec);
 
   // Unravel the substituted function types for each uncurry level.
   unsigned level = substType.getUncurryLevel();

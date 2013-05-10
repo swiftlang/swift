@@ -83,14 +83,13 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
-  CanType CurResultType;
   llvm::Function *CurFn;
   Mangle::ExplosionKind CurExplosionLevel;
   llvm::Value *ContextPtr;
 
-  IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
+  IRGenFunction(IRGenModule &IGM,
                 Mangle::ExplosionKind explosion,
-                unsigned uncurryLevel, llvm::Function *fn);
+                llvm::Function *fn);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
@@ -106,14 +105,11 @@ public:
   bool emitBranchToReturnBB();
   
 private:
-  void emitPrologue(CanType CurFuncType,
-                    ArrayRef<Pattern*> CurFuncParamPatterns,
-                    unsigned CurUncurryLevel);
+  void emitPrologue();
   void emitEpilogue();
 
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
-  const TypeInfo &getResultTypeInfo() const;
 
 //--- Helper methods -----------------------------------------------------------
 public:

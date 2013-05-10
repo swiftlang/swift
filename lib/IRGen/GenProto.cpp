@@ -1180,8 +1180,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
                                       const TypeInfo &type) {
   assert(isValueWitnessFunction(index));
 
-  IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                    ExplosionKind::Minimal, 0, fn);
+  IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
 
   auto argv = fn->arg_begin();
   switch (index) {
@@ -1345,8 +1344,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(fnName, fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     auto it = def->arg_begin();
     Address dest(it++, getFixedBufferAlignment(IGM));
     Address src(it++, getFixedBufferAlignment(IGM));
@@ -1493,8 +1491,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1523,8 +1520,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_assignWithTake_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1551,8 +1547,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_initWithCopy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1576,8 +1571,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
     IGM.Module.getOrInsertFunction("__swift_destroy_strong", fnTy);
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
     IGF.emitRelease(IGF.Builder.CreateLoad(arg));
     IGF.Builder.CreateRetVoid();
@@ -1614,8 +1608,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
 
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
-    IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def);
+    IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
     auto it = def->arg_begin();
     Address dest(it++, fixedTI->getFixedAlignment());
     Address src(it++, fixedTI->getFixedAlignment());
@@ -1858,8 +1851,7 @@ namespace {
       //fn->setVisibility(llvm::Function::HiddenVisibility);
 
       // Start building it.
-      IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                        ExplosionKind::Minimal, UncurryLevel, fn);
+      IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
       emitThunk(IGF);
 
       return asOpaquePtr(IGM, fn);
