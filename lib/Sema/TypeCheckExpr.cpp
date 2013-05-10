@@ -2076,6 +2076,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
 }
 
 static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
+                              Identifier builtinMethod,
                               bool (*isTypeOkay)(Type),
                               Diag<Type> diagnostic) {
   // If it's just an l2r conversion away from the right type, we're done.
@@ -2099,8 +2100,16 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
   unsigned numConversionsRemaining = 2;
   Type origType = E->getType();
   do {
+    // Figure out which method to use. If there's a builtin method, prefer that.
+    Identifier curMethod;
+    MemberLookup lookup(E->getType()->getRValueType(), builtinMethod, TC.TU);
+    if (lookup.isSuccess())
+      curMethod = builtinMethod;
+    else
+      curMethod = method;
+
     UnresolvedDotExpr *UDE =
-      new (TC.Context) UnresolvedDotExpr(E, E->getStartLoc(), method,
+      new (TC.Context) UnresolvedDotExpr(E, E->getStartLoc(), curMethod,
                                          E->getEndLoc());
     Expr *checkedDot = TC.semaUnresolvedDotExpr(UDE);
     if (!checkedDot) return true;
@@ -2164,7 +2173,8 @@ bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
   // Otherwise, apply .getArrayBoundValue() until we get an acceptable
   // integer type.
   Identifier methodName = Context.getIdentifier("getArrayBoundValue");
-  return convertWithMethod(*this, E, methodName, &isBuiltinIntegerType,
+  return convertWithMethod(*this, E, methodName, methodName,
+                           &isBuiltinIntegerType,
                            diag::array_bound_convert_limit_reached);
 }
 
@@ -2175,12 +2185,17 @@ static bool isBuiltinI1(Type T) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&E) {
+  if (getLangOpts().UseConstraintSolver) {
+    return typeCheckConditionConstraints(E);
+  }
+
   if (typeCheckExpression(E))
     return true;
 
   Identifier methodName = Context.getIdentifier("getLogicValue");
-  return convertWithMethod(*this, E, methodName, &isBuiltinI1,
-                           diag::condition_convert_limit_reached);
+  Identifier builtinMethodName = Context.getIdentifier("_getBuiltinLogicValue");
+  return convertWithMethod(*this, E, methodName, builtinMethodName,
+                           &isBuiltinI1, diag::condition_convert_limit_reached);
 }
 
 static Type ComputeAssignDestTy(TypeChecker &TC, Expr *Dest,

@@ -931,3 +931,13 @@ ProtocolDecl *TypeChecker::getStringInterpolationConvertibleProtocol() {
 
   return StringInterpolationConvertibleProto;
 }
+
+ProtocolDecl *TypeChecker::getLogicValueProtocol() {
+  if (!LogicValueProto) {
+    UnqualifiedLookup Globals(Context.getIdentifier("LogicValue"), &TU);
+    LogicValueProto
+      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
+  }
+
+  return LogicValueProto;
+}

@@ -302,7 +302,11 @@ private:
   /// \brief The 'StringInterpolationConvertible' protocol, used by
   /// string interpolation.
   ProtocolDecl *StringInterpolationConvertibleProto = nullptr;
-  
+
+
+  /// \brief The 'LogicValue' protocol, used by conditions.
+  ProtocolDecl *LogicValueProto = nullptr;
+
   Type IntLiteralType;
   Type FloatLiteralType;
   Type CharacterLiteralType;
@@ -497,7 +501,9 @@ public:
   bool typeCheckCondition(Expr *&E);
   bool typeCheckArrayBound(Expr *&E, bool requireConstant);
   bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
-  
+
+  bool typeCheckConditionConstraints(Expr *&E);
+
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
 
@@ -880,7 +886,10 @@ public:
   /// \brief Retrieve the StringInterpolationConvertible protocol declaration,
   /// if it exists.
   ProtocolDecl *getStringInterpolationConvertibleProtocol();
-  
+
+  /// \brief Retrieve the LogicValue protocol declaration, if it exists.
+  ProtocolDecl *getLogicValueProtocol();
+
   /// \name AST Mutation Listener Implementation
   /// @{
   void handleExternalDecl(Decl *decl);

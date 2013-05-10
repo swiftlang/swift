@@ -2878,11 +2878,110 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   return { dest, src };
 }
 
+bool TypeChecker::typeCheckConditionConstraints(Expr *&expr) {
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  expr = expr->walk(PreCheckExpression(*this));
+  if (!expr)
+    return true;
+
+  llvm::raw_ostream &log = llvm::errs();
+
+  // Construct a constraint system from this expression.
+  ConstraintSystem cs(*this);
+  if (cs.generateConstraints(expr))
+    return true;
+
+  // The result must be a LogicValue.
+  auto logicValueProto = getLogicValueProtocol();
+  if (!logicValueProto) {
+    diagnose(expr->getLoc(), diag::condition_missing_proto);
+    return true;
+  }
+
+  cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                   logicValueProto->getDeclaredType(),
+                   cs.getConstraintLocator(expr, { }));
+
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Initial constraints for the given expression---\n";
+    expr->print(log);
+    log << "\n";
+    cs.dump();
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (cs.solve(viable)) {
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return true;
+    }
+
+    // FIXME: Dumping constraints by default due to crummy diagnostics.
+    if (getLangOpts().DebugConstraintSolver || true) {
+      log << "---Solved constraints---\n";
+      cs.dump();
+
+      if (!viable.empty()) {
+        unsigned idx = 0;
+        for (auto &solution : viable) {
+          log << "---Solution #" << ++idx << "---\n";
+          solution.dump(&Context.SourceMgr);
+        }
+      }
+
+      if (viable.size() == 0)
+        log << "No solution found.\n";
+      else if (viable.size() == 1)
+        log << "Unique solution found.\n";
+      else {
+        log << "Found " << viable.size() << " potential solutions.\n";
+      }
+    }
+
+    // FIXME: Crappy diagnostic.
+    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+      .highlight(expr->getSourceRange());
+
+    return true;
+  }
+
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Solution---\n";
+    solution.dump(&Context.SourceMgr);
+  }
+
+  // Apply the solution to the expression.
+  auto result = cs.applySolution(solution, expr);
+  if (!result) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return true;
+  }
+
+  // Convert the expression to a logic value.
+  result = solution.convertToLogicValue(result,
+                                        cs.getConstraintLocator(expr, { }));
+  if (!result) {
+    return true;
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Type-checked expression---\n";
+    result->dump();
+  }
+
+  expr = result;
+  return false;
+}
+
 bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
                                          bool &isTrivial) {
   ConstraintSystem cs(*this);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
+
 
 //===--------------------------------------------------------------------===//
 // Debugging

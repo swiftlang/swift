@@ -27,6 +27,52 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief Find a particular named function witness for a type that conforms to
+/// the given protocol.
+///
+/// \param tc The type check we're using.
+///
+/// \param type The type whose witness to find.
+///
+/// \param proto The protocol to which the type conforms.
+///
+/// \param name The name of the requirement.
+///
+/// \param diag The diagnostic to emit if the protocol definition doesn't
+/// have a requirement with the given name.
+///
+/// \returns The named witness.
+static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
+                                  ProtocolDecl *proto,
+                                  Identifier name,
+                                  Diag<> diag) {
+  // Find the named requirement.
+  FuncDecl *requirement = nullptr;
+  for (auto member : proto->getMembers()) {
+    auto fd = dyn_cast<FuncDecl>(member);
+    if (!fd || fd->getName().empty())
+      continue;
+
+    if (fd->getName() == name) {
+      requirement = fd;
+      break;
+    }
+  }
+  
+  if (!requirement) {
+    tc.diagnose(proto->getLoc(), diag);
+    return nullptr;
+  }
+
+  // Find the member used to satisfy the named requirement.
+  ProtocolConformance *conformance = 0;
+  bool conforms = tc.conformsToProtocol(type, proto, &conformance);
+  (void)conforms;
+  assert(conforms && conformance && "Protocol conformance broken?");
+  assert(conformance->Mapping.count(requirement) && "Missing conformance");
+  return cast<FuncDecl>(conformance->Mapping[requirement]);
+}
+
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -110,6 +156,7 @@ namespace {
       return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
     }
 
+  public:
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, SourceLoc dotLoc, ValueDecl *member,
                          SourceLoc memberLoc, Type openedType,
@@ -314,6 +361,7 @@ namespace {
     Expr *finishApply(ApplyExpr *apply, Type openedType,
                       ConstraintLocatorBuilder locator);
 
+  private:
     /// \brief Retrieve the fixed type for the given type variable.
     Type getFixedType(TypeVariableType *typeVar) {
       auto knownBinding = solution.typeBindings.find(typeVar);
@@ -514,33 +562,10 @@ namespace {
       auto interpolationProto = tc.getStringInterpolationConvertibleProtocol();
       assert(interpolationProto && "Missing string interpolation protocol?");
 
-      // Find the 'convertFromStringInterpolation' requirement.
-      FuncDecl *requirement = nullptr;
-      for (auto member : interpolationProto->getMembers()) {
-        auto fd = dyn_cast<FuncDecl>(member);
-        if (!fd || fd->getName().empty())
-          continue;
-
-        if (fd->getName().str() == "convertFromStringInterpolation") {
-          requirement = fd;
-          break;
-        }
-      }
-      if (!requirement) {
-        tc.diagnose(interpolationProto->getLoc(),
-                    diag::interpolation_broken_proto);
-        return nullptr;
-      }
-
-      // Find the member used to satisfy the 'convertFromStringInterpolation'
-      // requirement.
-      ProtocolConformance *conformance = 0;
-      bool conforms = tc.conformsToProtocol(type, interpolationProto,
-                                            &conformance);
-      (void)conforms;
-      assert(conforms && conformance && "Interpolation conformance broken?");
-      assert(conformance->Mapping.count(requirement) && "Missing conformance");
-      auto member = conformance->Mapping[requirement];
+      // FIXME: Cache name,
+      auto name = tc.Context.getIdentifier("convertFromStringInterpolation");
+      auto member = findNamedWitness(tc, type, interpolationProto, name,
+                                     diag::interpolation_broken_proto);
 
       // Build a reference to the convertFromStringInterpolation member.
       // FIXME: Dubious source location information.
@@ -2103,3 +2128,117 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   ExprRewriter rewriter(cs, *this);
   return rewriter.coerceToType(expr, toType, locator);
 }
+
+/// \brief Determine whether the given type is the standard library's 'Bool'.
+static bool isBool(TypeChecker &tc, Type type) {
+  auto oneofType = type->getAs<OneOfType>();
+  if (!oneofType)
+    return false;
+
+  // Check whether this type is named 'Bool'.
+  // FIXME: Cache names.
+  auto structDecl = oneofType->getDecl();
+  auto boolName = tc.Context.getIdentifier("Bool");
+  if (structDecl->getName() != boolName)
+    return false;
+
+  // Check whether this type resides in the 'swift' module.
+  auto module = dyn_cast<Module>(structDecl->getDeclContext());
+  if (!module)
+    return false;
+
+  // FIXME: Cache name.
+  auto swiftName = tc.Context.getIdentifier("swift");
+  return module->Name == swiftName;
+}
+
+/// b\rief Determine whether the given type is a Builtin i1.
+static bool isBuiltinI1(Type type) {
+  if (auto builtinIntTy = type->getAs<BuiltinIntegerType>()) {
+    return builtinIntTy->getBitWidth() == 1;
+  }
+  return false;
+}
+
+Expr *
+Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+  ExprRewriter rewriter(cs, *this);
+
+  // FIXME: Cache name.
+  auto &tc = cs.getTypeChecker();
+  auto type = expr->getType();
+
+  // If the expression isn't Bool-typed, call getLogicValue() to get a bool.
+  if (!isBool(tc, type->getRValueType())) {
+    // Find the getLogicValue witness we need to use.
+    auto name = tc.Context.getIdentifier("getLogicValue");
+    auto getLogicValue = findNamedWitness(tc, type, tc.getLogicValueProtocol(),
+                                          name, diag::condition_broken_proto);
+
+    // Form a reference to getLogicValue.
+    // FIXME: openedType won't capture generics. The protocol definition
+    // prevents this, but it feels hacky.
+    auto openedType
+      = getLogicValue->getType()->castTo<AnyFunctionType>()->getResult();
+    auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
+                                             getLogicValue, expr->getEndLoc(),
+                                             openedType, locator);
+
+    // Call getLogicValue.
+    Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                           { }, nullptr,
+                                           expr->getEndLoc(),
+                                           TupleType::getEmpty(tc.Context));
+    ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+    expr = rewriter.finishApply(apply, openedType, locator);
+
+    // At this point, we must have a Bool.
+    type = expr->getType();
+    if (!isBool(tc, type->getRValueType())) {
+      tc.diagnose(tc.getLogicValueProtocol()->getLoc(),
+                  diag::condition_broken_proto);
+      return nullptr;
+    }
+  }
+
+  // Find the Bool.getBuiltinLogicValue that returns a Builtin i1.
+  auto name = tc.Context.getIdentifier("_getBuiltinLogicValue");
+  FuncDecl *getLogicValue = nullptr;
+  MemberLookup lookup(type->getRValueType(), name, tc.TU);
+  for (auto &result : lookup.Results) {
+    // Make sure we have a function.
+    auto func = dyn_cast<FuncDecl>(result.D);
+    if (!func)
+      continue;
+
+    // Make sure the function returns a builtin i1.
+    auto resultTy = func->getType()->castTo<AnyFunctionType>()->getResult();
+    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
+    if (isBuiltinI1(resultTy)) {
+      getLogicValue = func;
+      break;
+    }
+  }
+
+  if (!getLogicValue) {
+    tc.diagnose(expr->getLoc(), diag::broken_bool);
+    return nullptr;
+  }
+
+  // Form a reference to getLogicValue.
+  auto openedType
+    = getLogicValue->getType()->castTo<AnyFunctionType>()->getResult();
+  auto memberRef = rewriter.buildMemberRef(expr, expr->getStartLoc(),
+                                           getLogicValue, expr->getEndLoc(),
+                                           openedType, locator);
+
+  // Call getLogicValue.
+  Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                         { }, nullptr,
+                                         expr->getEndLoc(),
+                                         TupleType::getEmpty(tc.Context));
+  ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
+  return rewriter.finishApply(apply, openedType, locator);
+}
+

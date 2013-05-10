@@ -1111,6 +1111,11 @@ NOTE(subscript_decl_here,sema_tca,none,
 ERROR(condition_convert_limit_reached,sema_tce,none,
       "getLogicValue() for type %0 used in a conditional does not return "
       "a bool", (Type))
+ERROR(condition_missing_proto,sema_tce,none,
+      "condition requires the missing protocol 'LogicValue' to be defined", ())
+ERROR(condition_broken_proto,sema_tce,none,
+      "protocol 'LogicValue' is broken", ())
+ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
