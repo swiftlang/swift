@@ -82,10 +82,10 @@ public:
   }
 
   std::pair<llvm::Value*,llvm::Value*>
-  getSizeAndAlignment(IRGenFunction &IGF) const override {
+  getSizeAndAlignmentMask(IRGenFunction &IGF) const override {
     auto wtable = asImpl().getValueWitnessTable(IGF);
     auto size = emitLoadOfSize(IGF, wtable);
-    auto align = emitLoadOfAlignment(IGF, wtable);
+    auto align = emitLoadOfAlignmentMask(IGF, wtable);
     return { size, align };
   }
 
@@ -94,9 +94,9 @@ public:
     return emitLoadOfSize(IGF, wtable);
   }
 
-  llvm::Value *getAlignment(IRGenFunction &IGF) const override {
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF) const override {
     auto wtable = asImpl().getValueWitnessTable(IGF);
-    return emitLoadOfAlignment(IGF, wtable);
+    return emitLoadOfAlignmentMask(IGF, wtable);
   }
 
   llvm::Value *getStride(IRGenFunction &IGF) const override {
@@ -107,7 +107,7 @@ public:
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override {
     return nullptr;
   }
-  llvm::Constant *getStaticAlignment(IRGenModule &IGM) const override {
+  llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override {
     return nullptr;
   }
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {

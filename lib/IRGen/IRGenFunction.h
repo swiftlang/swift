@@ -162,9 +162,9 @@ public:
                             const llvm::Twine &name = "");
 
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
-                                   llvm::Value *align,
+                                   llvm::Value *alignMask,
                                    const llvm::Twine &name = "");
-  llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *align,
+  llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *alignMask,
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size);
   

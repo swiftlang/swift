@@ -60,8 +60,9 @@ public:
     /// The offset from the allocation to the first element.
     llvm::Value *HeaderSize;
 
-    /// The alignment requirement for the array allocation.
-    llvm::Value *AllocAlign;
+    /// The alignment requirement for the array allocation, as a
+    /// bitmask of the bits that cannot be set.
+    llvm::Value *AllocAlignMask;
 
     /// The most aggressive statically-known alignment
     /// requirement for the total allocation.

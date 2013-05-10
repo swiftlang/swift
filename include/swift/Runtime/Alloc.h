@@ -52,15 +52,15 @@ struct HeapObject {
 ///
 /// \param requiredSize - the required size of the allocation,
 ///   including the header
-/// \param requiredAlignment - the required alignment of the allocation;
-///   always a power of 2 no less than alignof(void*)
+/// \param requiredAlignmentMask - the required alignment of the allocation;
+///   always one less than a power of 2 that's at least alignof(void*)
 /// \return never null
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
 extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredSize,
-                                         size_t requiredAlignment);
+                                         size_t requiredAlignmentMask);
 
 /// The structure returned by swift_allocBox.
 struct BoxPair {

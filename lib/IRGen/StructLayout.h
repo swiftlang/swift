@@ -324,7 +324,7 @@ public:
 
   bool isFixedLayout() const { return IsFixedLayout; }
   llvm::Value *emitSize(IRGenFunction &IGF) const;
-  llvm::Value *emitAlign(IRGenFunction &IGF) const;
+  llvm::Value *emitAlignMask(IRGenFunction &IGF) const;
 
   /// Bitcast the given pointer to this type.
   Address emitCastTo(IRGenFunction &IGF, llvm::Value *ptr,

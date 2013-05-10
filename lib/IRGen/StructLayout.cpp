@@ -103,9 +103,9 @@ llvm::Value *StructLayout::emitSize(IRGenFunction &IGF) const {
   return IGF.IGM.getSize(getSize());
 }
 
-llvm::Value *StructLayout::emitAlign(IRGenFunction &IGF) const {
+llvm::Value *StructLayout::emitAlignMask(IRGenFunction &IGF) const {
   assert(isFixedLayout());
-  return IGF.IGM.getSize(getAlignment().asSize());
+  return IGF.IGM.getSize(getAlignment().asSize() - Size(1));
 }
 
 /// Bitcast an arbitrary pointer to be a pointer to this type.

@@ -45,25 +45,25 @@ public:
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
   OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
-                        const llvm::Twine &name) const;
+                        const llvm::Twine &name) const override;
 
   // We can give these reasonable default implementations.
 
   void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const;
+                          Address srcAddr) const override;
 
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr) const;
+                          Address srcAddr) const override;
 
   std::pair<llvm::Value*, llvm::Value*>
-  getSizeAndAlignment(IRGenFunction &IGF) const;
-  llvm::Value *getSize(IRGenFunction &IGF) const;
-  llvm::Value *getAlignment(IRGenFunction &IGF) const;
-  llvm::Value *getStride(IRGenFunction &IGF) const;
+  getSizeAndAlignmentMask(IRGenFunction &IGF) const override;
+  llvm::Value *getSize(IRGenFunction &IGF) const override;
+  llvm::Value *getAlignmentMask(IRGenFunction &IGF) const override;
+  llvm::Value *getStride(IRGenFunction &IGF) const override;
 
-  llvm::Constant *getStaticSize(IRGenModule &IGM) const;
-  llvm::Constant *getStaticAlignment(IRGenModule &IGM) const;
-  llvm::Constant *getStaticStride(IRGenModule &IGM) const;
+  llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
+  llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;
+  llvm::Constant *getStaticStride(IRGenModule &IGM) const override;
 
   void completeFixed(Size size, Alignment alignment) {
     StorageSize = size;

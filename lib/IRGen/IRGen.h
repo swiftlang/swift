@@ -187,9 +187,16 @@ public:
   friend Size operator+(Size L, Size R) {
     return Size(L.Value + R.Value);
   }
-
   friend Size &operator+=(Size &L, Size R) {
     L.Value += R.Value;
+    return L;
+  }
+
+  friend Size operator-(Size L, Size R) {
+    return Size(L.Value - R.Value);
+  }
+  friend Size &operator-=(Size &L, Size R) {
+    L.Value -= R.Value;
     return L;
   }
 

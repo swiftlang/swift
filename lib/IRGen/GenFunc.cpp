@@ -497,12 +497,9 @@ static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
                        llvm::AttributeSet &attrs) {
   if (cc == AbstractCC::C && requiresExternalByvalArgument(IGM, argTy)) {
     const TypeInfo &ti = IGM.getFragileTypeInfo(argTy);
-    llvm::Constant *alignConstant = ti.getStaticAlignment(IGM);
-    // FIXME: non-static alignment?
-    size_t alignValue = alignConstant
-      ? alignConstant->getUniqueInteger().getZExtValue()
-      : 1;
-    byvals.push_back({argTypes.size(), Alignment(alignValue)});
+    assert(isa<FixedTypeInfo>(ti) &&
+           "emitting 'byval' argument with non-fixed layout?");
+    byvals.push_back({argTypes.size(), ti.getBestKnownAlignment()});
     argTypes.push_back(ti.getStorageType()->getPointerTo());
   } else {
     auto schema = IGM.getSchema(argTy, explosionKind);
@@ -824,7 +821,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     args.claimAll();
     Type valueTy = substitutions[0].Replacement;
     const TypeInfo &valueTI = IGF.IGM.getFragileTypeInfo(valueTy);
-    out->add(valueTI.getAlignment(IGF));
+    // The alignof value is one greater than the alignment mask.
+    out->add(IGF.Builder.CreateAdd(valueTI.getAlignmentMask(IGF),
+                                   IGF.IGM.getSize(Size(1))));
     return;
   }
   
@@ -904,7 +903,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   if (BuiltinName == "allocRaw") {
     auto size = args.claimNext();
     auto align = args.claimNext();
-    auto alloc = IGF.emitAllocRawCall(size, align, "builtin-allocRaw");
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    auto alloc = IGF.emitAllocRawCall(size, alignMask, "builtin-allocRaw");
     out->add(alloc);
     return;
   }

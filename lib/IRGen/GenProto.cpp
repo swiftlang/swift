@@ -684,19 +684,19 @@ namespace {
     std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF) const {
       llvm::Value *wtable = getValueWitnessTable(IGF);
-      auto size = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Size);
-      auto align = emitLoadOfValueWitness(IGF, wtable, ValueWitness::Alignment);
+      auto size = emitLoadOfSize(IGF, wtable);
+      auto align = emitLoadOfAlignmentMask(IGF, wtable);
       return std::make_pair(size, align);
     }
 
     llvm::Value *getSize(IRGenFunction &IGF) const {
       llvm::Value *wtable = getValueWitnessTable(IGF);
-      return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Size);
+      return emitLoadOfSize(IGF, wtable);
     }
 
     llvm::Value *getAlignment(IRGenFunction &IGF) const {
       llvm::Value *wtable = getValueWitnessTable(IGF);
-      return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Alignment);
+      return emitLoadOfAlignmentMask(IGF, wtable);
     }
 
     llvm::Value *getStride(IRGenFunction &IGF) const {
@@ -915,17 +915,20 @@ static void emitDynamicPackingOperation(IRGenFunction &IGF,
                                         const TypeInfo &type,
                                         DynamicPackingOperation &operation) {
   llvm::Value *size = type.getSize(IGF);
-  llvm::Value *align = type.getAlignment(IGF);
+  llvm::Value *alignMask = type.getAlignmentMask(IGF);
 
   auto indirectBB = IGF.createBasicBlock("dynamic-packing.indirect");
   auto directBB = IGF.createBasicBlock("dynamic-packing.direct");
   auto contBB = IGF.createBasicBlock("dynamic-packing.cont");
 
   // Check whether the type is either over-sized or over-aligned.
+  // Note that, since alignof(FixedBuffer) is a power of 2 and
+  // alignMask is one less than one, alignMask > alignof(FixedBuffer)
+  // is equivalent to alignMask+1 > alignof(FixedBuffer).
   auto bufferSize = IGF.IGM.getSize(getFixedBufferSize(IGF.IGM));
-      auto oversize = IGF.Builder.CreateICmpUGT(size, bufferSize, "oversized");
+  auto oversize = IGF.Builder.CreateICmpUGT(size, bufferSize, "oversized");
   auto bufferAlign = IGF.IGM.getSize(getFixedBufferAlignment(IGF.IGM).asSize());
-  auto overalign = IGF.Builder.CreateICmpUGT(align, bufferAlign, "overaligned");
+  auto overalign = IGF.Builder.CreateICmpUGT(alignMask, bufferAlign, "overaligned");
 
   // Branch.
   llvm::Value *cond = IGF.Builder.CreateOr(oversize, overalign, "indirect");
@@ -1004,7 +1007,7 @@ static Address emitAllocateBuffer(IRGenFunction &IGF,
                                   Address buffer) {
   switch (packing) {
   case FixedPacking::Allocate: {
-    auto sizeAndAlign = type.getSizeAndAlignment(IGF);
+    auto sizeAndAlign = type.getSizeAndAlignmentMask(IGF);
     llvm::Value *addr =
       IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
     buffer = IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
@@ -1297,7 +1300,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   case ValueWitness::Size:
-  case ValueWitness::Alignment:
+  case ValueWitness::AlignmentMask:
   case ValueWitness::Stride:
     llvm_unreachable("these value witnesses aren't functions");
   }
@@ -1723,8 +1726,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
 
-  case ValueWitness::Alignment: {
-    if (auto value = concreteTI.getStaticAlignment(IGM))
+  case ValueWitness::AlignmentMask: {
+    if (auto value = concreteTI.getStaticAlignmentMask(IGM))
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
 
     // Just fill in null here if the type can't be statically laid out.

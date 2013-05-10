@@ -217,28 +217,28 @@ HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {
 
   // Otherwise, we need to do this computation at runtime.
 
-  // Read the alignment of the element type.
-  llvm::Value *eltAlign = ElementTI.getAlignment(IGF);
+  // Read the alignment mask of the element type.
+  // mask = alignment - 1
+  llvm::Value *eltAlignMask = ElementTI.getAlignmentMask(IGF);
 
   // Round the header size up to the element alignment.
   llvm::Value *headerSizeV = IGF.IGM.getSize(headerSize);
 
-  // mask = alignment - 1
   // headerSize = (headerSize + mask) & ~mask
-  auto eltAlignMask = IGF.Builder.CreateSub(eltAlign, IGF.IGM.getSize(Size(1)));
   headerSizeV = IGF.Builder.CreateAdd(headerSizeV, eltAlignMask);
   llvm::Value *eltAlignMaskInverted = IGF.Builder.CreateNot(eltAlignMask);
   headerSizeV = IGF.Builder.CreateAnd(headerSizeV, eltAlignMaskInverted,
                                       "array-header-size");
 
-  // allocAlign = max(headerAlign, alignment)
-  llvm::Value *headerAlignV = IGF.IGM.getSize(headerAlign.asSize());
+  // allocAlignMask = max(headerAlignMask, mask)
+  llvm::Value *headerAlignMaskV =
+    IGF.IGM.getSize(headerAlign.asSize() - Size(1));
   llvm::Value *overaligned =
-    IGF.Builder.CreateICmpUGT(eltAlign, headerAlignV, "overaligned");
-  llvm::Value *allocAlign =
-    IGF.Builder.CreateSelect(overaligned, eltAlign, headerAlignV);
+    IGF.Builder.CreateICmpUGT(eltAlignMask, headerAlignMaskV, "overaligned");
+  llvm::Value *allocAlignMask =
+    IGF.Builder.CreateSelect(overaligned, eltAlignMask, headerAlignMaskV);
 
-  return { headerSizeV, allocAlign, headerAlign };
+  return { headerSizeV, allocAlignMask, headerAlign };
 }
 
 /// Destroy all the elements of an array.
@@ -504,11 +504,11 @@ llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
 
   llvm::Constant *metadata = getPrivateMetadata(IGF.IGM);
   llvm::Value *size = getAllocationSize(IGF, layout, length, true, true);
-  llvm::Value *align = layout.AllocAlign;
+  llvm::Value *alignMask = layout.AllocAlignMask;
 
   // Perform the allocation.
   llvm::Value *alloc =
-    IGF.emitAllocObjectCall(metadata, size, align, "array.alloc");
+    IGF.emitAllocObjectCall(metadata, size, alignMask, "array.alloc");
 
   if (!Bindings.empty()) {
     Address bindingsBuffer =
@@ -547,9 +547,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name) {
   llvm::Value *metadata = layout.getPrivateMetadata(IGM);
   llvm::Value *size = layout.emitSize(*this);
-  llvm::Value *align = layout.emitAlign(*this);
+  llvm::Value *alignMask = layout.emitAlignMask(*this);
 
-  return emitAllocObjectCall(metadata, size, align, name);
+  return emitAllocObjectCall(metadata, size, alignMask, name);
 }
 
 namespace {

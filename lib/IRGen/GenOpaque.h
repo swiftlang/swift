@@ -117,8 +117,9 @@ namespace irgen {
   /// Emit a load of the 'size' value witness.
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable);
 
-  /// Emit a load of the 'alignment' value witness.
-  llvm::Value *emitLoadOfAlignment(IRGenFunction &IGF, llvm::Value *wtable);
+  /// Emit a load of the 'alignmentMask' value witness.
+  llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF,
+                                       llvm::Value *wtable);
 
   /// Emit a load of the 'stride' value witness.
   llvm::Value *emitLoadOfStride(IRGenFunction &IGF, llvm::Value *wtable);

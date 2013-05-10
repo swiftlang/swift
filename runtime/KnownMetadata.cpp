@@ -73,7 +73,7 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::allocateBuffer*) &projectBuffer,                \
   (value_witness_types::typeOf*) &swift_staticTypeof,                   \
   (value_witness_types::size) (SIZE),                                   \
-  (value_witness_types::alignment) (SIZE),                              \
+  (value_witness_types::alignmentMask) (SIZE - 1),                      \
   (value_witness_types::stride) (SIZE)                                  \
 }
 
@@ -144,7 +144,7 @@ const ValueWitnessTable swift::_TWVBo = {
   (value_witness_types::allocateBuffer*) &projectBuffer,
   (value_witness_types::typeOf*) &swift_objectTypeof,
   (value_witness_types::size) sizeof(void*),
-  (value_witness_types::alignment) alignof(void*),
+  (value_witness_types::alignmentMask) (alignof(void*) - 1),
   (value_witness_types::stride) sizeof(void*)
 };
 
@@ -220,7 +220,7 @@ const ValueWitnessTable swift::_TWVBO = {
   (value_witness_types::allocateBuffer*) &projectBuffer,
   (value_witness_types::typeOf*) &swift_objcTypeof,
   (value_witness_types::size) sizeof(void*),
-  (value_witness_types::alignment) alignof(void*),
+  (value_witness_types::alignmentMask) (alignof(void*) - 1),
   (value_witness_types::stride) sizeof(void*)
 };
 
@@ -291,7 +291,7 @@ const ValueWitnessTable swift::_TWVFT_T_ = {
   (value_witness_types::allocateBuffer*) &projectBuffer,
   (value_witness_types::typeOf*) &swift_staticTypeof,
   (value_witness_types::size) sizeof(Function),
-  (value_witness_types::alignment) alignof(Function),
+  (value_witness_types::alignmentMask) (alignof(Function) - 1),
   (value_witness_types::stride) sizeof(Function)
 };
 
@@ -318,7 +318,7 @@ const ValueWitnessTable swift::_TWVT_ = {
   (value_witness_types::allocateBuffer*) &projectBuffer,
   (value_witness_types::typeOf*) &swift_staticTypeof,
   (value_witness_types::size) 0,
-  (value_witness_types::alignment) 1,
+  (value_witness_types::alignmentMask) 0,
   (value_witness_types::stride) 0
 };
 

@@ -294,12 +294,8 @@ namespace {
       // NSRect correctly.
       if (requiresExternalByvalArgument(IGM, inputTy)) {
         const TypeInfo &ti = IGM.getFragileTypeInfo(inputTy);
-        llvm::Constant *alignConstant = ti.getStaticAlignment(IGM);
-        unsigned alignValue = alignConstant
-          ? alignConstant->getUniqueInteger().getZExtValue()
-          : 1;
         addByvalArgumentAttributes(IGM, Attrs, argTys.size(),
-                                   Alignment(alignValue));
+                                   ti.getBestKnownAlignment());
         argTys.push_back(ti.getStorageType()->getPointerTo());
       } else {
         auto argSchema = IGM.getSchema(inputTy,
@@ -787,11 +783,7 @@ namespace {
         // If the argument was passed byval in the C calling convention,
         // reexplode it.
         llvm::Value *addrValue = Params.claimNext();
-        llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
-        unsigned align = alignConstant
-          ? alignConstant->getUniqueInteger().getZExtValue()
-          : 1;
-        Address addr(addrValue, Alignment(align));
+        Address addr(addrValue, ti.getBestKnownAlignment());
         Explosion loaded(IGF.CurExplosionLevel);
         ti.load(IGF, addr, loaded);
         auto Vals = loaded.claim(ti.getExplosionSize(IGF.CurExplosionLevel));
@@ -962,11 +954,8 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
     ->getCanonicalType();
   TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
-  llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
-  Alignment align(alignConstant
-                    ? alignConstant->getUniqueInteger().getZExtValue()
-                    : 1);
-  
+  Alignment align = ti.getBestKnownAlignment();
+
   // Pick out the arguments:
   // - indirect return (if any)
   Address indirectReturn;
@@ -1048,11 +1037,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   CanType propTy = property->getType()->getCanonicalType();
   CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
     ->getCanonicalType();
-  TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
-  llvm::Constant *alignConstant = ti.getStaticAlignment(IGF.IGM);
-  Alignment align(alignConstant
-                  ? alignConstant->getUniqueInteger().getZExtValue()
-                  : 1);
+  auto &propTI = IGM.getFragileTypeInfo(propTy);
+  Alignment align = propTI.getBestKnownAlignment();
 
   // Pick out the arguments:
   // - self (passed in at +0)
@@ -1072,14 +1058,14 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
     // assign it (with copy so that we retain it) into the ivar.
     llvm::Value *value = params.claimNext();
     Address valueAddr(value, align);
-    ti.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
+    propTI.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
   } else {
     Explosion copy(explosionLevel);
     // Copy the argument values so they get retained.
-    ti.copy(IGF, params, copy);
+    propTI.copy(IGF, params, copy);
     
     // Assign the exploded value to the ivar.
-    ti.assign(IGF, copy, ivar.getAddress());
+    propTI.assign(IGF, copy, ivar.getAddress());
   }
   
   IGF.Builder.CreateRetVoid();

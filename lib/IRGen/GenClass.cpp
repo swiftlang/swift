@@ -468,8 +468,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
   llvm::Value *metadata = emitClassHeapMetadataRef(IGF, thisType);
   
   llvm::Value *size = layout.emitSize(IGF);
-  llvm::Value *align = layout.emitAlign(IGF);
-  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, align,
+  llvm::Value *alignMask = layout.emitAlignMask(IGF);
+  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   llvm::Type *destType = layout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
@@ -911,24 +911,32 @@ namespace {
       auto typeEncode = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
       auto &ivarTI = IGM.getFragileTypeInfo(ivar->getType());
-      auto size = ivarTI.getStaticSize(IGM);
-      auto alignment = ivarTI.getStaticAlignment(IGM);
-      assert((size != nullptr) == (alignment != nullptr));
-      if (size != nullptr) {
-        if (IGM.SizeTy != IGM.Int32Ty) {
-          size = llvm::ConstantExpr::getTrunc(size, IGM.Int32Ty);
-          alignment = llvm::ConstantExpr::getTrunc(alignment, IGM.Int32Ty);
-        }
+      Size size;
+      Alignment alignment;
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ivarTI)) {
+        size = fixedTI->getFixedSize();
+        alignment = fixedTI->getFixedAlignment();
       } else {
-        size = alignment = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+        // FIXME: set something up to fill these in at runtime!
+        size = Size(0);
+        alignment = Alignment(0);
+      }
+
+      // If the size is larger than we can represent in 32-bits,
+      // complain about the unimplementable ivar.
+      if (uint32_t(size.getValue()) != size.getValue()) {
+        IGM.error(ivar->getLoc(),
+                  "ivar size (" + Twine(size.getValue()) +
+                  " bytes) overflows Objective-C ivar layout");
+        size = Size(0);
       }
 
       llvm::Constant *fields[] = {
         offsetVar,
         name,
         typeEncode,
-        size,
-        alignment
+        llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
+        llvm::ConstantInt::get(IGM.Int32Ty, alignment.getValue())
       };
       return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }

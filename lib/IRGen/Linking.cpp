@@ -54,7 +54,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::TypeOf: return "ty";
 
   case ValueWitness::Size:
-  case ValueWitness::Alignment:
+  case ValueWitness::AlignmentMask:
   case ValueWitness::Stride:
     llvm_unreachable("not a function witness");
   }

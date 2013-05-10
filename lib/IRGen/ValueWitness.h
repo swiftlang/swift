@@ -164,10 +164,19 @@ enum class ValueWitness : unsigned {
   /// The required storage size of a single object of this type.
   Size,
 
-  ///   size_t alignment;
+  ///   size_t alignmentMask;
   ///
-  /// The required alignment of the first byte of this type.
-  Alignment,
+  /// The required alignment of the first byte of an object of this
+  /// type, expressed as a mask of the low bits that must not be set
+  /// in the pointer.  This representation can be easily converted to
+  /// the 'alignof' result by merely adding 1, but it is more directly
+  /// useful for performing dynamic structure layouts, and it grants
+  /// an additional bit of precision in a compact field without
+  /// needing to switch to an exponent representation.
+  ///
+  /// For example, if the type needs to be 8-byte aligned, the value
+  /// of this field is 0x7.
+  AlignmentMask,
 
   ///   size_t stride;
   ///

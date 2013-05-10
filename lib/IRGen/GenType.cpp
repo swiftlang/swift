@@ -104,9 +104,9 @@ static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
 
 /// Return the size and alignment of this type.
 std::pair<llvm::Value*,llvm::Value*>
-FixedTypeInfo::getSizeAndAlignment(IRGenFunction &IGF) const {
+FixedTypeInfo::getSizeAndAlignmentMask(IRGenFunction &IGF) const {
   return std::make_pair(FixedTypeInfo::getSize(IGF),
-                        FixedTypeInfo::getAlignment(IGF));
+                        FixedTypeInfo::getAlignmentMask(IGF));
 }
 
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF) const {
@@ -116,11 +116,11 @@ llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedSize());
 }
 
-llvm::Value *FixedTypeInfo::getAlignment(IRGenFunction &IGF) const {
-  return FixedTypeInfo::getStaticAlignment(IGF.IGM);
+llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF) const {
+  return FixedTypeInfo::getStaticAlignmentMask(IGF.IGM);
 }
-llvm::Constant *FixedTypeInfo::getStaticAlignment(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, Size(getFixedAlignment().getValue()));
+llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
+  return asSizeConstant(IGM, Size(getFixedAlignment().getValue() - 1));
 }
 
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF) const {

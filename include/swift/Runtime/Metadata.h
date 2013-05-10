@@ -257,8 +257,17 @@ typedef const Metadata *typeOf(OpaqueValue *src,
 /// multiple of the alignment.
 typedef size_t size;
 
-/// The required alignment for the first byte of an object of this type.
-typedef size_t alignment;
+/// The required alignment of the first byte of an object of this
+/// type, expressed as a mask of the low bits that must not be set
+/// in the pointer.  This representation can be easily converted to
+/// the 'alignof' result by merely adding 1, but it is more directly
+/// useful for performing dynamic structure layouts, and it grants
+/// an additional bit of precision in a compact field without
+/// needing to switch to an exponent representation.
+///
+/// For example, if the type needs to be 8-byte aligned, the value
+/// of this witness is 0x7.
+typedef size_t alignmentMask;
 
 /// When allocating an array of objects of this type, the number of bytes
 /// between array elements.  This value may be zero.  This value is always
@@ -302,12 +311,28 @@ struct ValueWitnessTable {
 #undef DECLARE_WITNESS
 
   value_witness_types::size size;
-  value_witness_types::alignment alignment;
+  value_witness_types::alignmentMask alignmentMask;
   value_witness_types::stride stride;
 
   /// Are values of this type allocated inline?
   bool isValueInline() const {
-    return (size <= sizeof(ValueBuffer) && alignment <= alignof(ValueBuffer));
+    return (size <= sizeof(ValueBuffer) &&
+            alignmentMask < alignof(ValueBuffer));
+  }
+
+  /// Return the alignment required by this type, in bytes.
+  size_t getAlignment() const {
+    return alignmentMask + 1;
+  }
+
+  /// The alignment mask of this type.  An offset may be rounded up to
+  /// the required alignment by adding this mask and masking by its
+  /// bit-negation.
+  ///
+  /// For example, if the type needs to be 8-byte aligned, the value
+  /// of this witness is 0x7.
+  size_t getAlignmentMask() const {
+    return alignmentMask;
   }
 };
 

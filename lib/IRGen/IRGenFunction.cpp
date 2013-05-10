@@ -121,7 +121,7 @@ static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
 /// Emit a 'raw' allocation, which has no heap pointer and is
 /// not guaranteed to be zero-initialized.
 llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
-                                             llvm::Value *align,
+                                             llvm::Value *alignMask,
                                              const llvm::Twine &name) {
 
   // Try to use swift_rawAlloc.
@@ -133,8 +133,9 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                                 name);
     }
 
-    assert(isa<llvm::ConstantInt>(align));
-    assert(csize->getZExtValue() %cast<llvm::ConstantInt>(align)->getZExtValue()
+    assert(isa<llvm::ConstantInt>(alignMask));
+    assert(csize->getZExtValue() %
+               (cast<llvm::ConstantInt>(alignMask)->getZExtValue() + 1)
              == 0 && "size not a multiple of alignment!");
   }
 
@@ -149,11 +150,11 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
 /// Emit a heap allocation.
 llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
                                                 llvm::Value *size,
-                                                llvm::Value *align,
+                                                llvm::Value *alignMask,
                                                 const llvm::Twine &name) {
   // For now, all we have is swift_allocObject.
   return emitAllocatingCall(*this, IGM.getAllocObjectFn(),
-                            { metadata, size, align }, name);
+                            { metadata, size, alignMask }, name);
 }
 
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,

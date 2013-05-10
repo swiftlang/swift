@@ -48,14 +48,15 @@ struct TSD {
 HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
-                         size_t requiredAlignment) {
+                         size_t requiredAlignmentMask) {
   HeapObject *object;
   static_assert(offsetof(TSD, cache) == SWIFT_TSD_ALLOC_BASE, "Fix ASM");
   static_assert(offsetof(TSD, rawCache) == SWIFT_TSD_RAW_ALLOC_BASE, "Fix ASM");
   (void)tsd;
   for (;;) {
     object = reinterpret_cast<HeapObject *>(
-      calloc(1, llvm::RoundUpToAlignment(requiredSize, requiredAlignment)));
+      calloc(1, llvm::RoundUpToAlignment(requiredSize,
+                                         requiredAlignmentMask+1)));
     if (object) {
       break;
     }
@@ -83,7 +84,7 @@ namespace {
     /// inside the box.
     static size_t getValueOffset(Metadata const *type) {
       return llvm::RoundUpToAlignment(sizeof(GenericBox),
-                                      type->getValueWitnesses()->alignment);
+                                  type->getValueWitnesses()->getAlignment());
     }
 
     /// Returns the size of the allocation for the box, including the header
@@ -144,7 +145,7 @@ swift::swift_allocBox(Metadata const *type) {
   // Allocate the box.
   HeapObject *obj = swift_allocObject(&GenericBoxHeapMetadata,
                                       GenericBox::getAllocatedSize(type),
-                                      type->getValueWitnesses()->alignment);
+                                type->getValueWitnesses()->getAlignmentMask());
   // allocObject will initialize the heap metadata pointer and refcount for us.
   // We also need to store the type metadata between the header and the
   // value.

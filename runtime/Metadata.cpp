@@ -653,7 +653,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   metadata->Labels = labels;
 
   size_t size = 0;
-  size_t alignment = 1;
+  size_t alignment = 0;
   for (unsigned i = 0; i != numElements; ++i) {
     auto elt = elements[i];
 
@@ -662,13 +662,13 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
     // Lay out this tuple element.
     auto eltVWT = elt->getValueWitnesses();
-    size = llvm::RoundUpToAlignment(size, eltVWT->alignment);
+    size = llvm::RoundUpToAlignment(size, eltVWT->getAlignment());
     size += eltVWT->size;
-    alignment = std::max(alignment, eltVWT->alignment);
+    alignment = std::max(alignment, eltVWT->getAlignment());
   }
 
   witnesses->size = size;
-  witnesses->alignment = alignment;
+  witnesses->alignmentMask = (alignment - 1);
   witnesses->stride = llvm::RoundUpToAlignment(size, alignment);
 
   // Copy the function witnesses in, either from the proposed

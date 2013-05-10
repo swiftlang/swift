@@ -119,9 +119,9 @@ static llvm::FunctionType *createWitnessFunctionType(IRGenModule &IGM,
   }
       
   case ValueWitness::Size:
-  case ValueWitness::Alignment:
+  case ValueWitness::AlignmentMask:
   case ValueWitness::Stride:
-    llvm_unreachable("these witnesses aren't value witnesses!");
+    llvm_unreachable("these witnesses aren't value witness functions!");
   }
   llvm_unreachable("bad value witness!");
 }
@@ -175,8 +175,8 @@ static llvm::StringRef getValueWitnessLabel(ValueWitness index) {
     return "typeof";
   case ValueWitness::Size:
     return "size";
-  case ValueWitness::Alignment:
-    return "alignment";
+  case ValueWitness::AlignmentMask:
+    return "alignmentMask";
   case ValueWitness::Stride:
     return "stride";
   }
@@ -389,10 +389,10 @@ llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *wtable) {
   return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Size);
 }
 
-/// Emit a load of the 'alignment' value witness.
-llvm::Value *irgen::emitLoadOfAlignment(IRGenFunction &IGF,
+/// Emit a load of the 'alignmentMask' value witness.
+llvm::Value *irgen::emitLoadOfAlignmentMask(IRGenFunction &IGF,
                                         llvm::Value *wtable) {
-  return emitLoadOfValueWitness(IGF, wtable, ValueWitness::Alignment);
+  return emitLoadOfValueWitness(IGF, wtable, ValueWitness::AlignmentMask);
 }
 
 /// Emit a load of the 'stride' value witness.
