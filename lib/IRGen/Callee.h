@@ -203,6 +203,21 @@ namespace irgen {
     }
 
     /// Prepare a callee for a known function with a known data pointer.
+    static Callee forKnownFunction(SILType origSILType,
+                                   SILType substResultType,
+                                   ArrayRef<Substitution> subs,
+                                   llvm::Value *fn, llvm::Value *data,
+                                   ExplosionKind explosionLevel) {
+      auto *info = origSILType.getFunctionTypeInfo();
+      return forKnownFunction(info->getAbstractCC(),
+                              origSILType.getSwiftType(),
+                              substResultType.getSwiftRValueType(),
+                              subs,
+                              fn, data, explosionLevel,
+                              info->getUncurryLevel());
+    }
+
+    /// Prepare a callee for a known function with a known data pointer.
     static Callee forKnownFunction(AbstractCC convention,
                                    CanType origFormalType,
                                    CanType substResultType,
@@ -229,7 +244,7 @@ namespace irgen {
       result.Substitutions = subs;
       return result;
     }
-
+    
     AbstractCC getConvention() const { return Convention; }
 
     CanType getOrigFormalType() const { return OrigFormalType; }

@@ -408,6 +408,12 @@ public:
       : inputs;
   }
   
+  /// Returns the type of the return type or the indirect return slot if
+  /// present.
+  SILType getSemanticResultType() const {
+    return hasIndirectReturn() ? getIndirectReturnType() : getResultType();
+  }
+  
   /// Get the uncurry level of this type.
   unsigned getUncurryLevel() const {
     return uncurryCount - 1;

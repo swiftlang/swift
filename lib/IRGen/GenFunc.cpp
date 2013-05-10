@@ -1722,7 +1722,7 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   // Collect the indirect return address, if present.
   Address indirectReturn;
-  CanType retTy(substType.castTo<FunctionType>()->getResult());
+  SILType retTy = substType.getFunctionTypeInfo()->getSemanticResultType();
   TypeInfo const &retTI = IGM.getFragileTypeInfo(retTy);
                 
   ExplosionSchema schema = retTI.getSchema(explosionLevel);
@@ -1741,14 +1741,12 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   assert(params.empty() && "did not claim all parameters?!");
   
   // Apply the arguments in a call to the generic function.
-  Callee callee = Callee::forKnownFunction(genericType.getFunctionTypeInfo()->getAbstractCC(),
-                                           genericType.getSwiftType(),
+  Callee callee = Callee::forKnownFunction(genericType,
                                            retTy,
                                            substitutions,
                                            fnPtr,
                                            nullptr,
-                                           explosionLevel,
-                                           genericType.getUncurryLevel());
+                                           explosionLevel);
   CallEmission emission(subIGF, callee);
   
   for (size_t i = 0; i < paramLevels.size(); ++i) {
