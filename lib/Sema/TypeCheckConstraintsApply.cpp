@@ -432,21 +432,28 @@ namespace {
 
   private:
     /// \brief Build a new subscript.
-    Expr *buildSubscript(Expr *expr, Expr *base, Expr *index) {
+    ///
+    /// \param base The base of the subscript.
+    /// \param index The index of the subscript.
+    /// \param locator The locator used to refer to the subscript.
+    Expr *buildSubscript(Expr *base, Expr *index,
+                         ConstraintLocatorBuilder locator) {
       // Determine the declaration selected for this subscript operation.
-      auto choice = getOverloadChoice(
-                      cs.getConstraintLocator(
-                        expr,
-                        ConstraintLocator::SubscriptMember)).first;
+      auto selected = getOverloadChoice(
+                        cs.getConstraintLocator(
+                          locator.withPathElement(
+                            ConstraintLocator::SubscriptMember)));
+      auto choice = selected.first;
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
+      auto subscriptTy = simplifyType(selected.second);
 
-      // FIXME: Falls back to existing type checker to actually populate
-      // these nodes.
       auto &tc = cs.getTypeChecker();
       auto baseTy = base->getType()->getRValueType();
 
       // Subscripting an existential type.
       if (baseTy->isExistentialType()) {
+        // FIXME: Falls back to existing type checker to actually populate
+        // these nodes.
         auto result
           = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
         return tc.semaSubscriptExpr(result);
@@ -454,6 +461,8 @@ namespace {
 
       // Subscripting an archetype.
       if (baseTy->is<ArchetypeType>()) {
+        // FIXME: Falls back to existing type checker to actually populate
+        // these nodes.
         auto result
           = new (tc.Context) ArchetypeSubscriptExpr(base, index, subscript);
         return tc.semaSubscriptExpr(result);
@@ -461,15 +470,35 @@ namespace {
 
       // Subscripting a specialization of a generic type.
       if (baseTy->isSpecialized()) {
+        // FIXME: Falls back to existing type checker to actually populate
+        // these nodes.
         auto result
           = new (tc.Context) GenericSubscriptExpr(base, index, subscript);
         return tc.semaSubscriptExpr(result);
       }
 
       // Subscripting a normal, nominal type.
+
+      // Coerce the base to the container type.
+      auto containerTy
+        = subscript->getDeclContext()->getDeclaredTypeOfContext();
+      base = coerceObjectArgumentToType(base, containerTy, locator);
+
+      // Coerce the index argument.
+      auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
+      index = coerceToType(index, indexTy,
+                           locator.withPathElement(
+                             ConstraintLocator::SubscriptIndex));
+
+      // Form the subscript expression.
+      auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
+      resultTy = LValueType::get(resultTy->getRValueType(),
+                                 LValueType::Qual::DefaultForMemberAccess,
+                                 tc.Context);
       SubscriptExpr *subscriptExpr = new (tc.Context) SubscriptExpr(base,index);
+      subscriptExpr->setType(resultTy);
       subscriptExpr->setDecl(subscript);
-      return tc.semaSubscriptExpr(subscriptExpr);
+      return subscriptExpr;
     }
 
     /// \brief Build a reference to an operator within a protocol.
@@ -869,7 +898,8 @@ namespace {
     }
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
-      return buildSubscript(expr, expr->getBase(), expr->getIndex());
+      return buildSubscript(expr->getBase(), expr->getIndex(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitArrayExpr(ArrayExpr *expr) {
@@ -964,19 +994,23 @@ namespace {
     }
 
     Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
-      return buildSubscript(expr, expr->getBase(), expr->getIndex());
+      return buildSubscript(expr->getBase(), expr->getIndex(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
-      return buildSubscript(expr, expr->getBase(), expr->getIndex());
+      return buildSubscript(expr->getBase(), expr->getIndex(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
-      return buildSubscript(expr, expr->getBase(), expr->getIndex());
+      return buildSubscript(expr->getBase(), expr->getIndex(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitGenericSubscriptExpr(GenericSubscriptExpr *expr) {
-      return buildSubscript(expr, expr->getBase(), expr->getIndex());
+      return buildSubscript(expr->getBase(), expr->getIndex(),
+                            cs.getConstraintLocator(expr, { }));
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
