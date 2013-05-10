@@ -1181,7 +1181,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   assert(isValueWitnessFunction(index));
 
   IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                    ExplosionKind::Minimal, 0, fn, Prologue::Bare);
+                    ExplosionKind::Minimal, 0, fn);
 
   auto argv = fn->arg_begin();
   switch (index) {
@@ -1346,7 +1346,7 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     auto it = def->arg_begin();
     Address dest(it++, getFixedBufferAlignment(IGM));
     Address src(it++, getFixedBufferAlignment(IGM));
@@ -1494,7 +1494,7 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1524,7 +1524,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1552,7 +1552,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1577,7 +1577,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
     IGF.emitRelease(IGF.Builder.CreateLoad(arg));
     IGF.Builder.CreateRetVoid();
@@ -1615,7 +1615,7 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                      ExplosionKind::Minimal, 0, def, Prologue::Bare);
+                      ExplosionKind::Minimal, 0, def);
     auto it = def->arg_begin();
     Address dest(it++, fixedTI->getFixedAlignment());
     Address src(it++, fixedTI->getFixedAlignment());
@@ -1859,8 +1859,7 @@ namespace {
 
       // Start building it.
       IRGenFunction IGF(IGM, CanType(), ArrayRef<Pattern*>(),
-                        ExplosionKind::Minimal, UncurryLevel, fn,
-                        Prologue::Bare);
+                        ExplosionKind::Minimal, UncurryLevel, fn);
       emitThunk(IGF);
 
       return asOpaquePtr(IGM, fn);

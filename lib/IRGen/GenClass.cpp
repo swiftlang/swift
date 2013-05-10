@@ -441,7 +441,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
                                        llvm::Function *deallocator,
                                        llvm::Function *destroyer) {
   IRGenFunction IGF(IGM, CanType(), nullptr,
-                    ExplosionKind::Minimal, 0, deallocator, Prologue::Bare);
+                    ExplosionKind::Minimal, 0, deallocator);
 
   Type thisType = theClass->getDeclaredTypeInContext();
   const ClassTypeInfo &info =

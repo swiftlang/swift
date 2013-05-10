@@ -354,13 +354,12 @@ public:
   Address IndirectReturn;
   
   IRGenSILFunction(IRGenModule &IGM,
-                   CanType t,
-                   ExplosionKind explosionLevel,
-                   llvm::Function *fn);
+                   SILFunction *f,
+                   ExplosionKind explosionLevel);
   ~IRGenSILFunction();
   
-  /// Generate IR for the given SIL Function.
-  void emitSILFunction(SILFunction *f);
+  /// Generate IR for the SIL Function.
+  void emitSILFunction();
 
   void newLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = loweredValues.insert({v, std::move(lv)});

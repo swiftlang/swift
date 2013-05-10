@@ -60,6 +60,7 @@ namespace swift {
   class ProtocolDecl;
   struct SILConstant;
   class SILModule;
+  class SILType;
   class SourceLoc;
   class StructDecl;
   class TranslationUnit;
@@ -168,6 +169,7 @@ public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
   const TypeInfo &getFragileTypeInfo(CanType T);
   const TypeInfo &getFragileTypeInfo(Type T);
+  const TypeInfo &getFragileTypeInfo(SILType T);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   llvm::Type *getStorageType(CanType T);
@@ -346,6 +348,10 @@ public:
                                       unsigned uncurryLevel,
                                       ExtraData data,
                                       llvm::AttributeSet &attrs);
+                                      
+  llvm::FunctionType *getFunctionType(SILType type, ExplosionKind explosionKind,
+                                      ExtraData extraData,
+                                      llvm::AttributeSet &attrs);
 
   llvm::Constant *getSize(Size size);
 
@@ -354,8 +360,6 @@ public:
 
   Address getAddrOfGlobalVariable(VarDecl *D);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect);
-  llvm::Function *getAddrOfAnonymousFunction(SILFunction *f,
-                                             CapturingExpr *expr);
   llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data);
   llvm::Function *getAddrOfInjectionFunction(OneOfElementDecl *D);
   llvm::Function *getAddrOfGetter(ValueDecl *D, FormalType type,
@@ -381,11 +385,8 @@ public:
   llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D);
   llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
-  void getAddrOfSILFunction(SILFunction *f,
-                            ExplosionKind level,
-                            llvm::Function* &fnptr,
-                            unsigned &naturalCurryLevel,
-                            AbstractCC &cc);
+  llvm::Function *getAddrOfSILFunction(SILFunction *f,
+                                       ExplosionKind level);
   llvm::Function *getAddrOfBridgeToBlockConverter(CanType blockType);
 
   llvm::StringRef mangleType(CanType type,

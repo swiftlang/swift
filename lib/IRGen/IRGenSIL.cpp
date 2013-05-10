@@ -103,14 +103,16 @@ ExplosionKind LoweredValue::getExplosionKind() const {
 }
 
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
-                                   CanType t,
-                                   ExplosionKind explosionLevel,
-                                   llvm::Function *fn)
-  : IRGenFunction(IGM, t,
-                  /*paramPatterns=*/ nullptr,
-                  explosionLevel, 0, fn, Prologue::Bare),
-    CurSILFn(nullptr)
+                                   SILFunction *f,
+                                   ExplosionKind explosionLevel)
+  : IRGenFunction(IGM, f->getLoweredType().getSwiftType(),
+                  /*paramPatterns*/ nullptr,
+                  explosionLevel,
+                  0,
+                  IGM.getAddrOfSILFunction(f, explosionLevel)),
+    CurSILFn(f)
 {
+  
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -129,42 +131,48 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   for (SILArgument *arg : make_range(silBB->bbarg_begin(), silBB->bbarg_end())) {
     size_t first = phis.size();
     
-    const TypeInfo &ti = IGF.getFragileTypeInfo(arg->getType().getSwiftType());
-    ExplosionSchema schema = ti.getSchema(IGF.CurExplosionLevel);
-    for (auto &elt : schema) {
-      if (elt.isScalar())
-        phis.push_back(
-                   IGF.Builder.CreatePHI(elt.getScalarType(), predecessors));
-      else
-        phis.push_back(
-                   IGF.Builder.CreatePHI(elt.getAggregateType()->getPointerTo(),
-                   predecessors));
-    }
+    const TypeInfo &ti = IGF.getFragileTypeInfo(arg->getType());
     
-    Explosion argValue(IGF.CurExplosionLevel);
-    for (llvm::PHINode *phi : make_range(phis.begin()+first, phis.end()))
-      argValue.add(phi);
-    IGF.newLoweredExplosion(SILValue(arg,0), argValue);
+    if (arg->getType().isAddress()) {
+      phis.push_back(IGF.Builder.CreatePHI(ti.getStorageType()->getPointerTo(),
+                                           predecessors));
+      IGF.newLoweredAddress(SILValue(arg,0),
+                            ti.getAddressForPointer(phis.back()));
+    } else {
+      ExplosionSchema schema = ti.getSchema(IGF.CurExplosionLevel);
+      for (auto &elt : schema) {
+        if (elt.isScalar())
+          phis.push_back(
+                     IGF.Builder.CreatePHI(elt.getScalarType(), predecessors));
+        else
+          phis.push_back(
+                     IGF.Builder.CreatePHI(elt.getAggregateType()->getPointerTo(),
+                     predecessors));
+      }
+      
+      Explosion argValue(IGF.CurExplosionLevel);
+      for (llvm::PHINode *phi : make_range(phis.begin()+first, phis.end()))
+        argValue.add(phi);
+      IGF.newLoweredExplosion(SILValue(arg,0), argValue);
+    }
   }
   
   return phis;
 }
 
-void IRGenSILFunction::emitSILFunction(SILFunction *f) {
+void IRGenSILFunction::emitSILFunction() {
   DEBUG(llvm::dbgs() << "emitting SIL function: ";
-        f->printName(llvm::dbgs());
+        CurSILFn->printName(llvm::dbgs());
         llvm::dbgs() << '\n';
-        f->print(llvm::dbgs()));
+        CurSILFn->print(llvm::dbgs()));
   
-  assert(!f->empty() && "function has no basic blocks?!");
+  assert(!CurSILFn->empty() && "function has no basic blocks?!");
   
-  CurSILFn = f;
-
   // Map the entry bb.
-  loweredBBs[f->begin()] = LoweredBB(CurFn->begin(), {});
+  loweredBBs[CurSILFn->begin()] = LoweredBB(CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
-  for (SILBasicBlock *bb = f->begin()->getNextNode();
-       bb != f->end(); bb = bb->getNextNode()) {
+  for (SILBasicBlock *bb = CurSILFn->begin()->getNextNode();
+       bb != CurSILFn->end(); bb = bb->getNextNode()) {
     // FIXME: Use the SIL basic block's name.
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
     std::vector<llvm::PHINode*> phis = emitPHINodesForBBArgs(*this, bb, llBB);
@@ -184,15 +192,13 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
   if (funcTI->hasIndirectReturn()) {
     SILArgument *ret = entry->first->bbarg_end()[-1];
     SILValue retv(ret, 0);
-    TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                           ret->getType().getSwiftRValueType());
+    TypeInfo const &retType = IGM.getFragileTypeInfo(ret->getType());
     
     newLoweredAddress(retv, retType.getAddressForPointer(params.claimNext()));
   } else {
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
-    TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                       funcTI->getResultType().getSwiftType());
+    TypeInfo const &retType = IGM.getFragileTypeInfo(funcTI->getResultType());
     ExplosionSchema schema = retType.getSchema(CurExplosionLevel);
     
     if (schema.requiresIndirectResult()) {
@@ -201,7 +207,7 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
   }
 
   // Unravel the function types for each uncurry level.
-  unsigned level = f->getLoweredType().getUncurryLevel();
+  unsigned level = CurSILFn->getLoweredType().getUncurryLevel();
   llvm::SmallVector<AnyFunctionType*, 4> uncurriedTypes;
   AnyFunctionType *uncurriedType = funcTy.castTo<AnyFunctionType>();
   for (;;) {
@@ -214,7 +220,7 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
 
   // Map LLVM arguments in inner-to-outer curry order to match the Swift
   // convention.
-  level = f->getLoweredType().getUncurryLevel();
+  level = CurSILFn->getLoweredType().getUncurryLevel();
   do {
     unsigned from = funcTI->getUncurriedInputBegins()[level],
       to = funcTI->getUncurriedInputEnds()[level];
@@ -223,8 +229,7 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
          argi != argend; ++argi) {
       SILArgument *arg = *argi;
       SILValue argv(arg, 0);
-      TypeInfo const &argType = IGM.getFragileTypeInfo(
-                                           arg->getType().getSwiftRValueType());
+      TypeInfo const &argType = IGM.getFragileTypeInfo(arg->getType());
       if (arg->getType().isAddress()) {
         newLoweredAddress(argv,
                    argType.getAddressForPointer(params.claimNext()));
@@ -245,7 +250,7 @@ void IRGenSILFunction::emitSILFunction(SILFunction *f) {
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
   // Emit the function body.
-  for (SILBasicBlock &bb : *f)
+  for (SILBasicBlock &bb : *CurSILFn)
     visitSILBasicBlock(&bb);
 }
 
@@ -266,39 +271,24 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
 /// Find the entry point, natural curry level, and calling convention for a
 /// SILConstant function.
-void IRGenModule::getAddrOfSILFunction(SILFunction *f,
-                                       ExplosionKind level,
-                                       llvm::Function* &fnptr,
-                                       unsigned &naturalCurryLevel,
-                                       AbstractCC &absCC) {
-  naturalCurryLevel = f->getUncurryLevel();
-  absCC = f->getAbstractCC();
-
+llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
+                                                  ExplosionKind level) {
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  if (llvm::Function *fn = Module.getFunction(f->getMangledName())) {
-    fnptr = fn;
-    return;
-  }
-      
+  if (llvm::Function *fn = Module.getFunction(f->getMangledName()))
+    return fn;
+    
   LinkEntity entity = LinkEntity::forSILFunction(f, level);
   
-  llvm::FunctionType *fnType;
-  // A bit of a hack here. SIL represents closure functions with their context
-  // expanded out and uses a partial application function to construct the
-  // context. IRGen previously set up local functions to expect their extraData
-  // prepackaged.
   llvm::AttributeSet attrs;
-  fnType = getFunctionType(absCC,
-                           f->getLoweredType().getSwiftType(),
-                           level,
-                           naturalCurryLevel,
-                           ExtraData::None,
-                           attrs);
+  llvm::FunctionType *fnType = getFunctionType(f->getLoweredType(),
+                                               level,
+                                               ExtraData::None,
+                                               attrs);
   
-  auto cc = expandAbstractCC(*this, absCC);
+  auto cc = expandAbstractCC(*this, f->getAbstractCC());
   LinkInfo link = LinkInfo::get(*this, entity);
-  fnptr = link.createFunction(*this, fnType, cc, attrs);
+  return link.createFunction(*this, fnType, cc, attrs);
 }
 
 void IRGenSILFunction::visitBuiltinFunctionRefInst(
@@ -309,16 +299,14 @@ void IRGenSILFunction::visitBuiltinFunctionRefInst(
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
-  llvm::Function *fnptr;
-  unsigned naturalCurryLevel;
-  AbstractCC cc;
-  IGM.getAddrOfSILFunction(i->getFunction(), CurExplosionLevel,
-                           fnptr, naturalCurryLevel, cc);
+  llvm::Function *fnptr = IGM.getAddrOfSILFunction(i->getFunction(),
+                                                   CurExplosionLevel);
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
-  newLoweredStaticFunction(SILValue(i, 0), fnptr, cc);
+  newLoweredStaticFunction(SILValue(i, 0), fnptr,
+                           i->getFunction()->getAbstractCC());
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -517,15 +505,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       llvm_unreachable("unexpected extra data for function value");
 
     // Cast the callee pointer to the right function type.
-    // FIXME calling convention. attrs are important for C/ObjC functions too.
     llvm::AttributeSet attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(AbstractCC::Freestanding,
-                                           calleeTy.getSwiftType(),
-                                           IGF.CurExplosionLevel,
-                                           calleeTy.getUncurryLevel(),
-                                           extraData,
-                                           attrs)->getPointerTo();
-
+    auto fnPtrTy = IGF.IGM.getFunctionType(calleeTy, IGF.CurExplosionLevel,
+                                           extraData, attrs)->getPointerTo();
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
   }
@@ -712,8 +694,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   if (i->hasIndirectReturn()) {
     SILValue indirectReturn = i->getIndirectReturn();
     Address a = getLoweredAddress(indirectReturn);
-    TypeInfo const &ti
-      = getFragileTypeInfo(indirectReturn.getType().getSwiftRValueType());
+    TypeInfo const &ti = getFragileTypeInfo(indirectReturn.getType());
     emission.emitToMemory(a, ti);
     return;
   }
@@ -764,6 +745,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
       to = ti->getUncurriedInputEnds()[uncurryLevel];
     for (SILValue arg : i->getArguments().slice(from, to - from)) {
       emitApplyArgument(*this, args, arg);
+      // FIXME: Need to carry the address-ness of each argument along side
+      // the object type's TypeInfo.
       argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
     }
   }
@@ -811,7 +794,7 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
   // require an indirect return.
   if (IndirectReturn.isValid()) {
     TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                 i->getOperand().getType().getSwiftType());
+                                 i->getOperand().getType());
     retType.initialize(*this, result, IndirectReturn);
     Builder.CreateRetVoid();
   } else
@@ -865,7 +848,7 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
 }
 
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  auto &ti = getFragileTypeInfo(i->getType());
   llvm::Value *zeroValue = llvm::Constant::getNullValue(ti.getStorageType());
   Explosion out(CurExplosionLevel);
   out.add(zeroValue);
@@ -937,7 +920,7 @@ void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered(CurExplosionLevel);
   Address source = getLoweredAddress(i->getOperand());
-  const TypeInfo &type = getFragileTypeInfo(i->getType().getSwiftRValueType());
+  const TypeInfo &type = getFragileTypeInfo(i->getType().getObjectType());
   type.loadAsTake(*this, source, lowered);
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
@@ -946,7 +929,7 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   Explosion source = getLoweredExplosion(i->getSrc());
   Address dest = getLoweredAddress(i->getDest());
   const TypeInfo &type = getFragileTypeInfo(
-                              i->getSrc().getType().getSwiftRValueType());
+                              i->getSrc().getType().getObjectType());
 
   type.initialize(*this, source, dest);
 }
@@ -961,8 +944,7 @@ void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  TypeInfo const &ti = getFragileTypeInfo(
-                                      i->getOperand().getType().getSwiftType());
+  TypeInfo const &ti = getFragileTypeInfo(i->getOperand().getType());
   ti.retain(*this, lowered);
 }
 
@@ -976,8 +958,7 @@ void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  TypeInfo const &ti = getFragileTypeInfo(
-                                      i->getOperand().getType().getSwiftType());
+  TypeInfo const &ti = getFragileTypeInfo(i->getOperand().getType());
   ti.release(*this, lowered);
 }
 
@@ -1086,13 +1067,13 @@ void IRGenSILFunction::visitPointerToAddressInst(swift::PointerToAddressInst *i)
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *ptrValue = from.claimNext();
 
-  auto &ti = getFragileTypeInfo(i->getType().getSwiftRValueType());
+  auto &ti = getFragileTypeInfo(i->getType());
   
   llvm::Type *destType = ti.getStorageType()->getPointerTo();
   ptrValue = Builder.CreateBitCast(ptrValue, destType);
   
   newLoweredAddress(SILValue(i, 0),
-                    Address(ptrValue, ti.getBestKnownAlignment()));
+                    ti.getAddressForPointer(ptrValue));
 }
 
 static void emitPointerCastInst(IRGenSILFunction &IGF,
@@ -1117,7 +1098,7 @@ void IRGenSILFunction::visitRefToObjectPointerInst(
 
 void IRGenSILFunction::visitObjectPointerToRefInst(
                                              swift::ObjectPointerToRefInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  auto &ti = getFragileTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
@@ -1130,7 +1111,7 @@ void IRGenSILFunction::visitRefToRawPointerInst(
 }
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
-  auto &ti = getFragileTypeInfo(i->getType().getSwiftType());
+  auto &ti = getFragileTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
@@ -1162,8 +1143,7 @@ void IRGenSILFunction::visitArchetypeToSuperInst(swift::ArchetypeToSuperInst *i)
   // and cast it to the superclass type.
   Explosion out(CurExplosionLevel);
   
-  const TypeInfo &baseTypeInfo
-    = getFragileTypeInfo(i->getType().getSwiftType());
+  const TypeInfo &baseTypeInfo = getFragileTypeInfo(i->getType());
   llvm::Type *baseTy = baseTypeInfo.StorageType;
   llvm::Type *basePtrTy = baseTy->getPointerTo();
   llvm::Value *castPtrVal = Builder.CreateBitCast(archetype.getAddress(),
@@ -1220,10 +1200,9 @@ void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(from.getKind());
   assert(from.size() == 1 && "class should explode to single value");
-  const TypeInfo &toTI = getFragileTypeInfo(i->getType().getSwiftType());
+  const TypeInfo &toTI = getFragileTypeInfo(i->getType());
   llvm::Value *fromValue = from.claimNext();
-  to.add(Builder.CreateBitCast(fromValue,
-                                        toTI.getStorageType()));
+  to.add(Builder.CreateBitCast(fromValue, toTI.getStorageType()));
   newLoweredExplosion(SILValue(i, 0), to);
 }
 

@@ -68,7 +68,7 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
                            "_swift_initObjCClasses", &IGM.Module);
 
   IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
-                        /*uncurry*/ 0, initFn, Prologue::Bare);
+                        /*uncurry*/ 0, initFn);
 
   llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
   llvm::Value *loadSel =
@@ -211,7 +211,7 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
                            "_swift_initObjCCategories", &IGM.Module);
   
   IRGenFunction initIGF(IGM, CanType(), nullptr, ExplosionKind::Minimal,
-                        /*uncurry*/ 0, initFn, Prologue::Bare);
+                        /*uncurry*/ 0, initFn);
   
   for (ExtensionDecl *ext : categories) {
     CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
@@ -254,7 +254,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     
     // Insert a call to the top_level_code symbol from the SIL module.
     IRGenFunction initIGF(*this, CanType(), nullptr, ExplosionKind::Minimal,
-                          /*uncurry*/ 0, initFn, Prologue::Bare);
+                          /*uncurry*/ 0, initFn);
     initIGF.Builder.CreateCall(topLevelCodeFn);
     initIGF.Builder.CreateRetVoid();
   }
@@ -311,7 +311,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     
     IRGenFunction mainIGF(
       *this, CanType(), nullptr, ExplosionKind::Minimal,
-        /*uncurry*/ 0, mainFn, Prologue::Bare);
+        /*uncurry*/ 0, mainFn);
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();
@@ -875,34 +875,6 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   // Write this to the cache and return.
   entry = addr;
   return result;
-}
-
-/// Fetch the declaration corresponding to the given CapturingExpr.
-llvm::Function *IRGenModule::getAddrOfAnonymousFunction(SILFunction *f,
-                                                        CapturingExpr *expr) {
-  unsigned uncurryLevel = f->getLoweredType().getUncurryLevel();
-  LinkEntity entity = LinkEntity::forAnonymousFunction(expr,
-                                                       ExplosionKind::Minimal,
-                                                       uncurryLevel);
-  
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) return cast<llvm::Function>(entry);
-
-  llvm::AttributeSet attrs;
-  SILType silTy = f->getLoweredType();
-  CanType ty = silTy.getSwiftType();
-  auto *fnType = getFunctionType(AbstractCC::Freestanding,
-                       ty,
-                       entity.getExplosionKind(),
-                       uncurryLevel,
-                       ExtraData::None,
-                       attrs);
-  auto cc = expandAbstractCC(*this, AbstractCC::Freestanding);
-  
-  LinkInfo link = LinkInfo::get(*this, entity);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
 }
 
 /// Fetch the declaration of the given known function.

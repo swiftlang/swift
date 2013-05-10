@@ -655,6 +655,18 @@ IRGenModule::getFunctionType(AbstractCC cc,
   return sig.getType();
 }
 
+llvm::FunctionType *
+IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
+                             ExtraData extraData,
+                             llvm::AttributeSet &attrs) {
+  assert(!type.isAddress());
+  assert(type.is<AnyFunctionType>());
+  SILFunctionTypeInfo *info = type.getFunctionTypeInfo();
+  return getFunctionType(info->getAbstractCC(), type.getSwiftType(),
+                         explosionKind, info->getUncurryLevel(),
+                         extraData, attrs);
+}
+
 AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
   if (fn->isInstanceMember())
     return AbstractCC::Method;
@@ -1575,45 +1587,6 @@ void IRGenFunction::emitPrologue(CanType CurFuncType,
   // Set up the alloca insertion point.
   AllocaIP = Builder.CreateAlloca(IGM.Int1Ty, /*array size*/ nullptr,
                                   "alloca point");
-
-  // That's it for the 'bare' prologue.
-  if (CurPrologue == Prologue::Bare)
-    return;
-
-  // Set up the return block.
-  emitBBForReturn();
-
-  // List out the parameter values in an Explosion.
-  Explosion values = collectParameters();
-
-  // Set up the return slot, stealing the first argument if necessary.
-  {
-    // Find the 'code' result type of this function.
-    const TypeInfo &resultType = getResultTypeInfo();
-
-    ExplosionSchema resultSchema(CurExplosionLevel);
-    resultType.getSchema(resultSchema);
-
-    if (resultSchema.requiresIndirectResult()) {
-      ReturnSlot = resultType.getAddressForPointer(values.claimNext());
-    } else if (resultSchema.empty()) {
-      assert(!ReturnSlot.isValid());
-    } else {
-      // Prepare the return slot.
-      ReturnSlot = resultType.allocate(*this, NotOnHeap, "return_value");
-    }
-  }
-
-  // Set up the parameters.
-  auto params = CurFuncParamPatterns.slice(0, CurUncurryLevel + 1);
-  emitParameterClauses(*this, CurFuncType, params, values);
-
-  if (CurPrologue == Prologue::StandardWithContext) {
-    ContextPtr = values.claimNext();
-    ContextPtr->setName(".context");
-  }
-
-  assert(values.empty() && "didn't exhaust all parameters?");
 }
 
 /// Emit a branch to the return block and set the insert point there.
@@ -1655,30 +1628,6 @@ bool IRGenFunction::emitBranchToReturnBB() {
 void IRGenFunction::emitEpilogue() {
   // Destroy the alloca insertion point.
   AllocaIP->eraseFromParent();
-
-  // That's it for the 'bare' epilogue.
-  if (CurPrologue == Prologue::Bare)
-    return;
-  
-  // Jump to the return block.
-  if (!emitBranchToReturnBB())
-    return;
-
-  const TypeInfo &resultType = getResultTypeInfo();
-  ExplosionSchema resultSchema(CurExplosionLevel);
-  resultType.getSchema(resultSchema);
-
-  if (resultSchema.requiresIndirectResult()) {
-    assert(isa<llvm::Argument>(ReturnSlot.getAddress()));
-    Builder.CreateRetVoid();
-  } else if (resultSchema.empty()) {
-    assert(!ReturnSlot.isValid());
-    Builder.CreateRetVoid();
-  } else {
-    Explosion result(CurExplosionLevel);
-    resultType.loadAsTake(*this, ReturnSlot, result);
-    emitScalarReturn(result);
-  }
 }
 
 void IRGenFunction::emitScalarReturn(Explosion &result) {
@@ -1698,34 +1647,14 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
   }
 }
 
-/// Emit a SIL function.
-static void emitSILFunction(IRGenModule &IGM,
-                            SILFunction *f,
-                            llvm::Function *entrypoint) {
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
-  
-  // Emit the code for the function.
-  PrettyStackTraceSILFunction stackTrace("emitting IR from SIL for", f);
-  
-  IRGenSILFunction igs(IGM,
-                       f->getLoweredType().getSwiftType(),
-                       explosionLevel,
-                       entrypoint); 
-  igs.emitSILFunction(f);
-}
-
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
   
-  llvm::Function *entrypoint;
-  unsigned naturalCurryLevel;
-  AbstractCC cc;
-  // FIXME: explosion levels
-  getAddrOfSILFunction(f, ExplosionKind::Minimal,
-                       entrypoint, naturalCurryLevel, cc);
-  ::emitSILFunction(*this, f, entrypoint);
+  // FIXME: Emit all needed explosion levels.
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  IRGenSILFunction(*this, f, explosionLevel).emitSILFunction();
 }
 
 /// Emit the forwarding stub function for a partial application.
@@ -1752,7 +1681,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setAttributes(attrs);
 
   IRGenFunction subIGF(IGM, outType, {}, explosionLevel, /*curryLevel=*/ 0,
-                       fwd, Prologue::Bare);
+                       fwd);
   
   Explosion params = subIGF.collectParameters();
 
@@ -1845,11 +1774,8 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   // Create the thunk function.
   llvm::AttributeSet attrs;
-  AbstractCC cc = substType.getFunctionTypeInfo()->getAbstractCC();
-  llvm::FunctionType *specTy = IGM.getFunctionType(cc,
-                                                   substType.getSwiftType(),
+  llvm::FunctionType *specTy = IGM.getFunctionType(substType,
                                                    explosionLevel,
-                                                   /*curryLevel=*/ 0,
                                                    ExtraData::None,
                                                    attrs);
   // FIXME: Give the thunk a real name.
@@ -1861,7 +1787,7 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   IRGenFunction subIGF(IGM, substType.getSwiftType(), {},
                        explosionLevel, /*curryLevel=*/ 0,
-                       spec, Prologue::Bare);
+                       spec);
 
   // Unravel the substituted function types for each uncurry level.
   unsigned level = substType.getUncurryLevel();
@@ -1898,7 +1824,7 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   assert(params.empty() && "did not claim all parameters?!");
   
   // Apply the arguments in a call to the generic function.
-  Callee callee = Callee::forKnownFunction(cc,
+  Callee callee = Callee::forKnownFunction(genericType.getFunctionTypeInfo()->getAbstractCC(),
                                            genericType.getSwiftType(),
                                            retTy,
                                            substitutions,

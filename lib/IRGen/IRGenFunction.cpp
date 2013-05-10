@@ -31,11 +31,10 @@ using namespace irgen;
 IRGenFunction::IRGenFunction(IRGenModule &IGM, CanType fnType,
                              ArrayRef<Pattern*> p,
                              ExplosionKind explosionLevel,
-                             unsigned uncurryLevel, llvm::Function *Fn,
-                             Prologue prologue)
+                             unsigned uncurryLevel, llvm::Function *Fn)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
-    CurPrologue(prologue), ContextPtr(nullptr) {
+    ContextPtr(nullptr) {
       
   if (fnType) CurResultType = getResultType(fnType, uncurryLevel);
       

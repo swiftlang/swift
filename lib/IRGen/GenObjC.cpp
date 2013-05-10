@@ -849,7 +849,7 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
   objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
   IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
                     explosionLevel, uncurryLevel,
-                    objcImpl, Prologue::Bare);
+                    objcImpl);
   Explosion params = IGF.collectParameters();
 
   SmallVector<llvm::Value *, 16> args;
@@ -948,7 +948,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
                     explosionLevel,
                     getterType.getNaturalUncurryLevel(),
-                    objcImpl, Prologue::Bare);
+                    objcImpl);
   Explosion params = IGF.collectParameters();
   CanType propTy = property->getType()->getCanonicalType();
   CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
@@ -1032,7 +1032,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   IRGenFunction IGF(IGM, origFormalType, ArrayRef<Pattern*>(),
                     explosionLevel,
                     setterType.getNaturalUncurryLevel(),
-                    objcImpl, Prologue::Bare);
+                    objcImpl);
   Explosion params = IGF.collectParameters();
   CanType propTy = property->getType()->getCanonicalType();
   CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()

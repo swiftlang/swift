@@ -44,6 +44,7 @@ namespace swift {
   template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;
+  class SILType;
   class SourceLoc;
   class StructType;
   class Substitution;
@@ -75,29 +76,6 @@ enum class LocalTypeData : unsigned {
   Metatype = ~0U
 };
 
-/// Prologue - A value indicating controlling the kind of prologue/epilogue
-/// code to emit.
-enum class Prologue : unsigned char {
-  /// The standard prologue/epilogue is useful for emitting normal
-  /// function bodies consisting of statements and expressions.  It implies:
-  ///   - everything from Prologue::Bare, plus
-  ///   - materializing the argument variables and mapping them in Locals,
-  ///   - creating and managing ReturnBB, and
-  ///   - initializing ReturnSlot and extracting the return value from it.
-  Standard,
-
-  // Standard prologue/epilogue, but the function uses the context pointer.
-  StandardWithContext,
-
-  /// The bare prologue is useful for emitting small functions that
-  /// don't need proper statement/expression emission.  It implies:
-  ///   - creating the entry block
-  ///   - setting up and tearing down the alloca point
-  /// Functions using this prologue style are responsible for emitting
-  /// the 'ret' instruction before epilogue emission.
-  Bare
-};
-
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -108,13 +86,11 @@ public:
   CanType CurResultType;
   llvm::Function *CurFn;
   Mangle::ExplosionKind CurExplosionLevel;
-  Prologue CurPrologue;
   llvm::Value *ContextPtr;
 
   IRGenFunction(IRGenModule &IGM, CanType t, ArrayRef<Pattern*> p,
                 Mangle::ExplosionKind explosion,
-                unsigned uncurryLevel, llvm::Function *fn,
-                Prologue prologue = Prologue::Standard);
+                unsigned uncurryLevel, llvm::Function *fn);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
@@ -147,6 +123,7 @@ public:
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getFragileTypeInfo(Type T);
   const TypeInfo &getFragileTypeInfo(CanType T);
+  const TypeInfo &getFragileTypeInfo(SILType T);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,
                   Size size, Alignment align);
   void emitMemCpy(llvm::Value *dest, llvm::Value *src,

@@ -232,6 +232,11 @@ const TypeInfo &IRGenFunction::getFragileTypeInfo(CanType T) {
   return IGM.getFragileTypeInfo(T);
 }
 
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenFunction::getFragileTypeInfo(SILType T) {
+  return IGM.getFragileTypeInfo(T);
+}
+
 /// Get a pointer to the storage type for the given type.  Note that,
 /// unlike fetching the type info and asking it for the storage type,
 /// this operation will succeed for forward-declarations.
@@ -259,6 +264,11 @@ const TypeInfo &IRGenModule::getFragileTypeInfo(Type T) {
 /// Get the fragile type information for the given type.
 const TypeInfo &IRGenModule::getFragileTypeInfo(CanType T) {
   return Types.getCompleteTypeInfo(T);
+}
+
+/// Get the fragile type information for the given type.
+const TypeInfo &IRGenModule::getFragileTypeInfo(SILType T) {
+  return Types.getCompleteTypeInfo(T.getSwiftRValueType());
 }
 
 /// 
