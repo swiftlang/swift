@@ -240,18 +240,6 @@ namespace {
     bool isDirect() const { return CurState == State::Direct; }
     bool isIndirect() const { return CurState == State::Indirect; }
 
-    Callee getDirectValuesAsIndirectCallee(CanType origFormalType,
-                                           CanType substResultType,
-                                           ArrayRef<Substitution> subs) {
-      assert(isDirect());
-      Explosion &values = getDirectValues();
-      assert(values.size() == 2);
-      llvm::Value *fn = values.claimNext();
-      llvm::Value *data = values.claimNext();
-      return Callee::forIndirectCall(origFormalType, substResultType, subs,
-                                     fn, data);
-    }
-
     Explosion &getDirectValues() {
       assert(isDirect());
       return CurValue.getDirect();
@@ -712,35 +700,6 @@ llvm::Value *Callee::getDataPointer(IRGenFunction &IGF) const {
   if (hasDataPointer()) return DataPtr;
   return IGF.IGM.RefCountedNull;
 }
-
-static llvm::Value *emitCastOfIndirectFunction(IRGenFunction &IGF,
-                                               llvm::Value *fnPtr,
-                                               llvm::Value *dataPtr,
-                                               CanType origFnType) {
-  bool hasData = !isa<llvm::ConstantPointerNull>(dataPtr);
-  auto extraData = (hasData ? ExtraData::Retainable : ExtraData::None);
-  llvm::AttributeSet attrs;
-  auto fnPtrTy = IGF.IGM.getFunctionType(AbstractCC::Freestanding,
-                                         origFnType, ExplosionKind::Minimal,
-                                         0, extraData, attrs)->getPointerTo();
-  return IGF.Builder.CreateBitCast(fnPtr, fnPtrTy);
-}
-
-/// Given a function pointer derived from an indirect source,
-/// construct a callee appropriately.
-static Callee emitIndirectCallee(IRGenFunction &IGF,
-                                 llvm::Value *fnPtr,
-                                 llvm::Value *dataPtr,
-                                 ArrayRef<Substitution> subs,
-                                 CanType origFnType,
-                                 CanType substResultType) {
-  // Cast the function pointer appropriately.
-  fnPtr = emitCastOfIndirectFunction(IGF, fnPtr, dataPtr, origFnType);
-
-  return Callee::forIndirectCall(origFnType, substResultType, subs,
-                                 fnPtr, dataPtr);
-}
-
 
 static void extractScalarResults(IRGenFunction &IGF, llvm::Value *call,
                                  Explosion &out) {
@@ -1329,53 +1288,11 @@ static void drillIntoOrigFnType(Type &origFnType) {
   }
 }
 
-/// We're about to pass arguments to something.  Force the current
-/// callee to ensure that we're calling something with arguments.
+/// We're about to pass arguments to something. Ensure the current
+/// callee has additional arguments.
 void CallEmission::forceCallee() {
-  // Nothing to do if there are args remaining for the callee.
-  if (RemainingArgsForCallee--) return;
-  RemainingArgsForCallee = 0; // 1 minus the one we're about to add
-
-  // Otherwise, we need to compute the new, indirect callee.
-  Explosion fn(CurCallee.getExplosionLevel());
-
-  // If the original function is formally typed to return a function,
-  // then we just emit to that (unmapped).
-  assert(LastArgWritten <= 1);
-  if (LastArgWritten == 0) {
-    assert(CurOrigType->is<AnyFunctionType>());
-    emitToUnmappedExplosion(fn);
-  } else {
-    assert(CurOrigType->is<ArchetypeType>());
-    // Use the substituted function type to create a temporary.  This
-    // isn't actually the right type --- that would be a T -> U type
-    // with the corresponding generic arguments from the substitued
-    // type --- but it's good enough for our work here, which is just
-    // copying back and forth.
-    auto &substTI = IGF.getFragileTypeInfo(CurCallee.getSubstResultType());
-
-    // Allocate the temporary.
-    Address addr = substTI.allocate(IGF, NotOnHeap, "polymorphic-currying-temp")
-      .getUnownedAddress();
-
-    // Emit the current call into that temporary.
-    Address castAddr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy);
-    emitToUnmappedMemory(castAddr);
-
-    // Claim the values from the temporary.
-    substTI.loadAsTake(IGF, addr, fn);
-  }
-
-  // Grab the values.
-  llvm::Value *fnPtr = fn.claimNext();
-  llvm::Value *dataPtr = fn.claimNext();
-
-  // Set up for an indirect call.
-  auto substFnType = cast<AnyFunctionType>(CurCallee.getSubstResultType());
-  CanType substResultType = CanType(substFnType->getResult());
-  CurCallee = emitIndirectCallee(IGF, fnPtr, dataPtr,
-                                 CurCallee.getSubstitutions(),
-                                 CurOrigType, substResultType);
+  assert(RemainingArgsForCallee && "callee doesn't take any more args?!");
+  --RemainingArgsForCallee;
 }
 
 /// Does the given convention grow clauses left-to-right?

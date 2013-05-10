@@ -230,18 +230,6 @@ namespace irgen {
       return result;
     }
 
-    /// Prepare a callee for an indirect call to a function.
-    static Callee forIndirectCall(CanType origFormalType,
-                                  CanType substResultType,
-                                  ArrayRef<Substitution> subs,
-                                  llvm::Value *fn, llvm::Value *data) {
-      if (isa<llvm::ConstantPointerNull>(data))
-        data = nullptr;
-      return forKnownFunction(AbstractCC::Freestanding,
-                              origFormalType, substResultType, subs,
-                              fn, data, ExplosionKind::Minimal, 0);
-    }
-
     AbstractCC getConvention() const { return Convention; }
 
     CanType getOrigFormalType() const { return OrigFormalType; }
