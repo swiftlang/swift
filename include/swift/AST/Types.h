@@ -215,6 +215,13 @@ public:
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
+  /// \brief Determine whether the given type is "generic", meaning that
+  /// it involves generic types for which generic arguments have not been
+  /// provided.
+  /// For example, the type Vector and Vector<Int>.InnerGeneric are both
+  /// unspecialized generic, but the type Vector<Int> is not.
+  bool isUnspecializedGeneric();
+
   /// \brief Whether this type has been validated yet.
   bool getValidated() const { return TypeBits.TypeBase.Validated; }
 

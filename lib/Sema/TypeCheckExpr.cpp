@@ -95,6 +95,8 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
 }
 
 Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
+  assert(!getLangOpts().UseConstraintSolver && "Shouldn't get here");
+
   // Propagate errors up.
   if (SE->getBase()->getType()->is<ErrorType>() ||
       SE->getIndex()->getType()->is<ErrorType>()) {
@@ -139,7 +141,7 @@ Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
                                 Context));
     return SE;
   }
-  
+
   // Determine the type of the base of this subscript expression.
   Type BaseTy = SE->getBase()->getType()->getRValueType();
 
@@ -255,6 +257,8 @@ collectArchetypeToExistentialSubstitutions(ASTContext &Context,
 }
 
 Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
+  assert(!getLangOpts().UseConstraintSolver && "Shouldn't get here");
+
   // Propagate errors up.
   if (E->getDecl()->getType()->is<ErrorType>()) {
     E->setType(ErrorType::get(Context));
@@ -339,6 +343,8 @@ Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
 }
 
 Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
+  assert(!getLangOpts().UseConstraintSolver && "Shouldn't get here");
+
   // Propagate errors up.
   if (E->getDecl()->getType()->is<ErrorType>()) {
     E->setType(ErrorType::get(Context));
@@ -392,6 +398,8 @@ Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
 }
 
 Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
+  assert(!getLangOpts().UseConstraintSolver && "Shouldn't get here");
+
   // Propagate errors up.
   if (E->getDecl()->getType()->is<ErrorType>()) {
     E->setType(ErrorType::get(Context));
@@ -1001,6 +1009,10 @@ public:
   }
 
   Expr *visitSubscriptExpr(SubscriptExpr *E) {
+    if (TC.getLangOpts().UseConstraintSolver) {
+      return E;
+    }
+
     return TC.semaSubscriptExpr(E);
   }
 

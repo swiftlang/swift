@@ -205,6 +205,74 @@ bool TypeBase::isSpecialized() {
   }
 }
 
+bool TypeBase::isUnspecializedGeneric() {
+  CanType CT = getCanonicalType();
+  if (CT.getPointer() != this)
+    return CT->isUnspecializedGeneric();
+
+  switch (getKind()) {
+#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
+#define SUGARED_TYPE(id, parent) case TypeKind::id:
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+    return false;
+
+  case TypeKind::UnboundGeneric:
+    return true;
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
+    return true;
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto funcTy = cast<AnyFunctionType>(this);
+    return funcTy->getInput()->isUnspecializedGeneric() ||
+           funcTy->getResult()->isUnspecializedGeneric();
+  }
+
+  case TypeKind::Class:
+  case TypeKind::Struct:
+  case TypeKind::OneOf:
+    if (auto parentTy = cast<NominalType>(this)->getParent())
+      return parentTy->isUnspecializedGeneric();
+    return false;
+
+  case TypeKind::MetaType:
+    return cast<MetaTypeType>(this)->getInstanceType()
+             ->isUnspecializedGeneric();
+
+  case TypeKind::LValue:
+    return cast<LValueType>(this)->getObjectType()->isUnspecializedGeneric();
+
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(this);
+    for (auto &Elt : tupleTy->getFields())
+      if (Elt.getType()->isUnspecializedGeneric())
+        return true;
+
+    return false;
+  }
+
+  case TypeKind::Archetype:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
+  case TypeKind::DeducibleGenericParam:
+  case TypeKind::Module:
+  case TypeKind::Protocol:
+  case TypeKind::ProtocolComposition:
+    return false;
+    
+  case TypeKind::Array:
+    return cast<ArrayType>(this)->getBaseType()->isUnspecializedGeneric();
+  }
+}
+
 /// \brief Gather the type variables in the given type, recursively.
 static void gatherTypeVariables(Type wrappedTy,
                           SmallVectorImpl<TypeVariableType *> &typeVariables) {

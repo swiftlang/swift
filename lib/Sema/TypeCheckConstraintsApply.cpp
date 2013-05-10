@@ -456,15 +456,6 @@ namespace {
       auto indexTy = subscriptTy->castTo<AnyFunctionType>()->getInput();
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
-      // Subscripting a specialization of a generic type.
-      if (baseTy->isSpecialized()) {
-        // FIXME: Falls back to existing type checker to actually populate
-        // these nodes.
-        auto result
-          = new (tc.Context) GenericSubscriptExpr(base, index, subscript);
-        return tc.semaSubscriptExpr(result);
-      }
-
       // Coerce the index argument.
       index = coerceToType(index, indexTy,
                            locator.withPathElement(
@@ -487,6 +478,32 @@ namespace {
                                                                      index,
                                                                      subscript);
         subscriptExpr->setType(resultTy);
+        return subscriptExpr;
+      }
+
+      // Handle subscripting of generics.
+      if (containerTy->isUnspecializedGeneric()) {
+        // Compute the substitutions we need to apply for the generic subscript,
+        // along with the base type of the subscript.
+        GenericParamList *genericParams = nullptr;
+        CoercionContext cc(tc);
+        containerTy = subscript->getDeclContext()->getDeclaredTypeInContext();
+        containerTy
+          = tc.substBaseForGenericTypeMember(subscript, baseTy,
+                                             containerTy,
+                                             index->getStartLoc(), cc,
+                                             &genericParams);
+
+        // Coerce the base to the (substituted) container type.
+        base = coerceObjectArgumentToType(base, containerTy, locator);
+
+        // Form the generic subscript expression.
+        auto subscriptExpr = new (tc.Context) GenericSubscriptExpr(base, index,
+                                                                   subscript);
+        subscriptExpr->setType(resultTy);
+        subscriptExpr->setSubstitutions(
+          tc.encodeSubstitutions(genericParams, cc.Substitutions,
+                                 cc.Conformance, true, false));
         return subscriptExpr;
       }
 
