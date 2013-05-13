@@ -1198,7 +1198,7 @@ namespace {
   /// subclass user then just calls getTargetIndex(), which performs
   /// the layout and returns the found index.
   ///
-  /// \param Base the base class, which should generally be a CRTP
+  /// \tparam Base the base class, which should generally be a CRTP
   ///   class template applied to the most-derived class
   template <class Base> class MetadataSearcher : public Base {
     static const unsigned InvalidIndex = ~0U;

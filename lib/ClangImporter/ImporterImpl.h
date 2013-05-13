@@ -283,7 +283,7 @@ public:
 
   /// \brief Retrieve the named module.
   ///
-  /// \param The name of the module.
+  /// \param name The name of the module.
   ///
   /// \returns The named module, or null if the module has not been imported.
   Module *getNamedModule(StringRef name);

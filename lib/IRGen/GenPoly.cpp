@@ -178,9 +178,9 @@ bool irgen::differsByAbstractionAsFunction(IRGenModule &IGM,
 /// thunking the current value as it's passed in and "un-thunking"
 /// it on the way out.  Of course, that ain't free.
 ///
-/// \param orig - T in the definition;  the type which the
-///   substitution was performed on
-/// \param subst - S(T)
+/// In the functions below, parameters named \c orig refer to the type T in the
+/// definition -- substitution has been performed on this type. Parameters named
+/// \c subst refer to a type after substitution, i.e. S(T).
 namespace {
   class DiffersByAbstraction
       : public SubstTypeVisitor<DiffersByAbstraction, bool> {
