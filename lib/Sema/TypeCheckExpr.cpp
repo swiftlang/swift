@@ -71,6 +71,10 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
 /// Make the given expression have a materializable type if it doesn't
 /// already.
 Expr *TypeChecker::convertToMaterializable(Expr *E) {
+  if (getLangOpts().UseConstraintSolver) {
+    return coerceToMaterializableConstraints(E);
+  }
+
   // Load l-values.
   if (LValueType *lv = E->getType()->getAs<LValueType>())
     return convertLValueToRValue(lv, E);

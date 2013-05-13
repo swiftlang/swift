@@ -567,6 +567,10 @@ public:
   Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
   Expr *convertToMaterializable(Expr *E);
 
+  /// \brief Coerce the given expression to materializable type, if it
+  /// isn't already.
+  Expr *coerceToMaterializableConstraints(Expr *expr);
+
   /// conformsToProtocol - Determine whether the given type conforms to the
   /// given protocol.
   ///

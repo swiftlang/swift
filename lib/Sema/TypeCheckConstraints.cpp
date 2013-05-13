@@ -3102,6 +3102,53 @@ bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
+Expr *TypeChecker::coerceToMaterializableConstraints(Expr *expr) {
+  // Load lvalues.
+  if (auto lvalue = expr->getType()->getAs<LValueType>()) {
+    return new (Context) LoadExpr(expr, lvalue->getObjectType());
+  }
+
+  // Walk into parenthesized expressions to update the subexpression.
+  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+    auto sub = coerceToMaterializableConstraints(paren->getSubExpr());
+    paren->setSubExpr(sub);
+    paren->setType(sub->getType());
+    return paren;
+  }
+
+  // Walk into tuples to update the subexpressions.
+  if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+    bool anyChanged = false;
+    for (auto &elt : tuple->getElements()) {
+      // Materialize the element.
+      auto oldType = elt->getType();
+      elt = coerceToMaterializableConstraints(elt);
+
+      // If the type changed at all, make a note of it.
+      if (elt->getType().getPointer() != oldType.getPointer()) {
+        anyChanged = true;
+      }
+    }
+
+    // If any of the types changed, rebuild the tuple type.
+    if (anyChanged) {
+      SmallVector<TupleTypeElt, 4> elements;
+      elements.reserve(tuple->getElements().size());
+      for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+        Type type = tuple->getElement(i)->getType();
+        Identifier name = tuple->getElementName(i);
+        elements.push_back(TupleTypeElt(type, name));
+      }
+      tuple->setType(TupleType::get(elements, Context));
+    }
+
+    return tuple;
+  }
+
+  // Nothing to do.
+  return expr;
+}
+
 //===--------------------------------------------------------------------===//
 // Debugging
 //===--------------------------------------------------------------------===//
