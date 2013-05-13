@@ -105,6 +105,7 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
+option(SWIFT_USE_LIBRARY_MODULES "Use modules for Swift libraries" NO)
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
@@ -185,9 +186,6 @@ function(compile_swift_files)
     list(APPEND swift_flags -parse-as-library)
   endif()
 
-  # Use the constraint checker, because we can
-  list(APPEND swift_flags "-constraint-checker")
-
   set(objfile ${SWIFTFILE_OUTPUT})
   if (NOT IS_ABSOLUTE ${objfile})
     set(objfile
@@ -197,20 +195,32 @@ function(compile_swift_files)
   if(SWIFTFILE_IS_MAIN)
     set(module_source_file)
   else()
-    # Compute the module source file; a hack until we get real module
-    # compilation.  In principle this separate file might not be needed
-    # except for swift.swift, which is composed of multiple .swift
-    # files.
     get_filename_component(module_source_name ${objfile} NAME_WE)
     set(module_source_dir ${SWIFTLIB_DIR}/swift)
-    set(module_source_file ${module_source_dir}/${module_source_name}.swift)
 
-    add_custom_command(
-      OUTPUT ${module_source_file}
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
-      COMMAND cat ${source_files} > "${module_source_file}"
-      DEPENDS ${source_files}
-      COMMENT "FIXME: generating module source file ${module_source_name}.swift")
+    if(SWIFT_USE_LIBRARY_MODULES)
+      set(module_source_file ${module_source_dir}/${module_source_name}.sm)
+
+      add_custom_command(
+        OUTPUT ${module_source_file}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
+        COMMAND swift -emit-module ${swift_flags} -o "${module_source_file}" ${source_files}
+        DEPENDS ${source_files})
+    else()
+      # Build the module source file; a hack until we get real module
+      # compilation.  In principle this separate file might not be needed
+      # except for swift.swift, which is composed of multiple .swift
+      # files.
+      set(module_source_file ${module_source_dir}/${module_source_name}.swift)
+
+      add_custom_command(
+        OUTPUT ${module_source_file}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
+        COMMAND cat ${source_files} > "${module_source_file}"
+        DEPENDS ${source_files}
+        COMMENT "FIXME: generating module source file ${module_source_name}.swift")
+    endif()
+
     set_source_files_properties("${module_source_file}" PROPERTIES GENERATED ON)
     install(FILES ${module_source_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
