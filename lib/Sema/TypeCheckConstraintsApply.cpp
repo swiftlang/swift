@@ -81,6 +81,34 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
   return cast<FuncDecl>(conformance->Mapping[requirement]);
 }
 
+/// \brief Perform the substitutions required to convert a given object type
+/// to the object type required to access a specific member, producing the
+/// archetype-to-replacement mappings and protocol conformance information
+/// as a result.
+///
+/// \param tc The type checker we're using to perform the substitution.
+/// \param member The member we will be accessing after performing the
+/// conversion.
+/// \param objectTy The type of object in which we want to access the member,
+/// which will be a subtype of the member's context type.
+/// \param otherType A type (typically the type of the member) that should
+/// also be subsituted.
+/// \param loc The location of this substitution.
+/// \param substitutions Will be populated with the archetype-to-fixed type
+/// mappings needed for the conversion.
+/// \param conformances The protocol conformances required to perform the
+/// conversion.
+/// \param genericParams Will be set to the generic parameter list used for
+/// substitution.
+///
+/// \returns The substituted form of otherType.
+static Type substForBaseConversion(TypeChecker &tc, ValueDecl *member,
+                                   Type objectTy,
+                                   Type otherType, SourceLoc loc,
+                                   TypeSubstitutionMap &substitutions,
+                                   ConformanceMap &conformances,
+                                   GenericParamList *&genericParams);
+
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -225,12 +253,13 @@ namespace {
         // checker already did, given that we know the eventual type we're
         // going to produce.
         GenericParamList *genericParams = nullptr;
-        CoercionContext cc(tc);
-        Type substTy
-          = tc.substBaseForGenericTypeMember(member, baseTy,
-                                             member->getTypeOfReference(),
-                                             memberLoc, cc,
-                                             &genericParams);
+        TypeSubstitutionMap substitutions;
+        ConformanceMap conformances;
+        Type substTy = substForBaseConversion(tc, member, baseTy,
+                                              member->getTypeOfReference(),
+                                              memberLoc, substitutions,
+                                              conformances,
+                                              genericParams);
 
         if (isa<FuncDecl>(member) || isa<OneOfElementDecl>(member) ||
             isa<ConstructorDecl>(member)) {
@@ -247,8 +276,9 @@ namespace {
           // argument. This eliminates the genericity that comes from being
           // an instance method of a generic class.
           Expr *specializedRef
-            = tc.buildSpecializeExpr(ref, substTy, cc.Substitutions,
-                                     cc.Conformance,
+            = tc.buildSpecializeExpr(ref, substTy, substitutions,
+                                     conformances,
+                                     /*ArchetypesAreOpen=*/false,
                                      /*OnlyInnermostParams=*/false);
 
           ApplyExpr *apply;
@@ -292,9 +322,9 @@ namespace {
         // FIXME: Use simplifyType(openedType);
         result->setType(substTy);
         result->setSubstitutions(tc.encodeSubstitutions(genericParams,
-                                                        cc.Substitutions,
-                                                        cc.Conformance,
-                                                        true, false));
+                                                        substitutions,
+                                                        conformances,
+                                                        false, false));
         return result;
       }
 
@@ -486,13 +516,13 @@ namespace {
         // Compute the substitutions we need to apply for the generic subscript,
         // along with the base type of the subscript.
         GenericParamList *genericParams = nullptr;
-        CoercionContext cc(tc);
+        TypeSubstitutionMap substitutions;
+        ConformanceMap conformances;
         containerTy = subscript->getDeclContext()->getDeclaredTypeInContext();
-        containerTy
-          = tc.substBaseForGenericTypeMember(subscript, baseTy,
-                                             containerTy,
-                                             index->getStartLoc(), cc,
-                                             &genericParams);
+        containerTy = substForBaseConversion(tc, subscript, baseTy, containerTy,
+                                             index->getStartLoc(),
+                                             substitutions,
+                                             conformances, genericParams);
 
         // Coerce the base to the (substituted) container type.
         base = coerceObjectArgumentToType(base, containerTy, locator);
@@ -502,8 +532,8 @@ namespace {
                                                                    subscript);
         subscriptExpr->setType(resultTy);
         subscriptExpr->setSubstitutions(
-          tc.encodeSubstitutions(genericParams, cc.Substitutions,
-                                 cc.Conformance, true, false));
+          tc.encodeSubstitutions(genericParams, substitutions,
+                                 conformances, false, false));
         return subscriptExpr;
       }
 
@@ -2124,6 +2154,73 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Tail-recurse to actually call the constructor.
   return finishApply(apply, openedType, locator);
+}
+
+Type substForBaseConversion(TypeChecker &tc, ValueDecl *member,
+                            Type objectTy,
+                            Type otherType, SourceLoc loc,
+                            TypeSubstitutionMap &substitutions,
+                            ConformanceMap &conformances,
+                            GenericParamList *&genericParams) {
+  ConstraintSystem cs(tc);
+
+  // The archetypes that have been opened up and replaced with type variables.
+  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+
+  // Open up the owning context of the member.
+  Type ownerTy = cs.openTypeOfContext(member->getDeclContext(), true,
+                                      replacements, &genericParams);
+
+  // The base type of the member access needs to be convertible to the
+  // opened type of the member's context.
+  cs.addConstraint(ConstraintKind::Conversion, objectTy, ownerTy);
+
+  // Solve the constraint system.
+  llvm::SmallVector<Solution, 1> solutions;
+  bool failed = cs.solve(solutions);
+  (void)failed;
+  assert(!failed && "Solution failed");
+  assert(solutions.size() == 1 && "Multiple solutions?");
+
+  // Fill in the set of substitutions.
+  auto &solution = solutions.front();
+  for (auto replacement : replacements) {
+    substitutions[replacement.first]
+      = solution.simplifyType(tc, replacement.second);
+  }
+
+  // Finalize the set of protocol conformances.
+  failed = tc.checkSubstitutions(substitutions, conformances, loc,
+                                 &substitutions);
+  assert(!failed && "Substitutions cannot fail?");
+
+  // Replace the already-opened archetypes in the requested "other" type with
+  // their replacements.
+  otherType = tc.substType(otherType, substitutions);
+
+  // If we have a polymorphic function type for which all of the generic
+  // parameters have been replaced, make it monomorphic.
+  // FIXME: Arguably, this should be part of substType
+  if (auto polyFn = otherType->getAs<PolymorphicFunctionType>()) {
+    bool allReplaced = true;
+    for (auto gp : polyFn->getGenericParams().getParams()) {
+      auto archetype
+      = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+      if (!substitutions.count(archetype)) {
+        allReplaced = false;
+        break;
+      }
+    }
+
+    if (allReplaced) {
+      otherType = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
+                                    tc.Context);
+    }
+  }
+
+  // Validate this type before returning it.
+  tc.validateTypeSimple(otherType);
+  return otherType;
 }
 
 /// \brief Apply a given solution to the expression, producing a fully

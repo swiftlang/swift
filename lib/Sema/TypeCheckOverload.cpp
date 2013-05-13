@@ -939,13 +939,14 @@ SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances,
+                                 bool ArchetypesAreOpen,
                                  bool OnlyInnermostParams) {
   auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
   return new (Context) SpecializeExpr(Sub, Ty,
                          encodeSubstitutions(&polyFn->getGenericParams(),
                                              Substitutions,
                                              Conformances,
-                                             true,
+                                             ArchetypesAreOpen,
                                              OnlyInnermostParams));
 }
 
@@ -993,6 +994,7 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
     E = buildSpecializeExpr(E, Candidate.getType(),
                             Candidate.getSubstitutions(),
                             Candidate.getConformances(),
+                            /*ArchetypesAreOpen=*/true,
                             /*OnlyInnermostParams=*/true);
   }
 
@@ -1071,6 +1073,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         Expr *specializedRef
           = buildSpecializeExpr(ref, substTy, CC.Substitutions,
                                 CC.Conformance,
+                                /*ArchetypesAreOpen=*/true,
                                 /*OnlyInnermostParams=*/false);
 
         Expr *apply;

@@ -1843,6 +1843,27 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openBindingType(Type type);
 
+  /// \brief "Open" the type of a declaration context, which must be a type or
+  /// extension.
+  ///
+  /// \param dc The context to open.
+  ///
+  /// \param openAllLevels If true, we open all levels of the type, not just the
+  /// outermost level. FIXME: Should this always be true?
+  ///
+  /// \param replacements Will receive the set of type variable replacements
+  /// for each of the archetypes in \c dc.
+  ///
+  /// \param genericParams If non-null, will receive the set of generic
+  /// parameters opened up by this routine.
+  ///
+  /// \returns The opened type of the base.
+  Type openTypeOfContext(
+         DeclContext *dc,
+         bool openAllLevels,
+         llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
+         GenericParamList **genericParams);
+
   /// \brief Retrieve the type of a reference to the given value declaration.
   ///
   /// For references to polymorphic function types, this routine "opens up"

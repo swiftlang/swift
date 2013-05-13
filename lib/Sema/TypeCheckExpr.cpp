@@ -696,6 +696,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
                                                         E2, Type())) {
         E1 = buildSpecializeExpr(E1, Ovl.getType(), Ovl.getSubstitutions(),
                                  Ovl.getConformances(),
+                                 /*ArchetypesAreOpen=*/true,
                                  /*OnlyInnermostParams=*/true);
         E->setFn(E1);
         return semaApplyExpr(E);

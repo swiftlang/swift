@@ -797,6 +797,56 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
   return type;
 }
 
+Type ConstraintSystem::openTypeOfContext(
+       DeclContext *dc,
+       bool openAllLevels,
+       llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
+       GenericParamList **genericParams) {
+  GenericParamList *dcGenericParams = nullptr;
+  Type result;
+  if (auto nominalOwner = dyn_cast<NominalTypeDecl>(dc)) {
+    result = nominalOwner->getDeclaredTypeInContext();
+    dcGenericParams = nominalOwner->getGenericParamsOfContext();
+  } else {
+    auto extensionOwner = cast<ExtensionDecl>(dc);
+    auto extendedTy = extensionOwner->getExtendedType();
+    if (auto nominal = extendedTy->getAs<NominalType>()) {
+      result = nominal->getDecl()->getDeclaredTypeInContext();
+      dcGenericParams = nominal->getDecl()->getGenericParamsOfContext();
+    } else if (auto unbound = extendedTy->getAs<UnboundGenericType>()) {
+      result = unbound->getDecl()->getDeclaredTypeInContext();
+      dcGenericParams = unbound->getDecl()->getGenericParamsOfContext();
+    } else
+      llvm_unreachable("unknown owner for type member");
+  }
+
+  // Save the generic parameters for the caller.
+  if (genericParams)
+    *genericParams = dcGenericParams;
+
+  // If the owner is not specialized, we're done.
+  if (!result->isSpecialized())
+    return result;
+
+  // Open up the types in the owner.
+  SmallVector<ArchetypeType *, 4> allOpenArcheTypes;
+  ArrayRef<ArchetypeType *> openArchetypes;
+  if (dcGenericParams) {
+    openArchetypes = dcGenericParams->getAllArchetypes();
+
+    // If we have multiple levels and are supposed to open them all, do so now.
+    if (openAllLevels && dcGenericParams->getOuterParameters()) {
+      for (auto gp = dcGenericParams; gp; gp = gp->getOuterParameters()) {
+        allOpenArcheTypes.append(gp->getAllArchetypes().begin(),
+                                 gp->getAllArchetypes().end());
+      }
+      openArchetypes = allOpenArcheTypes;
+    }
+  }
+
+  return openType(result, openArchetypes, replacements);
+}
+
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                 bool isTypeReference) {
   // If the base is a module type, just use the type of the decl.
@@ -811,36 +861,12 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     isInstance = false;
   }
 
-  // Figure out the type of the owner.
-  auto owner = value->getDeclContext();
-  GenericParamList *ownerGenericParams = nullptr;
-  Type ownerTy;
-  if (auto nominalOwner = dyn_cast<NominalTypeDecl>(owner)) {
-    ownerTy = nominalOwner->getDeclaredTypeInContext();
-    ownerGenericParams = nominalOwner->getGenericParamsOfContext();
-  } else {
-    auto extensionOwner = cast<ExtensionDecl>(owner);
-    auto extendedTy = extensionOwner->getExtendedType();
-    if (auto nominal = extendedTy->getAs<NominalType>()) {
-      ownerTy = nominal->getDecl()->getDeclaredTypeInContext();
-      ownerGenericParams = nominal->getDecl()->getGenericParamsOfContext();
-    } else if (auto unbound = extendedTy->getAs<UnboundGenericType>()) {
-      ownerTy = unbound->getDecl()->getDeclaredTypeInContext();
-      ownerGenericParams = unbound->getDecl()->getGenericParamsOfContext();
-    } else
-      llvm_unreachable("unknown owner for type member");
-  }
-
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
 
-  // If the owner is specialized, we need to open up the types in the owner.
-  if (ownerTy->isSpecialized()) {
-    ArrayRef<ArchetypeType *> openArchetypes;
-    if (ownerGenericParams)
-      openArchetypes = ownerGenericParams->getAllArchetypes();
-    ownerTy = openType(ownerTy, openArchetypes, replacements);
-  }
+  // Figure out the type of the owner.
+  Type ownerTy = openTypeOfContext(value->getDeclContext(), false, replacements,
+                                   nullptr);
 
   // The base type must be convertible to the owner type. For most cases,
   // subtyping suffices. However, the owner might be a protocol and the base a
@@ -3075,7 +3101,6 @@ bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
   ConstraintSystem cs(*this);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
-
 
 //===--------------------------------------------------------------------===//
 // Debugging
