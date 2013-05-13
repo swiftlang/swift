@@ -343,6 +343,16 @@ public:
                               SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeLoc &retLoc);
   NullablePtr<Pattern> parsePattern();
+
+  /// Parse a tuple pattern element.
+  ///
+  ///   pattern-tuple-element:
+  ///     pattern ('=' expr)?
+  ///
+  /// \param allowInitExpr Whether to allow initializers.
+  ///
+  /// \returns The tuple pattern element, if successful.
+  Optional<TuplePatternElt> parsePatternTupleElement(bool allowInitExpr);
   NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
   NullablePtr<Pattern> parsePatternAtom();
   NullablePtr<Pattern> parsePatternIdentifier();

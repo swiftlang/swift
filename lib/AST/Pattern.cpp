@@ -175,6 +175,18 @@ Identifier Pattern::getBoundName() const {
   return Identifier();
 }
 
+void TuplePatternElt::revertToNonVariadic() {
+  assert(VarargBaseType && "Not a variadic element");
+
+  // Fix the pattern.
+  auto typedPattern = cast<TypedPattern>(ThePattern);
+  typedPattern->getTypeLoc()
+    = TypeLoc(VarargBaseType, typedPattern->getTypeLoc().getSourceRange());
+
+  // Clear out the variadic base type.
+  VarargBaseType = Type();
+}
+
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts,

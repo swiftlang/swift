@@ -159,7 +159,7 @@ SourceLoc Parser::consumeStartingLess() {
   
   // Skip the starting '<' in the existing token.
   SourceLoc Loc = Tok.getLoc();  
-  StringRef Remaining =Tok.getText().substr(1);
+  StringRef Remaining = Tok.getText().substr(1);
   Tok.setToken(L->getTokenKind(Remaining), Remaining);
   return Loc;
 }
@@ -172,7 +172,7 @@ SourceLoc Parser::consumeStartingGreater() {
   
   // Skip the starting '>' in the existing token.
   SourceLoc Loc = Tok.getLoc();
-  StringRef Remaining =Tok.getText().substr(1);
+  StringRef Remaining = Tok.getText().substr(1);
   Tok.setToken(L->getTokenKind(Remaining), Remaining);
   return Loc;
 }

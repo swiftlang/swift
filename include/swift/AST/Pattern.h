@@ -139,6 +139,8 @@ public:
 /// An element of a tuple pattern.
 class TuplePatternElt {
   Pattern *ThePattern;
+
+  // FIXME: Init and VarargBaseType can be collapsed into one field.
   ExprHandle *Init;
   Type VarargBaseType;
 
@@ -153,6 +155,13 @@ public:
   bool isVararg() const { return !VarargBaseType.isNull(); }
   Type getVarargBaseType() const { return VarargBaseType; }
   void setVarargBaseType(Type ty) { VarargBaseType = ty; }
+
+  /// \brief Revert this variadic tuple pattern element to a
+  /// non-variadic version.
+  ///
+  /// Used for error recovery, when we've detected that the element
+  /// is not the last one.
+  void revertToNonVariadic();
 };
 
 /// A pattern consisting of a tuple of patterns.
