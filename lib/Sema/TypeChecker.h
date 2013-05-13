@@ -418,12 +418,6 @@ public:
   
   bool isSubtypeOfConstraints(Type t1, Type t2, bool &isTrivial);
 
-  /// \brief Determine whether T1 and T2 are the same type (structureally)
-  /// within the given coercion context, deducing generic arguments if needed.
-  /// FIXME: This routine ignores labels, which may or may not be what we want.
-  bool isSameType(Type T1, Type T2, CoercionContext *CC = nullptr,
-                  bool Labeled = true);
-
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
   bool semaTupleExpr(TupleExpr *TE);
   Expr *semaSubscriptExpr(SubscriptExpr *SE);

@@ -22,6 +22,8 @@ using namespace swift;
 // In TypeCheckCoercion.cpp.
 CoercionResult isCoercibleToType(TypeChecker &tc, Expr *E, Type Ty,
                                  CoercionKind Kind, CoercionContext *CC);
+bool isSameType(TypeChecker &tc, Type T1, Type T2,
+                CoercionContext *CC = nullptr, bool Labeled = true);
 
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
   if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn))
@@ -251,7 +253,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
     // Check for trivial subtyping, to deduce any generic parameters
     // that require deduction. We'll do a specific type check later,
     // after substitution.
-    if (!isSameType(SrcTy, DestTy, &LocalCC))
+    if (!isSameType(*this, SrcTy, DestTy, &LocalCC))
       return OverloadCandidate();
   } else {
     OpaqueValueExpr OVE(Loc, SrcTy);
@@ -286,7 +288,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   if (GlobalCC.requiresSubstitution()) {
     // Deduce arguments.
     if (DestLV) {
-      if (!isSameType(SrcTy, DestTy, &GlobalCC))
+      if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
         return OverloadCandidate();
     } else {
       OpaqueValueExpr OVE(Loc, SrcTy);
@@ -313,7 +315,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
 
   if (DestLV) {
     // Simply checking for type equality suffices.
-    if (!isSameType(SrcTy, DestTy, &GlobalCC))
+    if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
       return OverloadCandidate();
   } else {
     // Check that the source is coercible to the destination.
@@ -694,7 +696,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     if (GlobalCC.requiresSubstitution()) {
       // Deduce arguments.
       if (DestLV) {
-        if (!isSameType(SrcTy, DestTy, &GlobalCC))
+        if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
           continue;
       } else {
         OpaqueValueExpr OVE(Loc, SrcTy);
@@ -724,7 +726,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
 
     if (DestLV) {
       // Simply checking for type equality suffices.
-      if (!isSameType(SrcTy, EffectiveDestTy, &GlobalCC))
+      if (!isSameType(*this, SrcTy, EffectiveDestTy, &GlobalCC))
         continue;
     } else {
     // Check that the source is coercible to the destination.

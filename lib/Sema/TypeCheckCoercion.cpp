@@ -33,6 +33,8 @@ using namespace swift;
 static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
                             DeducibleGenericParamType *Deducible,
                             Type DeducedTy, unsigned Flags);
+bool isSameType(TypeChecker &tc, Type T1, Type T2,
+                CoercionContext *CC = nullptr, bool Labeled = true);
 
 namespace {
 
@@ -1594,7 +1596,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Because we have coerced something in the source tuple, we need to
         // rebuild the type of that tuple.
         RebuildSourceType = true;
-      } else if (ETy && !TC.isSameType(ElementTy, DestEltTy, &CC)) {
+      } else if (ETy && !isSameType(TC, ElementTy, DestEltTy, &CC)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
@@ -1636,7 +1638,7 @@ SemaCoerce::convertTupleToTupleType(Expr *E, unsigned NumExprElements,
         // Because we have coerced something in the source tuple, we need to
         // rebuild the type of that tuple.
         RebuildSourceType = true;
-      } else if (ETy && !TC.isSameType(ElementTy, DestEltTy, &CC)) {
+      } else if (ETy && !isSameType(TC,ElementTy, DestEltTy, &CC)) {
         // FIXME: Allow conversions when we don't have a tuple expression?
         if (Flags & CF_Apply)
           TC.diagnose(E->getLoc(), diag::tuple_element_type_mismatch, SrcField,
@@ -2187,7 +2189,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
     }
 
     if (SrcLT &&
-        TC.isSameType(DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
+        isSameType(TC,DestLT->getObjectType(), SrcLT->getObjectType(), &CC)) {
       bool AddressAllowed = (Flags & CF_ImplicitLValue)
                          || isa<AddressOfExpr>(E->getSemanticsProvidingExpr());
       bool QualifiersOkay = SrcLT->getQualifiers() <= DestLT->getQualifiers();
@@ -2258,7 +2260,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // Try to match up the types, deducing any generic arguments along the way.
   // We do this now, rather than in the earlier isEqual type check, because
   // lvalues and tuple types need to be decomposed first.
-  if (TC.isSameType(E->getType(), DestTy, &CC))
+  if (isSameType(TC,E->getType(), DestTy, &CC))
     return unchanged(E, Flags);
 
   // If there is an implicit conversion from the source to the destination
@@ -2843,11 +2845,11 @@ bool TypeChecker::isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC) {
   return matchTypes(*this, T1, T2, flags, trivial, CC);
 }
 
-bool TypeChecker::isSameType(Type T1, Type T2, CoercionContext *CC,
-                             bool Labeled) {
+bool isSameType(TypeChecker &tc, Type T1, Type T2, CoercionContext *CC,
+                bool Labeled) {
   bool Trivial = true;
   unsigned Flags = ST_None;
   if (!Labeled)
     Flags |= ST_Unlabeled;
-  return matchTypes(*this, T1, T2, Flags, Trivial, CC);
+  return matchTypes(tc, T1, T2, Flags, Trivial, CC);
 }
