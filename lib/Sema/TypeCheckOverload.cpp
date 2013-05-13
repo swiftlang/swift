@@ -19,6 +19,10 @@
 #include "swift/AST/Types.h"
 using namespace swift;
 
+// In TypeCheckCoercion.cpp.
+CoercionResult isCoercibleToType(TypeChecker &tc, Expr *E, Type Ty,
+                                 CoercionKind Kind, CoercionContext *CC);
+
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
   if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn))
     return DR->getDecl()->getName();
@@ -183,14 +187,14 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
         ->castTo<AnyFunctionType>();
 
   // Check whether arguments are suitable for this function.
-  if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
+  if (isCoercibleToType(*this, Arg, FunctionTy->getInput(), Kind, &CC)
         == CoercionResult::Failed)
     return OverloadCandidate();
 
   // Check whether we can coerce the result type.
   if (DestTy) { 
     OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-    if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &CC)
+    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &CC)
           == CoercionResult::Failed)
       return OverloadCandidate();
   }
@@ -251,7 +255,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
       return OverloadCandidate();
   } else {
     OpaqueValueExpr OVE(Loc, SrcTy);
-    if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &LocalCC)
+    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &LocalCC)
           == CoercionResult::Failed) {
       return OverloadCandidate();
     }
@@ -286,7 +290,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
         return OverloadCandidate();
     } else {
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+      if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
             == CoercionResult::Failed) {
         return OverloadCandidate();
       }
@@ -314,7 +318,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   } else {
     // Check that the source is coercible to the destination.
     OpaqueValueExpr OVE(Loc, SrcTy);
-    if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
           == CoercionResult::Failed) {
       return OverloadCandidate();
     }
@@ -365,7 +369,7 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
-  CoercionResult cr = isCoercibleToType(&base, openedTypes[0],
+  CoercionResult cr = isCoercibleToType(*this, &base, openedTypes[0],
                                         CoercionKind::Normal, &CC);
   if (cr == CoercionResult::Failed)
     return nullptr;
@@ -414,7 +418,7 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
-  CoercionResult cr = isCoercibleToType(&base, openedTypes.back(),
+  CoercionResult cr = isCoercibleToType(*this, &base, openedTypes.back(),
                                         CoercionKind::Normal, &CC);
   if (cr == CoercionResult::Failed)
     return true;
@@ -550,14 +554,14 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     CoercionKind Kind = CoercionKind::Normal;
     if (OperatorSyntax && VD->getAttrs().isAssignment())
       Kind = CoercionKind::Assignment;
-    if (isCoercibleToType(Arg, FunctionTy->getInput(), Kind, &CC)
+    if (isCoercibleToType(*this, Arg, FunctionTy->getInput(), Kind, &CC)
           == CoercionResult::Failed)
       continue;
 
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &CC)
+      if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &CC)
             == CoercionResult::Failed)
         continue;
     }
@@ -694,7 +698,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
           continue;
       } else {
         OpaqueValueExpr OVE(Loc, SrcTy);
-        if (isCoercibleToType(&OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+        if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
               == CoercionResult::Failed) {
           continue;
         }
@@ -725,7 +729,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     } else {
     // Check that the source is coercible to the destination.
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(&OVE, EffectiveDestTy, CoercionKind::Normal,
+      if (isCoercibleToType(*this, &OVE, EffectiveDestTy, CoercionKind::Normal,
                             &GlobalCC)
             == CoercionResult::Failed) {
         continue;

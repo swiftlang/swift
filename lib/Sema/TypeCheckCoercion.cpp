@@ -2485,9 +2485,8 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
                      DestTy);
 }
 
-CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
-                                              CoercionKind Kind,
-                                              CoercionContext *CC) {
+CoercionResult isCoercibleToType(TypeChecker &tc, Expr *E, Type Ty,
+                                 CoercionKind Kind, CoercionContext *CC) {
   unsigned Flags = CF_UserConversions;
   switch (Kind) {
   case CoercionKind::Normal:
@@ -2502,7 +2501,7 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
     break;
   }
 
-  CoercionContext MyCC(*this);
+  CoercionContext MyCC(tc);
   if (!CC)
     CC = &MyCC;
 
@@ -2518,11 +2517,11 @@ CoercionResult TypeChecker::isCoercibleToType(Expr *E, Type Ty,
     }
 
     // Substitute the deduced arguments into the type.
-    Ty = substType(Ty, CC->Substitutions);
+    Ty = tc.substType(Ty, CC->Substitutions);
     if (!Ty)
       return CoercionResult::Failed;
 
-    validateTypeSimple(Ty);
+    tc.validateTypeSimple(Ty);
   }
 
   // If we've completed our substitutions, finalize them by gathering

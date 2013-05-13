@@ -549,19 +549,6 @@ public:
                            CoercionKind Kind = CoercionKind::Normal,
                            CoercionContext *CC = nullptr);
   
-  /// isCoercibleToType - Determine whether the given expression can be 
-  /// coerced to the given type.
-  ///
-  /// If a non-NULL coercion context is provided, that coercion context
-  /// will be used (and updated) based on this coercion.
-  ///
-  /// The result is a three-state value: the coercion may succeed, may fail, or
-  /// it may be unknowable whether it can ever succeed (for example, if
-  /// unresolved literals are involved).
-  CoercionResult isCoercibleToType(Expr *E, Type Ty,
-                                   CoercionKind Kind = CoercionKind::Normal,
-                                   CoercionContext *CC = nullptr);
-  
   /// coerceObjectArgument - Coerce the given expression to an object argument
   /// of the given container type.
   ///
