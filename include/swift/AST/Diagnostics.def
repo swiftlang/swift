@@ -742,6 +742,9 @@ ERROR(sema_opening_import,sema_nb,none,
 ERROR(invalid_declaration_imported,sema_nb,none,
       "invalid declaration referenced in import", ())
 
+ERROR(serialization_malformed_module,sema,none,
+      "malformed module file", ())
+
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))
 ERROR(unknown_dotted_type_base,sema_nb,none,

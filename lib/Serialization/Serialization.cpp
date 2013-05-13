@@ -146,7 +146,9 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
                                FileBufferIDs inputFiles){
-  os << SIGNATURE;
+  // Write the signature through the BitstreamWriter for alignment purposes.
+  for (unsigned char byte : SIGNATURE)
+    Out.Emit(byte, 8);
 
   writeHeader();
   writeInputFiles(TU->Ctx.SourceMgr, inputFiles);
