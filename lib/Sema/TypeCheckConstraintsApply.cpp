@@ -916,7 +916,7 @@ namespace {
         // If the base expression is not an lvalue, make everything inside it
         // materializable.
         if (!base->getType()->is<LValueType>()) {
-          base = cs.getTypeChecker().convertToMaterializable(base);
+          base = cs.getTypeChecker().coerceToMaterializable(base);
           if (!base)
             return nullptr;
         }

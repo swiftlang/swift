@@ -390,7 +390,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
       }
 
       if (!EltTy)
-        initExpr = convertToMaterializable(initExpr);
+        initExpr = coerceToMaterializable(initExpr);
 
       struct CheckForLocalRef : public ASTWalker {
         TypeChecker &TC;

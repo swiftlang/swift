@@ -52,7 +52,7 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
     bool anyChange = false;
     for (Expr *&eltRef : TE->getElements()) {
       Type oldType = eltRef->getType();
-      Expr *newElt = TC.convertToMaterializable(eltRef);
+      Expr *newElt = TC.coerceToMaterializable(eltRef);
       if (!newElt) return;
 
       // Remember if the type changed at all.  A superficial test is fine.
@@ -72,11 +72,7 @@ static void convertToMaterializableHelper(TypeChecker &TC, Expr *E) {
 
 /// Make the given expression have a materializable type if it doesn't
 /// already.
-Expr *TypeChecker::convertToMaterializable(Expr *E) {
-  if (getLangOpts().UseConstraintSolver) {
-    return coerceToMaterializableConstraints(E);
-  }
-
+Expr *TypeChecker::convertToMaterializableOld(Expr *E) {
   // Load l-values.
   if (LValueType *lv = E->getType()->getAs<LValueType>())
     return convertLValueToRValue(*this, lv, E);
@@ -1411,7 +1407,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base expression is not an lvalue, make everything inside it
   // materializable.
   if (!BaseTy->is<LValueType>()) {
-    Base = convertToMaterializable(Base);
+    Base = coerceToMaterializable(Base);
     if (!Base)
       return nullptr;
 
@@ -1495,7 +1491,7 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   // If the base is a tuple, we need to force it to be either a proper lvalue
   // or a proper rvalue; otherwise, the semantics are strange.
   if (!Base->getType()->is<LValueType>())
-    Base = convertToMaterializable(Base);
+    Base = coerceToMaterializable(Base);
 
   return recheckTypes(buildMemberRefExpr(Base, E->getDotLoc(), Lookup,
                                          E->getNameLoc()));
@@ -1956,14 +1952,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
                                                      /*TypeCheckAST=*/false);
 }
 
-bool TypeChecker::typeCheckExpression(Expr *&E, Type ConvertType) {
-  // If we're using the constraint solver, we take a different path through
-  // the type checker. Handle it here.
-  if (getLangOpts().UseConstraintSolver) {
-    E = typeCheckExpressionConstraints(E, ConvertType);
-    return E == nullptr;
-  }
-
+bool TypeChecker::typeCheckExpressionOld(Expr *&E, Type ConvertType) {
   SemaExpressionTree SET(*this);
   E = SET.doIt(E);
 
@@ -2159,36 +2148,7 @@ static bool isBuiltinIntegerType(Type T) {
 }
 
 /// Type check an array bound.
-bool TypeChecker::typeCheckArrayBound(Expr *&E, bool constantRequired) {
-  // If it's an integer literal expression, just convert the type directly.
-  if (auto lit = dyn_cast<IntegerLiteralExpr>(E->getSemanticsProvidingExpr())) {
-    // FIXME: the choice of 64-bit is rather arbitrary.
-    E->setType(BuiltinIntegerType::get(64, Context));
-
-    // Constant array bounds must be non-zero.
-    if (constantRequired) {
-      uint64_t size = lit->getValue().getZExtValue();
-      if (size == 0) {
-        diagnose(lit->getLoc(), diag::new_array_bound_zero)
-          .highlight(lit->getSourceRange());
-        return nullptr;
-      }
-    }
-
-    return false;
-  }
-
-  // Otherwise, if a constant expression is required, fail.
-  if (constantRequired) {
-    diagnose(E->getLoc(), diag::non_constant_array)
-      .highlight(E->getSourceRange());
-    return true;
-  }
-
-  if (getLangOpts().UseConstraintSolver) {
-    return typeCheckArrayBoundConstraints(E);
-  }
-
+bool TypeChecker::typeCheckArrayBoundOld(Expr *&E) {
   // Just quietly accept if the type is unresolved.
   if (E->getType()->isUnresolvedType())
     return false;
@@ -2209,11 +2169,7 @@ static bool isBuiltinI1(Type T) {
   return false;
 }
 
-bool TypeChecker::typeCheckCondition(Expr *&E) {
-  if (getLangOpts().UseConstraintSolver) {
-    return typeCheckConditionConstraints(E);
-  }
-
+bool TypeChecker::typeCheckConditionOld(Expr *&E) {
   if (typeCheckExpression(E))
     return true;
 
@@ -2250,13 +2206,8 @@ static Type ComputeAssignDestTy(TypeChecker &TC, Expr *Dest,
   return DestTy;
 }
 
-bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
-                                      Expr *&Src) {
-  if (getLangOpts().UseConstraintSolver) {
-    llvm::tie(Dest, Src) = typeCheckAssignmentConstraints(Dest, EqualLoc, Src);
-    return !Dest || !Src;
-  }
-
+bool TypeChecker::typeCheckAssignmentOld(Expr *&Dest, SourceLoc EqualLoc,
+                                         Expr *&Src) {
   SemaExpressionTree SET(*this);
   
   // Type check the destination.

@@ -2636,19 +2636,24 @@ namespace {
 }
 
 #pragma mark High-level entry points
-Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
+bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
+  // FIXME: Old type checker.
+  if (!getLangOpts().UseConstraintSolver) {
+    return typeCheckExpressionOld(expr, convertType);
+  }
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
   if (!expr)
-    return nullptr;
+    return true;
 
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
   if (cs.generateConstraints(expr))
-    return nullptr;
+    return true;
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
@@ -2669,7 +2674,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   if (cs.solve(viable)) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
-      return nullptr;
+      return true;
     }
 
     // FIXME: Dumping constraints by default due to crummy diagnostics.
@@ -2698,7 +2703,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
 
-    return nullptr;
+    return true;
   }
 
   auto &solution = viable[0];
@@ -2711,7 +2716,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   auto result = cs.applySolution(solution, expr);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
-   return nullptr;
+   return true;
   }
 
   // If we're supposed to convert the expression to some particular type,
@@ -2719,7 +2724,7 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
   if (convertType) {
     result = solution.coerceToType(result, convertType);
     if (!result) {
-      return nullptr;
+      return true;
     }
   }
 
@@ -2728,7 +2733,8 @@ Expr *TypeChecker::typeCheckExpressionConstraints(Expr *expr, Type convertType){
     result->dump();
   }
 
-  return result;
+  expr = result;
+  return false;
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the
@@ -2779,10 +2785,17 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
   return destTy;
 }
 
-std::pair<Expr *, Expr *>
-TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
-                                            SourceLoc equalLoc,
-                                            Expr *src) {
+std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
+                                                           SourceLoc equalLoc,
+                                                           Expr *src) {
+  // FIXME: Old type checker.
+  if (!getLangOpts().UseConstraintSolver) {
+    if (typeCheckAssignmentOld(dest, equalLoc, src))
+      return { nullptr, nullptr };
+
+    return { dest, src };
+  }
+
   // First, pre-check the destination and source, validating any types that
   // occur in the expression and folding sequence expressions.
 
@@ -2900,7 +2913,12 @@ TypeChecker::typeCheckAssignmentConstraints(Expr *dest,
   return { dest, src };
 }
 
-bool TypeChecker::typeCheckConditionConstraints(Expr *&expr) {
+bool TypeChecker::typeCheckCondition(Expr *&expr) {
+  // FIXME: Old type checker.
+  if (!getLangOpts().UseConstraintSolver) {
+    return typeCheckConditionOld(expr);
+  }
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
@@ -2998,7 +3016,37 @@ bool TypeChecker::typeCheckConditionConstraints(Expr *&expr) {
   return false;
 }
 
-bool TypeChecker::typeCheckArrayBoundConstraints(Expr *&expr) {
+bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
+  // If it's an integer literal expression, just convert the type directly.
+  if (auto lit = dyn_cast<IntegerLiteralExpr>(
+                   expr->getSemanticsProvidingExpr())) {
+    // FIXME: the choice of 64-bit is rather arbitrary.
+    expr->setType(BuiltinIntegerType::get(64, Context));
+
+    // Constant array bounds must be non-zero.
+    if (constantRequired) {
+      uint64_t size = lit->getValue().getZExtValue();
+      if (size == 0) {
+        diagnose(lit->getLoc(), diag::new_array_bound_zero)
+        .highlight(lit->getSourceRange());
+        return nullptr;
+      }
+    }
+
+    return false;
+  }
+
+  // Otherwise, if a constant expression is required, fail.
+  if (constantRequired) {
+    diagnose(expr->getLoc(), diag::non_constant_array)
+      .highlight(expr->getSourceRange());
+    return true;
+  }
+
+  // FIXME: Old type checker.
+  if (!getLangOpts().UseConstraintSolver)
+    return typeCheckArrayBoundOld(expr);
+  
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
@@ -3096,8 +3144,11 @@ bool TypeChecker::typeCheckArrayBoundConstraints(Expr *&expr) {
   return false;
 }
 
-bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
-                                         bool &isTrivial) {
+bool TypeChecker::isSubtypeOf(Type type1, Type type2, bool &isTrivial) {
+  if (!getLangOpts().UseConstraintSolver) {
+    return isSubtypeOfOld(type1, type2, isTrivial);
+  }
+  
   ConstraintSystem cs(*this);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
@@ -3123,7 +3174,11 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
   return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
 }
 
-Expr *TypeChecker::coerceToMaterializableConstraints(Expr *expr) {
+Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
+  if (!getLangOpts().UseConstraintSolver) {
+    return convertToMaterializableOld(expr);
+  }
+
   // Load lvalues.
   if (auto lvalue = expr->getType()->getAs<LValueType>()) {
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
@@ -3131,7 +3186,7 @@ Expr *TypeChecker::coerceToMaterializableConstraints(Expr *expr) {
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<ParenExpr>(expr)) {
-    auto sub = coerceToMaterializableConstraints(paren->getSubExpr());
+    auto sub = coerceToMaterializable(paren->getSubExpr());
     paren->setSubExpr(sub);
     paren->setType(sub->getType());
     return paren;
@@ -3143,7 +3198,7 @@ Expr *TypeChecker::coerceToMaterializableConstraints(Expr *expr) {
     for (auto &elt : tuple->getElements()) {
       // Materialize the element.
       auto oldType = elt->getType();
-      elt = coerceToMaterializableConstraints(elt);
+      elt = coerceToMaterializable(elt);
 
       // If the type changed at all, make a note of it.
       if (elt->getType().getPointer() != oldType.getPointer()) {

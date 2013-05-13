@@ -414,9 +414,9 @@ public:
   /// relationship.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
+  bool isSubtypeOfOld(Type t1, Type t2, bool &isTrivial);
+
   bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
-  
-  bool isSubtypeOfConstraints(Type t1, Type t2, bool &isTrivial);
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
   bool semaTupleExpr(TupleExpr *TE);
@@ -500,20 +500,34 @@ public:
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
 
-  bool typeCheckExpression(Expr *&E, Type ConvertType = Type());
-  Expr *typeCheckExpressionConstraints(Expr *expr, Type convertType = Type());
+  bool typeCheckExpressionOld(Expr *&E, Type ConvertType = Type());
 
-  bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
-  bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
-  bool typeCheckCondition(Expr *&E);
-  bool typeCheckArrayBound(Expr *&E, bool requireConstant);
-  bool typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
+  /// \brief Type check the given expression.
+  ///
+  /// \param expr The expression to type-check, which will be modified in
+  /// place.
+  ///
+  /// \param coerceType The type that the expression is being coerced to,
+  /// or null if the expression is standalone.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool typeCheckExpression(Expr *&expr, Type coerceType = Type());
 
-  bool typeCheckConditionConstraints(Expr *&expr);
-  bool typeCheckArrayBoundConstraints(Expr *&expr);
+  /// \brief Type check the given expression as a condition, which converts
+  /// it to a logic value.
+  ///
+  /// \param expr The expression to type-check, which will be modified in place
+  /// to return a logic value (builtin i1).
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool typeCheckCondition(Expr *&expr);
 
-  /// \brief Compute the set of captures for the given function or closure.
-  void computeCaptures(CapturingExpr *capturing);
+  /// \brief Type check the given expression as an array bound, which converts
+  /// it to a builtin integer value.
+  ///
+  /// \param expr The expression to type-check, which will be modified in
+  /// place to return a builtin integral value (e.g., builtin i64).
+  bool typeCheckArrayBound(Expr *&expr, bool requireConstant);
 
   /// \brief Type check an assignment expression using the constraint-based
   /// type checker.
@@ -524,9 +538,21 @@ public:
   ///
   /// \returns a converted (dest, src) expression pair, or (nullptr, nullptr)
   /// if the assignment failed to type-check.
-  std::pair<Expr *, Expr *> typeCheckAssignmentConstraints(Expr *dest,
-                                                           SourceLoc equalLoc,
-                                                           Expr *src);
+  std::pair<Expr *, Expr *> typeCheckAssignment(Expr *dest,
+                                                SourceLoc equalLoc,
+                                                Expr *src);
+
+  bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
+  bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
+  
+  bool typeCheckConditionOld(Expr *&E);
+  bool typeCheckArrayBoundOld(Expr *&E);
+  bool typeCheckAssignmentOld(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
+
+
+  /// \brief Compute the set of captures for the given function or closure.
+  void computeCaptures(CapturingExpr *capturing);
+
 
   /// \brief Retrieve the default literal type for the given literal kind.
   Type getDefaultLiteralType(LiteralKind kind);
@@ -539,7 +565,7 @@ public:
   /// literals, resolve those unresolved literals to their default types and
   /// type-check the expression again.
   bool resolveUnresolvedLiterals(Expr *&E);
-  
+
   /// coerceToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if
   /// the types don't match and diagnoses cases where the conversion cannot be
@@ -564,14 +590,14 @@ public:
                              CoercionContext *CC = nullptr);
   
   Expr *convertToRValueOld(Expr *E);
-  Expr *convertToMaterializable(Expr *E);
+  Expr *convertToMaterializableOld(Expr *E);
 
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
   
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
-  Expr *coerceToMaterializableConstraints(Expr *expr);
+  Expr *coerceToMaterializable(Expr *expr);
 
   /// conformsToProtocol - Determine whether the given type conforms to the
   /// given protocol.

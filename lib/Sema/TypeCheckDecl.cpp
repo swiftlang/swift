@@ -333,7 +333,7 @@ public:
         return;
       }
       if (!DestTy) {
-        Expr *newInit = TC.convertToMaterializable(Init);
+        Expr *newInit = TC.coerceToMaterializable(Init);
         if (newInit) Init = newInit;
       }
       PBD->setInit(Init);

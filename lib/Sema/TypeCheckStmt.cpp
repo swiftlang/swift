@@ -113,9 +113,10 @@ public:
   Stmt *visitAssignStmt(AssignStmt *S) {
     Expr *Dest = S->getDest();
     Expr *Src = S->getSrc();
-    if (TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src))
-      return 0;
-    
+    llvm::tie(Dest, Src) = TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src);
+    if (!Dest || !Src)
+      return nullptr;
+
     S->setDest(Dest);
     S->setSrc(Src);
     return S;
@@ -569,7 +570,7 @@ public:
     Expr *subjectExpr = S->getSubjectExpr();
     if (typeCheckExpr(subjectExpr))
       return nullptr;
-    subjectExpr = TC.convertToMaterializable(subjectExpr);
+    subjectExpr = TC.coerceToMaterializable(subjectExpr);
     if (!subjectExpr)
       return nullptr;
     S->setSubjectExpr(subjectExpr);

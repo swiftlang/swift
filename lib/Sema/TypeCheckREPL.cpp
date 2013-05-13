@@ -439,7 +439,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   ASTContext &C = TC->Context;
 
   // Always print rvalues, not lvalues.
-  E = TC->convertToMaterializable(E);
+  E = TC->coerceToMaterializable(E);
 
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
@@ -531,7 +531,7 @@ static void processREPLTopLevelExpr(Expr *E, TypeChecker *TC) {
   // going to reparent it.
   TC->TU.Decls.pop_back();
 
-  E = TC->convertToMaterializable(E);
+  E = TC->coerceToMaterializable(E);
 
   // Create the meta-variable, let the typechecker name it.
   VarDecl *vd = new (TC->Context) VarDecl(E->getStartLoc(),
@@ -608,7 +608,7 @@ static void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD,
   // Replace the initializer of PBD with a reference to our repl temporary.
   Expr *E = new (TC->Context) DeclRefExpr(vd, vd->getStartLoc(),
                                           vd->getTypeOfReference());
-  E = TC->convertToMaterializable(E);
+  E = TC->coerceToMaterializable(E);
   PBD->setInit(E);
   TC->TU.Decls.push_back(PBTLCD);
 
