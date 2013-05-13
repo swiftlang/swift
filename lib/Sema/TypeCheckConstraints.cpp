@@ -2915,7 +2915,7 @@ bool TypeChecker::typeCheckConditionConstraints(Expr *&expr) {
     return true;
 
   // The result must be a LogicValue.
-  auto logicValueProto = getLogicValueProtocol();
+  auto logicValueProto = getProtocol(KnownProtocolKind::LogicValue);
   if (!logicValueProto) {
     diagnose(expr->getLoc(), diag::condition_missing_proto);
     return true;
@@ -3013,7 +3013,7 @@ bool TypeChecker::typeCheckArrayBoundConstraints(Expr *&expr) {
     return true;
 
   // The result must be an ArrayBound.
-  auto arrayBoundProto = getArrayBoundProtocol();
+  auto arrayBoundProto = getProtocol(KnownProtocolKind::ArrayBound);
   if (!arrayBoundProto) {
     diagnose(expr->getLoc(), diag::array_bound_missing_proto);
     return true;

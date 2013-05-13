@@ -275,6 +275,33 @@ public:
   }
 };
 
+/// \brief The set of known protocols.
+enum class KnownProtocolKind : unsigned {
+  /// \brief The 'ArrayBound' protocol, used for array bounds.
+  ArrayBound,
+
+  /// \brief The 'ArrayLiteralConvertible' protocol, used for array literals.
+  ArrayLiteralConvertible,
+
+  /// \brief The 'DictionaryLiteralConvertible' protocol, used for dictionary
+  /// literals.
+  DictionaryLiteralConvertible,
+
+  /// \brief The 'Enumerable' protocol, used by the for-each loop.
+  Enumerable,
+
+  /// \brief The 'Enumerator' protocol, used by the for-each loop.
+  Enumerator,
+
+  /// \brief The 'LogicValue' protocol, used for places where a value is
+  /// considered to be a logic value, such as in an 'if' statement.
+  LogicValue,
+
+  /// \brief The 'StringInterpolationConvertible ' protocol, used for string
+  /// interpolation literals.
+  StringInterpolationConvertible
+};
+
 class TypeChecker : public ASTMutationListener {
 public:
   TranslationUnit &TU;
@@ -285,28 +312,13 @@ public:
   std::vector<FuncExprLike> implicitlyDefinedFunctions;
 
 private:
-  /// \brief The 'Enumerable' protocol, used by the for-each loop.
-  ProtocolDecl *EnumerableProto;
+  /// \brief The number of known protocols.
+  static const unsigned numKnownProtocols
+    = 1 + static_cast<unsigned>(
+            KnownProtocolKind::StringInterpolationConvertible);
 
-  /// \brief The 'Enumerator' protocol, used by the for-each loop.
-  ProtocolDecl *EnumeratorProto;
-  
-  /// \brief The 'ArrayLiteralConvertible' protocol, used by [] array literals.
-  ProtocolDecl *ArrayLiteralProto;
-
-  /// \brief The 'DictionaryLiteralConvertible' protocol, used by []
-  /// dictionary literals.
-  ProtocolDecl *DictionaryLiteralProto = nullptr;
-
-  /// \brief The 'StringInterpolationConvertible' protocol, used by
-  /// string interpolation.
-  ProtocolDecl *StringInterpolationConvertibleProto = nullptr;
-
-  /// \brief The 'ArrayBound' protocol, used by array bounds.
-  ProtocolDecl *ArrayBoundProto = nullptr;
-
-  /// \brief The 'LogicValue' protocol, used by conditions.
-  ProtocolDecl *LogicValueProto = nullptr;
+  /// \brief The set of known protocols, lazily populated as needed.
+  ProtocolDecl *knownProtocols[numKnownProtocols] = { };
 
   Type IntLiteralType;
   Type FloatLiteralType;
@@ -862,29 +874,11 @@ public:
                            SourceLoc NameLoc);
   /// @}
 
-  /// \brief Retrieve the Enumerable protocol declaration, if it exists.
-  ProtocolDecl *getEnumerableProtocol();
-
-  /// \brief Retrieve the Enumerator protocol declaration, if it exists.
-  ProtocolDecl *getEnumeratorProtocol();
-
-  /// \brief Retrieve the ArrayLiteralConvertible protocol declaration, if it
-  /// exists.
-  ProtocolDecl *getArrayLiteralProtocol();
-
-  /// \brief Retrieve the DictionaryLiteralConvertible protocol
-  /// declaration, if it exists.
-  ProtocolDecl *getDictionaryLiteralProtocol();
-
-  /// \brief Retrieve the StringInterpolationConvertible protocol declaration,
-  /// if it exists.
-  ProtocolDecl *getStringInterpolationConvertibleProtocol();
-
-  /// \brief Retrieve the ArrayBound protocol declaration, if it exists.
-  ProtocolDecl *getArrayBoundProtocol();
-
-  /// \brief Retrieve the LogicValue protocol declaration, if it exists.
-  ProtocolDecl *getLogicValueProtocol();
+  /// \brief Retrieve a specific, known protocol.
+  ///
+  /// \returns null if the protocol is not available. This represents a
+  /// problem with the Standard Library.
+  ProtocolDecl *getProtocol(KnownProtocolKind kind);
 
   /// \name AST Mutation Listener Implementation
   /// @{

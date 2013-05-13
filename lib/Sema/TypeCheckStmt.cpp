@@ -297,14 +297,16 @@ public:
     S->setContainer(Container);
 
     // Retrieve the 'Enumerable' protocol.
-    ProtocolDecl *EnumerableProto = TC.getEnumerableProtocol();
+    ProtocolDecl *EnumerableProto
+      = TC.getProtocol(KnownProtocolKind::Enumerable);
     if (!EnumerableProto) {
       TC.diagnose(S->getForLoc(), diag::foreach_missing_enumerable);
       return nullptr;
     }
 
     // Retrieve the 'Enumerator' protocol.
-    ProtocolDecl *EnumeratorProto = TC.getEnumeratorProtocol();
+    ProtocolDecl *EnumeratorProto
+      = TC.getProtocol(KnownProtocolKind::Enumerator);
     if (!EnumeratorProto) {
       TC.diagnose(S->getForLoc(), diag::foreach_missing_range);
       return nullptr;
@@ -875,79 +877,4 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   BraceStmt *Body = TLCD->getBody();
   StmtChecker(*this, TLCD).typeCheckStmt(Body);
   TLCD->setBody(Body);
-}
-
-ProtocolDecl *TypeChecker::getEnumerableProtocol() {
-  if (!EnumerableProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("Enumerable"), &TU);
-    EnumerableProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-  
-  return EnumerableProto;
-}
-
-ProtocolDecl *TypeChecker::getEnumeratorProtocol() {
-  if (!EnumeratorProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("Enumerator"), &TU);
-    EnumeratorProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-  
-  return EnumeratorProto;
-}
-
-ProtocolDecl *TypeChecker::getArrayLiteralProtocol() {
-  if (!ArrayLiteralProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("ArrayLiteralConvertible"),
-                              &TU);
-    ArrayLiteralProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-  
-  return ArrayLiteralProto;
-}
-
-ProtocolDecl *TypeChecker::getDictionaryLiteralProtocol() {
-  if (!DictionaryLiteralProto) {
-    UnqualifiedLookup Globals(
-                        Context.getIdentifier("DictionaryLiteralConvertible"),
-                        &TU);
-    DictionaryLiteralProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-  
-  return DictionaryLiteralProto;
-}
-
-ProtocolDecl *TypeChecker::getStringInterpolationConvertibleProtocol() {
-  if (!StringInterpolationConvertibleProto) {
-    UnqualifiedLookup Globals(
-                        Context.getIdentifier("StringInterpolationConvertible"),
-                        &TU);
-    StringInterpolationConvertibleProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-
-  return StringInterpolationConvertibleProto;
-}
-
-ProtocolDecl *TypeChecker::getArrayBoundProtocol() {
-  if (!ArrayBoundProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("ArrayBound"), &TU);
-    ArrayBoundProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-
-  return ArrayBoundProto;
-}
-
-ProtocolDecl *TypeChecker::getLogicValueProtocol() {
-  if (!LogicValueProto) {
-    UnqualifiedLookup Globals(Context.getIdentifier("LogicValue"), &TU);
-    LogicValueProto
-      = dyn_cast_or_null<ProtocolDecl>(Globals.getSingleTypeResult());
-  }
-
-  return LogicValueProto;
 }

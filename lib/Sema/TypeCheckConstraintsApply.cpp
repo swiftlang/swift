@@ -650,7 +650,8 @@ namespace {
 
       // Find the string interpolation protocol we need.
       auto &tc = cs.getTypeChecker();
-      auto interpolationProto = tc.getStringInterpolationConvertibleProtocol();
+      auto interpolationProto
+        = tc.getProtocol(KnownProtocolKind::StringInterpolationConvertible);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       // FIXME: Cache name,
@@ -959,8 +960,10 @@ namespace {
     Expr *visitArrayExpr(ArrayExpr *expr) {
       Type openedType = expr->getType();
       Type arrayTy = simplifyType(openedType);
+      auto &tc = cs.getTypeChecker();
 
-      ProtocolDecl *arrayProto = cs.getTypeChecker().getArrayLiteralProtocol();
+      ProtocolDecl *arrayProto
+        = tc.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
        // Use a value member constraint to find the appropriate
@@ -1003,10 +1006,10 @@ namespace {
     Expr *visitDictionaryExpr(DictionaryExpr *expr) {
       Type openedType = expr->getType();
       Type dictionaryTy = simplifyType(openedType);
+      auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *dictionaryProto
-      = cs.getTypeChecker().getDictionaryLiteralProtocol();
-      assert(dictionaryProto && "type-checked dictionary literal w/o protocol?");
+        = tc.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
 
       // Use a value member constraint to find the appropriate
       // convertFromDictionaryLiteral call.
@@ -2401,7 +2404,7 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   // FIXME: Cache names.
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
-                  tc.getLogicValueProtocol(),
+                  tc.getProtocol(KnownProtocolKind::LogicValue),
                   tc.Context.getIdentifier("getLogicValue"),
                   tc.Context.getIdentifier("_getBuiltinLogicValue"),
                   diag::condition_broken_proto,
@@ -2420,7 +2423,7 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
-                  tc.getArrayBoundProtocol(),
+                  tc.getProtocol(KnownProtocolKind::ArrayBound),
                   tc.Context.getIdentifier("getArrayBoundValue"),
                   tc.Context.getIdentifier("_getBuiltinArrayBoundValue"),
                   diag::broken_array_bound_proto,

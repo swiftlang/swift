@@ -180,7 +180,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // Dig out the StringInterpolationConvertible protocol.
       auto &tc = CS.getTypeChecker();
-      auto interpolationProto = tc.getStringInterpolationConvertibleProtocol();
+      auto interpolationProto
+        = tc.getProtocol(KnownProtocolKind::StringInterpolationConvertible);
       if (!interpolationProto) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
@@ -446,7 +447,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       // FIXME: This isn't actually used for anything at the moment.
-      ProtocolDecl *arrayProto = CS.TC.getArrayLiteralProtocol();
+      ProtocolDecl *arrayProto
+        = CS.TC.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
       if (!arrayProto) {
         CS.TC.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
         return Type();
@@ -499,7 +501,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // A dictionary expression can be of a type T that conforms to the
       // DictionaryLiteralConvertible protocol.
       // FIXME: This isn't actually used for anything at the moment.
-      ProtocolDecl *dictionaryProto = CS.TC.getDictionaryLiteralProtocol();
+      ProtocolDecl *dictionaryProto
+        = CS.TC.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
       if (!dictionaryProto) {
         CS.TC.diagnose(expr->getStartLoc(), diag::dictionary_expr_missing_proto);
         return Type();

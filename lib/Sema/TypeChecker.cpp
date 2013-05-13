@@ -34,7 +34,6 @@ using namespace swift;
 
 TypeChecker::TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
   : TU(TU), Context(TU.Ctx),
-    EnumerableProto(0), EnumeratorProto(0), ArrayLiteralProto(0),
     Diags(Diags)
 {
   Context.addMutationListener(*this);
@@ -68,6 +67,51 @@ void TypeChecker::addedExternalDecl(Decl *decl) {
 
 void TypeChecker::addedExternalType(Type type) {
   Context.ExternalTypes.push_back(type);
+}
+
+ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
+  // Check whether we've already looked for and cached this protocol.
+  unsigned index = (unsigned)kind;
+  assert(index < numKnownProtocols && "Number of known protocol is wrong");
+  if (knownProtocols[index])
+    return knownProtocols[index];
+
+  // Look for the protocol by name.
+  Identifier name;
+  switch (kind) {
+  case KnownProtocolKind::ArrayBound:
+    name = Context.getIdentifier("ArrayBound");
+    break;
+
+  case KnownProtocolKind::ArrayLiteralConvertible:
+    name = Context.getIdentifier("ArrayLiteralConvertible");
+    break;
+
+  case KnownProtocolKind::DictionaryLiteralConvertible:
+    name = Context.getIdentifier("DictionaryLiteralConvertible");
+    break;
+
+  case KnownProtocolKind::Enumerable:
+    name = Context.getIdentifier("Enumerable");
+    break;
+
+  case KnownProtocolKind::Enumerator:
+    name = Context.getIdentifier("Enumerator");
+    break;
+
+  case KnownProtocolKind::LogicValue:
+    name = Context.getIdentifier("LogicValue");
+    break;
+
+  case KnownProtocolKind::StringInterpolationConvertible:
+    name = Context.getIdentifier("StringInterpolationConvertible");
+    break;
+  }
+
+  UnqualifiedLookup global(name, &TU);
+  knownProtocols[index]
+    = dyn_cast_or_null<ProtocolDecl>(global.getSingleTypeResult());
+  return knownProtocols[index];
 }
 
 /// \brief Check for circular inheritance of protocols.
