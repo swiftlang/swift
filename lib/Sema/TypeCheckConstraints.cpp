@@ -3102,6 +3102,27 @@ bool TypeChecker::isSubtypeOfConstraints(Type type1, Type type2,
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
+Expr *TypeChecker::coerceToRValue(Expr *expr) {
+  if (!getLangOpts().UseConstraintSolver)
+    return convertToRValueOld(expr);
+
+  // If we already have an rvalue, we're done.
+  auto lvalueTy = expr->getType()->getAs<LValueType>();
+  if (!lvalueTy)
+    return expr;
+
+  // Can't load from an explicit lvalue.
+  if (auto addrOf = dyn_cast<AddressOfExpr>(expr->getSemanticsProvidingExpr())){
+    diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
+             lvalueTy->getObjectType())
+      .fixItRemove(SourceRange(expr->getLoc()));
+    return coerceToRValue(addrOf->getSubExpr());
+  }
+
+  // Load the lvalue.
+  return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
+}
+
 Expr *TypeChecker::coerceToMaterializableConstraints(Expr *expr) {
   // Load lvalues.
   if (auto lvalue = expr->getType()->getAs<LValueType>()) {

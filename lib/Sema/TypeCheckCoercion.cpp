@@ -35,6 +35,7 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
                             Type DeducedTy, unsigned Flags);
 bool isSameType(TypeChecker &tc, Type T1, Type T2,
                 CoercionContext *CC = nullptr, bool Labeled = true);
+Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
 
 namespace {
 
@@ -379,7 +380,7 @@ public:
 
       Expr *Result = TC.buildFilteredOverloadSet(Ovl, Best);
       if (!DestTy->is<LValueType>())
-        Result = TC.convertToRValue(Result);
+        Result = TC.convertToRValueOld(Result);
       return coerceToType(Result, DestTy, CC, SubFlags);
     }
 
@@ -1193,7 +1194,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       }
       
       Expr *Fn = TC.buildFilteredOverloadSet(Ovl, Best);
-      Fn = TC.convertToRValue(Fn);
+      Fn = TC.convertToRValueOld(Fn);
       E->setFn(Fn);
 
       if (Expr *Result = TC.semaApplyExpr(E))
@@ -2555,11 +2556,11 @@ Expr *TypeChecker::coerceObjectArgument(Expr *E, Type ContainerTy,
   return nullptr;
 }
 
-Expr *TypeChecker::convertLValueToRValue(LValueType *srcLV, Expr *E) {
+Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E) {
   assert(E && "no expression to load!");
   assert(E->getType()->isEqual(srcLV));
   
-  CoercionContext CC(*this);
+  CoercionContext CC(tc);
   if (CoercedResult Result = SemaCoerce::loadLValue(E, srcLV, CC, CF_Apply))
     return Result.getExpr();
   else {

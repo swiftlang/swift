@@ -563,10 +563,12 @@ public:
   Expr *coerceObjectArgument(Expr *E, Type ContainerTy,
                              CoercionContext *CC = nullptr);
   
-  Expr *convertToRValue(Expr *E);
-  Expr *convertLValueToRValue(LValueType *SrcLT, Expr *E);
+  Expr *convertToRValueOld(Expr *E);
   Expr *convertToMaterializable(Expr *E);
 
+  /// \brief Coerce the given expression to an rvalue, if it isn't already.
+  Expr *coerceToRValue(Expr *expr);
+  
   /// \brief Coerce the given expression to materializable type, if it
   /// isn't already.
   Expr *coerceToMaterializableConstraints(Expr *expr);

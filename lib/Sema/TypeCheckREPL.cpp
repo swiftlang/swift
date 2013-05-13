@@ -89,7 +89,7 @@ getArgRefExpr(TypeChecker &TC,
 
   Expr *ArgRef = new (Context) DeclRefExpr(Arg, Loc,
                                            Arg->getTypeOfReference());
-  ArgRef = TC.convertToRValue(ArgRef);
+  ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
     // For each index, we look through a TupleType or StructType.
     CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();

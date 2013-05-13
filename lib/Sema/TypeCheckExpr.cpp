@@ -31,11 +31,13 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-Expr *TypeChecker::convertToRValue(Expr *E) {
+Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
+
+Expr *TypeChecker::convertToRValueOld(Expr *E) {
   assert(E && "no expression to load!");
 
   if (LValueType *lv = E->getType()->getAs<LValueType>())
-    return convertLValueToRValue(lv, E);
+    return convertLValueToRValue(*this, lv, E);
 
   return E;
 }
@@ -77,7 +79,7 @@ Expr *TypeChecker::convertToMaterializable(Expr *E) {
 
   // Load l-values.
   if (LValueType *lv = E->getType()->getAs<LValueType>())
-    return convertLValueToRValue(lv, E);
+    return convertLValueToRValue(*this, lv, E);
 
   // Recursively walk into tuples and parens, performing loads.
   convertToMaterializableHelper(*this, E);
@@ -566,7 +568,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   bool isSuper = isa<SuperRefExpr>(E->getArg());
 
   // Perform lvalue-to-rvalue conversion on the function.
-  E1 = convertToRValue(E1);
+  E1 = convertToRValueOld(E1);
   if (!E1) return nullptr;
 
   // If we have a concrete function type, then we win.
@@ -724,7 +726,7 @@ Expr *TypeChecker::semaApplyExpr(ApplyExpr *E) {
   // If we have a best candidate, build a call to it now.
   if (Best) {
     E1 = buildFilteredOverloadSet(Ovl, Best);
-    E->setFn(convertToRValue(E1));
+    E->setFn(convertToRValueOld(E1));
     return semaApplyExpr(E);
   }
   
@@ -1168,7 +1170,7 @@ public:
       return 0;
     }
 
-    Expr *subExpr = TC.convertToRValue(E->getSubExpr());
+    Expr *subExpr = TC.coerceToRValue(E->getSubExpr());
     if (!subExpr) {
       E->setType(ErrorType::get(TC.Context));
       return 0;
@@ -2099,7 +2101,7 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
   // If it's just an l2r conversion away from the right type, we're done.
   if (LValueType *lvalue = E->getType()->getAs<LValueType>()) {
     if (isTypeOkay(lvalue->getObjectType())) {
-      Expr *newExpr = TC.convertToRValue(E);
+      Expr *newExpr = TC.coerceToRValue(E);
       if (!newExpr) return true;
       E = newExpr;
       return false;
@@ -2336,7 +2338,7 @@ bool TypeChecker::typeCheckAssignment(Expr *&Dest, SourceLoc EqualLoc,
   // If the source is not unresolved (but the destination is), coerce the
   // destination to an lvalue of the source type.
   if (!IsSrcUnresolved) {
-    Src = convertToRValue(Src);
+    Src = coerceToRValue(Src);
     if (!Src) return true;
 
     // FIXME: Handle the case where the dest is a TupleExpr.

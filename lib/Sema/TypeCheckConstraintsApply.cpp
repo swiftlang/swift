@@ -229,7 +229,7 @@ namespace {
           base = coerceToType(base, MetaTypeType::get(containerTy, context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
-          base = coerceToRvalue(base);
+          base = tc.coerceToRValue(base);
         }
         assert(base && "Unable to convert base?");
 
@@ -310,7 +310,7 @@ namespace {
           base = coerceToType(base, MetaTypeType::get(baseTy, context),
                               locator.withPathElement(
                                 ConstraintLocator::MemberRefBase));
-          base = coerceToRvalue(base);
+          base = tc.coerceToRValue(base);
         }
         assert(base && "Unable to convert base?");
 
@@ -456,9 +456,6 @@ namespace {
     /// \param locator Locator used to describe where in this expression we are.
     Expr *coerceObjectArgumentToType(Expr *expr, Type toType,
                                      ConstraintLocatorBuilder locator);
-
-    /// \brief Coerce the given expression to an rvalue.
-    Expr *coerceToRvalue(Expr *expr);
 
   private:
     /// \brief Build a new subscript.
@@ -1225,7 +1222,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       if (Expr *base = expr->getBase()) {
-        base = coerceToRvalue(base);
+        base = tc.coerceToRValue(base);
         if (!base) return nullptr;
         expr->setBase(base);
         expr->setType(MetaTypeType::get(base->getType(), tc.Context));
@@ -1308,11 +1305,12 @@ namespace {
     }
 
     Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
+      auto &tc = cs.getTypeChecker();
       auto &C = cs.getASTContext();
 
       expr->setType(simplifyType(expr->getType()));
 
-      Expr *sub = cs.getTypeChecker().convertToRValue(expr->getSubExpr());
+      Expr *sub = tc.coerceToRValue(expr->getSubExpr());
       if (!sub) return nullptr;
       expr->setSubExpr(sub);
 
@@ -1347,7 +1345,8 @@ namespace {
     Expr *visitIsSubtypeExpr(IsSubtypeExpr *expr) {
       expr->setType(simplifyType(expr->getType()));
       
-      Expr *sub = cs.getTypeChecker().convertToRValue(expr->getSubExpr());
+      auto &tc = cs.getTypeChecker();
+      Expr *sub = tc.coerceToRValue(expr->getSubExpr());
       if (!sub) return nullptr;
       expr->setSubExpr(sub);
 
@@ -1875,17 +1874,6 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   return new (tc.Context) MaterializeExpr(expr, destType);
 }
 
-Expr *ExprRewriter::coerceToRvalue(Expr *expr) {
-  // If we already have an rvalue, we're done.
-  auto lvalueTy = expr->getType()->getAs<LValueType>();
-  if (!lvalueTy)
-    return expr;
-
-  // Load the lvalue.
-  auto &tc = cs.getTypeChecker();
-  return new (tc.Context) LoadExpr(expr, lvalueTy->getObjectType());
-}
-
 /// \brief Determine if this literal kind is a string literal.
 static bool isStringLiteralKind(LiteralKind kind) {
   return kind == LiteralKind::UTFString ||
@@ -2072,8 +2060,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   TypeChecker &tc = cs.getTypeChecker();
 
   // The function is always an rvalue.
-  // FIXME: Bring convertToRvalue into the application step.
-  auto fn = coerceToRvalue(apply->getFn());
+  auto fn = tc.coerceToRValue(apply->getFn());
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;

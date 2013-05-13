@@ -247,7 +247,7 @@ public:
     ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
     Expr *Result = TC.semaApplyExpr(Call);
     if (!Result) return nullptr;
-    return TC.convertToRValue(Result);
+    return TC.coerceToRValue(Result);
   }
   
   /// callNullaryMemberOf - Form a call (with no arguments) to a method of the
@@ -287,7 +287,7 @@ public:
     ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
     Expr *Result = TC.semaApplyExpr(Call);
     if (!Result) return nullptr;
-    return TC.convertToRValue(Result);
+    return TC.coerceToRValue(Result);
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
