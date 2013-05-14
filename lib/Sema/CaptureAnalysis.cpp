@@ -118,6 +118,8 @@ class CaptureAnalysisVisitor : public ASTWalker {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(CE)) {
         for (Pattern *P : FE->getBodyParamPatterns())
           WalkPattern(P);
+      } else if (auto closure = dyn_cast<PipeClosureExpr>(CE)) {
+        WalkPattern(closure->getParams());
       } else if (ClosureExpr *CLE = dyn_cast<ClosureExpr>(CE)) {
         WalkPattern(CLE->getPattern());
       }

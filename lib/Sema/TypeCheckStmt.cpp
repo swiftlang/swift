@@ -67,6 +67,10 @@ public:
     : TC(TC), TheFunc(TheFunc), DC(TheFunc),
       LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
 
+  StmtChecker(TypeChecker &TC, PipeClosureExpr *TheClosure)
+    : TC(TC), TheFunc(TheClosure), DC(TheClosure),
+      LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
+
   StmtChecker(TypeChecker &TC, ConstructorDecl *TheCtor)
     : TC(TC), TheFunc(TheCtor), DC(TheCtor),
       LoopNestLevel(0), SwitchLevel(0), FallthroughDest(nullptr) { }
@@ -134,6 +138,8 @@ public:
            ++i)
         resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
       return resultTy;
+    } else if (auto closure = TheFunc.dyn_cast<PipeClosureExpr *>()) {
+      return closure->getResultType();
     } else
       return TupleType::getEmpty(TC.Context);
   }
@@ -872,6 +878,14 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
 void TypeChecker::typeCheckDestructorBody(DestructorDecl *DD) {
   Stmt *Body = DD->getBody();
   StmtChecker(*this, DD).typeCheckStmt(Body);
+}
+
+void TypeChecker::typeCheckClosureBody(PipeClosureExpr *closure) {
+  BraceStmt *body = closure->getBody();
+  StmtChecker(*this, closure).typeCheckStmt(body);
+  if (body) {
+    closure->setBody(body);
+  }
 }
 
 void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

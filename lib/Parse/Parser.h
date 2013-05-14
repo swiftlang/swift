@@ -342,7 +342,11 @@ public:
   bool parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
                               SmallVectorImpl<Pattern*> &bodyPatterns,
                               TypeLoc &retLoc);
+
   NullablePtr<Pattern> parsePattern();
+
+  /// \brief Determine whether this token can start a pattern.
+  bool isStartOfPattern(Token tok);
 
   /// Parse a tuple pattern element.
   ///
@@ -396,7 +400,24 @@ public:
   NullablePtr<Expr> parseExprNew();
   NullablePtr<Expr> parseExprSuper();
   Expr *parseExprStringLiteral();
+  
   Expr *parseExprIdentifier();
+
+  /// Parse a closure expression after the opening brace.
+  ///
+  ///   expr-closure:
+  ///     '{' closure-signature? brace-item-list* '}'
+  ///
+  ///   closure-signature:
+  ///     '|' closure-signature-arguments? '|' closure-signature-result?
+  ///
+  ///   closure-signature-arguments:
+  ///     pattern-tuple-element (',' pattern-tuple-element)*
+  ///
+  ///   closure-signature-result:
+  ///     '->' type
+  NullablePtr<Expr> parseExprClosure();
+
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);

@@ -559,7 +559,20 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       // Look in the generic parameters after checking our local declaration.
       if (FD)
         GenericParams = FD->getGenericParams();
-
+    } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
+      // Look for local variables; normally, the parser resolves these
+      // for us, but it can't do the right thing inside local types.
+      if (Loc.isValid()) {
+        FindLocalVal localVal(Loc, Name);
+        localVal.visit(CE->getBody());
+        if (!localVal.MatchingValue) {
+          localVal.checkPattern(CE->getParams());
+        }
+        if (localVal.MatchingValue) {
+          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+          return;
+        }
+      }
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())

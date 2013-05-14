@@ -103,11 +103,14 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
 }
 
 SourceRange ReturnStmt::getSourceRange() const {
+  SourceLoc Start = ReturnLoc;
   SourceLoc End = ReturnLoc;
   if (Result)
     End = Result->getEndLoc();
+  if (Start.isInvalid() && Result)
+    Start = Result->getStartLoc();
   
-  return SourceRange(ReturnLoc, End);
+  return SourceRange(Start, End);
 }
 
 SourceRange IfStmt::getSourceRange() const {

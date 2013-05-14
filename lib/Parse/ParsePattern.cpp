@@ -263,6 +263,11 @@ NullablePtr<Pattern> Parser::parsePattern() {
   return pattern;
 }
 
+/// \brief Determine whether this token can start a pattern.
+bool Parser::isStartOfPattern(Token tok) {
+  return tok.is(tok::identifier) || tok.is(tok::l_paren);
+}
+
 /// Parse an identifier as a pattern.
 NullablePtr<Pattern> Parser::parsePatternIdentifier() {
   SourceLoc loc = Tok.getLoc();

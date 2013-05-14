@@ -1117,6 +1117,42 @@ namespace {
       return expr;
     }
 
+    Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+      simplifyExprType(expr);
+
+      // Coerce the pattern, in case we resolved something.
+      auto fnType = expr->getType()->castTo<FunctionType>();
+      auto &tc = cs.getTypeChecker();
+      if (tc.coerceToType(expr->getParams(), fnType->getInput(), false))
+        return nullptr;
+
+      // If this is a single-expression closure, convert the expression
+      // in the body to the result type of the closure.
+      if (expr->hasSingleExpressionBody()) {
+        Expr *body = coerceToType(expr->getSingleExpressionBody(),
+                                  fnType->getResult(),
+                                  cs.getConstraintLocator(
+                                    expr,
+                                    ConstraintLocator::ClosureResult));
+        if (!body)
+          return nullptr;
+
+        expr->setSingleExpressionBody(body);
+
+        // Compute the capture list, now that we have analyzed the expression.
+        tc.computeCaptures(expr);
+
+        return expr;
+      }
+
+      // For other closures, type-check the body.
+      tc.typeCheckClosureBody(expr);
+
+      // Compute the capture list, now that we have type-checked the body.
+      tc.computeCaptures(expr);
+      return expr;
+    }
+
     Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
       auto type = simplifyType(expr->getType())->castTo<FunctionType>();
 

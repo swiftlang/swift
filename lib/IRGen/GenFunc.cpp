@@ -1866,6 +1866,10 @@ struct EmitLocalDecls : public ASTWalker {
       IGM.emitLocalDecls(FE->getBody());
       return false;
     }
+    if (auto *CE = dyn_cast<PipeClosureExpr>(E)) {
+      IGM.emitLocalDecls(CE->getBody());
+      return false;
+    }
     return true;
   }
 };

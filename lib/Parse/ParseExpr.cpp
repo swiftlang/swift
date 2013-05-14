@@ -470,8 +470,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprAnonClosureArg();
     break;
 
-  case tok::l_brace:     // { expr }
-    Result = parseExprExplicitClosure();
+  case tok::l_brace:     // expr-closure
+    if (Context.LangOpts.UseConstraintSolver)
+      Result = parseExprClosure();
+    else
+      Result = parseExprExplicitClosure();
     break;
 
   case tok::period_prefix: {     // .foo
@@ -668,11 +671,198 @@ Expr *Parser::parseExprIdentifier() {
   return actOnIdentifierExpr(Name, Loc);
 }
 
+/// \brief Determine whether the given token starts with a pipe ('|').
+static bool startsWithPipe(Token tok) {
+  return tok.isAnyOperator() && tok.getText()[0] == '|';
+}
+
+/// \brief Consume a pipe at the beginning of the current token.
+static SourceLoc consumePipe(Parser &parser) {
+  assert(startsWithPipe(parser.Tok));
+
+  // Simple case: it's just a pipe.
+  if (parser.Tok.getLength() == 1)
+    return parser.consumeToken();
+
+  // Skip the starting '|' of the token.
+  SourceLoc loc = parser.Tok.getLoc();
+  StringRef remaining = parser.Tok.getText().substr(1);
+  parser.Tok.setToken(parser.L->getTokenKind(remaining), remaining);
+  return loc;
+}
+
+// Note: defined below.
+static void AddFuncArgumentsToScope(Pattern *pat, CapturingExpr *CE, Parser &P);
+
+NullablePtr<Expr> Parser::parseExprClosure() {
+  assert(Tok.is(tok::l_brace) && "Not at a left brace?");
+
+  // Parse the opening left brace.
+  SourceLoc leftBrace = consumeToken();
+
+  // If we started with a pipe, parse the closure-signature.
+  Pattern *params = nullptr;
+  SourceLoc arrowLoc;
+  TypeLoc explicitResultType;
+  if (startsWithPipe(Tok)) {
+    // Consume the starting pipe.
+    SourceLoc leftPipe = consumePipe(*this);
+
+    // Parse the list of tuple pattern elements.
+    SmallVector<TuplePatternElt, 4> elements;
+    bool invalid = false;
+    if (!startsWithPipe(Tok)) {
+      do {
+        // Parse a pattern-tuple-element.
+        Optional<TuplePatternElt> elt = parsePatternTupleElement(true);
+        if (!elt) {
+          invalid = true;
+          break;
+        }
+
+        // Variadic elements must come last.
+        // FIXME: Unnecessary restriction. It makes conversion more interesting,
+        // but is not complicated to support.
+        if (!elements.empty() && elements.back().isVararg()) {
+          diagnose(elements.back().getPattern()->getLoc(),
+                   diag::ellipsis_pattern_not_at_end)
+          .highlight(elt->getPattern()->getSourceRange());
+
+          // Make the previous element non-variadic.
+          elements.back().revertToNonVariadic();
+        }
+
+        // Add this element to the list.
+        elements.push_back(*elt);
+
+        // Parse the comma.
+        if (Tok.is(tok::comma)) {
+          consumeToken();
+          continue;
+        }
+
+        // If it looks like we might have a pattern, assume that it's
+        // just a missing comma.
+        if (isStartOfPattern(Tok)) {
+          diagnose(Tok.getLoc(), diag::missing_comma_in_pattern)
+            .fixItInsert(Tok.getLoc(), ", ");
+          continue;
+        }
+
+        // Break out; we'll complain below.
+        break;
+      } while (true);
+    }
+
+    // Parse the closing pipe.
+    SourceLoc rightPipe;
+    if (!startsWithPipe(Tok)) {
+      // If the user simply forgot the arrow, we can provide a Fix-It.
+      if (Tok.is(tok::arrow)) {
+        rightPipe = elements.empty()? Tok.getLoc() : PreviousLoc;
+        diagnose(rightPipe, diag::expected_rpipe)
+          .fixItInsert(rightPipe, "|");
+        diagnose(leftPipe, diag::opening_pipe);
+      } else if (invalid) {
+        // Don't complain; just assign a location for the right
+        // pipe to the current token.
+        rightPipe = Tok.getLoc();
+      } else {
+        // Complain, but without a Fix-It because we don't know where it
+        // would go.
+        rightPipe = Tok.getLoc();
+        diagnose(rightPipe, diag::expected_rpipe);
+        diagnose(leftPipe, diag::opening_pipe);
+      }
+    } else {
+      // Consume the pipe.
+      rightPipe = consumePipe(*this);
+    }
+
+    params = TuplePattern::createSimple(Context, leftPipe, elements, rightPipe);
+
+    // Parse the optional return type.
+    if (Tok.is(tok::arrow)) {
+      // Consume the ->.
+      arrowLoc = consumeToken();
+
+      // Parse the type.
+      if (parseType(explicitResultType, diag::expected_closure_result_type)) {
+        // If we couldn't parse the result type, clear out the arrow location.
+        arrowLoc = SourceLoc();
+      }
+    }
+  }
+
+  // Create the closure expression and enter its context.
+  PipeClosureExpr *closure = new (Context) PipeClosureExpr(params, arrowLoc,
+                                                           explicitResultType,
+                                                           CurDeclContext);
+  // The arguments to the func are defined in their own scope.
+  Scope closureBodyScope(this, /*AllowLookup=*/true);
+  ContextChange cc(*this, closure);
+
+  // Handle parameters.
+  if (params) {
+    // Add the parameters into scope.
+    AddFuncArgumentsToScope(params, closure, *this);
+  } else {
+    // There are no parameters; allow anonymous closure variables.
+    // FIXME: We could do this all the time, and then provide Fix-Its
+    // to map $i -> the appropriately-named argument. This might help
+    // users who are refactoring code by adding names.
+    AnonClosureVars.emplace_back();
+  }
+
+  // Parse the body.
+  SmallVector<ExprStmtOrDecl, 4> bodyElements;
+  parseBraceItems(bodyElements, /*IsTopLevel=*/false,
+                     BraceItemListKind::Brace);
+
+  // Parse the closing '}'.
+  SourceLoc rightBrace;
+  parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
+                     leftBrace);
+
+  // If we didn't have any parameters, create a parameter list from the
+  // anonymous closure arguments.
+  if (!params) {
+    // Create a parameter pattern containing the anonymous variables.
+    auto& anonVars = AnonClosureVars.back();
+    SmallVector<TuplePatternElt, 4> elements;
+    for (auto anonVar : anonVars) {
+      elements.push_back(TuplePatternElt(new (Context) NamedPattern(anonVar)));
+    }
+    params = TuplePattern::createSimple(Context, SourceLoc(), elements,
+                                        SourceLoc());
+
+    // Pop out of the anonymous closure variables scope.
+    AnonClosureVars.pop_back();
+
+    // Attach the parameters to the closure.
+    closure->setParams(params, /*anonymousClosureVars=*/true);
+  }
+
+  // If the body consists of a single expression, turn it into a return
+  // statement. The 'return' location is left invalid to indicate that
+  // it's an implicit return.
+  if (bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
+    bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
+                                               bodyElements[0].get<Expr*>());
+  }
+
+  // Set the body of the closure.
+  closure->setBody(BraceStmt::create(Context, leftBrace, bodyElements,
+                                     rightBrace));
+
+  return closure;
+}
+
 ///   expr-explicit-closure:
 ///     '{' expr? '}'
 NullablePtr<Expr> Parser::parseExprExplicitClosure() {
   SourceLoc LBLoc = consumeToken(tok::l_brace);
-  
+
   ExplicitClosureExpr *ThisClosure =
       new (Context) ExplicitClosureExpr(LBLoc, CurDeclContext);
 
@@ -722,6 +912,28 @@ Expr *Parser::parseExprAnonClosureArg() {
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
     diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
     return new (Context) ErrorExpr(Loc);
+  }
+
+  // If this is a closure expression that did not have any named parameters,
+  // generate the anonymous variables we need.
+  if (auto closure = dyn_cast<PipeClosureExpr>(CurDeclContext)) {
+    if (!closure->getParams()) {
+      auto &decls = AnonClosureVars.back();
+      while (ArgNo >= decls.size()) {
+        unsigned nextIdx = decls.size();
+        llvm::SmallVector<char, 4> StrBuf;
+        StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
+        Identifier ident = Context.getIdentifier(varName);
+        SourceLoc varLoc; // FIXME: Location?
+        VarDecl *var = new (Context) VarDecl(varLoc, ident, Type(), closure);
+        decls.push_back(var);
+      }
+
+      return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
+    }
+
+    // FIXME: If we have named parameters, and there is a name for this
+    // parameter, provide a Fix-It to remap to that parameter.
   }
 
   // Make sure that this is located in an explicit closure expression.
@@ -1062,12 +1274,12 @@ NullablePtr<Expr> Parser::parseExprFunc() {
 /// is known to be a FunctionType on the outer level) creating and adding named
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
-static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
+static void AddFuncArgumentsToScope(Pattern *pat, CapturingExpr *CE, Parser &P){
   switch (pat->getKind()) {
   case PatternKind::Named: {
     // Reparent the decl and add it to the scope.
     VarDecl *var = cast<NamedPattern>(pat)->getDecl();
-    var->setDeclContext(FE);
+    var->setDeclContext(CE);
     P.ScopeInfo.addToScope(var);
     return;
   }
@@ -1076,16 +1288,16 @@ static void AddFuncArgumentsToScope(Pattern *pat, FuncExpr *FE, Parser &P) {
     return;
 
   case PatternKind::Paren:
-    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), FE, P);
+    AddFuncArgumentsToScope(cast<ParenPattern>(pat)->getSubPattern(), CE, P);
     return;
 
   case PatternKind::Typed:
-    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), FE, P);
+    AddFuncArgumentsToScope(cast<TypedPattern>(pat)->getSubPattern(), CE, P);
     return;
 
   case PatternKind::Tuple:
     for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
-      AddFuncArgumentsToScope(field.getPattern(), FE, P);
+      AddFuncArgumentsToScope(field.getPattern(), CE, P);
     return;
   }
   llvm_unreachable("bad pattern kind!");

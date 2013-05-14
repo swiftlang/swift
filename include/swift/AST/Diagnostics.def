@@ -398,6 +398,8 @@ ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
       "variadic arguments '...' must come at the end of the pattern", ())
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "tuple element in pattern cannot have a default initializer", ())
+ERROR(missing_comma_in_pattern,pattern_parsing,none,
+      "missing comma between patterns", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -518,7 +520,14 @@ ERROR(dollar_numeric_too_large,expr_parsing,none,
 
 ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
       "anonymous closure argument not contained in a closure", ())
-
+ERROR(expected_rpipe,expr_parsing,none,
+      "expected '|' to finish closure argument list", ())
+NOTE(opening_pipe,expr_parsing,none,
+     "to match this opening '|'", ())
+ERROR(expected_closure_result_type,expr_parsing,none,
+      "expected closure result type after '->'", ())
+ERROR(expected_closure_rbrace,expr_parsing,none,
+      "expected '}' at end of closure", ())
 
 ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
       "expected identifier after '.' expression", ())

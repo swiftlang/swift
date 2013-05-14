@@ -445,7 +445,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look in the generic parameters after checking our local declaration.
       if (FD)
         GenericParams = FD->getGenericParams();
-
+    } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
+      if (Loc.isValid()) {
+        FindLocalVal(Loc, Consumer).visit(CE->getBody());
+      }
     } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())

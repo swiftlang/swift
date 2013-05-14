@@ -199,6 +199,18 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
   return pattern;
 }
 
+Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
+                                    ArrayRef<TuplePatternElt> elements,
+                                    SourceLoc rp) {
+  if (elements.size() == 1 &&
+      elements[0].getInit() == nullptr &&
+      elements[0].getPattern()->getBoundName().empty() &&
+      !elements[0].isVararg())
+    return new (C) ParenPattern(lp, elements[0].getPattern(), rp);
+
+  return create(C, lp, elements, rp);
+}
+
 SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
 }

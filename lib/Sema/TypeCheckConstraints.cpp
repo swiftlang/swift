@@ -2563,6 +2563,26 @@ namespace {
         return false;
       }
 
+      // For closures, type-check the patterns and result type as written,
+      // but do not walk into the body. That will be type-checked after
+      // we've determine the complete function type.
+      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+        // Validate the parameters.
+        if (TC.typeCheckPattern(closure->getParams(), false, true)) {
+          expr->setType(ErrorType::get(TC.Context));
+          return false;
+        }
+
+        // Validate the result type, if present.
+        if (closure->hasExplicitResultType() &&
+            TC.validateType(closure->getExplicitResultTypeLoc(), false)) {
+          expr->setType(ErrorType::get(TC.Context));
+          return false;
+        }
+        
+        return closure->hasSingleExpressionBody();
+      }
+
       return true;
     }
 

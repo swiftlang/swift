@@ -617,12 +617,12 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
         tupleTypeElts.reserve(tuplePat->getNumFields());
         for (auto tupleElt : tuplePat->getFields()) {
-          auto eltTy = getTypeForPattern(tupleElt.getPattern(), expr);
+          Type eltTy = getTypeForPattern(tupleElt.getPattern(), expr);
           auto name = findPatternName(tupleElt.getPattern());
           Type varArgBaseTy;
           if (tupleElt.isVararg()) {
-            varArgBaseTy = eltTy;
-            eltTy = CS.getTypeChecker().getArraySliceType(SourceLoc(), eltTy);
+            varArgBaseTy
+              = cast<ArraySliceType>(eltTy.getPointer())->getBaseType();
           }
           tupleTypeElts.push_back(TupleTypeElt(eltTy, name, tupleElt.getInit(),
                                                varArgBaseTy));
@@ -652,9 +652,33 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // eventual function type.
       auto patterns = expr->getArgParamPatterns();
       for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
-        Type paramTy =  getTypeForPattern(patterns[e - i - 1], expr);
+        Type paramTy = getTypeForPattern(patterns[e - i - 1], expr);
         funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
       }
+
+      return funcTy;
+    }
+
+    Type visitPipeClosureExpr(PipeClosureExpr *expr) {
+      // Closure expressions always have function type. In cases where a
+      // parameter or return type is omitted, a fresh type variable is used to
+      // stand in for that parameter or return type, allowing it to be inferred
+      // from context.
+      Type funcTy;
+      if (expr->hasExplicitResultType()) {
+        funcTy = expr->getExplicitResultTypeLoc().getType();
+      } else {
+        // If no return type was specified, create a fresh type
+        // variable for it.
+        funcTy = CS.createTypeVariable(expr);
+      }
+
+      // Walk through the patterns in the func expression, backwards,
+      // computing the type of each pattern (which may involve fresh type
+      // variables where parameter types where no provided) and building the
+      // eventual function type.
+      auto paramTy = getTypeForPattern(expr->getParams(), expr);
+      funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
 
       return funcTy;
     }
@@ -1003,6 +1027,18 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         return isa<ExplicitClosureExpr>(expr);
       }
 
+      // For closures containing only a single expression, the body participates
+      // in type checking.
+      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+        if (closure->hasSingleExpressionBody()) {
+          // Visit the closure itself, which produces a function type.
+          auto funcTy = CG.visit(expr)->castTo<FunctionType>();
+          expr->setType(funcTy);
+        }
+
+        return true;
+      }
+
       // For new array expressions, we visit the node but not any of its
       // children.
       // FIXME: If new array expressions gain an initializer, we'll need to
@@ -1037,6 +1073,23 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
             CG.getConstraintSystem()
               .getConstraintLocator(expr, ConstraintLocator::ClosureResult));
         return expr;
+      }
+
+      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+        if (closure->hasSingleExpressionBody()) {
+          // Visit the body. It's type needs to be convertible to the function's
+          // return type.
+          auto resultTy = closure->getResultType();
+          auto bodyTy = closure->getSingleExpressionBody()->getType();
+          CG.getConstraintSystem()
+            .addConstraint(ConstraintKind::Conversion, bodyTy,
+                           resultTy,
+                           CG.getConstraintSystem()
+                             .getConstraintLocator(
+                               expr,
+                               ConstraintLocator::ClosureResult));
+          return expr;
+        }
       }
 
       if (auto type = CG.visit(expr)) {

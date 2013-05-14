@@ -186,6 +186,12 @@ public:
                               ArrayRef<TuplePatternElt> elements,
                               SourceLoc rp);
 
+  /// \brief Create either a tuple pattern or a paren pattern, depending
+  /// on the elements.
+  static Pattern *createSimple(ASTContext &C, SourceLoc lp,
+                               ArrayRef<TuplePatternElt> elements,
+                               SourceLoc rp);
+
   unsigned getNumFields() const {
     return TuplePatternBits.NumFields;
   }

@@ -1184,6 +1184,15 @@ RValue SILGenFunction::visitFuncExpr(FuncExpr *e, SGFContext C) {
   return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e), e));
 }
 
+RValue SILGenFunction::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
+  // Generate the closure function.
+  SGM.emitClosure(e);
+
+  // Generate the closure value (if any) for the closure expr's function
+  // reference.
+  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e), e));
+}
+
 RValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   // Generate the closure body.
   SGM.emitClosure(e);
@@ -1196,6 +1205,11 @@ RValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 void SILGenFunction::emitFunction(FuncExpr *fe) {
   emitProlog(fe, fe->getBodyParamPatterns(), fe->getResultType(F.getContext()));
   visit(fe->getBody());
+}
+
+void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
+  emitProlog(ce, ce->getParams(), ce->getResultType());
+  visit(ce->getBody());
 }
 
 void SILGenFunction::emitClosure(ClosureExpr *ce) {

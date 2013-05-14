@@ -1684,7 +1684,112 @@ public:
   }
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
+
+/// An explicit unnamed func definition, which can optionally
+/// have named arguments.
+///    e.g.  func(a : int) -> int { return a+1 }
+class PipeClosureExpr : public CapturingExpr {
+  /// \brief The set of parameters, along with a bit indicating when these
+  /// parameters were synthesized from anonymous closure variables.
+  llvm::PointerIntPair<Pattern *, 1, bool> params;
+
+  /// \brief The location of the '->' denoting an explicit return type,
+  /// if present.
+  SourceLoc arrowLoc;
+
+  /// \brief The explicitly-specified result type.
+  TypeLoc explicitResultType;
+
+  /// \brief The body of the closure.
+  BraceStmt *body;
   
+public:
+  PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
+                  TypeLoc explicitResultType, DeclContext *parent)
+    : CapturingExpr(ExprKind::PipeClosure, Type(), parent),
+      params(params, false), arrowLoc(arrowLoc),
+      explicitResultType(explicitResultType), body(nullptr) { }
+
+  SourceRange getSourceRange() const;
+  SourceLoc getLoc() const;
+
+  /// \brief Retrieve the parameters of this closure.
+  Pattern *getParams() const { return params.getPointer(); }
+
+  /// \brief Determine whether the parameters of this closure are actually
+  /// anonymous closure variables.
+  bool hasAnonymousClosureVars() const { return params.getInt(); }
+
+  /// \brief Set the parameters of this closure along with a flag indicating
+  /// whether these parameters are actually anonymous closure variables.
+  void setParams(Pattern *pattern, bool anonymousClosureVars) {
+    params.setPointerAndInt(pattern, anonymousClosureVars);
+  }
+
+  BraceStmt *getBody() const { return body; }
+  void setBody(BraceStmt *S) { body = S; }
+
+  /// \brief Determine whether this closure expression has an
+  /// explicitly-specified result type.
+  bool hasExplicitResultType() const { return arrowLoc.isValid(); }
+
+  /// \brief Retrieve the location of the \c '->' for closures with an
+  /// explicit result type.
+  SourceLoc getArrowLoc() const {
+    assert(hasExplicitResultType() && "No arrow location");
+    return arrowLoc;
+  }
+
+  /// \brief Retrieve the explicit result type location information.
+  TypeLoc &getExplicitResultTypeLoc() {
+    assert(hasExplicitResultType() && "No explicit result type");
+    return explicitResultType;
+  }
+
+  /// \brief Determine whether the closure has a single expression for its
+  /// body.
+  ///
+  /// This will be true for closures such as, e.g.,
+  /// \code
+  ///   { $0 + 1 }
+  /// \endcode
+  ///
+  /// or
+  ///
+  /// \code
+  ///   { |x, y| x > y }
+  /// \endcode
+  ///
+  /// But not for empty closures nor 
+  bool hasSingleExpressionBody() const;
+
+  /// \brief Retrieve the body for closure that has a single expression for
+  /// its body.
+  ///
+  /// Only valid when \c hasSingleExpressionBody() is true.
+  Expr *getSingleExpressionBody() const;
+
+  /// \brief Set the body for a closure that has a single expression as its
+  /// body.
+  ///
+  /// This routine cannot change whether a closure has a single expression as
+  /// its body; it can only update that expression.
+  void setSingleExpressionBody(Expr *newBody);
+
+  /// \brief Retrieve the result type of this function.
+  Type getResultType() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PipeClosure;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
+  }
+  static bool classof(const CapturingExpr *E) {
+    return classof(cast<Expr>(E));
+  }
+};
+
 /// ClosureExpr - An expression which is implicitly created by using an
 /// expression in a function context where the expression's type matches the
 /// result of the function.  This may either be explicit in source or implicitly

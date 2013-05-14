@@ -512,6 +512,11 @@ public:
 
   CoercedResult visitFuncExpr(FuncExpr *E);
 
+  CoercedResult visitPipeClosureExpr(PipeClosureExpr *expr) {
+    TC.diagnose(expr->getLoc(), diag::requires_constraint_checker);
+    return failed(expr);
+  }
+
   CoercedResult visitExplicitClosureExpr(ExplicitClosureExpr *E);
 
   CoercedResult visitImplicitClosureExpr(ImplicitClosureExpr *E) {

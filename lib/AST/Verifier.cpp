@@ -185,7 +185,12 @@ namespace {
       Functions.push_back(func);
       return shouldVerify(cast<Expr>(func));
     }
-    
+
+    bool shouldVerify(PipeClosureExpr *closure) {
+      Functions.push_back(closure);
+      return shouldVerify(cast<Expr>(closure));
+    }
+
     bool shouldVerify(ConstructorDecl *cd) {
       Functions.push_back(cd);
       return shouldVerify(cast<Decl>(cd));
@@ -198,6 +203,10 @@ namespace {
     
     void cleanup(FuncExpr *func) {
       assert(Functions.back().get<FuncExpr*>() == func);
+      Functions.pop_back();
+    }
+    void cleanup(PipeClosureExpr *closure) {
+      assert(Functions.back().get<PipeClosureExpr*>() == closure);
       Functions.pop_back();
     }
     void cleanup(ConstructorDecl *cd) {
@@ -214,6 +223,8 @@ namespace {
       Type resultType;
       if (FuncExpr *fe = func.dyn_cast<FuncExpr*>()) {
         resultType = fe->getResultType(Ctx);
+      } else if (auto closure = func.dyn_cast<PipeClosureExpr *>()) {
+        resultType = closure->getResultType();
       } else {
         resultType = TupleType::getEmpty(Ctx);
       }

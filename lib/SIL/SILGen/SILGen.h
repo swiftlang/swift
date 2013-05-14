@@ -104,6 +104,9 @@ public:
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
   void emitFunction(SILConstant::Loc decl, FuncExpr *fe);
+  /// \brief Generates code for the given closure expression and adds the 
+  /// SILFunction to the current SILModule under the nane SILConstant(ce).
+  void emitClosure(PipeClosureExpr *ce);
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// SILFunction to the current SILModule under the name SILConstant(ce).
   void emitClosure(ClosureExpr *ce);
@@ -293,6 +296,8 @@ public:
   
   /// emitFunction - Generates code for a FuncExpr.
   void emitFunction(FuncExpr *fe);
+  /// \brief Emits code for a PipeClosureExpr.
+  void emitClosure(PipeClosureExpr *ce);
   /// emitClosure - Generates code for a ClosureExpr. This is akin
   /// to visiting the body as if wrapped in a ReturnStmt.
   void emitClosure(ClosureExpr *ce);
@@ -504,6 +509,7 @@ public:
   RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
   RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
   RValue visitFuncExpr(FuncExpr *E, SGFContext C);
+  RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
   RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
   RValue visitInterpolatedStringLiteralExpr(
                                               InterpolatedStringLiteralExpr *E,

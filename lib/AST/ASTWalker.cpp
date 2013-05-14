@@ -300,6 +300,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return nullptr;
   }
 
+  Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+    // Handle single-expression closures.
+    if (expr->hasSingleExpressionBody()) {
+      if (Expr *body = doIt(expr->getSingleExpressionBody())) {
+        expr->setSingleExpressionBody(body);
+        return expr;
+      }
+      return nullptr;
+    }
+
+    // Handle other closures.
+    if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
+      expr->setBody(body);
+      return expr;
+    }
+    return nullptr;
+  }
+
   Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
     if (Expr *E2 = doIt(E->getBody())) {
       E->setBody(E2);

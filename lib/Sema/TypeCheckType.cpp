@@ -28,6 +28,9 @@ using namespace swift;
 /// implementation type, find its canonicalization.
 static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
                                 SourceLoc loc) {
+  if (sliceTy->hasImplementationType())
+    return false;
+  
   Type baseTy = sliceTy->getBaseType();
 
   // Hack for array slices: first, try to look up Slice<T>.

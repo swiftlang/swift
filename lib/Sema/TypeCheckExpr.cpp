@@ -1263,7 +1263,11 @@ public:
   Expr *visitFuncExpr(FuncExpr *E) {
     llvm_unreachable("Should not walk into FuncExprs!");
   }
-  
+
+  Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+    llvm_unreachable("Should not walk into PipeClosureExprs!");
+  }
+
   Expr *visitModuleExpr(ModuleExpr *E) {
     // ModuleExpr is fully resolved.
     assert(!E->getType()->isUnresolvedType());
@@ -2359,6 +2363,8 @@ void TypeChecker::computeCaptures(CapturingExpr *capturing) {
   llvm::SetVector<ValueDecl*> Captures;
   FindCapturedVars finder(*this, Captures, capturing);
   if (auto closure = dyn_cast<ClosureExpr>(capturing))
+    finder.doWalk(closure->getBody());
+  else if (auto closure = dyn_cast<PipeClosureExpr>(capturing))
     finder.doWalk(closure->getBody());
   else {
     auto func = cast<FuncExpr>(capturing);

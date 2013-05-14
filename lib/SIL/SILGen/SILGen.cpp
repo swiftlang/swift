@@ -242,6 +242,14 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }  
 }
 
+void SILGenModule::emitClosure(PipeClosureExpr *ce) {
+  SILConstant constant(ce);
+  SILFunction *f = preEmitFunction(constant, ce);
+  bool hasVoidReturn = isVoidableType(ce->getResultType());
+  SILGenFunction(*this, *f, hasVoidReturn).emitClosure(ce);
+  postEmitFunction(constant, f);
+}
+
 void SILGenModule::emitClosure(ClosureExpr *ce) {
   SILConstant constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);

@@ -49,6 +49,7 @@ namespace swift {
   class OneOfElementDecl;
   class NameAliasType;
   class Pattern;
+  class PipeClosureExpr;
   struct PrintOptions;
   class ProtocolDecl;
   class ProtocolType;
@@ -1810,7 +1811,8 @@ inline bool ValueDecl::isSettable() const {
 /// A convenience typedef for FuncExpr-like-things, including FuncExprs,
 /// constructors, and destructors.
 using FuncExprLike =
-  llvm::PointerUnion3<FuncExpr*, ConstructorDecl*, DestructorDecl*>;
+  llvm::PointerUnion4<FuncExpr*, ConstructorDecl*, DestructorDecl*,
+                      PipeClosureExpr*>;
   
 } // end namespace swift
 

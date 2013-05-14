@@ -338,6 +338,8 @@ Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
 ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
   if (auto *func = dyn_cast<FuncExpr>(this))
     return func->getArgParamPatterns();
+  if (auto *closure = dyn_cast<PipeClosureExpr>(this))
+    return closure->getParams();
   if (auto *closure = dyn_cast<ClosureExpr>(this))
     return closure->getParamPatterns();
   llvm_unreachable("unknown capturing expr");
@@ -434,6 +436,46 @@ RebindThisInConstructorExpr::RebindThisInConstructorExpr(Expr *SubExpr,
          TupleType::getEmpty(This->getASTContext())),
     SubExpr(SubExpr), This(This)
 {}
+
+
+SourceRange PipeClosureExpr::getSourceRange() const {
+  return body->getSourceRange();
+}
+
+SourceLoc PipeClosureExpr::getLoc() const {
+  return body->getStartLoc();
+}
+
+bool PipeClosureExpr::hasSingleExpressionBody() const {
+  // We expect to see just a single statement...
+  auto bodyElements = body->getElements();
+  if (bodyElements.size() != 1 || !bodyElements[0].is<Stmt *>())
+    return false;
+
+  // That is a return statement...
+  auto returnStmt = dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt *>());
+  if (!returnStmt)
+    return false;
+
+  // With an invalid source location for the 'return'.
+  return returnStmt->getReturnLoc().isInvalid();
+}
+
+Expr *PipeClosureExpr::getSingleExpressionBody() const {
+  assert(hasSingleExpressionBody() && "Not a single-expression body");
+  return cast<ReturnStmt>(body->getElements()[0].get<Stmt *>())->getResult();
+}
+
+Type PipeClosureExpr::getResultType() const {
+  if (getType()->is<ErrorType>())
+    return getType();
+
+  return getType()->castTo<AnyFunctionType>()->getResult();
+}
+
+void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
+  cast<ReturnStmt>(body->getElements()[0].get<Stmt *>())->setResult(newBody);
+}
 
 //===----------------------------------------------------------------------===//
 // Printing for Expr and all subclasses.
@@ -778,6 +820,11 @@ public:
       OS << '\n';
       printRec(E->getBody());
     }
+    OS << ')';
+  }
+  void visitPipeClosureExpr(PipeClosureExpr *expr) {
+    printCapturing(expr, "closure_expr");
+    printRec(expr->getBody());
     OS << ')';
   }
   void visitExplicitClosureExpr(ExplicitClosureExpr *E) {

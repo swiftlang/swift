@@ -436,6 +436,7 @@ public:
   void typeCheckFunctionBody(FuncExpr *FE);
   void typeCheckConstructorBody(ConstructorDecl *CD);
   void typeCheckDestructorBody(DestructorDecl *DD);
+  void typeCheckClosureBody(PipeClosureExpr *closure);
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(unsigned StartElem);
