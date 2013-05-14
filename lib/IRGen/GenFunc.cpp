@@ -1562,6 +1562,11 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
 void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
+    
+  // FIXME: Ignore FFI thunks for now. IRGenSILFunction doesn't know how to
+  // emit them correctly.
+  if (f->getAbstractCC() == AbstractCC::C)
+    return;
   
   // FIXME: Emit all needed explosion levels.
   ExplosionKind explosionLevel = ExplosionKind::Minimal;

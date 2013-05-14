@@ -90,6 +90,8 @@ void SILConstant::print(raw_ostream &OS) const {
   if (uncurryLevel != 0) {
     OS << "." << uncurryLevel;
   }
+  if (isObjC)
+    OS << ".objc";
 }
 
 void SILConstant::dump() const {

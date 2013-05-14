@@ -54,7 +54,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
     // The function must be [objc] to belong to a family.
     if (!c.hasDecl())
       return SelectorFamily::NonObjC;
-    if (!c.getDecl()->isObjC())
+    if (!c.getDecl()->isObjC() && !c.isObjC)
       return SelectorFamily::NonObjC;
     
     return getSelectorFamily(c.getDecl()->getName());
@@ -62,7 +62,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::Getter:
     // Getter selectors can belong to families if their name begins with the
     // wrong thing.
-    if (c.getDecl()->isObjC())
+    if (c.getDecl()->isObjC() || c.isObjC)
       return getSelectorFamily(c.getDecl()->getName());
     
     SWIFT_FALLTHROUGH;
@@ -77,6 +77,8 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::OneOfElement:
   case SILConstant::Kind::Destroyer:
   case SILConstant::Kind::GlobalAccessor:
+    if (c.isObjC)
+      return SelectorFamily::None;
     return SelectorFamily::NonObjC;
   }
 }

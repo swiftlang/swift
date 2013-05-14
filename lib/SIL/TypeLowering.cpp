@@ -364,6 +364,10 @@ TypeConverter::getTypeLoweringInfo(Type t,
 }
 
 static AbstractCC getAbstractCC(SILConstant c) {
+  // If this is an ObjC thunk, it always has C calling convention.
+  if (c.isObjC)
+    return AbstractCC::C;
+  
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())
     return AbstractCC::Freestanding;
@@ -586,9 +590,8 @@ Type TypeConverter::makeConstantType(SILConstant c) {
           ? var->getGetter()
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
-        return getFunctionTypeWithCaptures(*this,
-                                       propTy,
-                                       property->getCaptures());
+        return getFunctionTypeWithCaptures(*this, propTy,
+                                           property->getCaptures());
       }
     }
     return propertyMethodType;

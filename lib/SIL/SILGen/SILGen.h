@@ -103,19 +103,18 @@ public:
   /// SILFunction to the current SILModule under the name SILConstant(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
-  SILFunction *emitFunction(SILConstant::Loc decl, FuncExpr *fe);
+  void emitFunction(SILConstant::Loc decl, FuncExpr *fe);
   /// emitClosure - Generates code for the given ClosureExpr and adds the
   /// SILFunction to the current SILModule under the name SILConstant(ce).
-  SILFunction *emitClosure(ClosureExpr *ce);
+  void emitClosure(ClosureExpr *ce);
   /// emitConstructor - Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILConstant(decl).
-  SILFunction *emitConstructor(ConstructorDecl *decl);
+  void emitConstructor(ConstructorDecl *decl);
   /// emitDestructor - Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
   /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
-  SILFunction *emitDestructor(ClassDecl *cd,
-                              DestructorDecl /*nullable*/ *dd);
+  void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
   
   /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
   /// function.
@@ -131,7 +130,14 @@ public:
   void addGlobalVariable(VarDecl *global);
   
   /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalDefinition(Decl *d);  
+  void emitExternalDefinition(Decl *d);
+  
+  /// Emit the ObjC-compatible entry point for a method.
+  void emitObjCMethodThunk(FuncDecl *method);
+  
+  /// Emit the ObjC-compatible getter and setter for an instance variable or
+  /// property.
+  void emitObjCPropertyMethodThunks(VarDecl *prop);
 };
   
 /// Materialize - Represents a temporary allocation.
@@ -311,6 +317,16 @@ public:
   /// emitCurryThunk - Generates code for a curry thunk from one uncurry level
   /// of a function to another.
   void emitCurryThunk(FuncExpr *fe, SILConstant fromLevel, SILConstant toLevel);
+
+
+  /// Generate an ObjC-compatible thunk for a method.
+  void emitObjCMethodThunk(SILConstant thunk);
+  
+  /// Generate an ObjC-compatible getter for a property.
+  void emitObjCPropertyGetter(SILConstant getter);
+  
+  /// Generate an ObjC-compatible setter for a property.
+  void emitObjCPropertySetter(SILConstant setter);
 
   //===--------------------------------------------------------------------===//
   // Control flow

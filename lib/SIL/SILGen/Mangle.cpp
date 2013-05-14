@@ -39,11 +39,14 @@ static char mangleConstructorKind(SILConstant::Kind kind) {
 
 /// Mangle this entity into the given stream.
 void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
-  // Almost everything below gets the common prefix:
-  //   mangled-name ::= '_T' global
   llvm::raw_string_ostream buffer(f->getMutableMangledName());
   
   Mangler mangler(buffer);
+
+  // Almost everything below gets one of the common prefixes:
+  //   mangled-name ::= '_T' global     // Native symbol
+  //   mangled-name ::= '_TTo' global   // ObjC interop
+  char const *introducer = c.isObjC ? "_TTo" : "_T";
   
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
@@ -72,7 +75,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
       }
     }
 
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
       
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal,
@@ -83,7 +86,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
   //   entity ::= context 'd'                     // destroying destructor
   // FIXME: Only the destroying destructor is currently emitted in SIL.
   case SILConstant::Kind::Destroyer:
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleDeclContext(cast<ClassDecl>(c.getDecl()));
     buffer << 'd';
@@ -93,7 +96,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
   //   entity ::= context 'c' type                // initializing constructor
   case SILConstant::Kind::Allocator:
   case SILConstant::Kind::Initializer: {
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     auto ctor = cast<ConstructorDecl>(c.getDecl());
     mangler.mangleContextOf(ctor);
@@ -104,7 +107,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
 
   //   entity ::= declaration 'g'                 // getter
   case SILConstant::Kind::Getter:
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
     buffer << 'g';
@@ -112,7 +115,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
 
   //   entity ::= declaration 's'                 // setter
   case SILConstant::Kind::Setter:
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
     buffer << 's';
@@ -120,7 +123,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
 
   //   entity ::= declaration 'a'                 // addressor
   case SILConstant::Kind::GlobalAccessor:
-    buffer << "_T";
+    buffer << introducer;
     if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
     buffer << 'a';

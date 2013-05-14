@@ -82,17 +82,20 @@ struct SILConstant {
   Kind kind : 4;
   /// The uncurry level of this SILConstant.
   unsigned uncurryLevel : 16;
+  /// True if this references an ObjC-visible method.
+  unsigned isObjC : 1;
   
   /// A magic value for SILConstant constructors to ask for the natural uncurry
   /// level of the constant.
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
   
   /// Produces a null SILConstant.
-  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0) {}
+  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0) {}
   
   /// Produces a SILConstant of the given kind for the given decl.
   explicit SILConstant(ValueDecl *decl, Kind kind,
-                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel);
+                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                       bool isObjC = false);
   
   /// Produces the 'natural' SILConstant for the given ValueDecl or
   /// CapturingExpr:
@@ -111,7 +114,8 @@ struct SILConstant {
   /// then the SILConstant for the natural uncurry level of the definition is
   /// used.
   explicit SILConstant(Loc loc,
-                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel);
+                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                       bool isObjC = false);
     
   bool isNull() const { return loc.isNull(); }
   
@@ -145,12 +149,14 @@ struct SILConstant {
   bool operator==(SILConstant rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
-      && uncurryLevel == rhs.uncurryLevel;
+      && uncurryLevel == rhs.uncurryLevel
+      && isObjC == rhs.isObjC;
   }
   bool operator!=(SILConstant rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
       || kind != rhs.kind
-      || uncurryLevel != rhs.uncurryLevel;
+      || uncurryLevel != rhs.uncurryLevel
+      || isObjC != rhs.isObjC;
   }
   
   void print(llvm::raw_ostream &os) const;
@@ -159,13 +165,22 @@ struct SILConstant {
   // Returns the SILConstant for an entity at a shallower uncurry level.
   SILConstant atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
-    return SILConstant(loc.getOpaqueValue(), kind, level);
+    return SILConstant(loc.getOpaqueValue(), kind, level, isObjC);
+  }
+  
+  // Returns the ObjC (or native) entry point corresponding to the same
+  // constant.
+  SILConstant asObjC(bool objc = true) const {
+    return SILConstant(loc.getOpaqueValue(), kind, uncurryLevel, objc);
   }
   
   /// Produces a SILConstant from an opaque value.
-  explicit SILConstant(void *opaqueLoc, Kind kind, unsigned uncurryLevel)
+  explicit SILConstant(void *opaqueLoc,
+                       Kind kind,
+                       unsigned uncurryLevel,
+                       bool isObjC)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
-      kind(kind), uncurryLevel(uncurryLevel)
+      kind(kind), uncurryLevel(uncurryLevel), isObjC(isObjC)
   {}
 };
 
@@ -182,16 +197,17 @@ template<> struct DenseMapInfo<swift::SILConstant> {
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILConstant getEmptyKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0);
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false);
   }
   static swift::SILConstant getTombstoneKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0);
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false);
   }
   static unsigned getHashValue(swift::SILConstant Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
     unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
     unsigned h3 = UnsignedInfo::getHashValue(Val.uncurryLevel);
-    return h1 ^ (h2 << 4) ^ (h3 << 9);
+    unsigned h4 = UnsignedInfo::getHashValue(Val.isObjC);
+    return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
   }
   static bool isEqual(swift::SILConstant const &LHS,
                       swift::SILConstant const &RHS) {

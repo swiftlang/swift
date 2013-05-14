@@ -61,8 +61,9 @@ static unsigned getNaturalUncurryLevel(FuncDecl *fd) {
 }
 
 SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
-                         unsigned atUncurryLevel)
-  : loc(vd), kind(kind)
+                         unsigned atUncurryLevel,
+                         bool isObjC)
+  : loc(vd), kind(kind), isObjC(isObjC)
 {
   unsigned naturalUncurryLevel;
   
@@ -93,7 +94,7 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     
     bool isGlobal = kind == Kind::GlobalAccessor;
     
-    assert((isGlobal ^ var->isProperty())
+    assert(!(isGlobal && var->isProperty())
            && "can't reference property as global var");
     assert(!(isGlobal && var->getDeclContext()->isLocalContext())
            && "can't reference local var as global var");
@@ -133,7 +134,9 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     : atUncurryLevel;
 }
 
-SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
+SILConstant::SILConstant(SILConstant::Loc baseLoc,
+                         unsigned atUncurryLevel,
+                         bool asObjC) {
   unsigned naturalUncurryLevel;
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
@@ -199,6 +202,8 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc, unsigned atUncurryLevel) {
   uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
     ? naturalUncurryLevel
     : atUncurryLevel;
+    
+  isObjC = asObjC;
 }
 
 SILType SILType::getObjectPointerType(ASTContext &C) {

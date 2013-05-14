@@ -12,6 +12,7 @@
 
 #include "SILGen.h"
 #include "Initialization.h"
+#include "OwnershipConventions.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -678,6 +679,39 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
                   ti.getReferenceTypeElements());
 }
 
+static bool requiresObjCMethodEntryPoint(FuncDecl *method) {
+  // Property accessors should be generated alongside the property.
+  if (method->isGetterOrSetter())
+    return false;
+    
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (method->getType()->is<PolymorphicFunctionType>()
+      || method->getType()->getAs<AnyFunctionType>()
+          ->getResult()->is<PolymorphicFunctionType>()
+      || method->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+    
+  if (method->isObjC() || method->getAttrs().isIBAction())
+    return true;
+  if (auto override = method->getOverriddenDecl())
+    return requiresObjCMethodEntryPoint(override);
+  return false;
+}
+
+static bool requiresObjCPropertyEntryPoints(VarDecl *property) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (property->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+  
+  if (property->isObjC())
+    return true;
+  if (auto override = property->getOverriddenDecl())
+    return requiresObjCPropertyEntryPoints(override);
+  return false;
+}
+
 /// SILGenType - an ASTVisitor for generating SIL from method declarations
 /// inside nominal types.
 class SILGenType : public Lowering::ASTVisitor<SILGenType> {
@@ -712,6 +746,8 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd, fd->getBody());
+    if (requiresObjCMethodEntryPoint(fd))
+      SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
     SGM.emitConstructor(cd);
@@ -722,11 +758,13 @@ public:
     explicitDestructor = dd;
   }
   
-  
-  // no-ops. We don't deal with the layout of types here.
+  // no-op. We don't deal with the layout of types here.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
-  void visitVarDecl(VarDecl *) {}
   
+  void visitVarDecl(VarDecl *vd) {
+    if (requiresObjCPropertyEntryPoints(vd))
+      SGM.emitObjCPropertyMethodThunks(vd);
+  }
 };
 
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
@@ -1033,4 +1071,183 @@ ManagedValue SILGenFunction::emitInlineFunction(FuncExpr *body, RValue &&args,
   // Clean up and return the result as an RValue.
   return scope.pop();
   
+}
+
+//===----------------------------------------------------------------------===//
+// ObjC method thunks
+//===----------------------------------------------------------------------===//
+
+/// Take a return value at +1 and adjust it to the retain count expected by
+/// the given ownership conventions.
+static void emitObjCReturnValue(SILGenFunction &gen,
+                                SILLocation loc,
+                                SILValue result,
+                                OwnershipConventions const &ownership) {
+  // Autorelease the retained native result if necessary.
+  switch (ownership.getReturn()) {
+  case OwnershipConventions::Return::Autoreleased:
+    gen.B.createAutoreleaseReturn(loc, result);
+    return;
+  case OwnershipConventions::Return::Unretained:
+    gen.emitReleaseRValue(loc, result);
+    SWIFT_FALLTHROUGH;
+  case OwnershipConventions::Return::Retained:
+    gen.B.createReturn(loc, result);
+    return;
+  }
+}
+
+/// Take an argument at +0 and bring it to +1.
+static void emitObjCUnconsumedArgument(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       SILValue arg) {
+  // If address-only, copy to raise the ownership count.
+  if (arg.getType().isAddressOnly()) {
+    SILValue tmp = gen.B.createAllocVar(loc, AllocKind::Stack, arg.getType());
+    gen.B.createCopyAddr(loc, arg, tmp, /*isTake*/false, /*isInit*/ true);
+    gen.B.createDeallocVar(loc, AllocKind::Stack, tmp);
+    return;
+  }
+  
+  gen.emitRetainRValue(loc, arg);
+}
+
+void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
+  SILType thunkTy = SGM.getConstantType(thunk);
+  
+  // Take ownership of any +0 arguments.
+  auto ownership = OwnershipConventions::get(*this, thunk, thunkTy);
+  
+  SmallVector<SILValue, 4> args;
+  
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  ArrayRef<SILType> inputs
+    = info->getInputTypesWithoutIndirectReturnType();
+  for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
+    SILValue arg = new (F.getModule()) SILArgument(inputs[i], F.begin());
+    
+    if (!ownership.isArgumentConsumed(i))
+      emitObjCUnconsumedArgument(*this, thunk.getDecl(), arg);
+      
+    args.push_back(arg);
+  }
+  
+  if (info->hasIndirectReturn()) {
+    args.push_back(new (F.getModule()) SILArgument(info->getIndirectReturnType(),
+                                                   F.begin()));
+  }
+  
+  // Call the native entry point.
+  SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(),
+                                            thunk.asObjC(false));
+  SILValue result = B.createApply(thunk.getDecl(), nativeFn,
+                                  info->getResultType(),
+                                  args);
+  
+  emitObjCReturnValue(*this, thunk.getDecl(), result, ownership);
+}
+
+void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
+  SILType thunkTy = SGM.getConstantType(getter);
+  auto ownership = OwnershipConventions::get(*this, getter, thunkTy);
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+
+  SILValue thisValue
+    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
+  SILValue indirectReturn;
+  SILType resultType;
+  if (info->hasIndirectReturn()) {
+    indirectReturn = new (F.getModule()) SILArgument(info->getIndirectReturnType(),
+                                                     F.begin());
+    resultType = indirectReturn.getType();
+  } else {
+    resultType = info->getResultType();
+  }
+  
+  auto *var = cast<VarDecl>(getter.getDecl());
+  if (var->isProperty()) {
+    // If the native property is logical, forward to the native getter.
+    if (!ownership.isArgumentConsumed(0))
+      emitObjCUnconsumedArgument(*this, var, thisValue);
+    SmallVector<SILValue, 2> args;
+    args.push_back(thisValue);
+    if (indirectReturn)
+      args.push_back(indirectReturn);
+    SILValue nativeFn = emitGlobalFunctionRef(var, getter.asObjC(false));
+    SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
+    emitObjCReturnValue(*this, var, result, ownership);
+    return;
+  }
+
+  // If the native property is physical, load it.
+  SILValue addr = B.createRefElementAddr(var, thisValue, var,
+                                         resultType.getAddressType());
+  if (indirectReturn) {
+    assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
+           && "any address-only type should appear Unretained to ObjC");
+    
+    // "Take" because we return at +0.
+    B.createCopyAddr(var, addr, indirectReturn,
+                     /*isTake*/ true, /*isInitialize*/ true);
+    B.createReturn(var, emitEmptyTuple(var));
+    return;
+  }
+  
+  // Retain the result if the calling convention calls for it.
+  SILValue result = B.createLoad(var, addr);
+  switch (ownership.getReturn()) {
+  case OwnershipConventions::Return::Retained:
+    emitRetainRValue(var, result);
+    break;
+  case OwnershipConventions::Return::Unretained:
+  case OwnershipConventions::Return::Autoreleased:
+    break;
+  }
+  B.createReturn(var, result);
+}
+
+void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
+  SILType thunkTy = SGM.getConstantType(setter);
+  auto ownership = OwnershipConventions::get(*this, setter, thunkTy);
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  
+  SILValue thisValue
+    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
+  SILValue setValue
+    = new (F.getModule()) SILArgument(info->getInputTypes()[1], F.begin());
+  
+  auto *var = cast<VarDecl>(setter.getDecl());
+  if (var->isProperty()) {
+    // If the native property is logical, forward to the native setter.
+    if (!ownership.isArgumentConsumed(0))
+      emitObjCUnconsumedArgument(*this, var, thisValue);
+    if (!ownership.isArgumentConsumed(1))
+      emitObjCUnconsumedArgument(*this, var, setValue);
+    SmallVector<SILValue, 2> args;
+    args.push_back(thisValue);
+    args.push_back(setValue);
+    SILValue nativeFn = emitGlobalFunctionRef(var, setter.asObjC(false));
+    SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
+    // Result should always be void.
+    B.createReturn(var, result);
+    return;
+  }
+  
+  // If the native property is physical, store to it.
+  SILValue addr = B.createRefElementAddr(var, thisValue, var,
+                                         setValue.getType().getAddressType());
+  if (setValue.getType().isAddressOnly()) {
+    // "Take" if the argument was received at +0.
+    B.createCopyAddr(var, setValue, addr,
+                     /*isTake*/ !ownership.isArgumentConsumed(1),
+                     /*isInitialize*/ false);
+  } else {
+    SILValue old = B.createLoad(var, addr);
+    if (!ownership.isArgumentConsumed(1))
+      emitRetainRValue(var, setValue);
+    B.createStore(var, setValue, addr);
+    emitReleaseRValue(var, old);
+  }
+  
+  B.createReturn(var, emitEmptyTuple(var));
 }

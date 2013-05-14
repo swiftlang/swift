@@ -160,9 +160,9 @@ void SILGenModule::postEmitFunction(SILConstant constant,
   F->verify();
 }
 
-SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
+void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Ignore prototypes.
-  if (fe->getBody() == nullptr) return nullptr;
+  if (fe->getBody() == nullptr) return;
   
   SILConstant constant(decl);
   SILFunction *f = preEmitFunction(constant, fe);
@@ -179,11 +179,11 @@ SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   ValueDecl *vd = decl.dyn_cast<ValueDecl*>();
   FuncDecl *fd = dyn_cast_or_null<FuncDecl>(vd);
   if (fd && fd->isGetterOrSetter())
-    return f;
+    return;
   
   // FIXME: Thunks for instance methods.
   if (fd && fd->isInstanceMember())
-    return f;
+    return;
   
   // FIXME: Curry thunks for generic functions don't work right yet, so skip
   // emitting thunks for generic functions for now.
@@ -191,7 +191,7 @@ SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
        ft;
        ft = ft->getResult()->getAs<AnyFunctionType>()) {
     if (ft->is<PolymorphicFunctionType>())
-      return f;
+      return;
   }
   
   // Generate the curry thunks.
@@ -202,8 +202,6 @@ SILFunction *SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
     emitCurryThunk(curryConstant, constant, fe);
     constant = curryConstant;
   }
-  
-  return f;
 }
 
 void SILGenModule::emitCurryThunk(SILConstant entryPoint,
@@ -220,7 +218,7 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
   M.globals.insert(global);
 }
 
-SILFunction *SILGenModule::emitConstructor(ConstructorDecl *decl) {
+void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   SILConstant constant(decl);
   SILFunction *f = preEmitFunction(constant, decl);
 
@@ -241,29 +239,53 @@ SILFunction *SILGenModule::emitConstructor(ConstructorDecl *decl) {
     SILGenFunction(*this, *f, /*hasVoidReturn=*/true)
       .emitValueConstructor(decl);
     postEmitFunction(constant, f);
-  }
-  
-  return f;
+  }  
 }
 
-SILFunction *SILGenModule::emitClosure(ClosureExpr *ce) {
+void SILGenModule::emitClosure(ClosureExpr *ce) {
   SILConstant constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/false).emitClosure(ce);
   postEmitFunction(constant, f);
-  
-  return f;
 }
 
-SILFunction *SILGenModule::emitDestructor(ClassDecl *cd,
-                                          DestructorDecl /*nullable*/ *dd) {
+void SILGenModule::emitDestructor(ClassDecl *cd,
+                                  DestructorDecl /*nullable*/ *dd) {
   // Emit the destroying destructor.
   SILConstant destroyer(cd, SILConstant::Kind::Destroyer);
   SILFunction *f = preEmitFunction(destroyer, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
-  
-  return f;
+}
+
+void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
+  SILConstant thunk(method, SILConstant::ConstructAtNaturalUncurryLevel,
+                    /*isObjC*/ true);
+                    
+  SILFunction *f = preEmitFunction(thunk, method->getBody());
+  SILGenFunction(*this, *f, false).emitObjCMethodThunk(thunk);
+  postEmitFunction(thunk, f);
+}
+
+void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
+  SILConstant getter(prop, SILConstant::Kind::Getter,
+                     SILConstant::ConstructAtNaturalUncurryLevel,
+                     /*isObjC*/ true);
+                     
+  SILFunction *f = preEmitFunction(getter, prop);
+  SILGenFunction(*this, *f, false).emitObjCPropertyGetter(getter);
+  postEmitFunction(getter, f);
+
+  if (!prop->isSettable())
+    return;
+
+  SILConstant setter(prop, SILConstant::Kind::Setter,
+                     SILConstant::ConstructAtNaturalUncurryLevel,
+                     /*isObjC*/ true);
+
+  f = preEmitFunction(setter, prop);
+  SILGenFunction(*this, *f, false).emitObjCPropertySetter(setter);
+  postEmitFunction(setter, f);
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
