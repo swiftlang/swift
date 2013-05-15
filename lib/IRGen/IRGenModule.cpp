@@ -36,6 +36,7 @@
 
 using namespace swift;
 using namespace irgen;
+using llvm::Attribute;
 
 const unsigned DefaultAS = 0;
 
@@ -178,77 +179,13 @@ IRGenModule::~IRGenModule() {
   delete &Types;
 }
 
-/// Create a function using swift's runtime calling convention.
-static llvm::Constant *createRuntimeFunction(IRGenModule &IGM, StringRef name,
-                                             llvm::FunctionType *fnType) {
-  llvm::Constant *addr = IGM.Module.getOrInsertFunction(name, fnType);
-  if (auto fn = dyn_cast<llvm::Function>(addr))
-    fn->setCallingConv(IGM.RuntimeCC);
-  return addr;
-}
-
-/// Create a nounwind function using swift's runtime calling convention.
-static llvm::Constant *createNounwindRuntimeFunction(IRGenModule &IGM,
-                                                     StringRef name,
-                                               llvm::FunctionType *fnType) {
-  auto addr = createRuntimeFunction(IGM, name, fnType);
-  if (auto fn = dyn_cast<llvm::Function>(addr))
-    fn->setDoesNotThrow();
-  return addr;
-}
-
-/// Create a readonly runtime function.
-///
-/// 'readonly' permits calls to this function to be removed, GVN'ed,
-/// and re-ordered, but not necessarily around writes to memory.  It
-/// is a promise that the function has no side effects.  We actually
-/// apply this attribute to functions that do have side effects, but
-/// those side effects are things like allocating a cache entry: that
-/// is, they are not visible outside of the abstraction of the
-/// function (except by e.g. monitoring memory usage).  This is
-/// permitted, as it does not affect the validity of transformations.
-static llvm::Constant *createReadonlyRuntimeFunction(IRGenModule &IGM,
-                                                     StringRef name,
-                                               llvm::FunctionType *fnType) {
-  llvm::Constant *addr = createNounwindRuntimeFunction(IGM, name, fnType);
-  if (auto fn = dyn_cast<llvm::Function>(addr)) {
-    fn->setOnlyReadsMemory();
-  }
-  return addr;
-}
-
-/// Create a readnone runtime function.
-///
-/// 'readnone' is a stronger version of 'readonly'; it permits calls
-/// to this function to be removed, GVN'ed, and re-ordered regardless
-/// of any intervening writes to memory.  It is an additional promise
-/// that the function does not depend on the current state of memory.
-/// We actually apply this attribute to functions that do depend on
-/// the current state of memory, but only when that memory is known to
-/// be immutable.  This is permitted, as it does not affect the
-/// validity of transformations.
-///
-/// Note that functions like swift_getTupleMetadata which read values
-/// out of a local array cannot be marked 'readnone'.
-static llvm::Constant *createReadnoneRuntimeFunction(IRGenModule &IGM,
-                                                     StringRef name,
-                                               llvm::FunctionType *fnType) {
-  llvm::Constant *addr = createNounwindRuntimeFunction(IGM, name, fnType);
-  if (auto fn = dyn_cast<llvm::Function>(addr)) {
-    fn->setDoesNotAccessMemory();
-  }
-  return addr;
-}
-
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
                       llvm::Constant *&cache,
                       char const *name,
-                      llvm::Constant *(*createFn)(IRGenModule &IGM,
-                                                  StringRef name,
-                                                  llvm::FunctionType *fnType),
                       std::initializer_list<llvm::Type*> retTypes,
-                      std::initializer_list<llvm::Type*> argTypes)
-{
+                      std::initializer_list<llvm::Type*> argTypes,
+                      std::initializer_list<Attribute::AttrKind> attrs
+                         = std::initializer_list<Attribute::AttrKind>()) {
   if (cache)
     return cache;
   
@@ -262,111 +199,123 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
   auto fnTy = llvm::FunctionType::get(retTy,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
-  
-  cache = createFn(IGM, name, fnTy);
+
+  cache = IGM.Module.getOrInsertFunction(name, fnTy);
+
+  // Add any function attributes and set the calling convention.
+  if (auto fn = dyn_cast<llvm::Function>(cache)) {
+    fn->setCallingConv(IGM.RuntimeCC);
+
+    for (auto Attr : attrs)
+      fn->addFnAttr(Attr);
+  }
+
   return cache;
 }
 
 llvm::Constant *IRGenModule::getAllocBoxFn() {
   // struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
-  return getRuntimeFn(*this, AllocBoxFn,
-                      "swift_allocBox", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, AllocBoxFn, "swift_allocBox",
                       { RefCountedPtrTy, OpaquePtrTy },
-                      { TypeMetadataPtrTy });
+                      { TypeMetadataPtrTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getAllocObjectFn() {
   // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t align);
-  return getRuntimeFn(*this, AllocObjectFn,
-                      "swift_allocObject", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, AllocObjectFn, "swift_allocObject",
                       { RefCountedPtrTy },
-                      { TypeMetadataPtrTy, SizeTy, SizeTy });
+                      { TypeMetadataPtrTy, SizeTy, SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getDeallocObjectFn() {
   // void swift_deallocObject(RefCounted *obj, size_t size);
-  return getRuntimeFn(*this, DeallocObjectFn,
-                      "swift_deallocObject", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, DeallocObjectFn, "swift_deallocObject",
                       { VoidTy },
-                      { RefCountedPtrTy, SizeTy });
+                      { RefCountedPtrTy, SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getRawAllocFn() {
   /// void *swift_rawAlloc(SwiftAllocIndex index);
-  return getRuntimeFn(*this, RawAllocFn,
-                      "swift_rawAlloc", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, RawAllocFn, "swift_rawAlloc",
                       { Int8PtrTy },
-                      { SizeTy });
+                      { SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getRawDeallocFn() {
   /// void swift_rawDealloc(void *ptr, SwiftAllocIndex index);
-  return getRuntimeFn(*this, RawDeallocFn,
-                      "swift_rawDealloc", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, RawDeallocFn, "swift_rawDealloc",
                       { VoidTy },
-                      { Int8PtrTy, SizeTy });
+                      { Int8PtrTy, SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getSlowAllocFn() {
   /// void *swift_slowAlloc(size_t size, size_t flags);
-  return getRuntimeFn(*this, SlowAllocFn,
-                      "swift_slowAlloc", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, SlowAllocFn, "swift_slowAlloc",
                       { Int8PtrTy },
-                      { SizeTy, SizeTy });
+                      { SizeTy, SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
   /// void swift_slowRawDealloc(void *ptr, size_t size);
   return getRuntimeFn(*this, SlowRawDeallocFn, "swift_slowRawDealloc",
-                      createNounwindRuntimeFunction,
                       { VoidTy },
-                      { Int8PtrTy, SizeTy });
+                      { Int8PtrTy, SizeTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getCopyPODFn() {
   /// void *swift_copyPOD(void *dest, void *src, Metadata *self);
-  return getRuntimeFn(*this, CopyPODFn, "swift_copyPOD", createNounwindRuntimeFunction,
+  return getRuntimeFn(*this, CopyPODFn, "swift_copyPOD",
                       { OpaquePtrTy },
-                      { OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy });
+                      { OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getDynamicCastClassFn() {
   // void *swift_dynamicCastClass(void*, void*);
   return getRuntimeFn(*this, DynamicCastClassFn, "swift_dynamicCastClass",
-                      createReadonlyRuntimeFunction,
                       { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy });
+                      { Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getDynamicCastClassUnconditionalFn() {
   // void *swift_dynamicCastClassUnconditional(void*, void*);
-  return getRuntimeFn(*this, DynamicCastClassUnconditionalFn, "swift_dynamicCastClassUnconditional",
-                      createReadonlyRuntimeFunction,
+  return getRuntimeFn(*this, DynamicCastClassUnconditionalFn,
+                      "swift_dynamicCastClassUnconditional",
                       { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy });
+                      { Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getDynamicCastFn() {
   // void *swift_dynamicCast(void*, void*);
   return getRuntimeFn(*this, DynamicCastFn, "swift_dynamicCast",
-                      createReadonlyRuntimeFunction,
                       { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy });
+                      { Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
   // void *swift_dynamicCastUnconditional(void*, void*);
-  return getRuntimeFn(*this, DynamicCastUnconditionalFn, "swift_dynamicCastUnconditional",
-                      createReadonlyRuntimeFunction,
+  return getRuntimeFn(*this, DynamicCastUnconditionalFn,
+                      "swift_dynamicCastUnconditional",
                       { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy });
+                      { Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getRetainNoResultFn() {
   // void swift_retainNoResult(void *ptr);
   getRuntimeFn(*this, RetainNoResultFn, "swift_retain_noresult",
-               createNounwindRuntimeFunction,
-               { VoidTy }, { RefCountedPtrTy });
+               { VoidTy }, { RefCountedPtrTy },
+               { Attribute::NoUnwind });
   if (auto fn = dyn_cast<llvm::Function>(RetainNoResultFn))
     fn->setDoesNotCapture(1);
   return RetainNoResultFn;
@@ -375,8 +324,7 @@ llvm::Constant *IRGenModule::getRetainNoResultFn() {
 llvm::Constant *IRGenModule::getReleaseFn() {
   // void swift_release(void *ptr);
   getRuntimeFn(*this, ReleaseFn, "swift_release",
-               createNounwindRuntimeFunction,
-               { VoidTy }, { RefCountedPtrTy });
+               { VoidTy }, { RefCountedPtrTy }, { Attribute::NoUnwind });
   if (auto fn = dyn_cast<llvm::Function>(ReleaseFn))
     fn->setDoesNotCapture(1);
   return ReleaseFn;
@@ -386,16 +334,15 @@ llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
   // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
   //                                            type_metadata_t *result);
   return getRuntimeFn(*this, GetFunctionMetadataFn, "swift_getFunctionMetadata",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy, TypeMetadataPtrTy });
+                      { TypeMetadataPtrTy, TypeMetadataPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
   // type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
   //                                           const void *arguments);
   return getRuntimeFn(*this, GetGenericMetadataFn, "swift_getGenericMetadata",
-                      createRuntimeFunction,
                       { TypeMetadataPtrTy },
                       { TypeMetadataPatternPtrTy, Int8PtrTy });
 }
@@ -403,41 +350,41 @@ llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
 llvm::Constant *IRGenModule::getGetMetatypeMetadataFn() {
   // type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
   return getRuntimeFn(*this, GetMetatypeMetadataFn, "swift_getMetatypeMetadata",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy });
+                      { TypeMetadataPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getGetObjCClassMetadataFn() {
   // type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
   return getRuntimeFn(*this, GetObjCClassMetadataFn, "swift_getObjCClassMetadata",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy });
+                      { TypeMetadataPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getStaticTypeofFn() {
   // type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
   return getRuntimeFn(*this, StaticTypeofFn, "swift_staticTypeof",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy });
+                      { OpaquePtrTy, TypeMetadataPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getObjectTypeofFn() {
   // type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
   return getRuntimeFn(*this, ObjectTypeofFn, "swift_objectTypeof",
-                      createNounwindRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy });
+                      { OpaquePtrTy, TypeMetadataPtrTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getObjCTypeofFn() {
   // type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
   return getRuntimeFn(*this, ObjCTypeofFn, "swift_objcTypeof",
-                      createNounwindRuntimeFunction,
                       { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy });
+                      { OpaquePtrTy, TypeMetadataPtrTy },
+                      { Attribute::NoUnwind });
 }
 
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
@@ -455,14 +402,14 @@ llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
   //                                         const char *labels,
   //                                         value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadataFn, "swift_getTupleTypeMetadata",
-                      createReadonlyRuntimeFunction,
                       { TypeMetadataPtrTy },
                       {
                         SizeTy,
                         TypeMetadataPtrTy->getPointerTo(0),
                         Int8PtrTy,
                         WitnessTablePtrTy
-                      });
+                      },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
@@ -471,14 +418,14 @@ llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
   //                                          const char *labels,
   //                                          value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadata2Fn, "swift_getTupleTypeMetadata2",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
                       {
                         TypeMetadataPtrTy, 
                         TypeMetadataPtrTy,
                         Int8PtrTy,
                         WitnessTablePtrTy
-                      });
+                      },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
@@ -488,7 +435,6 @@ llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
   //                                          const char *labels,
   //                                          value_witness_table_t *proposed);
   return getRuntimeFn(*this, GetTupleMetadata3Fn, "swift_getTupleTypeMetadata3",
-                      createReadnoneRuntimeFunction,
                       { TypeMetadataPtrTy },
                       {
                         TypeMetadataPtrTy,
@@ -496,7 +442,8 @@ llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
                         TypeMetadataPtrTy,
                         Int8PtrTy,
                         WitnessTablePtrTy
-                      });
+                      },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 
@@ -516,17 +463,15 @@ llvm::Constant *IRGenModule::getGetObjectClassFn() {
 }
 
 llvm::Constant *IRGenModule::getGetObjectTypeFn() {
-  if (GetObjectTypeFn) return GetObjectTypeFn;
-
   // type_metadata_t *swift_getObjectType(id object);
+
   // Since this supposedly looks through dynamic subclasses, it's
   // invariant across reasonable isa-rewriting schemes and therefore
   // can be readnone.
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(TypeMetadataPtrTy, ObjCPtrTy, false);
-  GetObjectTypeFn =
-    createReadnoneRuntimeFunction(*this, "swift_getObjectType", fnType);
-  return GetObjectTypeFn;
+  return getRuntimeFn(*this, GetObjectTypeFn, "swift_getObjectType",
+                      { TypeMetadataPtrTy },
+                      { ObjCPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
