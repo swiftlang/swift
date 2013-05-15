@@ -256,9 +256,6 @@ public:
   /// block that 'return' jumps to in those contexts, or 'null' if returning
   /// can return normally from the function.
   SILBasicBlock *epilogBB;
-  
-  /// Return continuation block stack for force-inlined functions.
-  std::vector<SILBasicBlock *> inlineReturnBBStack;
 
 public:
   SILGenFunction(SILGenModule &SGM, SILFunction &F, bool hasVoidReturn);
@@ -600,10 +597,6 @@ public:
   /// to a variable or passed as an argument or return value.
   SILValue emitGeneralizedValue(SILLocation loc, SILValue thinFn);
   
-  /// Emit an inline function call.
-  ManagedValue emitInlineFunction(FuncExpr *body, Expr *args, SGFContext C);
-  ManagedValue emitInlineFunction(FuncExpr *body, RValue &&args, SGFContext C);
-
   //
   // Helpers for emitting ApplyExpr chains.
   //

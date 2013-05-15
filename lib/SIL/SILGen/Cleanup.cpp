@@ -103,24 +103,18 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
 }
 
 void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
-  auto end = Stack.find(ReturnScope);
-  for (auto cleanup = Stack.begin(); cleanup != end; ++cleanup) {
-    if (cleanup->isActive())
-      cleanup->emit(Gen);
-  }
+  for (auto &cleanup : Stack)
+    if (cleanup.isActive())
+      cleanup.emit(Gen);
 }
 
-void CleanupManager::emitReturnAndCleanups(SILLocation loc,
-                                           SILValue returnValue) {
+void CleanupManager::emitReturnAndCleanups(SILLocation loc, SILValue returnValue) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
 
   emitCleanupsForReturn(loc);
   
-  if (!Gen.inlineReturnBBStack.empty()) {
-    B.createBranch(loc, Gen.inlineReturnBBStack.back(),
-                   returnValue);
-  } else if (Gen.epilogBB) {
+  if (Gen.epilogBB) {
     assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
     B.createBranch(loc, Gen.epilogBB);
   } else {

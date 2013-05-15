@@ -63,13 +63,8 @@ public:
   virtual void emit(SILGenFunction &Gen) = 0;
 };
 
-class CleanupManager;
-template<CleanupsDepth CleanupManager::*SCOPE>
-class ScopeImpl;
-
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
-  template<CleanupsDepth CleanupManager::*SCOPE>
-  friend class ScopeImpl;
+  friend class Scope;
 
   SILGenFunction &Gen;
   
@@ -77,7 +72,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   DiverseStack<Cleanup, 128> Stack;
   
   CleanupsDepth InnermostScope;
-  CleanupsDepth ReturnScope;
   
   void popAndEmitTopCleanup();
   void popAndEmitTopDeadCleanups(CleanupsDepth end);
@@ -89,8 +83,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   
 public:
   CleanupManager(SILGenFunction &Gen)
-    : Gen(Gen), InnermostScope(Stack.stable_end()),
-      ReturnScope(Stack.stable_end()) {
+    : Gen(Gen), InnermostScope(Stack.stable_end()) {
   }
   
   /// Return a stable reference to the current cleanup.
@@ -140,11 +133,6 @@ public:
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.
   void setCleanupState(CleanupsDepth depth, CleanupState state);
-  
-  /// Scope RAII manager for local scopes.
-  using Scope = ScopeImpl<&CleanupManager::InnermostScope>;
-  /// Scope RAII manager for force-inlining.
-  using InliningScope = ScopeImpl<&CleanupManager::ReturnScope>;
 };
 
 } // end namespace Lowering
