@@ -454,12 +454,10 @@ llvm::Constant *IRGenModule::getGetObjectClassFn() {
   // This is an Objective-C runtime function.
   // We have to mark it readonly instead of readnone because isa-rewriting
   // can have a noticeable effect here.
-  llvm::FunctionType *fnType =
-    llvm::FunctionType::get(TypeMetadataPtrTy, ObjCPtrTy, false);
-  GetObjectClassFn = Module.getOrInsertFunction("object_getClass", fnType);
-  if (auto fn = dyn_cast<llvm::Function>(GetObjectClassFn))
-    fn->setOnlyReadsMemory();
-  return GetObjectClassFn;
+  return getRuntimeFn(*this, GetObjectClassFn, "object_getClass",
+                      { TypeMetadataPtrTy },
+                      { ObjCPtrTy },
+                      { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
 llvm::Constant *IRGenModule::getGetObjectTypeFn() {
