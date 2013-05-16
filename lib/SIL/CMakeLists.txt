@@ -4,6 +4,7 @@ add_swift_library(swiftSIL
   Mangle.cpp
   SILBasicBlock.cpp
   SILInstruction.cpp
+  SILFunction.cpp
   SIL.cpp
   SILBase.cpp
   SILPrinter.cpp

@@ -42,8 +42,7 @@ enum class SILLinkage : unsigned char {
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
 class SILFunction
-  : public llvm::ilist_node<SILFunction>, SILAllocated<SILFunction>
-{
+  : public llvm::ilist_node<SILFunction>, SILAllocated<SILFunction> {
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
@@ -66,13 +65,11 @@ private:
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;
+public:
 
-  // Intentionally marked private so that we need to use
-  // 'SILModule::constructSIL()' to generate a SILFunction.
   SILFunction(SILModule &Module, SILLinkage Linkage,
               StringRef MangledName, SILType LoweredType);
   
-public:
   ~SILFunction();
 
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }

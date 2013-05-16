@@ -1,4 +1,4 @@
-//===--- SILFunction.cpp - Defines the SILFunction data structure ---------===//
+//===--- SIL.cpp - Implements random SIL functionality --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstant.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -21,19 +20,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 using namespace swift;
-
-SILFunction::SILFunction(SILModule &Module,
-                         SILLinkage Linkage,
-                         StringRef Name,
-                         SILType LoweredType)
-  : ModuleAndLinkage(&Module, Linkage), MangledName(Name),
-    LoweredType(LoweredType)
-{
-  Module.functions.push_back(this);
-}
-
-SILFunction::~SILFunction() {
-}
 
 SILModule::SILModule(ASTContext &Context)
   : Context(Context), Types(*this) {
@@ -256,16 +242,4 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
   return SILType(CanType(ty),
                  /*isAddress=*/false,
                  /*isLoadable=*/true);
-}
-
-ASTContext &SILFunction::getContext() const {
-  return getModule().Context;
-}
-
-void *SILFunction::allocate(unsigned Size, unsigned Align) const {
-  return getModule().allocate(Size, Align);
-}
-
-SILTypeList *SILFunction::getSILTypeList(ArrayRef<SILType> Types) const {
-  return getModule().getSILTypeList(Types);
 }
