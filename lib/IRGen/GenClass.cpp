@@ -388,19 +388,11 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
                                                       VarDecl *field) {
-  return projectPhysicalClassMemberAddress(IGF, base,
-                                           baseType.getSwiftRValueType(),
-                                           field);
-}
-
-OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
-                                                      llvm::Value *base,
-                                                      CanType baseType,
-                                                      VarDecl *field) {
   auto &baseClassTI = IGF.getFragileTypeInfo(baseType).as<ClassTypeInfo>();
-  ClassDecl *baseClass = baseType->getClassOrBoundGenericClass();
+  ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
   
-  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
+  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass,
+                     baseType.getSwiftRValueType());
   
   auto &entry = layout.getFieldEntry(field);
   switch (entry.getAccess()) {

@@ -42,10 +42,6 @@ namespace irgen {
                                                  llvm::Value *base,
                                                  SILType baseType,
                                                  VarDecl *field);
-  OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
-                                                 llvm::Value *base,
-                                                 CanType baseType,
-                                                 VarDecl *field);
 
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
