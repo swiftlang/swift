@@ -280,72 +280,6 @@ AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,
 }
 
 namespace {
-  struct ObjCMethodSignature {
-    bool IsIndirectReturn;
-    llvm::FunctionType *FnTy;
-    CanType ResultType;
-    llvm::AttributeSet Attrs;
-    
-    void addFormalArg(IRGenModule &IGM,
-                      CanType inputTy,
-                      SmallVectorImpl<llvm::Type*> &argTys) {
-      // This is a totally wrong and shameful hack, but it lets us pass
-      // NSRect correctly.
-      if (requiresExternalByvalArgument(IGM, inputTy)) {
-        const TypeInfo &ti = IGM.getFragileTypeInfo(inputTy);
-        addByvalArgumentAttributes(IGM, Attrs, argTys.size(),
-                                   ti.getBestKnownAlignment());
-        argTys.push_back(ti.getStorageType()->getPointerTo());
-      } else {
-        auto argSchema = IGM.getSchema(inputTy,
-                                       ExplosionKind::Minimal);
-        argSchema.addToArgTypes(IGM, argTys);
-      }
-    }
-
-    ObjCMethodSignature(IRGenModule &IGM, CanType formalType, bool isSuper) {
-      auto selfFnType = cast<AnyFunctionType>(formalType);
-      auto formalFnType = cast<AnyFunctionType>(CanType(selfFnType->getResult()));
-
-      llvm::Type *resultTy;
-      SmallVector<llvm::Type*, 8> argTys;
-
-      // Consider the result type first.
-      ResultType = CanType(formalFnType->getResult());
-      if (auto ptrTy = requiresExternalIndirectResult(IGM, ResultType)) {
-        IsIndirectReturn = true;
-        resultTy = IGM.VoidTy;
-        argTys.push_back(ptrTy);
-        addIndirectReturnAttributes(IGM, Attrs);
-      } else {
-        IsIndirectReturn = false;
-
-        auto resultSchema = IGM.getSchema(ResultType, ExplosionKind::Minimal);
-        assert(!resultSchema.containsAggregate());
-        resultTy = resultSchema.getScalarResultType(IGM);
-      }
-
-      // Add the 'self' or 'super' argument.
-      if (isSuper)
-        argTys.push_back(IGM.ObjCSuperPtrTy);
-      else
-        argTys.push_back(IGM.getStorageType(CanType(selfFnType->getInput())));
-
-      // Add the _cmd argument.
-      argTys.push_back(IGM.ObjCSELTy);
-
-      // Add the formal arguments.
-      CanType inputs(formalFnType->getInput());
-      if (TupleType *tuple = dyn_cast<TupleType>(inputs)) {
-        for (const TupleTypeElt &field : tuple->getFields())
-          addFormalArg(IGM, CanType(field.getType()), argTys);
-      } else
-        addFormalArg(IGM, inputs, argTys);
-
-      FnTy = llvm::FunctionType::get(resultTy, argTys, /*variadic*/ false);
-    }
-  };
-
   class Selector {
     
     llvm::SmallString<80> Text;
@@ -475,6 +409,17 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   selfValues.add(super.getAddress());
 }
 
+static llvm::FunctionType *getMsgSendSuperTy(IRGenModule &IGM,
+                                             llvm::FunctionType *fnTy,
+                                             bool indirectResult) {
+  SmallVector<llvm::Type*, 4> args(fnTy->param_begin(), fnTy->param_end());
+  if (indirectResult)
+    args[1] = IGM.ObjCSuperPtrTy;
+  else
+    args[0] = IGM.ObjCSuperPtrTy;
+  return llvm::FunctionType::get(fnTy->getReturnType(), args, fnTy->isVarArg());
+}
+
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
 /// '_cmd' arguments.
 CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
@@ -487,12 +432,22 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   assert((method.kind == SILConstant::Kind::Initializer
           || method.kind == SILConstant::Kind::Func)
          && "objc method call must be to a func or constructor decl");
-  ObjCMethodSignature sig(IGF.IGM, origType.getSwiftRValueType(), isSuper);
+  llvm::AttributeSet attrs;
+  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::C,
+                                      origType.getSwiftRValueType(),
+                                      ExplosionKind::Minimal,
+                                      /*uncurryLevel*/ 1,
+                                      ExtraData::None,
+                                      attrs);
+  bool indirectResult = requiresExternalIndirectResult(IGF.IGM,
+                                     substResultType.getSwiftRValueType());
+  if (isSuper)
+    fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 
   // Create the appropriate messenger function.
   // FIXME: this needs to be target-specific.
   llvm::Constant *messenger;
-  if (sig.IsIndirectReturn) {
+  if (indirectResult) {
     messenger = isSuper
       ? IGF.IGM.getObjCMsgSendSuperStretFn()
       : IGF.IGM.getObjCMsgSendStretFn();
@@ -503,8 +458,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   }
 
   // Cast the messenger to the right type.
-  messenger = llvm::ConstantExpr::getBitCast(messenger,
-                                             sig.FnTy->getPointerTo());
+  messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
 
   // FIXME: ObjC method constants should get SILGen-ed with a [sil_cc=c] type.
   CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::C,
@@ -568,7 +522,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
 static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM,
-                                            const ObjCMethodSignature &sig,
                                             llvm::StringRef name) {
   // Construct the thunk name.
   llvm::SmallString<128> buffer;
@@ -595,16 +548,19 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                                   unsigned uncurryLevel) {
 
   // Construct a callee and derive its ownership conventions.
-  CanType origFormalType = method->getType()->getCanonicalType();
-  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
-  auto callee = Callee::forMethod(origFormalType, sig.ResultType,
-                                  ArrayRef<Substitution>(),
+  auto *origFormalType
+    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
+  auto *origFnType
+    = cast<AnyFunctionType>(CanType(origFormalType->getResult()));
+  auto callee = Callee::forMethod(CanType(origFormalType),
+                                  CanType(origFnType->getResult()),
+                                  ArrayRef<Substitution>{},
                                   swiftImpl,
                                   explosionLevel,
                                   uncurryLevel);
 
   llvm::Function *objcImpl
-    = findSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
+    = findSwiftAsObjCThunk(IGM, swiftImpl->getName());
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
@@ -619,8 +575,6 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
   FormalType getterType = IGM.getTypeOfGetter(property);
-  CanType origFormalType = getterType.getType();
-  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
   llvm::SmallString<32> swiftName;
   
   // Find the ObjC thunk for the property.
@@ -629,7 +583,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
   getterEntity.mangle(swiftName);
   
-  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, sig, swiftName);
+  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, swiftName);
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
@@ -646,8 +600,6 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
   FormalType setterType = IGM.getTypeOfSetter(property);
-  CanType origFormalType = setterType.getType();
-  ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
   llvm::SmallString<32> swiftName;
   
   // Generate the name of the ObjC thunk for the setter.
@@ -656,7 +608,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
   setterEntity.mangle(swiftName);
   
-  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, sig, swiftName);
+  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, swiftName);
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
