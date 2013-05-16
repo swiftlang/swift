@@ -12,11 +12,34 @@
 
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 using namespace swift;
 
+
+/// parseSILLinkage - Parse a linkage specifier if present.
+///   sil-linkage:
+///     /*empty*/           // defaults to external linkage.
+///     'internal'
+///     'clang_thunk'
+static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
+  if (P.Tok.isNot(tok::identifier)) {
+    Result = SILLinkage::External;
+  } else if (P.Tok.getText() == "internal") {
+    Result = SILLinkage::Internal;
+    P.consumeToken(tok::identifier);
+  } else if (P.Tok.getText() == "clang_thunk") {
+    Result = SILLinkage::ClangThunk;
+    P.consumeToken(tok::identifier);
+  } else {
+    P.diagnose(P.Tok, diag::expected_sil_linkage_or_function);
+    return true;
+  }
+  return false;
+}
+
+
 ///   decl-sil:   [[only in SIL mode]]
-///     'sil' sil-linkage? '@' identifier ':' sil-type decl-sil-body
+///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body
 ///   decl-sil-body:
 ///     '{' sil-basic-block+ '}'
 bool Parser::parseDeclSIL() {
@@ -27,16 +50,22 @@ bool Parser::parseDeclSIL() {
 
   consumeToken(tok::kw_sil);
 
-  // TODO: Handle linkage.
-
+  SILLinkage FnLinkage;
   Identifier FnName;
   SILType FnType;
 
-  if (parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
+  if (parseSILLinkage(FnLinkage, *this) ||
+      parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type) ||
       parseSILType(FnType))
     return true;
+
+  SILFunction *Fn = new (*SIL) SILFunction(*SIL, FnLinkage,
+                                           FnName.str(), FnType);
+  (void)Fn;
+
+  // Now that we have a SILFunction parse the body, if present.
 
   SourceLoc LBraceLoc = Tok.getLoc();
   if (consumeIf(tok::l_brace)) {
@@ -60,6 +89,8 @@ bool Parser::parseSILType(SILType &Result) {
   if (parseToken(tok::sil_dollar, diag::expected_sil_type) ||
       parseType(Ty, diag::expected_sil_type))
     return true;
+
+  Result = SILType::getRawPointerType(Context);
 
   return false;
 }

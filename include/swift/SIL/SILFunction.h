@@ -27,10 +27,6 @@ class SILInstruction;
 class SILModule;
 class TranslationUnit;
   
-namespace Lowering {
-  class SILGenModule;
-}
-
 /// Linkage attribute for a SIL function.
 enum class SILLinkage : unsigned char {
   External,
