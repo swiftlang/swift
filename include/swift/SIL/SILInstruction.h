@@ -1162,8 +1162,8 @@ public:
     return Conformances;
   }
 
-  Type getConcreteType() const {
-    return getType().getSwiftRValueType();
+  SILType getConcreteType() const {
+    return getType();
   }
 };
 

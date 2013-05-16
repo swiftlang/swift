@@ -1329,8 +1329,8 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
 
 void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   Address container = getLoweredAddress(i->getOperand());
-  CanType destType = i->getOperand().getType().getSwiftRValueType();
-  CanType srcType = i->getConcreteType()->getCanonicalType();
+  SILType destType = i->getOperand().getType();
+  SILType srcType = i->getConcreteType();
   Address buffer = emitExistentialContainerInit(*this,
                                                 container,
                                                 destType, srcType,
@@ -1342,8 +1342,8 @@ void IRGenSILFunction::visitUpcastExistentialInst(
                                               swift::UpcastExistentialInst *i) {
   Address src = getLoweredAddress(i->getSrcExistential());
   Address dest = getLoweredAddress(i->getDestExistential());
-  CanType srcType = i->getSrcExistential().getType().getSwiftRValueType();
-  CanType destType = i->getDestExistential().getType().getSwiftRValueType();
+  SILType srcType = i->getSrcExistential().getType();
+  SILType destType = i->getDestExistential().getType();
   emitExistentialContainerUpcast(*this, dest, destType, src, srcType,
                                  i->isTakeOfSrc(),
                                  i->getConformances());
@@ -1351,7 +1351,7 @@ void IRGenSILFunction::visitUpcastExistentialInst(
 
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
-  CanType baseTy = i->getOperand().getType().getSwiftRValueType();
+  SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
   Address object = emitExistentialProjection(*this, base, baseTy);
   Explosion lowered(CurExplosionLevel);

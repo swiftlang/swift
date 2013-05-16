@@ -48,17 +48,17 @@ namespace irgen {
   /// existential container.
   Address emitExistentialContainerInit(IRGenFunction &IGF,
                                    Address dest,
-                                   CanType destType,
-                                   CanType srcType,
+                                   SILType destType,
+                                   SILType srcType,
                                    ArrayRef<ProtocolConformance*> conformances);
 
   /// Initialize an existential container using the value and metadata from
   /// an existing, more specific existential container.
   void emitExistentialContainerUpcast(IRGenFunction &IGF,
                                   Address dest,
-                                  CanType destType,
+                                  SILType destType,
                                   Address src,
-                                  CanType srcType,
+                                  SILType srcType,
                                   bool isTakeOfSrc,
                                   ArrayRef<ProtocolConformance*> conformances);
   
@@ -66,7 +66,7 @@ namespace irgen {
   /// of its concrete value buffer.
   Address emitExistentialProjection(IRGenFunction &IGF,
                                     Address base,
-                                    CanType baseTy);
+                                    SILType baseTy);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.

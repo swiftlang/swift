@@ -566,7 +566,7 @@ public:
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
     OS << "init_existential " << getID(AEI->getOperand()) << ", $";
-    AEI->getConcreteType()->print(OS);
+    AEI->getConcreteType().print(OS);
   }
   void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
     OS << "upcast_existential ";

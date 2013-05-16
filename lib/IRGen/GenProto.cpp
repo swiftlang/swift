@@ -3061,7 +3061,7 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
 static void emitProtocolWitnessTables(IRGenFunction &IGF,
                                   Address dest,
                                   ExistentialTypeInfo const &destTI,
-                                  CanType srcType,
+                                  SILType srcType,
                                   ArrayRef<ProtocolConformance*> conformances,
                                   llvm::Value* &metadata,
                                   FixedPacking &packing,
@@ -3077,7 +3077,7 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
   // Compute basic layout information about the type.  If we have a
   // concrete type, we need to know how it packs into a fixed-size
   // buffer.  If we don't, we need an value-witness table.
-  if (isa<ArchetypeType>(srcType)) { // FIXME: tuples of archetypes?
+  if (srcType.is<ArchetypeType>()) { // FIXME: tuples of archetypes?
     packing = (FixedPacking) -1;
     wtable = srcTI.as<ArchetypeTypeInfo>().getValueWitnessTable(IGF);
   } else {
@@ -3093,7 +3093,7 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
     llvm::Value *ptable;
     
     // If the source type is an archetype, look at what's bound.
-    if (isa<ArchetypeType>(srcType)) {
+    if (srcType.is<ArchetypeType>()) {
       auto &archTI = srcTI.as<ArchetypeTypeInfo>();
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
       ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
@@ -3107,7 +3107,8 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
       
       // Compute the conformance information.
       const ConformanceInfo &conformance =
-      protoI.getConformance(IGF.IGM, srcType, srcTI, proto, *astConformance);
+      protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(), srcTI, proto,
+                            *astConformance);
       ptable = conformance.getTable(IGF);
     }
     
@@ -3121,10 +3122,8 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
 /// Emit an existential container initialization by copying the value and
 /// witness tables from an existential container of a more specific type.
 void irgen::emitExistentialContainerUpcast(IRGenFunction &IGF,
-                                 Address dest,
-                                 CanType destType,
-                                 Address src,
-                                 CanType srcType,
+                                 Address dest, SILType destType,
+                                 Address src,  SILType srcType,
                                  bool isTakeOfSrc,
                                  ArrayRef<ProtocolConformance*> conformances) {
   auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
@@ -3187,16 +3186,17 @@ void irgen::emitExistentialContainerUpcast(IRGenFunction &IGF,
 /// Returns the address of the uninitialized buffer for the concrete value.
 Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
                                   Address dest,
-                                  CanType destType,
-                                  CanType srcType,
+                                  SILType destType,
+                                  SILType srcType,
                                   ArrayRef<ProtocolConformance*> conformances) {
   auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
   const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
   ExistentialLayout destLayout = destTI.getLayout();
   assert(destTI.getProtocols().size() == conformances.size());
   
-  assert(!srcType->isExistentialType() &&
-         "SIL existential-to-existential erasure not yet supported");
+  assert(!srcType.isExistentialType() &&
+         "existential-to-existential erasure should be done with "
+         "upcast_existential");
   
   // First, write out the metadata and witness tables.
   
@@ -3380,8 +3380,8 @@ AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
 /// buffer.
 Address irgen::emitExistentialProjection(IRGenFunction &IGF,
                                          Address base,
-                                         CanType baseTy) {
-  assert(baseTy->isExistentialType());
+                                         SILType baseTy) {
+  assert(baseTy.isExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 

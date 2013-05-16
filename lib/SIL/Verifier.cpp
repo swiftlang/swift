@@ -628,7 +628,7 @@ public:
             "init_existential must be applied to an address");
     require(exType.isExistentialType(),
             "init_existential must be applied to address of existential");
-    require(!AEI->getConcreteType()->isExistentialType(),
+    require(!AEI->getConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
             "an existential container");
   }
