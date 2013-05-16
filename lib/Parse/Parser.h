@@ -112,7 +112,9 @@ public:
   Parser(swift::Component *Comp, ASTContext &Context,
          llvm::StringRef fragment, DiagnosticEngine &Diags, SILModule *SIL);
   ~Parser();
-  
+
+  bool isInSILMode() const { return SIL != nullptr; }
+
   //===--------------------------------------------------------------------===//
   // Utilities
   
@@ -283,7 +285,7 @@ public:
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
-
+  bool parseDeclSIL();
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);

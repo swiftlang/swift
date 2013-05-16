@@ -364,6 +364,7 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 ///     decl-struct
 ///     decl-import
 ///     decl-operator
+///     decl-sil       [[Only in SIL mode]]
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
@@ -406,7 +407,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags));
     break;
-      
+  case tok::kw_sil:   // This is only a keyword in SIL mode.
+    assert(isInSILMode() && "sil should only be a keyword in SIL mode");
+    HadParseError = parseDeclSIL();
+    break;
+
   case tok::kw_subscript:
     HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
                                        !(Flags & PD_DisallowFuncDef),
