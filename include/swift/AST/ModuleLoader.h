@@ -82,6 +82,15 @@ public:
   /// \param result Will be populated with the results of name lookup.
   virtual void lookupMembers(Module *module, Type base, Identifier name,
                              SmallVectorImpl<ValueDecl*> &result) { }
+
+  /// \brief Look for a declaration of the given operator.
+  ///
+  /// \returns The operator decl, or null if this module does not define the
+  /// operator in question.
+  virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
+                                       DeclKind fixity) {
+    return nullptr;
+  }
 };
 
 }

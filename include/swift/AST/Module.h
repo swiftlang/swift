@@ -35,6 +35,7 @@ namespace swift {
   class BraceStmt;
   class Component;
   class Decl;
+  enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class IdentifierType;
   class InfixOperatorDecl;
@@ -316,6 +317,19 @@ public:
   // Inherited from Module.
   ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
+  /// Look up an operator declaration.
+  ///
+  /// \param name The operator name ("+", ">>", etc.)
+  ///
+  /// \param fixity One of PrefixOperator, InfixOperator, or PostfixOperator.
+  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+
+  /// Look up an operator declaration.
+  template <typename T>
+  T *lookupOperator(Identifier name) {
+    static_assert((T*){}, "Must specify prefix, postfix, or infix operator");
+  }
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
@@ -340,6 +354,18 @@ public:
     return DC->getContextKind() == DeclContextKind::ClangModule;
   }
 };
+
+template <>
+PrefixOperatorDecl *
+LoadedModule::lookupOperator<PrefixOperatorDecl>(Identifier name);
+
+template <>
+PostfixOperatorDecl *
+LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name);
+
+template <>
+InfixOperatorDecl *
+LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name);
 
 
 } // end namespace swift

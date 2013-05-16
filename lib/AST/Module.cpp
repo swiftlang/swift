@@ -296,7 +296,9 @@ Optional<OP_DECL *> lookupOperatorDeclForName(Module *M,
                           Identifier Name,
                           llvm::StringMap<OP_DECL *> TranslationUnit::*OP_MAP)
 {
-  // Only Swift TUs contain operators currently.
+  if (auto loadedModule = dyn_cast<LoadedModule>(M))
+    return loadedModule->lookupOperator<OP_DECL>(Name);
+
   auto *TU = dyn_cast<TranslationUnit>(M);
   if (!TU)
     return nullptr;
@@ -406,6 +408,32 @@ void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
 ArrayRef<ExtensionDecl*> LoadedModule::lookupExtensions(Type T) {
   return Owner.lookupExtensions(this, T);
 }
+
+OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
+  return Owner.lookupOperator(this, name, fixity);
+}
+
+template<>
+PrefixOperatorDecl *
+LoadedModule::lookupOperator<PrefixOperatorDecl>(Identifier name) {
+  auto result = lookupOperator(name, DeclKind::PrefixOperator);
+  return cast_or_null<PrefixOperatorDecl>(result);
+}
+
+template<>
+PostfixOperatorDecl *
+LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name) {
+  auto result = lookupOperator(name, DeclKind::PostfixOperator);
+  return cast_or_null<PostfixOperatorDecl>(result);
+}
+
+template<>
+InfixOperatorDecl *
+LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
+  auto result = lookupOperator(name, DeclKind::InfixOperator);
+  return cast_or_null<InfixOperatorDecl>(result);
+}
+
 
 
 //===----------------------------------------------------------------------===//

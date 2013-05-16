@@ -60,7 +60,7 @@ namespace swift {
 
   typedef llvm::PointerUnion<clang::Decl *, clang::MacroInfo *> ClangNode;
   
-enum class DeclKind {
+enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
 #define DECL_RANGE(Id, FirstId, LastId) \
   First_##Id##Decl = FirstId, Last_##Id##Decl = LastId,
