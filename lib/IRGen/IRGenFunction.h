@@ -146,6 +146,7 @@ public:
                         llvm::Value *&valueAddress);
 
   llvm::Value *emitTypeMetadataRef(CanType type);
+  llvm::Value *emitTypeMetadataRef(SILType type);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
 private:
@@ -173,12 +174,12 @@ public:
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
   void emitSupertoArchetypeConversion(Explosion &input,
-                                    CanType destType, Address outputArchetype);
+                                    SILType destType, Address outputArchetype);
 
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
   llvm::Value *emitUnconditionalDowncast(llvm::Value *from,
-                                         CanType toType);
+                                         SILType toType);
   
 
 //--- Declaration emission -----------------------------------------------------

@@ -16,6 +16,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #include "ASTVisitor.h"
@@ -658,9 +659,9 @@ void irgen::reemitAsSubstituted(IRGenFunction &IGF,
 
 
 void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
-                                                   CanType destType,
+                                                   SILType destType,
                                                    Address outputArchetype) {
-  assert(destType->is<ArchetypeType>() && "expected archetype type");
+  assert(destType.is<ArchetypeType>() && "expected archetype type");
   
   llvm::Value *superObject = input.claimNext();
   superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);

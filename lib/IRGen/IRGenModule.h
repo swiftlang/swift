@@ -387,7 +387,7 @@ public:
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ExplosionKind level);
-  llvm::Function *getAddrOfBridgeToBlockConverter(CanType blockType);
+  llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType);
 
   llvm::StringRef mangleType(CanType type,
                              llvm::SmallVectorImpl<char> &buffer);

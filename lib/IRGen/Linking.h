@@ -321,9 +321,9 @@ public:
     return entity;
   }
   
-  static LinkEntity forBridgeToBlockConverter(CanType type) {
+  static LinkEntity forBridgeToBlockConverter(SILType type) {
     LinkEntity entity;
-    entity.setForType(Kind::BridgeToBlockConverter, type);
+    entity.setForType(Kind::BridgeToBlockConverter, type.getSwiftRValueType());
     return entity;
   }
 

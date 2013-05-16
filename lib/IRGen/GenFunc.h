@@ -72,7 +72,7 @@ namespace irgen {
   /// Emit a call to convert a Swift closure to an Objective-C block via a
   /// shim function defined in Objective-C.
   void emitBridgeToBlock(IRGenFunction &IGF,
-                         CanType blockType,
+                         SILType blockType,
                          Explosion &swiftClosure,
                          Explosion &outBlock);
 

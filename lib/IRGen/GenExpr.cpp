@@ -19,6 +19,7 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILType.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -39,14 +40,14 @@ using namespace irgen;
 
 /// Emit a checked unconditional downcast.
 llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
-                                                      CanType toType) {
+                                                      SILType toType) {
   // Emit the value we're casting from.
   if (from->getType() != IGM.Int8PtrTy)
     from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
   
   // Emit a reference to the metadata.
   llvm::Value *metadataRef
-    = IGM.getAddrOfTypeMetadata(toType, false, false);
+    = IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(), false, false);
   if (metadataRef->getType() != IGM.Int8PtrTy)
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
   

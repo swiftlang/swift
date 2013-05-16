@@ -490,6 +490,10 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
   return EmitTypeMetadataRef(*this).visit(type);
 }
 
+llvm::Value *IRGenFunction::emitTypeMetadataRef(SILType type) {
+  return emitTypeMetadataRef(type.getSwiftRValueType());
+}
+
 /// Produce the heap metadata pointer for the given class type.  For
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class

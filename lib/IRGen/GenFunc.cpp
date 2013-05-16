@@ -1792,9 +1792,10 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
 }
 
 /// Fetch the declaration of the given block-to-
-llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(CanType blockType)
+llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType)
 {
-  LinkEntity entity = LinkEntity::forBridgeToBlockConverter(blockType);
+  LinkEntity entity
+    = LinkEntity::forBridgeToBlockConverter(blockType);
   
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -1821,7 +1822,7 @@ llvm::Function *IRGenModule::getAddrOfBridgeToBlockConverter(CanType blockType)
 /// Emit a call to convert a Swift closure to an Objective-C block via a
 /// shim function defined in Objective-C.
 void irgen::emitBridgeToBlock(IRGenFunction &IGF,
-                              CanType blockTy,
+                              SILType blockTy,
                               Explosion &swiftClosure,
                               Explosion &outBlock) {
   // Get the function pointer as an i8*.

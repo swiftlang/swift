@@ -1233,7 +1233,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
 void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(CurExplosionLevel);
-  emitBridgeToBlock(*this, i->getType().getSwiftType(), from, to);
+  emitBridgeToBlock(*this, i->getType(), from, to);
   newLoweredExplosion(SILValue(i, 0), to);
 }
 
@@ -1262,9 +1262,8 @@ void IRGenSILFunction::visitSuperToArchetypeInst(swift::SuperToArchetypeInst *i)
 {
   Address archetype = getLoweredAddress(i->getDestArchetypeAddress());
   Explosion super = getLoweredExplosion(i->getSrcBase());
-  emitSupertoArchetypeConversion(super,
-                   i->getDestArchetypeAddress().getType().getSwiftRValueType(),
-                   archetype);
+  emitSupertoArchetypeConversion(super, i->getDestArchetypeAddress().getType(),
+                                 archetype);
 }
 
 void IRGenSILFunction::visitIsaInst(swift::IsaInst *i) {
@@ -1315,7 +1314,7 @@ void IRGenSILFunction::visitDowncastInst(swift::DowncastInst *i) {
   llvm::Value *fromValue = from.claimNext();
   llvm::Value *castValue = emitUnconditionalDowncast(
                                               fromValue,
-                                              i->getType().getSwiftType());
+                                              i->getType());
   to.add(castValue);
   newLoweredExplosion(SILValue(i, 0), to);
 }
