@@ -11,14 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "ModuleFormat.h"
+#include "ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SourceMgr.h"
@@ -138,7 +137,6 @@ Module *SerializedModuleLoader::error(AccessPathElem moduleID) {
 
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            Module::AccessPathTy path) {
-  using namespace serialization;
 
   // FIXME: Swift submodules?
   if (path.size() > 1)
@@ -155,87 +153,22 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
     return nullptr;
   }
-
   assert(inputFile);
-  auto start =
-    reinterpret_cast<const unsigned char *>(inputFile->getBufferStart());
-  auto end =
-    reinterpret_cast<const unsigned char *>(inputFile->getBufferEnd());
-  llvm::BitstreamReader reader(start, end);
-  llvm::BitstreamCursor cursor(reader);
-
-  for (unsigned char byte : SIGNATURE) {
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
-      return error(moduleID);
-  }
-
-  // Future-proofing: make sure we validate the control block before we try to
-  // read any other blocks.
-  bool hasValidControlBlock = false;
-
-  // FIXME: Hack to get the interesting case up and running.
-  SmallVector<uint64_t, 64> scratch;
-  SmallVector<StringRef, 4> inputFilePaths;
-
-  auto topLevelEntry = cursor.advance();
-  while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
-    switch (topLevelEntry.ID) {
-    case llvm::bitc::BLOCKINFO_BLOCK_ID:
-      if (cursor.ReadBlockInfoBlock())
-        return error(moduleID);
-      break;
-
-    case CONTROL_BLOCK_ID:
-      // FIXME: Actually validate the control block.
-      if (cursor.SkipBlock())
-        return error(moduleID);
-      hasValidControlBlock = true;
-      break;
-
-    case INPUT_BLOCK_ID: {
-      cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      // FIXME: Hack to get the interesting case up and running.
-      auto next = cursor.advance();
-      while (next.Kind == llvm::BitstreamEntry::Record) {
-        scratch.clear();
-        StringRef blobData;
-        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
-        switch (kind) {
-        case input_block::SOURCE_FILE:
-          assert(scratch.empty());
-          inputFilePaths.push_back(blobData);
-          break;
-        default:
-          // Unknown input kind, possibly for use by a future version of the
-          // module format.
-          // FIXME: Should we warn about this?
-          break;
-        }
-
-        next = cursor.advance();
-      }
-
-      if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        return error(moduleID);
-
-      break;
-    }
-
-    default:
-      // Unknown top-level block, possibly for use by a future version of the
-      // module format.
-      if (cursor.SkipBlock())
-        return error(moduleID);
-      break;
-    }
-
-    topLevelEntry = cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
-  }
-
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+  
+  Module *result;
+  llvm::OwningPtr<ModuleFile> loadedModuleFile;
+  switch (ModuleFile::load(std::move(inputFile), loadedModuleFile)) {
+  case ModuleStatus::Valid:
+    llvm_unreachable("non-fallback modules not supported yet!");
+  case ModuleStatus::FallBackToTranslationUnit:
+    result = makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
+    break;
+  case ModuleStatus::FormatTooNew:
+    // FIXME: "version mismatch" should have a different error from "malformed".
     return error(moduleID);
+  case ModuleStatus::Malformed:
+    return error(moduleID);
+  }
 
-  // FIXME: At least /pretend/ to be a LoadedModule.
-  auto module = makeTU(Ctx, moduleID, inputFilePaths);
-  return module;
+  return result;
 }
