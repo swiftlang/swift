@@ -246,8 +246,7 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
 
   // Map the indirect return if present.
   emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-    return requiresExternalIndirectResult(IGF.IGM,
-                                  funcTI->getResultType().getSwiftRValueType());
+    return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
   });
   
   assert((funcTI->getUncurryLevel() == 0 || funcTI->getUncurryLevel() == 1)
@@ -294,8 +293,7 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
     Explosion argExplosion(IGF.CurExplosionLevel);
     
     // Load and explode an argument that is 'byval' in the C calling convention.
-    if (requiresExternalByvalArgument(IGF.IGM,
-                                      arg->getType().getSwiftRValueType())) {
+    if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
       Address byval = argType.getAddressForPointer(params.claimNext());
       argType.load(IGF, byval, argExplosion);
     } else {

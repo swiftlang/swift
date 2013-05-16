@@ -79,12 +79,14 @@ namespace irgen {
   /// Does an ObjC method or C function returning the given type require an
   /// sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
-                                                    CanType type);
+                                                    SILType type);
   
   /// Does an argument of this type need to be passed by value on the stack to
   /// C or ObjC arguments?
   llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
                                                    CanType type);
+  llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
+                                                   SILType type);
   
   /// Add function attributes to an attribute set for an indirect return
   /// argument.

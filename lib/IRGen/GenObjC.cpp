@@ -440,7 +440,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                       ExtraData::None,
                                       attrs);
   bool indirectResult = requiresExternalIndirectResult(IGF.IGM,
-                                     substResultType.getSwiftRValueType());
+                                                       substResultType);
   if (isSuper)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 

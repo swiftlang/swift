@@ -1326,9 +1326,10 @@ static bool isLeftToRight(AbstractCC cc) {
 /// Does an ObjC method or C function returning the given type require an
 /// sret indirect result?
 llvm::PointerType *irgen::requiresExternalIndirectResult(IRGenModule &IGM,
-                                                         CanType type) {
+                                                         SILType type) {
   // FIXME: we need to consider the target's C calling convention.
-  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+  return IGM.requiresIndirectResult(type.getSwiftRValueType(),
+                                    ExplosionKind::Minimal);
 }
 
 /// Does an argument of this type need to be passed by value on the stack to
@@ -1337,6 +1338,11 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
                                                         CanType type) {
   // FIXME: we need to consider the target's C calling convention.
   return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+}
+
+llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
+                                                        SILType type) {
+  return requiresExternalByvalArgument(IGM, type.getSwiftRValueType());
 }
 
 void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
