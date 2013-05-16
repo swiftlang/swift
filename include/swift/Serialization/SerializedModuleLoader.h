@@ -50,13 +50,6 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual Module *
   loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
-
-private:
-  /// Report an error in reading a module file.
-  ///
-  /// \returns A dummy module, to prevent reloadeding 
-  // FIXME: This should move to a dedicated Reader class.
-  Module *error(std::pair<Identifier, SourceLoc> importLoc);
 };
 
 }

@@ -124,14 +124,25 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
 }
 
 
-Module *SerializedModuleLoader::error(AccessPathElem moduleID) {
-  Ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
+static Module *error(SerializedModuleLoader &owner, ASTContext &ctx,
+                     AccessPathElem moduleID, ModuleStatus reason) {
+  switch (reason) {
+  case ModuleStatus::Valid:
+  case ModuleStatus::FallBackToTranslationUnit:
+    llvm_unreachable("not an error");
+  case ModuleStatus::Malformed:
+    ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
+    break;
+  case ModuleStatus::FormatTooNew:
+    ctx.Diags.diagnose(moduleID.second, diag::serialization_module_too_new);
+    break;
+  }
 
   // Return a dummy module to avoid future errors.
-  auto comp = new (Ctx.Allocate<Component>(1)) Component();
-  auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first, comp);
+  auto comp = new (ctx.Allocate<Component>(1)) Component();
+  auto module = new (ctx) SerializedModule(ctx, owner, moduleID.first, comp);
 
-  Ctx.LoadedModules[moduleID.first.str()] = module;
+  ctx.LoadedModules[moduleID.first.str()] = module;
   return module;
 }
 
@@ -157,17 +168,16 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   
   Module *result;
   llvm::OwningPtr<ModuleFile> loadedModuleFile;
-  switch (ModuleFile::load(std::move(inputFile), loadedModuleFile)) {
+  ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
+  switch (err) {
   case ModuleStatus::Valid:
     llvm_unreachable("non-fallback modules not supported yet!");
   case ModuleStatus::FallBackToTranslationUnit:
     result = makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
     break;
   case ModuleStatus::FormatTooNew:
-    // FIXME: "version mismatch" should have a different error from "malformed".
-    return error(moduleID);
   case ModuleStatus::Malformed:
-    return error(moduleID);
+    return error(*this, Ctx, moduleID, err);
   }
 
   return result;
