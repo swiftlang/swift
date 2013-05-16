@@ -45,6 +45,10 @@ class Lexer {
   /// InSILMode - This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
   bool InSILMode;
+
+  /// InSILBody - This is true when we're lexing the body of a SIL declaration
+  /// in a SIL file.  This enables some context-sensitive lexing.
+  bool InSILBody = false;
   
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -138,6 +142,22 @@ public:
   tok getTokenKind(StringRef Text);
   
   void lexHexNumber();
+
+  /// SILBodyRAII - This helper class is used when parsing a SIL body to inform
+  /// the lexer that SIL-specific lexing should be enabled.
+  struct SILBodyRAII {
+    Lexer &L;
+    SILBodyRAII(Lexer &L) : L(L) {
+      assert(!L.InSILBody && "Already in a sil body?");
+      L.InSILBody = true;
+    }
+    ~SILBodyRAII() {
+      assert(L.InSILBody && "Left sil body already?");
+      L.InSILBody = false;
+    }
+    SILBodyRAII(const SILBodyRAII&) = delete;
+    void operator=(const SILBodyRAII&) = delete;
+  };
 
 private:
   void lexImpl();

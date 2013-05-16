@@ -79,25 +79,28 @@ IDENTIFIER_KEYWORD(this)
 IDENTIFIER_KEYWORD(This)
 
 // Punctuators.
-PUNCTUATOR(l_paren,  "(")
-PUNCTUATOR(r_paren,     ")")
-PUNCTUATOR(l_brace,     "{")
-PUNCTUATOR(r_brace,     "}")
-PUNCTUATOR(l_square, "[")
-PUNCTUATOR(r_square,    "]")
+PUNCTUATOR(l_paren,       "(")
+PUNCTUATOR(r_paren,       ")")
+PUNCTUATOR(l_brace,       "{")
+PUNCTUATOR(r_brace,       "}")
+PUNCTUATOR(l_square,      "[")
+PUNCTUATOR(r_square,      "]")
 
-PUNCTUATOR(period,      ".")
+PUNCTUATOR(period,        ".")
 PUNCTUATOR(period_prefix, ".")
-PUNCTUATOR(comma,       ",")
-PUNCTUATOR(colon,       ":")
-PUNCTUATOR(semi,        ";")
-PUNCTUATOR(equal,       "=")
-PUNCTUATOR(ellipsis,    "...")
+PUNCTUATOR(comma,         ",")
+PUNCTUATOR(colon,         ":")
+PUNCTUATOR(semi,          ";")
+PUNCTUATOR(equal,         "=")
+PUNCTUATOR(ellipsis,      "...")
 
-PUNCTUATOR(amp_prefix,  "&")
-PUNCTUATOR(arrow,       "->")
+PUNCTUATOR(amp_prefix,    "&")
+PUNCTUATOR(arrow,         "->")
 
-PUNCTUATOR(question,    "?")
+PUNCTUATOR(question,      "?")
+
+PUNCTUATOR(sil_at_sign,   "@")    // Only in SIL mode.
+PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
 
 #undef KEYWORD
 #undef IDENTIFIER_KEYWORD

@@ -1,2 +1,5 @@
 // RUN: %swift %s -emit-sil
 
+sil @top_level_code : $() -> () {
+}
+

@@ -37,6 +37,7 @@ namespace swift {
   struct TypeLoc;
   class TupleType;
   class SILModule;
+  class SILType;
   
   struct OneOfElementInfo;
   
@@ -285,7 +286,6 @@ public:
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
-  bool parseDeclSIL();
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);
@@ -320,6 +320,13 @@ public:
                                        SourceLoc InfixLoc,
                                        Identifier Name,
                                        SourceLoc NameLoc);
+
+  //===--------------------------------------------------------------------===//
+  // SIL Parsing.
+
+  bool parseDeclSIL();
+  bool parseSILType(SILType &Type);
+
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

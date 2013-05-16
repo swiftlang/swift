@@ -622,7 +622,11 @@ void Lexer::lexOperatorIdentifier() {
 void Lexer::lexDollarIdent() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '$');
-  
+
+  // In a SIL function body, '$' is a token by itself.
+  if (InSILBody)
+    return formToken(tok::sil_dollar, TokStart);
+
   // Lex [a-zA-Z_$0-9]*
   while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
     ++CurPtr;
@@ -1177,6 +1181,7 @@ Restart:
       validateUTF8CharacterAndAdvance(tmp, BufferEnd);
       diagnose(CurPtr-1, diag::lex_invalid_character);
     }
+
     CurPtr = tmp;
     return formToken(tok::unknown, TokStart);
   }
@@ -1222,7 +1227,13 @@ Restart:
   case ';': return formToken(tok::semi,     TokStart);
   case ':': return formToken(tok::colon,    TokStart);
   case '?': return formToken(tok::question, TokStart);
-      
+
+  case '@':
+    // @ is only a token in SIL mode.
+    if (InSILMode)
+      return formToken(tok::sil_at_sign, TokStart);
+    return formToken(tok::unknown, TokStart);
+
   // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
