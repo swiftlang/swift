@@ -42,14 +42,13 @@ enum class SILLinkage : unsigned char {
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
 class SILFunction
-  : public llvm::ilist_node<SILFunction>, SILAllocated<SILFunction> {
+  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
 private:
   friend class SILBasicBlock;
   friend class SILModule;
-  friend class Lowering::SILGenModule;
 
   /// ModuleAndLinkage - The SIL module that the function belongs to, and
   /// the function's linkage.
