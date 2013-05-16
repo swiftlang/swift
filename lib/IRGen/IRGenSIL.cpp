@@ -155,6 +155,157 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   return phis;
 }
 
+static void emitEntryPointIndirectReturn(IRGenSILFunction &IGF,
+                                 SILBasicBlock *entry,
+                                 Explosion &params,
+                                 SILFunctionTypeInfo *funcTI,
+                                 std::function<bool()> requiresIndirectResult) {
+  // Map the indirect return if present.
+  if (funcTI->hasIndirectReturn()) {
+    SILArgument *ret = entry->bbarg_end()[-1];
+    SILValue retv(ret, 0);
+    TypeInfo const &retType = IGF.IGM.getFragileTypeInfo(ret->getType());
+    
+    IGF.newLoweredAddress(retv, retType.getAddressForPointer(params.claimNext()));
+  } else {
+    // Map an indirect return for a type SIL considers loadable but still
+    // requires an indirect return at the IR level.
+    if (requiresIndirectResult()) {
+      TypeInfo const &retType = IGF.IGM.getFragileTypeInfo(funcTI->getResultType());
+      IGF.IndirectReturn = retType.getAddressForPointer(params.claimNext());
+    }
+  }  
+}
+
+/// Emit entry point arguments for a SILFunction with the Swift calling
+/// convention.
+static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
+                                            SILBasicBlock *entry,
+                                            Explosion &params,
+                                            SILType funcTy) {
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+  
+  // Map the indirect return if present.
+  emitEntryPointIndirectReturn(IGF, entry, params, funcTI,
+    [&]() -> bool {
+      TypeInfo const &retType = IGF.IGM.getFragileTypeInfo(funcTI->getResultType());
+      ExplosionSchema schema = retType.getSchema(IGF.CurExplosionLevel);
+     
+      return schema.requiresIndirectResult();
+    });
+
+  // Unravel the function types for each uncurry level.
+  unsigned level = funcTI->getUncurryLevel();
+  llvm::SmallVector<AnyFunctionType*, 4> uncurriedTypes;
+  AnyFunctionType *uncurriedType = funcTy.castTo<AnyFunctionType>();
+  for (;;) {
+    uncurriedTypes.push_back(uncurriedType);
+    if (level-- != 0)
+      uncurriedType = uncurriedType->getResult()->castTo<AnyFunctionType>();
+    else
+      break;
+  }
+
+  // Map LLVM arguments in inner-to-outer curry order to match the Swift
+  // convention.
+  level = funcTI->getUncurryLevel();
+  do {
+    unsigned from = funcTI->getUncurriedInputBegins()[level],
+      to = funcTI->getUncurriedInputEnds()[level];
+    for (auto argi = entry->bbarg_begin() + from,
+           argend = entry->bbarg_begin() + to;
+         argi != argend; ++argi) {
+      SILArgument *arg = *argi;
+      SILValue argv(arg, 0);
+      TypeInfo const &argType = IGF.getFragileTypeInfo(arg->getType());
+      if (arg->getType().isAddress()) {
+        IGF.newLoweredAddress(argv,
+                              argType.getAddressForPointer(params.claimNext()));
+        continue;
+      }
+      Explosion explosion(IGF.CurExplosionLevel);
+      argType.reexplode(IGF, params, explosion);
+      IGF.newLoweredExplosion(arg, explosion);
+    }
+    
+    // Bind polymorphic arguments for this uncurry level.
+    auto fn = uncurriedTypes.back();
+    uncurriedTypes.pop_back();
+    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fn))
+      emitPolymorphicParameters(IGF, polyFn, params);
+  } while (level-- != 0);
+}
+
+/// Emit entry point arguments for a SILFunction with the C/ObjC calling
+/// convention.
+static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
+                                       SILBasicBlock *entry,
+                                       Explosion &params,
+                                       SILType funcTy) {
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+
+  // Map the indirect return if present.
+  emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
+    return requiresExternalIndirectResult(IGF.IGM,
+                                  funcTI->getResultType().getSwiftRValueType());
+  });
+  
+  assert((funcTI->getUncurryLevel() == 0 || funcTI->getUncurryLevel() == 1)
+         && "invalid uncurry level for foreign function");
+  
+  ArrayRef<SILType> inputTypes;
+  unsigned argOffset;
+  
+  // An ObjC method is represented as a curried function type with the 'self'
+  // argument as the first argument clause.
+  if (funcTI->getUncurryLevel() == 1) {
+    // Map the self argument.
+    assert(funcTI->getInputTypesForCurryLevel(0).size() == 1
+           && "should only have 'self' in first argument clause");
+    unsigned selfOffset = funcTI->getUncurriedInputBegins()[0];
+    SILArgument *selfArg = entry->bbarg_begin()[selfOffset];
+    TypeInfo const &selfType = IGF.getFragileTypeInfo(selfArg->getType());
+    Explosion self(IGF.CurExplosionLevel);
+    selfType.reexplode(IGF, params, self);
+    IGF.newLoweredExplosion(selfArg, self);
+    
+    // Discard the _cmd argument.
+    params.claimNext();
+    
+    inputTypes = funcTI->getInputTypesForCurryLevel(1);
+    argOffset = funcTI->getUncurriedInputBegins()[1];
+  } else {
+    inputTypes = funcTI->getInputTypesForCurryLevel(0);
+    argOffset = funcTI->getUncurriedInputBegins()[0];
+  }
+
+  // Map the arguments.
+  for (SILType inputType : inputTypes) {
+    (void)inputType;
+    
+    SILArgument *arg = entry->bbarg_begin()[argOffset++];
+    TypeInfo const &argType = IGF.getFragileTypeInfo(arg->getType());
+    if (arg->getType().isAddress()) {
+      IGF.newLoweredAddress(arg,
+                            argType.getAddressForPointer(params.claimNext()));
+      continue;
+    }
+    
+    Explosion argExplosion(IGF.CurExplosionLevel);
+    
+    // Load and explode an argument that is 'byval' in the C calling convention.
+    if (requiresExternalByvalArgument(IGF.IGM,
+                                      arg->getType().getSwiftRValueType())) {
+      Address byval = argType.getAddressForPointer(params.claimNext());
+      argType.load(IGF, byval, argExplosion);
+    } else {
+      argType.reexplode(IGF, params, argExplosion);
+    }
+    
+    IGF.newLoweredExplosion(arg, argExplosion);
+  }
+}
+
 void IRGenSILFunction::emitSILFunction() {
   DEBUG(llvm::dbgs() << "emitting SIL function: ";
         CurSILFn->printName(llvm::dbgs());
@@ -181,66 +332,16 @@ void IRGenSILFunction::emitSILFunction() {
   // Map the LLVM arguments to arguments on the entry point BB.
   Explosion params = collectParameters();
   SILType funcTy = CurSILFn->getLoweredType();
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
-  
-  // Map the indirect return if present.
-  if (funcTI->hasIndirectReturn()) {
-    SILArgument *ret = entry->first->bbarg_end()[-1];
-    SILValue retv(ret, 0);
-    TypeInfo const &retType = IGM.getFragileTypeInfo(ret->getType());
-    
-    newLoweredAddress(retv, retType.getAddressForPointer(params.claimNext()));
-  } else {
-    // Map an indirect return for a type SIL considers loadable but still
-    // requires an indirect return at the IR level.
-    TypeInfo const &retType = IGM.getFragileTypeInfo(funcTI->getResultType());
-    ExplosionSchema schema = retType.getSchema(CurExplosionLevel);
-    
-    if (schema.requiresIndirectResult()) {
-      IndirectReturn = retType.getAddressForPointer(params.claimNext());
-    }
-  }
 
-  // Unravel the function types for each uncurry level.
-  unsigned level = CurSILFn->getLoweredType().getUncurryLevel();
-  llvm::SmallVector<AnyFunctionType*, 4> uncurriedTypes;
-  AnyFunctionType *uncurriedType = funcTy.castTo<AnyFunctionType>();
-  for (;;) {
-    uncurriedTypes.push_back(uncurriedType);
-    if (level-- != 0)
-      uncurriedType = uncurriedType->getResult()->castTo<AnyFunctionType>();
-    else
-      break;
+  switch (CurSILFn->getAbstractCC()) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    emitEntryPointArgumentsNativeCC(*this, entry->first, params, funcTy);
+    break;
+  case AbstractCC::C:
+    emitEntryPointArgumentsCCC(*this, entry->first, params, funcTy);
+    break;
   }
-
-  // Map LLVM arguments in inner-to-outer curry order to match the Swift
-  // convention.
-  level = CurSILFn->getLoweredType().getUncurryLevel();
-  do {
-    unsigned from = funcTI->getUncurriedInputBegins()[level],
-      to = funcTI->getUncurriedInputEnds()[level];
-    for (auto argi = entry->first->bbarg_begin() + from,
-           argend = entry->first->bbarg_begin() + to;
-         argi != argend; ++argi) {
-      SILArgument *arg = *argi;
-      SILValue argv(arg, 0);
-      TypeInfo const &argType = IGM.getFragileTypeInfo(arg->getType());
-      if (arg->getType().isAddress()) {
-        newLoweredAddress(argv,
-                   argType.getAddressForPointer(params.claimNext()));
-      } else {
-        Explosion explosion(CurExplosionLevel);
-        argType.reexplode(*this, params, explosion);
-        newLoweredExplosion(arg, explosion);
-      }
-    }
-    
-    // Bind polymorphic arguments for this uncurry level.
-    auto fn = uncurriedTypes.back();
-    uncurriedTypes.pop_back();
-    if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fn))
-      emitPolymorphicParameters(*this, polyFn, params);    
-  } while (level-- != 0);
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
   
@@ -779,17 +880,31 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
   Builder.CreateUnreachable();
 }
 
-void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
-  Explosion result = getLoweredExplosion(i->getOperand());
+static void emitReturnInst(IRGenSILFunction &IGF,
+                           SILType resultTy,
+                           Explosion &result) {
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
-  if (IndirectReturn.isValid()) {
-    TypeInfo const &retType = IGM.getFragileTypeInfo(
-                                 i->getOperand().getType());
-    retType.initialize(*this, result, IndirectReturn);
-    Builder.CreateRetVoid();
-  } else
-    emitScalarReturn(result);
+  if (IGF.IndirectReturn.isValid()) {
+    TypeInfo const &retType = IGF.getFragileTypeInfo(resultTy);
+    retType.initialize(IGF, result, IGF.IndirectReturn);
+    IGF.Builder.CreateRetVoid();
+  } else {
+    IGF.emitScalarReturn(result);
+  }
+}
+
+void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
+  Explosion result = getLoweredExplosion(i->getOperand());
+  emitReturnInst(*this, i->getOperand().getType(), result);
+}
+
+void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
+  Explosion result = getLoweredExplosion(i->getOperand());
+  assert(result.size() == 1 &&
+         "should have one objc pointer value for autorelease_return");
+  emitObjCAutoreleaseReturnValue(*this, result.getAll()[0]);
+  emitReturnInst(*this, i->getOperand().getType(), result);
 }
 
 // Add branch arguments to destination phi nodes.

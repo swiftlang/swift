@@ -520,15 +520,40 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
                        llvm::AttributeSet &attrs) {
   auto fn = cast<AnyFunctionType>(type);
 
-  // Save up the formal parameter types in reverse order.
-  llvm::SmallVector<AnyFunctionType*, 8> formalFnTypes(uncurryLevel + 1);
-  formalFnTypes[uncurryLevel] = fn;
-  while (uncurryLevel--) {
-    fn = cast<AnyFunctionType>(CanType(fn->getResult()));
+  // Save up the formal parameter types.
+  llvm::SmallVector<AnyFunctionType*, 8> formalFnTypes;
+  switch (cc) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    formalFnTypes.resize(uncurryLevel+1);
+    // Save the parameter types in reverse order.
     formalFnTypes[uncurryLevel] = fn;
+    while (uncurryLevel--) {
+      fn = cast<AnyFunctionType>(CanType(fn->getResult()));
+      formalFnTypes[uncurryLevel] = fn;
+    }
+    break;
+
+  case AbstractCC::C:
+    // A C/ObjC function should have either one uncurry level (for a standalone
+    // function) or two (for an ObjC method). In the former case, we handle the
+    // first uncurry level specially so that we can drop in the magic '_cmd'
+    // argument.
+    assert((uncurryLevel == 0 || uncurryLevel == 1)
+           && "unexpected uncurry level for C calling conv");
+    if (uncurryLevel == 1) {
+      // self
+      decomposeFunctionArg(IGM, CanType(fn->getInput()), cc, explosionKind,
+                           argTypes, byvals, attrs);
+      // _cmd
+      argTypes.push_back(IGM.Int8PtrTy);
+      fn = cast<AnyFunctionType>(CanType(fn->getResult()));
+    }
+    formalFnTypes.push_back(fn);
+    break;
   }
 
-  // Explode the argument clusters in that reversed order.
+  // Explode the argument clusters.
   for (AnyFunctionType *fnTy : formalFnTypes) {
     CanType inputTy = CanType(fnTy->getInput());
     if (TupleType *tupleTy = inputTy->getAs<TupleType>()) {
@@ -1563,11 +1588,6 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
     
-  // FIXME: Ignore FFI thunks for now. IRGenSILFunction doesn't know how to
-  // emit them correctly.
-  if (f->getAbstractCC() == AbstractCC::C)
-    return;
-  
   // FIXME: Emit all needed explosion levels.
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   IRGenSILFunction(*this, f, explosionLevel).emitSILFunction();

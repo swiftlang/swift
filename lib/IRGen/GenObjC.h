@@ -60,6 +60,10 @@ namespace irgen {
   llvm::Value *emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
                                                      llvm::Value *value);
 
+  /// Autorelease a return value.
+  llvm::Value *emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
+                                              llvm::Value *value);
+
   /// Build the components of an Objective-C method descriptor for the given
   /// method implementation.
   void emitObjCMethodDescriptorParts(IRGenModule &IGM,

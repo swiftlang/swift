@@ -533,9 +533,10 @@ public:
   void visitIndexAddrInst(IndexAddrInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
-  void visitReturnInst(ReturnInst *i);
   void visitBranchInst(BranchInst *i);
   void visitCondBranchInst(CondBranchInst *i);
+  void visitReturnInst(ReturnInst *i);
+  void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
 };
 
 } // end namespace irgen

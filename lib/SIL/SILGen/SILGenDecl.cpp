@@ -833,6 +833,8 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd, fd->getBody());
+    if (requiresObjCMethodEntryPoint(fd))
+      SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
     SGM.emitConstructor(cd);
@@ -843,7 +845,11 @@ public:
   
   // no-ops. We don't deal with the layout of types here.
   void visitPatternBindingDecl(PatternBindingDecl *) {}
-  void visitVarDecl(VarDecl *) {}
+  
+  void visitVarDecl(VarDecl *vd) {
+    if (requiresObjCPropertyEntryPoints(vd))
+      SGM.emitObjCPropertyMethodThunks(vd);
+  }
 };
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {

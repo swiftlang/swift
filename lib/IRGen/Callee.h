@@ -94,59 +94,12 @@ namespace irgen {
                                                   ValueDecl *func);
   };
 
-  class OwnershipConventions {
-  protected:
-    ~OwnershipConventions() = default;
-  public:
-    virtual bool isResultAutoreleased(IRGenModule &IGM,
-                                      const Callee &callee) const = 0;
-
-    /// Collect the indexes of all the consumed arguments in the given
-    /// callee.  These are indexes into the explosion schema of the
-    /// callee's appropriately-uncurried original formal type.
-    ///
-    /// \param set - initially empty; filled with indexes in increasing
-    ///   order
-    virtual void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
-                           llvm::SmallVectorImpl<unsigned> &set) const = 0;
-
-
-    /// A buffer for allocating an OwnershipConventions object into.
-    class Buffer {
-      void *Storage[4];
-
-    public:
-      /// Set a new object into this buffer.  The caller is responsible
-      /// for ensuring that an object isn't already allocated here.
-      template <class T, class... Args> T &set(Args &&...args) {
-        static_assert(sizeof(T) <= sizeof(Storage),
-                      "conventions type overruns buffer size");
-        static_assert(alignof(T) <= alignof(void*),
-                      "conventions type requires extra alignment");
-        static_assert(std::is_trivially_destructible<T>::value,
-                      "conventions type has non-trivial destructor");
-        return *new (&Storage) T(std::forward<Args>(args)...);
-      }
-
-      /// Return a pointer to the object allocated in this buffer.
-      /// The caller is responsible for ensuring that an object has
-      /// actually been so allocated.
-      const OwnershipConventions &get() const {
-        return reinterpret_cast<const OwnershipConventions &>(Storage);
-      }
-    };
-  };
-
   class Callee {
     /// The explosion level to use for this function.
     ExplosionKind ExplosionLevel;
 
     /// The abstract calling convention used by this function.
     AbstractCC Convention;
-
-    /// Whether this function has non-standard ownership conventions.
-    /// If true, OwnershipConventions will be appropriately initialized.
-    bool HasOwnershipConventions;
 
     /// The number of function applications at which this function is
     /// being called.
@@ -168,9 +121,6 @@ namespace irgen {
     /// The archetype substitutions under which the function is being
     /// called.
     std::vector<Substitution> Substitutions;
-
-    /// A buffer for storing an OwnershipConventions implementation.
-    OwnershipConventions::Buffer OwnershipConventionsBuffer;
 
   public:
     Callee() = default;
@@ -234,7 +184,6 @@ namespace irgen {
 
       Callee result;
       result.ExplosionLevel = explosionLevel;
-      result.HasOwnershipConventions = false;
       result.Convention = convention;
       result.UncurryLevel = uncurryLevel;
       result.OrigFormalType = origFormalType;
@@ -268,23 +217,6 @@ namespace irgen {
 
     /// Return the data pointer as a %swift.refcounted*.
     llvm::Value *getDataPointer(IRGenFunction &IGF) const;
-
-    /// Construct an OwnershipConventions in this callee.
-    template <class T, class... Args>
-    T &setOwnershipConventions(Args &&...args) {
-      assert(!HasOwnershipConventions);
-      HasOwnershipConventions = true;
-      return OwnershipConventionsBuffer.set<T>(std::forward<Args>(args)...);
-    }
-
-    bool hasOwnershipConventions() const {
-      return HasOwnershipConventions;
-    }
-
-    const OwnershipConventions &getOwnershipConventions() const {
-      assert(HasOwnershipConventions);
-      return OwnershipConventionsBuffer.get();
-    }
   };
 
 } // end namespace irgen

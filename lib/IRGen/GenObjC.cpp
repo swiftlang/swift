@@ -187,7 +187,7 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
 }
 
 /// Autorelease a return value.
-static llvm::Value *emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
+llvm::Value *irgen::emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
                                                    llvm::Value *value) {
   auto fn = IGF.IGM.getObjCAutoreleaseReturnValueFn();
   fn = getCastOfRetainFn(IGF.IGM, fn, value->getType());
@@ -197,7 +197,6 @@ static llvm::Value *emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
   call->setTailCall(); // force tail calls at -O0
   return call;
 }
-
 
 namespace {
   /// A type-info implementation suitable for an ObjC pointer type.
@@ -429,130 +428,7 @@ namespace {
 
 #undef FOREACH_FAMILY
   };
-
-
-  /// Ownership conventions derived from a Clang method declaration.
-  class ObjCMethodConventions : public OwnershipConventions {
-    clang::ObjCMethodDecl *Method;
-  public:
-    ObjCMethodConventions(clang::ObjCMethodDecl *method)
-      : Method(method) {}
-
-    bool isResultAutoreleased(IRGenModule &IGM,
-                              const Callee &callee) const override {
-      return (Method->getResultType()->isObjCRetainableType() &&
-              !Method->hasAttr<clang::NSReturnsRetainedAttr>());
-    }
-
-    void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
-                         SmallVectorImpl<unsigned> &set) const override {
-      // 'self'
-      if (Method->hasAttr<clang::NSConsumesSelfAttr>())
-        set.push_back(0);
-
-      // Formal parameters.
-      unsigned nextArgIndex = 2;
-      unsigned methodParamIndex = 0;
-
-      auto type = cast<FunctionType>(callee.getOrigFormalType());
-      type = cast<FunctionType>(CanType(type->getResult()));
-      addConsumedArgs(IGM, callee, set, CanType(type->getInput()),
-                      nextArgIndex, methodParamIndex);
-    }
-
-    void addConsumedArgs(IRGenModule &IGM, const Callee &callee,
-                         SmallVectorImpl<unsigned> &set, CanType argType,
-                         unsigned &nextArgIndex,
-                         unsigned &methodParamIndex) const {
-      if (auto tuple = dyn_cast<TupleType>(argType)) {
-        for (auto &elt : tuple->getFields()) {
-          addConsumedArgs(IGM, callee, set, CanType(elt.getType()),
-                          nextArgIndex, methodParamIndex);
-        }
-        return;
-      }
-
-      assert(methodParamIndex < Method->param_size());
-      auto param = *(Method->param_begin() + methodParamIndex);
-      assert(param);
-      if (param->hasAttr<clang::NSConsumedAttr>()) {
-        set.push_back(nextArgIndex++);
-      } else {
-        nextArgIndex +=
-          IGM.getExplosionSize(argType, callee.getExplosionLevel());
-      }
-      methodParamIndex++;
-    }
-  };
-
-  /// Ownership conventions derived from a selector family.
-  class ObjCSelectorConventions : public OwnershipConventions {
-    CanType SubstResultType;
-    Selector::Family Family;
-  public:
-    ObjCSelectorConventions(CanType substResultType, Selector::Family family)
-      : SubstResultType(substResultType), Family(family) {}
-
-    bool isResultAutoreleased(IRGenModule &IGM,
-                              const Callee &callee) const override {
-      // If the result type isn't a retainable object pointer, this
-      // isn't applicable.
-      if (!SubstResultType->getClassOrBoundGenericClass())
-        return false;
-
-      switch (Family) {
-      case Selector::Family::Alloc:
-      case Selector::Family::Init:
-      case Selector::Family::Copy:
-      case Selector::Family::MutableCopy:
-      case Selector::Family::New:
-        return false;
-
-      case Selector::Family::None:
-        return true;
-      }
-      llvm_unreachable("bad selector family!");
-    }
-
-    void getConsumedArgs(IRGenModule &IGM, const Callee &callee,
-                         SmallVectorImpl<unsigned> &set) const override {
-      // The only conventionally-consumed argument is an init method's self.
-      if (Family == Selector::Family::Init)
-        set.push_back(0);
-    }
-  };
 }
-
-/// Try to find a clang method declaration for the given function.
-/// FIXME: Should do the same for C functions that take ObjC pointer args.
-static clang::ObjCMethodDecl *findClangMethod(ValueDecl *method) {
-  if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
-    if (auto decl = methodFn->getClangDecl())
-      return cast<clang::ObjCMethodDecl>(decl);
-
-    if (auto overridden = methodFn->getOverriddenDecl())
-      return findClangMethod(overridden);
-  }
-
-  return nullptr;
-}
-
-/// Set the appropriate ownership conventions for an Objective-C
-/// method on the given callee.
-static const OwnershipConventions &setOwnershipConventions(Callee &callee,
-                                                     ValueDecl *method,
-                                                     const Selector &selector) {
-  if (auto clangDecl = findClangMethod(method)) {
-    callee.setOwnershipConventions<ObjCMethodConventions>(clangDecl);
-  } else {
-    auto substResultType = callee.getSubstResultType();
-    auto selectorFamily = selector.getFamily();
-    callee.setOwnershipConventions<ObjCSelectorConventions>(substResultType,
-                                                            selectorFamily);
-  }
-  return callee.getOwnershipConventions();
-}
-
 
 static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
                               llvm::Value *selfValue,
@@ -639,10 +515,6 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                           /*uncurry*/ 1));
   // Compute the selector.
   Selector selector(method.getDecl());
-  
-  // Respect conventions.
-  Callee &callee = emission.getMutableCallee();
-  setOwnershipConventions(callee, method.getDecl(), selector);
 
   return emission;
 }
@@ -693,23 +565,11 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   emission.addArg(args);
 }
 
-/// Can we use the given method directly as the IMPL of an Objective-C
-/// function?
-///
-/// It is okay for this to conservatively return false.
-static bool canUseSwiftFunctionAsObjCFunction(IRGenModule &IGM,
-                                        const ObjCMethodSignature &signature,
-                                        const OwnershipConventions &ownership,
-                                              CanType origFormalType) {
-  // TODO: nullary functions that return compatibly should be okay.
-  return false;
-}
-
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
-static llvm::Function *createSwiftAsObjCThunk(IRGenModule &IGM,
-                                              const ObjCMethodSignature &sig,
-                                              llvm::StringRef name) {
+static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM,
+                                            const ObjCMethodSignature &sig,
+                                            llvm::StringRef name) {
   // Construct the thunk name.
   llvm::SmallString<128> buffer;
   buffer.reserve(name.size() + 2);
@@ -717,97 +577,12 @@ static llvm::Function *createSwiftAsObjCThunk(IRGenModule &IGM,
   assert(name.startswith("_T"));
   buffer.append(name.substr(2));
 
-  auto fn = llvm::Function::Create(sig.FnTy, llvm::Function::InternalLinkage,
-                                   buffer.str(), &IGM.Module);
-  fn->setAttributes(sig.Attrs);
-  fn->setUnnamedAddr(true );
+  auto fn = IGM.Module.getFunction(buffer);
+  assert(fn && "no SIL function for swift-as-objc thunk");
+  // FIXME: Should set the linkage of the SILFunction to 'internal'.
+  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  fn->setUnnamedAddr(true);
   return fn;
-}
-
-namespace {
-  class TranslateParameters : public irgen::TypeVisitor<TranslateParameters> {
-    IRGenFunction &IGF;
-    Explosion &Params;
-    SmallVectorImpl<llvm::Value*> &Args;
-    SmallVectorImpl<unsigned> &ConsumedArgs;
-    SmallVectorImpl<unsigned>::const_iterator NextConsumedArg;
-    unsigned NextParamIndex = 0;
-    
-  public:
-    TranslateParameters(IRGenFunction &IGF, Explosion &params,
-                        SmallVectorImpl<llvm::Value*> &args,
-                        SmallVectorImpl<unsigned> &consumedArgs)
-      : IGF(IGF), Params(params), Args(args), ConsumedArgs(consumedArgs),
-        NextConsumedArg(consumedArgs.begin()) {
-    }
-
-    void ignoreNext(unsigned count) {
-      Params.claim(count);
-      NextParamIndex += count;
-    }
-
-    /// Break apart tuple types and treat the fields separately and in order.
-    void visitTupleType(TupleType *type) {
-      for (auto &field : type->getFields()) {
-        visit(CanType(field.getType()));
-      }
-    }
-
-    /// Retain class pointers if necessary.
-    void visitClassType(ClassType *type) {
-      visitAnyClassType(type->getDecl());
-    }
-    void visitBoundGenericClassType(BoundGenericClassType *type) {
-      visitAnyClassType(type->getDecl());
-    }
-    void visitAnyClassType(ClassDecl *theClass) {
-      auto param = Params.claimNext();
-      if (shouldRetainNextParam()) {
-        Args.push_back(IGF.emitBestRetainCall(param, theClass));
-      } else {
-        Args.push_back(param);
-      }
-    }
-
-    // Everything else gets copied to raise the component retain counts to +1.
-    // FIXME: blocks could potentially be ns_consumed.
-    void visitType(TypeBase *type) {
-      const TypeInfo &ti = IGF.getFragileTypeInfo(type);
-      if (requiresExternalByvalArgument(IGF.IGM, CanType(type))) {
-        // If the argument was passed byval in the C calling convention,
-        // reexplode it.
-        llvm::Value *addrValue = Params.claimNext();
-        Address addr(addrValue, ti.getBestKnownAlignment());
-        Explosion loaded(IGF.CurExplosionLevel);
-        ti.load(IGF, addr, loaded);
-        auto Vals = loaded.claim(ti.getExplosionSize(IGF.CurExplosionLevel));
-        Args.append(Vals.begin(), Vals.end());
-        NextParamIndex += 1;
-      } else {
-        Explosion copied(IGF.CurExplosionLevel);
-        ti.copy(IGF, Params, copied);
-        auto vals = copied.claim(ti.getExplosionSize(IGF.CurExplosionLevel));
-        Args.append(vals.begin(), vals.end());
-        NextParamIndex += vals.size();
-      }
-    }
-
-  private:
-    /// Given that the next parameter is a retainable type, check
-    /// whether its index is in the consumed-arguments set.
-    /// If not, we need to retain it.  Regardless, advance the
-    /// next-parameter-index counter.
-    bool shouldRetainNextParam() {
-      auto paramIndex = NextParamIndex++;
-
-      // Note that the consumed-arguments set is just a sorted list.
-      // If the remaining set is empty, we're done.
-      if (NextConsumedArg == ConsumedArgs.end()) return true;
-      if (*NextConsumedArg != paramIndex) return true;
-      NextConsumedArg++;
-      return false;
-    }
-  };
 }
 
 /// Produce a pointer to the objc_msgSend-compatible thunk wrapping the
@@ -827,76 +602,9 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                   swiftImpl,
                                   explosionLevel,
                                   uncurryLevel);
-  auto &conventions = setOwnershipConventions(callee, method, selector);
 
-  // Build the Objective-C function.
-  llvm::Function *objcImpl;
-
-  // As a special case, consider whether we really need a thunk.
-  if (canUseSwiftFunctionAsObjCFunction(IGM, sig, conventions,
-                                        origFormalType)) {
-    objcImpl = swiftImpl;
-    return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
-  }
-  
-  // Otherwise, build a function.
-  objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
-  IRGenFunction IGF(IGM, explosionLevel, objcImpl);
-  Explosion params = IGF.collectParameters();
-
-  SmallVector<llvm::Value *, 16> args;
-
-  // Remember the out-pointer.
-  if (sig.IsIndirectReturn) {
-    // TODO: remap return values?
-    args.push_back(params.claimNext());
-  }
-
-  auto fnType = cast<AnyFunctionType>(origFormalType);
-  auto selfType = CanType(fnType->getInput());
-  fnType = cast<AnyFunctionType>(CanType(fnType->getResult()));
-  auto formalArgType = CanType(fnType->getInput());
-
-  SmallVector<unsigned, 16> consumedArgs;
-  conventions.getConsumedArgs(IGM, callee, consumedArgs);
-
-  TranslateParameters translate(IGF, params, args, consumedArgs);
-
-  // Pull off and translate 'self'.
-  translate.visit(selfType);
-  params.getLastClaimed()->setName(method->isStatic() ? "This" : "this");
-
-  // 'self' just got pushed on, but we need it to come later.
-  auto self = args.back();
-  args.pop_back();
-
-  // Ignore '_cmd'.
-  translate.ignoreNext(1);
-
-  // Translate the formal parameters.
-  translate.visit(formalArgType);
-  assert(params.empty());
-
-  // Put 'self' in its proper place.
-  args.push_back(self);
-
-  // Perform the call.
-  // FIXME: other fn attributes?
-  auto call = IGF.Builder.CreateCall(swiftImpl, args);
-  if (sig.IsIndirectReturn) {
-    call->addAttribute(1, llvm::Attribute::StructRet);
-  }
-
-  if (call->getType()->isVoidTy()) {
-    IGF.Builder.CreateRetVoid();
-  } else {
-    llvm::Value *result = call;
-    if (conventions.isResultAutoreleased(IGM, callee)) {
-      result = emitObjCAutoreleaseReturnValue(IGF, result);
-    }
-    IGF.Builder.CreateRet(result);
-  }
-
+  llvm::Function *objcImpl
+    = findSwiftAsObjCThunk(IGM, sig, swiftImpl->getName());
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
@@ -910,72 +618,18 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
-  // Thunk the getter method, if there is one.
-  if (FuncDecl *getter = property->getGetter()) {
-    llvm::Function *swiftImpl = IGM.getAddrOfGetter(property, explosionLevel);
-    return getObjCMethodPointerForSwiftImpl(IGM, selector, getter,
-                                            swiftImpl, explosionLevel,
-                                            /*uncurryLevel=*/ 1);
-  }
-  
-  assert(!property->isProperty() && "property without getter?!");
-  
-  // Synthesize a getter.
-  
   FormalType getterType = IGM.getTypeOfGetter(property);
   CanType origFormalType = getterType.getType();
   ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
   llvm::SmallString<32> swiftName;
   
-  // Generate the mangled name of the Swift getter (without actually creating
-  // a Function for it).
+  // Find the ObjC thunk for the property.
   CodeRef getterCode = CodeRef::forGetter(property, explosionLevel,
                                         getterType.getNaturalUncurryLevel());
   LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
   getterEntity.mangle(swiftName);
   
-  llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
-
-  // Emit the ObjC method.
-  IRGenFunction IGF(IGM, explosionLevel, objcImpl);
-  Explosion params = IGF.collectParameters();
-  CanType propTy = property->getType()->getCanonicalType();
-  CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
-    ->getCanonicalType();
-  TypeInfo const &ti = IGM.getFragileTypeInfo(propTy);
-  Alignment align = ti.getBestKnownAlignment();
-
-  // Pick out the arguments:
-  // - indirect return (if any)
-  Address indirectReturn;
-  if (requiresExternalIndirectResult(IGM, propTy)) {
-    indirectReturn = Address(params.claimNext(), align);
-  }
-  // - self (passed in at +0)
-  llvm::Value *thisValue = params.claimNext();
-  // - _cmd
-  params.claimNext();
-  
-  // Load the physical ivar.
-  OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
-                                                        thisValue,
-                                                        classTy,
-                                                        property);
-  
-  // Return it at +0.
-  if (indirectReturn.isValid()) {
-    // "initializeWithTake" because ObjC getter convention is to return at
-    // +0.
-    ti.initializeWithTake(IGF, indirectReturn, ivar.getAddress());
-    IGF.Builder.CreateRetVoid();
-  } else {
-    Explosion value(explosionLevel);
-    // "loadAsTake" because ObjC getter convention is to return at +0.
-    ti.loadAsTake(IGF, ivar.getAddress(), value);
-    IGF.emitScalarReturn(value);
-  }
-  
-  // Cast the method pointer to i8* and return it.
+  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, sig, swiftName);
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
@@ -991,72 +645,18 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   // FIXME: Explosion level
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   
-  // Thunk the setter method, if there is one.
-  if (FuncDecl *setter = property->getSetter()) {
-    llvm::Function *swiftImpl = IGM.getAddrOfSetter(property, explosionLevel);
-    return getObjCMethodPointerForSwiftImpl(IGM, selector, setter,
-                                            swiftImpl, explosionLevel,
-                                            /*uncurryLevel=*/ 1);
-  }
-  
-  assert(!property->isProperty() && "settable property w/o setter?!");
-  
-  // Synthesize a setter.
-  
   FormalType setterType = IGM.getTypeOfSetter(property);
   CanType origFormalType = setterType.getType();
   ObjCMethodSignature sig(IGM, origFormalType, /*isSuper*/ false);
   llvm::SmallString<32> swiftName;
   
-  // Generate the mangled name of the Swift setter (without actually creating
-  // a Function for it).
+  // Generate the name of the ObjC thunk for the setter.
   CodeRef setterCode = CodeRef::forSetter(property, explosionLevel,
                                           setterType.getNaturalUncurryLevel());
   LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
   setterEntity.mangle(swiftName);
   
-  llvm::Function *objcImpl = createSwiftAsObjCThunk(IGM, sig, swiftName);
-
-  // Emit the ObjC method.
-  IRGenFunction IGF(IGM, explosionLevel, objcImpl);
-  Explosion params = IGF.collectParameters();
-  CanType propTy = property->getType()->getCanonicalType();
-  CanType classTy = property->getDeclContext()->getDeclaredTypeInContext()
-    ->getCanonicalType();
-  auto &propTI = IGM.getFragileTypeInfo(propTy);
-  Alignment align = propTI.getBestKnownAlignment();
-
-  // Pick out the arguments:
-  // - self (passed in at +0)
-  llvm::Value *thisValue = params.claimNext();
-  // - _cmd
-  params.claimNext();
-  // - value (passed in at +0) -- we'll deal with that below.
-  
-  // Project the physical ivar.
-  OwnedAddress ivar = projectPhysicalClassMemberAddress(IGF,
-                                                        thisValue,
-                                                        classTy,
-                                                        property);
-  
-  if (requiresExternalByvalArgument(IGM, propTy)) {
-    // If the argument was passed byval in the C calling convention,
-    // assign it (with copy so that we retain it) into the ivar.
-    llvm::Value *value = params.claimNext();
-    Address valueAddr(value, align);
-    propTI.assignWithCopy(IGF, ivar.getAddress(), valueAddr);
-  } else {
-    Explosion copy(explosionLevel);
-    // Copy the argument values so they get retained.
-    propTI.copy(IGF, params, copy);
-    
-    // Assign the exploded value to the ivar.
-    propTI.assign(IGF, copy, ivar.getAddress());
-  }
-  
-  IGF.Builder.CreateRetVoid();
-  
-  // Cast the method pointer to i8* and return it.
+  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, sig, swiftName);
   return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 }
 
@@ -1218,6 +818,14 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
   if (method->isGetterOrSetter())
     return false;
+    
+    // We don't export generic methods or subclasses to IRGen yet.
+  if (method->getType()->is<PolymorphicFunctionType>()
+      || method->getType()->getAs<AnyFunctionType>()
+          ->getResult()->is<PolymorphicFunctionType>()
+      || method->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
   
   if (method->isObjC() || method->getAttrs().isIBAction())
     return true;
@@ -1227,6 +835,11 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
 }
 
 bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (property->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+
   if (property->isObjC())
     return true;
   if (auto override = property->getOverriddenDecl())

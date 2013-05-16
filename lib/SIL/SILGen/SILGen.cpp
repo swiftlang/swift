@@ -96,7 +96,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILConstant constant) {
   /// Anonymous functions always have internal linkage.
   if (!constant.hasDecl())
     return SILLinkage::Internal;
-  
+    
   ValueDecl *d = constant.getDecl();
   DeclContext *dc = d->getDeclContext();
   while (!dc->isModuleContext()) {

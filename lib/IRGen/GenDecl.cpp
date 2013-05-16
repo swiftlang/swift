@@ -470,6 +470,7 @@ void IRGenModule::emitGlobalTopLevel(TranslationUnit *TU, unsigned StartElem) {
     emitSILFunction(&f);
   }
 
+  // Emit types and other global decls.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     emitGlobalDecl(TU->Decls[i]);
   }
