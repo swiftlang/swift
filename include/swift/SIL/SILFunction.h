@@ -144,10 +144,6 @@ public:
   // Forwarding to the SILModule's allocator and type information
   //===--------------------------------------------------------------------===//
   ASTContext &getContext() const;
-
-  void *allocate(unsigned Size, unsigned Align) const;
-  
-  SILTypeList *getSILTypeList(ArrayRef<SILType> Types) const;
 };
 
 /// Observe that we are processing a specific SIL function.

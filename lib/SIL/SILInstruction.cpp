@@ -200,7 +200,7 @@ DERIVED *FunctionInst::create(SILFunction &F, ArrayRef<SILValue> Args,
   static_assert(sizeof(DERIVED) == sizeof(FunctionInst),
                 "can't have extra storage in a FunctionInst subclass");
 
-  void *Buffer = F.allocate(sizeof(DERIVED) +
+  void *Buffer = F.getModule().allocate(sizeof(DERIVED) +
                             decltype(Operands)::getExtraSize(Args.size()),
                             alignof(DERIVED));
   return ::new(Buffer) DERIVED(::std::forward<T>(ConstructorArgs)...);
@@ -244,8 +244,8 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
 }
 
 template<typename INST>
-static void *allocateLiteralInstWithTextSize(SILFunction &B, unsigned length) {
-  return B.allocate(sizeof(INST) + length, alignof(INST));
+static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
+  return F.getModule().allocate(sizeof(INST) + length, alignof(INST));
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,
@@ -366,7 +366,7 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
 SpecializeInst *SpecializeInst::create(SILLocation Loc, SILValue Operand,
                                        ArrayRef<Substitution> Substitutions,
                                        SILType DestTy, SILFunction &F) {
- void *Buffer = F.allocate(
+ void *Buffer = F.getModule().allocate(
            sizeof(SpecializeInst) + Substitutions.size() * sizeof(Substitution),
            alignof(SpecializeInst));
   return ::new(Buffer) SpecializeInst(Loc, Operand, Substitutions, DestTy);
@@ -391,7 +391,7 @@ SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
 
 StructInst *StructInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.allocate(sizeof(StructInst) +
+  void *Buffer = F.getModule().allocate(sizeof(StructInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(StructInst));
   return ::new(Buffer) StructInst(Loc, Ty, Elements);
@@ -403,7 +403,7 @@ StructInst::StructInst(SILLocation Loc, SILType Ty, ArrayRef<SILValue> Elems)
 
 TupleInst *TupleInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<SILValue> Elements, SILFunction &F) {
-  void *Buffer = F.allocate(sizeof(TupleInst) +
+  void *Buffer = F.getModule().allocate(sizeof(TupleInst) +
                             decltype(Operands)::getExtraSize(Elements.size()),
                             alignof(TupleInst));
   return ::new(Buffer) TupleInst(Loc, Ty, Elements);
@@ -479,7 +479,7 @@ BranchInst *BranchInst::create(SILLocation Loc,
 BranchInst *BranchInst::create(SILLocation Loc,
                                SILBasicBlock *DestBB, ArrayRef<SILValue> Args,
                                SILFunction &F) {
-  void *Buffer = F.allocate(sizeof(BranchInst) +
+  void *Buffer = F.getModule().allocate(sizeof(BranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(BranchInst));
   return ::new (Buffer) BranchInst(Loc, DestBB, Args);
@@ -512,7 +512,7 @@ CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());
 
-  void *Buffer = F.allocate(sizeof(CondBranchInst) +
+  void *Buffer = F.getModule().allocate(sizeof(CondBranchInst) +
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(CondBranchInst));
   return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args);

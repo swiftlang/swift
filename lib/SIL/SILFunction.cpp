@@ -31,11 +31,3 @@ SILFunction::~SILFunction() {
 ASTContext &SILFunction::getContext() const {
   return getModule().Context;
 }
-
-void *SILFunction::allocate(unsigned Size, unsigned Align) const {
-  return getModule().allocate(Size, Align);
-}
-
-SILTypeList *SILFunction::getSILTypeList(ArrayRef<SILType> Types) const {
-  return getModule().getSILTypeList(Types);
-}
