@@ -415,7 +415,7 @@ public:
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
-       << SI->getType() << "  // ";
+       << SI->getType() << ", ";
     bool first = true;
     for (Substitution const &s : SI->getSubstitutions()) {
       if (!first)
