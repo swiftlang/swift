@@ -23,8 +23,7 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                        ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
                                        AbstractCC cc,
-                                       SILBase &base)
-{
+                                       SILBase &base) {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
   // return both the begins and ends of each uncurried argument group.

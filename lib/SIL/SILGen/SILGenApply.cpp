@@ -785,7 +785,7 @@ namespace {
     auto cleanup = args[0].getCleanup();
     
     // Take the reference type argument and cast it to ObjectPointer.
-    SILType objPointerType = SILType::getObjectPointerType(gen.F.getContext());
+    SILType objPointerType = SILType::getObjectPointerType(gen.F.getASTContext());
     SILValue result = gen.B.createRefToObjectPointer(loc, args[0].getValue(),
                                                      objPointerType);
     // Return the cast result with the original cleanup.
@@ -828,7 +828,7 @@ namespace {
     // Take the reference type argument and cast it to RawPointer.
     // RawPointers do not have ownership semantics, so the cleanup on the
     // argument remains.
-    SILType rawPointerType = SILType::getRawPointerType(gen.F.getContext());
+    SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
     SILValue result = gen.B.createRefToRawPointer(loc, args[0].getValue(),
                                                   rawPointerType);
     return ManagedValue(result, ManagedValue::Unmanaged);
@@ -865,7 +865,7 @@ namespace {
     assert(args.size() == 1 && "addressof should have a single argument");
     
     // Take the address argument and cast it to RawPointer.
-    SILType rawPointerType = SILType::getRawPointerType(gen.F.getContext());
+    SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
     SILValue result = gen.B.createAddressToPointer(loc, args[0].getUnmanagedValue(),
                                                    rawPointerType);
     return ManagedValue(result, ManagedValue::Unmanaged);
@@ -953,10 +953,10 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
                                             SILValue Length,
                                             Expr *ArrayInjectionFunction) {
   // Bitcast the BasePtr (an lvalue) to Builtin.RawPointer if it isn't already.
-  if (BasePtr.getType() != SILType::getRawPointerType(F.getContext()))
+  if (BasePtr.getType() != SILType::getRawPointerType(F.getASTContext()))
     BasePtr = B.createAddressToPointer(SILLocation(),
                               BasePtr,
-                              SILType::getRawPointerType(F.getContext()));
+                              SILType::getRawPointerType(F.getASTContext()));
 
   // Construct a call to the injection function.
   CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);

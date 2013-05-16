@@ -14,12 +14,10 @@
 #include "swift/SIL/SILModule.h"
 using namespace swift;
 
-SILFunction::SILFunction(SILModule &Module,
-                         SILLinkage Linkage,
-                         StringRef Name,
-                         SILType LoweredType)
-: ModuleAndLinkage(&Module, Linkage), MangledName(Name),
-LoweredType(LoweredType) {
+SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
+                         StringRef Name, SILType LoweredType)
+  : ModuleAndLinkage(&Module, Linkage), MangledName(Name),
+    LoweredType(LoweredType) {
   Module.functions.push_back(this);
 }
 
@@ -28,6 +26,6 @@ SILFunction::~SILFunction() {
 
 
 
-ASTContext &SILFunction::getContext() const {
-  return getModule().Context;
+ASTContext &SILFunction::getASTContext() const {
+  return getModule().getASTContext();
 }

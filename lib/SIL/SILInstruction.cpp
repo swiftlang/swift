@@ -276,21 +276,21 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty, intmax_t Value,
 }
 
 IntegerLiteralInst *
-IntegerLiteralInst::create(swift::IntegerLiteralExpr *E, SILFunction &B) {
+IntegerLiteralInst::create(swift::IntegerLiteralExpr *E, SILFunction &F) {
   return create(E,
                 SILType::getBuiltinIntegerType(
                      E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
-                     B.getContext()),
-                E->getText(), B);
+                     F.getASTContext()),
+                E->getText(), F);
 }
 
 IntegerLiteralInst *
-IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &B) {
+IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &F) {
   return create(E,
                 SILType::getBuiltinIntegerType(
                      E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
-                     B.getContext()),
-                E->getValue(), B);
+                     F.getASTContext()),
+                E->getValue(), F);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.
@@ -314,13 +314,13 @@ FloatLiteralInst::create(SILLocation Loc, SILType Ty, StringRef Text,
 }
 
 FloatLiteralInst *
-FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &B) {
+FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &F) {
   return create(E,
                 // Builtin floating-point types are always valid SIL types.
                 SILType::getBuiltinFloatType(
                          E->getType()->castTo<BuiltinFloatType>()->getFPKind(),
-                         B.getContext()),
-                E->getText(), B);
+                         F.getASTContext()),
+                E->getText(), F);
 }
 
 APFloat FloatLiteralInst::getValue() const {
@@ -419,10 +419,11 @@ MetatypeInst::MetatypeInst(SILLocation Loc, SILType Metatype)
 ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
   : SILInstruction(ValueKind::ModuleInst, Loc, ModuleType) {}
 
-ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc, SILValue Operand,
+ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
+                                               SILValue Operand,
                                                SILFunction &F)
   : UnaryInstructionBase(Loc, Operand,
-                         SILType::getOpaquePointerType(F.getContext()))
+                   SILType::getOpaquePointerType(F.getASTContext()))
 {}
 
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,

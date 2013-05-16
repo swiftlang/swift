@@ -140,10 +140,7 @@ public:
   /// '@function_mangled_name'.
   void printName(raw_ostream &OS) const;
   
-  //===--------------------------------------------------------------------===//
-  // Forwarding to the SILModule's allocator and type information
-  //===--------------------------------------------------------------------===//
-  ASTContext &getContext() const;
+  ASTContext &getASTContext() const;
 };
 
 /// Observe that we are processing a specific SIL function.

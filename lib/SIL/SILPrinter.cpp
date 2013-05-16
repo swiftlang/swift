@@ -803,11 +803,10 @@ void ValueBase::dumpInContext() const {
 
 void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
-  ASTContext &Ctx = F->getContext();
   SourceLoc sloc;
   F->printName(out);
 
   out << " at ";
-  printSourceLoc(out, sloc, Ctx);
+  printSourceLoc(out, sloc, F->getASTContext());
   out << '\n';
 }

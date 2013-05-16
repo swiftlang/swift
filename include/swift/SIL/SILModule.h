@@ -54,7 +54,7 @@ private:
 
   /// Context - This is the context that uniques the types used by this
   /// SILFunction.
-  ASTContext &Context;
+  ASTContext &TheASTContext;
   
   /// The list of Functions in the module.
   FunctionListType functions;
@@ -64,7 +64,7 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &Context);
+  SILModule(ASTContext &TheASTContext);
   
 public:
   ~SILModule();
@@ -82,7 +82,7 @@ public:
     return new SILModule(Context);
   }
   
-  ASTContext &getContext() const { return Context; }
+  ASTContext &getASTContext() const { return TheASTContext; }
   
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;

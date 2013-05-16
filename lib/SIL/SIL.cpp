@@ -22,7 +22,7 @@
 using namespace swift;
 
 SILModule::SILModule(ASTContext &Context)
-  : Context(Context), Types(*this) {
+  : TheASTContext(Context), Types(*this) {
 }
 
 SILModule::~SILModule() {

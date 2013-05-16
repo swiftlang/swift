@@ -170,7 +170,7 @@ public:
 };
   
 TypeConverter::TypeConverter(SILModule &m)
-  : M(m), Context(m.getContext()) {
+  : M(m), Context(m.getASTContext()) {
 }
 
 TypeConverter::~TypeConverter() {

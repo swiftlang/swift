@@ -101,7 +101,7 @@ RValue SILGenFunction::visitApplyExpr(ApplyExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
   return B.createTuple(loc,
-                       getLoweredType(TupleType::getEmpty(SGM.M.getContext())),
+                       getLoweredType(TupleType::getEmpty(SGM.M.getASTContext())),
                        {});
 }
 
@@ -517,7 +517,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 ArrayRef<ManagedValue> elements,
                                 Expr *VarargsInjectionFn) {
   SILValue numEltsVal = gen.B.createIntegerLiteral(SILLocation(),
-                      SILType::getBuiltinIntegerType(64, gen.F.getContext()),
+                      SILType::getBuiltinIntegerType(64, gen.F.getASTContext()),
                       elements.size());
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
                                                   gen.getLoweredType(baseTy),
@@ -686,7 +686,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
       = innerMethodTy->castTo<PolymorphicFunctionType>();
     innerMethodTy = FunctionType::get(innerPFT->getInput(),
                                       innerPFT->getResult(),
-                                      F.getContext());
+                                      F.getASTContext());
   }
   
   Type outerMethodTy = FunctionType::get(thisValue.getType().getSwiftType(),
@@ -694,7 +694,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                          /*isAutoClosure*/ false,
                                          /*isBlock*/ false,
                                          /*isThin*/ true,
-                                         F.getContext());
+                                         F.getASTContext());
 
   if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
     outerSubs = bgt->getSubstitutions();
@@ -708,7 +708,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
       allSubs = outerSubs;
     else {
       Substitution *allSubsBuf
-        = F.getContext().Allocate<Substitution>(outerSubs.size()
+        = F.getASTContext().Allocate<Substitution>(outerSubs.size()
                                                   + innerSubs.size());
       std::memcpy(allSubsBuf,
                   outerSubs.data(), outerSubs.size() * sizeof(Substitution));
@@ -758,7 +758,7 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
                                         e->getType(),
-                                        F.getContext());
+                                        F.getASTContext());
     SILConstant c(e->getDecl());
     
     CanType archetypeType = archetype.getType().getSwiftType();
@@ -792,14 +792,14 @@ SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
     // as an OpaquePointer.
     // 'this' for existential metatypes is the metatype itself.
     Type thisTy = e->getDecl()->isInstanceMember()
-      ? F.getContext().TheOpaquePointerType
+      ? F.getASTContext().TheOpaquePointerType
       : e->getBase()->getType();
     
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(thisTy,
                                         e->getType(),
-                                        F.getContext());
+                                        F.getASTContext());
     SILConstant c(e->getDecl());
     return B.createProtocolMethod(e, existential, c,
                                   getLoweredLoadableType(methodType,
@@ -1078,7 +1078,7 @@ RValue SILGenFunction::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   // For class, archetype, and protocol types, look up the dynamic metatype.
   SILType metaTy = getLoweredLoadableType(
-    MetaTypeType::get(base.getType().getSwiftRValueType(), F.getContext()));
+    MetaTypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
   if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
     return B.createClassMetatype(loc, metaTy, base);
   } else if (base.getType().getSwiftRValueType()->is<ArchetypeType>()) {
@@ -1203,7 +1203,7 @@ RValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
 }
 
 void SILGenFunction::emitFunction(FuncExpr *fe) {
-  emitProlog(fe, fe->getBodyParamPatterns(), fe->getResultType(F.getContext()));
+  emitProlog(fe, fe->getBodyParamPatterns(), fe->getResultType(F.getASTContext()));
   visit(fe->getBody());
 }
 
@@ -1284,7 +1284,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
   
   // If we have a base class, invoke its destructor.
-  SILType objectPtrTy = SILType::getObjectPointerType(F.getContext());
+  SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
   if (Type baseTy = cd->getBaseClass()) {
     ClassDecl *baseClass = baseTy->getClassOrBoundGenericClass();
     
@@ -1643,7 +1643,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   emitStore(ctor, ManagedValue(thisArg, ManagedValue::Unmanaged), thisLV);
   
   // Emit the prolog for the non-this arguments.
-  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getContext()));
+  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getASTContext()));
 
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit the block until after we've emitted the body.
@@ -1881,5 +1881,5 @@ void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
-  return RValue(CanType(TupleType::getEmpty(F.getContext())));
+  return RValue(CanType(TupleType::getEmpty(F.getASTContext())));
 }
