@@ -1096,7 +1096,7 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType().getSwiftType());
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType());
   Explosion e(CurExplosionLevel);
   e.add(alloced);
   newLoweredExplosion(SILValue(i, 0), e);

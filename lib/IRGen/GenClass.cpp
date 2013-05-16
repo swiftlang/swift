@@ -461,7 +461,7 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
 }
 
 /// Emit an allocation of a class.
-llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, CanType thisType) {
+llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType thisType) {
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   auto &classTI = IGF.IGM.getFragileTypeInfo(thisType).as<ClassTypeInfo>();
   auto &layout = classTI.getLayout(IGF.IGM);

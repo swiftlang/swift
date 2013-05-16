@@ -47,7 +47,7 @@ namespace irgen {
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
 
   /// Emit an allocation of a class.
-  llvm::Value *emitClassAllocation(IRGenFunction &IGF, CanType thisType);
+  llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType thisType);
 
   /// Emit the deallocating destructor for a class in terms of its destroying
   /// destructor.
