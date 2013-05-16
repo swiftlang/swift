@@ -231,7 +231,7 @@ public:
 
     if (!BB->pred_empty()) {
       OS.PadToColumn(50);
-      OS << "; Preds:";
+      OS << "// Preds:";
       for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
         OS << ' ' << getID(*BBI);
     }
@@ -255,7 +255,7 @@ public:
     visit(V);
     if (!V->use_empty()) {
       OS.PadToColumn(50);
-      OS << "; users: ";
+      OS << "// users: ";
       interleave(V->use_begin(), V->use_end(),
                  [&] (Operand *o) {
                    OS << getID(o->getUser());
@@ -323,7 +323,7 @@ public:
     printAllocKind(AVI->getAllocKind());
     OS << "$" << AVI->getElementType().getString();
     if (VarDecl *vd = AVI->getDecl())
-      OS << "  ; var " << vd->getName();
+      OS << "  // var " << vd->getName();
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
@@ -415,7 +415,7 @@ public:
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", $"
-       << SI->getType() << "  ; ";
+       << SI->getType() << "  // ";
     bool first = true;
     for (Substitution const &s : SI->getSubstitutions()) {
       if (!first)
