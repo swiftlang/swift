@@ -829,7 +829,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     = i->getCallee().getType().getFunctionTypeInfo();
 
   Explosion args(CurExplosionLevel);
-  SmallVector<const TypeInfo *, 8> argTypes;
+  SmallVector<SILType, 8> argTypes;
   while (uncurryLevel-- != 0) {
     unsigned from = ti->getUncurriedInputBegins()[uncurryLevel],
       to = ti->getUncurriedInputEnds()[uncurryLevel];
@@ -837,16 +837,14 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
       emitApplyArgument(*this, args, arg);
       // FIXME: Need to carry the address-ness of each argument alongside
       // the object type's TypeInfo.
-      argTypes.push_back(&getFragileTypeInfo(arg.getType().getSwiftType()));
+      argTypes.push_back(arg.getType());
     }
   }
   
   // Create the thunk and function value.
   Explosion function(CurExplosionLevel);
-  CanType closureTy = i->getType().getSwiftType();
   emitFunctionPartialApplication(*this, calleeFn, args, argTypes,
-                                 closureTy,
-                                 function);
+                                 i->getType(), function);
   newLoweredExplosion(v, function);
 }
 

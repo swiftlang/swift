@@ -48,8 +48,8 @@ namespace irgen {
   void emitFunctionPartialApplication(IRGenFunction &IGF,
                                       llvm::Function *fnPtr,
                                       Explosion &args,
-                                      ArrayRef<const TypeInfo *> argTypes,
-                                      CanType outType,
+                                      ArrayRef<SILType> argTypes,
+                                      SILType outType,
                                       Explosion &out);
   
   /// Emit a specialization thunk from a generic function to a specialized

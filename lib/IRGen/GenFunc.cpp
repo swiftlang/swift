@@ -1603,13 +1603,13 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Function *fnPtr,
                                        ExplosionKind explosionLevel,
-                                       CanType outType,
+                                       SILType outType,
                                        HeapLayout const &layout) {
   llvm::AttributeSet attrs;
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(AbstractCC::Freestanding,
-                                                  outType,
+                                                  outType.getSwiftRValueType(),
                                                   explosionLevel,
                                                   /*curryLevel=*/ 0,
                                                   extraData,
@@ -1666,11 +1666,18 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            llvm::Function *fnPtr,
                                            Explosion &args,
-                                           ArrayRef<const TypeInfo *> argTypes,
-                                           CanType outType,
+                                           ArrayRef<SILType> argTypes,
+                                           SILType outType,
                                            Explosion &out) {
+  // Collect the type infos for the context types.
+  // FIXME: Keep LValueTypes out of this.
+  llvm::SmallVector<const TypeInfo *, 4> argTypeInfos;
+  for (SILType argType : argTypes) {
+    argTypeInfos.push_back(&IGF.getFragileTypeInfo(argType.getSwiftType()));
+  }
+  
   // Store the context arguments on the heap.
-  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypes);
+  HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypeInfos);
   llvm::Value *data;
   if (layout.isKnownEmpty()) {
     data = IGF.IGM.RefCountedNull;
