@@ -327,7 +327,9 @@ public:
   /// Look up an operator declaration.
   template <typename T>
   T *lookupOperator(Identifier name) {
-    static_assert((T*){}, "Must specify prefix, postfix, or infix operator");
+    // Make any non-specialized instantiations fail with a "nice" error message.
+    static_assert(static_cast<T*>(nullptr),
+                  "Must specify prefix, postfix, or infix operator decl");
   }
 
   static bool classof(const DeclContext *DC) {
