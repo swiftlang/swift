@@ -259,12 +259,14 @@ public:
     // dynamically dispatch the call.
     // FIXME: Or if it's an ObjC method. Extension methods on classes will
     // hopefully become dynamically dispatched too.
-    if (auto *fe = dyn_cast<FuncDecl>(e->getDecl())) {
-      if (isa<ClassDecl>(fe->getDeclContext()) || fe->isObjC()) {
+    if (auto *fd = dyn_cast<FuncDecl>(e->getDecl())) {
+      if (isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setThisParam(gen.visit(thisCallSite->getArg()));
-        SILConstant constant(fe);
+        SILConstant constant(fd,
+                             SILConstant::ConstructAtNaturalUncurryLevel,
+                             gen.SGM.requiresObjCDispatch(fd));
         
         SILValue classMethod = gen.B.createClassMethod(thisCallSite,
                                              thisParam.peekScalarValue(),
@@ -282,7 +284,9 @@ public:
     
     // FIXME: Store context values for local funcs in a way that we can
     // apply them directly as an added "call site" here.
-    SILConstant constant(e->getDecl());
+    SILConstant constant(e->getDecl(),
+                         SILConstant::ConstructAtNaturalUncurryLevel,
+                         gen.SGM.requiresObjCDispatch(e->getDecl()));
 
     // Obtain a reference for a local closure.
     if (gen.LocalConstants.count(constant)) {
@@ -344,20 +348,6 @@ public:
     visit(e->getSubExpr());
   }
   
-  bool needsSuperMethodDispatch(SILConstant c) {
-    // ObjC methods and constructors require super dispatch.
-    if (gen.SGM.getConstantCC(c) == AbstractCC::C)
-      return true;
-    if (c.kind == SILConstant::Kind::Initializer) {
-      DeclContext *ctorDC = cast<ConstructorDecl>(c.getDecl())->getDeclContext();
-      if (auto *cls = dyn_cast<ClassDecl>(ctorDC)) {
-        if (cls->isObjC())
-          return true;
-      }
-    }
-    return false;
-  }
-
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     // FIXME: Eliminate the implicit coercions of the SuperExpr.
@@ -375,10 +365,14 @@ public:
     Expr *fn = apply->getFn();
     SILConstant constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      constant = SILConstant(ctorRef->getDecl(), SILConstant::Kind::Initializer);
+      constant = SILConstant(ctorRef->getDecl(), SILConstant::Kind::Initializer,
+                         SILConstant::ConstructAtNaturalUncurryLevel,
+                         gen.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
-      constant = SILConstant(declRef->getDecl());
+      constant = SILConstant(declRef->getDecl(),
+                         SILConstant::ConstructAtNaturalUncurryLevel,
+                         gen.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
     } else
       llvm_unreachable("invalid super callee");
 
@@ -392,7 +386,7 @@ public:
     setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
     
     SILValue superMethod;
-    if (needsSuperMethodDispatch(constant)) {
+    if (constant.isObjC) {
       // ObjC super calls require dynamic dispatch.
       superMethod = gen.B.createSuperMethod(apply, super.getValue(),
                                             constant, constantTy);

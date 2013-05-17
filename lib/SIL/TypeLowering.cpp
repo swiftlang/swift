@@ -357,12 +357,14 @@ static AbstractCC getAbstractCC(SILConstant c) {
   if (!c.hasDecl())
     return AbstractCC::Freestanding;
   
+  // Assert that there is a native entry point available.
   // FIXME: We don't emit calls to ObjC properties correctly as class_method
   // dispatches yet.
-  if (c.getDecl()->hasClangNode() &&
-      c.kind != SILConstant::Kind::Getter &&
-      c.kind != SILConstant::Kind::Setter)
-    return AbstractCC::C;
+  assert((!c.getDecl()->hasClangNode() ||
+          c.kind == SILConstant::Kind::Getter ||
+          c.kind == SILConstant::Kind::Setter)
+         && "should not be referencing native entry point of foreign decl");
+
   if (c.getDecl()->isInstanceMember() ||
       c.kind == SILConstant::Kind::Initializer)
     return AbstractCC::Method;

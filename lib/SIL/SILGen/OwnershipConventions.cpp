@@ -16,7 +16,6 @@ using namespace Lowering;
   FAMILY(New, "new")
 
 enum class swift::Lowering::SelectorFamily : unsigned {
-  NonObjC,
   None,
 #define GET_LABEL(LABEL, PREFIX) LABEL,
   FOREACH_FAMILY(GET_LABEL)
@@ -51,12 +50,6 @@ static SelectorFamily getSelectorFamily(Identifier name) {
 static SelectorFamily getSelectorFamily(SILConstant c) {
   switch (c.kind) {
   case SILConstant::Kind::Func:
-    // The function must be [objc] to belong to a family.
-    if (!c.hasDecl())
-      return SelectorFamily::NonObjC;
-    if (!c.getDecl()->isObjC() && !c.isObjC)
-      return SelectorFamily::NonObjC;
-    
     return getSelectorFamily(c.getDecl()->getName());
 
   case SILConstant::Kind::Getter:
@@ -77,9 +70,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::OneOfElement:
   case SILConstant::Kind::Destroyer:
   case SILConstant::Kind::GlobalAccessor:
-    if (c.isObjC)
-      return SelectorFamily::None;
-    return SelectorFamily::NonObjC;
+    return SelectorFamily::None;
   }
 }
 
@@ -99,6 +90,10 @@ static clang::Decl *findClangMethod(ValueDecl *method) {
 OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
                                                SILConstant c,
                                                SILType ty) {
+  // Native functions use the default Swift convention.
+  if (!c.isObjC)
+    return getDefault(ty);
+  
   SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo();
   
   // If we have a clang decl associated with the Swift decl, derive its
@@ -111,12 +106,7 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
   
   // If the decl belongs to an ObjC method family, use that family's ownership
   // conventions.
-  SelectorFamily family = getSelectorFamily(c);
-  if (family != SelectorFamily::NonObjC)
-    return getForObjCSelectorFamily(family, ft);
-  
-  // Other decls follow the default Swift convention.
-  return getDefault(ty);
+  return getForObjCSelectorFamily(getSelectorFamily(c), ft);
 }
 
 OwnershipConventions OwnershipConventions::getDefault(SILType ty) {
@@ -225,9 +215,6 @@ OwnershipConventions::getForObjCSelectorFamily(SelectorFamily family,
       // Normal ObjC methods consume nothing and return autoreleased.
     case SelectorFamily::None:
       break;
-      
-    case SelectorFamily::NonObjC:
-      llvm_unreachable("not an objc method?!");
   }
   
   return {

@@ -679,17 +679,18 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
                   ti.getReferenceTypeElements());
 }
 
-static bool requiresObjCMethodEntryPoint(FuncDecl *method) {
+bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
   if (method->isGetterOrSetter())
     return false;
     
   // We don't export generic methods or subclasses to IRGen yet.
   if (method->getType()->is<PolymorphicFunctionType>()
-      || method->getType()->getAs<AnyFunctionType>()
+      || method->getType()->castTo<AnyFunctionType>()
           ->getResult()->is<PolymorphicFunctionType>()
-      || method->getDeclContext()->getDeclaredTypeInContext()
-          ->is<BoundGenericType>())
+      || (method->getDeclContext()->getDeclaredTypeInContext()
+          && method->getDeclContext()->getDeclaredTypeInContext()
+            ->is<BoundGenericType>()))
     return false;
     
   if (method->isObjC() || method->getAttrs().isIBAction())
@@ -699,7 +700,7 @@ static bool requiresObjCMethodEntryPoint(FuncDecl *method) {
   return false;
 }
 
-static bool requiresObjCPropertyEntryPoints(VarDecl *property) {
+bool SILGenModule::requiresObjCPropertyEntryPoints(VarDecl *property) {
   // We don't export generic methods or subclasses to IRGen yet.
   if (property->getDeclContext()->getDeclaredTypeInContext()
           ->is<BoundGenericType>())
@@ -712,7 +713,27 @@ static bool requiresObjCPropertyEntryPoints(VarDecl *property) {
   return false;
 }
 
-/// SILGenType - an ASTVisitor for generating SIL from method declarations
+bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
+  if (vd->hasClangNode())
+    return true;
+  if (auto *fd = dyn_cast<FuncDecl>(vd))
+    return requiresObjCMethodEntryPoint(fd);
+  if (auto *pd = dyn_cast<VarDecl>(vd))
+    return requiresObjCPropertyEntryPoints(pd);
+  return vd->isObjC();
+}
+
+bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
+  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
+    DeclContext *ctorDC = cd->getDeclContext();
+    if (auto *cls = dyn_cast<ClassDecl>(ctorDC)) {
+      return cls->isObjC();
+    }
+  }
+  return requiresObjCDispatch(vd);
+}
+
+/// An ASTVisitor for generating SIL from method declarations
 /// inside nominal types.
 class SILGenType : public Lowering::ASTVisitor<SILGenType> {
 public:
@@ -746,7 +767,7 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd, fd->getBody());
-    if (requiresObjCMethodEntryPoint(fd))
+    if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
@@ -762,7 +783,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   
   void visitVarDecl(VarDecl *vd) {
-    if (requiresObjCPropertyEntryPoints(vd))
+    if (SGM.requiresObjCPropertyEntryPoints(vd))
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 };
@@ -833,7 +854,7 @@ public:
   }
   void visitFuncDecl(FuncDecl *fd) {
     SGM.emitFunction(fd, fd->getBody());
-    if (requiresObjCMethodEntryPoint(fd))
+    if (SGM.requiresObjCMethodEntryPoint(fd))
       SGM.emitObjCMethodThunk(fd);
   }
   void visitConstructorDecl(ConstructorDecl *cd) {
@@ -847,7 +868,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   
   void visitVarDecl(VarDecl *vd) {
-    if (requiresObjCPropertyEntryPoints(vd))
+    if (SGM.requiresObjCPropertyEntryPoints(vd))
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 };
