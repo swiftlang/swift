@@ -1,4 +1,4 @@
-//===--- SILBase.cpp - SIL Memory Allocation utilities --------------------===//
+//===--- SILModule.cpp - SILModule implementation -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

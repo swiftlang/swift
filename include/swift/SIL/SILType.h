@@ -21,7 +21,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "swift/SIL/SILBase.h"
+#include "swift/SIL/SILAllocated.h"
 
 namespace swift {
   class ASTContext;

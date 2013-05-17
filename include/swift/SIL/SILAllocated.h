@@ -1,4 +1,4 @@
-//===--- SILBase.h - Defines some core details of SIL code ------*- C++ -*-===//
+//===--- SILAllocated.h - Defines the SILAllocated class --------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,20 +9,17 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the SILBase class, which provides some basic functionality
-// for clients of SIL and serves as a baseclass for SIL types.
-//
-//===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILBASE_H
-#define SWIFT_SIL_SILBASE_H
+#ifndef SWIFT_SIL_SILALLOCATED_H
+#define SWIFT_SIL_SILALLOCATED_H
 
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
   class SILModule;
 
+/// SILAllocated - This class enforces that derived classes are allocated out of
+/// the SILModule bump pointer allocator.
 template <typename DERIVED>
 class SILAllocated {
 public:
@@ -37,7 +34,8 @@ public:
   }
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with
-  /// precise alignment knowledge.
+  /// precise alignment knowledge.  This is templated on the allocator type so
+  /// that this doesn't require including SILModule.h.
   template <typename SizeTy>
   void *operator new(size_t Bytes, const SizeTy &C,
                      size_t Alignment = alignof(DERIVED)) {

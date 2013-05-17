@@ -24,8 +24,6 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 SILFunction::~SILFunction() {
 }
 
-
-
 ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();
 }

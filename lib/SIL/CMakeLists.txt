@@ -6,7 +6,7 @@ add_swift_library(swiftSIL
   SILInstruction.cpp
   SILFunction.cpp
   SIL.cpp
-  SILBase.cpp
+  SILModule.cpp
   SILPrinter.cpp
   SILSuccessor.cpp
   SILType.cpp
