@@ -737,6 +737,12 @@ NullablePtr<Expr> Parser::parseExprClosure() {
     bool invalid = false;
     if (!startsWithPipe(Tok)) {
       do {
+        // If we see an arrow here, the user forgot a pattern. We'll complain
+        // below.
+        if (Tok.is(tok::arrow)) {
+          break;
+        }
+
         // Parse a pattern-tuple-element.
         // FIXME: Eventually, we want to allow default arguments.
         Optional<TuplePatternElt> elt = parsePatternTupleElement(false);
@@ -769,8 +775,9 @@ NullablePtr<Expr> Parser::parseExprClosure() {
         // If it looks like we might have a pattern, assume that it's
         // just a missing comma.
         if (isStartOfPattern(Tok)) {
-          diagnose(Tok.getLoc(), diag::missing_comma_in_pattern)
-            .fixItInsert(Tok.getLoc(), ", ");
+          SourceLoc endOfPreviousLoc = getEndOfPreviousLoc();
+          diagnose(endOfPreviousLoc, diag::missing_comma_in_pattern)
+            .fixItInsert(endOfPreviousLoc, ",");
           continue;
         }
 
@@ -782,9 +789,9 @@ NullablePtr<Expr> Parser::parseExprClosure() {
     // Parse the closing pipe.
     SourceLoc rightPipe;
     if (!startsWithPipe(Tok)) {
-      // If the user simply forgot the arrow, we can provide a Fix-It.
+      // If the user simply forgot the pipe, we can provide a Fix-It.
       if (Tok.is(tok::arrow)) {
-        rightPipe = elements.empty()? Tok.getLoc() : PreviousLoc;
+        rightPipe = getEndOfPreviousLoc();
         diagnose(rightPipe, diag::expected_rpipe)
           .fixItInsert(rightPipe, "|");
         diagnose(leftPipe, diag::opening_pipe);
@@ -851,6 +858,12 @@ NullablePtr<Expr> Parser::parseExprClosure() {
   SourceLoc rightBrace;
   parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
                      leftBrace);
+
+  // We always need a right brace location, even if we couldn't parse the
+  // actual right brace.
+  // FIXME: Is this a local hack, should parseMatchingToken handle this?
+  if (rightBrace.isInvalid())
+    rightBrace = PreviousLoc;
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.

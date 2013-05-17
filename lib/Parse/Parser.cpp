@@ -152,6 +152,10 @@ SourceLoc Parser::consumeToken() {
   return Loc;
 }
 
+SourceLoc Parser::getEndOfPreviousLoc() {
+  return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
+}
+
 SourceLoc Parser::consumeStartingLess() {
   assert(startsWithLess(Tok) && "Token does not start with '<'");
   

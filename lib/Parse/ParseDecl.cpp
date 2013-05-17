@@ -1320,10 +1320,9 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
     // If the previous declaration didn't have a semicolon and this new
     // declaration doesn't start a line, complain.
     if (!previousHadSemi && !Tok.isAtStartOfLine()) {
-      SourceLoc EndOfPreviousLoc = Lexer::getLocForEndOfToken(SourceMgr,
-                                                              PreviousLoc);
-      diagnose(EndOfPreviousLoc, diag::declaration_same_line_without_semi)
-        .fixItInsert(EndOfPreviousLoc, ";");
+      SourceLoc endOfPrevious = getEndOfPreviousLoc();
+      diagnose(endOfPrevious, diag::declaration_same_line_without_semi)
+        .fixItInsert(endOfPrevious, ";");
       // FIXME: Add semicolon to the AST?
     }
 

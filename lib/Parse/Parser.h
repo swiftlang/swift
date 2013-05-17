@@ -132,7 +132,11 @@ public:
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeToken();
   }
-  
+
+  /// \brief Retrieve the location just past the end of the previous
+  /// source location.
+  SourceLoc getEndOfPreviousLoc();
+
   /// consumeIf - If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K) {
