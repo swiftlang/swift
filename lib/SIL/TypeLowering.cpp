@@ -280,9 +280,8 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t,
   
   //
   // Make a SILFunctionTypeInfo for function types.
-  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
+  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>())
     return makeInfoForFunctionType(ft, cc, uncurryLevel);
-  }
   
   //
   // Other types don't need any additional SILTypeInfo.
@@ -295,14 +294,18 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
   TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
   types[getTypeKey(t, cc, uncurryLevel)] = theInfo;
-  bool address = false;
-  bool addressOnly = false;
   
+  // LValue types are a special case for lowering, because they get completely
+  // removed, represented as 'address' SILTypes.
   if (LValueType *lvt = t->getAs<LValueType>()) {
+    // Derive SILType for LValueType from the object type.
     t = lvt->getObjectType()->getCanonicalType();
-    address = true;
-    addressOnly = getTypeLoweringInfo(t).isAddressOnly();
-  } else if (t->hasReferenceSemantics()) {
+    theInfo->loweredType = getLoweredType(t, cc, uncurryLevel).getAddressType();
+    return *theInfo;
+  }
+  
+  bool addressOnly = false;
+  if (t->hasReferenceSemantics()) {
     // Reference types are always loadable, and need only to retain/release
     // themselves.
     addressOnly = false;
@@ -318,19 +321,16 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
       theInfo->referenceTypeElements.clear();
   }
 
-  // Derive SILType for LValueType from the object type.
-  if (address) {
-    theInfo->loweredType = getLoweredType(t, cc, uncurryLevel).getAddressType();
-  }
-  // Generate SILTypeInfo for lowered types that need it.
-  else if (SILTypeInfo *info = makeSILTypeInfo(t, cc, uncurryLevel)) {
+  // Generate SILTypeInfo for lowered types that need it (functions and
+  // aggregates).
+  if (SILTypeInfo *info = makeSILTypeInfo(t, cc, uncurryLevel)) {
     theInfo->loweredType = SILType(info,
-                                   /*address=*/ address || addressOnly,
+                                   /*address=*/ addressOnly,
                                    /*loadable=*/ !addressOnly);
   // If there's no SILTypeInfo, create a SILType from just the Swift type.
   } else {
     theInfo->loweredType = SILType(t,
-                                   /*address=*/ address || addressOnly,
+                                   /*address=*/ addressOnly,
                                    /*loadable=*/ !addressOnly);
   }
   
