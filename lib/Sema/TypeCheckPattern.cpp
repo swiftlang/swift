@@ -182,8 +182,6 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
     for (unsigned i = 0, e = TP->getNumFields(); i != e; ++i) {
       TuplePatternElt &elt = TP->getFields()[i];
       Pattern *pattern = elt.getPattern();
-      assert(!elt.getInit() &&
-             "parsing must prevent tuple init outside of function signatures!");
 
       Type CoercionType;
       if (hadError)
@@ -192,6 +190,16 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
         CoercionType = tupleTy->getFields()[i].getType();
 
       hadError |= coerceToType(pattern, CoercionType, isFirstPass);
+
+      // Type-check the initialization expression.
+      if (ExprHandle *initHandle = elt.getInit()) {
+        Expr *init = initHandle->getExpr();
+        if (typeCheckExpression(init, CoercionType)) {
+          initHandle->setExpr(nullptr);
+        } else {
+          initHandle->setExpr(init);
+        }
+      }
     }
 
     return hadError;

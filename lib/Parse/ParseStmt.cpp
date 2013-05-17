@@ -21,6 +21,8 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 
 /// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
@@ -315,7 +317,10 @@ NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
     return 0;
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
-  
+
+  // The pipe is not a delimiter within braces.
+  llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
+
   SmallVector<ExprStmtOrDecl, 16> Entries;
   SourceLoc RBLoc;
 

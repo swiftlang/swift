@@ -78,6 +78,11 @@ NullablePtr<Expr> Parser::parseExprAs(Expr *sub) {
     : (Expr*) new (Context) CoerceExpr(sub, asLoc, type);
 }
 
+/// \brief Determine whether the given token starts with a pipe ('|').
+static bool startsWithPipe(Token tok) {
+  return tok.isAnyOperator() && tok.getText()[0] == '|';
+}
+
 /// parseExprSequence
 ///
 ///   expr-sequence:
@@ -103,6 +108,11 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
 
     switch (Tok.getKind()) {
     case tok::oper_binary: {
+      // If '|' is a delimiter and this operator starts with a '|',
+      // we're done.
+      if (PipeIsDelimiter && startsWithPipe(Tok))
+        goto done;
+
       // Parse the operator.
       Expr *Operator = parseExprOperator();
       SequencedExprs.push_back(Operator);
@@ -191,6 +201,14 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     Operator = parseExprOperator();
     break;
   case tok::oper_binary: {
+    // If '|' is a delimiter and this operator starts with a '|',
+    // we're done. Complain about needing an expression here.
+    if (PipeIsDelimiter && startsWithPipe(Tok)) {
+      diagnose(Tok, diag::expected_expr_after_operator)
+        .highlight(SourceRange(PreviousLoc));
+      return nullptr;
+    }
+
     // For recovery purposes, accept an oper_binary here.
     SourceLoc OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
     Tok.setKind(tok::oper_prefix);
@@ -198,8 +216,7 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
 
     assert(OperEndLoc != Tok.getLoc() && "binary operator with no spaces?");
     diagnose(PreviousLoc, diag::expected_prefix_operator)
-      .fixItRemove(Diagnostic::Range(OperEndLoc,
-                                                           Tok.getLoc()));
+      .fixItRemove(Diagnostic::Range(OperEndLoc, Tok.getLoc()));
     break;
   }
   case tok::oper_postfix:
@@ -270,6 +287,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
       continue;
     }
 
+    // Pipe is not a delimiter within the square brackets.
+    llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
     auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
     if (boundValue.isNull() || !Tok.is(tok::r_square)) {
       if (!boundValue.isNull())
@@ -587,8 +606,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       continue;
     }
 
-    // Check for a postfix-operator suffix.
-    if (Tok.is(tok::oper_postfix)) {
+    // Check for a postfix-operator suffix, ignoring leading pipes when
+    // pipe is a delimiter.
+    if (Tok.is(tok::oper_postfix) && !
+        (PipeIsDelimiter && startsWithPipe(Tok))) {
       Expr *oper = parseExprOperator();
       Result = new (Context) PostfixUnaryExpr(oper, Result.get());
       continue;
@@ -671,11 +692,6 @@ Expr *Parser::parseExprIdentifier() {
   return actOnIdentifierExpr(Name, Loc);
 }
 
-/// \brief Determine whether the given token starts with a pipe ('|').
-static bool startsWithPipe(Token tok) {
-  return tok.isAnyOperator() && tok.getText()[0] == '|';
-}
-
 /// \brief Consume a pipe at the beginning of the current token.
 static SourceLoc consumePipe(Parser &parser) {
   assert(startsWithPipe(parser.Tok));
@@ -688,6 +704,11 @@ static SourceLoc consumePipe(Parser &parser) {
   SourceLoc loc = parser.Tok.getLoc();
   StringRef remaining = parser.Tok.getText().substr(1);
   parser.Tok.setToken(parser.L->getTokenKind(remaining), remaining);
+
+  // If the token was treated as a binary operator, treat it as a prefix.
+  if (parser.Tok.getKind() == tok::oper_binary)
+    parser.Tok.setKind(tok::oper_prefix);
+  
   return loc;
 }
 
@@ -708,13 +729,17 @@ NullablePtr<Expr> Parser::parseExprClosure() {
     // Consume the starting pipe.
     SourceLoc leftPipe = consumePipe(*this);
 
+    // The pipe is treated as a delimiter within the closure parameter list.
+    llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, true);
+
     // Parse the list of tuple pattern elements.
     SmallVector<TuplePatternElt, 4> elements;
     bool invalid = false;
     if (!startsWithPipe(Tok)) {
       do {
         // Parse a pattern-tuple-element.
-        Optional<TuplePatternElt> elt = parsePatternTupleElement(true);
+        // FIXME: Eventually, we want to allow default arguments.
+        Optional<TuplePatternElt> elt = parsePatternTupleElement(false);
         if (!elt) {
           invalid = true;
           break;
@@ -814,6 +839,9 @@ NullablePtr<Expr> Parser::parseExprClosure() {
     AnonClosureVars.emplace_back();
   }
 
+  // The pipe is not a delimiter within the body of the closure.
+  llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
+
   // Parse the body.
   SmallVector<ExprStmtOrDecl, 4> bodyElements;
   parseBraceItems(bodyElements, /*IsTopLevel=*/false,
@@ -871,6 +899,9 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
 
   NullablePtr<Expr> Body;
   if (Tok.isNot(tok::r_brace)) {
+    // The pipe is not a delimiter in the body of the closure.
+    llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
+
     Body = parseExpr(diag::expected_expr_closure);
     if (Body.isNull()) return 0;
   } else {
@@ -1076,6 +1107,9 @@ NullablePtr<Expr> Parser::parseExprCollection() {
     return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc);
   }
 
+  // Pipe is not a delimiter within the square brackets.
+  llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
+
   // Parse the first expression.
   NullablePtr<Expr> FirstExpr
     = parseExpr(diag::expected_expr_in_collection_literal);
@@ -1257,7 +1291,7 @@ NullablePtr<Expr> Parser::parseExprFunc() {
 
   // Establish the new context.
   ContextChange CC(*this, FE);
-  
+
   // Then parse the expression.
   NullablePtr<BraceStmt> Body =
     parseBraceItemList(diag::expected_lbrace_func_expr);

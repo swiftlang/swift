@@ -21,6 +21,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
@@ -316,6 +317,9 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     return false;
   }
 
+  // '|' is not a delimiter within any list.
+  llvm::SaveAndRestore<bool> pipeNotDelimiter(PipeIsDelimiter, false);
+  
   bool Invalid = false;
   while (true) {
     while (Tok.is(SeparatorK)) {

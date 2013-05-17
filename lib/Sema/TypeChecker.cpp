@@ -766,7 +766,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // Check default arguments in patterns.
   // FIXME: This is an ugly hack to keep default arguments working for the
   // moment; I don't really want to invest more time into them until we're
-  // sure how they are acutally supposed to work.
+  // sure how they are actually supposed to work.
   struct PatternDefaultArgChecker : public ASTWalker {
     TypeChecker &TC;
     ExprPrePassWalker &PrePass;

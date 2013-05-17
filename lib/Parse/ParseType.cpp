@@ -22,6 +22,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 bool Parser::parseTypeAnnotation(TypeLoc &result) {
@@ -444,7 +445,10 @@ bool Parser::parseTypeArray(TypeLoc &result) {
                arrayRange };
     return false;
   }
-  
+
+  // Pipe is not a delimiter within an array bound.
+  llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
+
   NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
   if (sizeEx.isNull()) return true;
 
