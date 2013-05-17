@@ -229,7 +229,7 @@ void irgen::projectTupleElementFromExplosion(IRGenFunction &IGF,
                                              Explosion &tuple,
                                              unsigned fieldNo,
                                              Explosion &out) {
-  FOR_TUPLE_IMPL(IGF, tupleType.getSwiftRValueType(),
+  FOR_TUPLE_IMPL(IGF, tupleType,
                  projectElementFromExplosion,
                  tuple, fieldNo, out);
 }
@@ -238,7 +238,7 @@ OwnedAddress irgen::projectTupleElementAddress(IRGenFunction &IGF,
                                                OwnedAddress tuple,
                                                SILType tupleType,
                                                unsigned fieldNo) {
-  FOR_TUPLE_IMPL(IGF, tupleType.getSwiftRValueType(), projectElementAddress,
+  FOR_TUPLE_IMPL(IGF, tupleType, projectElementAddress,
                  tuple, fieldNo);
 }
 
