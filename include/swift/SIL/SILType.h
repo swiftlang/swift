@@ -186,8 +186,6 @@ public:
   /// Gets the type referenced by an address type, or the type itself if it is
   /// not an address type. Invalid for address-only types.
   SILType getObjectType() const {
-    assert((value.getInt() | IsLoadableFlag) &&
-           "dereferencing an address-only address");
     return {{value.getPointer(), value.getInt() & ~IsAddressFlag}};
   }
   
