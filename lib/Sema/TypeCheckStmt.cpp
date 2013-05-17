@@ -250,6 +250,7 @@ public:
     // Call the method.
     Expr *EmptyArgs
       = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
+                                   /*hasTrailingClosure=*/false,
                                    TupleType::getEmpty(TC.Context));
     ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
     Expr *Result = TC.semaApplyExpr(Call);
@@ -290,6 +291,7 @@ public:
     // Call base.name()
     Expr *EmptyArgs
       = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
+                                   /*hasTrailingClosure=*/false,
                                    TupleType::getEmpty(TC.Context));
     ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
     Expr *Result = TC.semaApplyExpr(Call);
@@ -541,7 +543,8 @@ public:
           = new (TC.Context) TupleExpr(SourceLoc(),
                      TC.Context.AllocateCopy(MutableArrayRef<Expr*>(matchArgs)),
                      nullptr,
-                     SourceLoc());
+                     SourceLoc(),
+                     /*hasTrailingClosure=*/false);
         Expr *matchRef = TC.buildRefExpr(matchDecls, valueExpr->getLoc());
         Expr *nextCondition
           = new (TC.Context) BinaryExpr(matchRef, matchArgExpr);
@@ -552,7 +555,8 @@ public:
             = new (TC.Context) TupleExpr(SourceLoc(),
                        TC.Context.AllocateCopy(MutableArrayRef<Expr*>(orArgs)),
                        nullptr,
-                       SourceLoc());
+                       SourceLoc(),
+                       /*hasTrailingClosure=*/false);
           Expr *orRef = TC.buildRefExpr(orDecls, valueExpr->getLoc());
           condition = new (TC.Context) BinaryExpr(orRef, orArgExpr);
         } else
@@ -718,7 +722,8 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
     return new (tc.Context) TupleExpr(SourceLoc(),
                                       tc.Context.AllocateCopy(elements),
                                       nullptr,
-                                      SourceLoc());
+                                      SourceLoc(),
+                                      /*hasTrailingClosure=*/false);
   }
 
   case PatternKind::Typed:

@@ -1097,8 +1097,9 @@ namespace {
         auto allocCall = new (Impl.SwiftContext) DotSyntaxCallExpr(allocRef,
                                                                    loc,
                                                                    initExpr);
-        auto emptyTuple = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr,
-                                                            loc);
+        auto emptyTuple
+          = new (Impl.SwiftContext) TupleExpr(loc, {}, nullptr, loc,
+                                              /*hasTrailingClosure=*/false);
         initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
 
         // Cast the result of the alloc call to the (metatype) 'this'.
@@ -1163,8 +1164,10 @@ namespace {
         callArg = callArgs[0];
       } else {
         auto callArgsCopy = Impl.SwiftContext.AllocateCopy(callArgs);
-        callArg = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
-                                                    nullptr, loc);
+        callArg
+          = new (Impl.SwiftContext) TupleExpr(loc, callArgsCopy,
+                                              nullptr, loc,
+                                              /*hasTrailingClosure=*/false);
       }
 
       initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
@@ -1318,7 +1321,8 @@ namespace {
         call = new (context) CallExpr(call, indexRef);
       } else {
         // For a property, call with no arguments.
-        auto emptyTuple = new (context) TupleExpr(loc, { }, nullptr, loc);
+        auto emptyTuple = new (context) TupleExpr(loc, { }, nullptr, loc,
+                                                  /*hasTrailingClosure=*/false);
         call = new (context) CallExpr(call, emptyTuple);
       }
 
@@ -1451,7 +1455,8 @@ namespace {
           = new (context) TupleExpr(loc,
                                     context.AllocateCopy(
                                       MutableArrayRef<Expr*>(callArgsArray)),
-                                  nullptr, loc);
+                                    nullptr, loc,
+                                    /*hasTrailingClosure=*/false);
       } else {
         callArgs = valueRef;
       }

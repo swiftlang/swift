@@ -418,6 +418,62 @@ NullablePtr<Expr> Parser::parseExprSuper() {
   }
 }
 
+/// \brief Create an argument with a trailing closure, with (optionally)
+/// the elements, names, and parentheses locations from an existing argument.
+static Expr *createArgWithTrailingClosure(ASTContext &context,
+                                          SourceLoc leftParen,
+                                          ArrayRef<Expr *> elementsIn,
+                                          Identifier *namesIn,
+                                          SourceLoc rightParen,
+                                          Expr *closure) {
+  // If there are no elements, just build a parenthesized expression around
+  // the cosure.
+  if (elementsIn.empty()) {
+    return new (context) ParenExpr(leftParen, closure, rightParen,
+                                   /*hasTrailingClosure=*/true);
+  }
+  
+  // Create the list of elements, and add the trailing closure to the end.
+  SmallVector<Expr *, 4> elements(elementsIn.begin(), elementsIn.end());
+  elements.push_back(closure);
+
+  Identifier *names = nullptr;
+  if (namesIn) {
+    names = context.Allocate<Identifier>(elements.size());
+    std::copy(namesIn, namesIn + elements.size() - 1, names);
+    new (namesIn + elements.size() - 1) Identifier();
+  }
+
+  // Form a full tuple expression.
+  return new (context) TupleExpr(leftParen, context.AllocateCopy(elements),
+                                 names, rightParen,
+                                 /*hasTrailingClosure=*/true);
+}
+
+/// \brief Add the given trailing closure argument to the call argument.
+static Expr *addTrailingClosureToArgument(ASTContext &context,
+                                          Expr *arg, Expr *closure) {
+  // Deconstruct the call argument to find its elements, element names,
+  // and the locations of the left and right parentheses.
+  if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+    // Deconstruct a tuple expression.
+    return createArgWithTrailingClosure(context,
+                                        tuple->getLParenLoc(),
+                                        tuple->getElements(),
+                                        tuple->getElementNames(),
+                                        tuple->getRParenLoc(),
+                                        closure);
+  }
+
+  // Deconstruct a parenthesized expression.
+  auto paren = dyn_cast<ParenExpr>(arg);
+  return createArgWithTrailingClosure(context,
+                                      paren->getLParenLoc(),
+                                      paren->getSubExpr(),
+                                      nullptr,
+                                      paren->getRParenLoc(), closure);
+}
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -449,6 +505,9 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///   expr-call:
 ///     expr-postfix expr-paren
 ///
+///   expr-trailing-closure:
+///     expr-postfix expr-closure
+///
 ///   expr-postfix:
 ///     expr-primary
 ///     expr-dot
@@ -456,7 +515,8 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     expr-subscript
 ///     expr-call
 ///     expr-postfix operator-postfix
-///
+///     expr-trailing-closure
+
 NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   NullablePtr<Expr> Result;
   switch (Tok.getKind()) {
@@ -614,7 +674,40 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       Result = new (Context) PostfixUnaryExpr(oper, Result.get());
       continue;
     }
-        
+
+    // Check for a closure suffix.
+    // FIXME: We current require an explicit argument list on trailing closures,
+    // to avoid the ambiguity introduced by
+    //
+    //   for x in map(xs) { $0 + 15 } {
+    //      // loop body...
+    //    }
+    //
+    // However, we believe we can cope with this ambiguity.
+    if (Tok.is(tok::l_brace) && startsWithPipe(peekToken()) &&
+        Context.LangOpts.UseConstraintSolver) {
+      Expr *closure = parseExprClosure();
+
+      // If the current expression is a call, the trailing
+      if (Result.isNull())
+        continue;
+
+      // When a closure follows a call, it becomes the last argument of
+      // that call.
+      if (auto call = dyn_cast<CallExpr>(Result.get())) {
+        Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
+                                                 closure);
+        call->setArg(arg);
+        continue;
+      }
+
+      // Otherwise, the closure implicitly forms a call.
+      Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
+                                               nullptr, SourceLoc(), closure);
+      Result = new (Context) CallExpr(Result.get(), arg);
+      continue;
+    }
+
     break;
   }
   
@@ -715,7 +808,7 @@ static SourceLoc consumePipe(Parser &parser) {
 // Note: defined below.
 static void AddFuncArgumentsToScope(Pattern *pat, CapturingExpr *CE, Parser &P);
 
-NullablePtr<Expr> Parser::parseExprClosure() {
+Expr *Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
 
   // Parse the opening left brace.
@@ -920,7 +1013,8 @@ NullablePtr<Expr> Parser::parseExprExplicitClosure() {
     Body = parseExpr(diag::expected_expr_closure);
     if (Body.isNull()) return 0;
   } else {
-    Body = new (Context) TupleExpr(LBLoc, MutableArrayRef<Expr *>(), 0, LBLoc);
+    Body = new (Context) TupleExpr(LBLoc, MutableArrayRef<Expr *>(), 0, LBLoc,
+                                   /*hasTrailingClosure=*/false);
   }
   ThisClosure->setBody(Body.get());
   
@@ -1100,10 +1194,12 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
       (SubExprNames.empty() || SubExprNames[0].empty())) {
-    return new (Context) ParenExpr(LLoc, SubExprs[0], RLoc);
+    return new (Context) ParenExpr(LLoc, SubExprs[0], RLoc,
+                                   /*hasTrailingClosure=*/false);
   }
 
-  return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc);
+  return new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
+                                 /*hasTrailingClosure=*/false);
 }
 
 /// parseExprCollection - Parse a collection literal expression.
@@ -1119,7 +1215,8 @@ NullablePtr<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     // FIXME: We want a special 'empty collection' literal kind.
     SourceLoc RSquareLoc = consumeToken();
-    return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc);
+    return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc,
+                                   /*hasTrailingClosure=*/false);
   }
 
   // Pipe is not a delimiter within the square brackets.
@@ -1183,11 +1280,13 @@ NullablePtr<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   Expr *SubExpr;
   if (SubExprs.size() == 1)
     SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
-                                      RSquareLoc);
+                                      RSquareLoc,
+                                      /*hasTrailingClosure=*/false);
   else
     SubExpr = new (Context) TupleExpr(LSquareLoc,
                                       Context.AllocateCopy(SubExprs),
-                                      nullptr, RSquareLoc);
+                                      nullptr, RSquareLoc,
+                                      /*hasTrailingClosure=*/false);
 
   return new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc);
 }
@@ -1218,7 +1317,8 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     SubExprs.push_back(new (Context) TupleExpr(SourceLoc(),
                                                Context.AllocateCopy(Exprs),
                                                nullptr,
-                                               SourceLoc()));
+                                               SourceLoc(),
+                                               /*hasTrailingClosure=*/false));
   };
 
   // Parse the first value.
@@ -1265,11 +1365,13 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   Expr *SubExpr;
   if (SubExprs.size() == 1)
     SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
-                                      RSquareLoc);
+                                      RSquareLoc,
+                                      /*hasTrailingClosure=*/false);
   else
     SubExpr = new (Context) TupleExpr(LSquareLoc,
                                       Context.AllocateCopy(SubExprs),
-                                      nullptr, RSquareLoc);
+                                      nullptr, RSquareLoc,
+                                      /*hasTrailingClosure=*/false);
 
   return new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc);
 }

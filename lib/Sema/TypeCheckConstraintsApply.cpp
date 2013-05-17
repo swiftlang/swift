@@ -693,6 +693,7 @@ namespace {
                                               tc.Context.AllocateCopy(segments),
                                               nullptr,
                                               expr->getStartLoc(),
+                                              /*hasTrailingClosure=*/false,
                                               TupleType::get(tupleElements,
                                                              tc.Context));
       }
@@ -1816,6 +1817,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Form an empty tuple.
       Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
                                               nullptr, expr->getEndLoc(),
+                                              /*hasTrailingClosure=*/false,
                                               TupleType::getEmpty(tc.Context));
 
       // Call the conversion function with an empty tuple.
@@ -2372,6 +2374,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
                                            { }, nullptr,
                                            expr->getEndLoc(),
+                                           /*hasTrailingClosure=*/false,
                                            TupleType::getEmpty(tc.Context));
     ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
     expr = rewriter.finishApply(apply, openedType, locator);
@@ -2408,6 +2411,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   Expr *arg = new (tc.Context) TupleExpr(expr->getStartLoc(),
                                          { }, nullptr,
                                          expr->getEndLoc(),
+                                         /*hasTrailingClosure=*/false,
                                          TupleType::getEmpty(tc.Context));
   ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, arg);
   return rewriter.finishApply(apply, openedType, locator);

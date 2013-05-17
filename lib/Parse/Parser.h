@@ -433,7 +433,7 @@ public:
   ///
   ///   closure-signature-result:
   ///     '->' type
-  NullablePtr<Expr> parseExprClosure();
+  Expr *parseExprClosure();
 
   NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();

@@ -1543,7 +1543,8 @@ Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS,
   Expr *ArgElts[] = { LHS, RHS };
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
   TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
-                                              ArgElts2, 0, SourceLoc());
+                                              ArgElts2, 0, SourceLoc(),
+                                              /*hasTrailingClosure=*/false);
   if (TypeCheckAST && TC.semaTupleExpr(Arg))
     return nullptr;
 
@@ -2066,7 +2067,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
   GenericParamList *genericParams = nullptr;
   GenericParamList *outerGenericParams = nullptr;
   if (FuncDecl *FD = FE->getDecl()) {
-    isInstanceFunc = FD->computeThisType(&outerGenericParams);
+    isInstanceFunc = (bool)FD->computeThisType(&outerGenericParams);
     genericParams = FD->getGenericParams();
   }
 
@@ -2130,6 +2131,7 @@ static bool convertWithMethod(TypeChecker &TC, Expr *&E, Identifier method,
     TupleExpr *callArgs =
       new (TC.Context) TupleExpr(E->getStartLoc(), MutableArrayRef<Expr *>(), 0,
                                  E->getEndLoc(),
+                                 /*hasTrailingClosure=*/false,
                                  TupleType::getEmpty(TC.Context));
     CallExpr *CE = new (TC.Context) CallExpr(E, callArgs, Type());
     Expr *CheckedCall = TC.semaApplyExpr(CE);

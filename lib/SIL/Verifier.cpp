@@ -833,7 +833,7 @@ public:
             "isa operand must be a class type");
     CanType testTy = II->getTestType().getSwiftRValueType();
     if (auto *archetype = dyn_cast<ArchetypeType>(testTy))
-      require(archetype->getSuperclass(),
+      require((bool)archetype->getSuperclass(),
               "isa must test against a class type or base-class-constrained "
               "archetype");
     else

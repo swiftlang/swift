@@ -1020,6 +1020,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   // FIXME: Terrible, terrible hack to get the source ranges to work for
   // these implicit nodes.
   FnRef = new (TC.Context) ParenExpr(E->getStartLoc(), FnRef, E->getEndLoc(),
+                                     /*hasTrailingClosure=*/false,
                                      FnRef->getType());
   ApplyExpr *ApplyThis = new (TC.Context) DotSyntaxCallExpr(FnRef,
                                                             SourceLoc(),
@@ -1030,7 +1031,8 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   
   TupleExpr *Args = new (TC.Context) TupleExpr(E->getStartLoc(),
                                                MutableArrayRef<Expr *>(),
-                                               nullptr, E->getEndLoc());
+                                               nullptr, E->getEndLoc(),
+                                               /*hasTrailingClosure=*/false);
   TC.semaTupleExpr(Args);
 
   ApplyExpr *Call = new (TC.Context) CallExpr(BoundFn, Args);
@@ -1134,7 +1136,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     Expr *Args[] = {Result, Segment};
     TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(),
                       TC.Context.AllocateCopy(MutableArrayRef<Expr *>(Args, 2)),
-                                                nullptr, SourceLoc());
+                                                nullptr, SourceLoc(),
+                                                /*hasTrailingClosure=*/false);
     if (TC.semaTupleExpr(Arg))
       return nullptr;
     

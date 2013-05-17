@@ -2061,6 +2061,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-postfix ::= <a href="#expr-metatype">expr-metatype</a>
     expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
     expr-postfix ::= <a href="#expr-call">expr-call</a>
+    expr-postfix ::= <a href="#expr-trailing-closure">expr-trailing-closure</a>
 
   </pre>
 
@@ -2775,7 +2776,52 @@ ill-formed if the type does not conform to the protocol.</p>
     (j &lt;+ 2)()
   </pre>
 
+  <!-- ===================================================================== -->
+  <h3 id="expr-trailing-closure">Trailing Closures</h3>
+  <!-- ===================================================================== -->
+  
+  <pre class="grammar">
+    expr-trailing-closure ::= <a href="#expr">expr-postfix</a> <a href="#expr-closure">expr-closure</a>
+  </pre>
 
+  <p>A postfix expression followed by a closure will be invoked with
+  the closure as its argument. This syntax is referred to as a
+  "trailing" closure, because the closure itself is outside the
+  parentheses used to call the expression. Trailing closures are
+  syntactic sugar that eliminates the awkwardness of closing a
+  function call with "})", where the "}" ends the closure and the ")"
+  ends the call.</p>
+
+  <p>Trailing closures use a simple syntactic translation, making them
+  purely syntactic sugar. If the postfix expression preceding the
+  trailing closure is an <a href="#expr-call">expr-call</a>, the
+  closure is added to the end of the <a
+  href="#expr-paren">expr-paren</a> of that call. Otherwise, the
+  postfix expression is (implicitly) called with the trailing closure
+  as its only argument.</p>
+
+  <div class="commentary">
+    It is possible to model trailing closures as simply another way to
+    perform a function call, forgoing the syntactic transformation for
+    <a href="#expr-call">expr-call</a>, if functions meant to be used
+    with trailing closures are written as curried functions, e.g.,
+    <pre>
+func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
+    </pre>
+    There are two problems with this (admittedly simpler) design.
+    First, functions imported from C, C++, and Objective-C won't ever
+    be written in this curried syntax, so we would have to implement
+    redundant entry points to enable this syntax. Second, this design
+    forces the idea of currying front and center for Swift programmers
+    who otherwise wouldn't care, for mostly theoretical reasons.
+  </div>
+
+  <pre class="example">
+  dispatch_async(q) {
+    print("Whenever you get around to it\n")
+  }
+  </pre>
+  
   <!-- ********************************************************************* -->
   <h2 id = "stmt">Statements</h2>
   <!-- ********************************************************************* -->

@@ -263,14 +263,15 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
 }
 
 SourceRange TupleExpr::getSourceRange() const {
-  if (LParenLoc.isValid()) {
+  if (LParenLoc.isValid() && !HasTrailingClosure) {
     assert(RParenLoc.isValid() && "Mismatched parens?");
     return SourceRange(LParenLoc, RParenLoc);
   }
   if (getElements().empty())
     return SourceRange();
   
-  SourceLoc Start = getElement(0)->getStartLoc();
+  SourceLoc Start = LParenLoc.isValid()? LParenLoc
+                                       : getElement(0)->getStartLoc();
   SourceLoc End = getElement(getElements().size()-1)->getEndLoc();
   return SourceRange(Start, End);
 }
@@ -621,12 +622,18 @@ public:
       << " name='" << E->getName() << "')";
   }
   void visitParenExpr(ParenExpr *E) {
-    printCommon(E, "paren_expr") << '\n';
+    printCommon(E, "paren_expr");
+    if (E->hasTrailingClosure())
+      OS << " trailing-closure";
+    OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
   void visitTupleExpr(TupleExpr *E) {
     printCommon(E, "tuple_expr");
+    if (E->hasTrailingClosure())
+      OS << " trailing-closure";
+
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
       if (E->getElement(i))
@@ -811,7 +818,11 @@ public:
   }
   void visitPipeClosureExpr(PipeClosureExpr *expr) {
     printCapturing(expr, "closure_expr");
-    printRec(expr->getBody());
+    if (expr->hasSingleExpressionBody()) {
+      OS << " single-expression\n";
+      printRec(expr->getSingleExpressionBody());
+    } else
+      printRec(expr->getBody());
     OS << ')';
   }
   void visitExplicitClosureExpr(ExplicitClosureExpr *E) {

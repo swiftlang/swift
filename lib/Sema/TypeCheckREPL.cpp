@@ -141,9 +141,10 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
                                                       EndLoc));
     if (!Res)
       return;
-    TupleExpr *CallArgs =
-      new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
-                              TupleType::getEmpty(Context));
+    TupleExpr *CallArgs
+      = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+                                /*hasTrailingClosure=*/false,
+                                TupleType::getEmpty(Context));
     CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
     Res = TC.semaApplyExpr(CE);
     if (!Res)
@@ -313,8 +314,9 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
                                                       EndLoc));
     if (!Res)
       return;
-    TupleExpr *CallArgs =
-        new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+    TupleExpr *CallArgs
+      = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
+                                /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
     Res = TC.semaApplyExpr(CE);

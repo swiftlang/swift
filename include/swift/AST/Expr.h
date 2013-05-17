@@ -724,14 +724,18 @@ class ParenExpr : public Expr {
   SourceLoc LParenLoc, RParenLoc;
   Expr *SubExpr;
 
+  /// \brief Whether we're wrapping a trailing closure expression.
+  /// FIXME: Pack bit into superclass.
+  bool HasTrailingClosure;
+
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
+            bool hasTrailingClosure,
             Type ty = Type())
     : Expr(ExprKind::Paren, ty), LParenLoc(lploc), RParenLoc(rploc),
-      SubExpr(subExpr) {
-    // We just assert that these are always valid; it's not clear why
-    // you'd ever construct something where that's not true.
-    assert(lploc.isValid() && rploc.isValid());
+      SubExpr(subExpr), HasTrailingClosure(hasTrailingClosure) {
+    assert(lploc.isValid() == rploc.isValid() &&
+           "Mismatched source location information");
   }
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
@@ -739,8 +743,21 @@ public:
 
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceRange getSourceRange() const {
+    // When the locations of the parentheses are invalid, ask our subexpression
+    // for its source range instead.
+    if (LParenLoc.isInvalid())
+      return SubExpr->getSourceRange();
+
+    // If we have a trailing closure, our end point is the end of the trailing
+    // closure.
+    if (HasTrailingClosure)
+      return SourceRange(LParenLoc, SubExpr->getEndLoc());
+
     return SourceRange(LParenLoc, RParenLoc);
   }
+
+  /// \brief Whether this expression has a trailing closure as its argument.
+  bool hasTrailingClosure() const { return HasTrailingClosure; }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *E) { SubExpr = E; }
@@ -759,13 +776,20 @@ class TupleExpr : public Expr {
   MutableArrayRef<Expr *> SubExprs;
   /// SubExprNames - Can be null if no names.  Otherwise length = SubExpr.size()
   Identifier *SubExprNames;
-  
+
+  /// \brief Whether we're wrapping a trailing closure expression.
+  /// FIXME: Pack bit into superclass.
+  bool HasTrailingClosure;
+
 public:
   TupleExpr(SourceLoc LParenLoc, MutableArrayRef<Expr *> SubExprs,
             Identifier *SubExprNames, SourceLoc RParenLoc,
+            bool hasTrailingClosure,
             Type Ty = Type())
     : Expr(ExprKind::Tuple, Ty), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-      SubExprs(SubExprs), SubExprNames(SubExprNames) {
+      SubExprs(SubExprs), SubExprNames(SubExprNames),
+      HasTrailingClosure(hasTrailingClosure)
+  {
     assert(LParenLoc.isValid() == RParenLoc.isValid() &&
            "Mismatched parenthesis location information validity");
   }
@@ -774,6 +798,9 @@ public:
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
   SourceRange getSourceRange() const;
+
+  /// \brief Whether this expression has a trailing closure as its argument.
+  bool hasTrailingClosure() const { return HasTrailingClosure; }
 
   MutableArrayRef<Expr*> getElements() {
     return SubExprs;
@@ -794,6 +821,8 @@ public:
 
   bool hasElementNames() const { return SubExprNames; }
 
+  Identifier *getElementNames() const { return SubExprNames; }
+  
   Identifier getElementName(unsigned i) const {
     return SubExprNames ? SubExprNames[i] : Identifier();
   }

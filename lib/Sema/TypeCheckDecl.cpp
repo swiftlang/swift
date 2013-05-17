@@ -932,7 +932,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
           = new (Context) TupleExpr(SourceLoc(),
                                     Context.AllocateCopy(eltInits),
                                     Context.AllocateCopy(eltNames).data(),
-                                    SourceLoc());
+                                    SourceLoc(),
+                                    /*hasTrailingClosure=*/false);
     }
     return true;
   }
@@ -1003,7 +1004,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
 
   // We found a default constructor. Construct the initializer expression.
   // FIXME: As an optimization, we could build a fully type-checked AST here.
-  Expr *arg = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc());
+  Expr *arg = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
+                                      /*hasTrailingClosure=*/false);
   Expr *metatype = new (Context) MetatypeExpr(nullptr, SourceLoc(),
                                               MetaTypeType::get(ty, Context));
   *initializer = new (Context) CallExpr(metatype, arg);
