@@ -83,8 +83,85 @@ bool Parser::parseDeclSIL() {
 }
 
 ///   sil-type:
-///     '$' type
+///     '$' sil-type-attributes? '*'? type
+///   sil-type-attributes:
+///     '[' sil-type-attribute (',' sil-type-attribute)* ']'
+///   sil-type-attribute:
+///     'sil_sret'
+///     'sil_cc' '=' ('c' | 'method' | 'freestanding')
+///     'sil_uncurry' '=' integer_literal
+///
 bool Parser::parseSILType(SILType &Result) {
+  bool IsSRet = false;
+  AbstractCC CallingConv = AbstractCC::Freestanding;
+  unsigned UncurryLevel = 0;
+
+  // If we have sil-type-attribute list, parse it.
+  if (Tok.is(tok::l_square) && peekToken().is(tok::identifier) &&
+      peekToken().getText().startswith("sil_")) {
+    SourceLoc LeftLoc = Tok.getLoc(), RightLoc;
+
+    // The attribute list is always guaranteed to have at least one attribute.
+    do {
+      consumeToken();
+
+      SourceLoc AttrTokenLoc = Tok.getLoc();
+      Identifier AttrToken;
+      if (parseIdentifier(AttrToken,
+                          diag::expected_identifier_sil_type_attributes))
+        return true;
+
+      if (AttrToken.str() == "sil_sret") {
+        IsSRet = true;
+        consumeToken(tok::identifier);
+      } else if (AttrToken.str() == "sil_cc") {
+        Identifier CCToken;
+        if (parseToken(tok::identifier, diag::malformed_sil_cc_attribute) ||
+            parseToken(tok::equal, diag::malformed_sil_cc_attribute) ||
+            parseIdentifier(CCToken, diag::malformed_sil_cc_attribute))
+          return true;
+
+        if (CCToken.str() == "c")
+          CallingConv = AbstractCC::C;
+        else if (CCToken.str() == "method")
+          CallingConv = AbstractCC::Method;
+        else if (CCToken.str() == "freestanding")
+          CallingConv = AbstractCC::Freestanding;
+        else {
+          diagnose(Tok, diag::malformed_sil_cc_attribute);
+          return true;
+        }
+      } else if (AttrToken.str() == "sil_uncurry") {
+        if (parseToken(tok::identifier, diag::malformed_sil_uncurry_attribute)||
+            parseToken(tok::equal, diag::malformed_sil_uncurry_attribute))
+          return true;
+        if (Tok.isNot(tok::integer_literal) ||
+            Tok.getText().getAsInteger(10, UncurryLevel)) {
+          diagnose(Tok, diag::malformed_sil_uncurry_attribute);
+          return true;
+        }
+
+        consumeToken(tok::integer_literal);
+      } else {
+        diagnose(AttrTokenLoc, diag::unknown_sil_type_attribute);
+        return true;
+      }
+
+      // Continue parsing the next token.
+    } while (Tok.is(tok::comma));
+
+    if (parseMatchingToken(tok::r_square, RightLoc,
+                           diag::expected_bracket_sil_type_attributes, LeftLoc))
+      return true;
+  }
+
+  // If we have a '*', then this is an address type.
+  bool isAddress = false;
+  if (Tok.isAnyOperator() && Tok.getText() == "*") {
+    isAddress = true;
+    consumeToken();
+  }
+
   TypeLoc Ty;
   if (parseToken(tok::sil_dollar, diag::expected_sil_type) ||
       parseType(Ty, diag::expected_sil_type))

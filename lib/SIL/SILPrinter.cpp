@@ -119,6 +119,7 @@ void SILType::print(raw_ostream &OS) const {
         Attributes += "method";
         break;
       case AbstractCC::Freestanding:
+        // Note: freestanding is the default.
         Attributes += "freestanding";
         break;
       }

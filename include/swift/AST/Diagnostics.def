@@ -322,6 +322,16 @@ ERROR(expected_sil_type, decl_parsing,none,
 
 ERROR(expected_sil_rbrace, decl_parsing,none,
       "expected '}' at the end of a sil body", ())
+ERROR(expected_bracket_sil_type_attributes,expr_parsing,none,
+      "expected ']' in SIL type attribute list", ())
+ERROR(expected_identifier_sil_type_attributes,expr_parsing,none,
+      "expected identifier in SIL type attribute list", ())
+ERROR(unknown_sil_type_attribute,expr_parsing,none,
+      "unknown SIL type attribute", ())
+ERROR(malformed_sil_cc_attribute,expr_parsing,none,
+      "invalid sil_cc attribute", ())
+ERROR(malformed_sil_uncurry_attribute,expr_parsing,none,
+      "invalid sil_uncurry attribute", ())
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
