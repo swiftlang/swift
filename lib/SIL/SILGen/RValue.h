@@ -120,7 +120,7 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
-    if (getType().isAddressOnly()) {
+    if (getType().isAddressOnly(gen.F.getModule())) {
       if (hasCleanup())
         forwardCleanup(gen);
       gen.B.createCopyAddr(loc, getValue(), address,
@@ -137,7 +137,7 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
-    if (getType().isAddressOnly()) {
+    if (getType().isAddressOnly(gen.F.getModule())) {
       if (hasCleanup())
         forwardCleanup(gen);
       gen.B.createCopyAddr(loc, getValue(), address,
@@ -153,7 +153,7 @@ public:
       
       SILValue old;
       
-      if (!ti.isTrivial())
+      if (!ti.isTrivial(gen.F.getModule()))
         old = gen.B.createLoad(loc, address);
       
       gen.emitStore(loc, *this, address);

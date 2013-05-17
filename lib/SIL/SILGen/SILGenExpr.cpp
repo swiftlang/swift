@@ -71,9 +71,9 @@ namespace {
 } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial()) {
+  if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial(SGM.M)) {
     return ManagedValue(v, ManagedValue::Unmanaged);
-  } else if (v.getType().isAddressOnly()) {
+  } else if (v.getType().isAddressOnly(SGM.M)) {
     Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
     return ManagedValue(v, getCleanupsDepth());
   } else {
@@ -257,7 +257,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       SILValue addr,
                                       SGFContext C,
                                       bool isTake) {
-  if (addr.getType().isAddressOnly()) {
+  if (addr.getType().isAddressOnly(SGM.M)) {
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, addr.getType(), C);
     B.createCopyAddr(loc, addr, copy,
@@ -322,7 +322,7 @@ SILValue SILGenFunction::getBufferForExprResult(
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   assert(!v.isLValue() && "materializing an lvalue?!");
   // Address-only values are already materialized.
-  if (v.getType().isAddressOnly()) {
+  if (v.getType().isAddressOnly(SGM.M)) {
     return Materialize{v.getValue(), v.getCleanup()};
   }
   
@@ -335,7 +335,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   v.forwardInto(*this, loc, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
+  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial(SGM.M)) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
     valueCleanup = getCleanupsDepth();
   }
@@ -344,7 +344,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
 }
 
 ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
-  assert(!address.getType().isAddressOnly() &&
+  assert(!address.getType().isAddressOnly(gen.SGM.M) &&
          "address-only value must be consumed with consumeInto");
   if (valueCleanup.isValid())
     gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
@@ -1270,10 +1270,10 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       if (vd->isProperty())
         continue;
       const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
-      if (!ti.isTrivial()) {
+      if (!ti.isTrivial(SGM.M)) {
         SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());
-        if (ti.isAddressOnly()) {
+        if (ti.isAddressOnly(SGM.M)) {
           B.createDestroyAddr(dd, addr);
         } else {
           SILValue field = B.createLoad(dd, addr);
@@ -1362,7 +1362,7 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
     = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
   
   // FIXME: We should actually elementwise default-construct the elements.
-  if (thisTy.isAddressOnly()) {
+  if (thisTy.isAddressOnly(gen.SGM.M)) {
     SILValue resultSlot
       = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
     gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
@@ -1400,7 +1400,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   
   // If we have an indirect return slot, initialize it in-place in the implicit
   // return slot.
-  if (thisTy.isAddressOnly()) {
+  if (thisTy.isAddressOnly(gen.SGM.M)) {
     SILValue resultSlot
       = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
     
@@ -1482,7 +1482,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // If 'this' is address-only, copy 'this' into the indirect return slot.
-  if (thisTy.isAddressOnly()) {
+  if (thisTy.isAddressOnly(SGM.M)) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
     SILValue thisBox = VarLocs[thisDecl].box;

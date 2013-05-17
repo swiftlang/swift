@@ -434,7 +434,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argValues.push_back(
                   forwardIfConsumed(Args[i], Ownership.isArgumentConsumed(i)));
   
-  if (resultTI.isAddressOnly()) {
+  if (resultTI.isAddressOnly(F.getModule())) {
     // Allocate a temporary to house the indirect return, and pass it to the
     // function as an implicit argument.
     SILValue buffer = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
@@ -696,7 +696,7 @@ namespace {
     auto &ti = gen.getTypeLoweringInfo(substitutions[0].Replacement);
     
     // Destroy is a no-op for trivial types.
-    if (ti.isTrivial())
+    if (ti.isTrivial(gen.F.getModule()))
       return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
     
     SILType destroyType = ti.getLoweredType();
@@ -705,7 +705,7 @@ namespace {
     SILValue addr = gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
                                                  destroyType.getAddressType());
     
-    if (destroyType.isAddressOnly()) {
+    if (destroyType.isAddressOnly(gen.F.getModule())) {
       // If the type is address-only, destroy it indirectly.
       gen.B.createDestroyAddr(loc, addr);
     } else {

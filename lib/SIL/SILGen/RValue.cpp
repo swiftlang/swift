@@ -63,7 +63,7 @@ public:
   void visitTupleType(TupleType *t, ManagedValue mv) {
     ++depth;
     SILValue v = mv.forward(gen);
-    if (v.getType().isAddressOnly()) {
+    if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
       for (unsigned i = 0; i < t->getFields().size(); ++i) {
         auto &field = t->getFields()[i];
@@ -71,7 +71,8 @@ public:
         SILValue member = gen.B.createElementAddr(SILLocation(),
                                                   v, i,
                                                   fieldTy.getAddressType());
-        if (!fieldTy.isAddressOnly() && !field.getType()->is<LValueType>())
+        if (!fieldTy.isAddressOnly(gen.F.getModule()) &&
+            !field.getType()->is<LValueType>())
           member = gen.B.createLoad(SILLocation(), member);
         visit(CanType(field.getType()),
               gen.emitManagedRValueWithCleanup(member));
@@ -190,7 +191,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (loweredType.isAddressOnly()) {
+  if (loweredType.isAddressOnly(gen.F.getModule())) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
     SILValue buffer = gen.emitTemporaryAllocation(SILLocation(), loweredType);

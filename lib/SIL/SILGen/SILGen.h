@@ -298,7 +298,7 @@ public:
                                  AbstractCC cc = AbstractCC::Freestanding,
                                  unsigned uncurryLevel = 0) {
     const TypeLoweringInfo &ti = getTypeLoweringInfo(t, cc, uncurryLevel);
-    assert(ti.isLoadable() && "unexpected address-only type");
+    assert(ti.isLoadable(F.getModule()) && "unexpected address-only type");
     return ti.getLoweredType();
   }
 

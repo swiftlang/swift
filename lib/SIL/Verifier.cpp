@@ -50,7 +50,7 @@ public:
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
-  SILFunction const &F;
+  const SILFunction &F;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo Dominance;
 public:
@@ -436,7 +436,7 @@ public:
             "Operand of dealloc_ref must be reference type");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
-    require(DI->getOperand().getType().isAddressOnly(),
+    require(DI->getOperand().getType().isAddressOnly(F.getModule()),
             "Operand of destroy_addr must be address-only");
   }
 
@@ -657,7 +657,7 @@ public:
   }
   
   void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
-    require(ASI->getOperand().getType().isAddressOnly(),
+    require(ASI->getOperand().getType().isAddressOnly(F.getModule()),
             "archetype_to_super operand must be an address");
     require(ASI->getOperand().getType().is<ArchetypeType>(),
             "archetype_to_super operand must be archetype");

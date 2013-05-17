@@ -318,8 +318,9 @@ struct InitializationForPattern
     // we can bind the address we were passed for the variable, and we don't
     // need to initialize it.
     SILType loweredTy = Gen.getLoweredType(vd->getType());
-    if (ArgumentOrVar == Argument && loweredTy.isAddressOnly()
-        && vd->hasFixedLifetime()) {
+    if (ArgumentOrVar == Argument &&
+        loweredTy.isAddressOnly(Gen.F.getModule()) &&
+        vd->hasFixedLifetime()) {
       return InitializationPtr(new ByrefArgumentInitialization(vd));
     }
     
@@ -393,7 +394,7 @@ struct ArgumentInitVisitor :
         break;
 
       case Initialization::Kind::SingleBuffer:
-        if (arg.getType().isAddressOnly()) {
+        if (arg.getType().isAddressOnly(gen.F.getModule())) {
           initB.createCopyAddr(loc, arg, I->getAddress(),
                                /*isTake=*/ true,
                                /*isInitialize=*/ true);
@@ -478,7 +479,7 @@ struct ArgumentInitVisitor :
     assert(I->kind == Initialization::Kind::Ignored &&
            "any pattern should match a black-hole Initialization");
     SILValue arg = makeArgument(P->getType(), f.begin());
-    if (arg.getType().isLoadable())
+    if (arg.getType().isLoadable(gen.F.getModule()))
       gen.emitReleaseRValue(SILLocation(), arg);
     return arg;
   }
@@ -593,7 +594,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
 
   // If the return type is address-only, emit the indirect return argument.
   const TypeLoweringInfo &returnTI = getTypeLoweringInfo(resultType);
-  if (returnTI.isAddressOnly()) {
+  if (returnTI.isAddressOnly(SGM.M)) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                    F.begin());
   }
@@ -649,7 +650,7 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                    ReferenceTypePath const &elt) {
   for (auto &comp : elt.path) {
     const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(comp.type);
-    assert(ti.isLoadable() && "fragile element is address-only?!");
+    assert(ti.isLoadable(gen.SGM.M) && "fragile element is address-only?!");
     v = gen.B.createExtract(loc, v, comp.index, ti.getLoweredType());
   }
   (gen.B.*createRR)(loc, v);
@@ -926,8 +927,8 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
     // it's address-only) then deallocate the variable.
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
     const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
-    if (!ti.isTrivial()) {
-      if (ti.isAddressOnly()) {
+    if (!ti.isTrivial(SGM.M)) {
+      if (ti.isAddressOnly(SGM.M)) {
         B.createDestroyAddr(vd, loc.address);
       } else {
         SILValue value = B.createLoad(vd, loc.address);
@@ -991,7 +992,7 @@ static void emitObjCUnconsumedArgument(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILValue arg) {
   // If address-only, copy to raise the ownership count.
-  if (arg.getType().isAddressOnly()) {
+  if (arg.getType().isAddressOnly(gen.SGM.M)) {
     SILValue tmp = gen.B.createAllocVar(loc, AllocKind::Stack, arg.getType());
     gen.B.createCopyAddr(loc, arg, tmp, /*isTake*/false, /*isInit*/ true);
     gen.B.createDeallocVar(loc, AllocKind::Stack, tmp);
@@ -1125,7 +1126,7 @@ void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
   // If the native property is physical, store to it.
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
                                          setValue.getType().getAddressType());
-  if (setValue.getType().isAddressOnly()) {
+  if (setValue.getType().isAddressOnly(SGM.M)) {
     // "Take" if the argument was received at +0.
     B.createCopyAddr(var, setValue, addr,
                      /*isTake*/ !ownership.isArgumentConsumed(1),

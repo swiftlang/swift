@@ -95,16 +95,16 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
-  bool isAddressOnly() const { return loweredType.isAddressOnly(); }
+  bool isAddressOnly(SILModule &M) const { return loweredType.isAddressOnly(M);}
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
-  bool isLoadable() const { return loweredType.isLoadable(); }
+  bool isLoadable(SILModule &M) const { return loweredType.isLoadable(M); }
   
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
-  bool isTrivial() const {
-    return loweredType.isLoadable() && referenceTypeElements.empty();
+  bool isTrivial(SILModule &M) const {
+    return loweredType.isLoadable(M) && referenceTypeElements.empty();
   }
   
   /// getReferenceTypeElements - For a nontrivial loadable value type, returns

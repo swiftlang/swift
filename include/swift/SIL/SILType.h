@@ -262,10 +262,10 @@ public:
   bool isAddress() const { return value.getInt() & IsAddressFlag; }
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
-  bool isLoadable() const { return value.getInt() & IsLoadableFlag; }
+  bool isLoadable(SILModule &M) const { return value.getInt() & IsLoadableFlag;}
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
-  bool isAddressOnly() const { return !isLoadable(); }
+  bool isAddressOnly(SILModule &M) const { return !isLoadable(M); }
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {

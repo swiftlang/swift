@@ -236,7 +236,7 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
   // If the result type lowers to an address-only type, add it as an indirect
   // return argument.
   SILType resultType = getLoweredType(ft->getResult());
-  bool hasIndirectReturn = resultType.isAddressOnly();
+  bool hasIndirectReturn = resultType.isAddressOnly(M);
   if (hasIndirectReturn) {
     inputTypes.push_back(resultType);
     resultType = getEmptyTupleType();
