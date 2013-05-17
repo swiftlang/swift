@@ -461,12 +461,12 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
 
   // FIXME: ObjC method constants should get SILGen-ed with a [sil_cc=c] type.
-  CallEmission emission(IGF, Callee::forKnownFunction(AbstractCC::C,
-                                          origType.getSwiftRValueType(),
-                                          substResultType.getSwiftRValueType(),
-                                          subs, messenger, nullptr,
-                                          ExplosionKind::Minimal,
-                                          /*uncurry*/ 1));
+  CallEmission emission(IGF,
+                        Callee::forKnownFunction(origType,
+                                                 substResultType,
+                                                 subs,
+                                                 messenger, nullptr,
+                                                 ExplosionKind::Minimal));
   // Compute the selector.
   Selector selector(method.getDecl());
 
