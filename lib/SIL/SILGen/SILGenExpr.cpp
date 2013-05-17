@@ -1379,8 +1379,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILType thisTy
     = gen.getLoweredType(ctor->getImplicitThisDecl()->getType());
 
-  if (TP->getFields().empty() &&
-      !thisTy.getCompoundTypeInfo()->getElements().empty()) {
+  if (TP->getFields().empty()) {
     // Emit a default constructor.
     return emitImplicitValueDefaultConstructor(gen, ctor);
   }

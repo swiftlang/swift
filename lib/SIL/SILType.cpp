@@ -45,36 +45,8 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
   return fi;
 }
 
-SILCompoundTypeInfo *SILCompoundTypeInfo::create(CanType swiftType,
-                                                 ArrayRef<Element> elements,
-                                                 SILModule &M) {
-  
-  void *buffer = M.allocate(sizeof(SILCompoundTypeInfo)
-                                 + sizeof(Element) * elements.size(),
-                               alignof(SILCompoundTypeInfo));
-  SILCompoundTypeInfo *cti =
-    ::new (buffer) SILCompoundTypeInfo(swiftType, elements.size());
-  
-  memcpy(cti->getElementBuffer(), elements.data(),
-         sizeof(Element) * elements.size());
-  return cti;
-}
-
-size_t SILCompoundTypeInfo::getIndexOfMemberDecl(VarDecl *vd) const {
-  // FIXME: use an index of some sort instead of doing linear scan.
-  // We can't however use DenseMap because SILTypeInfos are bump-allocated and
-  // don't get destructed.
-  ArrayRef<Element> elements = getElements();
-  for (size_t i = 0, size = elements.size(); i < size; ++i) {
-    if (elements[i].decl == vd)
-      return i;
-  }
-  llvm_unreachable("decl is not a member of type");
-}
-
 unsigned SILType::getUncurryLevel() const {
-  if (auto *info = value.getPointer().dyn_cast<SILTypeInfo*>())
-    if (auto *finfo = dyn_cast<SILFunctionTypeInfo>(info))
-      return finfo->getUncurryLevel();
+  if (auto *finfo = value.getPointer().dyn_cast<SILFunctionTypeInfo*>())
+    return finfo->getUncurryLevel();
   return 0;
 }

@@ -27,52 +27,10 @@ namespace swift {
   class ASTContext;
   class VarDecl;
   class SILFunctionTypeInfo;
-  class SILCompoundTypeInfo;
 
 namespace Lowering {
   class TypeConverter;
 }
-
-enum class SILTypeInfoKind {
-  // SILTypeInfo,
-  SILTypeInfo_First,
-    SILFunctionTypeInfo = SILTypeInfo_First,
-    SILCompoundTypeInfo,
-  SILTypeInfo_Last = SILCompoundTypeInfo
-};
-
-/// SILTypeInfo - Abstract base class for SIL types that need to carry
-/// additional information along with the underlying Swift type.
-class alignas(8) SILTypeInfo : public SILAllocated<SILTypeInfo> {
-  // alignas(8) because we need three tag bits on SILTypeInfo* for SILType.
-  
-  enum : unsigned { KindBits = 1 };
-  static_assert(1U << KindBits > unsigned(SILTypeInfoKind::SILTypeInfo_Last),
-                "not enough kind bits for all SILTypeInfo kinds");
-  
-  llvm::PointerIntPair<TypeBase*, KindBits, SILTypeInfoKind> SwiftTypeAndKind;
-
-public:
-  SILTypeInfo(SILTypeInfoKind kind, CanType swiftType)
-    : SwiftTypeAndKind(swiftType.getPointer(), kind) {}
-  
-  SILTypeInfo(const SILTypeInfo &) = delete;
-  SILTypeInfo &operator=(const SILTypeInfo &) = delete;
-  
-  SILTypeInfoKind getKind() const {
-    return SwiftTypeAndKind.getInt();
-  }
-  CanType getSwiftType() const {
-    return CanType(SwiftTypeAndKind.getPointer());
-  }
-  
-  static bool classof(SILTypeInfo const *ti) {
-    assert(ti->getKind() >= SILTypeInfoKind::SILTypeInfo_First
-           && ti->getKind() <= SILTypeInfoKind::SILTypeInfo_Last
-           && "invalid SILTypeInfo kind!");
-    return true;
-  }
-};
 
 } // end namespace swift
   
@@ -83,13 +41,13 @@ namespace llvm {
   // SILTypeInfo* is always at least eight-byte aligned; make the three tag bits
   // available through PointerLikeTypeTraits.
   template<>
-  class PointerLikeTypeTraits<swift::SILTypeInfo*> {
+  class PointerLikeTypeTraits<swift::SILFunctionTypeInfo*> {
   public:
-    static inline void *getAsVoidPointer(swift::SILTypeInfo *I) {
+    static inline void *getAsVoidPointer(swift::SILFunctionTypeInfo *I) {
       return (void*)I;
     }
-    static inline swift::SILTypeInfo *getFromVoidPointer(void *P) {
-      return (swift::SILTypeInfo*)P;
+    static inline swift::SILFunctionTypeInfo *getFromVoidPointer(void *P) {
+      return (swift::SILFunctionTypeInfo*)P;
     }
     enum { NumLowBitsAvailable = 3 };
   };
@@ -113,7 +71,7 @@ namespace swift {
 /// types do not have a known size or layout and must always be handled
 /// indirectly in memory.
 class SILType {
-  using PointerType = llvm::PointerUnion<TypeBase *, SILTypeInfo *>;
+  using PointerType = llvm::PointerUnion<TypeBase *, SILFunctionTypeInfo *>;
   using ValueType = llvm::PointerIntPair<PointerType, 2>;
   ValueType value;
 
@@ -146,11 +104,9 @@ class SILType {
            "LValueTypes should be eliminated by SIL lowering");
     assert(!ty->is<AnyFunctionType>() &&
            "SIL lowering must produce a SILFunctionTypeInfo for functions");
-    assert(!ty->is<TupleType>() &&
-           "SIL lowering must produce a SILCompoundTypeInfo for this");
   }
   
-  SILType(SILTypeInfo *ti, bool address, bool loadable)
+  SILType(SILFunctionTypeInfo *ti, bool address, bool loadable)
     : value(ti, makeFlags(address, loadable)) {
     assert((address || loadable) &&
            "SILType can't be the value of an address-only type");
@@ -190,14 +146,7 @@ public:
   }
   
   /// Returns the Swift type referenced by this SIL type.
-  CanType getSwiftRValueType() const {
-    PointerType p = value.getPointer();
-    if (auto *ty = p.dyn_cast<TypeBase*>())
-      return CanType(ty);
-    if (auto *ti = p.dyn_cast<SILTypeInfo*>())
-      return ti->getSwiftType();
-    llvm_unreachable("unknown SILType pointer type");
-  }
+  CanType getSwiftRValueType() const;
 
   /// Returns the Swift type equivalent to this SIL type. If the SIL type is
   /// an address type, returns an LValueType.
@@ -213,15 +162,9 @@ public:
   /// Gives the SILFunctionTypeInfo for a function type. The type must be
   /// derived from a Swift FunctionType or PolymorphicFunctionType.
   SILFunctionTypeInfo *getFunctionTypeInfo() const {
-    return cast<SILFunctionTypeInfo>(value.getPointer().get<SILTypeInfo*>());
+    return value.getPointer().get<SILFunctionTypeInfo*>();
   }
   
-  /// Gets the SILCompoundTypeInfo for a compound type. The type must be
-  /// derived from a Swift struct, tuple, oneof, or class type.
-  SILCompoundTypeInfo *getCompoundTypeInfo() const {
-    return cast<SILCompoundTypeInfo>(value.getPointer().get<SILTypeInfo*>());
-  }
-
   /// Returns the uncurry level of the type. Returns zero for non-function
   /// types.
   unsigned getUncurryLevel() const;
@@ -331,7 +274,10 @@ enum class AbstractCC : unsigned char {
 /// SILFunctionTypeInfo - SILType for a FunctionType or PolymorphicFunctionType.
 /// Specifies the uncurry level and SIL-level calling convention for the
 /// function.
-class SILFunctionTypeInfo : public SILTypeInfo {
+class alignas(8) SILFunctionTypeInfo {
+  // alignas(8) because we need three tag bits on SILFunctionTypeInfo*
+  // for SILType.
+  CanType swiftType;
   SILType resultType;
   unsigned inputTypeCount : 24;
   AbstractCC cc : 8;
@@ -359,7 +305,7 @@ class SILFunctionTypeInfo : public SILTypeInfo {
                       unsigned uncurryCount,
                       bool hasIndirectReturn,
                       AbstractCC cc)
-    : SILTypeInfo(SILTypeInfoKind::SILFunctionTypeInfo, swiftType),
+    : swiftType(swiftType),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
       cc(cc),
@@ -377,6 +323,8 @@ public:
                                      bool hasIndirectReturn,
                                      AbstractCC cc,
                                      SILModule &M);
+  
+  CanType getSwiftType() const { return swiftType; }
   
   /// Returns the list of input types needed to fully apply a function of
   /// this function type with an ApplyInst.
@@ -461,56 +409,17 @@ public:
   
   /// Returns the abstract calling convention of the function type.
   AbstractCC getAbstractCC() const { return cc; }
-  
-  static bool classof(SILTypeInfo const *ti) {
-    return ti->getKind() == SILTypeInfoKind::SILFunctionTypeInfo;
-  }
 };
+  
+inline CanType SILType::getSwiftRValueType() const {
+  PointerType p = value.getPointer();
+  if (auto *ty = p.dyn_cast<TypeBase*>())
+    return CanType(ty);
+  if (auto *ti = p.dyn_cast<SILFunctionTypeInfo*>())
+    return ti->getSwiftType();
+  llvm_unreachable("unknown SILType pointer type");
+}
 
-/// SILCompoundTypeInfo - SILType for a compound type, such as a tuple,
-/// struct, or class. This contains the type information for the type's elements
-/// indexable by Extract, ElementAddr, or RefElementAddr instructions. For
-/// nominal types, this also provides a mapping from Swift VarDecls to field
-/// indices.
-class SILCompoundTypeInfo : public SILTypeInfo {
-public:
-  struct Element {
-    /// The type of the element in the compound type.
-    SILType type;
-    /// The decl associated with the element, if any. Null for tuple types.
-    VarDecl *decl;
-  };
-private:
-  size_t elementCount;
-  
-  Element *getElementBuffer() {
-    return reinterpret_cast<Element*>(this+1);
-  }
-  
-  Element const *getElementBuffer() const {
-    return reinterpret_cast<Element const *>(this+1);
-  }
-  
-  SILCompoundTypeInfo(CanType t, size_t elementCount)
-    : SILTypeInfo(SILTypeInfoKind::SILCompoundTypeInfo, t),
-      elementCount(elementCount) {}
-  
-public:
-  static SILCompoundTypeInfo *create(CanType swiftType,
-                                     ArrayRef<Element> elements,
-                                     SILModule &M);
-  
-  ArrayRef<Element> getElements() const {
-    return ArrayRef<Element>(getElementBuffer(), elementCount);
-  }
-  
-  size_t getIndexOfMemberDecl(VarDecl *vd) const;
-  
-  static bool classof(SILTypeInfo const *ti) {
-    return ti->getKind() == SILTypeInfoKind::SILCompoundTypeInfo;
-  }
-};
-  
 } // end swift namespace
 
 namespace llvm {
