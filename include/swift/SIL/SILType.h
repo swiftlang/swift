@@ -19,9 +19,9 @@
 #define SWIFT_SIL_SILType_H
 
 #include "swift/AST/Types.h"
-#include "swift/SIL/SILBase.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "swift/SIL/SILBase.h"
 
 namespace swift {
   class ASTContext;
@@ -366,7 +366,7 @@ public:
                                      ArrayRef<unsigned> uncurriedInputCounts,
                                      bool hasIndirectReturn,
                                      AbstractCC cc,
-                                     SILBase &base);
+                                     SILModule &M);
   
   /// Returns the list of input types needed to fully apply a function of
   /// this function type with an ApplyInst.
@@ -488,7 +488,7 @@ private:
 public:
   static SILCompoundTypeInfo *create(CanType swiftType,
                                      ArrayRef<Element> elements,
-                                     SILBase &base);
+                                     SILModule &M);
   
   ArrayRef<Element> getElements() const {
     return ArrayRef<Element>(getElementBuffer(), elementCount);

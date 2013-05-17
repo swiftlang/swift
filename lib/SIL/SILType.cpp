@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/ErrorHandling.h"
-#include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 
@@ -23,11 +22,11 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                        ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
                                        AbstractCC cc,
-                                       SILBase &base) {
+                                       SILModule &M) {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
   // return both the begins and ends of each uncurried argument group.
-  void *buffer = base.allocate(sizeof(SILFunctionTypeInfo)
+  void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
                                  + sizeof(SILType)*inputTypes.size()
                                  + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
                                alignof(SILFunctionTypeInfo));
@@ -48,9 +47,9 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
 
 SILCompoundTypeInfo *SILCompoundTypeInfo::create(CanType swiftType,
                                                  ArrayRef<Element> elements,
-                                                 SILBase &base) {
+                                                 SILModule &M) {
   
-  void *buffer = base.allocate(sizeof(SILCompoundTypeInfo)
+  void *buffer = M.allocate(sizeof(SILCompoundTypeInfo)
                                  + sizeof(Element) * elements.size(),
                                alignof(SILCompoundTypeInfo));
   SILCompoundTypeInfo *cti =

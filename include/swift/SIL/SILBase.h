@@ -15,39 +15,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILBase_H
-#define SWIFT_SIL_SILBase_H
+#ifndef SWIFT_SIL_SILBASE_H
+#define SWIFT_SIL_SILBASE_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/Support/Allocator.h"
 
 namespace swift {
-class SILTypeList;
-class SILType;
-class SILBase {
-  /// Allocator that manages the memory of all the pieces of the SILModule.
-  mutable llvm::BumpPtrAllocator BPA;
-  void *TypeListUniquing;
-  SILBase(const SILBase&) = delete;
-  void operator=(const SILBase&) = delete;
-public:
-  SILBase();
-  ~SILBase();
-
-  /// Allocate memory using Function's internal allocator.
-  void *allocate(unsigned Size, unsigned Align) const {
-    return BPA.Allocate(Size, Align);
-  }
-  /// getSILTypeList - Get a uniqued pointer to a SIL type list.
-  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
-};
+  class SILModule;
 
 template <typename DERIVED>
 class SILAllocated {
 public:
   /// Forward to ordinary 'new'.
-  void *operator new(size_t Bytes,
-                     size_t Alignment = alignof(DERIVED)) {
+  void *operator new(size_t Bytes, size_t Alignment = alignof(DERIVED)) {
     return ::operator new(Bytes);
   }
 
@@ -58,7 +38,8 @@ public:
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with
   /// precise alignment knowledge.
-  void *operator new(size_t Bytes, const SILBase &C,
+  template <typename SizeTy>
+  void *operator new(size_t Bytes, const SizeTy &C,
                      size_t Alignment = alignof(DERIVED)) {
     return C.allocate(Bytes, Alignment);
   }

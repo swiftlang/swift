@@ -18,15 +18,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/Types.h"
 using namespace swift;
 
-SILModule::SILModule(ASTContext &Context)
-  : TheASTContext(Context), Types(*this) {
-}
-
-SILModule::~SILModule() {
-}
 
 static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   assert(func && "no function body?!");

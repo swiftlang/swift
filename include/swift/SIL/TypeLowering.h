@@ -13,12 +13,11 @@
 #ifndef SIL_TypeLowering_h
 #define SIL_TypeLowering_h
 
+#include "swift/SIL/SILType.h"
+#include "swift/SIL/SILConstant.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "swift/AST/Types.h"
-#include "swift/SIL/SILConstant.h"
-#include "swift/SIL/SILType.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
   class ValueDecl;
@@ -87,8 +86,8 @@ class TypeLoweringInfo {
 public:
   TypeLoweringInfo() = default;
 
-  TypeLoweringInfo(TypeLoweringInfo const &) = delete;
-  TypeLoweringInfo &operator=(TypeLoweringInfo const &) = delete;
+  TypeLoweringInfo(const TypeLoweringInfo &) = delete;
+  TypeLoweringInfo &operator=(const TypeLoweringInfo &) = delete;
   TypeLoweringInfo(TypeLoweringInfo &&) = default;
   TypeLoweringInfo &operator=(TypeLoweringInfo &&) = default;
   
@@ -133,7 +132,7 @@ class TypeConverter {
   llvm::DenseMap<TypeKey, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
-  TypeLoweringInfo const &makeTypeLoweringInfo(CanType t,
+  const TypeLoweringInfo &makeTypeLoweringInfo(CanType t,
                                                AbstractCC cc,
                                                unsigned uncurryLevel);
   SILTypeInfo *makeSILTypeInfo(CanType t,
@@ -157,7 +156,7 @@ public:
   TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Returns the SIL TypeLoweringInfo for a SIL type.
-  TypeLoweringInfo const &getTypeLoweringInfo(Type t,
+  const TypeLoweringInfo &getTypeLoweringInfo(Type t,
                                       AbstractCC cc = AbstractCC::Freestanding,
                                       unsigned uncurryLevel = 0);
   

@@ -18,7 +18,6 @@
 #define SWIFT_SIL_SILMODULE_H
 
 #include "swift/Basic/Range.h"
-#include "swift/SIL/SILBase.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILType.h"
@@ -27,6 +26,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/ilist.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -34,6 +34,7 @@ namespace swift {
   class ASTContext;
   class FuncDecl;
   class SILFunction;
+  class SILTypeList;
   
   namespace Lowering {
     class SILGenModule;
@@ -42,7 +43,7 @@ namespace swift {
 /// SILModule - A SIL translation unit. The module object owns all of the SIL
 /// SILFunction and other top-level objects generated when a translation unit is
 /// lowered to SIL.
-class SILModule : public SILBase {
+class SILModule {
 public:
   typedef llvm::ilist<SILFunction> FunctionListType;
   
@@ -51,6 +52,10 @@ private:
   friend class SILFunction;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
+
+  /// Allocator that manages the memory of all the pieces of the SILModule.
+  mutable llvm::BumpPtrAllocator BPA;
+  void *TypeListUniquing;
 
   /// Context - This is the context that uniques the types used by this
   /// SILFunction.
@@ -66,9 +71,16 @@ private:
   // to construct a SILModule.
   SILModule(ASTContext &TheASTContext);
   
+  SILModule(const SILModule&) = delete;
+  void operator=(const SILModule&) = delete;
+
 public:
   ~SILModule();
 
+  /// getSILTypeList - Get a uniqued pointer to a SIL type list.
+  SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
+
+  
   /// Types - This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;
   
@@ -115,6 +127,11 @@ public:
 
   /// Pretty-print the module to the designated stream.
   void print(raw_ostream &OS) const;
+  
+  /// Allocate memory using Function's internal allocator.
+  void *allocate(unsigned Size, unsigned Align) const {
+    return BPA.Allocate(Size, Align);
+  }
 };
 
 } // end swift namespace
