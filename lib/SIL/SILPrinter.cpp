@@ -27,6 +27,8 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FormattedStream.h"
 using namespace swift;
@@ -100,80 +102,50 @@ void SILConstant::dump() const {
 }
 
 void SILType::print(raw_ostream &OS) const {
-  if (isAddress()) {
-    OS << "*";
-  }
-  CanType swiftTy = getSwiftRValueType();
-
-  // Print function types with their mangled SIL arguments and returns.
-  if (auto *fTy = getAs<AnyFunctionType>()) {
+  // Build up the attributes for a SIL type, if any.
+  llvm::SmallString<64> Attributes;
+  if (is<AnyFunctionType>()) {
     auto info = getFunctionTypeInfo();
 
     // Print function attributes relevant to SIL.
-    unsigned attrCount = 0;
-    auto nextAttr = [&]{
-      if (attrCount++ == 0)
-        OS << '[';
-      else
-        OS << ", ";
-    };
-    
     if (info->getAbstractCC() != AbstractCC::Freestanding) {
-      nextAttr();
-      OS << "sil_cc=";
+      if (!Attributes.empty()) Attributes += ", ";
+      Attributes += "sil_cc=";
       switch (info->getAbstractCC()) {
       case AbstractCC::C:
-        OS << "c";
+        Attributes += "c";
         break;
       case AbstractCC::Method:
-        OS << "method";
+        Attributes += "method";
         break;
       case AbstractCC::Freestanding:
-        OS << "freestanding";
+        Attributes += "freestanding";
         break;
       }
-      
     }
-    if (fTy->isThin()) {
-      nextAttr();
-      OS << "thin";
-    }
-    
-    if (attrCount != 0)
-      OS << "] ";
 
-    AnyFunctionType *levelTy = fTy;
-    for (unsigned level = 0; level <= getUncurryLevel(); ++level) {
-      if (auto *polyTy = levelTy->getAs<PolymorphicFunctionType>()) {
-        polyTy->printGenericParams(OS);
-      }
-      OS << "(";
-      auto inputsForLevel = info->getInputTypesForCurryLevel(level);
-      interleave(inputsForLevel.begin(), inputsForLevel.end(),
-                 [&](SILType t) {
-                   t.print(OS);
-                 },
-                 [&] {
-                   OS << ", ";
-                 });
-      OS << ")";
-      if (level < getUncurryLevel())
-        levelTy = levelTy->getResult()->castTo<AnyFunctionType>();
+    if (info->getUncurryLevel()) {
+      if (!Attributes.empty()) Attributes += ", ";
+      Attributes += "sil_uncurry=";
+      Attributes += llvm::utostr(info->getUncurryLevel());
     }
-    
+
     if (info->hasIndirectReturn()) {
-      OS << "([sret] ";
-      info->getIndirectReturnType().print(OS);
-      OS << ")";
+      if (!Attributes.empty()) Attributes += ", ";
+      Attributes += "sil_sret";
     }
-    
-    OS << " -> ";
-    info->getResultType().print(OS);
-    return;
   }
 
+
+  // If we have any attributes, print them out.
+  if (!Attributes.empty())
+    OS << '[' << Attributes << "] ";
+
+  if (isAddress())
+    OS << '*';
+
   // Print other types as their Swift representation.
-  swiftTy->print(OS);
+  getSwiftRValueType()->print(OS);
 }
 
 void SILType::dump() const {
