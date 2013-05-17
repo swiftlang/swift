@@ -452,7 +452,8 @@ struct ArgumentInitVisitor :
         llvm_unreachable("empty tuple pattern with byref initializer?!");
         
       case Initialization::Kind::SingleBuffer:
-        assert(I->getAddress().getType().getSwiftRValueType() == P->getType()
+        assert(I->getAddress().getType().getSwiftRValueType()
+                 == P->getType()->getCanonicalType()
                && "empty tuple pattern with non-empty-tuple initializer?!");
         break;
       }

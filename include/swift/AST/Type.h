@@ -38,7 +38,7 @@ public:
   bool isNull() const { return Ptr == 0; }
   
   TypeBase *operator->() const { return Ptr; }
-  operator bool() const { return Ptr != 0; }
+  explicit operator bool() const { return Ptr != 0; }
   
   void dump() const;
   void print(raw_ostream &OS) const;

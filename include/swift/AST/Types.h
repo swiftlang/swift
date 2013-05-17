@@ -1772,7 +1772,7 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (!archetype)
     return nullptr;
 
-  return archetype->getSuperclass();
+  return (bool)archetype->getSuperclass();
 }
 
 inline Identifier SubstitutableType::getName() const {
