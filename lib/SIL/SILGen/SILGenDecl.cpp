@@ -85,8 +85,9 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
     for (unsigned i = 0; i < tupleTy->getFields().size(); ++i) {
       auto &field = tupleTy->getFields()[i];
       SILType fieldTy = gen.getLoweredType(field.getType()).getAddressType();
-      SILValue fieldAddr = gen.B.createElementAddr(SILLocation(),
-                                                   baseAddr, i, fieldTy);
+      SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
+                                                        baseAddr, i,
+                                                        fieldTy);
                           
       buf.push_back(InitializationPtr(new TupleElementInitialization(fieldAddr)));
     }
@@ -649,9 +650,15 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                                                 SILValue),
                                    ReferenceTypePath const &elt) {
   for (auto &comp : elt.path) {
-    const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(comp.type);
-    assert(ti.isLoadable(gen.SGM.M) && "fragile element is address-only?!");
-    v = gen.B.createExtract(loc, v, comp.index, ti.getLoweredType());
+    SILType silTy = gen.getLoweredLoadableType(comp.getType());
+    switch (comp.getKind()) {
+    case ReferenceTypePath::Component::Kind::StructField:
+      v = gen.B.createStructExtract(loc, v, comp.getStructField(), silTy);
+      break;
+    case ReferenceTypePath::Component::Kind::TupleElement:
+      v = gen.B.createTupleExtract(loc, v, comp.getTupleElement(), silTy);
+      break;
+    }
   }
   (gen.B.*createRR)(loc, v);
 }
@@ -667,7 +674,8 @@ void SILGenFunction::emitRetainRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
 
-  const TypeLoweringInfo &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
+  const TypeLoweringInfo &ti
+    = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
                   ti.getReferenceTypeElements());
 }
@@ -676,7 +684,8 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
 
-  const TypeLoweringInfo &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
+  const TypeLoweringInfo &ti
+    = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
                   ti.getReferenceTypeElements());
 }

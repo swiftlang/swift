@@ -489,8 +489,10 @@ public:
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *i);
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
-  void visitExtractInst(ExtractInst *i);
-  void visitElementAddrInst(ElementAddrInst *i);
+  void visitTupleExtractInst(TupleExtractInst *i);
+  void visitTupleElementAddrInst(TupleElementAddrInst *i);
+  void visitStructExtractInst(StructExtractInst *i);
+  void visitStructElementAddrInst(StructElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
   void visitModuleInst(ModuleInst *i);
 

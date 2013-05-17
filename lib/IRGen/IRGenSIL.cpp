@@ -957,45 +957,58 @@ void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
   newLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitExtractInst(swift::ExtractInst *i) {
+void IRGenSILFunction::visitTupleExtractInst(swift::TupleExtractInst *i) {
   SILValue v(i, 0);
   Explosion lowered(CurExplosionLevel);
   Explosion operand = getLoweredExplosion(i->getOperand());
   SILType baseType = i->getOperand().getType();
   
-  if (baseType.is<TupleType>()) {
-    projectTupleElementFromExplosion(*this,
-                                     baseType,
-                                     operand,
-                                     i->getFieldNo(),
-                                     lowered);
-  } else {
-    projectPhysicalStructMemberFromExplosion(*this,
-                                             baseType,
-                                             operand,
-                                             i->getFieldNo(),
-                                             lowered);
-  }
+  projectTupleElementFromExplosion(*this,
+                                   baseType,
+                                   operand,
+                                   i->getFieldNo(),
+                                   lowered);
   operand.claimAll();
   newLoweredExplosion(v, lowered);
 }
 
-void IRGenSILFunction::visitElementAddrInst(swift::ElementAddrInst *i) {
+void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
+{
   Address base = getLoweredAddress(i->getOperand());
   SILType baseType = i->getOperand().getType();
 
-  Address field;
-  if (baseType.is<TupleType>()) {
-    field = projectTupleElementAddress(*this,
-                                       OwnedAddress(base, nullptr),
-                                       baseType,
-                                       i->getFieldNo()).getAddress();
-  } else {
-    field = projectPhysicalStructMemberAddress(*this,
-                                               OwnedAddress(base, nullptr),
-                                               baseType,
-                                               i->getFieldNo()).getAddress();
-  }
+  Address field = projectTupleElementAddress(*this,
+                                             OwnedAddress(base, nullptr),
+                                             baseType,
+                                             i->getFieldNo()).getAddress();
+  newLoweredAddress(SILValue(i, 0), field);
+}
+
+void IRGenSILFunction::visitStructExtractInst(swift::StructExtractInst *i) {
+  SILValue v(i, 0);
+  Explosion lowered(CurExplosionLevel);
+  Explosion operand = getLoweredExplosion(i->getOperand());
+  SILType baseType = i->getOperand().getType();
+  
+  projectPhysicalStructMemberFromExplosion(*this,
+                                           baseType,
+                                           operand,
+                                           i->getField(),
+                                           lowered);
+
+  operand.claimAll();
+  newLoweredExplosion(v, lowered);
+}
+
+void IRGenSILFunction::visitStructElementAddrInst(
+                                              swift::StructElementAddrInst *i) {
+  Address base = getLoweredAddress(i->getOperand());
+  SILType baseType = i->getOperand().getType();
+
+  Address field = projectPhysicalStructMemberAddress(*this,
+                                                   OwnedAddress(base, nullptr),
+                                                   baseType,
+                                                   i->getField()).getAddress();
   newLoweredAddress(SILValue(i, 0), field);
 }
 

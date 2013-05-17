@@ -446,49 +446,74 @@ public:
             "invalid IndexAddrInst");
   }
   
-  void checkExtractInst(ExtractInst *EI) {
+  void checkTupleExtractInst(TupleExtractInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     require(!operandTy.isAddress(),
-            "cannot extract from address");
-    require(!operandTy.hasReferenceSemantics(),
-            "cannot extract from reference type");
+            "cannot tuple_extract from address");
     require(!EI->getType(0).isAddress(),
-            "result of extract cannot be address");
-    require(operandTy.is<TupleType>() || operandTy.is<StructType>()
-            || operandTy.is<BoundGenericStructType>(),
-            "must extract from tuple or struct");
+            "result of tuple_extract cannot be address");
+    require(operandTy.is<TupleType>(),
+            "must tuple_extract from tuple");
     
-    SILCompoundTypeInfo *ti = operandTy.getCompoundTypeInfo();
-    require(EI->getFieldNo() < ti->getElements().size(),
-            "invalid field index for extract instruction");
-    // FIXME: TypeLowering does not properly apply substitutions to generic
-    // struct types.
-    //require(EI->getType(0) == ti->getElements()[EI->getFieldNo()].type,
-    //        "result type does not match type of element");
+    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getFields();
+    require(EI->getFieldNo() < fields.size(),
+            "invalid field index for element_addr instruction");
+    require(EI->getType().getSwiftRValueType()
+            == CanType(fields[EI->getFieldNo()].getType()),
+            "type of tuple_element_addr does not match type of element");
   }
 
-  void checkElementAddrInst(ElementAddrInst *EI) {
+  void checkStructExtractInst(StructExtractInst *EI) {
+    SILType operandTy = EI->getOperand().getType();
+    require(!operandTy.isAddress(),
+            "cannot struct_extract from address");
+    require(!EI->getType(0).isAddress(),
+            "result of struct_extract cannot be address");
+    require(operandTy.is<StructType>()
+            || operandTy.is<BoundGenericStructType>(),
+            "must struct_extract from struct");
+    require(!EI->getField()->isProperty(),
+            "cannot load logical property with struct_extract");
+
+    // FIXME: Verify type of instruction. This requires type substitution for
+    // generic types.
+  }
+  
+  void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     require(operandTy.isAddress(),
             "must derive element_addr from address");
     require(!operandTy.hasReferenceSemantics(),
-            "cannot derive element_addr from reference type");
+            "cannot derive tuple_element_addr from reference type");
     require(EI->getType(0).isAddress(),
-            "result of element_addr must be lvalue");
-    require(operandTy.is<TupleType>() || operandTy.is<StructType>()
-            || operandTy.is<BoundGenericStructType>(),
-            "must extract from tuple or struct");
+            "result of tuple_element_addr must be address");
+    require(operandTy.is<TupleType>(),
+            "must derive tuple_element_addr from tuple");
 
-    SILCompoundTypeInfo *ti = operandTy.getCompoundTypeInfo();
-    require(EI->getFieldNo() < ti->getElements().size(),
+    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getFields();
+    require(EI->getFieldNo() < fields.size(),
             "invalid field index for element_addr instruction");
-    // FIXME: TypeLowering does not properly apply substitutions to generic
-    // struct types.
-    // require(EI->getType(0)
-    //           == ti->getElements()[EI->getFieldNo()].type.getAddressType(),
-    //         "result type does not match type of address to element");
+    require(EI->getType().getSwiftRValueType()
+              == CanType(fields[EI->getFieldNo()].getType()),
+            "type of tuple_element_addr does not match type of element");
   }
-  
+
+  void checkStructElementAddrInst(StructElementAddrInst *EI) {
+    SILType operandTy = EI->getOperand().getType();
+    require(operandTy.isAddress(),
+            "must derive struct_element_addr from address");
+    require(operandTy.is<StructType>()
+            || operandTy.is<BoundGenericStructType>(),
+            "must derive struct_element_addr from struct address");
+    require(EI->getType(0).isAddress(),
+            "result of struct_element_addr must be address");
+    require(!EI->getField()->isProperty(),
+            "cannot get address of logical property with struct_element_addr");
+    
+    // FIXME: Verify type of instruction. This requires type substitution for
+    // generic types.
+  }
+
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     require(!operandTy.isAddress(),
@@ -497,6 +522,11 @@ public:
             "must derive ref_element_addr from reference type");
     require(EI->getType(0).isAddress(),
             "result of ref_element_addr must be lvalue");
+    require(!EI->getField()->isProperty(),
+            "cannot get address of logical property with ref_element_addr");
+
+    // FIXME: Verify type of instruction. This requires type substitution for
+    // generic types.
   }
   
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {

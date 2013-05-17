@@ -22,6 +22,7 @@ namespace swift {
   class MemberRefExpr;
   class CanType;
   class SILType;
+  class VarDecl;
 
 namespace irgen {
   class IRGenFunction;
@@ -31,11 +32,11 @@ namespace irgen {
   OwnedAddress projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                   OwnedAddress base,
                                                   SILType baseType,
-                                                  unsigned fieldIndex);
+                                                  VarDecl *field);
   void projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
                                                 SILType baseType,
                                                 Explosion &base,
-                                                unsigned fieldNo,
+                                                VarDecl *field,
                                                 Explosion &out);
 
 } // end namespace irgen

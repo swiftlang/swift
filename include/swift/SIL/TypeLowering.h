@@ -58,10 +58,57 @@ CaptureKind getDeclCaptureKind(ValueDecl *capture);
 struct ReferenceTypePath {
   /// A component of the reference type path, comprising the index of an
   /// element and its type.
-  struct Component {
-    Type type;
-    unsigned index;
+  class Component {
+  public:
+    enum class Kind : unsigned { StructField, TupleElement };
+  
+  private:
+    llvm::PointerIntPair<TypeBase*, 1, Kind> typeAndKind;
+    union {
+      VarDecl *structField;
+      unsigned tupleElement;
+    };
+
+  public:
+    Component() = default;
+    
+    Component(CanType fieldType, VarDecl *structField)
+      : typeAndKind(fieldType.getPointer(), Kind::StructField),
+        structField(structField)
+    {}
+    
+    Component(CanType eltType, unsigned tupleElement)
+      : typeAndKind(eltType.getPointer(), Kind::TupleElement),
+        tupleElement(tupleElement)
+    {}
+    
+    static Component forStructField(CanType fieldType, VarDecl *structField) {
+      return {fieldType, structField};
+    }
+    static Component forTupleElement(CanType eltType, unsigned tupleElement) {
+      return {eltType, tupleElement};
+    }
+    
+    CanType getType() const {
+      return CanType(typeAndKind.getPointer());
+    }
+    
+    void setType(CanType t) {
+      typeAndKind.setPointer(t.getPointer());
+    }
+    
+    Kind getKind() const { return typeAndKind.getInt(); }
+    
+    VarDecl *getStructField() const {
+      assert(getKind() == Kind::StructField && "not a struct field");
+      return structField;
+    }
+    unsigned getTupleElement() const {
+      assert(getKind() == Kind::TupleElement && "not a tuple element");
+      return tupleElement;
+    }
   };
+  
   
   /// path - The index chain leading to the reference type element. For
   /// example, {0} refers to element zero, {0, 1} refers to element

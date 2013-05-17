@@ -486,13 +486,21 @@ public:
     }
     OS << ')';
   }
-  void visitExtractInst(ExtractInst *EI) {
-    OS << "extract " << getID(EI->getOperand()) << ", "
+  void visitTupleExtractInst(TupleExtractInst *EI) {
+    OS << "tuple_extract " << getID(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
-  void visitElementAddrInst(ElementAddrInst *EI) {
-    OS << "element_addr " << getID(EI->getOperand()) << ", "
+  void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
+    OS << "tuple_element_addr " << getID(EI->getOperand()) << ", "
        << EI->getFieldNo();
+  }
+  void visitStructExtractInst(StructExtractInst *EI) {
+    OS << "struct_extract " << getID(EI->getOperand()) << ", @"
+    << EI->getField()->getName().get();
+  }
+  void visitStructElementAddrInst(StructElementAddrInst *EI) {
+    OS << "struct_element_addr " << getID(EI->getOperand()) << ", @"
+    << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
@@ -502,9 +510,7 @@ public:
   void visitBuiltinZeroInst(BuiltinZeroInst *ZI) {
     OS << "builtin_zero $" << ZI->getType();
   }
-  
-  
-  
+
   void printDynamicMethodInst(DynamicMethodInst *I,
                               SILValue Operand,
                               StringRef Name) {

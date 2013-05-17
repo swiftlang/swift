@@ -98,10 +98,11 @@ public:
   LoadableTypeLoweringInfoVisitor(TypeLoweringInfo &theInfo)
     : theInfo(theInfo) {}
   
-  void pushPath() { currentElement.path.push_back({Type(), 0}); }
+  void pushPath() { currentElement.path.push_back({}); }
   void popPath() { currentElement.path.pop_back(); }
-  void setPathType(Type t) { currentElement.path.back().type = t; }
-  void advancePath() { ++currentElement.path.back().index; }
+  void setPath(ReferenceTypePath::Component c) {
+    currentElement.path.back() = c;
+  }
   
   Loadable_t visitType(TypeBase *t) {
     if (t->hasReferenceSemantics()) {
@@ -122,11 +123,10 @@ public:
       if (VarDecl *vd = dyn_cast<VarDecl>(d))
         if (!vd->isProperty()) {
           CanType ct = vd->getType()->getCanonicalType();
-          setPathType(ct);
+          setPath(ReferenceTypePath::Component::forStructField(ct, vd));
           if (visit(ct) == IsAddressOnly) {
             return IsAddressOnly;
           }
-          advancePath();
         }
     popPath();
     return IsLoadable;
@@ -148,13 +148,13 @@ public:
   
   Loadable_t visitTupleType(TupleType *t) {
     pushPath();
+    unsigned i = 0;
     for (TupleTypeElt const &elt : t->getFields()) {
       CanType ct = elt.getType()->getCanonicalType();
-      setPathType(ct);
+      setPath(ReferenceTypePath::Component::forTupleElement(ct, i++));
       if (visit(ct) == IsAddressOnly) {
         return IsAddressOnly;
       }
-      advancePath();
     }
     popPath();
     return IsLoadable;

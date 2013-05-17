@@ -303,18 +303,36 @@ public:
     return insert(TupleInst::create(Loc, Ty, Elements, F));
   }
   
-  SILValue createExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
-                           SILType ResultTy) {
+  SILValue createTupleExtract(SILLocation Loc,
+                              SILValue Operand,
+                              unsigned FieldNo,
+                              SILType ResultTy) {
     // Fold extract(tuple(a,b,c), 1) -> b.
     if (TupleInst *TI = dyn_cast<TupleInst>(Operand))
       return TI->getElements()[FieldNo];
 
-    return insert(new ExtractInst(Loc, Operand, FieldNo, ResultTy));
+    return insert(new TupleExtractInst(Loc, Operand, FieldNo, ResultTy));
   }
 
-  SILValue createElementAddr(SILLocation Loc, SILValue Operand,
-                             unsigned FieldNo, SILType ResultTy) {
-    return insert(new ElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+  TupleElementAddrInst *createTupleElementAddr(SILLocation Loc,
+                                               SILValue Operand,
+                                               unsigned FieldNo,
+                                               SILType ResultTy) {
+    return insert(new TupleElementAddrInst(Loc, Operand, FieldNo, ResultTy));
+  }
+  
+  StructExtractInst *createStructExtract(SILLocation Loc,
+                                         SILValue Operand,
+                                         VarDecl *Field,
+                                         SILType ResultTy) {
+    return insert(new StructExtractInst(Loc, Operand, Field, ResultTy));
+  }
+  
+  StructElementAddrInst *createStructElementAddr(SILLocation Loc,
+                                                 SILValue Operand,
+                                                 VarDecl *Field,
+                                                 SILType ResultTy) {
+    return insert(new StructElementAddrInst(Loc, Operand, Field, ResultTy));
   }
   
   SILValue createRefElementAddr(SILLocation Loc, SILValue Operand,

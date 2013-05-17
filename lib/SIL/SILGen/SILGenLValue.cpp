@@ -68,11 +68,11 @@ namespace {
     }
   };
   
-  class FragileElementComponent : public PhysicalPathComponent {
+  class TupleElementComponent : public PhysicalPathComponent {
     unsigned elementIndex;
     SILType type;
   public:
-    FragileElementComponent(unsigned elementIndex, SILType type)
+    TupleElementComponent(unsigned elementIndex, SILType type)
       : elementIndex(elementIndex), type(type) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
@@ -84,7 +84,31 @@ namespace {
              "base for element component must be an address");
       assert(!baseType.hasReferenceSemantics() &&
              "can't get element from address of ref type");
-      return gen.B.createElementAddr(loc, base, elementIndex, type);
+      return gen.B.createTupleElementAddr(loc, base, elementIndex, type);
+    }
+    
+    Type getObjectType() const override {
+      return type.getSwiftRValueType();
+    }
+  };
+  
+  class StructElementComponent : public PhysicalPathComponent {
+    VarDecl *field;
+    SILType type;
+  public:
+    StructElementComponent(VarDecl *field, SILType type)
+      : field(field), type(type) {}
+    
+    SILValue offset(SILGenFunction &gen, SILLocation loc,
+                 SILValue base) const override {
+      assert(base && "invalid value for element base");
+      SILType baseType = base.getType();
+      (void)baseType;
+      assert(baseType.isAddress() &&
+             "base for element component must be an address");
+      assert(!baseType.hasReferenceSemantics() &&
+             "can't get element from address of ref type");
+      return gen.B.createStructElementAddr(loc, base, field, type);
     }
     
     Type getObjectType() const override {
@@ -279,9 +303,8 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
         lv.add<RefElementComponent>(var,
                                     gen.getLoweredType(e->getType()));
       } else {
-        SILCompoundTypeInfo *cti = baseTy.getCompoundTypeInfo();
-        lv.add<FragileElementComponent>(cti->getIndexOfMemberDecl(var),
-                                        gen.getLoweredType(e->getType()));
+        lv.add<StructElementComponent>(var,
+                                       gen.getLoweredType(e->getType()));
       }
       return ::std::move(lv);
     }
@@ -334,7 +357,8 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(e->getType());
   assert(ti.isLoadable(gen.SGM.M) &&
          "address-only tuples not yet implemented");
-  lv.add<FragileElementComponent>(e->getFieldNumber(), ti.getLoweredType());
+  lv.add<TupleElementComponent>(e->getFieldNumber(),
+                                  ti.getLoweredType());
   return ::std::move(lv);
 }
 

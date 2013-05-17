@@ -1011,29 +1011,57 @@ public:
     : UnaryInstructionBase(Loc, Base, Metatype) {}
 };
 
-/// ExtractInst - Extract a numbered element out of a value of tuple or fragile
-/// struct type.
-class ExtractInst : public UnaryInstructionBase<ValueKind::ExtractInst> {
+/// Extract a numbered element out of a value of tuple type.
+class TupleExtractInst
+  : public UnaryInstructionBase<ValueKind::TupleExtractInst>
+{
   unsigned FieldNo;
 public:
-  ExtractInst(SILLocation Loc, SILValue Operand, unsigned FieldNo,
+  TupleExtractInst(SILLocation Loc, SILValue Operand, unsigned FieldNo,
               SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy), FieldNo(FieldNo) {}
   
   unsigned getFieldNo() const { return FieldNo; }
 };
 
-/// ElementAddrInst - Derive the address of a numbered element from the address
+/// Derive the address of a numbered element from the address
 /// of a tuple or fragile struct type.
-class ElementAddrInst : public UnaryInstructionBase<ValueKind::ElementAddrInst>
+class TupleElementAddrInst
+  : public UnaryInstructionBase<ValueKind::TupleElementAddrInst>
 {
   unsigned FieldNo;
 public:
-  ElementAddrInst(SILLocation Loc, SILValue Operand, unsigned FieldNo,
-                  SILType ResultTy)
+  TupleElementAddrInst(SILLocation Loc, SILValue Operand, unsigned FieldNo,
+                       SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy), FieldNo(FieldNo) {}
   
   unsigned getFieldNo() const { return FieldNo; }
+};
+  
+/// Extract a physical, fragile field out of a value of struct type.
+class StructExtractInst
+  : public UnaryInstructionBase<ValueKind::StructExtractInst>
+{
+  VarDecl *Field;
+public:
+  StructExtractInst(SILLocation Loc, SILValue Operand, VarDecl *Field,
+                    SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
+  
+  VarDecl *getField() const { return Field; }
+};
+
+/// Derive the address of a physical field from the address of a struct.
+class StructElementAddrInst
+  : public UnaryInstructionBase<ValueKind::StructElementAddrInst>
+{
+  VarDecl *Field;
+public:
+  StructElementAddrInst(SILLocation Loc, SILValue Operand, VarDecl *Field,
+                        SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
+  
+  VarDecl *getField() const { return Field; }
 };
 
 /// RefElementAddrInst - Derive the address of a named element in a reference

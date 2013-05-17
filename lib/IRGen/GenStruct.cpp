@@ -95,14 +95,30 @@ namespace {
   };
 }  // end anonymous namespace.
 
+static unsigned getStructFieldIndex(SILType ty, VarDecl *v) {
+  auto *decl = cast<StructDecl>(
+                    ty.getSwiftRValueType()->getNominalOrBoundGenericNominal());
+  // FIXME: Keep field index mappings in a side table somewhere?
+  unsigned index = 0;
+  for (auto member : decl->getMembers()) {
+    if (member == v)
+      return index;
+    if (auto *memberVar = dyn_cast<VarDecl>(member)) {
+      if (!memberVar->isProperty())
+        ++index;
+    }
+  }
+  llvm_unreachable("field not in struct?!");
+}
+
 OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
                                                        OwnedAddress base,
                                                        SILType baseType,
-                                                       unsigned fieldIndex) {
+                                                       VarDecl *field) {
   assert((baseType.is<StructType>() || baseType.is<BoundGenericStructType>())
          && "not a struct type");
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  auto &fieldI = baseTI.getFields()[fieldIndex];
+  auto &fieldI = baseTI.getFields()[getStructFieldIndex(baseType, field)];
   auto offsets = baseTI.getNonFixedOffsets(IGF);
   Address project = fieldI.projectAddress(IGF, base, offsets);
   return OwnedAddress(project, base.getOwner());
@@ -111,10 +127,10 @@ OwnedAddress irgen::projectPhysicalStructMemberAddress(IRGenFunction &IGF,
 void irgen::projectPhysicalStructMemberFromExplosion(IRGenFunction &IGF,
                                                      SILType baseType,
                                                      Explosion &base,
-                                                     unsigned fieldNo,
+                                                     VarDecl *field,
                                                      Explosion &out) {
   auto &baseTI = IGF.getFragileTypeInfo(baseType).as<StructTypeInfo>();
-  auto &fieldI = baseTI.getFields()[fieldNo];
+  auto &fieldI = baseTI.getFields()[getStructFieldIndex(baseType, field)];
   // If the field requires no storage, there's nothing to do.
   if (fieldI.isEmpty()) {
     return IGF.emitFakeExplosion(fieldI.getTypeInfo(), out);

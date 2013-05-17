@@ -68,11 +68,11 @@ public:
       for (unsigned i = 0; i < t->getFields().size(); ++i) {
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
-        SILValue member = gen.B.createElementAddr(SILLocation(),
-                                                  v, i,
-                                                  fieldTy.getAddressType());
-        if (!fieldTy.isAddressOnly(gen.F.getModule()) &&
-            !field.getType()->is<LValueType>())
+        SILValue member = gen.B.createTupleElementAddr(SILLocation(),
+                                                     v, i,
+                                                     fieldTy.getAddressType());
+        if (!fieldTy.isAddressOnly(gen.F.getModule())
+            && !field.getType()->is<LValueType>())
           member = gen.B.createLoad(SILLocation(), member);
         visit(CanType(field.getType()),
               gen.emitManagedRValueWithCleanup(member));
@@ -84,9 +84,9 @@ public:
       for (unsigned i = 0; i < t->getFields().size(); ++i) {
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
-        SILValue member = gen.B.createExtract(SILLocation(),
-                                              v, i,
-                                              fieldTy);
+        SILValue member = gen.B.createTupleExtract(SILLocation(),
+                                                   v, i,
+                                                   fieldTy);
         visit(CanType(field.getType()),
               gen.emitManagedRValueWithCleanup(member));
         if (depth == 1)
@@ -165,9 +165,9 @@ public:
     for (unsigned n = 0; n < t->getFields().size(); ++n) {
       auto &field = t->getFields()[n];
       SILType fieldTy = gen.getLoweredType(field.getType());
-      SILValue fieldAddr = gen.B.createElementAddr(SILLocation(),
-                                                   address, n,
-                                                   fieldTy.getAddressType());
+      SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
+                                                      address, n,
+                                                      fieldTy.getAddressType());
       this->visit(CanType(field.getType()), fieldAddr);
     }
   }

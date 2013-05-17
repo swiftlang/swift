@@ -582,9 +582,9 @@ RValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E,
 
 namespace {
 
-static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
-                                               Expr *e, ManagedValue base,
-                                               unsigned elt) {
+static ManagedValue emitExtractFromStruct(SILGenFunction &gen,
+                                          Expr *e, ManagedValue base,
+                                          VarDecl *field) {
   assert(!base.getType().hasReferenceSemantics() &&
          "can't extract from reference types here");
   if (e->getType()->is<LValueType>()) {
@@ -592,16 +592,16 @@ static ManagedValue emitExtractLoadableElement(SILGenFunction &gen,
     SILValue address;
     assert(base.getType().isAddress() &&
            "base of lvalue member ref must be ref type or address");
-    address = gen.B.createElementAddr(e,
+    address = gen.B.createStructElementAddr(e,
                                     base.getUnmanagedValue(),
-                                    elt,
+                                    field,
                                     gen.getLoweredType(e->getType()));
     return ManagedValue(address, ManagedValue::LValue);
   } else {
     // Extract the element from the original aggregate value.
-    SILValue extract = gen.B.createExtract(e,
+    SILValue extract = gen.B.createStructExtract(e,
                                         base.getValue(),
-                                        elt,
+                                        field,
                                         gen.getLoweredType(e->getType()));
     
     gen.emitRetainRValue(e, extract);
@@ -628,14 +628,12 @@ ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
   // If this is a physical field, derive its address directly.
   if (VarDecl *var = dyn_cast<VarDecl>(e->getDecl())) {
     if (!var->isProperty()) {
-      SILCompoundTypeInfo *cti = ty.getCompoundTypeInfo();
       // We can get to the element directly with element_addr or
       // ref_element_addr.
       ManagedValue base = gen.visit(e->getBase()).getAsSingleValue(gen);
       if (ty.hasReferenceSemantics())
         return emitExtractFromClass(gen, e, base, var);
-      size_t index = cti->getIndexOfMemberDecl(var);
-      return emitExtractLoadableElement(gen, e, base, index);
+      return emitExtractFromStruct(gen, e, base, var);
     }
   }
 
@@ -875,7 +873,7 @@ RValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E,
                                              SGFContext C) {
   if (E->getType()->is<LValueType>()) {
     SILValue baseAddr = visit(E->getBase()).getUnmanagedSingleValue(*this);
-    SILValue eltAddr = B.createElementAddr(E, baseAddr, E->getFieldNumber(),
+    SILValue eltAddr = B.createTupleElementAddr(E, baseAddr, E->getFieldNumber(),
                                  getLoweredType(E->getType()).getAddressType());
     return RValue(*this, ManagedValue(eltAddr, ManagedValue::LValue));
   } else {
@@ -1404,15 +1402,36 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     SILValue resultSlot
       = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
     
+    auto *decl = cast<StructDecl>(thisTy.getSwiftRValueType()
+                                  ->getNominalOrBoundGenericNominal());
+    unsigned memberIndex = 0;
+    
+    auto findNextPhysicalField = [&] {
+      while (memberIndex < decl->getMembers().size()) {
+        if (auto *vd = dyn_cast<VarDecl>(decl->getMembers()[memberIndex])) {
+          if (!vd->isProperty())
+            break;
+        }
+        ++memberIndex;
+      }
+    };
+    findNextPhysicalField();
+    
     for (size_t i = 0; i < elements.size(); ++i) {
+      assert(memberIndex < decl->getMembers().size() &&
+             "not enough physical struct members for value constructor?!");
       SILType argTy = gen.getLoweredType(elements[i].getType());
 
       // Store each argument in the corresponding element of 'this'.
-      SILValue slot = gen.B.createElementAddr(ctor, resultSlot, i,
-                                              argTy.getAddressType());
+      auto *field = cast<VarDecl>(decl->getMembers()[memberIndex]);
+      SILValue slot = gen.B.createStructElementAddr(ctor, resultSlot,
+                                                    cast<VarDecl>(field),
+                                                    argTy.getAddressType());
       InitializationPtr init(new ImplicitValueInitialization(slot,
                                                          elements[i].getType()));
       std::move(elements[i]).forwardInto(gen, init.get());
+      ++memberIndex;
+      findNextPhysicalField();
     }
     gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
     return;
