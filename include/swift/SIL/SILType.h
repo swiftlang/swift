@@ -140,16 +140,20 @@ class SILType {
     : value(ty.getPointer(), makeFlags(address, loadable)) {
     assert((address || loadable) &&
            "SILType can't be the value of an address-only type");
-    assert(!(ty && ty->is<LValueType>()) &&
+    if (!ty) return;
+
+    assert(!ty->is<LValueType>() &&
            "LValueTypes should be eliminated by SIL lowering");
-    assert(!(ty && ty->is<AnyFunctionType>()) &&
-           "SIL lowering must produce a SILFunctionTypeInfo for function types");
+    assert(!ty->is<AnyFunctionType>() &&
+           "SIL lowering must produce a SILFunctionTypeInfo for functions");
+    assert(!ty->is<TupleType>() &&
+           "SIL lowering must produce a SILCompoundTypeInfo for this");
   }
   
   SILType(SILTypeInfo *ti, bool address, bool loadable)
     : value(ti, makeFlags(address, loadable)) {
     assert((address || loadable) &&
-           "SILType can't be the value of an address-only type");    
+           "SILType can't be the value of an address-only type");
   }
   
   SILType(ValueType value)
@@ -160,13 +164,18 @@ class SILType {
 public:
   SILType() = default;
   
+  
+  /// getPrimitiveType - Form a SILType for a primitive type that does not
+  /// require any special handling (i.e., not a function or aggregate type).
+  static SILType getPrimitiveType(CanType T, bool isAddress, bool isLoadable) {
+    return SILType(T, isAddress, isLoadable);
+  }
+  
+  
   bool isNull() const { return value.getPointer().isNull(); }
   explicit operator bool() const { return bool(value.getPointer()); }
   
   bool isInvalid() const { return value.getInt() == InvalidFlags; }
-  
-  void dump() const;
-  void print(raw_ostream &OS) const;
   
   /// Gets the address type referencing this type, or the type itself if it is
   /// already an address type.
@@ -304,6 +313,9 @@ public:
   bool operator!=(SILType rhs) const {
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
+  
+  void dump() const;
+  void print(raw_ostream &OS) const;
 };
 
 /// A high-level calling convention.

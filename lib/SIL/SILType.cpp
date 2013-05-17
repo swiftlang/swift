@@ -28,14 +28,14 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
   // return both the begins and ends of each uncurried argument group.
   void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
                                  + sizeof(SILType)*inputTypes.size()
-                                 + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
+                             + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
                                alignof(SILFunctionTypeInfo));
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
                                                      swiftType,
                                                      inputTypes.size(),
                                                      resultType,
-                                                     uncurriedInputCounts.size(),
-                                                     hasIndirectReturn,
+                                                    uncurriedInputCounts.size(),
+                                                    hasIndirectReturn,
                                                      cc);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
