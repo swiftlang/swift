@@ -439,31 +439,17 @@ RebindThisInConstructorExpr::RebindThisInConstructorExpr(Expr *SubExpr,
 
 
 SourceRange PipeClosureExpr::getSourceRange() const {
-  return body->getSourceRange();
+  return body.getPointer()->getSourceRange();
 }
 
 SourceLoc PipeClosureExpr::getLoc() const {
-  return body->getStartLoc();
-}
-
-bool PipeClosureExpr::hasSingleExpressionBody() const {
-  // We expect to see just a single statement...
-  auto bodyElements = body->getElements();
-  if (bodyElements.size() != 1 || !bodyElements[0].is<Stmt *>())
-    return false;
-
-  // That is a return statement...
-  auto returnStmt = dyn_cast<ReturnStmt>(bodyElements[0].get<Stmt *>());
-  if (!returnStmt)
-    return false;
-
-  // With an invalid source location for the 'return'.
-  return returnStmt->getReturnLoc().isInvalid();
+  return body.getPointer()->getStartLoc();
 }
 
 Expr *PipeClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  return cast<ReturnStmt>(body->getElements()[0].get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
+           ->getResult();
 }
 
 Type PipeClosureExpr::getResultType() const {
@@ -474,7 +460,8 @@ Type PipeClosureExpr::getResultType() const {
 }
 
 void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
-  cast<ReturnStmt>(body->getElements()[0].get<Stmt *>())->setResult(newBody);
+  cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
+    ->setResult(newBody);
 }
 
 //===----------------------------------------------------------------------===//

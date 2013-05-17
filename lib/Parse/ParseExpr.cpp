@@ -885,16 +885,18 @@ NullablePtr<Expr> Parser::parseExprClosure() {
   }
 
   // If the body consists of a single expression, turn it into a return
-  // statement. The 'return' location is left invalid to indicate that
-  // it's an implicit return.
+  // statement.
+  bool hasSingleExpressionBody = false;
   if (bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
+    hasSingleExpressionBody = true;
     bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
                                                bodyElements[0].get<Expr*>());
   }
 
   // Set the body of the closure.
   closure->setBody(BraceStmt::create(Context, leftBrace, bodyElements,
-                                     rightBrace));
+                                     rightBrace),
+                   hasSingleExpressionBody);
 
   return closure;
 }

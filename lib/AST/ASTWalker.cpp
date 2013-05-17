@@ -312,7 +312,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
-      expr->setBody(body);
+      expr->setBody(body, false);
       return expr;
     }
     return nullptr;

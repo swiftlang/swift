@@ -884,7 +884,7 @@ void TypeChecker::typeCheckClosureBody(PipeClosureExpr *closure) {
   BraceStmt *body = closure->getBody();
   StmtChecker(*this, closure).typeCheckStmt(body);
   if (body) {
-    closure->setBody(body);
+    closure->setBody(body, closure->hasSingleExpressionBody());
   }
 }
 

@@ -1700,8 +1700,9 @@ class PipeClosureExpr : public CapturingExpr {
   /// \brief The explicitly-specified result type.
   TypeLoc explicitResultType;
 
-  /// \brief The body of the closure.
-  BraceStmt *body;
+  /// \brief The body of the closure, along with a bit indicating whether it
+  /// was originally just a single expression.
+  llvm::PointerIntPair<BraceStmt *, 1, bool> body;
   
 public:
   PipeClosureExpr(Pattern *params, SourceLoc arrowLoc,
@@ -1726,8 +1727,11 @@ public:
     params.setPointerAndInt(pattern, anonymousClosureVars);
   }
 
-  BraceStmt *getBody() const { return body; }
-  void setBody(BraceStmt *S) { body = S; }
+  BraceStmt *getBody() const { return body.getPointer(); }
+  void setBody(BraceStmt *S, bool isSingleExpression) {
+    body.setPointer(S);
+    body.setInt(isSingleExpression);
+  }
 
   /// \brief Determine whether this closure expression has an
   /// explicitly-specified result type.
@@ -1761,7 +1765,9 @@ public:
   /// \endcode
   ///
   /// But not for empty closures nor 
-  bool hasSingleExpressionBody() const;
+  bool hasSingleExpressionBody() const {
+    return body.getInt();
+  }
 
   /// \brief Retrieve the body for closure that has a single expression for
   /// its body.
