@@ -269,7 +269,7 @@ public:
   SILFunction &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
-  TypeLoweringInfo const &getTypeLoweringInfo(Type t,
+  const TypeLoweringInfo &getTypeLoweringInfo(Type t,
                                       AbstractCC cc = AbstractCC::Freestanding,
                                       unsigned uncurryLevel = 0) {
     return SGM.Types.getTypeLoweringInfo(t, cc, uncurryLevel);
@@ -282,7 +282,7 @@ public:
   SILType getLoweredLoadableType(Type t,
                                  AbstractCC cc = AbstractCC::Freestanding,
                                  unsigned uncurryLevel = 0) {
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(t, cc, uncurryLevel);
+    const TypeLoweringInfo &ti = getTypeLoweringInfo(t, cc, uncurryLevel);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }

@@ -1269,7 +1269,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
       if (vd->isProperty())
         continue;
-      TypeLoweringInfo const &ti = getTypeLoweringInfo(vd->getType());
+      const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
       if (!ti.isTrivial()) {
         SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());

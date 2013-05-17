@@ -331,7 +331,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
   // FIXME: address-only tuples
-  TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(e->getType());
+  const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(e->getType());
   assert(ti.isLoadable() &&
          "address-only tuples not yet implemented");
   lv.add<FragileElementComponent>(e->getFieldNumber(),

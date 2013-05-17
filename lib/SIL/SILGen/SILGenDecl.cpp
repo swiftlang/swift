@@ -533,7 +533,7 @@ static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
     // Constants are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
            "capturing byref by value?!");
-    TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(capture->getType());
+    const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                              gen.F.begin());
     gen.LocalConstants[SILConstant(capture)] = value;
@@ -591,7 +591,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   }
 
   // If the return type is address-only, emit the indirect return argument.
-  TypeLoweringInfo const &returnTI = getTypeLoweringInfo(resultType);
+  const TypeLoweringInfo &returnTI = getTypeLoweringInfo(resultType);
   if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                    F.begin());
@@ -647,7 +647,7 @@ static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
                                                                 SILValue),
                                    ReferenceTypePath const &elt) {
   for (auto &comp : elt.path) {
-    TypeLoweringInfo const &ti = gen.getTypeLoweringInfo(comp.type);
+    const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(comp.type);
     assert(ti.isLoadable() && "fragile element is address-only?!");
     v = gen.B.createExtract(loc, v, comp.index, ti.getLoweredType());
   }
@@ -665,7 +665,7 @@ void SILGenFunction::emitRetainRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
 
-  TypeLoweringInfo const &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
+  const TypeLoweringInfo &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
                   ti.getReferenceTypeElements());
 }
@@ -674,7 +674,7 @@ void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
 
-  TypeLoweringInfo const &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
+  const TypeLoweringInfo &ti = getTypeLoweringInfo(v.getType().getSwiftRValueType());
   rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
                   ti.getReferenceTypeElements());
 }
@@ -903,7 +903,7 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
     // allocation, so load and destroy the value (or destroy it indirectly if
     // it's address-only) then deallocate the variable.
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
-    TypeLoweringInfo const &ti = getTypeLoweringInfo(vd->getType());
+    const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
     if (!ti.isTrivial()) {
       if (ti.isAddressOnly()) {
         B.createDestroyAddr(vd, loc.address);

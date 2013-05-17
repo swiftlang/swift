@@ -427,7 +427,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
-  TypeLoweringInfo const &resultTI = getTypeLoweringInfo(resultTy);
+  const TypeLoweringInfo &resultTI = getTypeLoweringInfo(resultTy);
   
   // Get the callee value.
   SILValue fnValue = Ownership.isCalleeConsumed()

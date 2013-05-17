@@ -175,24 +175,14 @@ public:
     return getLoweredType(TupleType::getEmpty(Context));
   }
   
-  /// Get the () -> () function type as a SILType.
-  SILType getTopLevelFunctionType() {
-    auto t = FunctionType::get(TupleType::getEmpty(Context),
-                               TupleType::getEmpty(Context),
-                               /*isAutoClosure=*/ false,
-                               /*isBlock=*/ false,
-                               /*isThin=*/ true,
-                               Context);
-
-    return getLoweredType(t);
-  }
-  
   /// Returns the type of the "this" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;
+  
   /// Returns the type of a property accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
   /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
   Type getPropertyType(SILConstant::Kind kind, Type propType) const;
+  
   /// Returns the type of a subscript property accessor, Index -> () -> T
   /// for a getter, or Index -> (value:T) -> () for a setter.
   /// 'kind' must be one of the Kind constants
