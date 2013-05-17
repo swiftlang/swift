@@ -25,50 +25,42 @@ using namespace swift;
 using namespace Lowering;
 
 Type Lowering::getThinFunctionType(Type t) {
-  if (auto *ft = t->getAs<FunctionType>()) {
+  if (auto *ft = t->getAs<FunctionType>())
     return FunctionType::get(ft->getInput(), ft->getResult(),
                              ft->isAutoClosure(),
                              ft->isBlock(),
                              /*isThin*/ true,
                              ft->getASTContext());
-  } else if (auto *pft = t->getAs<PolymorphicFunctionType>()) {
+  
+  if (auto *pft = t->getAs<PolymorphicFunctionType>())
     return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
                                         &pft->getGenericParams(),
                                         /*isThin*/ true,
                                         pft->getASTContext());
-  } else {
-    return t;
-  }
+
+  return t;
 }
 
 Type Lowering::getThickFunctionType(Type t) {
-  if (auto *fTy = t->getAs<FunctionType>()) {
-    return FunctionType::get(fTy->getInput(),
-                             fTy->getResult(),
-                             fTy->isAutoClosure(),
-                             fTy->isBlock(),
-                             /*isThin*/ false,
-                             fTy->getASTContext());
-  } else if (auto *pfTy = t->getAs<PolymorphicFunctionType>()) {
-    return PolymorphicFunctionType::get(pfTy->getInput(),
-                                        pfTy->getResult(),
+  if (auto *fTy = t->getAs<FunctionType>())
+    return FunctionType::get(fTy->getInput(), fTy->getResult(),
+                             fTy->isAutoClosure(), fTy->isBlock(),
+                             /*isThin*/ false, fTy->getASTContext());
+  
+  if (auto *pfTy = t->getAs<PolymorphicFunctionType>())
+    return PolymorphicFunctionType::get(pfTy->getInput(), pfTy->getResult(),
                                         &pfTy->getGenericParams(),
                                         /*isThin*/ false,
                                         pfTy->getASTContext());
-  } else {
-    return t;
-  }
+
+  return t;
 }
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
-  if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
-    if (var->isProperty()) {
-      return var->isSettable()
-      ? CaptureKind::GetterSetter
-      : CaptureKind::Getter;
-    }
-  }
-  
+  if (VarDecl *var = dyn_cast<VarDecl>(capture))
+    if (var->isProperty())
+      return var->isSettable()? CaptureKind::GetterSetter : CaptureKind::Getter;
+
   if (capture->getType()->is<LValueType>())
     return CaptureKind::Byref;
   if (capture->getTypeOfReference()->is<LValueType>()) {
@@ -95,16 +87,16 @@ namespace {
   enum Loadable_t { IsAddressOnly, IsLoadable };
 }
   
-/// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct and
-/// tuple types and visit their element types, storing information about the
+/// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct
+/// and tuple types and visit their element types, storing information about the
 /// reference type members in the TypeLoweringInfo for the type.
 class Lowering::LoadableTypeLoweringInfoVisitor
-  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor, Loadable_t>
-{
+  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor, Loadable_t> {
   TypeLoweringInfo &theInfo;
   ReferenceTypePath currentElement;
 public:
-  LoadableTypeLoweringInfoVisitor(TypeLoweringInfo &theInfo) : theInfo(theInfo) {}
+  LoadableTypeLoweringInfoVisitor(TypeLoweringInfo &theInfo)
+    : theInfo(theInfo) {}
   
   void pushPath() { currentElement.path.push_back({Type(), 0}); }
   void popPath() { currentElement.path.pop_back(); }
@@ -122,8 +114,8 @@ public:
   }
   
   Loadable_t walkStructDecl(StructDecl *sd) {
-    // FIXME: if this struct has a resilient attribute, mark the TypeLoweringInfo
-    // as addressOnly and bail without checking fields.
+    // FIXME: if this struct has a resilient attribute, mark the
+    // TypeLoweringInfo as addressOnly and bail without checking fields.
     
     pushPath();
     for (Decl *d : sd->getMembers())
@@ -204,8 +196,7 @@ void TypeConverter::makeLayoutForDecl(
 namespace {
   /// Recursively destructure tuple-type arguments into SIL argument types.
   class LoweredFunctionInputTypeVisitor
-    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor>
-  {
+    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor> {
     TypeConverter &tc;
     SmallVectorImpl<SILType> &inputTypes;
   public:
@@ -251,13 +242,9 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
     resultType = getEmptyTupleType();
   }
   
-  return SILFunctionTypeInfo::create(topType,
-                                     inputTypes,
-                                     resultType,
-                                     uncurriedInputCounts,
-                                     hasIndirectReturn,
-                                     cc,
-                                     M);
+  return SILFunctionTypeInfo::create(topType, inputTypes, resultType,
+                                     uncurriedInputCounts, hasIndirectReturn,
+                                     cc, M);
 }
 
 SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t,
@@ -302,9 +289,8 @@ SILTypeInfo *TypeConverter::makeSILTypeInfo(CanType t,
   return nullptr;
 }
   
-TypeLoweringInfo const &
-TypeConverter::makeTypeLoweringInfo(CanType t,
-                                    AbstractCC cc,
+const TypeLoweringInfo &
+TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
                                     unsigned uncurryLevel) {
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
   TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
@@ -324,7 +310,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t,
   } else if (isAddressOnly(t)) {
     addressOnly = true;
   } else {
-    // walk aggregate types to determine address-only-ness and find reference
+    // Walk aggregate types to determine address-only-ness and find reference
     // type elements.
     addressOnly =
       LoadableTypeLoweringInfoVisitor(*theInfo).visit(t) == IsAddressOnly;
@@ -351,16 +337,15 @@ TypeConverter::makeTypeLoweringInfo(CanType t,
   return *theInfo;
 }
   
-TypeLoweringInfo const &
-TypeConverter::getTypeLoweringInfo(Type t,
-                                   AbstractCC cc,
+const TypeLoweringInfo &
+TypeConverter::getTypeLoweringInfo(Type t, AbstractCC cc,
                                    unsigned uncurryLevel) {
   CanType ct = t->getCanonicalType();
   auto existing = types.find(getTypeKey(ct, cc, uncurryLevel));
-  if (existing == types.end()) {
+  if (existing == types.end())
     return makeTypeLoweringInfo(ct, cc, uncurryLevel);
-  } else
-    return *existing->second;
+
+  return *existing->second;
 }
 
 static AbstractCC getAbstractCC(SILConstant c) {
@@ -389,8 +374,8 @@ SILType TypeConverter::getConstantType(SILConstant constant) {
   if (found == constantTypes.end()) {
     Type swiftTy = getThinFunctionType(makeConstantType(constant));
     AbstractCC cc = getAbstractCC(constant);
-    SILType loweredTy
-      = getTypeLoweringInfo(swiftTy, cc, constant.uncurryLevel).getLoweredType();
+    SILType loweredTy = getTypeLoweringInfo(swiftTy, cc,
+                                        constant.uncurryLevel).getLoweredType();
     DEBUG(llvm::dbgs() << "constant ";
           constant.print(llvm::dbgs());
           llvm::dbgs() << " has type ";
@@ -442,22 +427,18 @@ Type TypeConverter::getMethodTypeInContext(Type /*nullable*/ contextType,
     return methodType;
   Type thisType = getMethodThisType(contextType);
   
-  if (genericParams) {
-    return PolymorphicFunctionType::get(thisType, methodType,
-                                        genericParams,
+  if (genericParams)
+    return PolymorphicFunctionType::get(thisType, methodType, genericParams,
                                         Context);
-  }
 
-  return FunctionType::get(thisType, methodType,
-                           Context);
+  return FunctionType::get(thisType, methodType, Context);
 }
 
 /// Get the type of a global variable accessor function, () -> [byref] T.
 static Type getGlobalAccessorType(Type varType, ASTContext &C) {
   return FunctionType::get(TupleType::getEmpty(C),
                            LValueType::get(varType,
-                                           LValueType::Qual::DefaultForType,
-                                           C),
+                                           LValueType::Qual::DefaultForType, C),
                            C);
 }
 
@@ -465,16 +446,13 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
 static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
   Type classType = cd->getDeclaredTypeInContext();
 
-  if (cd->getGenericParams()) {
+  if (cd->getGenericParams())
     return PolymorphicFunctionType::get(classType,
                                         C.TheObjectPointerType,
                                         cd->getGenericParams(),
                                         C);
-  } else {
-    return FunctionType::get(classType,
-                             C.TheObjectPointerType,
-                             C);
-  }
+
+  return FunctionType::get(classType, C.TheObjectPointerType, C);
 }
 
 static Type getFunctionTypeWithCaptures(TypeConverter &types,

@@ -71,7 +71,8 @@ public:
 
     assert(0 && "triggering standard assertion failure routine");
   }
-#define require(condition, complaint) _require(condition, complaint ": " #condition)
+#define require(condition, complaint) \
+  _require(condition, complaint ": " #condition)
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
@@ -210,7 +211,7 @@ public:
     
     // Check that the arguments match the curry levels.
     require(PAI->getArguments().size() == ti->getCurryInputTypes().size(),
-            "closure doesn't have right number of curry arguments for function");
+           "closure doesn't have right number of curry arguments for function");
     for (size_t i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       DEBUG(llvm::dbgs() << "  argument type ";
             PAI->getArguments()[i].getType().print(llvm::dbgs());
@@ -237,7 +238,7 @@ public:
 
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
     require(isa<BuiltinModule>(BFI->getFunction()->getDeclContext()),
-            "builtin_function_ref must refer to a function in the Builtin module");
+         "builtin_function_ref must refer to a function in the Builtin module");
     require(BFI->getType().is<AnyFunctionType>(),
             "builtin_function_ref should have a function result");
     require(BFI->getType().castTo<AnyFunctionType>()->isThin(),
@@ -363,7 +364,8 @@ public:
   void checkClassMetatypeInst(ClassMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "class_metatype instruction must be of metatype type");
-    require(MI->getOperand().getType().getSwiftType()->getClassOrBoundGenericClass(),
+    require(MI->getOperand().getType().getSwiftType()
+            ->getClassOrBoundGenericClass(),
             "class_metatype base must be of class type");
     require(MI->getOperand().getType().getSwiftType() ==
              CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
@@ -871,7 +873,8 @@ public:
               .getSwiftType()->getClassOrBoundGenericClass() ||
             AI->getOperand().getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
-            "ref-to-raw-pointer operand must be a class reference or ObjectPointer");
+            "ref-to-raw-pointer operand must be a class reference or"
+            " ObjectPointer");
     require(AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "ref-to-raw-pointer result must be RawPointer");
@@ -882,7 +885,7 @@ public:
               .getSwiftType()->getClassOrBoundGenericClass() ||
             AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
-            "raw-pointer-to-ref result must be a class reference or ObjectPointer");
+        "raw-pointer-to-ref result must be a class reference or ObjectPointer");
     require(AI->getOperand().getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "raw-pointer-to-ref operand must be ObjectPointer");
@@ -911,7 +914,8 @@ public:
             "result types of convert_function operand and result do no match");
     require(opTI->getInputTypes().size() == resTI->getInputTypes().size(),
             "input types of convert_function operand and result do not match");
-    require(std::equal(opTI->getInputTypes().begin(), opTI->getInputTypes().end(),
+    require(std::equal(opTI->getInputTypes().begin(),
+                       opTI->getInputTypes().end(),
                       resTI->getInputTypes().begin()),
             "input types of convert_function operand and result do not match");
   }

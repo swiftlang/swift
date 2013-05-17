@@ -18,7 +18,6 @@
 #ifndef SWIFT_SIL_SILType_H
 #define SWIFT_SIL_SILType_H
 
-#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILBase.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -27,7 +26,9 @@
 namespace swift {
   class ASTContext;
   class VarDecl;
-  
+  class SILFunctionTypeInfo;
+  class SILCompoundTypeInfo;
+
 namespace Lowering {
   class TypeConverter;
 }
@@ -73,10 +74,7 @@ public:
   }
 };
 
-class SILFunctionTypeInfo;
-class SILCompoundTypeInfo;
-
-}
+} // end namespace swift
   
 namespace llvm {
   template<typename T>
@@ -95,7 +93,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = 3 };
   };
-}
+}  // end namespace llvm
  
 namespace swift {
 
@@ -138,11 +136,8 @@ class SILType {
   
   /// Private constructor. SILTypes are normally vended by
   /// TypeConverter::getLoweredType().
-  SILType(CanType ty,
-          bool address,
-          bool loadable)
-    : value(ty.getPointer(), makeFlags(address, loadable))
-  {
+  SILType(CanType ty, bool address, bool loadable)
+    : value(ty.getPointer(), makeFlags(address, loadable)) {
     assert((address || loadable) &&
            "SILType can't be the value of an address-only type");
     assert(!(ty && ty->is<LValueType>()) &&
@@ -151,11 +146,8 @@ class SILType {
            "SIL lowering must produce a SILFunctionTypeInfo for function types");
   }
   
-  SILType(SILTypeInfo *ti,
-          bool address,
-          bool loadable)
-    : value(ti, makeFlags(address, loadable))
-  {
+  SILType(SILTypeInfo *ti, bool address, bool loadable)
+    : value(ti, makeFlags(address, loadable)) {
     assert((address || loadable) &&
            "SILType can't be the value of an address-only type");    
   }
@@ -193,12 +185,10 @@ public:
   /// Returns the Swift type referenced by this SIL type.
   CanType getSwiftRValueType() const {
     PointerType p = value.getPointer();
-    if (auto *ty = p.dyn_cast<TypeBase*>()) {
+    if (auto *ty = p.dyn_cast<TypeBase*>())
       return CanType(ty);
-    }
-    if (auto *ti = p.dyn_cast<SILTypeInfo*>()) {
+    if (auto *ti = p.dyn_cast<SILTypeInfo*>())
       return ti->getSwiftType();
-    }
     llvm_unreachable("unknown SILType pointer type");
   }
 
@@ -206,13 +196,11 @@ public:
   /// an address type, returns an LValueType.
   CanType getSwiftType() const {
     CanType rvalueTy = getSwiftRValueType();
-    if (isAddress()) {
-      return LValueType::get(rvalueTy,
-                             LValueType::Qual::DefaultForType,
+    if (isAddress())
+      return LValueType::get(rvalueTy, LValueType::Qual::DefaultForType,
                              rvalueTy->getASTContext())
               ->getCanonicalType();
-    } else
-      return rvalueTy;
+    return rvalueTy;
   }
   
   /// Gives the SILFunctionTypeInfo for a function type. The type must be
@@ -236,9 +224,7 @@ public:
   /// The SILType must refer to a function type.
   CanType getFunctionResultType() const {
     auto *fty = castTo<AnyFunctionType>();
-    for (unsigned uncurry = 0;
-         uncurry < getUncurryLevel();
-         ++uncurry) {
+    for (unsigned uncurry = 0; uncurry < getUncurryLevel(); ++uncurry) {
       fty = fty->getResult()->castTo<AnyFunctionType>();
     }
     return CanType(fty->getResult());
