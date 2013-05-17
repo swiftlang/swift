@@ -2047,6 +2047,7 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-primary ::= <a href="#expr-literal">expr-literal</a>
     expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary ::= <a href="#expr-super">expr-super</a>
+    expr-primary ::= <a href="#expr-closure">expr-closure</a>
     expr-primary ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
     expr-primary ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
     expr-primary ::= <a href="#expr-paren">expr-paren</a>
@@ -2381,6 +2382,68 @@ ill-formed if the type does not conform to the protocol.</p>
   constructor, and must be called before the derived constructor accesses
   <tt>this</tt> or any instance variables.
   </p>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-closure">Closure Expression</h3>
+  <!-- ===================================================================== -->
+  <pre class="grammar">
+    expr-closure ::= '{' closure-signature? <a href="#brace-item-list">brace-item-list</a> '}'
+
+    closure-signature ::= '|' closure-signature-arguments? '|' <a href="#func-signature">func-signature-result</a>?
+
+    closure-signature-arguments ::= <a href="#pattern-tuple">pattern-tuple-element</a> (',' <a href="#pattern-tuple">pattern-tuple-element</a>)*
+  </pre>
+
+  <p>A closure defines an anonymous function as an expression. Like a
+  <a href="#decl-func">func</a> declaration, a closure has parameters,
+  a return type, and some number of statements that are executed when
+  the closure is called. Like local functions, closures can capture
+  values from its enclosing function and closure scopes. Closures are
+  often used in lieu of local functions when the function name would
+  only be used once, to be called by some other function. As a syntax
+  optimization, when the closure contains only a single expression, it's
+  value is used as the result of the closure. Thus, the closure <code>{
+  5 }</code> is equivalent to <code>{ return 5 }</code>.</p>
+
+  <p>Unlike <a href="#decl-func">func</a>
+  declarations, the return type, parameter types, and even the <a
+   href="#expr-anon-closure-arg">names of parameters</a> can be
+  omitted from the definition of the closure, making it a concise
+  syntax for small closures. In such cases, the context in which the
+  closure is used must provide information about the parameter and
+  return types. In the special case where the closure consists of only
+  a single expression, that expression participates in the
+  type checking of its context. </p>
+
+  <pre class="example">
+    <i>// Takes a closure that it calls to determine an ordering relation.</i>
+    func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
+    
+    func f() {
+      <i>// Compare one way.  Closure is inferred to return Bool and take two ints</i>
+      <i>// from the argument context.  This same information infers that $0 and $1</i>
+      <i>// both have type 'Int'.</i>
+      magic(42, { $0 &lt; $1 })
+    
+      <i>// Compare the other way way.</i>
+      magic(42, { $1 &lt; $0 })
+
+      <i>// Provide parameter names, but infer the types.</i>
+      magic(42, { |x, y| y &lt; x })
+
+      <i>// Provide parameter names and types.</i>
+      magic(42, { |x : Int, y : Int| y &lt; x })
+
+      <i>// Provide parameter names and types, and return type, with multiple statements.</i>
+      magic(42, { |x : Int, y : Int| -> Bool
+        print("Comparing \(x) to \(y).\n")
+        return y &lt; x
+      })
+
+      <i>// Error, not enough context to infer the type of $0.</i>
+      var x = { $0 } 
+    }
+  </pre>
   
   <!-- ===================================================================== -->
   <h3 id="expr-explicit-closure">Explicit Closure Expression</h3>
@@ -2445,8 +2508,8 @@ ill-formed if the type does not conform to the protocol.</p>
   the containing expression is <a href="#typecheck_anon">coerced into a closure
   context</a>.  All other dollar identifiers are invalid.</p>
   
-  <p>This can only be used in the body of an <a
-     href="#expr-explicit-closure">expr-explicit-closure</a>.
+  <p>This can only be used in the body of a closure (<a
+     href="#expr-closure">expr-closure</a>) that does not have explicitly-specified parameters or an explicit closure (<a href="#expr-explicit-closure">expr-explicit-closure</a>).
   </p>
   
 
