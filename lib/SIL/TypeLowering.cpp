@@ -220,7 +220,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
     return *theInfo;
   }
   
-  bool addressOnly = !SILType::isLoadable(t, M);;
+  bool addressOnly = SILType::isAddressOnly(t, M);;
   if (t->hasReferenceSemantics()) {
     // Reference types need only to retain/release themselves.
     theInfo->referenceTypeElements.push_back(ReferenceTypePath());
@@ -231,7 +231,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
 
   // Make a SILFunctionTypeInfo for function types.
   if (AnyFunctionType *ft = t->getAs<AnyFunctionType>())
-    theInfo->loweredType = SILType(makeInfoForFunctionType(ft, cc, uncurryLevel),
+    theInfo->loweredType = SILType(makeInfoForFunctionType(ft, cc,uncurryLevel),
                                    /*address=*/ addressOnly);
   // Otherwise, create a SILType from just the Swift type.
   else

@@ -16,28 +16,29 @@
 #include "swift/AST/Decl.h"
 using namespace swift;
 
-/// True if the type, or the referenced type of an address type, is loadable.
-/// This is the opposite of isAddressOnly.
-bool SILType::isLoadable(CanType Ty, SILModule &M) {
+/// isAddressOnly - True if the type, or the referenced type of an address
+/// type, is address-only.  For example, it could be a resilient struct or
+/// something of unknown size.
+bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   // Handle the obvious cases inline.
 
   // Reference types are always loadable.
   if (Ty->hasReferenceSemantics())
-    return true;
+    return false;
 
   // Archetypes and existentials are always address-only.
   // FIXME: Class archetypes and existentials will one day be representable as
   // reference types.
   // FIXME: resilient structs
   if (Ty->is<ArchetypeType>() || Ty->isExistentialType())
-    return false;
+    return true;
 
-  // Structs and tuples are loadable if all of their elements are loadable.
+  // Structs and tuples are address-only if any of their elements are.
   if (TupleType *TTy = Ty->getAs<TupleType>()) {
     for (const TupleTypeElt &elt : TTy->getFields())
-      if (!isLoadable(elt.getType()->getCanonicalType(), M))
-        return false;
-    return true;
+      if (isAddressOnly(elt.getType()->getCanonicalType(), M))
+        return true;
+    return false;
   }
 
   StructDecl *SD = nullptr;
@@ -53,13 +54,13 @@ bool SILType::isLoadable(CanType Ty, SILModule &M) {
     for (Decl *D : SD->getMembers())
       if (VarDecl *VD = dyn_cast<VarDecl>(D))
         if (!VD->isProperty() &&
-            !isLoadable(VD->getType()->getCanonicalType(), M))
-          return false;
-    return true;
+            isAddressOnly(VD->getType()->getCanonicalType(), M))
+          return true;
+    return false;
   }
 
-  // Otherwise, it must be loadable.
-  return true;
+  // Otherwise, it must not be address-only.
+  return false;
 }
 
 

@@ -180,18 +180,21 @@ public:
   /// True if the type is an address type.
   bool isAddress() const { return value.getInt(); }
 
-  /// True if the type, or the referenced type of an address type, is loadable.
-  /// This is the opposite of isAddressOnly.
-  static bool isLoadable(CanType T, SILModule &M);
+  /// isAddressOnly - True if the type, or the referenced type of an address
+  /// type, is address-only.  For example, it could be a resilient struct or
+  /// something of unknown size.
+  static bool isAddressOnly(CanType T, SILModule &M);
 
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
   bool isLoadable(SILModule &M) const {
-    return isLoadable(getSwiftRValueType(), M);
+    return !isAddressOnly(getSwiftRValueType(), M);
   }
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
-  bool isAddressOnly(SILModule &M) const { return !isLoadable(M); }
+  bool isAddressOnly(SILModule &M) const {
+    return isAddressOnly(getSwiftRValueType(), M);
+  }
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
