@@ -50,10 +50,10 @@ ArrayRef<SILType> ValueBase::getTypes() const {
   if (TypeOrTypeList.isNull())
     return ArrayRef<SILType>();
   // Arbitrary list of results.
-  if (auto *TypeList = TypeOrTypeList.getTypeListOrNull())
+  if (auto *TypeList = TypeOrTypeList.dyn_cast<SILTypeList*>())
     return ArrayRef<SILType>(TypeList->Types, TypeList->NumTypes);
   // Single result.
-  return TypeOrTypeList.getType();
+  return TypeOrTypeList.get<SILType>();
 }
 
 

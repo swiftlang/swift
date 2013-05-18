@@ -71,33 +71,16 @@ namespace swift {
 /// types do not have a known size or layout and must always be handled
 /// indirectly in memory.
 class SILType {
+public:
   using PointerType = llvm::PointerUnion<TypeBase *, SILFunctionTypeInfo *>;
-  using ValueType = llvm::PointerIntPair<PointerType, 2>;
+  // The bool value of the PointerIntPair is the "isAddress" bit.
+  using ValueType = llvm::PointerIntPair<PointerType, 1, bool>;
+private:
   ValueType value;
 
-  enum {
-    // Set if this is an address type.
-    IsAddressFlag = 1 << 0,
-    // Set if the underlying type is loadable. !IsAddress && !IsLoadable is
-    // invalid.
-    IsLoadableFlag = 1 << 1,
-    
-    // A SILType cannot be non-address and non-loadable. SILType can be unioned
-    // with an eight-byte-aligned pointer type; SILType::isInvalid() will return
-    // true for a pointer value that isn't a SILType.
-    InvalidFlags = 0
-  };
-  
-  static inline unsigned makeFlags(bool address, bool loadable) {
-    return (address << 0) | (loadable << 1);
-  }
-  
   /// Private constructor. SILTypes are normally vended by
   /// TypeConverter::getLoweredType().
-  SILType(CanType ty, bool address, bool loadable)
-    : value(ty.getPointer(), makeFlags(address, loadable)) {
-    assert((address || loadable) &&
-           "SILType can't be the value of an address-only type");
+  SILType(CanType ty, bool isAddress) : value(ty.getPointer(), isAddress) {
     if (!ty) return;
 
     assert(!ty->is<LValueType>() &&
@@ -106,14 +89,11 @@ class SILType {
            "SIL lowering must produce a SILFunctionTypeInfo for functions");
   }
   
-  SILType(SILFunctionTypeInfo *ti, bool address, bool loadable)
-    : value(ti, makeFlags(address, loadable)) {
-    assert((address || loadable) &&
-           "SILType can't be the value of an address-only type");
+  SILType(SILFunctionTypeInfo *ti, bool isAddress) : value(ti, isAddress) {
   }
   
-  SILType(ValueType value)
-    : value(value) {}
+  SILType(ValueType value) : value(value) {
+  }
 
   friend class Lowering::TypeConverter;
   friend struct llvm::DenseMapInfo<SILType>;
@@ -123,26 +103,24 @@ public:
   
   /// getPrimitiveType - Form a SILType for a primitive type that does not
   /// require any special handling (i.e., not a function or aggregate type).
-  static SILType getPrimitiveType(CanType T, bool isAddress, bool isLoadable) {
-    return SILType(T, isAddress, isLoadable);
+  static SILType getPrimitiveType(CanType T, bool isAddress) {
+    return SILType(T, isAddress);
   }
   
   
   bool isNull() const { return value.getPointer().isNull(); }
   explicit operator bool() const { return bool(value.getPointer()); }
   
-  bool isInvalid() const { return value.getInt() == InvalidFlags; }
-  
   /// Gets the address type referencing this type, or the type itself if it is
   /// already an address type.
   SILType getAddressType() const {
-    return {{value.getPointer(), value.getInt() | IsAddressFlag}};
+    return {{value.getPointer(), true}};
   }
 
   /// Gets the type referenced by an address type, or the type itself if it is
   /// not an address type. Invalid for address-only types.
   SILType getObjectType() const {
-    return {{value.getPointer(), value.getInt() & ~IsAddressFlag}};
+    return {{value.getPointer(), false}};
   }
   
   /// Returns the Swift type referenced by this SIL type.
@@ -200,7 +178,7 @@ public:
   }
   
   /// True if the type is an address type.
-  bool isAddress() const { return value.getInt() & IsAddressFlag; }
+  bool isAddress() const { return value.getInt(); }
 
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
@@ -430,6 +408,23 @@ inline CanType SILType::getSwiftRValueType() const {
 } // end swift namespace
 
 namespace llvm {
+
+// Allow the low bit of SILType to be used for nefarious purposes, e.g. putting
+// a SILType into a PointerUnion.
+template<>
+class PointerLikeTypeTraits<swift::SILType> {
+public:
+  static inline void *getAsVoidPointer(swift::SILType T) {
+    return T.getOpaqueValue();
+  }
+  static inline swift::SILType getFromVoidPointer(void *P) {
+    return swift::SILType::getFromOpaqueValue(P);
+  }
+  // SILType is just a wrapper around its ValueType, so it has a bit available.
+  enum { NumLowBitsAvailable =
+    PointerLikeTypeTraits<swift::SILType::ValueType>::NumLowBitsAvailable };
+};
+
 
 // Allow SILType to be used as a DenseMap key.
 template<>

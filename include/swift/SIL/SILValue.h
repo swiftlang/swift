@@ -39,38 +39,7 @@ namespace swift {
   /// represents a runtime computed value.  Things like SILInstruction derive
   /// from this.
   class ValueBase : public SILAllocated<ValueBase> {
-    struct SILTypeOrTypeList {
-      union {
-        SILType Ty;
-        SILTypeList *List;
-      };
-      
-      static_assert(sizeof(Ty) == sizeof(List),
-                    "SILTypeOrTypeList union size mismatch");
-      
-      SILTypeOrTypeList() : List() {}
-      
-      SILTypeOrTypeList(SILType Ty) : Ty(Ty) {}
-      
-      SILTypeOrTypeList(SILTypeList *Ptr)
-        : List(Ptr) {}
-      
-      bool isNull() const {
-        return !List;
-      }
-      
-      SILTypeList *getTypeListOrNull() const {
-        if (Ty.isInvalid())
-          return List;
-        return nullptr;
-      }
-      
-      SILType getType() const {
-        assert(!Ty.isInvalid() && "got type list but expected single type");
-        return Ty;
-      }
-    } TypeOrTypeList;
-
+    PointerUnion<SILType, SILTypeList*> TypeOrTypeList;
     Operand *FirstUse = nullptr;
     friend class Operand;
     friend class SILValue;

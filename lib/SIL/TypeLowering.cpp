@@ -232,13 +232,10 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
   // Make a SILFunctionTypeInfo for function types.
   if (AnyFunctionType *ft = t->getAs<AnyFunctionType>())
     theInfo->loweredType = SILType(makeInfoForFunctionType(ft, cc, uncurryLevel),
-                                   /*address=*/ addressOnly,
-                                   /*loadable=*/ !addressOnly);
+                                   /*address=*/ addressOnly);
   // Otherwise, create a SILType from just the Swift type.
   else
-    theInfo->loweredType = SILType(t,
-                                   /*address=*/ addressOnly,
-                                   /*loadable=*/ !addressOnly);
+    theInfo->loweredType = SILType(t, /*address=*/ addressOnly);
   
   return *theInfo;
 }
