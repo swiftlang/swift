@@ -201,9 +201,16 @@ public:
   
   /// True if the type is an address type.
   bool isAddress() const { return value.getInt() & IsAddressFlag; }
+
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
-  bool isLoadable(SILModule &M) const { return value.getInt() & IsLoadableFlag;}
+  static bool isLoadable(CanType T, SILModule &M);
+
+  /// True if the type, or the referenced type of an address type, is loadable.
+  /// This is the opposite of isAddressOnly.
+  bool isLoadable(SILModule &M) const {
+    return isLoadable(getSwiftRValueType(), M);
+  }
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const { return !isLoadable(M); }

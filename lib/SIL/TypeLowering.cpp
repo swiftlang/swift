@@ -75,23 +75,14 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   return CaptureKind::Constant;
 }
   
-static bool isAddressOnly(Type t) {
-  // Archetypes and existentials are always address-only.
-  // FIXME: Class archetypes and existentials will one day be representable as
-  // reference types.
-  // FIXME: resilient structs
-  return t->is<ArchetypeType>() || t->isExistentialType();
-}
-
-namespace {
-  enum Loadable_t { IsAddressOnly, IsLoadable };
-}
-  
 /// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct
 /// and tuple types and visit their element types, storing information about the
 /// reference type members in the TypeLoweringInfo for the type.
+///
+/// This is only invoked on loadable types.
+///
 class Lowering::LoadableTypeLoweringInfoVisitor
-  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor, Loadable_t> {
+  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor> {
   TypeLoweringInfo &theInfo;
   ReferenceTypePath currentElement;
 public:
@@ -104,60 +95,46 @@ public:
     currentElement.path.back() = c;
   }
   
-  Loadable_t visitType(TypeBase *t) {
-    if (t->hasReferenceSemantics()) {
+  void visitType(TypeBase *t) {
+    if (t->hasReferenceSemantics())
       theInfo.referenceTypeElements.push_back(currentElement);
-      return IsLoadable;
-    }
-    if (isAddressOnly(t))
-      return IsAddressOnly;
-    return IsLoadable;
   }
   
-  Loadable_t walkStructDecl(StructDecl *sd) {
-    // FIXME: if this struct has a resilient attribute, mark the
-    // TypeLoweringInfo as addressOnly and bail without checking fields.
-    
+  void walkStructDecl(StructDecl *sd) {
     pushPath();
     for (Decl *d : sd->getMembers())
       if (VarDecl *vd = dyn_cast<VarDecl>(d))
         if (!vd->isProperty()) {
           CanType ct = vd->getType()->getCanonicalType();
           setPath(ReferenceTypePath::Component::forStructField(ct, vd));
-          if (visit(ct) == IsAddressOnly) {
-            return IsAddressOnly;
-          }
+          visit(ct);
         }
     popPath();
-    return IsLoadable;
   }
   
-  Loadable_t visitBoundGenericType(BoundGenericType *gt) {
+  void visitBoundGenericType(BoundGenericType *gt) {
     if (StructDecl *sd = dyn_cast<StructDecl>(gt->getDecl()))
-      return walkStructDecl(sd);
+      walkStructDecl(sd);
     else
-      return this->visitType(gt);
+      visitType(gt);
   }
   
-  Loadable_t visitNominalType(NominalType *t) {
+  void visitNominalType(NominalType *t) {
     if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl()))
-      return walkStructDecl(sd);
+      walkStructDecl(sd);
     else
-      return this->visitType(t);
+      this->visitType(t);
   }
   
-  Loadable_t visitTupleType(TupleType *t) {
+  void visitTupleType(TupleType *t) {
     pushPath();
     unsigned i = 0;
     for (TupleTypeElt const &elt : t->getFields()) {
       CanType ct = elt.getType()->getCanonicalType();
       setPath(ReferenceTypePath::Component::forTupleElement(ct, i++));
-      if (visit(ct) == IsAddressOnly) {
-        return IsAddressOnly;
-      }
+      visit(ct);
     }
     popPath();
-    return IsLoadable;
   }
 };
   
@@ -243,21 +220,13 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
     return *theInfo;
   }
   
-  bool addressOnly = false;
+  bool addressOnly = !SILType::isLoadable(t, M);;
   if (t->hasReferenceSemantics()) {
-    // Reference types are always loadable, and need only to retain/release
-    // themselves.
-    addressOnly = false;
+    // Reference types need only to retain/release themselves.
     theInfo->referenceTypeElements.push_back(ReferenceTypePath());
-  } else if (isAddressOnly(t)) {
-    addressOnly = true;
-  } else {
-    // Walk aggregate types to determine address-only-ness and find reference
-    // type elements.
-    addressOnly =
-      LoadableTypeLoweringInfoVisitor(*theInfo).visit(t) == IsAddressOnly;
-    if (addressOnly)
-      theInfo->referenceTypeElements.clear();
+  } else if (!addressOnly) {
+    // Walk aggregate types to find reference type elements.
+    LoadableTypeLoweringInfoVisitor(*theInfo).visit(t);
   }
 
   // Make a SILFunctionTypeInfo for function types.
