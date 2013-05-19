@@ -29,16 +29,24 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   // Archetypes and existentials are always address-only.
   // FIXME: Class archetypes and existentials will one day be representable as
   // reference types.
-  // FIXME: resilient structs
+  // FIXME: if this is a struct has a resilient attribute, it is obviously
+  // AddressOnly.
   if (Ty->is<ArchetypeType>() || Ty->isExistentialType())
     return true;
 
   // Structs and tuples are address-only if any of their elements are.
   if (TupleType *TTy = Ty->getAs<TupleType>()) {
+    // Check to see if we've computed this property for this tuple yet.
+    auto Entry = M.AddressOnlyTypeCache.find(TTy);
+    // If we got a hit, then return the precomputed value.
+    if (Entry != M.AddressOnlyTypeCache.end())
+      return Entry->second;
+    
     for (const TupleTypeElt &elt : TTy->getFields())
       if (isAddressOnly(elt.getType()->getCanonicalType(), M))
-        return true;
-    return false;
+        return M.AddressOnlyTypeCache[TTy] = true;
+    
+    return M.AddressOnlyTypeCache[TTy] = false;
   }
 
   StructDecl *SD = nullptr;
@@ -49,14 +57,18 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   }
 
   if (SD) {
-    // FIXME: if this struct has a resilient attribute, it is obviously
-    // AddressOnly.
+    // Check to see if we've computed this property for this tuple yet.
+    auto Entry = M.AddressOnlyTypeCache.find(Ty.getPointer());
+    // If we got a hit, then return the precomputed value.
+    if (Entry != M.AddressOnlyTypeCache.end())
+      return Entry->second;
+
     for (Decl *D : SD->getMembers())
       if (VarDecl *VD = dyn_cast<VarDecl>(D))
         if (!VD->isProperty() &&
             isAddressOnly(VD->getType()->getCanonicalType(), M))
-          return true;
-    return false;
+          return M.AddressOnlyTypeCache[Ty.getPointer()] = true;
+    return M.AddressOnlyTypeCache[Ty.getPointer()] = false;
   }
 
   // Otherwise, it must not be address-only.

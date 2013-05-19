@@ -52,6 +52,7 @@ private:
   friend class SILFunction;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
+  friend class SILType;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
@@ -67,6 +68,10 @@ private:
   /// The collection of global variables used in the module.
   llvm::SetVector<VarDecl*> globals;
 
+  /// AddressOnlyTypeCache - This is a cache that memoizes the result of
+  /// SILType::isAddressOnly, to avoid recomputing it repeatedly.
+  llvm::DenseMap<TypeBase*, bool> AddressOnlyTypeCache;
+  
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ASTContext &TheASTContext);
