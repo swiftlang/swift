@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
 
@@ -26,7 +27,8 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 bool isTypeLookup,
                                 Module *curModule) {
   // Category declarations by their signatures.
-  llvm::SmallDenseMap<CanType, SmallVector<ValueDecl *, 2>> declsBySignature;
+  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>>
+    declsBySignature;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Determine the signature of this declaration.
