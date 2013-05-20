@@ -89,15 +89,18 @@ namespace swift {
         return *this;
       }
       
-      HasValue = true;
-      ::new ((void*)&Value) T(Other.Value);
+      if (Other.HasValue) {
+        HasValue = true;
+        ::new ((void*)&Value) T(Other.Value);
+      }
+      
       return *this;
     }
     
     Optional &operator=(Optional &&Other) {
       if (HasValue && Other.HasValue) {
         Value = std::move(Other.Value);
-        Other.HasValue = false;
+        Other.reset();
         return *this;
       }
       
@@ -106,9 +109,12 @@ namespace swift {
         return *this;
       }
       
-      HasValue = true;
-      ::new ((void*)&Value) T(std::move(Other.Value));
-      Other.HasValue = false;
+      if (Other.HasValue) {
+        HasValue = true;
+        ::new ((void*)&Value) T(std::move(Other.Value));
+        Other.reset();
+      }
+      
       return *this;
     }
     
