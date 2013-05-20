@@ -102,6 +102,9 @@ namespace swift {
   // Optimization passes.
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCExpandPass();
+
+  /// The extension for serialized modules.
+  static const char * const SERIALIZED_MODULE_EXTENSION = "swiftmodule";
 } // end namespace swift
 
 #endif

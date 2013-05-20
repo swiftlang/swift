@@ -199,7 +199,7 @@ function(compile_swift_files)
     set(module_source_dir ${SWIFTLIB_DIR}/swift)
 
     if(SWIFT_USE_LIBRARY_MODULES)
-      set(module_source_file ${module_source_dir}/${module_source_name}.sm)
+      set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
 
       add_custom_command(
         OUTPUT ${module_source_file}

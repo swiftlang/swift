@@ -52,7 +52,8 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
                                    llvm::OwningPtr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
-  moduleFilename += ".sm";
+  moduleFilename += '.';
+  moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
   llvm::SmallString<128> inputFilename;
 
