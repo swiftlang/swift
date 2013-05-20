@@ -605,6 +605,10 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   ExprPrePassWalker prePass(TC);
 
+  // FIXME: Resolve the types of extensions first, so that each nominal type
+  // has the complete chain of extensions associated with it. We need to be
+  // able to more lazily resolve types for this to work.
+
   // Validate the conformance types of all of the protocols in the translation
   // unit. This includes inherited protocols, associated types with
   // requirements, and (FIXME:) conformance requirements in requires clauses.
