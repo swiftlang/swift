@@ -32,80 +32,34 @@ static void DoGlobalExtensionLookup(Type BaseType,
                                     Module *CurModule,
                                     Module *BaseModule,
                                     bool IsTypeLookup) {
-  bool CurModuleHasTypeDecl = false;
-  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
+  SmallVector<ValueDecl *, 4> found;
+  
+  auto nominal = BaseType->getAnyNominal();
+  if (!nominal)
+    return;
 
-  // FIXME: Hack to avoid searching Clang modules more than once.
-  bool searchedClangModule = isa<ClangModule>(CurModule);
-
-  // Find all extensions in this module.
-  for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
-    for (Decl *Member : ED->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-        Consumer.foundDecl(VD);
-        if (!IsTypeLookup)
-          CurModuleTypes.insert(VD->getType()->getCanonicalType());
-        CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
-      }
-    }
+  // Add the members from the type itself to the list of results.
+  for (auto member : BaseMembers) {
+    found.push_back(member);
   }
 
-  if (BaseModule == CurModule) {
-    for (ValueDecl *VD : BaseMembers) {
-      Consumer.foundDecl(VD);
-      if (!IsTypeLookup)
-        CurModuleTypes.insert(VD->getType()->getCanonicalType());
-      CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
-    }
-  }
-
-  // The builtin module has no imports.
-  if (isa<BuiltinModule>(CurModule)) return;
-
-  // The Clang module loader handles transitive lookups itself... but is that
-  // what we want?
-  if (isa<ClangModule>(CurModule)) return;
-
-  // If we find a type in the current module, don't look into any
-  // imported modules.
-  if (CurModuleHasTypeDecl) return;
-
-  TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
-
-  // Otherwise, check our imported extensions as well.
-  // FIXME: Implement DAG-based shadowing rules.
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-
-    // FIXME: Don't search Clang modules more than once.
-    if (isa<ClangModule>(ImpEntry.second)) {
-      if (searchedClangModule)
+  // Look in each extension of this type.
+  for (auto extension : nominal->getExtensions()) {
+    for (auto member : extension->getMembers()) {
+      auto vd = dyn_cast<ValueDecl>(member);
+      if (!vd)
         continue;
 
-      searchedClangModule = true;
-    }
-
-    for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
-      for (Decl *Member : ED->getMembers()) {
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-          if (IsTypeLookup || isa<TypeDecl>(VD) ||
-              !CurModuleTypes.count(VD->getType()->getCanonicalType()))
-            Consumer.foundDecl(VD);
-        }
-      }
+      found.push_back(vd);
     }
   }
 
-  if (BaseModule != CurModule) {
-    for (ValueDecl *VD : BaseMembers) {
-      if (IsTypeLookup || isa<TypeDecl>(VD) ||
-          !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
-        Consumer.foundDecl(VD);
-      }
-    }
-  }
+  // Handle shadowing.
+  removeShadowedDecls(found, IsTypeLookup, CurModule);
+
+  // Report the declarations we found to the consumer.
+  for (auto decl : found)
+    Consumer.foundDecl(decl);
 }
 
 namespace {

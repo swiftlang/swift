@@ -22,9 +22,7 @@
 
 using namespace swift;
 
-/// \brief Remove any declarations in the given set that are shadowed by
-/// other declarations in that set.
-static void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 bool isTypeLookup,
                                 Module *curModule) {
   // Category declarations by their signatures.

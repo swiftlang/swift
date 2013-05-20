@@ -351,7 +351,17 @@ public:
   /// This method is called by findVisibleDecls() every time it finds a decl.
   virtual void foundDecl(ValueDecl *decl) = 0;
 };
-  
+
+/// \brief Remove any declarations in the given set that are shadowed by
+/// other declarations in that set.
+///
+/// \param decls The set of declarations being considered.
+/// \param isTypeLookup Whether the declarations are the result of type lookup.
+/// \param curModule The current module.
+void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+                         bool isTypeLookup,
+                         Module *curModule);
+
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer. If the current DeclContext is nested in a FuncExpr, the
 /// SourceLoc is used to determine which declarations in that FuncExpr's
