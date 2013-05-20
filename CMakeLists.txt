@@ -217,7 +217,7 @@ function(compile_swift_files)
         OUTPUT ${module_source_file}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
         COMMAND cat ${source_files} > "${module_source_file}"
-        DEPENDS ${source_files}
+        DEPENDS swift ${source_files}
         COMMENT "FIXME: generating module source file ${module_source_name}.swift")
     endif()
 

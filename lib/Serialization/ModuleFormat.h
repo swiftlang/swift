@@ -51,7 +51,22 @@ enum BlockID {
   /// The input block, which contains all the files this module depends on.
   ///
   /// \sa input_block
-  INPUT_BLOCK_ID
+  INPUT_BLOCK_ID,
+
+  /// The "decls-and-types" block, which contains all of the declarations that
+  /// come from this module.
+  ///
+  /// Types are also stored here, so that types that just wrap a Decl don't need
+  /// a separate entry in the file.
+  ///
+  /// \sa decls_block
+  DECLS_AND_TYPES_BLOCK_ID,
+
+  /// The index block, which contains cross-referencing information for the
+  /// module.
+  ///
+  /// \sa index_block
+  INDEX_BLOCK_ID
 };
 
 /// The record types within the control block.
@@ -81,6 +96,64 @@ namespace input_block {
   using SourceFileLayout = BCRecordLayout<
     SOURCE_FILE, // ID
     BCBlob // path
+  >;
+}
+
+using DeclID = uint32_t;
+using DeclIDField = BCFixed<32>;
+
+using BitOffset = uint32_t;
+using BitOffsetField = BCFixed<32>;
+
+/// The record types within the "decls-and-types" block.
+///
+/// \sa DECLS_AND_TYPES_BLOCK_ID
+namespace decls_block {
+  enum {
+    BUILTIN_TYPE = 1,
+
+    TYPEALIAS_DECL = 100,
+
+    NAME_HACK = 200
+  };
+
+  using BuiltinTypeLayout = BCRecordLayout<
+    BUILTIN_TYPE,
+    BCBlob // name of the builtin type
+  >;
+
+  using TypeAliasLayout = BCRecordLayout<
+    TYPEALIAS_DECL,
+    DeclIDField, // underlying type
+    BCFixed<1>,  // generic flag
+    BCArray<DeclIDField> // inherited types
+  >;
+
+  /// Names will eventually be uniqued in an identifier table, but for now we
+  /// store them as trailing records.
+  using NameHackLayout = BCRecordLayout<NAME_HACK, BCBlob>;
+}
+
+/// The record types within the index block.
+///
+/// \sa INDEX_BLOCK_ID
+namespace index_block {
+  enum {
+    TYPE_OFFSETS = 1,
+    DECL_OFFSETS
+  };
+
+  // FIXME: Merge these.
+  using TypeOffsetsLayout = BCRecordLayout<
+    TYPE_OFFSETS,
+    DeclIDField, // first ID in this module
+    BCArray<BitOffsetField>
+  >;
+
+  using DeclOffsetsLayout = BCRecordLayout<
+    DECL_OFFSETS,
+    DeclIDField, // first ID in this module
+    BCArray<BitOffsetField>
   >;
 }
 

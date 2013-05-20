@@ -227,7 +227,6 @@ namespace impl {
   /// Helper class for emitting an array element at the end of a record.
   ///
   /// \sa BCRecordLayout::emitRecord
-  // FIXME: Does not support arrays inline in the record data!
   template<typename EleTy>
   class BCRecordWriter<BCArray<EleTy>> {
   public:
@@ -237,12 +236,24 @@ namespace impl {
       // FIXME: validate array data.
       out.EmitRecordWithArray(abbrCode, buffer, arrayData);
     }
+
+    template <typename BufferTy, typename ArrayTy>
+    static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
+                     unsigned abbrCode, const ArrayTy &arrayData) {
+#ifndef NDEBUG
+      for (auto &item : arrayData)
+        EleTy::assertValid(item);
+#endif
+      buffer.reserve(buffer.size() + arrayData.size());
+      std::copy(arrayData.begin(), arrayData.end(),
+                std::back_inserter(buffer));
+      out.EmitRecordWithAbbrev(abbrCode, buffer);
+    }
   };
 
   /// Helper class for emitting a blob element at the end of a record.
   ///
   /// \sa BCRecordLayout::emitRecord
-  // FIXME: Does not support blob data inline in the record data!
   template<>
   class BCRecordWriter<BCBlob> {
   public:
