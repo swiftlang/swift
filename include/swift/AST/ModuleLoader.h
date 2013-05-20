@@ -25,7 +25,8 @@
 namespace swift {
 
 class Module;
-
+class NominalTypeDecl;
+  
 /// \brief Abstract interface that loads named modules into the AST.
 class ModuleLoader : public llvm::RefCountedBaseVPTR {
 public:
@@ -70,6 +71,16 @@ public:
   virtual ArrayRef<ExtensionDecl*> lookupExtensions(Module *module, Type type) {
     return {};
   }
+
+  /// \brief Load extensions to the given nominal type.
+  ///
+  /// \param nominal The nominal type whose extensions should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains extensions loaded from any generation up to and including this
+  /// one.
+  virtual void loadExtensions(NominalTypeDecl *nominal,
+                              unsigned previousGeneration) = 0;
 
   /// \brief Look for members of the given type.
   ///

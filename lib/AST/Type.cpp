@@ -399,6 +399,19 @@ NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
   return nullptr;
 }
 
+NominalTypeDecl *TypeBase::getAnyNominal() {
+  if (auto nominalTy = getAs<NominalType>())
+    return nominalTy->getDecl();
+
+  if (auto boundTy = getAs<BoundGenericType>())
+    return boundTy->getDecl();
+
+  if (auto unboundTy = getAs<UnboundGenericType>())
+    return unboundTy->getDecl();
+
+  return nullptr;
+}
+
 static Type getStrippedType(ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   switch (type->getKind()) {

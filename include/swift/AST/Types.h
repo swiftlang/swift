@@ -241,6 +241,11 @@ public:
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();
 
+  /// \brief If this is a nominal type, bound generic nominal type, or
+  /// unbound generic nominal type, return the (possibly generic) nominal type
+  /// declaration.
+  NominalTypeDecl *getAnyNominal();
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code

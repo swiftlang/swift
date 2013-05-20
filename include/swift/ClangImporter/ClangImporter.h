@@ -26,7 +26,8 @@ namespace swift {
 
 class ASTContext;
 class Module;
-  
+class NominalTypeDecl;
+
 /// \brief Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter : public ModuleLoader {
@@ -112,6 +113,16 @@ public:
   ///
   /// \param type The type for which we are looking for extensions.
   virtual ArrayRef<ExtensionDecl*> lookupExtensions(Module *module, Type type);
+
+  /// \brief Load extensions to the given nominal type.
+  ///
+  /// \param nominal The nominal type whose extensions should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains extensions loaded from any generation up to and including this
+  /// one.
+  virtual void loadExtensions(NominalTypeDecl *nominal,
+                              unsigned previousGeneration);
 };
 
 }

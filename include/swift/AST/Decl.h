@@ -46,8 +46,9 @@ namespace swift {
   class BraceStmt;
   class Component;
   class DeclAttributes;
-  class OneOfElementDecl;
+  class Module;
   class NameAliasType;
+  class OneOfElementDecl;
   class Pattern;
   class PipeClosureExpr;
   struct PrintOptions;
@@ -160,6 +161,9 @@ public:
 
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC) { Context = DC; }
+
+  /// \brief Retrieve the module in which this declaration resides.
+  Module *getModuleContext() const;
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   ASTContext &getASTContext() const {
@@ -996,6 +1000,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// insertion of new extensions.
   ExtensionDecl *LastExtension = nullptr;
 
+  /// \brief The generation at which we last loaded extensions.
+  unsigned ExtensionGeneration = 0;
+
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -1030,7 +1037,7 @@ public:
   void addExtension(ExtensionDecl *extension);
 
   /// \brief Retrieve the set of extensions of this type.
-  ExtensionRange getExtensions() const;
+  ExtensionRange getExtensions();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1868,10 +1875,6 @@ inline bool ValueDecl::isSettable() const {
     return sd->isSettable();
   } else
     return false;
-}
-
-inline ExtensionRange NominalTypeDecl::getExtensions() const {
-  return ExtensionRange(ExtensionIterator(FirstExtension), ExtensionIterator());
 }
 
 // FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls

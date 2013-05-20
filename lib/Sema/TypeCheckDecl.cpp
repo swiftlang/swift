@@ -637,11 +637,10 @@ public:
       }
 
       // Add this extension to the list of extensions for the extended type.
-      if (NominalTypeDecl *nominal
-            = ExtendedTy->getNominalOrBoundGenericNominal()) {
+      if (auto nominal = ExtendedTy->getAnyNominal()) {
         nominal->addExtension(ED);
       }
-      
+    
       checkInherited(ED, ED->getInherited());
     }
 

@@ -279,7 +279,8 @@ Module *ClangImporter::loadModule(
 
   // Bump the generation count.
   ++Impl.Generation;
-
+  Impl.SwiftContext.bumpGeneration();
+  
   return result;
 }
 
@@ -470,3 +471,9 @@ ClangImporter::lookupExtensions(Module *module, Type type) {
 
   return { };
 }
+
+void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
+                                   unsigned previousGeneration) {
+  lookupExtensions(nullptr, nominal->getDeclaredType());
+}
+

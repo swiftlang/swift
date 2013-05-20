@@ -243,6 +243,13 @@ void ASTContext::addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
   }
 }
 
+void ASTContext::loadExtensions(NominalTypeDecl *nominal,
+                                unsigned previousGeneration) {
+  for (auto loader : Impl.ModuleLoaders) {
+    loader->loadExtensions(nominal, previousGeneration);
+  }
+}
+
 llvm::IntrusiveRefCntPtr<ModuleLoader> ASTContext::getClangModuleLoader() const{
   return Impl.ClangModuleLoader;
 }

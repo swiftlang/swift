@@ -169,6 +169,13 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+Module *Decl::getModuleContext() const {
+  DeclContext *dc = getDeclContext();
+  while (!dc->isModuleContext())
+    dc = dc->getParent();
+  return cast<Module>(dc);
+}
+
 // Helper functions to verify statically whether source-location
 // functions have been overridden.
 typedef const char (&TwoChars)[2];
@@ -464,6 +471,19 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
   }
   DeclaredTyInContext = Ty;
   return DeclaredTyInContext;
+}
+
+ExtensionRange NominalTypeDecl::getExtensions() {
+  auto &context = Decl::getASTContext();
+
+  // If our list of extensions is out of date, update it now.
+  if (context.getCurrentGeneration() > ExtensionGeneration) {
+    unsigned previousGeneration = ExtensionGeneration;
+    ExtensionGeneration = context.getCurrentGeneration();
+    context.loadExtensions(this, previousGeneration);
+  }
+
+  return ExtensionRange(ExtensionIterator(FirstExtension), ExtensionIterator());
 }
 
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {

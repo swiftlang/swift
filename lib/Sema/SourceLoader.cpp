@@ -121,3 +121,9 @@ Module *SourceLoader::loadModule(
 
   return importTU;
 }
+
+void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
+                                  unsigned previousGeneration) {
+  // Type-checking the source automatically loads all extensions; there's
+  // nothing to do here.
+}

@@ -171,6 +171,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
   switch (err) {
   case ModuleStatus::Valid:
+    Ctx.bumpGeneration();
     llvm_unreachable("non-fallback modules not supported yet!");
   case ModuleStatus::FallBackToTranslationUnit:
     result = makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
@@ -181,4 +182,10 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
 
   return result;
+}
+
+void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
+                                            unsigned previousGeneration) {
+  // FIXME: Look for extensions of the given nominal type within the
+  // serialized module.
 }

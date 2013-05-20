@@ -54,6 +54,7 @@ namespace swift {
   class Identifier;
   class Module;
   class ModuleLoader;
+  class NominalTypeDecl;
   class TupleTypeElt;
   class OneOfElementDecl;
   class ProtocolDecl;
@@ -191,6 +192,16 @@ public:
   /// \brief The list of externally-created types that need validation.
   std::vector<Type> ExternalTypes;
 
+private:
+  /// \brief The current generation number, which reflects the number of
+  /// times that external modules have been loaded.
+  ///
+  /// Various places in the AST, such as the set of extensions associated with
+  /// a nominal type, keep track of the generation number they saw and will
+  /// automatically update when they are out of date.
+  unsigned CurrentGeneration = 0;
+
+public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
@@ -315,6 +326,16 @@ public:
   void addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
                        bool isClang = false);
 
+  /// \brief Load extensions to the given nominal type from the external
+  /// module loaders.
+  ///
+  /// \param nominal The nominal type whose extensions should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains extensions loaded from any generation up to and including this
+  /// one.
+  void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
+
   /// \brief Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null smart pointer.
@@ -327,6 +348,22 @@ public:
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
   Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath);
+
+  /// \brief Retrieve the current generation number, which reflects the
+  /// number of times a module import has caused mass invalidation of
+  /// lookup tables.
+  ///
+  /// Various places in the AST keep track of the generation numbers at which
+  /// their own information is valid, such as the list of extensions associated
+  /// with a nominal type.
+  unsigned getCurrentGeneration() const { return CurrentGeneration; }
+
+  /// \brief Increase the generation number, implying that various lookup
+  /// tables have been significantly altered by the introduction of a new
+  /// module import.
+  ///
+  /// \returns the previous generation number.
+  unsigned bumpGeneration() { return CurrentGeneration++; }
 
 private:
   friend class Decl;

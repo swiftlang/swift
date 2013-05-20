@@ -18,8 +18,120 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
+
+/// \brief Remove any declarations in the given set that are shadowed by
+/// other declarations in that set.
+static void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+                                bool isTypeLookup,
+                                Module *curModule) {
+  // Category declarations by their signatures.
+  llvm::SmallDenseMap<CanType, SmallVector<ValueDecl *, 2>> declsBySignature;
+  bool anyCollisions = false;
+  for (auto decl : decls) {
+    // Determine the signature of this declaration.
+    // FIXME: the canonical type makes a poor signature, because we don't
+    // canonicalize away default arguments and don't canonicalize polymorphic
+    // types well.
+    CanType signature;
+    if (isTypeLookup && isa<TypeDecl>(decl))
+      signature = cast<TypeDecl>(decl)->getDeclaredType()->getCanonicalType();
+    else
+      signature = decl->getType()->getCanonicalType();
+
+    // If we've seen a declaration with this signature before, note it.
+    auto &knownDecls = declsBySignature[signature];
+    if (!knownDecls.empty())
+      anyCollisions = true;
+
+    knownDecls.push_back(decl);
+  }
+
+  // If there were no signature collisions, there is nothing to do.
+  if (!anyCollisions)
+    return;
+
+  // Determine the set of declarations that are shadowed by other declarations.
+  llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
+  for (auto &collidingDecls : declsBySignature) {
+    // If only one declaration has this signature, it isn't shadowed by
+    // anything.
+    if (collidingDecls.second.size() == 1)
+      continue;
+
+    // Compare each declaration to every other declaration. This is
+    // unavoidably O(n^2) in the number of declarations, but because they
+    // all have the same signature, we expect n to remain small.
+    for (unsigned firstIdx = 0, n = collidingDecls.second.size();
+         firstIdx != n; ++firstIdx) {
+      auto firstDecl = collidingDecls.second[firstIdx];
+      auto firstDC = firstDecl->getDeclContext();
+      auto firstModule = firstDecl->getModuleContext();
+      for (unsigned secondIdx = firstIdx + 1; secondIdx != n; ++secondIdx) {
+        // Determine whether one module takes precedence over another.
+        auto secondDecl = collidingDecls.second[secondIdx];
+        auto secondModule = secondDecl->getModuleContext();
+
+        // If the first and second declarations are in the same module,
+        // prefer one in the type itself vs. one in an extension.
+        // FIXME: Should redeclaration checking prevent this from happening?
+        if (firstModule == secondModule) {
+          auto secondDC = secondDecl->getDeclContext();
+
+          // If both declarations are in extensions, or both are in the
+          // type definition itself, there's nothing we can do.
+          if (isa<ExtensionDecl>(firstDC) == isa<ExtensionDecl>(secondDC))
+            continue;
+
+          // If the second declaration is in an extension, it is shadowed
+          // by the first declaration. 
+          if (isa<ExtensionDecl>(secondDC)) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          // If the first declaration is in an extension, it is shadowed by
+          // the second declaration. There is no point in continuing to compare
+          // the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
+        }
+
+        // Prefer declarations in the current module over those in another
+        // module.
+        // FIXME: This is a hack. We should query a (lazily-built, cached)
+        // module graph to determine shadowing.
+        if ((firstModule == curModule) == (secondModule == curModule))
+          continue;
+
+        // If the first module is the current module, the second declaration
+        // is shadowed by the first.
+        if (firstModule == curModule) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
+        // Otherwise, the first declaration is shadowed by the second. There is
+        // no point in continuing to compare the first declaration to others.
+        shadowed.insert(firstDecl);
+        break;
+      }
+    }
+  }
+
+  // If none of the declarations were shadowed, we're done.
+  if (shadowed.empty())
+    return;
+
+  // Remove shadowed declarations from the list of declarations.
+  decls.erase(std::remove_if(decls.begin(), decls.end(),
+                             [&](ValueDecl *vd) {
+                               return shadowed.count(vd) > 0;
+                             }),
+              decls.end());
+}
 
 static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     ArrayRef<ValueDecl*> BaseMembers,
@@ -27,87 +139,32 @@ static void DoGlobalExtensionLookup(Type BaseType, Identifier Name,
                                     Module *BaseModule,
                                     bool IsTypeLookup,
                                     SmallVectorImpl<ValueDecl*> &Result) {
-  bool CurModuleHasTypeDecl = false;
-  llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
+  auto nominal = BaseType->getAnyNominal();
+  if (!nominal)
+    return;
 
-  // FIXME: Hack to avoid searching Clang modules more than once.
-  bool searchedClangModule = isa<ClangModule>(CurModule);
-
-  // Find all extensions in this module.
-  for (ExtensionDecl *ED : CurModule->lookupExtensions(BaseType)) {
-    for (Decl *Member : ED->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-        if (VD->getName() == Name) {
-          Result.push_back(VD);
-          if (!IsTypeLookup)
-            CurModuleTypes.insert(VD->getType()->getCanonicalType());
-          CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
-        }
-      }
-    }
+  // Add the members from the type itself to the list of results.
+  for (auto member : BaseMembers) {
+    if (member->getName() == Name)
+      Result.push_back(member);
   }
 
-  if (BaseModule == CurModule) {
-    for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name) {
-        Result.push_back(VD);
-        if (!IsTypeLookup)
-          CurModuleTypes.insert(VD->getType()->getCanonicalType());
-        CurModuleHasTypeDecl |= isa<TypeDecl>(VD);
-      }
-    }
-  }
-
-  // The builtin module has no imports.
-  if (isa<BuiltinModule>(CurModule)) return;
-
-  // The Clang module loader handles transitive lookups itself... but is that
-  // what we want?
-  if (isa<ClangModule>(CurModule)) return;
-
-  // If we find a type in the current module, don't look into any
-  // imported modules.
-  if (CurModuleHasTypeDecl) return;
-
-  TranslationUnit &TU = *cast<TranslationUnit>(CurModule);
-
-  // Otherwise, check our imported extensions as well.
-  // FIXME: Implement DAG-based shadowing rules.
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-
-    // FIXME: Don't search Clang modules more than once.
-    if (isa<ClangModule>(ImpEntry.second)) {
-      if (searchedClangModule)
+  // Look in each extension for declarations with this name.
+  for (auto extension : nominal->getExtensions()) {
+    for (auto member : extension->getMembers()) {
+      auto vd = dyn_cast<ValueDecl>(member);
+      if (!vd)
         continue;
 
-      searchedClangModule = true;
-    }
+      if (vd->getName() != Name)
+        continue;
 
-    for (ExtensionDecl *ED : ImpEntry.second->lookupExtensions(BaseType)) {
-      for (Decl *Member : ED->getMembers()) {
-        if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-          if (VD->getName() == Name &&
-              (IsTypeLookup || isa<TypeDecl>(VD) ||
-               !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
-            Result.push_back(VD);
-          }
-        }
-      }
+      Result.push_back(vd);
     }
   }
 
-  if (BaseModule != CurModule) {
-    for (ValueDecl *VD : BaseMembers) {
-      if (VD->getName() == Name &&
-          (IsTypeLookup || isa<TypeDecl>(VD) ||
-           !CurModuleTypes.count(VD->getType()->getCanonicalType()))) {
-        Result.push_back(VD);
-      }
-    }
-  }
+  // Handle shadowing.
+  removeShadowedDecls(Result, IsTypeLookup, CurModule);
 }
 
 MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M,

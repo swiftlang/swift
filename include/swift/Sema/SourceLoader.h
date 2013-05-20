@@ -49,6 +49,16 @@ public:
   virtual Module *
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+
+  /// \brief Load extensions to the given nominal type.
+  ///
+  /// \param nominal The nominal type whose extensions should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains extensions loaded from any generation up to and including this
+  /// one.
+  virtual void loadExtensions(NominalTypeDecl *nominal,
+                              unsigned previousGeneration) override;
 };
 
 }
