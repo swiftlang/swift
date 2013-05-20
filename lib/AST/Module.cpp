@@ -175,69 +175,6 @@ void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
 }
 
 //===----------------------------------------------------------------------===//
-// Module Extension Name Lookup
-//===----------------------------------------------------------------------===//
-
-namespace {
-  class TUExtensionCache {
-    llvm::DenseMap<CanType, TinyPtrVector<ExtensionDecl*>> Extensions;
-  public:
-
-    TUExtensionCache(TranslationUnit &TU);
-    
-    ArrayRef<ExtensionDecl*> getExtensions(CanType T) const{
-      auto I = Extensions.find(T);
-      if (I == Extensions.end())
-        return ArrayRef<ExtensionDecl*>();
-      return I->second;
-    }
-  };
-}
-
-static TUExtensionCache &getTUExtensionCachePimpl(void *&Ptr,
-                                                  TranslationUnit &TU) {
-  // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
-  // the DenseMap will leak.
-  if (Ptr == 0)
-    Ptr = new TUExtensionCache(TU);
-  return *(TUExtensionCache*)Ptr;
-}
-
-static void freeTUExtensionCachePimpl(void *&Ptr) {
-  delete (TUExtensionCache*)Ptr;
-  Ptr = 0;
-}
-
-TUExtensionCache::TUExtensionCache(TranslationUnit &TU) {
-  for (Decl *D : TU.Decls) {
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      // Ignore failed name lookups.
-      if (ED->getExtendedType()->is<ErrorType>()) continue;
-      
-      Extensions[ED->getExtendedType()->getCanonicalType()].push_back(ED);
-    }
-  }
-}
-
-
-/// lookupExtensions - Look up all of the extensions in the module that are
-/// extending the specified type and return a list of them.
-ArrayRef<ExtensionDecl*> Module::lookupExtensions(Type T) {
-  assert(ASTStage >= Parsed &&
-         "Extensions should only be looked up after name binding is underway");
-  
-  // The builtin module just has free functions, not extensions.
-  if (isa<BuiltinModule>(this)) return ArrayRef<ExtensionDecl*>();
-
-  if (auto tu = dyn_cast<TranslationUnit>(this)) {
-    TUExtensionCache &Cache = getTUExtensionCachePimpl(ExtensionCachePimpl,*tu);
-    return Cache.getExtensions(T->getCanonicalType());
-  }
-
-  return cast<LoadedModule>(this)->lookupExtensions(T);
-}
-
-//===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
@@ -392,7 +329,6 @@ void TranslationUnit::print(raw_ostream &os, const PrintOptions &options) {
 
 void TranslationUnit::clearLookupCache() {
   freeTUCachePimpl(LookupCachePimpl);
-  freeTUExtensionCachePimpl(ExtensionCachePimpl);
 }
 
 //===----------------------------------------------------------------------===//
@@ -403,10 +339,6 @@ void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
                                NLKind lookupKind,
                                SmallVectorImpl<ValueDecl*> &result) {
   return Owner.lookupValue(this, accessPath, name, lookupKind, result);
-}
-
-ArrayRef<ExtensionDecl*> LoadedModule::lookupExtensions(Type T) {
-  return Owner.lookupExtensions(this, T);
 }
 
 OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {

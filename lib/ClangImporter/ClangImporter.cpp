@@ -424,56 +424,18 @@ void ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) {
                           consumer);
 }
 
-ArrayRef<ExtensionDecl*>
-ClangImporter::lookupExtensions(Module *module, Type type) {
-  // Figure out if this type is actually an Objective-C class imported into
-  // Swift.
-  auto classDecl = type->getClassOrBoundGenericClass();
-  if (!classDecl)
-    return { };
-
-  auto objcClass
-    = dyn_cast_or_null<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
+                                   unsigned previousGeneration) {
+  auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                     nominal->getClangDecl());
   if (!objcClass)
-    return { };
+    return;
 
-  // Check the cache. If it is up-to-date, use it.
-  auto &cache = Impl.ClassExtensions[classDecl];
-  if (cache.Generation == Impl.Generation) {
-    if (cache.Extensions)
-      return *cache.Extensions;
-
-    return { };
-  }
-
-  // Rebuild the cache.
-  cache.Generation = Impl.Generation;
-  auto extensions = cache.Extensions;
-  if (extensions)
-    extensions->clear();
+  // Import all of the visible categories. Simply loading them adds them to
+  // the list of extensions.
   for (auto I = objcClass->visible_categories_begin(),
             E = objcClass->visible_categories_end();
        I != E; ++I) {
-    if (auto imported = cast_or_null<ExtensionDecl>(Impl.importDecl(*I))){
-      if (!extensions) {
-        extensions = new SmallVector<ExtensionDecl *, 4>;
-
-        // The dense map may have been re-allocated, so we can't use 'cache'
-        // here.
-        Impl.ClassExtensions[classDecl].Extensions = extensions;
-      }
-      extensions->push_back(imported);
-    }
+    Impl.importDecl(*I);
   }
-
-  if (extensions)
-    return *extensions;
-
-  return { };
 }
-
-void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
-                                   unsigned previousGeneration) {
-  lookupExtensions(nullptr, nominal->getDeclaredType());
-}
-

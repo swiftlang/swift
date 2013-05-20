@@ -65,7 +65,6 @@ namespace swift {
 class Module : public DeclContext {
 protected:
   void *LookupCachePimpl;
-  void *ExtensionCachePimpl;
   Component *Comp;
 public:
   ASTContext &Ctx;
@@ -91,7 +90,7 @@ public:
 
 protected:
   Module(DeclContextKind Kind, Identifier Name, Component *C, ASTContext &Ctx)
-  : DeclContext(Kind, nullptr), LookupCachePimpl(0), ExtensionCachePimpl(0),
+  : DeclContext(Kind, nullptr), LookupCachePimpl(0),
     Comp(C), Ctx(Ctx), Name(Name), ASTStage(Parsing) {
     assert(Comp != nullptr || Kind == DeclContextKind::BuiltinModule);
   }
@@ -116,10 +115,6 @@ public:
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
-
-  /// lookupExtensions - Look up all of the extensions in the module that are
-  /// extending the specified type and return a list of them.
-  ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
   /// Look up an InfixOperatorDecl for the given operator
   /// name in this module (which must be NameBound) and return it, or return
@@ -313,9 +308,6 @@ public:
   // Inherited from Module.
   void lookupValue(AccessPathTy accessPath, Identifier name, NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result);
-
-  // Inherited from Module.
-  ArrayRef<ExtensionDecl*> lookupExtensions(Type T);
 
   /// Look up an operator declaration.
   ///
