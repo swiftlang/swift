@@ -287,20 +287,20 @@ static AbstractCC getAbstractCC(SILConstant c) {
 
 SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
-  if (found == constantTypes.end()) {
-    AbstractCC cc = getAbstractCC(constant);
-    Type swiftTy = getThinFunctionType(makeConstantType(constant), cc);
-    SILType loweredTy
-      = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
-    DEBUG(llvm::dbgs() << "constant ";
-          constant.print(llvm::dbgs());
-          llvm::dbgs() << " has type ";
-          loweredTy.print(llvm::dbgs());
-          llvm::dbgs() << " cc " << unsigned(cc) << "\n");
-    constantTypes[constant] = loweredTy;
-    return loweredTy;
-  } else
+  if (found != constantTypes.end())
     return found->second;
+
+  AbstractCC cc = getAbstractCC(constant);
+  Type swiftTy = getThinFunctionType(makeConstantType(constant), cc);
+  SILType loweredTy
+    = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
+  DEBUG(llvm::dbgs() << "constant ";
+        constant.print(llvm::dbgs());
+        llvm::dbgs() << " has type ";
+        loweredTy.print(llvm::dbgs());
+        llvm::dbgs() << " cc " << unsigned(cc) << "\n");
+  constantTypes[constant] = loweredTy;
+  return loweredTy;
 }
 
 /// Get the type of a property accessor, () -> T for a getter or (value:T) -> ()
