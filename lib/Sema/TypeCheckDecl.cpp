@@ -1323,4 +1323,9 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "objc_block");
     VD->getMutableAttrs().ObjCBlock = false;
   }
+
+  if (Attrs.hasCC()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "cc");
+    VD->getMutableAttrs().cc = {};
+  }
 }

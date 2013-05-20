@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -126,6 +127,8 @@ public:
   }
 };
   
+enum class AbstractCC : unsigned char;
+  
 /// DeclAttributes - These are attributes that may be applied to declarations.
 class DeclAttributes {
 public:
@@ -148,9 +151,10 @@ public:
   bool ExplicitInfix = false;
   bool IBOutlet = false;
   bool IBAction = false;
+  Optional<AbstractCC> cc = Nothing;
   
-  DeclAttributes() { }
-
+  DeclAttributes() {}
+  
   bool isValid() const { return LSquareLoc.isValid(); }
 
   ResilienceData getResilienceData() const { return Resilience; }
@@ -166,12 +170,15 @@ public:
   bool isObjCBlock() const { return ObjCBlock; }
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
+  bool hasCC() const { return cc.hasValue(); }
+  AbstractCC getCC() const { return *cc; }
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
            !isAutoClosure() && !isAssignment() && !isConversion() &&
            !isForceInline() && !isPostfix() && !isPrefix() &&
-           !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction();
+           !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
+           !hasCC();
   }
 };
   

@@ -189,6 +189,51 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     
     return false;
   }
+      
+  // 'cc' attribute.
+  // FIXME: only permit this in type contexts.
+  case AttrName::cc: {
+    if (Attributes.hasCC())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    
+    consumeToken(tok::identifier);
+    
+    // Parse the cc name in parens.
+    SourceLoc beginLoc = Tok.getLoc(), nameLoc, endLoc;
+    StringRef name;
+    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (Tok.is(tok::identifier)) {
+        nameLoc = Tok.getLoc();
+        name = Tok.getText();
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::cc_attribute_expected_name);
+      }
+      if (parseMatchingToken(tok::r_paren, endLoc,
+                             diag::cc_attribute_expected_rparen,
+                             beginLoc)) {
+        // If the name isn't immediately followed by a closing paren, recover
+        // by trying to find some closing paren.
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+      }
+    } else {
+      diagnose(Tok, diag::cc_attribute_expected_lparen);
+    }
+    
+    if (!name.empty()) {
+      Attributes.cc = llvm::StringSwitch<Optional<AbstractCC>>(name)
+        .Case("freestanding", AbstractCC::Freestanding)
+        .Case("method", AbstractCC::Method)
+        .Case("cdecl", AbstractCC::C)
+        .Default(Nothing);
+      if (!Attributes.cc) {
+        diagnose(nameLoc, diag::cc_attribute_unknown_cc_name, name);
+        Attributes.cc = AbstractCC::Freestanding;
+      }
+    }
+    return false;
+  }
     
   // 'objc_block' attribute.
   // FIXME: only permit this in type contexts.
@@ -1071,7 +1116,7 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   DeclAttributes Attributes;
   // FIXME: Implicitly add immutable attribute.
   parseAttributeList(Attributes);
-
+  
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && !(Flags & PD_DisallowFuncDef) &&

@@ -53,8 +53,8 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
     attrs.Byref = false; // so that the empty() check below works
   }
 
-  // Handle the auto_closure and objc_block attributes for function types.
-  if (attrs.isAutoClosure() || attrs.isObjCBlock()) {
+  // Handle the auto_closure, cc, and objc_block attributes for function types.
+  if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock()) {
     FunctionType *FT = dyn_cast<FunctionType>(result.getType().getPointer());
     TupleType *InputTy = 0;
     if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
@@ -62,8 +62,10 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
       // auto_closures and objc_blocks require a syntactic function type.
       if (attrs.isAutoClosure())
         diagnose(attrs.LSquareLoc, diag::autoclosure_requires_function_type);
-      else
+      if (attrs.isObjCBlock())
         diagnose(attrs.LSquareLoc, diag::objc_block_requires_function_type);
+      if (attrs.hasCC())
+        diagnose(attrs.LSquareLoc, diag::cc_attribute_requires_function_type);
     } else if (attrs.isAutoClosure() &&
                (InputTy == 0 || !InputTy->getFields().empty())) {
       // auto_closures must take () syntactically.
@@ -75,6 +77,10 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
       Type resultType = FunctionType::get(FT->getInput(), FT->getResult(),
                                           attrs.isAutoClosure(),
                                           attrs.isObjCBlock(),
+                                          /*thin*/ false,
+                                          attrs.hasCC()
+                                           ? attrs.getCC()
+                                           : AbstractCC::Freestanding,
                                           Context);
       SourceRange resultRange = { attrs.LSquareLoc,
                                   result.getSourceRange().End };
@@ -82,6 +88,7 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
     }
     attrs.AutoClosure = false;
     attrs.ObjCBlock = false;
+    attrs.cc = Nothing;
   }
   
   // FIXME: this is lame.

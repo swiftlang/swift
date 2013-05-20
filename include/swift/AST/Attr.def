@@ -20,6 +20,7 @@
 
 // ATTR(name) - Invokes a macro for each attribute.
 ATTR(assignment)
+ATTR(cc)
 ATTR(conversion)
 ATTR(force_inline)
 ATTR(infix)
