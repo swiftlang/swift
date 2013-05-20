@@ -624,6 +624,12 @@ class ExtensionDecl : public Decl, public DeclContext {
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
 
+  /// \brief The next extension in the linked list of extensions.
+  ExtensionDecl *NextExtension = nullptr;
+
+  friend class ExtensionIterator;
+  friend class NominalTypeDecl;
+
 public:
   using Decl::getASTContext;
 
@@ -668,6 +674,52 @@ public:
   }
   
   using DeclContext::operator new;
+};
+
+/// \brief Iterator that walks the extensions of a particular type.
+class ExtensionIterator {
+  ExtensionDecl *current;
+
+public:
+  ExtensionIterator() : current() { }
+  explicit ExtensionIterator(ExtensionDecl *current) : current(current) { }
+
+  ExtensionDecl *operator*() const { return current; }
+  ExtensionDecl *operator->() const { return current; }
+
+  ExtensionIterator &operator++() {
+    current = current->NextExtension;
+    return *this;
+  }
+
+  ExtensionIterator operator++(int) {
+    ExtensionIterator tmp = *this;
+    ++(*this);
+    return tmp;
+  }
+
+  friend bool operator==(ExtensionIterator x, ExtensionIterator y) {
+    return x.current == y.current;
+  }
+
+  friend bool operator!=(ExtensionIterator x, ExtensionIterator y) {
+    return x.current != y.current;
+  }
+};
+
+/// \brief Range that covers a set of extensions.
+class ExtensionRange {
+  ExtensionIterator first;
+  ExtensionIterator last;
+
+public:
+
+  ExtensionRange(ExtensionIterator first, ExtensionIterator last)
+    : first(first), last(last) { }
+
+  typedef ExtensionIterator iterator;
+  iterator begin() const { return first; }
+  iterator end() const { return last; }
 };
 
 // PatternBindingDecl - This decl contains a pattern and optional initializer
@@ -937,6 +989,13 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
 
+  /// \brief The first extension of this type.
+  ExtensionDecl *FirstExtension = nullptr;
+
+  /// \brief The last extension of this type, used solely for efficient
+  /// insertion of new extensions.
+  ExtensionDecl *LastExtension = nullptr;
+
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -966,6 +1025,12 @@ public:
   void overwriteDeclaredType(Type DT) {
     DeclaredTy = DT;
   }
+
+  /// \brief Add a new extension to this nominal type.
+  void addExtension(ExtensionDecl *extension);
+
+  /// \brief Retrieve the set of extensions of this type.
+  ExtensionRange getExtensions() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1804,7 +1869,11 @@ inline bool ValueDecl::isSettable() const {
   } else
     return false;
 }
-  
+
+inline ExtensionRange NominalTypeDecl::getExtensions() const {
+  return ExtensionRange(ExtensionIterator(FirstExtension), ExtensionIterator());
+}
+
 // FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls
 // to use real FuncExpr bodies.
 

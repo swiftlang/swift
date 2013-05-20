@@ -635,7 +635,13 @@ public:
         // FIXME: It would be nice to point out where we found the named type
         // declaration, if any.
       }
-    
+
+      // Add this extension to the list of extensions for the extended type.
+      if (NominalTypeDecl *nominal
+            = ExtendedTy->getNominalOrBoundGenericNominal()) {
+        nominal->addExtension(ED);
+      }
+      
       checkInherited(ED, ED->getInherited());
     }
 

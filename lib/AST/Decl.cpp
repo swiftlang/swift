@@ -466,6 +466,21 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
   return DeclaredTyInContext;
 }
 
+void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
+  assert(!extension->NextExtension && "Already added extension");
+
+  // First extension; set both first and last.
+  if (!FirstExtension) {
+    FirstExtension = extension;
+    LastExtension = extension;
+    return;
+  }
+
+  // Add to the end of the list.
+  LastExtension->NextExtension = extension;
+  LastExtension = extension;
+}
+
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                              SourceLoc NameLoc, TypeLoc UnderlyingTy,
                              DeclContext *DC,

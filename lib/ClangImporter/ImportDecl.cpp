@@ -1807,6 +1807,7 @@ namespace {
             ExtensionDecl(loc, TypeLoc(objcClass->getDeclaredType(), loc),
                           importObjCProtocols(decl->getReferencedProtocols()),
                           dc);
+      objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
 

@@ -1096,35 +1096,12 @@ public:
                     typeDecl = origTypeDecl;
                   }
                 }
-                
-                // FIXME: Hack!
-                auto type = typeDecl->getDeclaredType();
-                bool searchedClangModule = false;
-                SmallVector<ExtensionDecl *, 4> extensions;
-                for (auto ext : TU->lookupExtensions(type)) {
-                  extensions.push_back(ext);
-                }
-                
-                llvm::SmallPtrSet<swift::Module *, 16> visited;
-                for (auto &impEntry : TU->getImportedModules()) {
-                  if (!visited.insert(impEntry.second))
-                    continue;
-                  
-                  // FIXME: Don't visit clang modules twice.
-                  if (isa<ClangModule>(impEntry.second)) {
-                    if (searchedClangModule)
-                      continue;
-                    
-                    searchedClangModule = true;
+
+                // Print extensions.
+                if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+                  for (auto extension : nominal->getExtensions()) {
+                    printOrDumpDecl(extension, doPrint);
                   }
-                  
-                  for (auto ext : impEntry.second->lookupExtensions(type)) {
-                    extensions.push_back(ext);
-                  }
-                }
-                
-                for (auto ext : extensions) {
-                  printOrDumpDecl(ext, doPrint);
                 }
               }
             }
