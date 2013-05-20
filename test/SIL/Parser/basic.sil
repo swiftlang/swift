@@ -1,13 +1,13 @@
 // RUN: %swift %s -emit-sil
 
-// CHECK: sil clang_thunk @prototype :
+// CHECK: sil clang_thunk @prototype : $() -> ()
 sil clang_thunk @prototype : $() -> ()
 
 
-// CHECK: sil @normal :
+// CHECK: sil @normal : $() -> ()
 sil @normal : $() -> () {
 }
 
-// CHECK: sil internal @internal_fn :
+// CHECK: sil internal @internal_fn : $() -> ()
 sil internal @internal_fn : $() -> () {
 }

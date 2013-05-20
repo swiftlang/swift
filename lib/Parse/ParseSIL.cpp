@@ -148,7 +148,9 @@ bool Parser::parseSILType(SILType &Result) {
       parseType(Ty, diag::expected_sil_type))
     return true;
 
-  Result = SILType::getRawPointerType(Context);
-
+  // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
+  // SILTypes itself.
+  (void)IsSRet;
+  Result = SIL->Types.getLoweredType(Ty.getType(), UncurryLevel);
   return false;
 }
