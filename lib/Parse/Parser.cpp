@@ -312,8 +312,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 /// parseList - Parse the list of statements, expressions, or declarations.
 bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                        tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
-                       std::function<bool()> callback)
-{
+                       std::function<bool()> callback) {
   assert(SeparatorK == tok::comma || SeparatorK == tok::semi);
 
   if (Tok.is(RightK)) {
@@ -357,6 +356,8 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       skipUntil(RightK, SeparatorK);
       if (Tok.is(RightK))
         break;
+      if (Tok.is(tok::eof))
+        return true;
       consumeIf(SeparatorK);
     }
   }
