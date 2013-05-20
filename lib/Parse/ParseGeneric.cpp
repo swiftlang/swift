@@ -34,8 +34,10 @@ using namespace swift;
 GenericParamList *Parser::parseGenericParameters() {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
-  SourceLoc LAngleLoc = consumeStartingLess();
+  return parseGenericParameters(consumeStartingLess());
+}
 
+GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
   // FIXME: Allow a bare 'requires' clause with no generic parameters?
   SmallVector<GenericParam, 4> GenericParams;

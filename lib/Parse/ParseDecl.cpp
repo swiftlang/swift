@@ -1081,11 +1081,24 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   }
   if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "func"))
     return 0;
-
+  
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, /*AllowLookup*/true);
-  GenericParamList *GenericParams = maybeParseGenericParams();
+  GenericParamList *GenericParams;
+
+  // If the name is an operator token that ends in '<' and the following token
+  // is an identifier, split the '<' off as a separate token. This allows things
+  // like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type variable
+  // '<T>' as expected.
+  if (Name.str().size() > 1 && Name.str().back() == '<'
+      && Tok.is(tok::identifier)) {
+    Name = Context.getIdentifier(Name.str().slice(0, Name.str().size() - 1));
+    SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(Name.str().size());
+    GenericParams = parseGenericParameters(LAngleLoc);
+  } else {
+    GenericParams = maybeParseGenericParams();
+  }
 
   // We force first type of a func declaration to be a tuple for consistency.
   //

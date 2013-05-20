@@ -472,6 +472,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
   GenericParamList *parseGenericParameters();
+  GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
   GenericParamList *maybeParseGenericParams();
   bool parseRequiresClause(SourceLoc &RequiresLoc,
                            SmallVectorImpl<Requirement> &Requirements);
