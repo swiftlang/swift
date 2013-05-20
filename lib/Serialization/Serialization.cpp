@@ -146,7 +146,8 @@ namespace {
     void writeAllDeclsAndTypes();
 
     /// Writes the offsets for decls or types.
-    void writeOffsets(DeclOrType whichOffsets);
+    void writeOffsets(const index_block::OffsetsLayout &Offsets,
+                      DeclOrType whichOffsets);
 
     /// Top-level entry point for serializing a translation unit module.
     void writeTranslationUnit(const TranslationUnit *TU);
@@ -323,14 +324,14 @@ void Serializer::writeAllDeclsAndTypes() {
   }
 }
 
-void Serializer::writeOffsets(DeclOrType which) {
-  if (which == DeclOrType::IsDecl) {
-    index_block::DeclOffsetsLayout Offsets(Out);
-    Offsets.emit(ScratchRecord, FirstLocalDeclID, DeclOffsets);
-  } else {
-    index_block::TypeOffsetsLayout Offsets(Out);
-    Offsets.emit(ScratchRecord, FirstLocalTypeID, TypeOffsets);
-  }
+void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
+                              DeclOrType which) {
+  if (which == DeclOrType::IsDecl)
+    Offsets.emit(ScratchRecord, index_block::DECL_OFFSETS, FirstLocalDeclID,
+                 DeclOffsets);
+  else
+    Offsets.emit(ScratchRecord, index_block::TYPE_OFFSETS, FirstLocalTypeID,
+                 TypeOffsets);
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
@@ -349,9 +350,10 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);
+    index_block::OffsetsLayout Offsets(Out);
 
-    writeOffsets(DeclOrType::IsDecl);
-    writeOffsets(DeclOrType::IsType);
+    writeOffsets(Offsets, DeclOrType::IsDecl);
+    writeOffsets(Offsets, DeclOrType::IsType);
   }
 }
 

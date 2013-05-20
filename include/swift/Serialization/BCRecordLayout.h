@@ -269,29 +269,23 @@ namespace impl {
 ///
 /// This class template is meant to be instantiated and then given a name,
 /// so that from then on that name can be used 
-template<unsigned RecordCode, typename... Fields>
-class BCRecordLayout {
+template<typename... Fields>
+class BCGenericRecordLayout {
   llvm::BitstreamWriter &Out;
   unsigned AbbrevCode;
 
 public:
-  enum : unsigned {
-    /// The record code associated with this layout.
-    Code = RecordCode
-  };
-
   /// Create a layout and register it with the given bitstream writer.
-  explicit BCRecordLayout(llvm::BitstreamWriter &out)
+  explicit BCGenericRecordLayout(llvm::BitstreamWriter &out)
     : Out(out), AbbrevCode(emitAbbrev(out)) {}
 
   /// Emit a record to the bitstream writer, using the given buffer for scratch
   /// space.
   ///
-  /// Note that even fixed arguments must be specified here. Currently, arrays
-  /// and blobs can only be passed as StringRefs.
+  /// Note that even fixed arguments must be specified here.
   template <typename BufferTy, typename... Data>
-  void emit(BufferTy &buffer, Data... data) {
-    emitRecord(Out, buffer, AbbrevCode, data...);
+  void emit(BufferTy &buffer, unsigned recordID, Data... data) const {
+    emitRecord(Out, buffer, AbbrevCode, recordID, data...);
   }
 
   /// Registers this record's layout with the bitstream reader.
@@ -299,7 +293,7 @@ public:
   /// \returns The abbreviation code for the newly-registered record type.
   static unsigned emitAbbrev(llvm::BitstreamWriter &out) {
     auto *abbrev = new llvm::BitCodeAbbrev();
-    impl::emitOps<BCLiteral<RecordCode>, Fields...>(*abbrev);
+    impl::emitOps<Fields...>(*abbrev);
     return out.EmitAbbrev(abbrev);
   }
 
@@ -310,18 +304,52 @@ public:
   /// and blobs can only be passed as StringRefs.
   template <typename BufferTy, typename... Data>
   static void emitRecord(llvm::BitstreamWriter &out, BufferTy &buffer,
-                         unsigned abbrCode, Data... data) {
-    static_assert(sizeof...(data) <= sizeof...(Fields),
+                         unsigned abbrCode, unsigned recordID, Data... data) {
+    static_assert(sizeof...(data)+1 <= sizeof...(Fields),
                   "Too many record elements");
-    static_assert(sizeof...(data) >= sizeof...(Fields),
+    static_assert(sizeof...(data)+1 >= sizeof...(Fields),
                   "Too few record elements");
     buffer.clear();
-    buffer.push_back(RecordCode);
-    impl::BCRecordWriter<Fields...>::emit(out, buffer, abbrCode, data...);
+    impl::BCRecordWriter<Fields...>::emit(out, buffer, abbrCode, recordID,
+                                          data...);
   }
 };
 
-/// RAII object to pair entering and exiting a sub-block.
+template<unsigned RecordCode, typename... Fields>
+class BCRecordLayout : public BCGenericRecordLayout<BCLiteral<RecordCode>,
+                                                    Fields...> {
+  using Base = BCGenericRecordLayout<BCLiteral<RecordCode>, Fields...>;
+public:
+  enum : unsigned {
+    /// The record code associated with this layout.
+    Code = RecordCode
+  };
+
+  /// Create a layout and register it with the given bitstream writer.
+  explicit BCRecordLayout(llvm::BitstreamWriter &out) : Base(out) {}
+
+  /// Emit a record to the bitstream writer, using the given buffer for scratch
+  /// space.
+  ///
+  /// Note that even fixed arguments must be specified here.
+  template <typename BufferTy, typename... Data>
+  void emit(BufferTy &buffer, Data... data) const {
+    Base::emit(buffer, RecordCode, data...);
+  }
+
+  /// Emit a record identified by \p abbrCode to bitstream reader \p out, using
+  /// \p buffer for scratch space.
+  ///
+  /// Note that even fixed arguments must be specified here. Currently, arrays
+  /// and blobs can only be passed as StringRefs.
+  template <typename BufferTy, typename... Data>
+  static void emitRecord(llvm::BitstreamWriter &out, BufferTy &buffer,
+                         unsigned abbrCode, Data... data) {
+    Base::emitRecord(out, buffer, abbrCode, RecordCode, data...);
+  }
+};
+
+  /// RAII object to pair entering and exiting a sub-block.
 class BCBlockRAII {
   llvm::BitstreamWriter &Writer;
 public:

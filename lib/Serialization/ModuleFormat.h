@@ -160,15 +160,8 @@ namespace index_block {
     DECL_OFFSETS
   };
 
-  // FIXME: Merge these.
-  using TypeOffsetsLayout = BCRecordLayout<
-    TYPE_OFFSETS,
-    DeclIDField, // first ID in this module
-    BCArray<BitOffsetField>
-  >;
-
-  using DeclOffsetsLayout = BCRecordLayout<
-    DECL_OFFSETS,
+  using OffsetsLayout = BCGenericRecordLayout<
+    BCFixed<2>,  // record ID
     DeclIDField, // first ID in this module
     BCArray<BitOffsetField>
   >;
