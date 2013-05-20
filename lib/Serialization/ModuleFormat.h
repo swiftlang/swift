@@ -41,6 +41,9 @@ const unsigned VERSION_MINOR = 0;
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
+///
+/// These IDs must \em not be renumbered or reordered without incrementing
+/// VERSION_MAJOR.
 enum BlockID {
   /// The control block, which contains all of the information that needs to
   /// be validated prior to committing to loading the serialized module.
@@ -66,13 +69,21 @@ enum BlockID {
   /// module.
   ///
   /// \sa index_block
-  INDEX_BLOCK_ID
+  INDEX_BLOCK_ID,
+
+  /// An empty block that signals to the reader to throw away the module and
+  /// reparse the source files in the input block.
+  ///
+  /// This is a bring-up hack and will eventually go away.
+  FALL_BACK_TO_TRANSLATION_UNIT_ID = 100
 };
 
 /// The record types within the control block.
 ///
 /// \sa CONTROL_BLOCK_ID
 namespace control_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
   enum {
     METADATA = 1
   };
@@ -89,6 +100,8 @@ namespace control_block {
 ///
 /// \sa INPUT_BLOCK_ID
 namespace input_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
   enum {
     SOURCE_FILE = 1
   };
@@ -109,6 +122,8 @@ using BitOffsetField = BCFixed<32>;
 ///
 /// \sa DECLS_AND_TYPES_BLOCK_ID
 namespace decls_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
   enum {
     BUILTIN_TYPE = 1,
 
@@ -138,6 +153,8 @@ namespace decls_block {
 ///
 /// \sa INDEX_BLOCK_ID
 namespace index_block {
+  // These IDs must \em not be renumbered or reordered without incrementing
+  // VERSION_MAJOR.
   enum {
     TYPE_OFFSETS = 1,
     DECL_OFFSETS

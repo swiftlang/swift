@@ -16,7 +16,6 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -28,9 +27,12 @@ using namespace swift;
 namespace {
 class SerializedModule : public LoadedModule {
 public:
+  ModuleFile *File;
+
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
-                   Identifier name, Component *comp)
-    : LoadedModule(DeclContextKind::SerializedModule, name, comp, ctx, owner) {}
+                   Identifier name, Component *comp, ModuleFile *file)
+    : LoadedModule(DeclContextKind::SerializedModule, name, comp, ctx, owner),
+      File(file) {}
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedModule;
@@ -39,6 +41,10 @@ public:
 
 typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 }
+
+// Defined out-of-line so that we can see ~ModuleFile.
+SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
+SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 // FIXME: Copied from SourceLoader. Not bothering to fix until we decide that
 // the source loader search path should be the same as the module loader search
@@ -124,28 +130,6 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
 }
 
 
-static Module *error(SerializedModuleLoader &owner, ASTContext &ctx,
-                     AccessPathElem moduleID, ModuleStatus reason) {
-  switch (reason) {
-  case ModuleStatus::Valid:
-  case ModuleStatus::FallBackToTranslationUnit:
-    llvm_unreachable("not an error");
-  case ModuleStatus::Malformed:
-    ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
-    break;
-  case ModuleStatus::FormatTooNew:
-    ctx.Diags.diagnose(moduleID.second, diag::serialization_module_too_new);
-    break;
-  }
-
-  // Return a dummy module to avoid future errors.
-  auto comp = new (ctx.Allocate<Component>(1)) Component();
-  auto module = new (ctx) SerializedModule(ctx, owner, moduleID.first, comp);
-
-  ctx.LoadedModules[moduleID.first.str()] = module;
-  return module;
-}
-
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            Module::AccessPathTy path) {
 
@@ -166,22 +150,33 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   }
   assert(inputFile);
   
-  Module *result;
   llvm::OwningPtr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
   switch (err) {
+  case ModuleStatus::FallBackToTranslationUnit:
+    return makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
   case ModuleStatus::Valid:
     Ctx.bumpGeneration();
-    llvm_unreachable("non-fallback modules not supported yet!");
-  case ModuleStatus::FallBackToTranslationUnit:
-    result = makeTU(Ctx, moduleID, loadedModuleFile->getInputSourcePaths());
     break;
   case ModuleStatus::FormatTooNew:
+    Ctx.Diags.diagnose(moduleID.second, diag::serialization_module_too_new);
+    loadedModuleFile.reset();
+    break;
   case ModuleStatus::Malformed:
-    return error(*this, Ctx, moduleID, err);
+    Ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
+    loadedModuleFile.reset();
+    break;
   }
 
-  return result;
+  if (loadedModuleFile)
+    LoadedModuleFiles.push_back(std::move(loadedModuleFile));
+
+  auto comp = new (Ctx.Allocate<Component>(1)) Component();
+  auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first, comp,
+                                           loadedModuleFile.get());
+
+  Ctx.LoadedModules[moduleID.first.str()] = module;
+  return module;
 }
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,

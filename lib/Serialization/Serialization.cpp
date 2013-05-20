@@ -91,8 +91,29 @@ namespace {
     /// The offset of each Decl in the bitstream, indexed by DeclID.
     std::vector<BitOffset> DeclOffsets;
 
+    /// The offset of each Type in the bitstream, indexed by DeclID.
+    std::vector<BitOffset> TypeOffsets;
+
     /// The last assigned DeclID for decls from this module.
     DeclID LastDeclID;
+
+    /// The last assigned DeclID for types from this module.
+    DeclID LastTypeID;
+
+    /// The first assigned DeclID for decls from this module.
+    ///
+    /// Decls with IDs less than this come from other modules.
+    DeclID FirstLocalDeclID;
+
+    /// The first assigned DeclID for types from this module.
+    ///
+    /// Types with IDs less than this come from other modules.
+    DeclID FirstLocalTypeID;
+
+    /// True if this module does not fully represent the original source file.
+    ///
+    /// This is a bring-up hack and will eventually go away.
+    bool ShouldFallBackToTranslationUnit;
 
     /// Records the use of the given Decl.
     ///
@@ -100,12 +121,6 @@ namespace {
     ///
     /// \returns The ID for the given Decl in this module.
     DeclID addDeclRef(const Decl *D);
-
-    /// The offset of each Type in the bitstream, indexed by DeclID.
-    std::vector<BitOffset> TypeOffsets;
-
-    /// The last assigned DeclID for types from this module.
-    DeclID LastTypeID;
 
     /// Records the use of the given Type.
     ///
@@ -137,7 +152,11 @@ namespace {
     void writeTranslationUnit(const TranslationUnit *TU);
 
   public:
-    Serializer() : Out(Buffer), LastDeclID(0), LastTypeID(0) {}
+    // FIXME: Use real local offsets.
+    Serializer()
+      : Out(Buffer), LastDeclID(0), LastTypeID(0), FirstLocalDeclID(1),
+        FirstLocalTypeID(1), ShouldFallBackToTranslationUnit(false) {
+    }
 
     /// Serialize a translation unit to the given stream.
     void writeToStream(raw_ostream &os, const TranslationUnit *TU,
@@ -236,6 +255,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, TYPE_OFFSETS);
   RECORD(index_block, DECL_OFFSETS);
 
+  BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
+
 #undef BLOCK
 #undef RECORD
 }
@@ -285,13 +306,19 @@ void Serializer::writeAllDeclsAndTypes() {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();
     DeclsAndTypesToWrite.pop();
 
+    // If we can't handle a decl or type, mark the module as incomplete.
     // FIXME: actually write the thing.
+    ShouldFallBackToTranslationUnit = true;
 
     DeclID id = DeclIDs[next];
     assert(id != 0 && "decl or type not referenced properly");
 
     auto &offsets = next.isDecl() ? DeclOffsets : TypeOffsets;
-    assert(id == offsets.size());
+    auto firstOffset = next.isDecl() ? FirstLocalDeclID :
+                                       FirstLocalTypeID;
+    assert((id - firstOffset) == offsets.size());
+    (void)firstOffset;
+    
     offsets.push_back(Out.GetCurrentBitNo());
   }
 }
@@ -299,18 +326,24 @@ void Serializer::writeAllDeclsAndTypes() {
 void Serializer::writeOffsets(DeclOrType which) {
   if (which == DeclOrType::IsDecl) {
     index_block::DeclOffsetsLayout Offsets(Out);
-    // FIXME: Use a real start offset.
-    Offsets.emit(ScratchRecord, 0, DeclOffsets);
+    Offsets.emit(ScratchRecord, FirstLocalDeclID, DeclOffsets);
   } else {
     index_block::TypeOffsetsLayout Offsets(Out);
-    // FIXME: Use a real start offset.
-    Offsets.emit(ScratchRecord, 0, TypeOffsets);
+    Offsets.emit(ScratchRecord, FirstLocalTypeID, TypeOffsets);
   }
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
-  for (auto D : TU->Decls)
+  // We don't handle imported modules at all yet, not even the standard library.
+  for (auto &M : TU->getImportedModules())
+    if (!isa<BuiltinModule>(M.second))
+      ShouldFallBackToTranslationUnit = true;
+
+  for (auto D : TU->Decls) {
+    if (isa<ImportDecl>(D))
+      continue;
     (void)addDeclRef(D);
+  }
 
   writeAllDeclsAndTypes();
   
@@ -323,7 +356,7 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 }
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
-                               FileBufferIDs inputFiles){
+                               FileBufferIDs inputFiles) {
   // Write the signature through the BitstreamWriter for alignment purposes.
   for (unsigned char byte : SIGNATURE)
     Out.Emit(byte, 8);
@@ -331,6 +364,9 @@ void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
   writeHeader();
   writeInputFiles(TU->Ctx.SourceMgr, inputFiles);
   writeTranslationUnit(TU);
+
+  if (ShouldFallBackToTranslationUnit)
+    BCBlockRAII(Out, FALL_BACK_TO_TRANSLATION_UNIT_ID, 2);
 
   os.write(Buffer.data(), Buffer.size());
   os.flush();

@@ -14,18 +14,21 @@
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
 #include "swift/AST/ModuleLoader.h"
+#include "llvm/ADT/OwningPtr.h"
 
 namespace swift {
-
 class ASTContext;
 class Module;
-  
+class ModuleFile;
+
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
 
-  explicit SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
+  std::vector<llvm::OwningPtr<ModuleFile>> LoadedModuleFiles;
+
+  explicit SerializedModuleLoader(ASTContext &ctx);
 
 public:
   /// \brief Create a new importer that can load serialized Swift modules
@@ -33,6 +36,8 @@ public:
   static SerializedModuleLoader *create(ASTContext &ctx) {
     return new SerializedModuleLoader(ctx);
   }
+
+  ~SerializedModuleLoader();
 
   SerializedModuleLoader(const SerializedModuleLoader &) = delete;
   SerializedModuleLoader(SerializedModuleLoader &&) = delete;
@@ -62,6 +67,6 @@ public:
                               unsigned previousGeneration) override;
 };
 
-}
+} // end namespace swift
 
 #endif

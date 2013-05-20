@@ -65,7 +65,7 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   : InputFile(std::move(input)),
     InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
                 reinterpret_cast<const uint8_t *>(InputFile->getBufferEnd())),
-    Status(ModuleStatus::FallBackToTranslationUnit) {
+    Status(ModuleStatus::Valid) {
   llvm::BitstreamCursor cursor{InputReader};
 
   for (unsigned char byte : SIGNATURE) {
@@ -128,6 +128,11 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
 
       break;
     }
+
+    case FALL_BACK_TO_TRANSLATION_UNIT_ID:
+      // This is a bring-up hack and will eventually go away.
+      Status = ModuleStatus::FallBackToTranslationUnit;
+      break;
 
     default:
       // Unknown top-level block, possibly for use by a future version of the
