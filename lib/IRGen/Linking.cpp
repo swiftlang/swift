@@ -195,7 +195,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::Getter:
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    mangler.mangleEntity(getDecl(), getExplosionKind(), 0);
     buffer << 'g';
     return;
 
@@ -203,7 +203,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::Setter:
     buffer << "_T";
     if (isLocalLinkage()) buffer << 'L';
-    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    mangler.mangleEntity(getDecl(), getExplosionKind(), 0);
     buffer << 's';
     return;
 
