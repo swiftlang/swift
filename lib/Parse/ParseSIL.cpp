@@ -88,12 +88,10 @@ bool Parser::parseDeclSIL() {
 ///     '[' sil-type-attribute (',' sil-type-attribute)* ']'
 ///   sil-type-attribute:
 ///     'sil_sret'
-///     'sil_cc' '=' ('c' | 'method' | 'freestanding')
 ///     'sil_uncurry' '=' integer_literal
 ///
 bool Parser::parseSILType(SILType &Result) {
   bool IsSRet = false;
-  AbstractCC CallingConv = AbstractCC::Freestanding;
   unsigned UncurryLevel = 0;
 
   // If we have sil-type-attribute list, parse it.
@@ -114,23 +112,6 @@ bool Parser::parseSILType(SILType &Result) {
       if (AttrToken.str() == "sil_sret") {
         IsSRet = true;
         consumeToken(tok::identifier);
-      } else if (AttrToken.str() == "sil_cc") {
-        Identifier CCToken;
-        if (parseToken(tok::identifier, diag::malformed_sil_cc_attribute) ||
-            parseToken(tok::equal, diag::malformed_sil_cc_attribute) ||
-            parseIdentifier(CCToken, diag::malformed_sil_cc_attribute))
-          return true;
-
-        if (CCToken.str() == "c")
-          CallingConv = AbstractCC::C;
-        else if (CCToken.str() == "method")
-          CallingConv = AbstractCC::Method;
-        else if (CCToken.str() == "freestanding")
-          CallingConv = AbstractCC::Freestanding;
-        else {
-          diagnose(Tok, diag::malformed_sil_cc_attribute);
-          return true;
-        }
       } else if (AttrToken.str() == "sil_uncurry") {
         if (parseToken(tok::identifier, diag::malformed_sil_uncurry_attribute)||
             parseToken(tok::equal, diag::malformed_sil_uncurry_attribute))
