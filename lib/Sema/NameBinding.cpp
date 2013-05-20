@@ -405,6 +405,132 @@ namespace {
 };
 }
 
+static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
+  auto DNT = cast<IdentifierType>(ED->getExtendedType().getPointer());
+  while (true) {
+    if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
+      for (auto &C : DNT->Components)
+        C.Value = Binder.TU->Ctx.TheErrorType;
+
+      return;
+    }
+
+    // We need to make sure the extended type is canonical. There are
+    // three possibilities here:
+    // 1. The type is already canonical, because it's either a NominalType
+    // or comes from an imported module.
+    // 2. The type is a NameAliasType, which
+    // we need to resolve immediately because we can't leave a
+    // non-canonical type here in the AST.
+    // 3. The type is a BoundGenericType; it's illegal to extend
+    // such a type.
+    Type FoundType = DNT->Components.back().Value.get<Type>();
+    if (FoundType->hasCanonicalTypeComputed())
+      break;
+
+    if (isa<BoundGenericType>(FoundType.getPointer())) {
+      Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
+                      false, ED->getExtendedType());
+      ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
+      break;
+    }
+
+    TypeAliasDecl *TAD =
+    cast<NameAliasType>(FoundType.getPointer())->getDecl();
+    TypeBase *underlying;
+
+    do {
+      underlying = TAD->getUnderlyingType().getPointer();
+
+      if (auto *underlyingAlias = dyn_cast<NameAliasType>(underlying)) {
+        TAD = underlyingAlias->getDecl();
+        continue;
+      }
+      break;
+    } while (true);
+
+    if (isa<NominalType>(underlying))
+      break;
+
+    DNT = dyn_cast<IdentifierType>(underlying);
+
+    if (!DNT) {
+      Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
+                      false, ED->getExtendedType());
+      ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
+      break;
+    }
+  }
+}
+
+static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
+  auto inherited = CD->getInherited();
+  if (!inherited.empty()) {
+    auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
+    Type foundType;
+    while (true) {
+      if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
+        for (auto &C : DNT->Components)
+          C.Value = Binder.TU->Ctx.TheErrorType;
+
+        foundType = Type();
+        break;
+      }
+
+      // We need to make sure the extended type is canonical. There are
+      // three possibilities here:
+      // 1. The type is already canonical, because it's either a NominalType
+      // or comes from an imported module.
+      // 2. The type is a NameAliasType from the current module, which
+      // we need to resolve immediately because we can't leave a
+      // non-canonical type here in the AST.
+      // 3. The type is a BoundGenericType; such a type isn't going to be
+      // canonical, but name lookup doesn't actually care about generic
+      // arguments, so we can ignore the fact that they're unresolved.
+      foundType = DNT->Components.back().Value.get<Type>();
+      if (foundType->hasCanonicalTypeComputed())
+        break;
+
+      if (isa<BoundGenericType>(foundType.getPointer()))
+        break;
+
+      TypeAliasDecl *TAD =
+      cast<NameAliasType>(foundType.getPointer())->getDecl();
+      Type curUnderlying = TAD->getUnderlyingType();
+      DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
+
+      if (!DNT) {
+        if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
+          // We don't need to resolve ProtocolCompositionTypes here; it's
+          // enough to know that the type in question isn't a class type.
+          foundType = Type();
+          break;
+        }
+        // FIXME: Handling for other types?
+        Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
+                        false, inherited[0].getType());
+        inherited[0].setInvalidType(Binder.Context);
+        foundType = Type();
+        break;
+      }
+    }
+
+    if (!foundType)
+      return;
+
+    // Check that the base type is a class.
+    TypeLoc baseClass;
+    if (foundType->getClassOrBoundGenericClass())
+      baseClass = inherited[0];
+
+    if (baseClass.getType()) {
+      CD->setBaseClassLoc(baseClass);
+      inherited = inherited.slice(1);
+      CD->setInherited(inherited);
+    }
+  }
+}
+
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -564,133 +690,15 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   //
   // The really tricky part about making everything work correctly is
   // shadowing: if an extension defines a type which shadows a type in an
-  // imported module, we have to make sure we don't choose a type which shouldn't
-  // be visible.
+  // imported module, we have to make sure we don't choose a type which
+  // shouldn't be visible.
   //
   // After this loop finishes, we can perform normal member lookup.
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
-      auto DNT = cast<IdentifierType>(ED->getExtendedType().getPointer());
-      while (true) {
-        if (Binder.resolveIdentifierType(DNT, TU)) {
-          for (auto &C : DNT->Components)
-            C.Value = TU->Ctx.TheErrorType;
-
-          break;
-        } else {
-          // We need to make sure the extended type is canonical. There are
-          // three possibilities here:
-          // 1. The type is already canonical, because it's either a NominalType
-          // or comes from an imported module.
-          // 2. The type is a NameAliasType, which
-          // we need to resolve immediately because we can't leave a
-          // non-canonical type here in the AST.
-          // 3. The type is a BoundGenericType; it's illegal to extend
-          // such a type.
-          Type FoundType = DNT->Components.back().Value.get<Type>();
-          if (FoundType->hasCanonicalTypeComputed())
-            break;
-
-          if (isa<BoundGenericType>(FoundType.getPointer())) {
-            Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
-                            false, ED->getExtendedType());
-            ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
-            break;
-          }
-
-          TypeAliasDecl *TAD =
-              cast<NameAliasType>(FoundType.getPointer())->getDecl();
-          TypeBase *underlying;
-          
-          do {
-            underlying = TAD->getUnderlyingType().getPointer();
-          
-            if (auto *underlyingAlias = dyn_cast<NameAliasType>(underlying)) {
-              TAD = underlyingAlias->getDecl();
-              continue;
-            }
-            break;
-          } while (true);
-          
-          if (isa<NominalType>(underlying))
-            break;
-          
-          DNT = dyn_cast<IdentifierType>(underlying);
-
-          if (!DNT) {
-            Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
-                            false, ED->getExtendedType());
-            ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
-            break;
-          }
-        }
-      }
+      bindExtensionDecl(ED, Binder);
     } else if (ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i])) {
-      auto inherited = CD->getInherited();
-      if (!inherited.empty()) {
-        auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
-        Type foundType;
-        while (true) {
-          if (Binder.resolveIdentifierType(DNT, TU)) {
-            for (auto &C : DNT->Components)
-              C.Value = TU->Ctx.TheErrorType;
-
-            foundType = Type();
-            break;
-          } else {
-            // We need to make sure the extended type is canonical. There are
-            // three possibilities here:
-            // 1. The type is already canonical, because it's either a NominalType
-            // or comes from an imported module.
-            // 2. The type is a NameAliasType from the current module, which
-            // we need to resolve immediately because we can't leave a
-            // non-canonical type here in the AST.
-            // 3. The type is a BoundGenericType; such a type isn't going to be
-            // canonical, but name lookup doesn't actually care about generic
-            // arguments, so we can ignore the fact that they're unresolved.
-            foundType = DNT->Components.back().Value.get<Type>();
-            if (foundType->hasCanonicalTypeComputed())
-              break;
-
-            if (isa<BoundGenericType>(foundType.getPointer()))
-              break;
-
-            TypeAliasDecl *TAD =
-                cast<NameAliasType>(foundType.getPointer())->getDecl();
-            Type curUnderlying = TAD->getUnderlyingType();
-            DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
-
-            if (!DNT) {
-              if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
-                // We don't need to resolve ProtocolCompositionTypes here; it's
-                // enough to know that the type in question isn't a class type.
-                foundType = Type();
-                break;
-              }
-              // FIXME: Handling for other types?
-              Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
-                              false, inherited[0].getType());
-              inherited[0].setInvalidType(Binder.Context);
-              foundType = Type();
-              break;
-            }
-          }
-        }
-
-        if (!foundType)
-          continue;
-
-        // Check that the base type is a class.
-        TypeLoc baseClass;
-        if (foundType->getClassOrBoundGenericClass())
-          baseClass = inherited[0];
-
-        if (baseClass.getType()) {
-          CD->setBaseClassLoc(baseClass);
-          inherited = inherited.slice(1);
-          CD->setInherited(inherited);
-        }
-      }
+      bindClassDecl(CD, Binder);
     } else if (FuncDecl *FD = dyn_cast<FuncDecl>(TU->Decls[i])) {
       // If this is an operator implementation, bind it to an operator decl.
       if (FD->isOperator())
