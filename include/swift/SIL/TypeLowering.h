@@ -25,15 +25,17 @@ namespace swift {
 namespace Lowering {
 
 /// Given a function type or polymorphic function type, returns the same type
-/// with the [thin] attribute added.
+/// with [thin] and calling convention attributes added.
 /// FIXME: The thinness of func decls should be checked by the Swift
 /// typechecker.
+Type getThinFunctionType(Type t, AbstractCC cc);
 Type getThinFunctionType(Type t);
 
 /// Given a function type or polymorphic function type, returns the same type
-/// with the [thin] attribute removed.
+/// with the [thin] attribute removed and a calling convention attribute added.
 /// FIXME: The thinness of func decls should be checked by the Swift
 /// typechecker.
+Type getThickFunctionType(Type t, AbstractCC cc);
 Type getThickFunctionType(Type t);
 
 /// CaptureKind - Different ways in which a function can capture context.
@@ -172,18 +174,16 @@ class TypeConverter {
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
   
   using TypeKey = std::pair<TypeBase *, unsigned>;
-  TypeKey getTypeKey(CanType t, AbstractCC cc, unsigned uncurryLevel) {
-    return {t.getPointer(), uncurryLevel << 8 | unsigned(cc)};
+  TypeKey getTypeKey(CanType t, unsigned uncurryLevel) {
+    return {t.getPointer(), uncurryLevel};
   }
   
   llvm::DenseMap<TypeKey, TypeLoweringInfo *> types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   const TypeLoweringInfo &makeTypeLoweringInfo(CanType t,
-                                               AbstractCC cc,
                                                unsigned uncurryLevel);
   SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft,
-                                               AbstractCC cc,
                                                unsigned uncurryLevel);
 
   Type makeConstantType(SILConstant constant);
@@ -198,15 +198,11 @@ public:
   TypeConverter &operator=(TypeConverter const &) = delete;
 
   /// Returns the SIL TypeLoweringInfo for a SIL type.
-  const TypeLoweringInfo &getTypeLoweringInfo(Type t,
-                                      AbstractCC cc = AbstractCC::Freestanding,
-                                      unsigned uncurryLevel = 0);
+  const TypeLoweringInfo &getTypeLoweringInfo(Type t,unsigned uncurryLevel = 0);
   
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t,
-                         AbstractCC cc = AbstractCC::Freestanding,
-                         unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, cc, uncurryLevel).loweredType;
+  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, uncurryLevel).loweredType;
   }
   
   /// Returns the SIL type of a constant reference.

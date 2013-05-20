@@ -692,6 +692,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                          /*isAutoClosure*/ false,
                                          /*isBlock*/ false,
                                          /*isThin*/ true,
+                                         methodType.getFunctionCC(),
                                          F.getASTContext());
 
   if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
@@ -716,7 +717,6 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
     }
     
     SILType specType = getLoweredLoadableType(outerMethodTy,
-                              methodType.getFunctionTypeInfo()->getAbstractCC(),
                               methodValue.getType().getUncurryLevel());
     
     methodValue = B.createSpecialize(loc, methodValue, allSubs, specType);
@@ -752,12 +752,16 @@ RValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
 SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
                                              SILValue archetype) {
   if (isa<FuncDecl>(e->getDecl())) {
+    SILConstant c(e->getDecl());
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
                                         e->getType(),
+                                        /*isAutoClosure*/ false,
+                                        /*isBlock*/ false,
+                                        /*isThin*/ false,
+                                        SGM.getConstantCC(c),
                                         F.getASTContext());
-    SILConstant c(e->getDecl());
     
     CanType archetypeType = archetype.getType().getSwiftType();
     if (auto *metaType = dyn_cast<MetaTypeType>(archetypeType))
@@ -765,7 +769,6 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
     
     return B.createArchetypeMethod(e, getLoweredType(archetypeType), c,
                                    getLoweredLoadableType(methodType,
-                                                          SGM.getConstantCC(c),
                                                           c.uncurryLevel));
   } else {
     llvm_unreachable("archetype properties not yet implemented");
@@ -795,13 +798,16 @@ SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
     
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
+    SILConstant c(e->getDecl());
     Type methodType = FunctionType::get(thisTy,
                                         e->getType(),
+                                        /*isAutoClosure*/ false,
+                                        /*isBlock*/ false,
+                                        /*isThin*/ false,
+                                        SGM.getConstantCC(c),
                                         F.getASTContext());
-    SILConstant c(e->getDecl());
     return B.createProtocolMethod(e, existential, c,
                                   getLoweredLoadableType(methodType,
-                                                         SGM.getConstantCC(c),
                                                          c.uncurryLevel));
   } else {
     llvm_unreachable("existential properties not yet implemented");
@@ -1870,16 +1876,15 @@ SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
   if (v.getType().is<AnyFunctionType>() &&
       v.getType().castTo<AnyFunctionType>()->isThin()) {
     // Thunk functions to the standard "freestanding" calling convention.
-    if (v.getType().getFunctionTypeInfo()->getAbstractCC()
-          != AbstractCC::Freestanding) {
-      SILType freestandingType
-        = getLoweredLoadableType(v.getType().getSwiftType(),
-                                 AbstractCC::Freestanding,
-                                 0);
-      v = B.createConvertCC(loc, v, freestandingType);
+    if (v.getType().getFunctionCC() != AbstractCC::Freestanding) {
+      auto freestandingType = getThinFunctionType(v.getType().getSwiftType(),
+                                                  AbstractCC::Freestanding);
+      SILType freestandingSILType = getLoweredLoadableType(freestandingType, 0);
+      v = B.createConvertCC(loc, v, freestandingSILType);
     }
     
-    Type thickTy = getThickFunctionType(v.getType().getSwiftType());
+    Type thickTy = getThickFunctionType(v.getType().getSwiftType(),
+                                        AbstractCC::Freestanding);
     
     v = B.createThinToThickFunction(loc, v,
                                     getLoweredLoadableType(thickTy));

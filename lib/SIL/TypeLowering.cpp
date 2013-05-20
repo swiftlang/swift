@@ -24,36 +24,50 @@
 using namespace swift;
 using namespace Lowering;
 
-Type Lowering::getThinFunctionType(Type t) {
+Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
   if (auto *ft = t->getAs<FunctionType>())
     return FunctionType::get(ft->getInput(), ft->getResult(),
                              ft->isAutoClosure(),
                              ft->isBlock(),
                              /*isThin*/ true,
+                             cc,
                              ft->getASTContext());
   
   if (auto *pft = t->getAs<PolymorphicFunctionType>())
     return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
                                         &pft->getGenericParams(),
                                         /*isThin*/ true,
+                                        cc,
                                         pft->getASTContext());
 
   return t;
 }
 
-Type Lowering::getThickFunctionType(Type t) {
+Type Lowering::getThinFunctionType(Type t) {
+  return getThinFunctionType(t, t->castTo<AnyFunctionType>()->getCC());
+}
+
+Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
   if (auto *fTy = t->getAs<FunctionType>())
     return FunctionType::get(fTy->getInput(), fTy->getResult(),
-                             fTy->isAutoClosure(), fTy->isBlock(),
-                             /*isThin*/ false, fTy->getASTContext());
+                             fTy->isAutoClosure(),
+                             fTy->isBlock(),
+                             /*isThin*/ false,
+                             cc,
+                             fTy->getASTContext());
   
   if (auto *pfTy = t->getAs<PolymorphicFunctionType>())
     return PolymorphicFunctionType::get(pfTy->getInput(), pfTy->getResult(),
                                         &pfTy->getGenericParams(),
                                         /*isThin*/ false,
+                                        cc,
                                         pfTy->getASTContext());
 
   return t;
+}
+
+Type Lowering::getThickFunctionType(Type t) {
+  return getThickFunctionType(t, t->castTo<AnyFunctionType>()->getCC());
 }
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
@@ -174,7 +188,6 @@ namespace {
 } // end anonymous namespace
   
 SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
-                                                            AbstractCC cc,
                                                             unsigned uncurries)
 {
   CanType topType(ft);
@@ -201,22 +214,21 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
   
   return SILFunctionTypeInfo::create(topType, inputTypes, resultType,
                                      uncurriedInputCounts, hasIndirectReturn,
-                                     cc, M);
+                                     M);
 }
 
 const TypeLoweringInfo &
-TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
-                                    unsigned uncurryLevel) {
+TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
   TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
-  types[getTypeKey(t, cc, uncurryLevel)] = theInfo;
+  types[getTypeKey(t, uncurryLevel)] = theInfo;
   
   // LValue types are a special case for lowering, because they get completely
   // removed, represented as 'address' SILTypes.
   if (LValueType *lvt = t->getAs<LValueType>()) {
     // Derive SILType for LValueType from the object type.
     t = lvt->getObjectType()->getCanonicalType();
-    theInfo->loweredType = getLoweredType(t, cc, uncurryLevel).getAddressType();
+    theInfo->loweredType = getLoweredType(t, uncurryLevel).getAddressType();
     return *theInfo;
   }
   
@@ -231,7 +243,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
 
   // Make a SILFunctionTypeInfo for function types.
   if (AnyFunctionType *ft = t->getAs<AnyFunctionType>())
-    theInfo->loweredType = SILType(makeInfoForFunctionType(ft, cc,uncurryLevel),
+    theInfo->loweredType = SILType(makeInfoForFunctionType(ft, uncurryLevel),
                                    /*address=*/ addressOnly);
   // Otherwise, create a SILType from just the Swift type.
   else
@@ -241,12 +253,11 @@ TypeConverter::makeTypeLoweringInfo(CanType t, AbstractCC cc,
 }
   
 const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfo(Type t, AbstractCC cc,
-                                   unsigned uncurryLevel) {
+TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   CanType ct = t->getCanonicalType();
-  auto existing = types.find(getTypeKey(ct, cc, uncurryLevel));
+  auto existing = types.find(getTypeKey(ct, uncurryLevel));
   if (existing == types.end())
-    return makeTypeLoweringInfo(ct, cc, uncurryLevel);
+    return makeTypeLoweringInfo(ct, uncurryLevel);
 
   return *existing->second;
 }
@@ -277,15 +288,15 @@ static AbstractCC getAbstractCC(SILConstant c) {
 SILType TypeConverter::getConstantType(SILConstant constant) {
   auto found = constantTypes.find(constant);
   if (found == constantTypes.end()) {
-    Type swiftTy = getThinFunctionType(makeConstantType(constant));
     AbstractCC cc = getAbstractCC(constant);
-    SILType loweredTy = getTypeLoweringInfo(swiftTy, cc,
-                                        constant.uncurryLevel).getLoweredType();
+    Type swiftTy = getThinFunctionType(makeConstantType(constant), cc);
+    SILType loweredTy
+      = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
     DEBUG(llvm::dbgs() << "constant ";
           constant.print(llvm::dbgs());
           llvm::dbgs() << " has type ";
           loweredTy.print(llvm::dbgs());
-          llvm::dbgs() << "\n");
+          llvm::dbgs() << " cc " << unsigned(cc) << "\n");
     constantTypes[constant] = loweredTy;
     return loweredTy;
   } else

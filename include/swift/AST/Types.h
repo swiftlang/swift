@@ -1042,6 +1042,18 @@ private:
   }
 };
   
+/// A high-level calling convention.
+enum class AbstractCC : unsigned char {
+  /// The C/ObjC calling convention.
+  C,
+  
+  /// The calling convention used for calling a normal function.
+  Freestanding,
+  
+  /// The calling convention used for calling an instance method.
+  Method
+};
+  
 /// AnyFunctionType - A function type has a single input and result, but
 /// these types may be tuples, for example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
@@ -1054,19 +1066,21 @@ private:
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const Type Input;
+  const llvm::PointerIntPair<Type, 3, AbstractCC> InputAndCC;
   const llvm::PointerIntPair<Type, 1, bool> OutputAndIsThin;
 protected:
   AnyFunctionType(TypeKind Kind, ASTContext *CanTypeContext,
                   Type Input, Type Output, bool isUnresolved,
-                  bool HasTypeVariable, bool isThin)
+                  bool HasTypeVariable, bool isThin, AbstractCC cc)
     : TypeBase(Kind, CanTypeContext, isUnresolved, HasTypeVariable),
-      Input(Input), OutputAndIsThin(Output, isThin) {
+      InputAndCC(Input, cc), OutputAndIsThin(Output, isThin) {
   }
 
 public:
-  Type getInput() const { return Input; }
+  Type getInput() const { return InputAndCC.getPointer(); }
   Type getResult() const { return OutputAndIsThin.getPointer(); }
+  
+  AbstractCC getCC() const { return InputAndCC.getInt(); }
   
   /// True if the function type is "thin", meaning values of the type can be
   /// represented as simple function pointers without context.
@@ -1106,16 +1120,24 @@ public:
   }
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
                            ASTContext &C) {
-    return get(Input, Result, isAutoClosure, false, false, C);
+    return get(Input, Result, isAutoClosure, false, false,
+               AbstractCC::Freestanding, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock,
                            ASTContext &C) {
-    return get(Input, Result, isAutoClosure, isBlock, false, C);
+    return get(Input, Result, isAutoClosure, isBlock, false,
+               AbstractCC::Freestanding, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock, bool isThin,
-                           ASTContext &C);
+                           ASTContext &C) {
+    return get(Input, Result, isAutoClosure, isBlock, isThin,
+               AbstractCC::Freestanding, C);
+  }
+  static FunctionType *get(Type Input, Type Result,
+                           bool isAutoClosure, bool isBlock, bool isThin,
+                           AbstractCC cc, ASTContext &C);
 
   /// True if this type allows an implicit conversion from a function argument
   /// expression of type T to a function of type () -> T.
@@ -1136,16 +1158,11 @@ private:
                bool isAutoClosure,
                bool isBlock,
                bool HasTypeVariable,
-               bool isThin);
+               bool isThin,
+               AbstractCC cc);
 };
   
 /// PolymorphicFunctionType - A polymorphic function type.
-///
-/// If the AutoClosure bit is set to true, then the input type is known to be ()
-/// and a value of this function type is only assignable (in source code) from
-/// the destination type of the function.  Sema inserts an ImplicitClosure to
-/// close over the value.  For example:
-///   var x : [auto_closure] () -> int = 4
 class PolymorphicFunctionType : public AnyFunctionType {
   // TODO: storing a GenericParamList* here is really the wrong solution;
   // we should be able to store something readily canonicalizable.
@@ -1155,12 +1172,20 @@ public:
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
                                       ASTContext &C) {
-    return get(input, output, params, false, C);
+    return get(input, output, params, false, AbstractCC::Freestanding, C);
   }
 
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
                                       bool isThin,
+                                      ASTContext &C) {
+    return get(input, output, params, isThin, AbstractCC::Freestanding, C);
+  }
+  
+  static PolymorphicFunctionType *get(Type input, Type output,
+                                      GenericParamList *params,
+                                      bool isThin,
+                                      AbstractCC cc,
                                       ASTContext &C);
 
   GenericParamList &getGenericParams() const { return *Params; }
@@ -1176,6 +1201,7 @@ public:
 private:
   PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
                           bool isThin,
+                          AbstractCC cc,
                           ASTContext &C);
 };  
   

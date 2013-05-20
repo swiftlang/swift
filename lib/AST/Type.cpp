@@ -766,6 +766,7 @@ CanType TypeBase::getCanonicalType() {
     Type Out = FT->getResult()->getCanonicalType();
     Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
                                           FT->isThin(),
+                                          FT->getCC(),
                                           In->getASTContext());
     break;
   }
@@ -777,6 +778,7 @@ CanType TypeBase::getCanonicalType() {
                                FT->isAutoClosure(),
                                FT->isBlock(),
                                FT->isThin(),
+                               FT->getCC(),
                                In->getASTContext());
     break;
   }
@@ -1467,24 +1469,57 @@ void TupleType::print(raw_ostream &OS) const {
   OS << ')';
 }
 
-void FunctionType::print(raw_ostream &OS) const {
-  bool firstAttr = true, hasAttr = false;
-  auto printAttr = [&](llvm::StringRef s) {
-    OS << (firstAttr ? "[" : ", ") << s;
-    firstAttr = false;
-    hasAttr = true;
-  };
-  
-  if (isAutoClosure())
-    printAttr("auto_closure");
-  if (isBlock())
-    printAttr("objc_block");
-  if (isThin())
-    printAttr("thin");
-  
-  if (hasAttr)
-    OS << "] ";
+namespace {
+  class AttributePrinter {
+    unsigned attrCount = 0;
+  public:
+    raw_ostream &OS;
+
+    explicit AttributePrinter(raw_ostream &OS) : OS(OS) {}
     
+    raw_ostream &next() {
+      return OS << (attrCount++ == 0 ? "[" : ", ");
+    }
+    
+    void finish() {
+      if (attrCount > 0)
+        OS << "] ";
+    }
+  };
+
+  static void printCC(AttributePrinter &attrs, AbstractCC cc) {
+    if (cc == AbstractCC::Freestanding)
+      return;
+    
+    attrs.next() << "cc(";
+    switch (cc) {
+    case AbstractCC::Freestanding:
+      attrs.OS << "freestanding";
+      break;
+    case AbstractCC::Method:
+      attrs.OS << "method";
+      break;
+    case AbstractCC::C:
+      attrs.OS << "cdecl";
+      break;
+    }
+    attrs.OS << ")";
+  }
+}
+
+void FunctionType::print(raw_ostream &OS) const {
+  AttributePrinter attrs(OS);
+
+  if (isAutoClosure())
+    attrs.next() << "auto_closure";
+  printCC(attrs, getCC());
+  if (isBlock())
+    attrs.next() << "objc_block";
+  if (isThin())
+    attrs.next() << "thin";
+
+  attrs.finish();
+  
   OS << getInput() << " -> " << getResult();
 }
 
@@ -1505,8 +1540,11 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
 }
 
 void PolymorphicFunctionType::print(raw_ostream &OS) const {
+  AttributePrinter attrs(OS);
+  printCC(attrs, getCC());
   if (isThin())
-    OS << "[thin] ";
+    attrs.next() << "thin";
+  attrs.finish();
     
   printGenericParams(OS);
   OS << ' ' << getInput() << " -> " << getResult();

@@ -107,24 +107,6 @@ void SILType::print(raw_ostream &OS) const {
   if (is<AnyFunctionType>()) {
     auto info = getFunctionTypeInfo();
 
-    // Print function attributes relevant to SIL.
-    if (info->getAbstractCC() != AbstractCC::Freestanding) {
-      if (!Attributes.empty()) Attributes += ", ";
-      Attributes += "sil_cc=";
-      switch (info->getAbstractCC()) {
-      case AbstractCC::C:
-        Attributes += "c";
-        break;
-      case AbstractCC::Method:
-        Attributes += "method";
-        break;
-      case AbstractCC::Freestanding:
-        // Note: freestanding is the default.
-        Attributes += "freestanding";
-        break;
-      }
-    }
-
     if (info->getUncurryLevel()) {
       if (!Attributes.empty()) Attributes += ", ";
       Attributes += "sil_uncurry=";

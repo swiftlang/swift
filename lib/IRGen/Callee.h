@@ -158,8 +158,8 @@ namespace irgen {
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel) {
-      auto *info = origSILType.getFunctionTypeInfo();
-      return forKnownFunction(info->getAbstractCC(),
+      SILFunctionTypeInfo *info = origSILType.getFunctionTypeInfo();
+      return forKnownFunction(origSILType.getFunctionCC(),
                               origSILType.getSwiftType(),
                               substResultType.getSwiftRValueType(),
                               subs,

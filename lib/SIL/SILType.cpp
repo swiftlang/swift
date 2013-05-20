@@ -81,7 +81,6 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                        SILType resultType,
                                        ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
-                                       AbstractCC cc,
                                        SILModule &M) {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
@@ -91,12 +90,11 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                              + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
                                alignof(SILFunctionTypeInfo));
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
-                                                     swiftType,
-                                                     inputTypes.size(),
-                                                     resultType,
+                                                    swiftType,
+                                                    inputTypes.size(),
+                                                    resultType,
                                                     uncurriedInputCounts.size(),
-                                                    hasIndirectReturn,
-                                                     cc);
+                                                    hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
   fi->getUncurryBuffer()[0] = 0;

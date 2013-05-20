@@ -157,6 +157,12 @@ public:
     }
     return CanType(fty->getResult());
   }
+  
+  /// Returns the AbstractCC of a function type.
+  /// The SILType must refer to a function type.
+  AbstractCC getFunctionCC() const {
+    return castTo<AnyFunctionType>()->getCC();
+  }
 
   /// Cast the Swift type referenced by this SIL type, or return null if the
   /// cast fails.
@@ -247,18 +253,6 @@ public:
   void print(raw_ostream &OS) const;
 };
 
-/// A high-level calling convention.
-enum class AbstractCC : unsigned char {
-  /// The C calling convention.
-  C,
-  
-  /// The calling convention used for calling a normal function.
-  Freestanding,
-  
-  /// The calling convention used for calling an instance method.
-  Method
-};
-  
 /// SILFunctionTypeInfo - SILType for a FunctionType or PolymorphicFunctionType.
 /// Specifies the uncurry level and SIL-level calling convention for the
 /// function.
@@ -267,8 +261,7 @@ class alignas(8) SILFunctionTypeInfo {
   // for SILType.
   CanType swiftType;
   SILType resultType;
-  unsigned inputTypeCount : 24;
-  AbstractCC cc : 8;
+  unsigned inputTypeCount;
   unsigned uncurryCount : 31;
   unsigned indirectReturn : 1;
 
@@ -291,12 +284,10 @@ class alignas(8) SILFunctionTypeInfo {
                       unsigned inputTypeCount,
                       SILType resultType,
                       unsigned uncurryCount,
-                      bool hasIndirectReturn,
-                      AbstractCC cc)
+                      bool hasIndirectReturn)
     : swiftType(swiftType),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
-      cc(cc),
       uncurryCount(uncurryCount),
       indirectReturn(hasIndirectReturn)
   {
@@ -309,7 +300,6 @@ public:
                                      SILType resultType,
                                      ArrayRef<unsigned> uncurriedInputCounts,
                                      bool hasIndirectReturn,
-                                     AbstractCC cc,
                                      SILModule &M);
   
   CanType getSwiftType() const { return swiftType; }
@@ -394,9 +384,6 @@ public:
                        getUncurryBuffer()[level],
                        getUncurryBuffer()[level+1] - getUncurryBuffer()[level]);
   }
-  
-  /// Returns the abstract calling convention of the function type.
-  AbstractCC getAbstractCC() const { return cc; }
 };
   
 inline CanType SILType::getSwiftRValueType() const {

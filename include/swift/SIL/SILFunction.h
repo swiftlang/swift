@@ -80,7 +80,7 @@ public:
   
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
-    return getFunctionTypeInfo()->getAbstractCC();
+    return getLoweredType().getFunctionCC();
   }
 
   StringRef getMangledName() const { return MangledName; }

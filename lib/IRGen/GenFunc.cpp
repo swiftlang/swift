@@ -671,7 +671,7 @@ IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
   assert(!type.isAddress());
   assert(type.is<AnyFunctionType>());
   SILFunctionTypeInfo *info = type.getFunctionTypeInfo();
-  return getFunctionType(info->getAbstractCC(), type.getSwiftType(),
+  return getFunctionType(type.getFunctionCC(), type.getSwiftType(),
                          explosionKind, info->getUncurryLevel(),
                          extraData, attrs);
 }

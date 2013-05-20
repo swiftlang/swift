@@ -91,11 +91,11 @@ public:
     // Save the type of the SpecializeExpr at the right depth in the type.
     assert(specializedType.getUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
-    AbstractCC cc = specializedType.getFunctionTypeInfo()->getAbstractCC();
+    AbstractCC cc = specializedType.getFunctionCC();
     if (callDepth == 0) {
       specializedType = gen.getLoweredLoadableType(
-                                             getThinFunctionType(e->getType()),
-                                             cc,
+                                             getThinFunctionType(e->getType(),
+                                                                 cc),
                                              specializedType.getUncurryLevel());
     } else {
       FunctionType *ft = specializedType.castTo<FunctionType>();
@@ -105,9 +105,9 @@ public:
                                               /*isAutoClosure*/ false,
                                               /*isBlock*/ false,
                                               /*isThin*/ true,
+                                              cc,
                                               outerInput->getASTContext());
       specializedType = gen.getLoweredLoadableType(newSpecialized,
-                                             cc,
                                              specializedType.getUncurryLevel());
     }
     specializeLoc = e;
@@ -993,9 +993,9 @@ ManagedValue SILGenFunction::emitSpecializedPropertyFunctionRef(
   if (!substitutions.empty()) {
     assert(method.getType().is<PolymorphicFunctionType>() &&
            "generic getter is not of a poly function type");
-    substPropertyType = getThinFunctionType(substPropertyType);
+    substPropertyType = getThinFunctionType(substPropertyType,
+                                            SGM.getConstantCC(constant));
     SILType loweredPropertyType = getLoweredLoadableType(substPropertyType,
-                                                   SGM.getConstantCC(constant),
                                                    constant.uncurryLevel);
     
     method = B.createSpecialize(loc, method, substitutions,

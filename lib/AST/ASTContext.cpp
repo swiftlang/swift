@@ -640,18 +640,21 @@ ModuleType *ModuleType::get(Module *M) {
   return Entry = new (C, AllocationArena::Permanent) ModuleType(M, C);
 }
 
-static char getFuncAttrKey(bool isAutoClosure, bool isBlock, bool isThin) {
-  return isAutoClosure | (isBlock << 1) | (isThin << 2);
+static char getFuncAttrKey(bool isAutoClosure, bool isBlock, bool isThin,
+                           AbstractCC cc) {
+  return isAutoClosure | (isBlock << 1) | (isThin << 2)
+       | (unsigned(cc) << 3);
 }
 
 /// FunctionType::get - Return a uniqued function type with the specified
 /// input and result.
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 bool isAutoClosure, bool isBlock, bool isThin,
+                                AbstractCC cc,
                                 ASTContext &C) {
   bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
-  char attrKey = getFuncAttrKey(isAutoClosure, isBlock, isThin);
+  char attrKey = getFuncAttrKey(isAutoClosure, isBlock, isThin, cc);
 
   FunctionType *&Entry
     = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
@@ -661,20 +664,23 @@ FunctionType *FunctionType::get(Type Input, Type Result,
                                              isAutoClosure,
                                              isBlock,
                                              hasTypeVariable,
-                                             isThin);
+                                             isThin,
+                                             cc);
 }
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(Type input, Type output,
                            bool isAutoClosure, bool isBlock,
-                           bool hasTypeVariable, bool isThin)
+                           bool hasTypeVariable, bool isThin,
+                           AbstractCC cc)
   : AnyFunctionType(TypeKind::Function,
              (input->isCanonical() && output->isCanonical()) ?
                &input->getASTContext() : 0,
              input, output,
              (input->isUnresolvedType() || output->isUnresolvedType()),
              hasTypeVariable,
-             isThin),
+             isThin,
+             cc),
     AutoClosure(isAutoClosure),
     Block(isBlock)
 { }
@@ -685,25 +691,27 @@ FunctionType::FunctionType(Type input, Type output,
 PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
                                                       bool isThin,
+                                                      AbstractCC cc,
                                                       ASTContext &C) {
   // FIXME: one day we should do canonicalization properly.
   bool hasTypeVariable = input->hasTypeVariable() || output->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
   return new (C, arena) PolymorphicFunctionType(input, output, params,
-                                                isThin, C);
+                                                isThin, cc, C);
 }
 
 PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
                                                  GenericParamList *params,
                                                  bool isThin,
+                                                 AbstractCC cc,
                                                  ASTContext &C)
   : AnyFunctionType(TypeKind::PolymorphicFunction,
                     (input->isCanonical() && output->isCanonical()) ?&C : 0,
                     input, output,
                     (input->isUnresolvedType() || output->isUnresolvedType()),
                     /*HasTypeVariable=*/false,
-                    isThin),
+                    isThin, cc),
     Params(params)
 {
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());

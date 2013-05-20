@@ -70,7 +70,7 @@ public:
   
   /// Returns the calling convention for a function.
   AbstractCC getConstantCC(SILConstant constant) {
-    return getConstantType(constant).getFunctionTypeInfo()->getAbstractCC();
+    return getConstantType(constant).getFunctionCC();
   }
   
   /// Determine the linkage of a constant.
@@ -285,19 +285,14 @@ public:
   SILBuilder &getBuilder() { return B; }
   
   const TypeLoweringInfo &getTypeLoweringInfo(Type t,
-                                      AbstractCC cc = AbstractCC::Freestanding,
-                                      unsigned uncurryLevel = 0) {
-    return SGM.Types.getTypeLoweringInfo(t, cc, uncurryLevel);
+                                              unsigned uncurryLevel = 0) {
+    return SGM.Types.getTypeLoweringInfo(t, uncurryLevel);
   }
-  SILType getLoweredType(Type t,
-                         AbstractCC cc = AbstractCC::Freestanding,
-                         unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, cc, uncurryLevel).getLoweredType();
+  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
+    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
   }
-  SILType getLoweredLoadableType(Type t,
-                                 AbstractCC cc = AbstractCC::Freestanding,
-                                 unsigned uncurryLevel = 0) {
-    const TypeLoweringInfo &ti = getTypeLoweringInfo(t, cc, uncurryLevel);
+  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
+    const TypeLoweringInfo &ti = getTypeLoweringInfo(t, uncurryLevel);
     assert(ti.isLoadable(F.getModule()) && "unexpected address-only type");
     return ti.getLoweredType();
   }
