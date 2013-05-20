@@ -465,69 +465,69 @@ static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
 
 static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
   auto inherited = CD->getInherited();
-  if (!inherited.empty()) {
-    auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
-    Type foundType;
-    while (true) {
-      if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
-        for (auto &C : DNT->Components)
-          C.Value = Binder.TU->Ctx.TheErrorType;
+  if (inherited.empty()) return;
 
+  auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
+  Type foundType;
+  while (true) {
+    if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
+      for (auto &C : DNT->Components)
+        C.Value = Binder.TU->Ctx.TheErrorType;
+
+      foundType = Type();
+      break;
+    }
+
+    // We need to make sure the extended type is canonical. There are
+    // three possibilities here:
+    // 1. The type is already canonical, because it's either a NominalType
+    // or comes from an imported module.
+    // 2. The type is a NameAliasType from the current module, which
+    // we need to resolve immediately because we can't leave a
+    // non-canonical type here in the AST.
+    // 3. The type is a BoundGenericType; such a type isn't going to be
+    // canonical, but name lookup doesn't actually care about generic
+    // arguments, so we can ignore the fact that they're unresolved.
+    foundType = DNT->Components.back().Value.get<Type>();
+    if (foundType->hasCanonicalTypeComputed())
+      break;
+
+    if (isa<BoundGenericType>(foundType.getPointer()))
+      break;
+
+    TypeAliasDecl *TAD =
+    cast<NameAliasType>(foundType.getPointer())->getDecl();
+    Type curUnderlying = TAD->getUnderlyingType();
+    DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
+
+    if (!DNT) {
+      if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
+        // We don't need to resolve ProtocolCompositionTypes here; it's
+        // enough to know that the type in question isn't a class type.
         foundType = Type();
         break;
       }
-
-      // We need to make sure the extended type is canonical. There are
-      // three possibilities here:
-      // 1. The type is already canonical, because it's either a NominalType
-      // or comes from an imported module.
-      // 2. The type is a NameAliasType from the current module, which
-      // we need to resolve immediately because we can't leave a
-      // non-canonical type here in the AST.
-      // 3. The type is a BoundGenericType; such a type isn't going to be
-      // canonical, but name lookup doesn't actually care about generic
-      // arguments, so we can ignore the fact that they're unresolved.
-      foundType = DNT->Components.back().Value.get<Type>();
-      if (foundType->hasCanonicalTypeComputed())
-        break;
-
-      if (isa<BoundGenericType>(foundType.getPointer()))
-        break;
-
-      TypeAliasDecl *TAD =
-      cast<NameAliasType>(foundType.getPointer())->getDecl();
-      Type curUnderlying = TAD->getUnderlyingType();
-      DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
-
-      if (!DNT) {
-        if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
-          // We don't need to resolve ProtocolCompositionTypes here; it's
-          // enough to know that the type in question isn't a class type.
-          foundType = Type();
-          break;
-        }
-        // FIXME: Handling for other types?
-        Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
-                        false, inherited[0].getType());
-        inherited[0].setInvalidType(Binder.Context);
-        foundType = Type();
-        break;
-      }
+      // FIXME: Handling for other types?
+      Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
+                      false, inherited[0].getType());
+      inherited[0].setInvalidType(Binder.Context);
+      foundType = Type();
+      break;
     }
+  }
 
-    if (!foundType)
-      return;
+  if (!foundType)
+    return;
 
-    // Check that the base type is a class.
-    TypeLoc baseClass;
-    if (foundType->getClassOrBoundGenericClass())
-      baseClass = inherited[0];
+  // Check that the base type is a class.
+  TypeLoc baseClass;
+  if (foundType->getClassOrBoundGenericClass())
+    baseClass = inherited[0];
 
-    if (baseClass.getType()) {
-      CD->setBaseClassLoc(baseClass);
-      inherited = inherited.slice(1);
-      CD->setInherited(inherited);
-    }
+  if (baseClass.getType()) {
+    CD->setBaseClassLoc(baseClass);
+    inherited = inherited.slice(1);
+    CD->setInherited(inherited);
   }
 }
 
