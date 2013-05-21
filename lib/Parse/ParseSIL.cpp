@@ -152,5 +152,10 @@ bool Parser::parseSILType(SILType &Result) {
   // SILTypes itself.
   (void)IsSRet;
   Result = SIL->Types.getLoweredType(Ty.getType(), UncurryLevel);
+  
+//  performNameBinding(TU);
+//  performTypeChecking(TU);
+
+  
   return false;
 }

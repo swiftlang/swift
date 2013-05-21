@@ -1046,7 +1046,7 @@ public:
   }
 
   Expr *visitNewArrayExpr(NewArrayExpr *E) {
-    if (TC.validateType(E->getElementTypeLoc(), /*isFirstPass*/false))
+    if (TC.validateType(E->getElementTypeLoc()))
       return nullptr;
 
     Type resultType = E->getElementTypeLoc().getType();
@@ -1151,7 +1151,7 @@ public:
   Expr *visitCoerceExpr(CoerceExpr *E) {
     // The type of the expr is always the type that the MetaType LHS specifies.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
-    if (TC.validateType(E->getTypeLoc(), false)) {
+    if (TC.validateType(E->getTypeLoc())) {
       E->setType(ErrorType::get(TC.Context));
       return 0;
     }
@@ -1161,7 +1161,7 @@ public:
   Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
     // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
-    if (TC.validateType(E->getTypeLoc(), false)) {
+    if (TC.validateType(E->getTypeLoc())) {
       E->setType(ErrorType::get(TC.Context));
       return 0;
     }
@@ -1206,7 +1206,7 @@ public:
   Expr *visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
     // The type of the expr is always the type specified.
     assert(!E->getType()->isUnresolvedType() &&"Type always specified by cast");
-    TC.validateType(E->getTypeLoc(), false);
+    TC.validateType(E->getTypeLoc());
     return E;
   }
     
@@ -2037,7 +2037,7 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
 
   bool badType = false;
   if (FE->getBodyResultTypeLoc().getType()) {
-    if (validateType(FE->getBodyResultTypeLoc(), isFirstPass)) {
+    if (validateType(FE->getBodyResultTypeLoc())) {
       FE->getBodyResultTypeLoc().setInvalidType(Context);
       badType = true;
     }

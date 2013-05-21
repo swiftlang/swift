@@ -114,7 +114,7 @@ allAssociatedTypes(SmallVectorImpl<ValueDecl *> &Results) {
 /// expressions are valid and that they have the appropriate conversions etc.
 ///
 /// This returns true if the type is invalid.
-bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
+bool TypeChecker::validateType(TypeLoc &Loc) {
   Type InTy = Loc.getType();
   assert(InTy && "Cannot validate null types!");
 
@@ -166,12 +166,12 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
   case TypeKind::Substituted: {
     TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
                Loc.getSourceRange());
-    return validateType(TL, isFirstPass);
+    return validateType(TL);
   }
 
   case TypeKind::NameAlias: {
     TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
-    IsInvalid = validateType(D->getUnderlyingTypeLoc(), isFirstPass);
+    IsInvalid = validateType(D->getUnderlyingTypeLoc());
     if (IsInvalid)
       D->getUnderlyingTypeLoc().setInvalidType(Context);
     break;
@@ -181,7 +181,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     if (DNT->Components.back().Value.is<Type>()) {
       // FIXME: Refactor this to avoid fake TypeLoc
       TypeLoc TempLoc = TypeLoc::withoutLoc(DNT->getMappedType());
-      IsInvalid = validateType(TempLoc, isFirstPass);
+      IsInvalid = validateType(TempLoc);
       break;
     }
     MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
@@ -323,7 +323,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
         if (Ty) {
           // FIXME: Refactor this to avoid fake TypeLoc
           TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
-          if (validateType(TempLoc, isFirstPass)) {
+          if (validateType(TempLoc)) {
             return true;
           }
 
@@ -353,7 +353,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ cast<ParenType>(T)->getUnderlyingType(),
                      Loc.getSourceRange() };
-    return validateType(TempLoc, isFirstPass);
+    return validateType(TempLoc);
   }
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
@@ -366,23 +366,13 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
       Type EltTy = TT->getFields()[i].getType();
       // FIXME: Extract real typeloc info
       TypeLoc TempLoc{ EltTy, Loc.getSourceRange() };
-      if (EltTy && validateType(TempLoc, isFirstPass)) {
+      if (EltTy && validateType(TempLoc)) {
         IsInvalid = true;
         break;
       }
 
       ExprHandle *EltInit = TT->getFields()[i].getInit();
       if (EltInit == 0) continue;
-
-      if (isFirstPass) {
-        if (!EltTy) {
-          diagnose(EltInit->getExpr()->getLoc(),
-                   diag::tuple_global_missing_type);
-          IsInvalid = true;
-          break;
-        }
-        continue;
-      } 
 
       Expr *initExpr = EltInit->getExpr();
       if (typeCheckExpression(initExpr, EltTy)) {
@@ -427,7 +417,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ cast<LValueType>(T)->getObjectType(),
                      Loc.getSourceRange() };
-    IsInvalid = validateType(TempLoc, isFirstPass);
+    IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of object type!
     break;
   }
@@ -437,10 +427,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     AnyFunctionType *FT = cast<AnyFunctionType>(T);
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ FT->getInput(), Loc.getSourceRange() };
-    IsInvalid = validateType(TempLoc, isFirstPass);
+    IsInvalid = validateType(TempLoc);
     if (!IsInvalid) {
       TempLoc = TypeLoc{ FT->getResult(), Loc.getSourceRange() };
-      IsInvalid = validateType(TempLoc, isFirstPass);
+      IsInvalid = validateType(TempLoc);
     }
     // FIXME: diagnose non-materializability of result type!
     break;
@@ -449,7 +439,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     ArrayType *AT = cast<ArrayType>(T);
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange() };
-    IsInvalid = validateType(TempLoc, isFirstPass);
+    IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
     break;
@@ -458,7 +448,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     ArraySliceType *AT = cast<ArraySliceType>(T);
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange() };
-    IsInvalid = validateType(TempLoc, isFirstPass);
+    IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid && !AT->hasImplementationType()) {
       IsInvalid = buildArraySliceType(*this, AT, Loc.getSourceRange().Start);
@@ -471,7 +461,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     for (auto Proto : PC->getProtocols()) {
       // FIXME: Extract real typeloc info.
       TypeLoc TempLoc{ Proto, Loc.getSourceRange() };
-      if (validateType(TempLoc, isFirstPass))
+      if (validateType(TempLoc))
         IsInvalid = true;
       else if (!Proto->isExistentialType()) {
         SourceLoc DiagLoc = Loc.getSourceRange().Start;
@@ -488,7 +478,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
     // FIXME: Extract real typeloc info?  Should we be validating this type
     // in the first place?
     TypeLoc TempLoc{ Meta->getInstanceType(), Loc.getSourceRange() };
-    IsInvalid = validateType(TempLoc, isFirstPass);
+    IsInvalid = validateType(TempLoc);
     break;
   }
 
@@ -501,7 +491,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isFirstPass) {
       // FIXME: Extract real typeloc info?  Should we be validating this type
       // in the first place?
       TypeLoc TempLoc = TypeLoc::withoutLoc(Arg);
-      if (validateType(TempLoc, isFirstPass)) {
+      if (validateType(TempLoc)) {
         IsInvalid = true;
         break;
       }

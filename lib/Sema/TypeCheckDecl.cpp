@@ -70,7 +70,7 @@ public:
   void checkInherited(Decl *D, MutableArrayRef<TypeLoc> Inherited) {
     // Check the list of inherited protocols.
     for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      if (TC.validateType(Inherited[i], IsFirstPass)) {
+      if (TC.validateType(Inherited[i])) {
         Inherited[i].setInvalidType(TC.Context);
         continue;
       }
@@ -123,7 +123,7 @@ public:
       
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
-        if (TC.validateType(Req.getConstraintLoc(), IsFirstPass)) {
+        if (TC.validateType(Req.getConstraintLoc())) {
           Req.setInvalid();
           continue;
         }
@@ -166,7 +166,7 @@ public:
 
       switch (Req.getKind()) {
       case RequirementKind::Conformance: {
-        if (TC.validateType(Req.getSubjectLoc(), IsFirstPass)) {
+        if (TC.validateType(Req.getSubjectLoc())) {
           Req.setInvalid();
           continue;
         }
@@ -174,12 +174,12 @@ public:
       }
 
       case RequirementKind::SameType:
-        if (TC.validateType(Req.getFirstTypeLoc(), IsFirstPass)) {
+        if (TC.validateType(Req.getFirstTypeLoc())) {
           Req.setInvalid();
           continue;
         }
 
-        if (TC.validateType(Req.getSecondTypeLoc(), IsFirstPass)) {
+        if (TC.validateType(Req.getSecondTypeLoc())) {
           Req.setInvalid();
           continue;
         }
@@ -359,7 +359,7 @@ public:
     assert(SD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent subscripts outside of types!");
 
-    bool isInvalid = TC.validateType(SD->getElementTypeLoc(), IsFirstPass);
+    bool isInvalid = TC.validateType(SD->getElementTypeLoc());
     isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass,
                                      /*allowUnknownTypes*/false);
 
@@ -375,7 +375,7 @@ public:
     if (!IsSecondPass) {
       // FIXME: Need to fix the validateType API for typealias.
       TypeLoc FakeTypeLoc = TypeLoc::withoutLoc(TAD->getDeclaredType());
-      TC.validateType(FakeTypeLoc, IsFirstPass);
+      TC.validateType(FakeTypeLoc);
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -448,7 +448,7 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       if (CD->hasBaseClass())
-        TC.validateType(CD->getBaseClassLoc(), IsFirstPass);
+        TC.validateType(CD->getBaseClassLoc());
 
       checkInherited(CD, CD->getInherited());
 
@@ -604,7 +604,7 @@ public:
 
     // We have an element with an argument type; validate the argument,
     // then compute a function type.
-    if (TC.validateType(ED->getArgumentTypeLoc(), IsFirstPass))
+    if (TC.validateType(ED->getArgumentTypeLoc()))
       return;
 
     Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
@@ -624,7 +624,7 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     if (!IsSecondPass) {
-      TC.validateType(ED->getExtendedTypeLoc(), IsFirstPass);
+      TC.validateType(ED->getExtendedTypeLoc());
 
       Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
       if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&

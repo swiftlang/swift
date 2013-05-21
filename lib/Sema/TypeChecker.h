@@ -348,14 +348,14 @@ public:
   Expr *buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
-  bool validateType(TypeLoc &Loc, bool isFirstPass);
+  bool validateType(TypeLoc &Loc);
 
   /// \brief Validate the given type, which has no location information
   /// and shall not fail.
   /// FIXME: This concept seems a bit broken.
   void validateTypeSimple(Type T) {
     TypeLoc TL(T, SourceRange());
-    bool result = validateType(TL, false);
+    bool result = validateType(TL);
     assert(!result && "Validation cannot fail!");
     (void)result;
   }

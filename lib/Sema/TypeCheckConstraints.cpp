@@ -2575,7 +2575,7 @@ namespace {
 
         // Validate the result type, if present.
         if (closure->hasExplicitResultType() &&
-            TC.validateType(closure->getExplicitResultTypeLoc(), false)) {
+            TC.validateType(closure->getExplicitResultTypeLoc())) {
           expr->setType(ErrorType::get(TC.Context));
           return false;
         }
@@ -2596,8 +2596,7 @@ namespace {
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         // FIXME: Check that the element type has a default constructor.
         
-        if (TC.validateType(newArray->getElementTypeLoc(),
-                            /*isFirstPass=*/false))
+        if (TC.validateType(newArray->getElementTypeLoc()))
           return nullptr;
 
         // Check array bounds. They are subproblems that don't interact with
@@ -2623,7 +2622,7 @@ namespace {
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
         for (TypeLoc &type : us->getUnresolvedParams()) {
-          if (TC.validateType(type, /*isFirstPass=*/false)) {
+          if (TC.validateType(type)) {
             TC.diagnose(us->getLAngleLoc(),
                         diag::while_parsing_as_left_angle_bracket);
             return nullptr;
@@ -2634,13 +2633,13 @@ namespace {
 
       // Type check the type parameters in cast expressions.
       if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
-        if (TC.validateType(cast->getTypeLoc(), /*isFirstPass=*/false))
+        if (TC.validateType(cast->getTypeLoc()))
           return nullptr;
         return expr;
       }
       
       if (auto is = dyn_cast<IsSubtypeExpr>(expr)) {
-        if (TC.validateType(is->getTypeLoc(), /*isFirstPass=*/false))
+        if (TC.validateType(is->getTypeLoc()))
           return nullptr;
         return expr;
       }

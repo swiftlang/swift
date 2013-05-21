@@ -44,7 +44,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
   case PatternKind::Typed: {
     bool hadError = false;
     TypedPattern *TP = cast<TypedPattern>(P);
-    if (validateType(TP->getTypeLoc(), isFirstPass)) {
+    if (validateType(TP->getTypeLoc())) {
       TP->setType(ErrorType::get(Context));
       hadError = true;
     } else {
@@ -121,7 +121,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = false;
-    if (validateType(TP->getTypeLoc(), isFirstPass)) {
+    if (validateType(TP->getTypeLoc())) {
       TP->overwriteType(ErrorType::get(Context));
       hadError = true;
     } else {
