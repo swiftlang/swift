@@ -955,6 +955,13 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   verify(TU);
 }
 
+/// performTypeLocChecking - recursively validate the specified type.  This is
+/// used when dealing with partial translation units (e.g. SIL parsing).
+bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T) {
+  return TypeChecker(*TU).validateType(T);
+}
+
+
 bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
                                            Expr *&parsedExpr) {
   // Set up a diagnostics engine that swallows diagnostics.

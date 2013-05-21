@@ -32,6 +32,7 @@ namespace swift {
   class Component;
   class Expr;
   class SILModule;
+  struct TypeLoc;
 
   namespace irgen {
     class Options;
@@ -68,6 +69,10 @@ namespace swift {
   /// main module.
   void performTypeChecking(TranslationUnit *TU, unsigned StartElem = 0);
 
+  /// performTypeLocChecking - recursively validate the specified type.  This is
+  /// used when dealing with partial translation units (e.g. SIL parsing).
+  bool performTypeLocChecking(TranslationUnit *TU, TypeLoc &T);
+  
   /// typeCheckCompletionContextExpr - Typecheck an expression parsed as a
   /// completion context.
   bool typeCheckCompletionContextExpr(TranslationUnit *TU,

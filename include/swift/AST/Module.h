@@ -77,7 +77,7 @@ public:
   /// ASTStage - Defines what phases of parsing and semantic analysis are
   /// complete for the given AST.  This should only be used for assertions and
   /// verification purposes.
-  enum {
+  enum ASTStage_t {
     /// Parsing is underway.
     Parsing,
     /// Parsing has completed.

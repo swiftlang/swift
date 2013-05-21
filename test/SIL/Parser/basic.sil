@@ -7,10 +7,10 @@ sil clang_thunk @prototype : $() -> ()
 class Class1 { var a : Class2 }
 class Class2 { var b : Class1 }
 
-// CHECK: sil @normal : $() -> ()
-sil @normal : $() -> () {
+// CHECK: sil @normal : $(a : Class1) -> ()
+sil @normal : $(a : Class1) -> () {
 }
 
-// CHECK: sil internal @internal_fn : $() -> ()
-sil internal @internal_fn : $() -> () {
+// CHECK: sil internal @internal_fn : $() -> Int
+sil internal @internal_fn : $() -> Int {
 }

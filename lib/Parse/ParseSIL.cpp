@@ -13,6 +13,8 @@
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Subsystems.h"
+#include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
 
@@ -148,6 +150,20 @@ bool Parser::parseSILType(SILType &Result) {
       parseType(Ty, diag::expected_sil_type))
     return true;
 
+  // If we successfully parsed the type, do some type checking / name binding
+  // of it.
+  {
+    // We have to lie and say we're done with parsing to make this happen.
+    assert(TU->ASTStage == TranslationUnit::Parsing &&
+           "Unexpected stage during parsing!");
+    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(TU->ASTStage,
+                                                      TranslationUnit::Parsed);
+    if (performTypeLocChecking(TU, Ty))
+      return true;
+  }
+
+  
+  
   // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
   // SILTypes itself.
   (void)IsSRet;
