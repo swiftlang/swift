@@ -65,6 +65,7 @@ public:
 
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
+  TranslationUnit *TU;
   const llvm::MemoryBuffer *Buffer;
   Lexer *L;
   SILModule *SIL;    // Non-null when parsing a .sil file.
@@ -111,10 +112,11 @@ public:
   };
 
 
-  Parser(unsigned BufferID, swift::Component *Component, ASTContext &Ctx,
-         unsigned Offset, unsigned EndOffset, bool IsMainModule,SILModule *SIL);
-  Parser(swift::Component *Comp, ASTContext &Context,
-         llvm::StringRef fragment, DiagnosticEngine &Diags, SILModule *SIL);
+  Parser(unsigned BufferID, TranslationUnit *TU,
+         unsigned Offset, unsigned EndOffset, bool IsMainModule,
+         SILModule *SIL);
+  Parser(TranslationUnit *TU, llvm::StringRef fragment, DiagnosticEngine &Diags,
+         SILModule *SIL);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }

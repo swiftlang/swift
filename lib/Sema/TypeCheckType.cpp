@@ -220,7 +220,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
 
         if (Globals.Results.empty()) {
           diagnose(Loc, Components.size() == 1 ? 
-                     diag::use_undeclared_type : diag::unknown_name_in_type, Name)
+                   diag::use_undeclared_type : diag::unknown_name_in_type, Name)
             .highlight(SourceRange(Loc, Components.back().Loc));
           return true;
         }
