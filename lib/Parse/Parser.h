@@ -409,7 +409,10 @@ public:
   // Each of these parsing methods returns null (in a NullablePtr) on a parse
   // error, or an ErrorExpr on a semantic error.  If the method cannot fail, it
   // returns a raw Expr*.
-  NullablePtr<Expr> parseExpr(Diag<> ID);
+  NullablePtr<Expr> parseExpr(Diag<> ID, bool isExprBasic = false);
+  NullablePtr<Expr> parseExprBasic(Diag<> ID) {
+    return parseExpr(ID, /*isExprBasic=*/true);
+  }
   NullablePtr<Expr> parseExprIs(Expr *sub);
   NullablePtr<Expr> parseExprAs(Expr *sub);
   NullablePtr<Expr> parseExprSequence(Diag<> ID);
@@ -458,7 +461,8 @@ public:
   // ErrorStmt on a semantic error.
   static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
   NullablePtr<Stmt> parseStmtOtherThanAssignment();
-  bool parseExprOrStmtAssign(ExprStmtOrDecl &Results);
+  bool parseExprOrStmtAssign(ExprStmtOrDecl &Results,
+                             bool usesExprBasic = false);
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();

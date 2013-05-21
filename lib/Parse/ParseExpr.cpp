@@ -23,17 +23,227 @@
 
 using namespace swift;
 
+/// \brief Create an argument with a trailing closure, with (optionally)
+/// the elements, names, and parentheses locations from an existing argument.
+static Expr *createArgWithTrailingClosure(ASTContext &context,
+                                          SourceLoc leftParen,
+                                          ArrayRef<Expr *> elementsIn,
+                                          Identifier *namesIn,
+                                          SourceLoc rightParen,
+                                          Expr *closure) {
+  // If there are no elements, just build a parenthesized expression around
+  // the cosure.
+  if (elementsIn.empty()) {
+    return new (context) ParenExpr(leftParen, closure, rightParen,
+                                   /*hasTrailingClosure=*/true);
+  }
+
+  // Create the list of elements, and add the trailing closure to the end.
+  SmallVector<Expr *, 4> elements(elementsIn.begin(), elementsIn.end());
+  elements.push_back(closure);
+
+  Identifier *names = nullptr;
+  if (namesIn) {
+    names = context.Allocate<Identifier>(elements.size());
+    std::copy(namesIn, namesIn + elements.size() - 1, names);
+    new (namesIn + elements.size() - 1) Identifier();
+  }
+
+  // Form a full tuple expression.
+  return new (context) TupleExpr(leftParen, context.AllocateCopy(elements),
+                                 names, rightParen,
+                                 /*hasTrailingClosure=*/true);
+}
+
+/// \brief Add the given trailing closure argument to the call argument.
+static Expr *addTrailingClosureToArgument(ASTContext &context,
+                                          Expr *arg, Expr *closure) {
+  // Deconstruct the call argument to find its elements, element names,
+  // and the locations of the left and right parentheses.
+  if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+    // Deconstruct a tuple expression.
+    return createArgWithTrailingClosure(context,
+                                        tuple->getLParenLoc(),
+                                        tuple->getElements(),
+                                        tuple->getElementNames(),
+                                        tuple->getRParenLoc(),
+                                        closure);
+  }
+
+  // Deconstruct a parenthesized expression.
+  auto paren = dyn_cast<ParenExpr>(arg);
+  return createArgWithTrailingClosure(context,
+                                      paren->getLParenLoc(),
+                                      paren->getSubExpr(),
+                                      nullptr,
+                                      paren->getRParenLoc(), closure);
+}
+
+/// \brief Determine whether the given expression is a postfix expression.
+static bool isPostfixExpr(Expr *expr) {
+  switch (expr->getKind()) {
+  // Not postfix expressions.
+  case ExprKind::AddressOf:
+  case ExprKind::Coerce:
+  case ExprKind::PostfixUnary:
+  case ExprKind::PrefixUnary:
+  case ExprKind::Sequence:
+  case ExprKind::IsSubtype:
+  case ExprKind::UncheckedDowncast:
+  case ExprKind::UnresolvedIf:
+  case ExprKind::UnresolvedElse:
+    return false;
+
+  // Postfix expressions.
+  case ExprKind::Array:
+  case ExprKind::Call:
+  case ExprKind::CharacterLiteral:
+  case ExprKind::DeclRef:
+  case ExprKind::Dictionary:
+  case ExprKind::ExplicitClosure:
+  case ExprKind::FloatLiteral:
+  case ExprKind::Func:
+  case ExprKind::MemberRef:
+  case ExprKind::Metatype:
+  case ExprKind::Module:
+  case ExprKind::NewArray:
+  case ExprKind::OverloadedDeclRef:
+  case ExprKind::Paren:
+  case ExprKind::PipeClosure:
+  case ExprKind::RebindThisInConstructor:
+  case ExprKind::IntegerLiteral:
+  case ExprKind::InterpolatedStringLiteral:
+  case ExprKind::StringLiteral:
+  case ExprKind::Subscript:
+  case ExprKind::SuperRef:
+  case ExprKind::Tuple:
+  case ExprKind::UnresolvedConstructor:
+  case ExprKind::UnresolvedDeclRef:
+  case ExprKind::UnresolvedDot:
+  case ExprKind::UnresolvedMember:
+  case ExprKind::UnresolvedSpecialize:
+    return true;
+
+  // Can't occur in the parser.
+  case ExprKind::ArchetypeToSuper:
+  case ExprKind::ArchetypeMemberRef:
+  case ExprKind::ArchetypeSubscript:
+  case ExprKind::Binary:
+  case ExprKind::BridgeToBlock:
+  case ExprKind::ConstructorRefCall:
+  case ExprKind::DefaultValue:
+  case ExprKind::DerivedToBase:
+  case ExprKind::DotSyntaxBaseIgnored:
+  case ExprKind::DotSyntaxCall:
+  case ExprKind::Erasure:
+  case ExprKind::ExistentialMemberRef:
+  case ExprKind::ExistentialSubscript:
+  case ExprKind::FunctionConversion:
+  case ExprKind::GenericMemberRef:
+  case ExprKind::GenericSubscript:
+  case ExprKind::If:
+  case ExprKind::ImplicitClosure:
+  case ExprKind::Load:
+  case ExprKind::Materialize:
+  case ExprKind::MetatypeConversion:
+  case ExprKind::OpaqueValue:
+  case ExprKind::OtherConstructorDeclRef:
+  case ExprKind::OverloadedMemberRef:
+  case ExprKind::OverloadedSubscript:
+  case ExprKind::Requalify:
+  case ExprKind::ScalarToTuple:
+  case ExprKind::Specialize:
+  case ExprKind::TupleElement:
+  case ExprKind::TupleShuffle:
+  case ExprKind::UncheckedSuperToArchetype:
+  case ExprKind::ZeroValue:
+    llvm_unreachable("Not a parsed expression");
+
+  // Treat error cases as postfix expressions.
+  case ExprKind::Error:
+    return true;
+  }
+}
+
 /// parseExpr
-///   expr:
-///     expr-sequence
-///     expr-sequence expr-is
-///     expr-sequence expr-as
 ///
-NullablePtr<Expr> Parser::parseExpr(Diag<> Message) {
+///   expr:
+///     expr-basic
+///     expr-trailing-closure expr-cast?
+///
+///   expr-basic:
+///     expr-sequence
+///     expr-sequence expr-cast?
+///
+///   expr-trailing-closure:
+///     expr-postfix expr-closure+
+///
+///   expr-cast:
+///     expr-is
+///     expr-as
+///
+/// \param isExprBasic Whether we're only parsing an expr-basic.
+NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   NullablePtr<Expr> expr = parseExprSequence(Message);
   if (expr.isNull())
     return nullptr;
-  
+
+  // Parse trailing closure, if we're allowed to.
+  while (!isExprBasic && Tok.is(tok::l_brace) &&
+      Context.LangOpts.UseConstraintSolver) {
+    // Parse the closure.
+    Expr *closure = parseExprClosure();
+
+    // The grammar only permits a postfix-expression. However, we've
+    // parsed a expr-sequence, so diagnose cases where we didn't get a
+    // trailing closure.
+    if (!isPostfixExpr(expr.get())) {
+      diagnose(closure->getStartLoc(), diag::trailing_closure_not_postfix)
+        .highlight(expr.get()->getSourceRange());
+
+      // Suggest parentheses around the complete expression.
+      SourceLoc afterExprLoc
+        = Lexer::getLocForEndOfToken(SourceMgr, expr.get()->getEndLoc());
+      diagnose(expr.get()->getStartLoc(),
+               diag::trailing_closure_full_expr_parentheses)
+        .fixItInsert(expr.get()->getStartLoc(), "(")
+        .fixItInsert(afterExprLoc, ")");
+
+      // Suggest parentheses around the smallest postfix-expression and the
+      // closure, if we can find it.
+      if (auto seq = dyn_cast<SequenceExpr>(expr.get())) {
+        Expr *last = seq->getElements().back();
+        if (isPostfixExpr(last)) {
+          SourceLoc afterClosureLoc
+            = Lexer::getLocForEndOfToken(SourceMgr, closure->getEndLoc());
+          diagnose(last->getStartLoc(),
+                   diag::trailing_closure_postfix_parentheses)
+            .fixItInsert(last->getStartLoc(), "(")
+            .fixItInsert(afterClosureLoc, ")");
+        }
+      }
+
+      // FIXME: We have no idea which of the two options above, if any,
+      // will actually type-check, which causes cascading failures. Should we
+      // simply mark the result expression as erroneous?
+    }
+
+    // Introduce the trailing closure into the call, or form a call, as
+    // necessary.
+    if (auto call = dyn_cast<CallExpr>(expr.get())) {
+      // When a closure follows a call, it becomes the last argument of
+      // that call.
+      Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
+                                               closure);
+      call->setArg(arg);
+    } else {
+      // Otherwise, the closure implicitly forms a call.
+      Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
+                                               nullptr, SourceLoc(), closure);
+      expr = new (Context) CallExpr(expr.get(), arg);
+    }
+  }
+
   if (Tok.is(tok::kw_is)) {
     return parseExprIs(expr.get());
   }
@@ -418,62 +628,6 @@ NullablePtr<Expr> Parser::parseExprSuper() {
   }
 }
 
-/// \brief Create an argument with a trailing closure, with (optionally)
-/// the elements, names, and parentheses locations from an existing argument.
-static Expr *createArgWithTrailingClosure(ASTContext &context,
-                                          SourceLoc leftParen,
-                                          ArrayRef<Expr *> elementsIn,
-                                          Identifier *namesIn,
-                                          SourceLoc rightParen,
-                                          Expr *closure) {
-  // If there are no elements, just build a parenthesized expression around
-  // the cosure.
-  if (elementsIn.empty()) {
-    return new (context) ParenExpr(leftParen, closure, rightParen,
-                                   /*hasTrailingClosure=*/true);
-  }
-  
-  // Create the list of elements, and add the trailing closure to the end.
-  SmallVector<Expr *, 4> elements(elementsIn.begin(), elementsIn.end());
-  elements.push_back(closure);
-
-  Identifier *names = nullptr;
-  if (namesIn) {
-    names = context.Allocate<Identifier>(elements.size());
-    std::copy(namesIn, namesIn + elements.size() - 1, names);
-    new (namesIn + elements.size() - 1) Identifier();
-  }
-
-  // Form a full tuple expression.
-  return new (context) TupleExpr(leftParen, context.AllocateCopy(elements),
-                                 names, rightParen,
-                                 /*hasTrailingClosure=*/true);
-}
-
-/// \brief Add the given trailing closure argument to the call argument.
-static Expr *addTrailingClosureToArgument(ASTContext &context,
-                                          Expr *arg, Expr *closure) {
-  // Deconstruct the call argument to find its elements, element names,
-  // and the locations of the left and right parentheses.
-  if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-    // Deconstruct a tuple expression.
-    return createArgWithTrailingClosure(context,
-                                        tuple->getLParenLoc(),
-                                        tuple->getElements(),
-                                        tuple->getElementNames(),
-                                        tuple->getRParenLoc(),
-                                        closure);
-  }
-
-  // Deconstruct a parenthesized expression.
-  auto paren = dyn_cast<ParenExpr>(arg);
-  return createArgWithTrailingClosure(context,
-                                      paren->getLParenLoc(),
-                                      paren->getSubExpr(),
-                                      nullptr,
-                                      paren->getRParenLoc(), closure);
-}
-
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -505,9 +659,6 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
 ///   expr-call:
 ///     expr-postfix expr-paren
 ///
-///   expr-trailing-closure:
-///     expr-postfix expr-closure
-///
 ///   expr-postfix:
 ///     expr-primary
 ///     expr-dot
@@ -515,7 +666,6 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
 ///     expr-subscript
 ///     expr-call
 ///     expr-postfix operator-postfix
-///     expr-trailing-closure
 
 NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   NullablePtr<Expr> Result;
@@ -672,39 +822,6 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         (PipeIsDelimiter && startsWithPipe(Tok))) {
       Expr *oper = parseExprOperator();
       Result = new (Context) PostfixUnaryExpr(oper, Result.get());
-      continue;
-    }
-
-    // Check for a closure suffix.
-    // FIXME: We current require an explicit argument list on trailing closures,
-    // to avoid the ambiguity introduced by
-    //
-    //   for x in map(xs) { $0 + 15 } {
-    //      // loop body...
-    //    }
-    //
-    // However, we believe we can cope with this ambiguity.
-    if (Tok.is(tok::l_brace) && startsWithPipe(peekToken()) &&
-        Context.LangOpts.UseConstraintSolver) {
-      Expr *closure = parseExprClosure();
-
-      // If the current expression is a call, the trailing
-      if (Result.isNull())
-        continue;
-
-      // When a closure follows a call, it becomes the last argument of
-      // that call.
-      if (auto call = dyn_cast<CallExpr>(Result.get())) {
-        Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
-                                                 closure);
-        call->setArg(arg);
-        continue;
-      }
-
-      // Otherwise, the closure implicitly forms a call.
-      Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
-                                               nullptr, SourceLoc(), closure);
-      Result = new (Context) CallExpr(Result.get(), arg);
       continue;
     }
 

@@ -568,6 +568,13 @@ ERROR(expected_expr_closure,expr_parsing,none,
 ERROR(expected_rbrace_in_closure,expr_parsing,none,
       "expected '}' at end of closure", ())
 
+ERROR(trailing_closure_not_postfix,expr_parsing,none,
+      "trailing closure can only follow a postfix expression", ())
+NOTE(trailing_closure_full_expr_parentheses,expr_parsing,none,
+     "add parentheses around complete expression", ())
+NOTE(trailing_closure_postfix_parentheses,expr_parsing,none,
+     "add parentheses around last postfix expression", ())
+
 // Subscript expressions
 ERROR(expected_expr_subscript_value,expr_parsing,none,
       "expected expression for subscript value", ())

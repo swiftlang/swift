@@ -91,8 +91,18 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 ///   expr-or-stmt-assign:
 ///     expr
 ///     stmt-assign
-bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
-  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr);
+///
+///   expr-or-stmt-assign-basic:
+///     expr-basic
+///     stmt-assign-basic
+///
+///   stmt-assign-basic:
+///     expr-basic '=' expr-basic
+///
+/// \para usesExprBasic If true, parse expr-or-stmt-assign-basic rather than
+/// expr-or-stmt-assign.
+bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result, bool usesExprBasic) {
+  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr, usesExprBasic);
   if (ResultExpr.isNull())
     return true;
 
@@ -104,7 +114,8 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result) {
     return false;
 
   SourceLoc EqualLoc = consumeToken();
-  NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment);
+  NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment,
+                                        usesExprBasic);
   if (RHSExpr.isNull())
     return true;
   Result = new (Context) AssignStmt(ResultExpr.get(),
@@ -358,14 +369,14 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
 
 /// 
 ///   stmt-if:
-///     'if' expr stmt-brace stmt-if-else?
+///     'if' expr-basic stmt-brace stmt-if-else?
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
 NullablePtr<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
-  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_if);
+  NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_if);
   if (Condition.isNull()) return 0;
   NullablePtr<BraceStmt> NormalBody =
     parseBraceItemList(diag::expected_lbrace_after_if);
@@ -393,11 +404,11 @@ NullablePtr<Stmt> Parser::parseStmtIf() {
 
 /// 
 ///   stmt-while:
-///     'while' expr stmt-brace
+///     'while' expr-basic stmt-brace
 NullablePtr<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
   
-  NullablePtr<Expr> Condition = parseExpr(diag::expected_expr_while);
+  NullablePtr<Expr> Condition = parseExprBasic(diag::expected_expr_while);
   if (Condition.isNull()) return 0;
   NullablePtr<BraceStmt> Body =
     parseBraceItemList(diag::expected_lbrace_after_while);
@@ -458,11 +469,11 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 }
       
 ///   stmt-for-c-style:
-///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign?
+///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign-basic?
 ///           stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
-///     expr-or-stmt-assign
+///     expr-basic-or-stmt-assign
 NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   SourceLoc Semi1Loc, Semi2Loc;
   SourceLoc LPLoc, RPLoc;
@@ -494,7 +505,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if ((Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
         (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third)))
+      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third, true)))
     return 0;
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,
@@ -530,7 +541,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
 /// 
 ///   stmt-for-each:
-///     'for' pattern 'in' expr stmt-brace
+///     'for' pattern 'in' expr-basic stmt-brace
 NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   NullablePtr<Pattern> Pattern = parsePattern();
 
@@ -542,7 +553,8 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   SourceLoc InLoc = consumeToken();
   
   // expr
-  NullablePtr<Expr> Container = parseExpr(diag::expected_foreach_container);
+  NullablePtr<Expr> Container
+    = parseExprBasic(diag::expected_foreach_container);
 
   // Introduce a new scope and place the variables in the pattern into that
   // scope.
@@ -567,10 +579,10 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 
 ///
 ///    stmt-switch:
-///      'switch' expr '{' stmt-case* '}'
+///      'switch' expr-basic '{' stmt-case* '}'
 NullablePtr<Stmt> Parser::parseStmtSwitch() {
   SourceLoc switchLoc = consumeToken(tok::kw_switch);
-  NullablePtr<Expr> subjectExpr = parseExpr(diag::expected_switch_expr);
+  NullablePtr<Expr> subjectExpr = parseExprBasic(diag::expected_switch_expr);
   
   if (subjectExpr.isNull())
     return nullptr;

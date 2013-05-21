@@ -2040,28 +2040,31 @@ ill-formed if the type does not conform to the protocol.</p>
   </div>
 
   <pre class="grammar">
-    expr         ::= expr-sequence <a href="#expr-cast">expr-cast</a>
+    expr          ::= expr-basic
+    expr          ::= <a
+    href="#expr-trailing-closure">expr-trailing-closure</a> <a href="#expr-cast">expr-cast</a>?
+
+    expr-basic    ::= expr-sequence <a href="#expr-cast">expr-cast</a>?
 
     expr-sequence ::= <a href="#expr-unary">expr-unary</a> <a href="#expr-binary">expr-binary</a>*
     
-    expr-primary ::= <a href="#expr-literal">expr-literal</a>
-    expr-primary ::= <a href="#expr-identifier">expr-identifier</a>
-    expr-primary ::= <a href="#expr-super">expr-super</a>
-    expr-primary ::= <a href="#expr-closure">expr-closure</a>
-    expr-primary ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
-    expr-primary ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
-    expr-primary ::= <a href="#expr-paren">expr-paren</a>
-    expr-primary ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary ::= <a href="#expr-func">expr-func</a>
+    expr-primary  ::= <a href="#expr-literal">expr-literal</a>
+    expr-primary  ::= <a href="#expr-identifier">expr-identifier</a>
+    expr-primary  ::= <a href="#expr-super">expr-super</a>
+    expr-primary  ::= <a href="#expr-closure">expr-closure</a>
+    expr-primary  ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
+    expr-primary  ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
+    expr-primary  ::= <a href="#expr-paren">expr-paren</a>
+    expr-primary  ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
+    expr-primary  ::= <a href="#expr-func">expr-func</a>
 
-    expr-postfix ::= expr-primary
-    expr-postfix ::= expr-postfix <a href="#operator">operator-postfix</a>
-    expr-postfix ::= <a href="#expr-new">expr-new</a>
-    expr-postfix ::= <a href="#expr-dot">expr-dot</a>
-    expr-postfix ::= <a href="#expr-metatype">expr-metatype</a>
-    expr-postfix ::= <a href="#expr-subscript">expr-subscript</a>
-    expr-postfix ::= <a href="#expr-call">expr-call</a>
-    expr-postfix ::= <a href="#expr-trailing-closure">expr-trailing-closure</a>
+    expr-postfix  ::= expr-primary
+    expr-postfix  ::= expr-postfix <a href="#operator">operator-postfix</a>
+    expr-postfix  ::= <a href="#expr-new">expr-new</a>
+    expr-postfix  ::= <a href="#expr-dot">expr-dot</a>
+    expr-postfix  ::= <a href="#expr-metatype">expr-metatype</a>
+    expr-postfix  ::= <a href="#expr-subscript">expr-subscript</a>
+    expr-postfix  ::= <a href="#expr-call">expr-call</a>
 
   </pre>
 
@@ -2779,9 +2782,25 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   <h3 id="expr-trailing-closure">Trailing Closures</h3>
   <!-- ===================================================================== -->
-  
+
+  <div class="commentary">
+    It is possible to model trailing closures as simply another way to
+    perform a function call, forgoing the syntactic transformation for
+    <a href="#expr-call">expr-call</a>, if functions meant to be used
+    with trailing closures are written as curried functions, e.g.,
+    <pre>
+func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
+    </pre>
+    There are two problems with this (admittedly simpler) design.
+    First, functions imported from C, C++, and Objective-C won't ever
+    be written in this curried syntax, so we would have to implement
+    redundant entry points to enable this syntax. Second, this design
+    forces the idea of currying front and center for Swift programmers
+    who otherwise wouldn't care, for mostly theoretical reasons.
+  </div>
+
   <pre class="grammar">
-    expr-trailing-closure ::= <a href="#expr">expr-postfix</a> <a href="#expr-closure">expr-closure</a>
+    expr-trailing-closure ::= <a href="#expr">expr-postfix</a> <a href="#expr-closure">expr-closure</a>+
   </pre>
 
   <p>A postfix expression followed by a closure will be invoked with
@@ -2799,22 +2818,6 @@ ill-formed if the type does not conform to the protocol.</p>
   href="#expr-paren">expr-paren</a> of that call. Otherwise, the
   postfix expression is (implicitly) called with the trailing closure
   as its only argument.</p>
-
-  <div class="commentary">
-    It is possible to model trailing closures as simply another way to
-    perform a function call, forgoing the syntactic transformation for
-    <a href="#expr-call">expr-call</a>, if functions meant to be used
-    with trailing closures are written as curried functions, e.g.,
-    <pre>
-func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
-    </pre>
-    There are two problems with this (admittedly simpler) design.
-    First, functions imported from C, C++, and Objective-C won't ever
-    be written in this curried syntax, so we would have to implement
-    redundant entry points to enable this syntax. Second, this design
-    forces the idea of currying front and center for Swift programmers
-    who otherwise wouldn't care, for mostly theoretical reasons.
-  </div>
 
   <pre class="example">
   dispatch_async(q) {
@@ -2892,6 +2895,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="grammar">
     stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
+    stmt-assign-basic ::= <a href="#expr">expr-basic</a> '=' <a href="#expr">expr-basic</a>
   </pre>
   
   <p>The assignment statement evaluates its left hand side as some sort of
@@ -2934,7 +2938,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </div>
 
   <pre class="grammar">
-    stmt-if      ::= 'if' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a> stmt-if-else?
+    stmt-if      ::= 'if' <a href="#expr">expr-basic</a> <a href="#brace-item-list">brace-item-list</a> stmt-if-else?
     stmt-if-else ::= 'else' <a href="#brace-item-list">brace-item-list</a>
     stmt-if-else ::= 'else' stmt-if
   </pre>
@@ -2969,7 +2973,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-while ::= 'while' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a>
+    stmt-while ::= 'while' <a href="#expr">expr-basic</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
   
   <p>'while' statements provide simple loop construct which (on each iteration
@@ -3026,8 +3030,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign? <a href="#brace-item-list">brace-item-list</a>
-    expr-or-stmt-assign   ::= <a href="#expr">expr</a> | <a href="#stmt-assign">stmt-assign</a>
+    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign-basic? <a href="#brace-item-list">brace-item-list</a>
+    expr-or-stmt-assign-basic ::= <a href="#expr">expr-basic</a> | <a href="#stmt-assign">stmt-assign-basic</a>
     stmt-for-c-style-init ::= <a href="#decl-var">decl-var</a>
     stmt-for-c-style-init ::= expr-or-stmt-assign
   </pre>
@@ -3056,7 +3060,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr</a> <a href="#brace-item-list">brace-item-list</a>
+    stmt-for-each ::= 'for' <a href="#pattern">pattern</a> 'in' <a href="#expr">expr-basic</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
   
   <p>Enumerator-based 'for' statements provide enumeration over the values in a
@@ -3083,7 +3087,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-switch ::= 'switch' <a href="#expr">expr</a> '{' stmt-switch-case* '}'
+    stmt-switch ::= 'switch' <a href="#expr">expr-basic</a> '{' stmt-switch-case* '}'
     stmt-switch-case ::= (case-label | default-label) <a href="#brace-item-list">brace-item</a>*
 
     case-label ::= 'case' expr (',' expr)* ':'
