@@ -1110,9 +1110,9 @@ namespace {
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getArgParamPatterns()[0], input, false))
+      if (tc.coerceToType(expr->getArgParamPatterns()[0], input))
         return nullptr;
-      if (tc.coerceToType(expr->getBodyParamPatterns()[0], input, false))
+      if (tc.coerceToType(expr->getBodyParamPatterns()[0], input))
         return nullptr;
 
       return expr;
@@ -1124,7 +1124,7 @@ namespace {
       // Coerce the pattern, in case we resolved something.
       auto fnType = expr->getType()->castTo<FunctionType>();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getParams(), fnType->getInput(), false))
+      if (tc.coerceToType(expr->getParams(), fnType->getInput()))
         return nullptr;
 
       // If this is a single-expression closure, convert the expression

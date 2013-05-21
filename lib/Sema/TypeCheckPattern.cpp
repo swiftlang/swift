@@ -50,8 +50,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
     } else {
       TP->setType(TP->getTypeLoc().getType());
     }
-    hadError |= coerceToType(TP->getSubPattern(),
-                             P->getType(), isFirstPass);
+    hadError |= coerceToType(TP->getSubPattern(), P->getType());
     return hadError;
   }
 
@@ -108,13 +107,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
+bool TypeChecker::coerceToType(Pattern *P, Type type) {
   switch (P->getKind()) {
   // For parens, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
     P->setType(type);
-    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type,
-                        isFirstPass);
+    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type);
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -134,7 +132,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
       }
     }
 
-    hadError |= coerceToType(TP->getSubPattern(), TP->getType(), isFirstPass);
+    hadError |= coerceToType(TP->getSubPattern(), TP->getType());
     return hadError;
   }
 
@@ -189,7 +187,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type, bool isFirstPass) {
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      hadError |= coerceToType(pattern, CoercionType, isFirstPass);
+      hadError |= coerceToType(pattern, CoercionType);
 
       // Type-check the initialization expression.
       if (ExprHandle *initHandle = elt.getInit()) {

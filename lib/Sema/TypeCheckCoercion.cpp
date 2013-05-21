@@ -1382,9 +1382,9 @@ CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   E->setType(FT);
 
   // Apply inferred argument type information to the argument patterns.
-  if (TC.coerceToType(E->getArgParamPatterns()[0], FT->getInput(), false))
+  if (TC.coerceToType(E->getArgParamPatterns()[0], FT->getInput()))
     return nullptr;
-  if (TC.coerceToType(E->getBodyParamPatterns()[0], FT->getInput(), false))
+  if (TC.coerceToType(E->getBodyParamPatterns()[0], FT->getInput()))
     return nullptr;
   
   // FIXME: Result type too!

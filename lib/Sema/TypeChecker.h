@@ -544,7 +544,7 @@ public:
                                                 Expr *src);
 
   bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
-  bool coerceToType(Pattern *P, Type Ty, bool isFirstPass);
+  bool coerceToType(Pattern *P, Type Ty);
   
   bool typeCheckConditionOld(Expr *&E);
   bool typeCheckArrayBoundOld(Expr *&E);

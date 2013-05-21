@@ -456,7 +456,7 @@ public:
 
     // Coerce the pattern to the element type, now that we know the element
     // type.
-    if (TC.coerceToType(S->getPattern(), ElementTy, /*isFirstPass*/false))
+    if (TC.coerceToType(S->getPattern(), ElementTy))
       return nullptr;
     
     // Type-check the body of the loop.
@@ -666,9 +666,9 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   // the arguments, mark the argument types as error type.
   if (FE->getType()->isUnresolvedType()) {
     for (auto P : FE->getArgParamPatterns())
-      coerceToType(P, ErrorType::get(Context), false);
+      coerceToType(P, ErrorType::get(Context));
     for (auto P : FE->getBodyParamPatterns())
-      coerceToType(P, ErrorType::get(Context), false);
+      coerceToType(P, ErrorType::get(Context));
   }
   
   BraceStmt *BS = FE->getBody();

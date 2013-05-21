@@ -338,8 +338,7 @@ public:
       }
       PBD->setInit(Init);
       if (!DestTy) {
-        if (TC.coerceToType(PBD->getPattern(), Init->getType(),
-                            /*isFirstPass*/false))
+        if (TC.coerceToType(PBD->getPattern(), Init->getType()))
           return;
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
