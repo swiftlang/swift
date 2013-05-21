@@ -91,8 +91,8 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 /// conversion.
 /// \param objectTy The type of object in which we want to access the member,
 /// which will be a subtype of the member's context type.
-/// \param otherType A type (typically the type of the member) that should
-/// also be subsituted.
+/// \param otherTypes A set of types that will also be substituted, and modified
+/// in place.
 /// \param loc The location of this substitution.
 /// \param substitutions Will be populated with the archetype-to-fixed type
 /// mappings needed for the conversion.
@@ -100,11 +100,10 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 /// conversion.
 /// \param genericParams Will be set to the generic parameter list used for
 /// substitution.
-///
-/// \returns The substituted form of otherType.
-static Type substForBaseConversion(TypeChecker &tc, ValueDecl *member,
+static void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
                                    Type objectTy,
-                                   Type otherType, SourceLoc loc,
+                                   MutableArrayRef<Type> otherTypes,
+                                   SourceLoc loc,
                                    TypeSubstitutionMap &substitutions,
                                    ConformanceMap &conformances,
                                    GenericParamList *&genericParams);
@@ -209,15 +208,20 @@ namespace {
         baseTy = baseMeta->getInstanceType();
       }
 
-      // Member references into existential or archetype types.
-      if (baseTy->isExistentialType() || baseTy->is<ArchetypeType>()) {
-        // Convert the base to the type of the 'this' parameter.
-        Type containerTy;
-        if (baseTy->isExistentialType())
-          containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
-        else
+      // Figure out the type of the container in which the member actually
+      // resides.
+      auto containerTy
+        = member->getDeclContext()->getDeclaredTypeOfContext();
+
+      // Member references into an archetype or existential type that resolves
+      // to a protocol requirement.
+      if (containerTy && containerTy->is<ProtocolType>() &&
+          (baseTy->is<ArchetypeType>() || baseTy->isExistentialType())) {
+        // For an archetype, just convert to the archetype itself.
+        if (baseTy->is<ArchetypeType>())
           containerTy = baseTy;
-        
+
+        // Convert the base appropriately.
         if (baseIsInstance) {
           // Convert the base to the appropriate container type, turning it
           // into an lvalue if required.
@@ -231,7 +235,6 @@ namespace {
                                 ConstraintLocator::MemberRefBase));
           base = tc.coerceToRValue(base);
         }
-        assert(base && "Unable to convert base?");
 
         // Build the member reference expression.
         Expr *result;
@@ -248,18 +251,38 @@ namespace {
       }
 
       // Reference to a member of a generic type.
-      if (baseTy->isSpecialized()) {
-        // FIXME: Feels like we're re-doing a lot of work that the type
-        // checker already did, given that we know the eventual type we're
-        // going to produce.
+      if (containerTy && containerTy->isUnspecializedGeneric()) {
+        // Figure out the substitutions required to convert to the base.
         GenericParamList *genericParams = nullptr;
         TypeSubstitutionMap substitutions;
         ConformanceMap conformances;
-        Type substTy = substForBaseConversion(tc, member, baseTy,
-                                              member->getTypeOfReference(),
-                                              memberLoc, substitutions,
-                                              conformances,
-                                              genericParams);
+        Type otherTypes[2] = {
+          member->getTypeOfReference(),
+          member->getDeclContext()->getDeclaredTypeInContext()
+        };
+
+        substForBaseConversion(tc, member, baseTy, otherTypes, memberLoc,
+                               substitutions, conformances, genericParams);
+        Type substTy = otherTypes[0];
+        containerTy = otherTypes[1];
+
+        // Convert the base appropriately.
+        // FIXME: We could be referring to a member of a superclass, so find
+        // that superclass and convert to it.
+        if (baseIsInstance) {
+          // Convert the base to the appropriate container type, turning it
+          // into an lvalue if required.
+          base = coerceObjectArgumentToType(
+                   base, containerTy,
+                   locator.withPathElement(ConstraintLocator::MemberRefBase));
+        } else {
+          // Convert the base to an rvalue of the appropriate metatype.
+          base = coerceToType(base, MetaTypeType::get(containerTy, context),
+                              locator.withPathElement(
+                                ConstraintLocator::MemberRefBase));
+          base = tc.coerceToRValue(base);
+        }
+        assert(base && "Unable to convert base?");
 
         if (isa<FuncDecl>(member) || isa<OneOfElementDecl>(member) ||
             isa<ConstructorDecl>(member)) {
@@ -296,24 +319,6 @@ namespace {
           return finishApply(apply, openedType, nullptr);
         }
 
-        // Convert the base appropriately.
-        // FIXME: We could be referring to a member of a superclass, so find
-        // that superclass and convert to it.
-        if (baseIsInstance) {
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
-          base = coerceObjectArgumentToType(
-                   base, baseTy,
-                   locator.withPathElement(ConstraintLocator::MemberRefBase));
-        } else {
-          // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(baseTy, context),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
-          base = tc.coerceToRValue(base);
-        }
-        assert(base && "Unable to convert base?");
-
         // Build a reference to a generic member.
         auto result = new (context) GenericMemberRefExpr(base, dotLoc, member,
                                                          memberLoc);
@@ -332,7 +337,6 @@ namespace {
       if (auto var = dyn_cast<VarDecl>(member)) {
         if (!baseTy->is<ModuleType>()) {
           // Convert the base to the type of the 'this' parameter.
-          Type containerTy = var->getDeclContext()->getDeclaredTypeOfContext();
           assert(baseIsInstance && "Can only access variables of an instance");
 
           // Convert the base to the appropriate container type, turning it
@@ -516,10 +520,9 @@ namespace {
         TypeSubstitutionMap substitutions;
         ConformanceMap conformances;
         containerTy = subscript->getDeclContext()->getDeclaredTypeInContext();
-        containerTy = substForBaseConversion(tc, subscript, baseTy, containerTy,
-                                             index->getStartLoc(),
-                                             substitutions,
-                                             conformances, genericParams);
+        substForBaseConversion(tc, subscript, baseTy, containerTy,
+                               index->getStartLoc(), substitutions,
+                               conformances, genericParams);
 
         // Coerce the base to the (substituted) container type.
         base = coerceObjectArgumentToType(base, containerTy, locator);
@@ -2184,9 +2187,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
-Type substForBaseConversion(TypeChecker &tc, ValueDecl *member,
+void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
                             Type objectTy,
-                            Type otherType, SourceLoc loc,
+                            MutableArrayRef<Type> otherTypes,
+                            SourceLoc loc,
                             TypeSubstitutionMap &substitutions,
                             ConformanceMap &conformances,
                             GenericParamList *&genericParams) {
@@ -2222,33 +2226,35 @@ Type substForBaseConversion(TypeChecker &tc, ValueDecl *member,
                                  &substitutions);
   assert(!failed && "Substitutions cannot fail?");
 
-  // Replace the already-opened archetypes in the requested "other" type with
-  // their replacements.
-  otherType = tc.substType(otherType, substitutions);
+  // Substitute all of the 'other' types with the substitutions we computed.
+  for (auto &otherType : otherTypes) {
+    // Replace the already-opened archetypes in the requested "other" type with
+    // their replacements.
+    otherType = tc.substType(otherType, substitutions);
 
-  // If we have a polymorphic function type for which all of the generic
-  // parameters have been replaced, make it monomorphic.
-  // FIXME: Arguably, this should be part of substType
-  if (auto polyFn = otherType->getAs<PolymorphicFunctionType>()) {
-    bool allReplaced = true;
-    for (auto gp : polyFn->getGenericParams().getParams()) {
-      auto archetype
-      = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
-      if (!substitutions.count(archetype)) {
-        allReplaced = false;
-        break;
+    // If we have a polymorphic function type for which all of the generic
+    // parameters have been replaced, make it monomorphic.
+    // FIXME: Arguably, this should be part of substType
+    if (auto polyFn = otherType->getAs<PolymorphicFunctionType>()) {
+      bool allReplaced = true;
+      for (auto gp : polyFn->getGenericParams().getParams()) {
+        auto archetype
+        = gp.getAsTypeParam()->getDeclaredType()->castTo<ArchetypeType>();
+        if (!substitutions.count(archetype)) {
+          allReplaced = false;
+          break;
+        }
+      }
+
+      if (allReplaced) {
+        otherType = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
+                                      tc.Context);
       }
     }
 
-    if (allReplaced) {
-      otherType = FunctionType::get(polyFn->getInput(), polyFn->getResult(),
-                                    tc.Context);
-    }
+    // Validate this type.
+    tc.validateTypeSimple(otherType);
   }
-
-  // Validate this type before returning it.
-  tc.validateTypeSimple(otherType);
-  return otherType;
 }
 
 /// \brief Apply a given solution to the expression, producing a fully
