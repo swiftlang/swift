@@ -117,7 +117,6 @@ public:
   }
   
   AbstractCC getAbstractCC() const {
-    // FIXME: decl is null for top_level_code
     return irgen::getAbstractCC(getDecl());
   }
 };
