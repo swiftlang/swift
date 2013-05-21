@@ -42,7 +42,7 @@ namespace {
   };
 }
   
-/// parseTranslationUnit - Entrypoint for the parser.
+/// parseIntoTranslationUnit - Entrypoint for the parser.
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      unsigned *BufferOffset,

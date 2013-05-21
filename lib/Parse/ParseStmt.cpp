@@ -79,7 +79,6 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_subscript:
   case tok::kw_constructor:
   case tok::kw_destructor:
-  case tok::kw_sil:
     return true;
   case tok::kw_protocol:
     return !(Tok2.isAnyOperator() && Tok2.getText().equals("<"));
@@ -184,6 +183,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
   bool previousHadSemi = true;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
+         Tok.isNot(tok::kw_sil) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
     bool NeedParseErrorRecovery = false;
     ExprStmtOrDecl Result;

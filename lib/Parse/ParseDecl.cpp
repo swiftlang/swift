@@ -30,8 +30,10 @@ using namespace swift;
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
+///     decl-sil    [[only in SIL mode]
 bool Parser::parseTranslationUnit(TranslationUnit *TU) {
-  if (TU->ASTStage == TranslationUnit::Parsed) {
+  if (TU->ASTStage == TranslationUnit::Parsed &&
+      !TU->getUnresolvedIdentifierTypes().empty()) {
     // FIXME: This is a bit messy; need to figure out a better way to deal
     // with memory allocation for TranslationUnit.
     UnresolvedIdentifierTypes.insert(UnresolvedIdentifierTypes.end(),
@@ -54,10 +56,20 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
   }
-  
-  parseBraceItems(Items, true,
-                  IsMainModule ? BraceItemListKind::TopLevelCode
-                               : BraceItemListKind::Brace);
+
+  // If we are in SIL mode, and if the first token is the start of a sil
+  // declaration, parse that one SIL function and return to the top level.  This
+  // allows type declarations and other things to be parsed, name bound, and
+  // type checked in batches, similar to immediate mode.  This also enforces
+  // that SIL bodies can only be at the top level.
+  if (Tok.is(tok::kw_sil)) {   // This is only a keyword in SIL mode.
+    assert(isInSILMode() && "sil should only be a keyword in SIL mode");
+    parseDeclSIL();
+  } else {
+    parseBraceItems(Items, true,
+                    IsMainModule ? BraceItemListKind::TopLevelCode
+                                 : BraceItemListKind::Brace);
+  }
 
 
   // If this is a MainModule, determine if we found code that needs to be
@@ -409,7 +421,6 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 ///     decl-struct
 ///     decl-import
 ///     decl-operator
-///     decl-sil       [[Only in SIL mode]]
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
@@ -451,10 +462,6 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     SWIFT_FALLTHROUGH;
   case tok::kw_func:
     Entries.push_back(parseDeclFunc(Flags));
-    break;
-  case tok::kw_sil:   // This is only a keyword in SIL mode.
-    assert(isInSILMode() && "sil should only be a keyword in SIL mode");
-    HadParseError = parseDeclSIL();
     break;
 
   case tok::kw_subscript:

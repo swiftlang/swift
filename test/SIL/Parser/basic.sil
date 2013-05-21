@@ -3,6 +3,9 @@
 // CHECK: sil clang_thunk @prototype : $() -> ()
 sil clang_thunk @prototype : $() -> ()
 
+// Some cyclic type references between SIL function bodies.
+class type1 { var a : type2 }
+class type2 { var b : type1 }
 
 // CHECK: sil @normal : $() -> ()
 sil @normal : $() -> () {
