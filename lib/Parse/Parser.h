@@ -72,7 +72,6 @@ public:
   swift::Component *Component;
   ASTContext &Context;
   ScopeInfo ScopeInfo;
-  std::vector<TranslationUnit::IdentTypeAndContext> UnresolvedIdentifierTypes;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
   bool IsMainModule;

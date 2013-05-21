@@ -163,12 +163,7 @@ public:
   typedef std::pair<IdentifierType*, DeclContext*> IdentTypeAndContext;
   typedef std::pair<TupleType*, DeclContext*> TupleTypeAndContext;
 private:
-  /// UnresolvedIdentifierTypes - This is a list of scope-qualified dotted types
-  /// that were unresolved at the end of the translation unit's parse
-  /// phase.
-  ArrayRef<IdentTypeAndContext> UnresolvedIdentifierTypes;
-
-  /// UnresolvedIdentifierTypes - This is a list of tuples containing a default
+  /// TypesWithDefaultValues - This is a list of tuples containing a default
   /// value expression, along with the context containing the type with the
   /// expression.
   ArrayRef<TupleTypeAndContext> TypesWithDefaultValues;
@@ -213,21 +208,6 @@ public:
       Kind = Library;
   }
   
-  /// getUnresolvedIdentifierTypes - This is a list of scope-qualified types
-  /// that were unresolved at the end of the translation unit's parse
-  /// phase.
-  ArrayRef<IdentTypeAndContext> getUnresolvedIdentifierTypes() const {
-    assert(ASTStage >= Parsed);
-    return UnresolvedIdentifierTypes;
-  }
-  void setUnresolvedIdentifierTypes(ArrayRef<IdentTypeAndContext> T) {
-    assert(ASTStage == Parsing);
-    UnresolvedIdentifierTypes = T;
-  }
-  void clearUnresolvedIdentifierTypes() {
-    UnresolvedIdentifierTypes = ArrayRef<IdentTypeAndContext>();
-  }
-
   ArrayRef<TupleTypeAndContext> getTypesWithDefaultValues() const {
     assert(ASTStage == NameBound);
     return TypesWithDefaultValues;

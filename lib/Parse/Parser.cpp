@@ -74,8 +74,6 @@ Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
   P.CurDeclContext = TU;
   
   Expr *parsed = P.parseExpr(diag::expected_expr).getPtrOrNull();
-  TU->setUnresolvedIdentifierTypes(
-         TU->Ctx.AllocateCopy(llvm::makeArrayRef(P.UnresolvedIdentifierTypes)));
   TU->ASTStage = TranslationUnit::Parsed;
   return parsed;
 }

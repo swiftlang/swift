@@ -245,7 +245,8 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
       if (parseGenericArguments(GenericArgs, LAngle, RAngle))
         return true;
     }
-    Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs));
+    Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs,
+                                                   CurDeclContext));
     EndLoc = Loc;
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -261,10 +262,10 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).
-  Components[0].Value = ScopeInfo.lookupValueName(Components[0].Id);
+  if (auto Entry = ScopeInfo.lookupValueName(Components[0].Id))
+    Components[0].setValue(Entry);
 
   auto Ty = IdentifierType::getNew(Context, Components);
-  UnresolvedIdentifierTypes.emplace_back(Ty, CurDeclContext);
   Result = { Ty, SourceRange(StartLoc, EndLoc) };
   return false;
 }

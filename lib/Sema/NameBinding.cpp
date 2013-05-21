@@ -188,7 +188,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
 
   // If name lookup for the base of the type didn't get resolved in the
   // parsing phase, perform lookup on it.
-  if (Components[0].Value.isNull()) {
+  if (!Components[0].isBound()) {
     Identifier Name = Components[0].Id;
     SourceLoc Loc = Components[0].Loc;
 
@@ -222,10 +222,10 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     case UnqualifiedLookupResult::MetatypeMember:
     case UnqualifiedLookupResult::ExistentialMember:
     case UnqualifiedLookupResult::ArchetypeMember:
-      Components[0].Value = Globals.Results[0].getValueDecl();
+      Components[0].setValue(Globals.Results[0].getValueDecl());
       break;
     case UnqualifiedLookupResult::ModuleName:
-      Components[0].Value = Globals.Results[0].getNamedModule();
+      Components[0].setValue(Globals.Results[0].getNamedModule());
       break;
 
     case UnqualifiedLookupResult::MetaArchetypeMember:
@@ -235,7 +235,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     }
   }
 
-  assert(!Components[0].Value.isNull() && "Failed to get a base");
+  assert(Components[0].isBound() && "Failed to get a base");
 
   // Now that we have a base, iteratively resolve subsequent member entries.
   auto LastOne = Components[0];
@@ -246,7 +246,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
       M->lookupValue(Module::AccessPathTy(), C.Id, 
                      NLKind::QualifiedLookup, Decls);
       if (Decls.size() == 1 && isa<TypeDecl>(Decls.back()))
-        C.Value = cast<TypeDecl>(Decls.back());
+        C.setValue(cast<TypeDecl>(Decls.back()));
     } else if (LastOne.Value.is<ValueDecl*>()) {
       diagnose(C.Loc, diag::cannot_resolve_extension_dot)
         .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
@@ -257,7 +257,7 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
       return true;
     }
 
-    if (C.Value.isNull()) {
+    if (!C.isBound()) {
       diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
         .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
       return true;
@@ -274,13 +274,13 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
         SmallVector<Type, 4> GenericArgTypes;
         for (TypeLoc T : GenericArgs)
           GenericArgTypes.push_back(T.getType());
-        Components.back().Value = BoundGenericType::get(NTD, Type(),
-                                                        GenericArgTypes);
+        Components.back().setValue(BoundGenericType::get(NTD, Type(),
+                                                         GenericArgTypes));
         return false;
       }
       // FIXME: Need better diagnostic here
     } else if (auto TD = dyn_cast<TypeDecl>(Last)) {
-      Components.back().Value = TD->getDeclaredType();
+      Components.back().setValue(TD->getDeclaredType());
       return false;
     }
   }
@@ -410,7 +410,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
   while (true) {
     if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
       for (auto &C : DNT->Components)
-        C.Value = Binder.TU->Ctx.TheErrorType;
+        C.setValue(Binder.TU->Ctx.TheErrorType);
 
       return;
     }
@@ -424,7 +424,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
     // non-canonical type here in the AST.
     // 3. The type is a BoundGenericType; it's illegal to extend
     // such a type.
-    Type FoundType = DNT->Components.back().Value.get<Type>();
+    Type FoundType = DNT->getMappedType();
     if (FoundType->hasCanonicalTypeComputed())
       break;
 
@@ -472,7 +472,7 @@ static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
   while (true) {
     if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
       for (auto &C : DNT->Components)
-        C.Value = Binder.TU->Ctx.TheErrorType;
+        C.setValue(Binder.TU->Ctx.TheErrorType);
 
       foundType = Type();
       break;
@@ -488,7 +488,7 @@ static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
     // 3. The type is a BoundGenericType; such a type isn't going to be
     // canonical, but name lookup doesn't actually care about generic
     // arguments, so we can ignore the fact that they're unresolved.
-    foundType = DNT->Components.back().Value.get<Type>();
+    foundType = DNT->getMappedType();
     if (foundType->hasCanonicalTypeComputed())
       break;
 

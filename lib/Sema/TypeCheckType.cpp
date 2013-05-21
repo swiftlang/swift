@@ -178,7 +178,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   }
   case TypeKind::Identifier: {
     IdentifierType *DNT = cast<IdentifierType>(T);
-    if (DNT->Components.back().Value.is<Type>()) {
+    if (DNT->isMapped()) {
       // FIXME: Refactor this to avoid fake TypeLoc
       TypeLoc TempLoc = TypeLoc::withoutLoc(DNT->getMappedType());
       IsInvalid = validateType(TempLoc);
@@ -191,24 +191,16 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
     for (auto &C : Components) {
       TypeDecl *TD = nullptr;
       Type BaseTy;
-      if (!C.Value.isNull()) {
+      if (C.isBound()) {
         // If there is a value, it must be a ValueDecl; resolve it.
         TD = dyn_cast<TypeDecl>(C.Value.get<ValueDecl*>());
-      } else if (LastOne.Value.isNull()) {
+      } else if (!LastOne.isBound()) {
         // We haven't resolved anything yet; use an unqualified lookup.
         Identifier Name = C.Id;
         SourceLoc Loc = C.Loc;
 
-        // FIXME: This loop is ridiculously inefficient.
-        DeclContext *DC = nullptr;
-        for (auto IdAndContext : TU.getUnresolvedIdentifierTypes()) {
-          if (IdAndContext.first == DNT) {
-            DC = IdAndContext.second;
-            break;
-          }
-        }
-        assert(DC && "no entry in UnresolvedIdentifierTypes "
-                     "for unresolved identifier type!");
+        DeclContext *DC = C.Value.get<DeclContext*>();
+        assert(DC);
 
         // Perform an unqualified lookup.
         UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
@@ -246,7 +238,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
             BaseTy = TD->getDeclContext()->getDeclaredTypeInContext();
           break;
         case UnqualifiedLookupResult::ModuleName:
-          C.Value = Globals.Results[0].getNamedModule();
+          C.setValue(Globals.Results[0].getNamedModule());
           break;
 
         case UnqualifiedLookupResult::MetaArchetypeMember:
@@ -329,12 +321,12 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
 
           if (BaseTy)
             Ty = substMemberTypeWithBase(Ty, TD, BaseTy);
-          C.Value = Ty;
+          C.setValue(Ty);
         }
       }
 
-      if (C.Value.isNull()) {
-        if (LastOne.Value.isNull())
+      if (!C.isBound()) {
+        if (!LastOne.isBound())
           diagnose(C.Loc, Components.size() == 1 ? 
                    diag::named_definition_isnt_type :
                    diag::dotted_reference_not_type, C.Id)

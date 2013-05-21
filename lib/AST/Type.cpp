@@ -917,16 +917,6 @@ const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
   return APFloat::IEEEhalf;
 }
 
-bool IdentifierType::isMapped() const {
-  return !Components.back().Value.isNull();
-}
-
-Type IdentifierType::getMappedType() {
-  assert(!Components.back().Value.isNull() &&
-         "Name binding hasn't resolved this to a type yet");
-  return Components.back().Value.get<Type>();
-}
-
 bool TypeBase::isSpelledLike(Type other) {
   TypeBase *me = this;
   TypeBase *them = other.getPointer();

@@ -896,7 +896,6 @@ class REPLEnvironment {
       Context.Diags.resetHadAnyError();
       while (TU->Decls.size() > RC.CurTUElem)
         TU->Decls.pop_back();
-      TU->clearUnresolvedIdentifierTypes();
       
       // FIXME: Handling of "import" declarations?  Is there any other
       // state which needs to be reset?

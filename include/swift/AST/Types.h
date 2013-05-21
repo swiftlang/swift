@@ -485,12 +485,25 @@ public:
     Identifier Id;
     ArrayRef<TypeLoc> GenericArgs;
     
-    /// Value is the decl or module that this refers to.  After name binding,
-    /// the last entry in the component list is known to be a TypeBase*.
-    llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
-    Component(SourceLoc Loc, Identifier Id,
-              ArrayRef<TypeLoc> GenericArgs) :
-        Loc(Loc), Id(Id), GenericArgs(GenericArgs) {}
+    /// Value is the decl or module that this refers to.
+    ///
+    /// Before name binding, each component has its value set to a DeclContext
+    /// for the root lookup, giving a context for that lookup.
+    ///
+    /// After name binding, the value is set to the decl being referenced, and
+    /// the last entry in the component list is known to be a Type.
+    llvm::PointerUnion4<DeclContext*, ValueDecl*, Type, Module*> Value;
+    
+    Component(SourceLoc Loc, Identifier Id, ArrayRef<TypeLoc> GenericArgs,
+              DeclContext *Ctx) :
+      Loc(Loc), Id(Id), GenericArgs(GenericArgs), Value(Ctx) {}
+    
+    /// isBound - Return true if this Component has been namebound already.
+    bool isBound() const { return !Value.is<DeclContext*>(); }
+    
+    void setValue(ValueDecl *VD) { Value = VD; }
+    void setValue(Type T) { Value = T; }
+    void setValue(Module *M) { Value = M; }
   };
   
 private:
@@ -512,11 +525,16 @@ public:
 
   /// isMapped - Determine whether name binding has resolved the identifiers
   /// to an actual type.
-  bool isMapped() const;
+  bool isMapped() const {
+    return Components.back().Value.is<Type>();
+  }
   
   /// getMappedType - After name binding is complete, this indicates what type
   /// this refers to (without removing any other sugar).
-  Type getMappedType();
+  Type getMappedType() {
+    assert(isMapped() && "Name binding hasn't resolved this to a type yet");
+    return Components.back().Value.get<Type>();
+  }
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.

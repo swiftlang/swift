@@ -32,15 +32,6 @@ using namespace swift;
 ///     stmt-brace-item*
 ///     decl-sil    [[only in SIL mode]
 bool Parser::parseTranslationUnit(TranslationUnit *TU) {
-  if (TU->ASTStage == TranslationUnit::Parsed &&
-      !TU->getUnresolvedIdentifierTypes().empty()) {
-    // FIXME: This is a bit messy; need to figure out a better way to deal
-    // with memory allocation for TranslationUnit.
-    UnresolvedIdentifierTypes.insert(UnresolvedIdentifierTypes.end(),
-                                     TU->getUnresolvedIdentifierTypes().begin(),
-                                     TU->getUnresolvedIdentifierTypes().end());
-  }
-
   TU->ASTStage = TranslationUnit::Parsing;
 
   // Prime the lexer.
@@ -86,12 +77,9 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   for (auto Item : Items)
     TU->Decls.push_back(Item.get<Decl*>());
 
-  TU->setUnresolvedIdentifierTypes(
-          Context.AllocateCopy(llvm::makeArrayRef(UnresolvedIdentifierTypes)));
   TU->setTypesWithDefaultValues(
           Context.AllocateCopy(llvm::makeArrayRef(TypesWithDefaultValues)));
 
-  UnresolvedIdentifierTypes.clear();
   TypesWithDefaultValues.clear();
 
   // Note that the translation unit is fully parsed and verify it.
