@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil
+// RUN: %swift %s -emit-sil | FileCheck %s
 
 // CHECK: sil clang_thunk @prototype : $() -> ()
 sil clang_thunk @prototype : $() -> ()
