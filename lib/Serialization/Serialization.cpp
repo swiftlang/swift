@@ -16,7 +16,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/Serialization/BCRecordLayout.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
-#include "llvm/Config/Config.h"
+#include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
