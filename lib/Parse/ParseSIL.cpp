@@ -162,16 +162,9 @@ bool Parser::parseSILType(SILType &Result) {
       return true;
   }
 
-  
-  
   // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
   // SILTypes itself.
   (void)IsSRet;
   Result = SIL->Types.getLoweredType(Ty.getType(), UncurryLevel);
-  
-//  performNameBinding(TU);
-//  performTypeChecking(TU);
-
-  
   return false;
 }

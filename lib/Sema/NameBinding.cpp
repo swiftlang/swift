@@ -73,14 +73,25 @@ namespace {
 
     /// resolveIdentifierType - Perform name binding for a IdentifierType,
     /// resolving it or diagnosing the error as appropriate and return true on
-    /// failure.  On failure, this leaves IdentifierType alone, otherwise it
-    /// fills in the Components.
-    bool resolveIdentifierType(IdentifierType *DNT, DeclContext *DC);
+    /// failure.  On failure, this fills the components in with ErrorType.
+    bool resolveIdentifierType(IdentifierType *DNT) {
+      if (!resolveIdentifierTypeImpl(DNT))
+        return false;
+      
+      // Handle the error case by filling components with ErrorType.
+      for (auto &C : DNT->Components)
+        if (!C.isBound())
+          C.setValue(Context.TheErrorType);
+      return true;
+    }
 
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
     Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
+    
+  private:
+    bool resolveIdentifierTypeImpl(IdentifierType *DNT);
   };
 }
 
@@ -181,9 +192,8 @@ addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
 
 /// resolveIdentifierType - Perform name binding for a IdentifierType,
 /// resolving it or diagnosing the error as appropriate and return true on
-/// failure.  On failure, this leaves IdentifierType alone, otherwise it fills
-/// in the Components.
-bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
+/// failure.  On success, this fills in the Components of the IdentifierType.
+bool NameBinder::resolveIdentifierTypeImpl(IdentifierType *DNT) {
   MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
 
   // If name lookup for the base of the type didn't get resolved in the
@@ -193,7 +203,8 @@ bool NameBinder::resolveIdentifierType(IdentifierType *DNT, DeclContext *DC) {
     SourceLoc Loc = Components[0].Loc;
 
     // Perform an unqualified lookup.
-    UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*IsTypeLookup*/true);
+    UnqualifiedLookup Globals(Name, Components[0].Value.get<DeclContext*>(),
+                              SourceLoc(), /*IsTypeLookup*/true);
 
     if (Globals.Results.size() > 1) {
       diagnose(Loc, diag::ambiguous_type_base, Name)
@@ -408,12 +419,8 @@ namespace {
 static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
   auto DNT = cast<IdentifierType>(ED->getExtendedType().getPointer());
   while (true) {
-    if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
-      for (auto &C : DNT->Components)
-        C.setValue(Binder.TU->Ctx.TheErrorType);
-
+    if (Binder.resolveIdentifierType(DNT))
       return;
-    }
 
     // We need to make sure the extended type is canonical. There are
     // three possibilities here:
@@ -470,13 +477,8 @@ static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
   auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
   Type foundType;
   while (true) {
-    if (Binder.resolveIdentifierType(DNT, Binder.TU)) {
-      for (auto &C : DNT->Components)
-        C.setValue(Binder.TU->Ctx.TheErrorType);
-
-      foundType = Type();
-      break;
-    }
+    if (Binder.resolveIdentifierType(DNT))
+      return;
 
     // We need to make sure the extended type is canonical. There are
     // three possibilities here:
@@ -511,13 +513,11 @@ static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
       Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
                       false, inherited[0].getType());
       inherited[0].setInvalidType(Binder.Context);
-      foundType = Type();
-      break;
+      return;
     }
   }
 
-  if (!foundType)
-    return;
+  assert(foundType);
 
   // Check that the base type is a class.
   TypeLoc baseClass;
