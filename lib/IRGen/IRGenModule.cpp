@@ -333,7 +333,8 @@ llvm::Constant *IRGenModule::getReleaseFn() {
 llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
   // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
   //                                            type_metadata_t *result);
-  return getRuntimeFn(*this, GetFunctionMetadataFn, "swift_getFunctionMetadata",
+  return getRuntimeFn(*this, GetFunctionMetadataFn,
+                      "swift_getFunctionTypeMetadata",
                       { TypeMetadataPtrTy },
                       { TypeMetadataPtrTy, TypeMetadataPtrTy },
                       { Attribute::NoUnwind, Attribute::ReadNone });
