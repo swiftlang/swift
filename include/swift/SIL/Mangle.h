@@ -38,7 +38,9 @@ enum class ExplosionKind : unsigned {
   /// representation, even when they're not universally fragile.  This
   /// is useful when internally manipulating objects or when working
   /// with specialized entry points for a function.
-  Maximal
+  Maximal,
+  
+  Last_ExplosionKind = Maximal
 };
  
 enum class IncludeType : bool { No, Yes };

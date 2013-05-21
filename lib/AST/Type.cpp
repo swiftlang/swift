@@ -1505,6 +1505,9 @@ namespace {
     case AbstractCC::C:
       attrs.OS << "cdecl";
       break;
+    case AbstractCC::ObjCMethod:
+      attrs.OS << "objc_method";
+      break;
     }
     attrs.OS << ")";
   }

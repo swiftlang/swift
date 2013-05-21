@@ -158,6 +158,7 @@ llvm::CallingConv::ID irgen::expandAbstractCC(IRGenModule &IGM,
                                               AbstractCC convention) {
   switch (convention) {
   case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
     return llvm::CallingConv::C;
 
   case AbstractCC::Method:
@@ -294,7 +295,9 @@ namespace {
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
     struct Currying {
-      Signature Signatures[3][2][3];
+      Signature Signatures[unsigned(AbstractCC::Last_AbstractCC) + 1]
+                          [unsigned(ExplosionKind::Last_ExplosionKind) + 1]
+                          [unsigned(ExtraData::Last_ExtraData) + 1];
 
       Signature &select(AbstractCC cc, ExplosionKind kind, ExtraData extraData) {
         return Signatures[unsigned(cc)][unsigned(kind)][unsigned(extraData)];
@@ -479,15 +482,23 @@ static void decomposeFunctionArg(IRGenModule &IGM, CanType argTy,
                        SmallVectorImpl<llvm::Type*> &argTypes,
                        SmallVectorImpl<std::pair<unsigned, Alignment>> &byvals,
                        llvm::AttributeSet &attrs) {
-  if (cc == AbstractCC::C && requiresExternalByvalArgument(IGM, argTy)) {
-    const TypeInfo &ti = IGM.getFragileTypeInfo(argTy);
-    assert(isa<FixedTypeInfo>(ti) &&
-           "emitting 'byval' argument with non-fixed layout?");
-    byvals.push_back({argTypes.size(), ti.getBestKnownAlignment()});
-    argTypes.push_back(ti.getStorageType()->getPointerTo());
-  } else {
+  switch (cc) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    if (requiresExternalByvalArgument(IGM, argTy)) {
+      const TypeInfo &ti = IGM.getFragileTypeInfo(argTy);
+      assert(isa<FixedTypeInfo>(ti) &&
+             "emitting 'byval' argument with non-fixed layout?");
+      byvals.push_back({argTypes.size(), ti.getBestKnownAlignment()});
+      argTypes.push_back(ti.getStorageType()->getPointerTo());
+      break;
+    }
+    SWIFT_FALLTHROUGH;
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
     auto schema = IGM.getSchema(argTy, explosionKind);
     schema.addToArgTypes(IGM, argTypes);
+    break;
   }
 }
 
@@ -534,21 +545,23 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     }
     break;
 
+  case AbstractCC::ObjCMethod:
+    // An ObjC method should be at uncurry level one, with the first uncurried
+    // clause taking 'self' and the second taking the method arguments. The
+    // '_cmd' argument gets magicked in between.
+    assert(uncurryLevel == 1 && "objc method should be at uncurry level 1");
+    // self
+    decomposeFunctionArg(IGM, CanType(fn->getInput()), cc, explosionKind,
+                         argTypes, byvals, attrs);
+    // _cmd
+    argTypes.push_back(IGM.Int8PtrTy);
+    fn = cast<AnyFunctionType>(CanType(fn->getResult()));
+    formalFnTypes.push_back(fn);
+    break;
+      
   case AbstractCC::C:
-    // A C/ObjC function should have either one uncurry level (for a standalone
-    // function) or two (for an ObjC method). In the former case, we handle the
-    // first uncurry level specially so that we can drop in the magic '_cmd'
-    // argument.
-    assert((uncurryLevel == 0 || uncurryLevel == 1)
-           && "unexpected uncurry level for C calling conv");
-    if (uncurryLevel == 1) {
-      // self
-      decomposeFunctionArg(IGM, CanType(fn->getInput()), cc, explosionKind,
-                           argTypes, byvals, attrs);
-      // _cmd
-      argTypes.push_back(IGM.Int8PtrTy);
-      fn = cast<AnyFunctionType>(CanType(fn->getResult()));
-    }
+    // C functions cannot be curried.
+    assert(uncurryLevel == 0 && "c function cannot be curried");
     formalFnTypes.push_back(fn);
     break;
   }
@@ -676,11 +689,23 @@ IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
                          extraData, attrs);
 }
 
+static bool isClassMethod(ValueDecl *vd) {
+  if (!vd->getDeclContext())
+    return false;
+  if (!vd->getDeclContext()->getDeclaredTypeInContext())
+    return false;
+  return vd->getDeclContext()->getDeclaredTypeInContext()
+  ->getClassOrBoundGenericClass();
+}
+
 AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
   if (fn->isInstanceMember())
     return AbstractCC::Method;
-  if (fn->hasClangNode())
+  if (fn->hasClangNode()) {
+    if (isClassMethod(fn))
+      return AbstractCC::ObjCMethod;
     return AbstractCC::C;
+  }
   return AbstractCC::Freestanding;
 }
 
@@ -1320,7 +1345,14 @@ void CallEmission::forceCallee() {
 /// Swift generally grows right-to-left, but ObjC needs us
 /// to go left-to-right.
 static bool isLeftToRight(AbstractCC cc) {
-  return cc == AbstractCC::C;
+  switch (cc) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    return true;
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    return false;
+  }
 }
 
 /// Does an ObjC method or C function returning the given type require an
@@ -1386,9 +1418,18 @@ void CallEmission::addArg(Explosion &arg) {
   forceCallee();
   llvm::SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
   
-  if (CurCallee.getConvention() == AbstractCC::C) {
+  // Convert arguments to a representation appropriate to the calling
+  // convention.
+  switch (CurCallee.getConvention()) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
     externalizeArguments(arg, newByvals,
-                   CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
+                 CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
+    break;
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // Nothing to do.
+    break;
   }
 
   // Add the given number of arguments.

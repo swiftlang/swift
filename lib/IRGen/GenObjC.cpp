@@ -270,15 +270,6 @@ llvm::Constant *IRGenModule::getAddrOfObjCSelectorRef(StringRef selector) {
   return global;
 }
 
-/// Determine the natural limits on how we can call the given method
-/// using Objective-C method dispatch.
-AbstractCallee irgen::getAbstractObjCMethodCallee(IRGenFunction &IGF,
-                                                  ValueDecl *fn) {
-  return AbstractCallee(AbstractCC::C, ExplosionKind::Minimal,
-                        /*minUncurry*/ 1, /*maxUncurry*/ 1,
-                        ExtraData::None);
-}
-
 namespace {
   class Selector {
     
@@ -433,7 +424,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILConstant::Kind::Func)
          && "objc method call must be to a func or constructor decl");
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::C,
+  auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
                                       origType.getSwiftRValueType(),
                                       ExplosionKind::Minimal,
                                       /*uncurryLevel*/ 1,

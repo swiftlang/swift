@@ -70,7 +70,9 @@ enum class ExtraData : unsigned char {
   Retainable,
 
   /// The function requires a metatype object as extra data.
-  Metatype
+  Metatype,
+  
+  Last_ExtraData = Metatype
 };
 
 /// ResilienceScope - The compiler is often able to pursue

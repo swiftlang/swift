@@ -49,10 +49,19 @@ using namespace swift;
 using namespace irgen;
 
 llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
-  // FIXME: Thunk C functions to Swift's CC when producing function values.
-  assert(cc != AbstractCC::C && "thunking C functions not yet implemented");
+  switch (cc) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // FIXME: Thunk foreign functions to Swift's CC when producing function
+    // values.
+    assert(false && "thunking C functions not yet implemented");
+    return nullptr;
+
+  case AbstractCC::Method:
+  case AbstractCC::Freestanding:
+    return IGF.Builder.CreateBitCast(function, IGF.IGM.Int8PtrTy);
+  }
   
-  return IGF.Builder.CreateBitCast(function, IGF.IGM.Int8PtrTy);
 }
 
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
@@ -236,49 +245,13 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   } while (level-- != 0);
 }
 
-/// Emit entry point arguments for a SILFunction with the C/ObjC calling
-/// convention.
-static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
-                                       SILBasicBlock *entry,
-                                       Explosion &params,
-                                       SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
-
-  // Map the indirect return if present.
-  emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
-    return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
-  });
-  
-  assert((funcTI->getUncurryLevel() == 0 || funcTI->getUncurryLevel() == 1)
-         && "invalid uncurry level for foreign function");
-  
-  ArrayRef<SILType> inputTypes;
-  unsigned argOffset;
-  
-  // An ObjC method is represented as a curried function type with the 'self'
-  // argument as the first argument clause.
-  if (funcTI->getUncurryLevel() == 1) {
-    // Map the self argument.
-    assert(funcTI->getInputTypesForCurryLevel(0).size() == 1
-           && "should only have 'self' in first argument clause");
-    unsigned selfOffset = funcTI->getUncurriedInputBegins()[0];
-    SILArgument *selfArg = entry->bbarg_begin()[selfOffset];
-    TypeInfo const &selfType = IGF.getFragileTypeInfo(selfArg->getType());
-    Explosion self(IGF.CurExplosionLevel);
-    selfType.reexplode(IGF, params, self);
-    IGF.newLoweredExplosion(selfArg, self);
-    
-    // Discard the _cmd argument.
-    params.claimNext();
-    
-    inputTypes = funcTI->getInputTypesForCurryLevel(1);
-    argOffset = funcTI->getUncurriedInputBegins()[1];
-  } else {
-    inputTypes = funcTI->getInputTypesForCurryLevel(0);
-    argOffset = funcTI->getUncurriedInputBegins()[0];
-  }
-
-  // Map the arguments.
+/// Emit entry point arguments for the parameters of a C function, or the
+/// method parameters of an ObjC method.
+static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
+                                           SILBasicBlock *entry,
+                                           Explosion &params,
+                                           ArrayRef<SILType> inputTypes,
+                                           unsigned argOffset) {
   for (SILType inputType : inputTypes) {
     (void)inputType;
     
@@ -302,6 +275,62 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
     
     IGF.newLoweredExplosion(arg, argExplosion);
   }
+}
+
+
+/// Emit entry point arguments for a SILFunction with the ObjC method calling
+/// convention.
+static void emitEntryPointArgumentsObjCCC(IRGenSILFunction &IGF,
+                                          SILBasicBlock *entry,
+                                          Explosion &params,
+                                          SILType funcTy) {
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+
+  // Map the indirect return if present.
+  emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
+    return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
+  });
+  
+  assert(funcTI->getUncurryLevel() == 1
+         && "objc method should be at uncurry level 1");
+  
+  // Map the self argument.
+  assert(funcTI->getInputTypesForCurryLevel(0).size() == 1
+         && "should only have 'self' in first argument clause");
+  unsigned selfOffset = funcTI->getUncurriedInputBegins()[0];
+  SILArgument *selfArg = entry->bbarg_begin()[selfOffset];
+  TypeInfo const &selfType = IGF.getFragileTypeInfo(selfArg->getType());
+  Explosion self(IGF.CurExplosionLevel);
+  selfType.reexplode(IGF, params, self);
+  IGF.newLoweredExplosion(selfArg, self);
+  
+  // Discard the _cmd argument.
+  params.claimNext();
+  
+  ArrayRef<SILType> inputTypes = funcTI->getInputTypesForCurryLevel(1);
+  unsigned argOffset = funcTI->getUncurriedInputBegins()[1];
+  
+  emitEntryPointArgumentsCOrObjC(IGF, entry, params,
+                                 inputTypes, argOffset);
+}
+
+/// Emit entry point arguments for a SILFunction with the C calling
+/// convention.
+static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
+                                       SILBasicBlock *entry,
+                                       Explosion &params,
+                                       SILType funcTy) {
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+
+  // Map the indirect return if present.
+  emitEntryPointIndirectReturn(IGF, entry, params, funcTI, [&] {
+    return requiresExternalIndirectResult(IGF.IGM, funcTI->getResultType());
+  });
+  
+  ArrayRef<SILType> inputTypes = funcTI->getInputTypesForCurryLevel(0);
+  unsigned argOffset = funcTI->getUncurriedInputBegins()[0];
+
+  emitEntryPointArgumentsCOrObjC(IGF, entry, params, inputTypes, argOffset);
 }
 
 void IRGenSILFunction::emitSILFunction() {
@@ -335,6 +364,9 @@ void IRGenSILFunction::emitSILFunction() {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
     emitEntryPointArgumentsNativeCC(*this, entry->first, params, funcTy);
+    break;
+  case AbstractCC::ObjCMethod:
+    emitEntryPointArgumentsObjCCC(*this, entry->first, params, funcTy);
     break;
   case AbstractCC::C:
     emitEntryPointArgumentsCCC(*this, entry->first, params, funcTy);
@@ -811,8 +843,17 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
          "partial application of non-static functions not yet implemented");
 
   auto *calleeFn = lv.getStaticFunction().getFunction();
-  assert(lv.getStaticFunction().getCC() != AbstractCC::C &&
-         "partial application of C calling convention functions not implemented");
+  
+  switch (lv.getStaticFunction().getCC()) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    assert(false && "partial_apply of foreign functions not implemented");
+    break;
+
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    break;
+  }
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.

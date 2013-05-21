@@ -262,10 +262,21 @@ TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   return *existing->second;
 }
 
+static bool isClassMethod(ValueDecl *vd) {
+  if (!vd->getDeclContext())
+    return false;
+  if (!vd->getDeclContext()->getDeclaredTypeInContext())
+    return false;
+  return vd->getDeclContext()->getDeclaredTypeInContext()
+    ->getClassOrBoundGenericClass();
+}
+
 static AbstractCC getAbstractCC(SILConstant c) {
-  // If this is an ObjC thunk, it always has C calling convention.
+  // If this is an ObjC thunk, it always has ObjC calling convention.
   if (c.isObjC)
-    return AbstractCC::C;
+    return c.hasDecl() && isClassMethod(c.getDecl())
+      ? AbstractCC::ObjCMethod
+      : AbstractCC::C;
   
   // Anonymous functions currently always have Freestanding CC.
   if (!c.hasDecl())

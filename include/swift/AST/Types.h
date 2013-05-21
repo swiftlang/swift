@@ -1067,14 +1067,19 @@ private:
   
 /// A high-level calling convention.
 enum class AbstractCC : unsigned char {
-  /// The C/ObjC calling convention.
+  /// The C freestanding calling convention.
   C,
+  
+  /// The ObjC method calling convention.
+  ObjCMethod,
   
   /// The calling convention used for calling a normal function.
   Freestanding,
   
   /// The calling convention used for calling an instance method.
-  Method
+  Method,
+  
+  Last_AbstractCC = Method,
 };
   
 /// AnyFunctionType - A function type has a single input and result, but

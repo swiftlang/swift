@@ -113,15 +113,12 @@ public:
     : CodeRef(CodeRef::forFunction(fn, explosionLevel, uncurryLevel)) {}
   
   FuncDecl *getDecl() const {
-    // FIXME: decl is null for top_level_code
-    return cast_or_null<FuncDecl>(CodeRef::getDecl());
+    return cast<FuncDecl>(CodeRef::getDecl());
   }
   
   AbstractCC getAbstractCC() const {
     // FIXME: decl is null for top_level_code
-    return getDecl()
-      ? irgen::getAbstractCC(getDecl())
-      : AbstractCC::Freestanding;
+    return irgen::getAbstractCC(getDecl());
   }
 };
 

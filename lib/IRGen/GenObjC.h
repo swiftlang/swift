@@ -38,10 +38,6 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
 
-  /// Determine the natural limits on how we can call the given
-  /// Objective-C member function.
-  AbstractCallee getAbstractObjCMethodCallee(IRGenFunction &IGF, ValueDecl *fn);
-
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
                                          SILConstant method,
                                          SILType origType,
