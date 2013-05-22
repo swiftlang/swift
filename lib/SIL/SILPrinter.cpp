@@ -269,32 +269,24 @@ public:
     OS << "argument of " << getID(A->getParent());
   }
   
-  void printAllocKind(AllocKind kind) {
+  static const char *getAllocKind(AllocKind kind) {
     switch (kind) {
-    case AllocKind::Heap:
-      OS << "heap ";
-      break;
-    case AllocKind::Pseudo:
-      OS << "pseudo ";
-      break;
-    case AllocKind::Stack:
-      OS << "stack ";
-      break;
+    case AllocKind::Heap:   return "heap";
+    case AllocKind::Pseudo: return "pseudo";
+    case AllocKind::Stack:  return "stack";
     }
   }
 
   void visitAllocVarInst(AllocVarInst *AVI) {
-    OS << "alloc_var ";
-    printAllocKind(AVI->getAllocKind());
-    OS << "$" << AVI->getElementType().getString();
+    OS << "alloc_var " << getAllocKind(AVI->getAllocKind());
+    OS << " $" << AVI->getElementType().getString();
     if (VarDecl *vd = AVI->getDecl())
       OS << "  // var " << vd->getName();
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
-    OS << "alloc_ref ";
-    printAllocKind(ARI->getAllocKind());
-    OS << ARI->getType();
+    OS << "alloc_ref " << getAllocKind(ARI->getAllocKind())
+       << ' ' << ARI->getType();
   }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
@@ -303,7 +295,7 @@ public:
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
     OS << "alloc_array $" << AAI->getElementType().getString()
-       << ", " << getID(AAI->getNumElements());
+       << ", " << getIDAndType(AAI->getNumElements());
   }
   
   void printFunctionInst(FunctionInst *FI) {
@@ -354,7 +346,7 @@ public:
        << ", \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
-    OS << "load " << getID(LI->getOperand());
+    OS << "load " << getIDAndType(LI->getOperand());
   }
   void visitStoreInst(StoreInst *SI) {
     OS << "store " << getID(SI->getSrc()) << " to " << getID(SI->getDest());
@@ -371,7 +363,7 @@ public:
     OS << "initialize_var ";
     if (!ZI->canDefaultConstruct())
       OS << "[no_default_construct] ";
-    OS << getID(ZI->getOperand());
+    OS << getIDAndType(ZI->getOperand());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", "
@@ -552,24 +544,23 @@ public:
   }
   
   void visitRetainInst(RetainInst *RI) {
-    OS << "retain " << getID(RI->getOperand());
+    OS << "retain " << getIDAndType(RI->getOperand());
   }
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
-    OS << "retain_autoreleased " << getID(RI->getOperand());
+    OS << "retain_autoreleased " << getIDAndType(RI->getOperand());
   }
   void visitReleaseInst(ReleaseInst *RI) {
-    OS << "release " << getID(RI->getOperand());
+    OS << "release " << getIDAndType(RI->getOperand());
   }
   void visitDeallocVarInst(DeallocVarInst *DI) {
-    OS << "dealloc_var ";
-    printAllocKind(DI->getAllocKind());
-    OS << getID(DI->getOperand());
+    OS << "dealloc_var " << getAllocKind(DI->getAllocKind()) << ' '
+       << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
-    OS << "dealloc_ref " << getID(DI->getOperand());
+    OS << "dealloc_ref " << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
-    OS << "destroy_addr " << getID(DI->getOperand());
+    OS << "destroy_addr " << getIDAndType(DI->getOperand());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
@@ -589,14 +580,13 @@ public:
   }
 
   void printBranchArgs(OperandValueArrayRef args) {
-    if (!args.empty()) {
-      OS << '(';
-      interleave(args,
-                 [&](SILValue v) { OS << getID(v); },
-                 [&] { OS << ", "; });
-      OS << ')';
-    }
-    
+    if (args.empty()) return;
+
+    OS << '(';
+    interleave(args,
+               [&](SILValue v) { OS << getID(v); },
+               [&] { OS << ", "; });
+    OS << ')';
   }
   
   void visitBranchInst(BranchInst *UBI) {
