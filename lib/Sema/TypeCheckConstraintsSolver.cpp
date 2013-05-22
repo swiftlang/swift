@@ -16,6 +16,7 @@
 #include "ConstraintSystem.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
+#include <tuple>
 using namespace swift;
 using namespace constraints;
 
@@ -56,8 +57,10 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 Optional<Solution> ConstraintSystem::finalize() {
   switch (State) {
   case Unsolvable:
-    removeInactiveChildren();
-    restoreTypeVariableBindings();
+    if (!solverState) {
+      removeInactiveChildren();
+      restoreTypeVariableBindings();
+    }
     return Nothing;
 
   case Solved:
@@ -67,9 +70,11 @@ Optional<Solution> ConstraintSystem::finalize() {
   case Active:
     if (hasActiveChildren()) {
       // There is a solution below, but by itself this isn't a solution.
-      removeInactiveChildren();
-      clearIntermediateData();
-      restoreTypeVariableBindings();
+      if (!solverState) {
+        removeInactiveChildren();
+        clearIntermediateData();
+        restoreTypeVariableBindings();
+      }
       return Nothing;
     }
 
@@ -78,15 +83,19 @@ Optional<Solution> ConstraintSystem::finalize() {
         !hasFreeTypeVariables()) {
       State = Solved;
       auto result = createSolution();
-      removeInactiveChildren();
-      restoreTypeVariableBindings();
+      if (!solverState) {
+        removeInactiveChildren();
+        restoreTypeVariableBindings();
+      }
       return std::move(result);
     }
 
     // We don't have a solution;
-    markUnsolvable();
-    removeInactiveChildren();
+    if (!solverState) {
+      markUnsolvable();
+      removeInactiveChildren();
       restoreTypeVariableBindings();
+    }
     return Nothing;
   }
 }
@@ -187,12 +196,13 @@ void ConstraintSystem::clearIntermediateData() {
 
 /// \brief Restore the type variable bindings to what they were before
 /// we attempted to solve this constraint system.
-void ConstraintSystem::restoreTypeVariableBindings() {
-  std::for_each(SavedBindings.rbegin(), SavedBindings.rend(),
+void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
+  std::for_each(SavedBindings.rbegin(), SavedBindings.rbegin() + numBindings,
                 [](SavedTypeVariableBinding &saved) {
                   saved.restore();
                 });
-  SavedBindings.clear();
+  SavedBindings.erase(SavedBindings.end() - numBindings,
+                      SavedBindings.end());
 }
 
 SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
@@ -274,8 +284,19 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       continue;
 
     case ConstraintClassification::Member:
-      // Mark the referenced type variables for both sides.
-      first->getTypeVariables(referencedTypeVars);
+      // Mark the referenced type variables for the left-hand side, unless
+      // it is simply a type variable or a metatype of a type variable, in
+      // which case it's not going to open up any more opportunities.
+      // FIXME: Enable this for old solver?
+      bool skipFirst = solverState;
+      if (skipFirst) {
+        if (auto metaFirst = first->getAs<MetaTypeType>())
+          skipFirst = metaFirst->getInstanceType()->is<TypeVariableType>();
+        else
+          skipFirst = first->is<TypeVariableType>();
+      }
+      if (skipFirst)
+        first->getTypeVariables(referencedTypeVars);
       simplifyType(constraint->getSecondType())
         ->getTypeVariables(referencedTypeVars);
       continue;
@@ -337,18 +358,24 @@ bool ConstraintSystem::simplify() {
     SmallVector<Constraint *, 16> existingConstraints;
     existingConstraints.swap(Constraints);
     solvedAny = false;
-    for (auto constraint : existingConstraints) {
+    for (unsigned i = 0, n = existingConstraints.size(); i != n; ++i) {
+      auto constraint = existingConstraints[i];
       if (ExternallySolved.count(constraint))
         continue;
 
-      if (addConstraint(constraint)) {
+      if (addConstraint(constraint, false, true)) {
         solvedAny = true;
 
-        if (TC.getLangOpts().DebugConstraintSolver)
+        if (TC.getLangOpts().DebugConstraintSolver && !solverState)
           SolvedConstraints.push_back(constraint);        
       }
 
       if (failedConstraint) {
+        if (solverState) {
+          solverState->retiredConstraints.append(
+            existingConstraints.begin() + i,
+            existingConstraints.end());
+        }
         return true;
       }
     }
@@ -851,6 +878,30 @@ static Optional<SolutionStep> getNextSolutionStep(ConstraintSystem &cs) {
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   assert(!Parent &&"Can only solve at the top level");
 
+  // If requested, use the new solver.
+  if (TC.getLangOpts().UseNewConstraintSolver) {
+    // Set up solver state.
+    SolverState state;
+    this->solverState = &state;
+
+    // Solve the sytem.
+    solveRec(solutions, 0);
+    
+    // If there is more than one viable system, attempt to pick the best
+    // solution.
+    if (solutions.size() > 1) {
+      if (auto best = findBestSolution(solutions)) {
+        if (best != &solutions[0])
+          solutions[0] = std::move(*best);
+        solutions.erase(solutions.begin() + 1, solutions.end());
+      }
+    }
+
+    // Remove the solver state.
+    this->solverState = nullptr;
+    return solutions.size() != 1;
+  }
+
   // Simplify this constraint system.
   if (TC.getLangOpts().DebugConstraintSolver) {
     llvm::errs() << "---Simplified constraints---\n";
@@ -1028,4 +1079,398 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   }
 
   return solutions.size() != 1;
+}
+
+namespace {
+
+/// \brief Truncate the given small vector to the given new size.
+template<typename T>
+void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
+  assert(newSize <= vec.size() && "Not a truncation!");
+  vec.erase(vec.begin() + newSize, vec.end());
+}
+
+}
+
+ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
+  : cs(cs)
+{
+  numResolvedOverloadSets = cs.solverState->resolvedOverloadSets.size();
+  numTypeVariables = cs.TypeVariables.size();
+  numUnresolvedOverloadSets = cs.UnresolvedOverloadSets.size();
+  numGeneratedOverloadSets = cs.solverState->generatedOverloadSets.size();
+  numSavedBindings = cs.SavedBindings.size();
+  numGeneratedConstraints = cs.solverState->generatedConstraints.size();
+  numRetiredConstraints = cs.solverState->retiredConstraints.size();
+}
+
+ConstraintSystem::SolverScope::~SolverScope() {
+  // Remove resolved overloads from the shared constraint system state.
+  // FIXME: In the long run, we shouldn't need this.
+  for (unsigned i = numResolvedOverloadSets,
+                n = cs.solverState->resolvedOverloadSets.size();
+       i != n; ++i) {
+    cs.ResolvedOverloads.erase(cs.solverState->resolvedOverloadSets[i]);
+  }
+
+  // Remove generated overloads from the shared constraint system state.
+  // FIXME: In the long run, we shouldn't need this.
+  for (unsigned i = numGeneratedOverloadSets,
+                n = cs.solverState->generatedOverloadSets.size();
+       i != n; ++i) {
+    cs.GeneratedOverloadSets.erase(cs.solverState->generatedOverloadSets[i]);
+  }
+
+  // Erase the end of various lists.
+  truncate(cs.solverState->resolvedOverloadSets, numResolvedOverloadSets);
+  truncate(cs.TypeVariables, numTypeVariables);
+  truncate(cs.UnresolvedOverloadSets, numUnresolvedOverloadSets);
+  truncate(cs.solverState->generatedOverloadSets, numGeneratedOverloadSets);
+
+  // Restore bindings.
+  cs.restoreTypeVariableBindings(cs.SavedBindings.size() - numSavedBindings);
+
+  // Add the retired constraints back into circulation.
+  for (unsigned i = numRetiredConstraints,
+                n = cs.solverState->retiredConstraints.size();
+       i != n; ++i) {
+    assert(std::find(cs.Constraints.begin(), cs.Constraints.end(),
+                     cs.solverState->retiredConstraints[i]) == cs.Constraints.end());
+  }
+
+  cs.Constraints.append(
+    cs.solverState->retiredConstraints.begin() + numRetiredConstraints,
+    cs.solverState->retiredConstraints.end());
+  truncate(cs.solverState->retiredConstraints, numRetiredConstraints);
+
+  // Remove any constraints that were generated here.
+  llvm::SmallPtrSet<Constraint *, 4> generated;
+  generated.insert(
+    cs.solverState->generatedConstraints.begin() + numGeneratedConstraints,
+    cs.solverState->generatedConstraints.end());
+  cs.Constraints.erase(std::remove_if(cs.Constraints.begin(),
+                                      cs.Constraints.end(),
+                                      [&](Constraint *c) {
+                                        return generated.count(c) > 0;
+                                      }),
+                       cs.Constraints.end());
+  truncate(cs.solverState->generatedConstraints, numGeneratedConstraints);
+
+  // Clear out other "failed" state.
+  cs.failedConstraint = nullptr;
+  cs.State = Active;
+}
+
+/// \brief Retrieve the set of potential type bindings for the given type
+/// variable, along with flags indicating whether those types should be
+/// opened.
+static SmallVector<std::pair<Type, bool>, 4>
+getPotentialBindings(ConstraintSystem &cs,
+                     TypeVariableConstraints &tvc,
+                     bool &involvesTypeVariables,
+                     bool &hasLiteralBindings) {
+  involvesTypeVariables = tvc.HasNonConcreteConstraints;
+  hasLiteralBindings = false;
+
+  llvm::SmallPtrSet<CanType, 4> exactTypes;
+  SmallVector<std::pair<Type, bool>, 4> bindings;
+
+  // Add the types below this type variable.
+  for (auto arg : tvc.Below) {
+    // Make sure we can perform this binding.
+    auto type = arg.second;
+    if (auto boundTy = checkTypeOfBinding(cs, tvc.TypeVar, type)) {
+      type = *boundTy;
+
+      // Check whether the type involves type variables.
+      if (type->hasTypeVariable())
+        involvesTypeVariables = true;
+    } else {
+      // If it's recursive, obviously it involves type variables.
+      involvesTypeVariables = true;
+      continue;
+    }
+
+    if (exactTypes.insert(type->getCanonicalType()))
+      bindings.push_back({type, false});
+  }
+
+  // Add the types above this type variable.
+  for (auto arg : tvc.Above) {
+    // Make sure we can perform this binding.
+    auto type = arg.second;
+    if (auto boundTy = checkTypeOfBinding(cs, tvc.TypeVar, type)) {
+      type = *boundTy;
+
+      // Anything with a type variable in it is not definitive.
+      if (type->hasTypeVariable())
+        involvesTypeVariables = true;
+    } else {
+      // If it's recursive, obviously it involves type variables.
+      involvesTypeVariables = true;
+      continue;
+    }
+
+    if (exactTypes.insert(type->getCanonicalType()))
+      bindings.push_back({type, false});
+  }
+
+  // Add the default literal types.
+  auto &tc = cs.getTypeChecker();
+  for (auto constraint : tvc.KindConstraints) {
+    if (constraint->getKind() != ConstraintKind::Literal)
+      continue;
+
+    if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
+      // For non-generic literal types, just check for exact types.
+      if (!type->isUnspecializedGeneric()) {
+        if (exactTypes.insert(type->getCanonicalType())) {
+          hasLiteralBindings = true;
+          bindings.push_back({type, true});
+        }
+        continue;
+      }
+
+      // For generic literal types, check whether we already have a
+      // specialization of this generic within our list.
+      auto nominal = type->getAnyNominal();
+      bool matched = false;
+      for (auto exactType : exactTypes) {
+        if (auto exactNominal = exactType->getAnyNominal()) {
+          // FIXME: Check parents?
+          if (nominal == exactNominal) {
+            matched = true;
+            break;
+          }
+        }
+      }
+
+      if (!matched) {
+        hasLiteralBindings = true;
+        exactTypes.insert(type->getCanonicalType());
+        bindings.push_back({type, true});
+      }
+    }
+  }
+
+  // FIXME: Minimize type bindings here by removing types that are supertypes
+  // of others in the list.
+
+  return bindings;
+}
+
+bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
+                                unsigned depth) {
+  // Simplify this system.
+  if (failedConstraint || simplify()) {
+    return true;
+  }
+
+  // If there are no constraints remaining, we're done. Save this solution.
+  if (Constraints.empty() && UnresolvedOverloadSets.empty()) {
+    if (auto solution = finalize()) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        llvm::errs().indent(depth * 2) << "(found solution)\n";
+      }
+
+      solutions.push_back(std::move(*solution));
+      return false;
+    }
+    return true;
+  }
+
+  // Collect the type variable constraints.
+  SmallVector<TypeVariableConstraints, 4> typeVarConstraints;
+  collectConstraintsForTypeVariables(typeVarConstraints);
+  if (!typeVarConstraints.empty()) {
+    // Look for the best type variable to bind.
+    unsigned bestTypeVarIndex = 0;
+    bool bestInvolvesTypeVariables = false;
+    bool bestHasLiteralBindings = false;
+    SmallVector<std::pair<Type, bool>, 4> bestBindings
+      = getPotentialBindings(*this,
+                             typeVarConstraints[0],
+                             bestInvolvesTypeVariables,
+                             bestHasLiteralBindings);
+    for (unsigned i = 1, n = typeVarConstraints.size(); i != n; ++i) {
+      bool involvesTypeVariables = false;
+      bool hasLiteralBindings = false;
+      SmallVector<std::pair<Type, bool>, 4> bindings
+        = getPotentialBindings(*this, typeVarConstraints[i],
+                               involvesTypeVariables, hasLiteralBindings);
+      if (bindings.empty())
+        continue;
+      
+      // Prefer type variables whose bindings don't involve type variables or,
+      // if neither involves type variables, those with fewer bindings.
+      if (bestBindings.empty() ||
+          std::make_tuple(involvesTypeVariables, hasLiteralBindings,
+                          -bindings.size())
+            <
+          std::make_tuple(bestInvolvesTypeVariables, bestHasLiteralBindings,
+                          -bestBindings.size())) {
+        bestTypeVarIndex = i;
+        bestInvolvesTypeVariables = involvesTypeVariables;
+        bestBindings = std::move(bindings);
+      }
+    }
+
+    // If we have a binding that does not involve type variables, or we have
+    // no other option, go ahead and try the bindings for this type variable.
+    if (!bestBindings.empty() &&
+        (!bestInvolvesTypeVariables || UnresolvedOverloadSets.empty())) {
+      auto typeVar = typeVarConstraints[bestTypeVarIndex].TypeVar;
+      bool anySolved = false;
+      unsigned tryCount = 0;
+      llvm::SmallPtrSet<CanType, 4> exploredTypes;
+      
+    retry:
+      anySolved = false;
+      bool sawFirstLiteralConstraint = false;
+      for (auto binding : bestBindings) {
+        auto type = binding.first;
+        if (TC.getLangOpts().DebugConstraintSolver) {
+          llvm::errs().indent(depth * 2) << "(trying " << typeVar->getString()
+            << " := " << type->getString() << "\n";
+        }
+
+        // Try to solve the system with typeVar := type
+        SolverScope scope(*this);
+        if (binding.second) {
+          // FIXME: If we were able to solve this without considering
+          // default literals.
+          if (!sawFirstLiteralConstraint) {
+            sawFirstLiteralConstraint = true;
+            if (anySolved)
+              break;
+          }
+          type = openType(type);
+        }
+
+        addConstraint(ConstraintKind::Equal, typeVar, type);
+        if (!solveRec(solutions, depth + 1))
+          anySolved = true;
+
+        if (TC.getLangOpts().DebugConstraintSolver) {
+          llvm::errs().indent(depth * 2) << ")\n";
+        }
+      }
+
+      if (!anySolved) {
+        // If none of the children had solutions, enumerate supertypes and
+        // try again.
+        SmallVector<std::pair<Type, bool>, 4> oldBindings;
+        oldBindings.swap(bestBindings);
+
+        // If this is our first attempt, note which bindings we already visited.
+        if (tryCount == 0) {
+          for (auto binding : oldBindings)
+            exploredTypes.insert(binding.first->getCanonicalType());
+        }
+
+        // Enumerate the supertypes of each of the types we tried.
+        bool handledLiteralConstraints = false;
+        for (auto binding : oldBindings) {
+          auto type = binding.first;
+
+          // If this is a literal constraint, find all of the types that
+          // conform to the literal constraint protocol.
+          // FIXME: Except that we actually need said protocol :)
+          if (binding.second) {
+            if (handledLiteralConstraints)
+              continue;
+
+            for (auto constraint
+                   : typeVarConstraints[bestTypeVarIndex].KindConstraints) {
+              if (constraint->getKind() != ConstraintKind::Literal)
+                continue;
+
+              // FIXME: Total hack. integer literal -> default floating
+              // literal kind.
+              if (constraint->getLiteralKind() == LiteralKind::Int) {
+                auto newType = TC.getDefaultLiteralType(LiteralKind::Float);
+                if (exploredTypes.insert(newType->getCanonicalType()))
+                  bestBindings.push_back({newType, false});
+              }
+            }
+
+            handledLiteralConstraints = true;
+            continue;
+          }
+
+          for (auto supertype : enumerateDirectSupertypes(type)) {
+            // If we're not allowed to try this binding, skip it.
+            auto simpleSuper = checkTypeOfBinding(*this, typeVar, supertype);
+            if (!simpleSuper)
+              continue;
+
+            // If we haven't seen this supertype, add it.
+            if (exploredTypes.insert((*simpleSuper)->getCanonicalType()))
+              bestBindings.push_back({*simpleSuper, false});
+          }
+        }
+
+        if (!bestBindings.empty()) {
+          ++tryCount;
+          goto retry;
+        }
+      }
+      
+      return !anySolved;
+    }
+
+    // Fall through to resolve an overload set.
+  }
+
+  // If there are no overload sets, we can't solve this system.
+  if (UnresolvedOverloadSets.empty()) {
+    return true;
+  }
+
+  // Find the overload set with the minimum number of overloads.
+  unsigned bestSize = UnresolvedOverloadSets[0]->getChoices().size();
+  unsigned bestIdx = 0;
+  if (bestSize > 2) {
+    for (unsigned i = 1, n = UnresolvedOverloadSets.size(); i < n; ++i) {
+      unsigned newSize = UnresolvedOverloadSets[i]->getChoices().size();
+      if (newSize < bestSize) {
+        bestSize = newSize;
+        bestIdx = i;
+
+        if (bestSize == 2)
+          break;
+      }
+    }
+  }
+
+  // Swap the best overload set to the end and pop it off the set of
+  // unresolved overload sets. We'll restore it later.
+  std::swap(UnresolvedOverloadSets[bestIdx], UnresolvedOverloadSets.back());
+  OverloadSet *bestOvl = UnresolvedOverloadSets.back();
+  UnresolvedOverloadSets.pop_back();
+
+  // Try each of the overloads.
+  bool anySolved = false;
+  for (unsigned i = 0, n = bestOvl->getChoices().size(); i != n; ++i) {
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs().indent(depth * 2) << "(overload set #" << bestOvl->getID()
+        << " ";
+    }
+
+    // Try to solve the system with this overload choice.
+    SolverScope scope(*this);
+    resolveOverload(bestOvl, i, depth + 1);
+    if (!solveRec(solutions, depth + 1))
+      anySolved = true;
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs().indent(depth * 2) << ")\n";
+    }
+  }
+
+  // Put the best overload set back in place.
+  UnresolvedOverloadSets.push_back(bestOvl);
+  std::swap(UnresolvedOverloadSets[bestIdx], UnresolvedOverloadSets.back());
+
+  return !anySolved;
 }

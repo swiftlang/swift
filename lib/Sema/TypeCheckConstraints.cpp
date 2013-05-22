@@ -409,30 +409,48 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 bool ConstraintSystem::addConstraint(Constraint *constraint,
-                                     bool isExternallySolved) {
+                                     bool isExternallySolved,
+                                     bool simplifyExisting) {
   switch (simplifyConstraint(*constraint)) {
   case SolutionKind::Error:
     if (!failedConstraint) {
       failedConstraint = constraint;
       markUnsolvable();
     }
+
+    if (!simplifyExisting && solverState) {
+      solverState->generatedConstraints.push_back(constraint);
+    }
+
     return false;
 
   case SolutionKind::TriviallySolved:
   case SolutionKind::Solved:
     // This constraint has already been solved; there is nothing more
     // to do.
-    if (TC.getLangOpts().DebugConstraintSolver)
+    if (TC.getLangOpts().DebugConstraintSolver && !solverState)
       SolvedConstraints.push_back(constraint);
 
     if (isExternallySolved)
       ExternallySolved.insert(constraint);
+
+    // Record solved constraint.
+    if (solverState) {
+      solverState->retiredConstraints.push_back(constraint);
+      if (!simplifyExisting)
+        solverState->generatedConstraints.push_back(constraint);
+    }
     return true;
 
   case SolutionKind::Unsolved:
     // We couldn't solve this constraint; add it to the pile.
     if (!isExternallySolved)
       Constraints.push_back(constraint);
+
+    if (!simplifyExisting && solverState) {
+      solverState->generatedConstraints.push_back(constraint);
+    }
+
     return false;
   }
 }
@@ -928,6 +946,9 @@ void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
   if (auto locator = ovl->getLocator()) {
     assert(!GeneratedOverloadSets[locator]);
     GeneratedOverloadSets[locator] = ovl;
+    if (solverState) {
+      solverState->generatedOverloadSets.push_back(locator);
+    }
   }
 
   // If there are fewer than two choices, then we can simply resolve this
@@ -1827,7 +1848,8 @@ static Type getMateralizedType(Type type, ASTContext &context) {
   return type;
 }
 
-void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
+void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx,
+                                       unsigned depth) {
   // Determie the type to which we'll bind the overload set's type.
   auto &choice = ovl->getChoices()[idx];
   Type refType;
@@ -1884,6 +1906,15 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
 
   // Note that we have resolved this overload.
   ResolvedOverloads[ovl] = std::make_pair(idx, refType);
+  if (solverState) {
+    solverState->resolvedOverloadSets.push_back(ovl);
+
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs() << "choice #" << idx << ": "
+        << ovl->getBoundType()->getString() << " := "
+        << refType->getString() << "\n";
+    }
+  }
 }
 
 Type ConstraintSystem::simplifyType(Type type,
@@ -2425,6 +2456,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
         // If one type is a subtype of the other, but not vice-verse,
         // we prefer the system with the more-constrained type.
+        // FIXME: Should we allow conversions, then rank based on what kind
+        // of match we actually had?
         bool trivial = false;
         bool type1Better = cs.matchTypes(type1, type2,
                                          TypeMatchKind::Subtype,
@@ -2459,6 +2492,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
           = cs.typeMatchesDefaultLiteralConstraint(boundTV1, type2);
         if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
           return result;
+
+        // Prefer concrete types to existentials.
+        bool isExistential1 = type1->isExistentialType();
+        bool isExistential2 = type2->isExistentialType();
+        if (updateSolutionCompareResult(result, isExistential1, isExistential2))
+          return result;
       }
 
       return result;
@@ -2481,8 +2520,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
   case SolutionCompareResult::Identical:
     // FIXME: We haven't checked enough to conclude that two solutions are
-    // identical.
-    return SolutionCompareResult::Incomparable;
+    // identical. But it's convenient to call them identical.
+    return SolutionCompareResult::Identical;
   }
 }
 

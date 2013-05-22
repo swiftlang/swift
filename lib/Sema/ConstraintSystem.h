@@ -1150,7 +1150,7 @@ struct TypeVariableConstraints {
     : HasNonConcreteConstraints(false), TypeVar(typeVar) {}
 
   /// \brief Whether there are any non-concrete constraints placed on this
-  /// type variable that aren't represented by the stored \c Constraints.
+  /// type variable that aren't represented by the stored constraints.
   bool HasNonConcreteConstraints;
 
   /// \brief The representative type variable.
@@ -1432,6 +1432,65 @@ class ConstraintSystem {
   friend class OverloadSet;
 
 public:
+  /// \brief Describes the current solver state.
+  struct SolverState {
+    /// \brief The overload sets that have been resolved along the current path.
+    SmallVector<OverloadSet *, 4> resolvedOverloadSets;
+
+    /// \brief The overload sets that were generated along the current path,
+    /// indexed by locator.
+    SmallVector<ConstraintLocator *, 4> generatedOverloadSets;
+
+    /// \brief The set of constraints that were generated along the current
+    /// path.
+    SmallVector<Constraint *, 32> generatedConstraints;
+
+    /// \brief The set of constraints that have been retired along the
+    /// current path.
+    SmallVector<Constraint *, 32> retiredConstraints;
+
+  };
+
+  /// \brief The current solver state.
+  SolverState *solverState = nullptr;
+
+  /// \brief Introduces a new solver scope, which any changes to the
+  /// solver state or constraint system are temporary and will be undone when
+  /// this object is destroyed.
+  ///
+  ///
+  class SolverScope {
+    ConstraintSystem &cs;
+
+    /// \brief The length of \c resolvedOverloadSets.
+    unsigned numResolvedOverloadSets;
+
+    /// \brief The length of \c TypeVariables.
+    unsigned numTypeVariables;
+
+    /// \brief The length of \c UnresolvedOverloadSets.
+    unsigned numUnresolvedOverloadSets;
+
+    /// \brief The length of \c generatedOverloadSets.
+    unsigned numGeneratedOverloadSets;
+    
+    /// \brief The length of \c SavedBindings.
+    unsigned numSavedBindings;
+
+    /// \brief The length of \c generatedConstraints.
+    unsigned numGeneratedConstraints;
+
+    /// \brief The length of \c retiredConstraints.
+    unsigned numRetiredConstraints;
+
+    SolverScope(const SolverScope &) = delete;
+    SolverScope &operator=(const SolverScope &) = delete;
+
+  public:
+    explicit SolverScope(ConstraintSystem &cs);
+    ~SolverScope();
+  };
+
   ConstraintSystem(TypeChecker &tc);
 
   /// \brief Creates a child constraint system that selects a
@@ -1569,7 +1628,16 @@ private:
 
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
-  void restoreTypeVariableBindings();
+  ///
+  /// \param numBindings The number of bindings to restore, from the end of
+  /// the saved-binding stack.
+  void restoreTypeVariableBindings(unsigned numBindings);
+
+  /// \brief Restore the type variable bindings to what they were before
+  /// we attempted to solve this constraint system.
+  void restoreTypeVariableBindings() {
+    restoreTypeVariableBindings(SavedBindings.size());
+  }
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -1700,9 +1768,16 @@ public:
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.
   ///
+  /// \param isExternallySolved Whether this constraint is being solved
+  /// as an eager simplification, outside of the simplify() loop.
+  ///
+  /// \param simplifyExisting Whether we're simplifying an existing
+  /// constraint rather than introducing a new constraint.
+  ///
   /// \returns true if this constraint was solved.
   bool addConstraint(Constraint *constraint,
-                     bool isExternallySolved = false);
+                     bool isExternallySolved = false,
+                     bool simplifyExisting = false);
 
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
@@ -2036,7 +2111,7 @@ public:
 
   /// \brief Resolve the given overload set to the choice with the given
   /// index within this constraint system.
-  void resolveOverload(OverloadSet *ovl, unsigned idx);
+  void resolveOverload(OverloadSet *ovl, unsigned idx, unsigned depth = 0);
 
   /// \brief Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -2128,6 +2203,15 @@ public:
   bool isSolved() const { return State == Solved; }
 
 private:
+  /// \brief Solve the system of constraints using the direct
+  /// recursion formulation.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  /// \param depth The depth of the recursion.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool solveRec(SmallVectorImpl<Solution> &solutions, unsigned depth);
+
   /// \brief Determine whether the given \p type matches the default literal
   /// type for a literal constraint placed on the type variable \p tv.
   bool typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,

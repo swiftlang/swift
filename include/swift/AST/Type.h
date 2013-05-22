@@ -162,6 +162,7 @@ namespace llvm {
   template<>
   class PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
+  public:
     static inline swift::CanType getFromVoidPointer(void *P) {
       return swift::CanType((swift::TypeBase*)P);
     }
