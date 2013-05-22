@@ -102,6 +102,8 @@ void SILConstant::dump() const {
 }
 
 void SILType::print(raw_ostream &OS) const {
+  OS << '$';
+
   // Build up the attributes for a SIL type, if any.
   llvm::SmallString<64> Attributes;
   if (is<AnyFunctionType>()) {
@@ -134,11 +136,6 @@ void SILType::print(raw_ostream &OS) const {
 void SILType::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
-}
-
-raw_ostream &operator<<(raw_ostream &OS, SILType t) {
-  t.print(OS);
-  return OS;
 }
 
 raw_ostream &operator<<(raw_ostream &OS, SILConstant t) {
@@ -282,7 +279,7 @@ public:
   void visitAllocRefInst(AllocRefInst *ARI) {
     OS << "alloc_ref ";
     printAllocKind(ARI->getAllocKind());
-    OS << "$" << ARI->getType().getSwiftType().getString();
+    OS << ARI->getType();
   }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
@@ -318,32 +315,32 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *DRI) {
-    OS << "function_ref $" << DRI->getType() << ", ";
+    OS << "function_ref " << DRI->getType() << ", ";
     DRI->getFunction()->printName(OS);
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref $" << BFI->getType()
+    OS << "builtin_function_ref " << BFI->getType()
        << ", @" << BFI->getFunction()->getName();
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
-    OS << "global_addr $" << GAI->getType() << ", @";
+    OS << "global_addr " << GAI->getType() << ", @";
     OS << GAI->getGlobal()->getName();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
     const auto &lit = ILI->getValue();
-    OS << "integer_literal $" << ILI->getType() << ", " << lit;
+    OS << "integer_literal " << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
     SmallVector<char, 12> Buffer;
     FLI->getValue().toString(Buffer);
-    OS << "float_literal $" << FLI->getType() << ", "
+    OS << "float_literal " << FLI->getType() << ", "
        << StringRef(Buffer.data(), Buffer.size());
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
-    OS << "string_literal $" << SLI->getType()
+    OS << "string_literal " << SLI->getType()
        << ", \"" << SLI->getValue() << "\"";
   }
   void visitLoadInst(LoadInst *LI) {
@@ -367,7 +364,7 @@ public:
     OS << getID(ZI->getOperand());
   }
   void visitSpecializeInst(SpecializeInst *SI) {
-    OS << "specialize " << getID(SI->getOperand()) << ", $"
+    OS << "specialize " << getID(SI->getOperand()) << ", "
        << SI->getType() << ", ";
     bool first = true;
     for (Substitution const &s : SI->getSubstitutions()) {
@@ -383,8 +380,7 @@ public:
   void printConversionInst(ConversionInst *CI,
                            SILValue operand,
                            llvm::StringRef name) {
-    OS << name << " " << getID(operand) << ", $"
-      << CI->getType();
+    OS << name << " " << getID(operand) << ", " << CI->getType();
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
@@ -436,11 +432,11 @@ public:
   }
   
   void visitIsaInst(IsaInst *I) {
-    OS << "isa " << getID(I->getOperand()) << ", $" << I->getTestType();
+    OS << "isa " << getID(I->getOperand()) << ", " << I->getTestType();
   }
 
   void visitStructInst(StructInst *SI) {
-    OS << "struct $";
+    OS << "struct ";
     SI->getType().print(OS);
     OS << ", (";
     interleave(SI->getElements(),
@@ -478,7 +474,7 @@ public:
   }
   
   void visitBuiltinZeroInst(BuiltinZeroInst *ZI) {
-    OS << "builtin_zero $" << ZI->getType();
+    OS << "builtin_zero " << ZI->getType();
   }
 
   void printDynamicMethodInst(DynamicMethodInst *I,
@@ -528,25 +524,25 @@ public:
     OS << "deinit_existential " << getID(DEI->getOperand());
   }
   void visitClassMetatypeInst(ClassMetatypeInst *MI) {
-    OS << "class_metatype $" << MI->getType() << ", " << getID(MI->getOperand());
+    OS << "class_metatype " << MI->getType() << ", " << getID(MI->getOperand());
   }
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
-    OS << "archetype_metatype $" << MI->getType() << ", "
+    OS << "archetype_metatype " << MI->getType() << ", "
        << getID(MI->getOperand());
   }
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
-    OS << "protocol_metatype $" << MI->getType() << ", "
+    OS << "protocol_metatype " << MI->getType() << ", "
        << getID(MI->getOperand());
   }
   void visitMetatypeInst(MetatypeInst *MI) {
-    OS << "metatype $" << MI->getType();
+    OS << "metatype " << MI->getType();
   }
   void visitModuleInst(ModuleInst *MI) {
     OS << "module @" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     OS << "associated_metatype " << getID(MI->getOperand())
-       << ", $" << MI->getType();
+       << ", " << MI->getType();
   }
   
   void visitRetainInst(RetainInst *RI) {
@@ -709,7 +705,7 @@ void SILFunction::print(llvm::raw_ostream &OS) const {
   }
   
   printName(OS);
-  OS << " : $" << LoweredType;
+  OS << " : " << LoweredType;
   
   if (!isExternalDeclaration()) {
     OS << " {\n";
