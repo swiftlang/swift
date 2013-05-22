@@ -24,9 +24,12 @@ using namespace swift;
 namespace {
   class SILParserFunctionState {
   public:
+    Parser &P;
     SILModule &SILMod;
     SILFunction *F;
   private:
+    /// HadError - Have we seen an error parsing this function?
+    bool HadError = false;
 
     /// Data structures used to perform name lookup of basic blocks.
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
@@ -34,15 +37,16 @@ namespace {
                    std::pair<SourceLoc, Identifier>> UndefinedBlocks;
   public:
 
-    SILParserFunctionState(SILFunction *F) : SILMod(F->getModule()), F(F) {}
+    SILParserFunctionState(Parser &P, SILFunction *F)
+      : P(P), SILMod(F->getModule()), F(F) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
-    bool diagnoseProblems(Parser &P);
+    bool diagnoseProblems();
     
     /// getBBForDefinition - Return the SILBasicBlock for a definition of the
     /// specified block.
-    SILBasicBlock *getBBForDefinition(Identifier Name);
+    SILBasicBlock *getBBForDefinition(Identifier Name, SourceLoc Loc);
     
     /// getBBForReference - return the SILBasicBlock of the specified name.  The
     /// source location is used to diagnose a failure if the block ends up never
@@ -55,9 +59,7 @@ namespace {
 
 /// diagnoseProblems - After a function is fully parse, emit any diagnostics
 /// for errors and return true if there were any.
-bool SILParserFunctionState::diagnoseProblems(Parser &P) {
-  bool HadError = false;
-
+bool SILParserFunctionState::diagnoseProblems() {
   // Check for any uses of basic blocks that were not defined.
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterminstic order.
@@ -73,15 +75,22 @@ bool SILParserFunctionState::diagnoseProblems(Parser &P) {
 
 /// getBBForDefinition - Return the SILBasicBlock for a definition of the
 /// specified block.
-SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name) {
+SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name,
+                                                          SourceLoc Loc) {
   SILBasicBlock *&BB = BlocksByName[Name];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
     return BB = new (SILMod) SILBasicBlock(F);
 
-  // If it already exists, we may have a forward reference.  If so, remember
-  // that it was correctly defined.
-  UndefinedBlocks.erase(BB);
+  // If it already exists, it was either a forward reference or a redefinition.
+  // If it is a forward reference, it should be in our undefined set.
+  if (!UndefinedBlocks.erase(BB)) {
+    // If we have a redefinition, return a new BB to avoid inserting
+    // instructions after the terminator.
+    P.diagnose(Loc, diag::basicblock_redefinition, Name);
+    HadError = true;
+    return new (SILMod) SILBasicBlock(F);
+  }
 
   // FIXME: Splice the block to the end of the function so they come out in the
   // right order.
@@ -222,23 +231,46 @@ bool Parser::parseSILType(SILType &Result) {
   return false;
 }
 
+
+///   sil-instruction:
+///     sil_local_name '=' identifier ...
+static bool parseSILInstruction(SILBasicBlock *BB, SILParserFunctionState &FS) {
+  Parser &P = FS.P;
+
+  if (P.Tok.isNot(tok::sil_local_name)) {
+    P.diagnose(P.Tok, diag::expected_sil_instr_name);
+    return true;
+  }
+  P.consumeToken(tok::sil_local_name);
+  
+  // Eat away, nom nom nom.
+  while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof) &&
+         !P.Tok.isAtStartOfLine())
+    P.consumeToken();
+
+  return false;
+}
+
+
 ///   sil-basic-block:
 ///     identifier /*TODO: argument list*/ ':' sil-instruction+
-static bool parseSILBasicBlock(SILParserFunctionState &FS, Parser &P) {
+static bool parseSILBasicBlock(SILParserFunctionState &FS) {
+  Parser &P = FS.P;
   Identifier BBName;
+  SourceLoc NameLoc = P.Tok.getLoc();
 
   if (P.parseIdentifier(BBName, diag::expected_sil_block_name) ||
       P.parseToken(tok::colon, diag::expected_sil_block_colon))
     return true;
 
-  SILBasicBlock *BB = FS.getBBForDefinition(BBName);
+  SILBasicBlock *BB = FS.getBBForDefinition(BBName, NameLoc);
 
-  (void)BB;
-  // Eat away, nom nom nom.
-  while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof))
-    P.consumeToken();
+  do {
+    if (parseSILInstruction(BB, FS))
+      return true;
+  } while (P.Tok.is(tok::sil_local_name));
 
-  return P.Tok.isNot(tok::r_brace);
+  return false;
 }
 
 
@@ -269,7 +301,7 @@ bool Parser::parseDeclSIL() {
   SILFunction *Fn = new (*SIL) SILFunction(*SIL, FnLinkage,
                                            FnName.str(), FnType);
 
-  SILParserFunctionState FunctionState(Fn);
+  SILParserFunctionState FunctionState(*this, Fn);
 
   // Now that we have a SILFunction parse the body, if present.
 
@@ -277,7 +309,7 @@ bool Parser::parseDeclSIL() {
   if (consumeIf(tok::l_brace)) {
     // Parse the basic block list.
     do {
-      if (parseSILBasicBlock(FunctionState, *this))
+      if (parseSILBasicBlock(FunctionState))
         return true;
     } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
 
@@ -286,6 +318,6 @@ bool Parser::parseDeclSIL() {
                        LBraceLoc);
   }
 
-  return FunctionState.diagnoseProblems(*this);
+  return FunctionState.diagnoseProblems();
 }
 

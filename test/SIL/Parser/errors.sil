@@ -1,0 +1,9 @@
+// RUN: %swift %s -emit-sil -verify
+
+sil @block_errors : $() -> () {
+bb0:
+  %0 = tuple ()
+  %1 = return $() %0
+bb0:                      // expected-error {{redefinition of basic block 'bb0'}}
+  %3 = return $() %0
+}
