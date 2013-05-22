@@ -220,7 +220,7 @@ public:
     if (!V->use_empty()) {
       OS.PadToColumn(50);
       OS << "// user";
-      if (std::distance(V->use_begin(), V->use_end()) != 1)
+      if (std::next(V->use_begin()) != V->use_end())
         OS << 's';
       OS << ": ";
       interleave(V->use_begin(), V->use_end(),
