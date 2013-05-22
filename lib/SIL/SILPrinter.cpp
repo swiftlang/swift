@@ -591,11 +591,11 @@ public:
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    OS << "return " << '(' << getID(RI->getOperand()) << ')';
+    OS << "return " << getID(RI->getOperand());
   }
   
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    OS << "autorelease_return " << '(' << getID(RI->getOperand()) << ')';
+    OS << "autorelease_return " << getID(RI->getOperand());
   }
 
   void printBranchArgs(OperandValueArrayRef args) {
