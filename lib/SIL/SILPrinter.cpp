@@ -165,7 +165,7 @@ public:
   }
 
   void print(const SILFunction *F) {
-    interleave(F->begin(), F->end(),
+    interleave(*F,
                [&](const SILBasicBlock &B) { print(&B); },
                [&] { OS << '\n'; });
   }
@@ -212,9 +212,7 @@ public:
       OS.PadToColumn(50);
       OS << "// users: ";
       interleave(V->use_begin(), V->use_end(),
-                 [&] (Operand *o) {
-                   OS << getID(o->getUser());
-                 },
+                 [&] (Operand *o) { OS << getID(o->getUser()); },
                  [&] { OS << ", "; });
     }
     OS << '\n';
@@ -441,31 +439,21 @@ public:
     OS << "isa " << getID(I->getOperand()) << ", $" << I->getTestType();
   }
 
-  void visitStructInst(StructInst *TI) {
+  void visitStructInst(StructInst *SI) {
     OS << "struct $";
-    TI->getType().print(OS);
+    SI->getType().print(OS);
     OS << ", (";
-    bool isFirst = true;
-    for (const auto &Elem : TI->getElements()) {
-      if (isFirst)
-        isFirst = false;
-      else
-        OS << ", ";
-      OS << getID(Elem);
-    }
+    interleave(SI->getElements(),
+               [&](const SILValue &V) { OS << getID(V); },
+               [&] { OS << ", "; });
     OS << ')';
   }
 
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
-    bool isFirst = true;
-    for (const auto &Elem : TI->getElements()) {
-      if (isFirst)
-        isFirst = false;
-      else
-        OS << ", ";
-      OS << getID(Elem);
-    }
+    interleave(TI->getElements(),
+               [&](const SILValue &V) { OS << getID(V); },
+               [&] { OS << ", "; });
     OS << ')';
   }
   void visitTupleExtractInst(TupleExtractInst *EI) {
@@ -601,7 +589,7 @@ public:
   void printBranchArgs(OperandValueArrayRef args) {
     if (!args.empty()) {
       OS << '(';
-      interleave(args.begin(), args.end(),
+      interleave(args,
                  [&](SILValue v) { OS << getID(v); },
                  [&] { OS << ", "; });
       OS << ')';
