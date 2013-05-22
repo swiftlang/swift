@@ -436,9 +436,7 @@ public:
   }
 
   void visitStructInst(StructInst *SI) {
-    OS << "struct ";
-    SI->getType().print(OS);
-    OS << ", (";
+    OS << "struct " << SI->getType() << " (";
     interleave(SI->getElements(),
                [&](const SILValue &V) { OS << getID(V); },
                [&] { OS << ", "; });
@@ -448,7 +446,7 @@ public:
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     interleave(TI->getElements(),
-               [&](const SILValue &V) { OS << getID(V); },
+               [&](const SILValue &V){ OS << getID(V) << " : " << V.getType();},
                [&] { OS << ", "; });
     OS << ')';
   }
