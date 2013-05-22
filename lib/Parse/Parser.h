@@ -38,7 +38,6 @@ namespace swift {
   class TupleType;
   class SILModule;
   class SILType;
-  class SILFunction;
   
   struct OneOfElementInfo;
   
@@ -335,7 +334,6 @@ public:
   // SIL Parsing.
 
   bool parseSILType(SILType &Type);
-  bool parseSILBasicBlock(SILFunction *F);
   bool parseDeclSIL();
 
 

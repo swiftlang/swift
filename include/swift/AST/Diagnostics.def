@@ -324,6 +324,8 @@ ERROR(expected_sil_block_name, decl_parsing,none,
       "expected basic block name or '}'", ())
 ERROR(expected_sil_block_colon, decl_parsing,none,
       "expected ':' after basic block name", ())
+ERROR(undefined_basicblock_use, decl_parsing,none,
+      "use of undefined basic block %0", (Identifier))
 
 ERROR(expected_sil_rbrace, decl_parsing,none,
       "expected '}' at the end of a sil body", ())
