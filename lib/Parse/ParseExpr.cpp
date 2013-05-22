@@ -79,8 +79,12 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
                                       paren->getRParenLoc(), closure);
 }
 
-/// \brief Determine whether the given expression is a postfix expression.
-static bool isPostfixExpr(Expr *expr) {
+/// \brief Determine whether the given expression is an expr-postfix.
+///
+/// This routine inspects the form of an expression AST to determine whether it
+/// was produced by parsing an expr-postfix, e.g., a call, member access, or
+/// primary expression such as a parenthesized expression or tuple.
+static bool isExprPostfix(Expr *expr) {
   switch (expr->getKind()) {
   // Not postfix expressions.
   case ExprKind::AddressOf:
@@ -197,7 +201,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
     // The grammar only permits a postfix-expression. However, we've
     // parsed a expr-sequence, so diagnose cases where we didn't get a
     // trailing closure.
-    if (!isPostfixExpr(expr.get())) {
+    if (!isExprPostfix(expr.get())) {
       diagnose(closure->getStartLoc(), diag::trailing_closure_not_postfix)
         .highlight(expr.get()->getSourceRange());
 
@@ -213,7 +217,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
       // closure, if we can find it.
       if (auto seq = dyn_cast<SequenceExpr>(expr.get())) {
         Expr *last = seq->getElements().back();
-        if (isPostfixExpr(last)) {
+        if (isExprPostfix(last)) {
           SourceLoc afterClosureLoc
             = Lexer::getLocForEndOfToken(SourceMgr, closure->getEndLoc());
           diagnose(last->getStartLoc(),
