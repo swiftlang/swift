@@ -24,6 +24,93 @@
 using namespace swift;
 using namespace Lowering;
 
+AnyFunctionType *TypeConverter::uncurryFunctionType(AnyFunctionType *t,
+                                                    unsigned uncurryLevel) {
+  if (uncurryLevel == 0)
+    return t;
+  
+  AbstractCC outerCC = t->getCC();
+  bool outerThinness = t->isThin();
+  assert(!t->isAutoClosure() && "auto_closures cannot be curried");
+  assert(!t->isBlock() && "objc blocks cannot be curried");
+  
+  // The uncurried input types.
+  SmallVector<TupleTypeElt, 4> inputs;
+  
+  // The uncurried generic parameter list components.
+  bool isPolymorphic = false;
+  SmallVector<GenericParam, 4> genericParams;
+  SmallVector<Requirement, 4> requirements;
+  SmallVector<ArchetypeType *, 4> allArchetypes;
+  GenericParamList *outerParameters = nullptr, *lastOuterParameters = nullptr;
+
+  // Merge inputs and generic parameters from the uncurry levels.
+  for (;;) {
+    inputs.push_back(TupleTypeElt(t->getInput()));
+    
+    if (auto *pft = dyn_cast<PolymorphicFunctionType>(t)) {
+      isPolymorphic = true;
+      GenericParamList &params = pft->getGenericParams();
+      if (GenericParamList *outer = params.getOuterParameters()) {
+        if (!outerParameters)
+          outerParameters = outer;
+        assert((!lastOuterParameters || lastOuterParameters == outer)
+               && "outer parameters do not nest");
+        lastOuterParameters = outer;
+      }
+      
+      genericParams.append(params.getParams().begin(),
+                           params.getParams().end());
+      requirements.append(params.getRequirements().begin(),
+                          params.getRequirements().end());
+      allArchetypes.append(params.getAllArchetypes().begin(),
+                           params.getAllArchetypes().end());
+    }
+    
+    if (uncurryLevel-- == 0)
+      break;
+    t = t->getResult()->castTo<AnyFunctionType>();
+  }
+  
+  // Put the inputs in the order expected by the calling convention.
+  switch (outerCC) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // C/ObjC functions are curried left-to-right.
+    // They shouldn't be generic though.
+    assert(!isPolymorphic && "c/objc function shouldn't be generic");
+    break;
+    
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // Swift functions uncurry right-to-left.
+    std::reverse(inputs.begin(), inputs.end());
+    break;
+  }
+  
+  // Create the new function type.
+  ASTContext &C = t->getASTContext();
+  Type inputType = TupleType::get(inputs, C);
+  if (isPolymorphic) {
+    auto *curriedGenericParams = GenericParamList::create(C,
+                                                          SourceLoc(),
+                                                          genericParams,
+                                                          SourceLoc(),
+                                                          requirements,
+                                                          SourceLoc());
+    curriedGenericParams->setAllArchetypes(C.AllocateCopy(allArchetypes));
+    curriedGenericParams->setOuterParameters(outerParameters);
+    
+    return PolymorphicFunctionType::get(inputType, t->getResult(),
+                                        curriedGenericParams,
+                                        outerThinness, outerCC, C);
+  } else {
+    return FunctionType::get(inputType, t->getResult(),
+                             /*autoClosure*/ false, /*block*/ false,
+                             outerThinness, outerCC, C);
+  }
+}
+
 Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
   if (auto *ft = t->getAs<FunctionType>())
     return FunctionType::get(ft->getInput(), ft->getResult(),

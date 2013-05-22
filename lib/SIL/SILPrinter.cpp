@@ -699,6 +699,15 @@ void SILFunction::dump() const {
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS) const {
+  // FIXME: Temporary testing comment until we actually use uncurried function
+  // types during SILGen.
+  OS << "// uncurried type: ";
+  getModule().Types.uncurryFunctionType(
+                  cast<AnyFunctionType>(getLoweredType().getSwiftRValueType()),
+                  getLoweredType().getUncurryLevel())
+    ->print(OS);
+  OS << '\n';
+  
   OS << "sil ";
   switch (getLinkage()) {
   case SILLinkage::Internal:

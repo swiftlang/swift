@@ -237,6 +237,9 @@ public:
                               Type methodType,
                               GenericParamList *genericParams = nullptr) const;
   
+  /// Convert a nested function type into an uncurried representation.
+  static AnyFunctionType *uncurryFunctionType(AnyFunctionType *t,
+                                              unsigned uncurryLevel);
 };
   
 } // namespace Lowering

@@ -33,7 +33,7 @@ enum OnHeap_t : unsigned char {
   NotOnHeap,
   OnHeap
 };
-
+  
 /// An enumeration indicating whether to "preserve" a value or "consume" it.
 enum ShouldPreserveValues : bool {
   ConsumeValues = false,
