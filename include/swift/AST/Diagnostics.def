@@ -319,6 +319,11 @@ ERROR(expected_sil_function_name, decl_parsing,none,
       "expected SIL function name", ())
 ERROR(expected_sil_type, decl_parsing,none,
       "expected type in SIL code", ())
+      
+ERROR(expected_sil_block_name, decl_parsing,none,
+      "expected basic block name or '}'", ())
+ERROR(expected_sil_block_colon, decl_parsing,none,
+      "expected ':' after basic block name", ())
 
 ERROR(expected_sil_rbrace, decl_parsing,none,
       "expected '}' at the end of a sil body", ())

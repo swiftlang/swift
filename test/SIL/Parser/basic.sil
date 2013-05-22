@@ -9,8 +9,10 @@ class Class2 { var b : Class1 }
 
 // CHECK: sil @normal : $(a : Class1) -> ()
 sil @normal : $(a : Class1) -> () {
+bb0:
+  %0 = tuple ()
+  %1 = return %0
 }
 
 // CHECK: sil internal @internal_fn : $() -> Int
-sil internal @internal_fn : $() -> Int {
-}
+sil internal @internal_fn : $() -> Int

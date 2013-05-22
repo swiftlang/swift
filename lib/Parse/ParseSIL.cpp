@@ -40,50 +40,6 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 }
 
 
-///   decl-sil:   [[only in SIL mode]]
-///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body
-///   decl-sil-body:
-///     '{' sil-basic-block+ '}'
-bool Parser::parseDeclSIL() {
-  // Inform the lexer that we're lexing the body of the SIL declaration.  Do
-  // this before we consume the 'sil' token so that all later tokens are
-  // properly handled.
-  Lexer::SILBodyRAII Tmp(*L);
-
-  consumeToken(tok::kw_sil);
-
-  SILLinkage FnLinkage;
-  Identifier FnName;
-  SILType FnType;
-
-  if (parseSILLinkage(FnLinkage, *this) ||
-      parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
-      parseIdentifier(FnName, diag::expected_sil_function_name) ||
-      parseToken(tok::colon, diag::expected_sil_type) ||
-      parseSILType(FnType))
-    return true;
-
-  SILFunction *Fn = new (*SIL) SILFunction(*SIL, FnLinkage,
-                                           FnName.str(), FnType);
-  (void)Fn;
-
-  // Now that we have a SILFunction parse the body, if present.
-
-  SourceLoc LBraceLoc = Tok.getLoc();
-  if (consumeIf(tok::l_brace)) {
-    // TODO: parse the body.
-
-    SourceLoc RBraceLoc;
-    parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
-                       LBraceLoc);
-  }
-
-
-  // TODO: Verify it is a function type.
-
-  return false;
-}
-
 ///   sil-type:
 ///     '$' sil-type-attributes? '*'? type
 ///   sil-type-attributes:
@@ -166,5 +122,72 @@ bool Parser::parseSILType(SILType &Result) {
   // SILTypes itself.
   (void)IsSRet;
   Result = SIL->Types.getLoweredType(Ty.getType(), UncurryLevel);
+
+  // If this is an address type, apply the modifier.
+  if (isAddress)
+    Result = Result.getAddressType();
   return false;
 }
+
+///   sil-basic-block:
+///     identifier /*TODO: argument list*/ ':' sil-instruction+
+bool Parser::parseSILBasicBlock(SILFunction *F) {
+  Identifier BBName;
+
+  if (parseIdentifier(BBName, diag::expected_sil_block_name) ||
+      parseToken(tok::colon, diag::expected_sil_block_colon))
+    return true;
+
+  // Eat away, nom nom nom.
+  while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
+    consumeToken();
+
+  return Tok.isNot(tok::r_brace);
+}
+
+
+///   decl-sil:   [[only in SIL mode]]
+///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body
+///   decl-sil-body:
+///     '{' sil-basic-block+ '}'
+bool Parser::parseDeclSIL() {
+  // Inform the lexer that we're lexing the body of the SIL declaration.  Do
+  // this before we consume the 'sil' token so that all later tokens are
+  // properly handled.
+  Lexer::SILBodyRAII Tmp(*L);
+
+  consumeToken(tok::kw_sil);
+
+  SILLinkage FnLinkage;
+  Identifier FnName;
+  SILType FnType;
+
+  if (parseSILLinkage(FnLinkage, *this) ||
+      parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
+      parseIdentifier(FnName, diag::expected_sil_function_name) ||
+      parseToken(tok::colon, diag::expected_sil_type) ||
+      parseSILType(FnType))
+    return true;
+
+  // TODO: Verify it is a function type.
+  SILFunction *Fn = new (*SIL) SILFunction(*SIL, FnLinkage,
+                                           FnName.str(), FnType);
+
+  // Now that we have a SILFunction parse the body, if present.
+
+  SourceLoc LBraceLoc = Tok.getLoc();
+  if (consumeIf(tok::l_brace)) {
+    // Parse the basic block list.
+    do {
+      if (parseSILBasicBlock(Fn))
+        return true;
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+
+    SourceLoc RBraceLoc;
+    parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                       LBraceLoc);
+  }
+
+  return false;
+}
+
