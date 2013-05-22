@@ -443,7 +443,7 @@ public:
   void visitStructInst(StructInst *SI) {
     OS << "struct " << SI->getType() << " (";
     interleave(SI->getElements(),
-               [&](const SILValue &V) { OS << getID(V); },
+               [&](const SILValue &V) { OS << getIDAndType(V); },
                [&] { OS << ", "; });
     OS << ')';
   }
@@ -578,11 +578,11 @@ public:
   }
 
   void visitReturnInst(ReturnInst *RI) {
-    OS << "return " << getID(RI->getOperand());
+    OS << "return " << getIDAndType(RI->getOperand());
   }
   
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
-    OS << "autorelease_return " << getID(RI->getOperand());
+    OS << "autorelease_return " << getIDAndType(RI->getOperand());
   }
 
   void printBranchArgs(OperandValueArrayRef args) {
