@@ -53,6 +53,17 @@ static raw_ostream &operator<<(raw_ostream &OS, ID i) {
   return OS;
 }
 
+/// IDAndType - Used when a client wants to print something like "%0 : $Int".
+struct IDAndType {
+  ID id;
+  SILType Ty;
+};
+
+static raw_ostream &operator<<(raw_ostream &OS, IDAndType i) {
+  return OS << i.id << " : " << i.Ty;
+}
+
+
 void SILConstant::print(raw_ostream &OS) const {
   if (isNull()) {
     OS << "<null>";
@@ -152,15 +163,20 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   SILValue subjectValue;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
-  ID getID(const SILBasicBlock *B);
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
-  ID getID(SILValue V);
-
 public:
   SILPrinter(raw_ostream &OS) : OS(OS) {
   }
 
+  ID getID(const SILBasicBlock *B);
+  ID getID(SILValue V);
+  IDAndType getIDAndType(SILValue V) {
+    return { getID(V), V.getType() };
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Big entrypoints.
   void print(const SILFunction *F) {
     interleave(*F,
                [&](const SILBasicBlock &B) { print(&B); },
@@ -174,7 +190,7 @@ public:
       OS << '(';
       for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
         if (I != BB->bbarg_begin()) OS << ", ";
-        OS << getID(*I) << " : " << (*I)->getType();
+        OS << getIDAndType(*I);
       }
       OS << ')';
     }
@@ -195,10 +211,6 @@ public:
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
-
-  void printAsOperand(SILBasicBlock *BB) {
-    OS << getID(BB);
-  }
 
   void print(SILValue V) {
     ID Name = getID(V);
@@ -293,14 +305,9 @@ public:
   
   void printFunctionInst(FunctionInst *FI) {
     OS << getID(FI->getCallee()) << '(';
-    bool first = true;
-    for (auto arg : FI->getArguments()) {
-      if (first)
-        first = false;
-      else
-        OS << ", ";
-      OS << getID(arg);
-    }
+    interleave(FI->getArguments(),
+               [&](const SILValue &arg) { OS << getID(arg); },
+               [&] { OS << ", "; });
     OS << ')';
   }
 
@@ -366,15 +373,13 @@ public:
   void visitSpecializeInst(SpecializeInst *SI) {
     OS << "specialize " << getID(SI->getOperand()) << ", "
        << SI->getType() << ", ";
-    bool first = true;
-    for (Substitution const &s : SI->getSubstitutions()) {
-      if (!first)
-        OS << ", ";
-      s.Archetype->print(OS);
-      OS << " = ";
-      s.Replacement->print(OS);
-      first = false;
-    }
+    interleave(SI->getSubstitutions(),
+               [&](const Substitution &s) {
+                 s.Archetype->print(OS);
+                 OS << " = ";
+                 s.Replacement->print(OS);
+               },
+               [&] { OS << ", "; });
   }
   
   void printConversionInst(ConversionInst *CI,
@@ -446,7 +451,7 @@ public:
   void visitTupleInst(TupleInst *TI) {
     OS << "tuple (";
     interleave(TI->getElements(),
-               [&](const SILValue &V){ OS << getID(V) << " : " << V.getType();},
+               [&](const SILValue &V){ OS << getIDAndType(V); },
                [&] { OS << ", "; });
     OS << ')';
   }
@@ -460,7 +465,7 @@ public:
   }
   void visitStructExtractInst(StructExtractInst *EI) {
     OS << "struct_extract " << getID(EI->getOperand()) << ", @"
-    << EI->getField()->getName().get();
+       << EI->getField()->getName().get();
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
     OS << "struct_element_addr " << getID(EI->getOperand()) << ", @"
@@ -592,17 +597,15 @@ public:
   }
   
   void visitBranchInst(BranchInst *UBI) {
-    OS << "br ";
-    printAsOperand(UBI->getDestBB());
+    OS << "br " << getID(UBI->getDestBB());
     printBranchArgs(UBI->getArgs());
   }
 
   void visitCondBranchInst(CondBranchInst *CBI) {
-    OS << "condbranch " << getID(CBI->getCondition()) << ", ";
-    printAsOperand(CBI->getTrueBB());
+    OS << "condbranch " << getID(CBI->getCondition()) << ", "
+       << getID(CBI->getTrueBB());
     printBranchArgs(CBI->getTrueArgs());
-    OS << ", ";
-    printAsOperand(CBI->getFalseBB());
+    OS << ", " << getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
   }
 };
@@ -649,7 +652,7 @@ ID SILPrinter::getID(SILValue V) {
 
 void swift::WriteAsOperand(raw_ostream &out, SILBasicBlock *BB,
                            bool printType) {
-  SILPrinter(out).printAsOperand(BB);
+  out << SILPrinter(out).getID(BB);
 }
 
 //===----------------------------------------------------------------------===//
