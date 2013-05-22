@@ -27,13 +27,13 @@ SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
 		 Object.swift CTypes.swift Misc.swift Range.swift \
 		 UnsafePointer.swift \
 		 Slice.swift StringByte.swift String.swift Char.swift \
-		 CodePoints.swift Dictionary.swift Vector.swift \
+		 Dictionary.swift Vector.swift \
 		 Algorithm.swift \
 		 Demangle.swift InputStream.swift OutputStream.swift \
 		 CString.swift \
 		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
 		 REPL.swift Environment.swift GenericIVar.swift \
-	   Optional.swift Generator.swift Zip.swift
+	   Optional.swift Generator.swift Zip.swift CodePoints.swift
 ifeq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES += Assert.swift
 else
