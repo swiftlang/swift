@@ -53,7 +53,7 @@ private:
   void operator delete(void *Ptr, size_t) = delete;
 
 public:
-  SILBasicBlock(SILFunction *F, const char *Name = "");
+  SILBasicBlock(SILFunction *F);
   ~SILBasicBlock();
 
   SILFunction *getParent() { return Parent; }

@@ -1257,7 +1257,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the base class destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F, "destructor");
+  epilogBB = new (SGM.M) SILBasicBlock(&F);
   
   // Emit the destructor body, if any.
   if (dd)
@@ -1490,7 +1490,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit this until after we've emitted the body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F, "constructor");
+  epilogBB = new (SGM.M) SILBasicBlock(&F);
 
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -1671,7 +1671,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit the block until after we've emitted the body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F, "constructor");
+  epilogBB = new (SGM.M) SILBasicBlock(&F);
   
   // Emit the constructor body.
   visit(ctor->getBody());

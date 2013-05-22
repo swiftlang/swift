@@ -60,8 +60,8 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
   
   SILValue V = emitConditionValue(*this, E);
   
-  SILBasicBlock *ContBB = new SILBasicBlock(&F, "condition.cont");
-  SILBasicBlock *TrueBB = new SILBasicBlock(&F, "if.true");
+  SILBasicBlock *ContBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *TrueBB = new (F.getModule()) SILBasicBlock(&F);
 
   for (SILType argTy : contArgs) {
     new (F.getModule()) SILArgument(argTy, ContBB);
@@ -69,7 +69,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
   
   SILBasicBlock *FalseBB, *FalseDestBB;
   if (hasFalseCode) {
-    FalseBB = FalseDestBB = new SILBasicBlock(&F, "if.false");
+    FalseBB = FalseDestBB = new (F.getModule()) SILBasicBlock(&F);
   } else {
     FalseBB = nullptr;
     FalseDestBB = ContBB;
@@ -197,11 +197,11 @@ void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "while");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "while.end");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -228,12 +228,12 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "dowhile");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "dowhile.end");
-  SILBasicBlock *CondBB = new (F.getModule()) SILBasicBlock(&F, "dowhile.cond");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *CondBB = new (F.getModule()) SILBasicBlock(&F);
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(CondBB, getCleanupsDepth());
   
@@ -283,12 +283,12 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "for.condition");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F, "for.inc");
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "for.end");
+  SILBasicBlock *IncBB = new (F.getModule()) SILBasicBlock(&F);
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(IncBB, getCleanupsDepth());
   
@@ -337,11 +337,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
   if (!B.hasValidInsertionPoint()) return;
   
   // Create a new basic block and jump into it.
-  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F, "foreach.cond");
+  SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
   
   // Set the destinations for 'break' and 'continue'
-  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F, "foreach.end");
+  SILBasicBlock *EndBB = new (F.getModule()) SILBasicBlock(&F);
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth());
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth());
   
@@ -406,8 +406,8 @@ void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
     // Emit the condition for this case.
     SILValue cond = emitConditionValue(*this, C->getConditionExpr());
     
-    SILBasicBlock *trueBB = new SILBasicBlock(&F, "switch.case");
-    SILBasicBlock *falseBB = new SILBasicBlock(&F, "switch.next");
+    SILBasicBlock *trueBB = new (F.getModule()) SILBasicBlock(&F);
+    SILBasicBlock *falseBB = new (F.getModule()) SILBasicBlock(&F);
 
     B.createCondBranch(C, cond, trueBB, falseBB);
     
@@ -418,7 +418,7 @@ void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
   SILBasicBlock *contBB;
   if (defaultCase) {
     caseBodyBlocks[defaultCase] = B.getInsertionBB();
-    contBB = new SILBasicBlock(&F, "switch.cont");
+    contBB = new (F.getModule()) SILBasicBlock(&F);
   } else {
     contBB = B.getInsertionBB();
   }

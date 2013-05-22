@@ -32,11 +32,9 @@ SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB)
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::SILBasicBlock(SILFunction *Parent, const char *Name)
+SILBasicBlock::SILBasicBlock(SILFunction *Parent)
   : Parent(Parent), PredList(0) {
   Parent->getBlocks().push_back(this);
-    
-  // FIXME: Drop the name on the floor for now.
 }
 SILBasicBlock::~SILBasicBlock() {}
 
