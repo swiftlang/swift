@@ -26,8 +26,7 @@
 
 namespace swift {
 
-template <typename ForwardIterator,
-          typename UnaryFunctor,
+template <typename ForwardIterator, typename UnaryFunctor,
           typename NullaryFunctor>
 inline void interleave(ForwardIterator begin, ForwardIterator end,
                        UnaryFunctor each_fn,
@@ -42,14 +41,11 @@ inline void interleave(ForwardIterator begin, ForwardIterator end,
   }
 }
 
-template <typename Container,
-typename UnaryFunctor,
-typename NullaryFunctor>
+template <typename Container, typename UnaryFunctor, typename NullaryFunctor>
 inline void interleave(const Container &c, UnaryFunctor each_fn,
                        NullaryFunctor between_fn) {
   interleave(c.begin(), c.end(), each_fn, between_fn);
 }
-
 
 } // end namespace swift
 

@@ -219,7 +219,10 @@ public:
     visit(V);
     if (!V->use_empty()) {
       OS.PadToColumn(50);
-      OS << "// users: ";
+      OS << "// user";
+      if (std::distance(V->use_begin(), V->use_end()) != 1)
+        OS << 's';
+      OS << ": ";
       interleave(V->use_begin(), V->use_end(),
                  [&] (Operand *o) { OS << getID(o->getUser()); },
                  [&] { OS << ", "; });

@@ -258,7 +258,8 @@ public:
 };
 
 /// An iterator over all uses of a ValueBase.
-class ValueBaseUseIterator {
+class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
+                                                  Operand*, ptrdiff_t> {
   Operand *Cur;
 public:
   ValueBaseUseIterator() = default;
@@ -297,7 +298,8 @@ inline Range<ValueBaseUseIterator> ValueBase::getUses() {
 }
 
 /// An iterator over all uses of a specific result of a ValueBase.
-class ValueUseIterator {
+class ValueUseIterator  : public std::iterator<std::forward_iterator_tag,
+                                               Operand*, ptrdiff_t> {
   llvm::PointerIntPair<Operand*, ValueResultNumberBits> CurAndResultNumber;
 public:
   ValueUseIterator() = default;
