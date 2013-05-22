@@ -35,6 +35,7 @@ enum class tok {
   floating_literal,
   string_literal,
   character_literal,
+  sil_local_name,      // %42 in SIL mode.
   
 #define KEYWORD(X) kw_ ## X,
 #define PUNCTUATOR(X, Y) X,

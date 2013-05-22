@@ -703,9 +703,10 @@ void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
 
-  if (*TokStart == '0' && *CurPtr == 'x') {
+  if (*TokStart == '0' && *CurPtr == 'x')
     return lexHexNumber();
-  } else if (*TokStart == '0' && *CurPtr == 'o') {
+  
+  if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7]+
     ++CurPtr;
     while (*CurPtr >= '0' && *CurPtr <= '7')
@@ -716,7 +717,9 @@ void Lexer::lexNumber() {
       return formToken(tok::unknown, TokStart);
     }
     return formToken(tok::integer_literal, TokStart);
-  } else if (*TokStart == '0' && *CurPtr == 'b') {
+  }
+  
+  if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01]+
     ++CurPtr;
     while (*CurPtr == '0' || *CurPtr == '1')
@@ -1270,8 +1273,19 @@ Restart:
       skipSlashStarComment();
       goto Restart;
     }
-    SWIFT_FALLTHROUGH;
-  case '=': case '-': case '+': case '*': case '%': case '<': case '>':
+    return lexOperatorIdentifier();
+  case '%':
+    // Lex %[0-9+] as a local SIL value
+    if (InSILBody && isdigit(CurPtr[0])) {
+      do {
+        ++CurPtr;
+      } while (isdigit(CurPtr[0]));
+      
+      return formToken(tok::sil_local_name, TokStart);
+    }
+    return lexOperatorIdentifier();
+      
+  case '=': case '-': case '+': case '*': case '<': case '>':
   case '!': case '&': case '|': case '^': case '~':
     return lexOperatorIdentifier();
   

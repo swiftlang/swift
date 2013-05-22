@@ -137,7 +137,7 @@ bool Parser::parseSILBasicBlock(SILFunction *F) {
   if (parseIdentifier(BBName, diag::expected_sil_block_name) ||
       parseToken(tok::colon, diag::expected_sil_block_colon))
     return true;
-
+  
   // Eat away, nom nom nom.
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof))
     consumeToken();
