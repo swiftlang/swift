@@ -288,12 +288,11 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
 }
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc)
-  : TC(tc), SharedState(new SharedStateType(tc))
+  : TC(tc), Arena(tc.Context, Allocator)
 {
 }
 
-ConstraintSystem::~ConstraintSystem() {
-}
+ConstraintSystem::~ConstraintSystem() { }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
@@ -317,7 +316,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 
 MemberLookup &ConstraintSystem::lookupMember(Type base, Identifier name) {
   base = base->getCanonicalType();
-  auto &ptr = SharedState->MemberLookups[{base, name}];
+  auto &ptr = MemberLookups[{base, name}];
   if (!ptr)
     ptr.reset(new MemberLookup(base, name, TC.TU));
   return *ptr;
@@ -330,14 +329,13 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   llvm::FoldingSetNodeID id;
   ConstraintLocator::Profile(id, anchor, path);
   void *insertPos = nullptr;
-  auto locator
-    = SharedState->ConstraintLocators.FindNodeOrInsertPos(id, insertPos);
+  auto locator = ConstraintLocators.FindNodeOrInsertPos(id, insertPos);
   if (locator)
     return locator;
 
   // Allocate a new locator and add it to the set.
   locator = ConstraintLocator::create(getAllocator(), anchor, path);
-  SharedState->ConstraintLocators.InsertNode(locator, insertPos);
+  ConstraintLocators.InsertNode(locator, insertPos);
   return locator;
 }
 
@@ -2018,8 +2016,7 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
   }
 
   // Look up the entry for this type/literalkind pair in LiteralChecks.
-  unsigned &known = SharedState->LiteralChecks[{type->getCanonicalType(),
-                                               (unsigned)kind}];
+  unsigned &known = LiteralChecks[{type->getCanonicalType(), (unsigned)kind}];
 
   // If we haven't already checked whether this type is literal compatible, do
   // it now.

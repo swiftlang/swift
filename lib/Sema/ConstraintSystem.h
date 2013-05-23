@@ -1306,48 +1306,39 @@ class ConstraintSystem {
   TypeChecker &TC;
   Constraint *failedConstraint = nullptr;
 
-  /// \brief Contains state that is shared among all of the child constraint
-  /// systems for a given type-checking problem.
-  struct SharedStateType {
-    /// \brief Allocator used for all of the related constraint systems.
-    llvm::BumpPtrAllocator Allocator;
+  /// \brief Allocator used for all of the related constraint systems.
+  llvm::BumpPtrAllocator Allocator;
 
-    /// \brief Arena used for memory management of constraint-checker-related
-    /// allocations.
-    ///
-    /// This arena will automatically be destroyed when the top constraint
-    /// system is destroyed.
-    ConstraintCheckerArenaRAII Arena;
+  /// \brief Arena used for memory management of constraint-checker-related
+  /// allocations.
+  ///
+  /// This arena will automatically be destroyed when the top constraint
+  /// system is destroyed.
+  ConstraintCheckerArenaRAII Arena;
 
-    /// \brief Counter for type variables introduced.
-    unsigned TypeCounter = 0;
+  /// \brief Counter for type variables introduced.
+  unsigned TypeCounter = 0;
 
-    /// \brief Counter for the overload sets introduced.
-    unsigned OverloadSetCounter = 0;
+  /// \brief Counter for the overload sets introduced.
+  unsigned OverloadSetCounter = 0;
 
-    /// \brief Cached member lookups.
-    llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
-      MemberLookups;
+  /// \brief Cached member lookups.
+  llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
+    MemberLookups;
 
-    /// \brief Cached literal checks.  The key is a canonical type + literal
-    /// kind.  The value is a tristate of 0 -> uncomputed, 1 -> computed
-    /// false, 2 -> computed true.
-    llvm::DenseMap<std::pair<CanType, unsigned>, unsigned> LiteralChecks;
+  /// \brief Cached literal checks.  The key is a canonical type + literal
+  /// kind.  The value is a tristate of 0 -> uncomputed, 1 -> computed
+  /// false, 2 -> computed true.
+  llvm::DenseMap<std::pair<CanType, unsigned>, unsigned> LiteralChecks;
 
-    /// \brief Folding set containing all of the locators used in this
-    /// constraint system.
-    llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
+  /// \brief Folding set containing all of the locators used in this
+  /// constraint system.
+  llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
 
-    /// \brief Folding set containing all of the failures that have occurred
-    /// while exploring this constraint system.
-    llvm::FoldingSet<Failure> Failures;
+  /// \brief Folding set containing all of the failures that have occurred
+  /// while exploring this constraint system.
+  llvm::FoldingSet<Failure> Failures;
 
-    SharedStateType(TypeChecker &tc) : Arena(tc.Context, Allocator) {}
-  };
-
-  /// \brief The state shared among all of the related constraint systems.
-  SharedStateType *SharedState;
-  
   /// \brief A mapping from each overload set that is resolved in this
   /// constraint system to a pair (index, type), where index is the index of
   /// the overload choice (within the overload set) and type is the type
@@ -1375,11 +1366,11 @@ class ConstraintSystem {
   SmallVector<Constraint *, 16> SolvedConstraints;
 
   unsigned assignTypeVariableID() {
-    return SharedState->TypeCounter++;
+    return TypeCounter++;
   }
 
   unsigned assignOverloadSetID() {
-    return SharedState->OverloadSetCounter++;
+    return OverloadSetCounter++;
   }
   friend class OverloadSet;
 
@@ -1548,14 +1539,13 @@ public:
     // Check whether we've recorded this failure already. If so, we're done.
     llvm::FoldingSetNodeID id;
     Failure::Profile(id, locator, kind, args...);
-    auto &failures = SharedState->Failures;
     void *insertPos = nullptr;
-    if (failures.FindNodeOrInsertPos(id, insertPos))
+    if (Failures.FindNodeOrInsertPos(id, insertPos))
       return;
 
     // Allocate a new failure and record it.
     auto failure = Failure::create(getAllocator(), locator, kind, args...);
-    failures.InsertNode(failure, insertPos);
+    Failures.InsertNode(failure, insertPos);
   }
 
   /// \brief Simplifies an argument to the failure by simplifying the type.
@@ -1787,7 +1777,7 @@ public:
              getSelectedOverloadFromSet(OverloadSet *ovl);
 
   /// \brief Retrieve the allocator used by this constraint system.
-  llvm::BumpPtrAllocator &getAllocator() { return SharedState->Allocator; }
+  llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
 
   template <typename It>
   ArrayRef<typename std::iterator_traits<It>::value_type>

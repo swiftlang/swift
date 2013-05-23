@@ -93,8 +93,8 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
 }
 
 bool ConstraintSystem::diagnose() {
-  if (SharedState->Failures.size() == 1) {
-    auto &failure = *SharedState->Failures.begin();
+  if (Failures.size() == 1) {
+    auto &failure = *Failures.begin();
     if (failure.getLocator() && failure.getLocator()->getAnchor()) {
       SourceRange range1, range2;
 
