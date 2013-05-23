@@ -895,6 +895,7 @@ namespace {
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
       case TypeKind::NameAlias:
+      case TypeKind::Protocol:
       case TypeKind::ProtocolComposition:
         return;
         

@@ -547,10 +547,10 @@ Type TypeChecker::transformType(Type type,
 #define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
-
   case TypeKind::OneOf:
   case TypeKind::Struct:
-  case TypeKind::Class: {
+  case TypeKind::Class:
+  case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
       parentTy = transformType(parentTy, fn);

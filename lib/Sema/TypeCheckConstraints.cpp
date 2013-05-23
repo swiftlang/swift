@@ -1398,7 +1398,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeKind::OneOf:
     case TypeKind::Struct:
-    case TypeKind::Class: {
+    case TypeKind::Class:
+    case TypeKind::Protocol: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
@@ -1950,6 +1951,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::Array:
   case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
+  case TypeKind::Protocol:
     // If we are supposed to record failures, do so.
     if (flags & TMF_RecordFailures) {
       recordFailure(locator, Failure::TypesNotConstructible,
