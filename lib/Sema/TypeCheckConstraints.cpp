@@ -810,10 +810,6 @@ Type ConstraintSystem::openTypeOfContext(
 
 Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                                 bool isTypeReference) {
-  // If the base is a module type, just use the type of the decl.
-  if (baseTy->is<ModuleType>())
-    return getTypeOfReference(value);
-
   // Figure out the instance type used for the base.
   Type baseObjTy = baseTy->getRValueType();
   bool isInstance = true;
@@ -821,6 +817,10 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     baseObjTy = baseMeta->getInstanceType();
     isInstance = false;
   }
+
+  // If the base is a module type, just use the type of the decl.
+  if (baseObjTy->is<ModuleType>())
+    return getTypeOfReference(value);
 
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
