@@ -96,12 +96,6 @@ Module *SourceLoader::loadModule(
   unsigned bufferID = Ctx.SourceMgr.AddNewSourceBuffer(inputFile.take(),
                                                        moduleID.second.Value);
 
-  // FIXME: Turn off the constraint-based type checker for the imported 'swift'
-  // module.
-  llvm::SaveAndRestore<bool> saveUseCS(Ctx.LangOpts.UseConstraintSolver,
-                                       (Ctx.LangOpts.UseConstraintSolver &&
-                                        moduleID.first.str() != "swift"));
-
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();
   TranslationUnit *importTU = new (Ctx) TranslationUnit(moduleID.first, comp,
