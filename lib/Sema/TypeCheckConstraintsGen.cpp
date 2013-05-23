@@ -857,18 +857,14 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     
     Type visitIfExpr(IfExpr *expr) {
       // The condition expression must be convertible with getLogicValue.
-      // FIXME: Add a constraint kind for Condition?
-      ASTContext &C = CS.getASTContext();
+      // We handle this type-check completely separately, because it has no
+      // bearing on the results of the type-check of the expression containing
+      // the ternary.
       Expr *condExpr = expr->getCondExpr();
-      
-      auto logicValueResultTy = CS.createTypeVariable(expr->getCondExpr());
-      auto getLogicValueTy = FunctionType::get(TupleType::getEmpty(C),
-                                               logicValueResultTy,
-                                               C);
-      CS.addValueMemberConstraint(condExpr->getType(),
-                              CS.getASTContext().getIdentifier("getLogicValue"),
-                              getLogicValueTy);
-      
+      // FIXME: Mark expression as an error if this fails.
+      CS.getTypeChecker().typeCheckCondition(condExpr);
+      expr->setCondExpr(condExpr);
+
       // The branches must be convertible to a common type.
       ConstraintLocatorBuilder locatorBuilder(CS.getConstraintLocator(expr,
                                                                       { }));

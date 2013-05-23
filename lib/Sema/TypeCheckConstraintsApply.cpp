@@ -1294,20 +1294,6 @@ namespace {
     }
 
     Expr *visitIfExpr(IfExpr *expr) {
-      {
-        // FIXME: Disable the constraint-based type checker here, because we are
-        // falling back to the existing type checker.
-        auto &tc = cs.getTypeChecker();
-        llvm::SaveAndRestore<bool> savedUseCS(tc.getLangOpts()
-                                                .UseConstraintSolver,
-                                              false);
-
-        Expr *condExpr = expr->getCondExpr();
-        if (tc.typeCheckCondition(condExpr))
-          return nullptr;
-        expr->setCondExpr(condExpr);
-      }
-
       auto resultTy = simplifyType(expr->getType());
       expr->setType(resultTy);
 
@@ -2285,6 +2271,22 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         Rewriter.visitNewArrayExpr(newArray);
+        return false;
+      }
+
+      // For ternary expressions, visit the then and else branches;
+      // the condition was checked separately.
+      if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+        // FIXME: Record failures.
+        if (auto thenExpr = ifExpr->getThenExpr()->walk(*this)) {
+          ifExpr->setThenExpr(thenExpr);
+        }
+
+        if (auto elseExpr = ifExpr->getElseExpr()->walk(*this)) {
+          ifExpr->setElseExpr(elseExpr);
+        }
+
+        Rewriter.visitIfExpr(ifExpr);
         return false;
       }
 

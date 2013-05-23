@@ -613,6 +613,18 @@ namespace {
       }
     }
 
+    void verifyChecked(IfExpr *expr) {
+      auto condTy
+        = expr->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
+      if (!condTy || condTy->getBitWidth() != 1) {
+        Out << "IfExpr condition is not an i1\n";
+        abort();
+      }
+
+      checkSameType(expr->getThenExpr()->getType(),
+                    expr->getElseExpr()->getType(),
+                    "then and else branches of an if-expr");
+    }
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {
