@@ -28,7 +28,6 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
@@ -43,12 +42,6 @@
 using namespace swift;
 using namespace constraints;
 using llvm::SmallPtrSet;
-
-//===--------------------------------------------------------------------===//
-// Constraint solver statistics
-//===--------------------------------------------------------------------===//
-#define DEBUG_TYPE "Constraint solver"
-STATISTIC(NumExploredConstraintSystems, "# of constraint systems explored");
 
 //===--------------------------------------------------------------------===//
 // Type variable implementation.
@@ -297,70 +290,26 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
 ConstraintSystem::ConstraintSystem(TypeChecker &tc)
   : TC(tc), SharedState(new SharedStateType(tc))
 {
-  ++NumExploredConstraintSystems;
-}
-
-ConstraintSystem::ConstraintSystem(ConstraintSystem *parent, 
-                                   unsigned overloadSetIdx,
-                                   unsigned overloadChoiceIdx)
-  : TC(parent->TC), Parent(parent), SharedState(parent->SharedState),
-    // FIXME: Lazily copy from parent system.
-    Constraints(parent->Constraints)
-{
-  ++NumExploredConstraintSystems;
-  
-  // Copy all of the parent's unresolved overload sets *except*
-  // the one we're resolving in this child system.
-  UnresolvedOverloadSets.append(
-    parent->UnresolvedOverloadSets.begin(),
-    parent->UnresolvedOverloadSets.begin() + overloadSetIdx);
-  UnresolvedOverloadSets.append(
-    parent->UnresolvedOverloadSets.begin() + overloadSetIdx + 1,
-    parent->UnresolvedOverloadSets.end());
-
-  // Resolve this overload, as requested by the caller.
-  resolveOverload(parent->UnresolvedOverloadSets[overloadSetIdx], 
-                  overloadChoiceIdx);
-}
-
-ConstraintSystem::ConstraintSystem(ConstraintSystem *parent, 
-                                   const PotentialBinding &binding)
-  : TC(parent->TC), Parent(parent), SharedState(parent->SharedState),
-    assumedTypeVar(binding.getTypeVariable()),
-    // FIXME: Lazily copy from parent system.
-    Constraints(parent->Constraints),
-    UnresolvedOverloadSets(parent->UnresolvedOverloadSets)
-{
-  ++NumExploredConstraintSystems;
-
-  auto type = binding.getType();
-  if (binding.shouldOpenType())
-    type = openBindingType(type);
-  addConstraint(ConstraintKind::Equal, assumedTypeVar, type);
 }
 
 ConstraintSystem::~ConstraintSystem() {
-  if (!Parent)
-    delete SharedState;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
-  for (auto cs = this; cs; cs = cs->Parent) {
-    for (auto tv : cs->TypeVariables) {
-      // We only care about the representatives.
-      if (getRepresentative(tv) != tv)
-        continue;
+  for (auto tv : TypeVariables) {
+    // We only care about the representatives.
+    if (getRepresentative(tv) != tv)
+      continue;
 
-      if (auto fixed = getFixedType(tv)) {
-        if (simplifyType(fixed)->hasTypeVariable())
-          return false;
+    if (auto fixed = getFixedType(tv)) {
+      if (simplifyType(fixed)->hasTypeVariable())
+        return false;
 
-        continue;
-      }
-      
-      return true;
+      continue;
     }
+    
+    return true;
   }
   
   return false;
@@ -415,7 +364,6 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   case SolutionKind::Error:
     if (!failedConstraint) {
       failedConstraint = constraint;
-      markUnsolvable();
     }
 
     if (!simplifyExisting && solverState) {
@@ -430,9 +378,6 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
     // to do.
     if (TC.getLangOpts().DebugConstraintSolver && !solverState)
       SolvedConstraints.push_back(constraint);
-
-    if (isExternallySolved)
-      ExternallySolved.insert(constraint);
 
     // Record solved constraint.
     if (solverState) {
@@ -973,11 +918,9 @@ void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
 
 OverloadSet *
 ConstraintSystem::getGeneratedOverloadSet(ConstraintLocator *locator) {
-  for (auto cs = this; cs; cs = cs->Parent) {
-    auto known = cs->GeneratedOverloadSets.find(locator);
-    if (known != cs->GeneratedOverloadSets.end())
-      return known->second;
-  }
+  auto known = GeneratedOverloadSets.find(locator);
+  if (known != GeneratedOverloadSets.end())
+    return known->second;
 
   return nullptr;
 }
@@ -986,12 +929,10 @@ ConstraintSystem::getGeneratedOverloadSet(ConstraintLocator *locator) {
 /// system (or one of its parents), along with the type it was given.
 Optional<std::pair<OverloadChoice, Type>>
 ConstraintSystem::getSelectedOverloadFromSet(OverloadSet *ovl) {
-  for (auto cs = this; cs; cs = cs->Parent) {
-    auto known = cs->ResolvedOverloads.find(ovl);
-    if (known != cs->ResolvedOverloads.end()) {
-      return std::make_pair(ovl->getChoices()[known->second.first],
-                            known->second.second);
-    }
+  auto known = ResolvedOverloads.find(ovl);
+  if (known != ResolvedOverloads.end()) {
+    return std::make_pair(ovl->getChoices()[known->second.first],
+                          known->second.second);
   }
 
   return Nothing;
@@ -3379,80 +3320,62 @@ void Solution::dump(llvm::SourceMgr *sm) const {
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
-  if (Parent) {
-    SmallVector<ConstraintSystem *, 4> path;;
-    for (auto cs = this; cs->Parent; cs = cs->Parent) {
-      path.push_back(cs);
-    }
+  if (!ResolvedOverloads.empty()) {
+    out << "Resolved overloads:\n";
 
-    out << "Assumptions:\n";
-    for (auto p = path.rbegin(), pe = path.rend(); p != pe; ++p) {
-      auto cs = *p;
-      out.indent(2);
+    // Otherwise, report the resolved overloads.
+    assert(!ResolvedOverloads.empty());
+    for (auto ovl : ResolvedOverloads) {
+      auto &choice = ovl.first->getChoices()[ovl.second.first];
+      out << "  selected overload set #" << ovl.first->getID()
+          << " choice #" << ovl.second.first << " for ";
+      switch (choice.getKind()) {
+      case OverloadChoiceKind::Decl:
+        if (choice.getBaseType())
+          out << choice.getBaseType()->getString() << ".";
+        out << choice.getDecl()->getName().str() << ": "
+          << ovl.first->getBoundType()->getString() << " == "
+          << ovl.second.second->getString() << "\n";
+        break;
 
-      // If we assumed a type variable binding, report that.
-      if (cs->assumedTypeVar) {
-        out << "  assuming " << cs->assumedTypeVar->getString() << " == "
-            << cs->getFixedType(cs->assumedTypeVar) << "\n";
-        continue;
-      }
+      case OverloadChoiceKind::BaseType:
+        out << "base type " << choice.getBaseType()->getString() << "\n";
+        break;
 
-      // Otherwise, report the resolved overloads.
-      assert(!cs->ResolvedOverloads.empty());
-      for (auto ovl : cs->ResolvedOverloads) {
-        auto &choice = ovl.first->getChoices()[ovl.second.first];
-        out << "  selected overload set #" << ovl.first->getID()
-            << " choice #" << ovl.second.first << " for ";
-        switch (choice.getKind()) {
-        case OverloadChoiceKind::Decl:
-          if (choice.getBaseType())
-            out << choice.getBaseType()->getString() << ".";
-          out << choice.getDecl()->getName().str() << ": "
-            << ovl.first->getBoundType()->getString() << " == "
-            << ovl.second.second->getString() << "\n";
-          break;
-
-        case OverloadChoiceKind::BaseType:
-          out << "base type " << choice.getBaseType()->getString() << "\n";
-          break;
-
-        case OverloadChoiceKind::FunctionReturningBaseType:
-          out << "function returning base type "
-              << choice.getBaseType()->getString() << "\n";
-          break;
-        case OverloadChoiceKind::IdentityFunction:
-          out << "identity " << choice.getBaseType()->getString() << " -> "
-              << choice.getBaseType()->getString() << "\n";
-          break;
-        case OverloadChoiceKind::TupleIndex:
-          out << "tuple " << choice.getBaseType()->getString() << " index "
-              << choice.getTupleIndex() << "\n";
-          break;
-        }
+      case OverloadChoiceKind::FunctionReturningBaseType:
+        out << "function returning base type "
+            << choice.getBaseType()->getString() << "\n";
+        break;
+      case OverloadChoiceKind::IdentityFunction:
+        out << "identity " << choice.getBaseType()->getString() << " -> "
+            << choice.getBaseType()->getString() << "\n";
+        break;
+      case OverloadChoiceKind::TupleIndex:
+        out << "tuple " << choice.getBaseType()->getString() << " index "
+            << choice.getTupleIndex() << "\n";
+        break;
       }
     }
     out << "\n";
   }
 
   out << "Type Variables:\n";
-  for (auto cs = this; cs; cs = cs->Parent) {
-    for (auto tv : cs->TypeVariables) {
-      out.indent(2);
-      tv->getImpl().print(out);
-      auto rep = getRepresentative(tv);
-      if (rep == tv) {
-        if (auto fixed = getFixedType(tv)) {
-          out << " as ";
-          fixed->print(out);
-        }
-      } else {
-        out << " equivalent to ";
-        rep->print(out);
+  for (auto tv : TypeVariables) {
+    out.indent(2);
+    tv->getImpl().print(out);
+    auto rep = getRepresentative(tv);
+    if (rep == tv) {
+      if (auto fixed = getFixedType(tv)) {
+        out << " as ";
+        fixed->print(out);
       }
-      out << "\n";
+    } else {
+      out << " equivalent to ";
+      rep->print(out);
     }
+    out << "\n";
   }
-  
+
   out << "\nUnsolved Constraints:\n";
   for (auto constraint : Constraints) {
     out.indent(2);

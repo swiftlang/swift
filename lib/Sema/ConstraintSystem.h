@@ -1203,28 +1203,6 @@ enum class SolutionCompareResult {
   Worse
 };
 
-/// \brief A potential binding of a type variable to another type.
-class PotentialBinding {
-  llvm::PointerIntPair<TypeVariableType *, 1, bool> typeVarAndOpen;
-  Type type;
-
-public:
-  PotentialBinding(TypeVariableType *typeVar, Type type, bool openType)
-    : typeVarAndOpen(typeVar, openType), type(type) { }
-
-  /// \brief Retrieve the type variable.
-  TypeVariableType *getTypeVariable() const {
-    return typeVarAndOpen.getPointer();
-  }
-
-  /// \brief Retrieve the type to which the type variable will be bound.
-  Type getType() const { return type; }
-
-  /// \brief Determine whether the type to which the type variable
-  /// will be bound should be opened.
-  bool shouldOpenType() const { return typeVarAndOpen.getInt(); }
-};
-
 /// \brief A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1326,7 +1304,6 @@ public:
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
   TypeChecker &TC;
-  ConstraintSystem *Parent = nullptr;
   Constraint *failedConstraint = nullptr;
 
   /// \brief Contains state that is shared among all of the child constraint
@@ -1370,28 +1347,6 @@ class ConstraintSystem {
 
   /// \brief The state shared among all of the related constraint systems.
   SharedStateType *SharedState;
-
-  // ---Track the state space we've already explored---
-  /// \brief The number of child systems that are still active, i.e., haven't
-  /// been found to be unsolvable.
-  unsigned NumActiveChildren = 0;
-
-  /// \brief Whether we have resolved an overload by creating child systems.
-  bool ResolvedOverloadsInChildSystems = false;
-
-  /// \brief Keeps track of the attempted type variable bindings we have
-  /// performed in child systems.
-  llvm::DenseMap<TypeVariableType *, llvm::SmallPtrSet<CanType, 16>>
-    ExploredTypeBindings;
-
-  /// \brief Keeps track of type variable bindings we should try next,
-  /// assuming that none of the current set of type bindings pans out.
-  ///
-  /// These bindings tend to be for supertypes of type variable bindings
-  /// we've already attempted.
-  SmallVector<PotentialBinding, 16> PotentialBindings;
-
-  // Valid everywhere
   
   /// \brief A mapping from each overload set that is resolved in this
   /// constraint system to a pair (index, type), where index is the index of
@@ -1399,18 +1354,15 @@ class ConstraintSystem {
   /// implied by that overload.
   llvm::DenseMap<OverloadSet *, std::pair<unsigned, Type>> ResolvedOverloads;
 
-  /// \brief The type variable for which we are assuming a given particular
-  /// type.
-  TypeVariableType *assumedTypeVar = nullptr;
-
+  /// \brief The state of the constraint system.
+  ///
+  /// FIXME: This notion is antiquated.
   enum { Active, Unsolvable, Solved } State = Active;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
   SmallVector<Constraint *, 16> Constraints;
-  llvm::SmallPtrSet<Constraint *, 4> ExternallySolved;
   SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
   llvm::DenseMap<ConstraintLocator *, OverloadSet *> GeneratedOverloadSets;
-  SmallVector<std::unique_ptr<ConstraintSystem>, 2> Children;
 
   /// \brief The set of type variable bindings that have changed while
   /// processing this constraint system.
@@ -1494,31 +1446,6 @@ public:
   };
 
   ConstraintSystem(TypeChecker &tc);
-
-  /// \brief Creates a child constraint system that selects a
-  /// particular overload from an unresolved overload set.
-  ///
-  /// \param parent The parent constraint system.
-  ///
-  /// \param overloadSetIdx The index into the parent's unresolved
-  /// overload set, selecting the overload to be resolved.
-  ///
-  /// \param overloadChoiceIdx The index into the unresolved
-  /// overload set identified by \p overloadSetIdx. This index
-  /// selects which overload choice this child system will explore.
-  ConstraintSystem(ConstraintSystem *parent, 
-                   unsigned overloadSetIdx,
-                   unsigned overloadChoiceIdx);
-
-  /// \brief Creates a child constraint system that binds a given
-  /// type variable to a given type.
-  ///
-  /// \param parent The parent constraint system.
-  ///
-  /// \param binding The type variable binding we will be exploring
-  /// within this child system.
-  ConstraintSystem(ConstraintSystem *parent, const PotentialBinding &binding);
-
   ~ConstraintSystem();
 
   /// \brief Retrieve the type checker associated with this constraint system.
@@ -1529,42 +1456,7 @@ public:
 
   /// \brief Retrieve the constraints.
   ArrayRef<Constraint *> getConstraints() const { return Constraints; }
-
-  /// \brief Retrieve the top-level constraint system.
-  ConstraintSystem &getTopConstraintSystem() {
-    ConstraintSystem *cs = this;
-    while (cs->Parent)
-      cs = cs->Parent;
-    return *cs;
-  }
-
-  /// \brief Retrieve the depth of this constraint system, i.e., the
-  /// number of hops from this constraint system to the top-level constraint
-  /// system.
-  unsigned getConstraintSystemDepth() const {
-    unsigned depth = 0;
-    const ConstraintSystem *cs = this;
-    while (cs->Parent) {
-      ++depth;
-      cs = cs->Parent;
-    }
-    return depth;
-  }
-
-  /// \brief Determine whether this constraint system has any child
-  /// constraint systems, active or not.
-  bool hasChildren() const { return !Children.empty(); }
   
-  /// \brief Determine whether this constraint system has any active
-  /// child constraint systems.
-  bool hasActiveChildren() const { return NumActiveChildren > 0; }
-
-  /// \brief Whether this system has resolved an overload by creating
-  /// child systems.
-  bool hasResolvedOverloadsInChildSystems() const {
-    return ResolvedOverloadsInChildSystems;
-  }
-
   /// \brief Determine whether this constraint system has any free type
   /// variables.
   bool hasFreeTypeVariables();
@@ -1572,61 +1464,15 @@ public:
   /// \brief Retrieve the constraint that caused this system to fail.
   Constraint *getFailedConstraint() const { return failedConstraint; }
 
-  /// \brief Create a new constraint system that is derived from this
-  /// constraint system, referencing the rules of the parent system but
-  /// also introducing its own (likely dependent) constraints.
-  ///
-  /// The new constraint system will be immediately simplified, and deleted
-  /// if simplification fails.
-  ///
-  /// \returns the new constraint system, or null if simplification failed.
-  template<typename ...Args>
-  ConstraintSystem *createDerivedConstraintSystem(Args &&...args){
-    ++NumActiveChildren;
-    auto result = new ConstraintSystem(this, std::forward<Args>(args)...);
-
-    // Attempt simplification of the resulting constraint system.
-    if (result->simplify()) {
-      // The constraint system constraints an error. Delete it now and
-      // return a null pointer to indicate failure.
-      result->restoreTypeVariableBindings();
-      delete result;
-      return nullptr;
-    }
-    
-    // The system may be solvable. Record and return it.
-    Children.push_back(std::unique_ptr<ConstraintSystem>(result));
-    return result;
-  }
-
 private:
-  /// \brief Indicates that the given child constraint system is inactive
-  /// (i.e., unsolvable).
-  void markChildInactive(ConstraintSystem *childCS);
-
-  /// \brief Indicates that this constraint system is unsolvable.
-  void markUnsolvable() {
-    State = Unsolvable;
-    if (Parent)
-      Parent->markChildInactive(this);
-  }
-
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
   /// \returns an empty solution if this constraint system is unsolvable.
   Optional<Solution> finalize();
 
-private:
-  /// \brief Remove any inactive (== unsolvable) children.
-  void removeInactiveChildren();
-
   /// \brief Create the solution based on this constraint system.
   Solution createSolution();
-
-  /// \brief Clear out any 'intermediate' data that is no longer useful when
-  /// all of the child systems are standalone.
-  void clearIntermediateData();
 
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
@@ -1634,12 +1480,6 @@ private:
   /// \param numBindings The number of bindings to restore, from the end of
   /// the saved-binding stack.
   void restoreTypeVariableBindings(unsigned numBindings);
-
-  /// \brief Restore the type variable bindings to what they were before
-  /// we attempted to solve this constraint system.
-  void restoreTypeVariableBindings() {
-    restoreTypeVariableBindings(SavedBindings.size());
-  }
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -1663,12 +1503,6 @@ public:
   /// this constraint system.
   unsigned getNumUnresolvedOverloadSets() const {
     return UnresolvedOverloadSets.size();
-  }
-
-  /// \brief Determine whether this constraint system has any potential
-  /// bindings.
-  bool hasPotentialBindings() const {
-    return !PotentialBindings.empty();
   }
 
   /// \brief Create a new type variable.
@@ -1862,27 +1696,6 @@ public:
     typeVar->getImpl().assignFixedType(type, SavedBindings);
   }
 
-  /// \brief Determine whether we have already explored type bindings for
-  /// the given type variable via child systems.
-  bool haveExploredTypeVar(TypeVariableType *typeVar) {
-    return ExploredTypeBindings.count(typeVar) > 0;
-  }
-
-  /// \brief Add a new potential binding of a type variable to a particular
-  /// type, to be explored by a child system.
-  void addPotentialBinding(const PotentialBinding &binding) {
-    PotentialBindings.push_back(binding);
-  }
-
-  /// \brief Indicate a design to explore a specific binding for the given
-  /// type variable.
-  ///
-  /// \returns true if this type variable binding should be explored,
-  /// or false if it has already been explored.
-  bool exploreBinding(TypeVariableType *typeVar, Type binding) {
-    return ExploredTypeBindings[typeVar].insert(binding->getCanonicalType());
-  }
-
   /// \brief "Open" the given type by replacing any occurrences of archetypes
   /// (including those implicit in unbound generic types) with fresh type
   /// variables.
@@ -1913,7 +1726,8 @@ public:
   /// archetypes (including those implicit in unbound generic types) with
   /// fresh type variables.
   ///
-  /// This variant of \c openType() tweaks the result from 
+  /// This variant of \c openType() tweaks the result from \c openType() to
+  /// prefer arrays to slices.
   /// FIXME: This is a bit of a hack.
   ///
   /// \param type The type to open.

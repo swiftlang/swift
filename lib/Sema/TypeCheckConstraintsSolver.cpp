@@ -25,7 +25,6 @@ using namespace constraints;
 //===--------------------------------------------------------------------===//
 #define DEBUG_TYPE "Constraint solver"
 STATISTIC(NumSimplifyIterations, "# of simplification iterations");
-STATISTIC(NumSupertypeFallbacks, "# of supertype fallbacks");
 
 /// \brief Check whether the given type can be used as a binding for the given
 /// type variable.
@@ -56,10 +55,6 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 Optional<Solution> ConstraintSystem::finalize() {
   switch (State) {
   case Unsolvable:
-    if (!solverState) {
-      removeInactiveChildren();
-      restoreTypeVariableBindings();
-    }
     return Nothing;
 
   case Solved:
@@ -67,130 +62,37 @@ Optional<Solution> ConstraintSystem::finalize() {
     break;
 
   case Active:
-    if (hasActiveChildren()) {
-      // There is a solution below, but by itself this isn't a solution.
-      if (!solverState) {
-        removeInactiveChildren();
-        clearIntermediateData();
-        restoreTypeVariableBindings();
-      }
-      return Nothing;
-    }
-
     // Check whether we have a proper solution.
     if (Constraints.empty() && UnresolvedOverloadSets.empty() &&
         !hasFreeTypeVariables()) {
       State = Solved;
       auto result = createSolution();
-      if (!solverState) {
-        removeInactiveChildren();
-        restoreTypeVariableBindings();
-      }
       return std::move(result);
     }
 
     // We don't have a solution;
-    if (!solverState) {
-      markUnsolvable();
-      removeInactiveChildren();
-      restoreTypeVariableBindings();
-    }
+    State = Unsolvable;
     return Nothing;
-  }
-}
-
-void ConstraintSystem::removeInactiveChildren() {
-  Children.erase(std::remove_if(Children.begin(), Children.end(),
-                   [&](std::unique_ptr<ConstraintSystem> &child) -> bool {
-                     return !child->hasActiveChildren() &&
-                            (!child->Children.empty() ||
-                             !child->isSolved());
-                   }),
-                 Children.end());
-}
-
-void ConstraintSystem::markChildInactive(ConstraintSystem *childCS) {
-  assert(NumActiveChildren > 0);
-  --NumActiveChildren;
-
-  // If the child system made an assumption about a type variable that
-  // didn't pan out, try weaker assumptions.
-  if (auto typeVar = childCS->assumedTypeVar) {
-    auto boundTy = childCS->getFixedType(typeVar);
-    auto supertypes = enumerateDirectSupertypes(boundTy);
-    auto &explored = ExploredTypeBindings[typeVar];
-
-    bool addedAny = false;
-    for (auto supertype : supertypes) {
-      // Make sure we can actually do the binding.
-      if (auto bindingTy = checkTypeOfBinding(*this, typeVar, supertype))
-        supertype = *bindingTy;
-      else
-        continue;
-
-      if (explored.count(supertype->getCanonicalType()) > 0)
-        continue;
-
-      ++NumSupertypeFallbacks;
-      PotentialBindings.push_back( { typeVar, supertype, false } );
-      addedAny = true;
-    }
-
-    if (!addedAny) {
-      // If we haven't added any constraints for this type variable, check
-      // whether we can fall back to a default literal type.
-      // FIXME: This would be far, far more efficient if we keep constraints
-      // related to a type variable on-line.
-      for (auto constraint : Constraints) {
-        if (constraint->getClassification() !=ConstraintClassification::Literal)
-          continue;
-
-        if (auto constrainedVar
-              = dyn_cast<TypeVariableType>(
-                  constraint->getFirstType().getPointer())) {
-          if (getRepresentative(constrainedVar) != typeVar)
-            continue;
-
-          if (auto literalType =
-                TC.getDefaultLiteralType(constraint->getLiteralKind())) {
-            if (explored.count(literalType->getCanonicalType()) == 0)
-              PotentialBindings.push_back({typeVar, literalType, true});
-          }
-        }
-      }
-    }
   }
 }
 
 Solution ConstraintSystem::createSolution() {
   assert(State == Solved);
 
-  decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
-  PotentialBindings.clear();
-  decltype(ExternallySolved)().swap(ExternallySolved);
+  Solution solution(*this);
+  // For each of the type variables, get its fixed type.
+  for (auto tv : TypeVariables) {
+    solution.typeBindings[tv] = simplifyType(tv);
+  }
 
-  Solution solution(getTopConstraintSystem());
-  for (auto cs = this; cs; cs = cs->Parent) {
-    // For each of the type variables, get its fixed type.
-    for (auto tv : cs->TypeVariables) {
-      solution.typeBindings[tv] = simplifyType(tv);
-    }
-
-    // For each of the overload sets, get its overload choice.
-    for (auto resolved : cs->ResolvedOverloads) {
-      solution.overloadChoices[resolved.first->getLocator()]
-        = { resolved.first->getChoices()[resolved.second.first],
-            resolved.second.second };
-    }
+  // For each of the overload sets, get its overload choice.
+  for (auto resolved : ResolvedOverloads) {
+    solution.overloadChoices[resolved.first->getLocator()]
+      = { resolved.first->getChoices()[resolved.second.first],
+          resolved.second.second };
   }
 
   return solution;
-}
-
-void ConstraintSystem::clearIntermediateData() {
-  decltype(ExploredTypeBindings)().swap(ExploredTypeBindings);
-  PotentialBindings.clear();
-  decltype(ExternallySolved)().swap(ExternallySolved);
 }
 
 /// \brief Restore the type variable bindings to what they were before
@@ -360,8 +262,6 @@ bool ConstraintSystem::simplify() {
     solvedAny = false;
     for (unsigned i = 0, n = existingConstraints.size(); i != n; ++i) {
       auto constraint = existingConstraints[i];
-      if (ExternallySolved.count(constraint))
-        continue;
 
       // FIXME: Temporary hack. We shouldn't ever end up revisiting a
       // constraint like this.
@@ -385,7 +285,6 @@ bool ConstraintSystem::simplify() {
       }
     }
 
-    ExternallySolved.clear();
     ++NumSimplifyIterations;
   } while (solvedAny);
 
