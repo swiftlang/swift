@@ -356,6 +356,7 @@ bool ConstraintSystem::simplify() {
     // Loop through all of the thus-far-unsolved constraints, attempting to
     // simplify each one.
     SmallVector<Constraint *, 16> existingConstraints;
+    llvm::SmallPtrSet<Constraint *, 16> visited;
     existingConstraints.swap(Constraints);
     solvedAny = false;
     for (unsigned i = 0, n = existingConstraints.size(); i != n; ++i) {
@@ -363,6 +364,11 @@ bool ConstraintSystem::simplify() {
       if (ExternallySolved.count(constraint))
         continue;
 
+      // FIXME: Temporary hack. We shouldn't ever end up revisiting a
+      // constraint like this.
+      if (!visited.insert(constraint))
+        continue;
+      
       if (addConstraint(constraint, false, true)) {
         solvedAny = true;
 
@@ -885,7 +891,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     this->solverState = &state;
 
     // Solve the sytem.
-    solveRec(solutions, 0);
+    solveRec(solutions);
     
     // If there is more than one viable system, attempt to pick the best
     // solution.
@@ -1095,6 +1101,8 @@ void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs)
 {
+  ++cs.solverState->depth;
+
   numResolvedOverloadSets = cs.solverState->resolvedOverloadSets.size();
   numTypeVariables = cs.TypeVariables.size();
   numUnresolvedOverloadSets = cs.UnresolvedOverloadSets.size();
@@ -1105,6 +1113,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  --cs.solverState->depth;
+
   // Remove resolved overloads from the shared constraint system state.
   // FIXME: In the long run, we shouldn't need this.
   for (unsigned i = numResolvedOverloadSets,
@@ -1259,8 +1269,7 @@ getPotentialBindings(ConstraintSystem &cs,
   return bindings;
 }
 
-bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
-                                unsigned depth) {
+bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions) {
   // Simplify this system.
   if (failedConstraint || simplify()) {
     return true;
@@ -1270,7 +1279,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   if (Constraints.empty() && UnresolvedOverloadSets.empty()) {
     if (auto solution = finalize()) {
       if (TC.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(depth * 2) << "(found solution)\n";
+        llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
       }
 
       solutions.push_back(std::move(*solution));
@@ -1330,7 +1339,8 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
       for (auto binding : bestBindings) {
         auto type = binding.first;
         if (TC.getLangOpts().DebugConstraintSolver) {
-          llvm::errs().indent(depth * 2) << "(trying " << typeVar->getString()
+          llvm::errs().indent(solverState->depth * 2)
+            << "(trying " << typeVar->getString()
             << " := " << type->getString() << "\n";
         }
 
@@ -1348,11 +1358,11 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
         }
 
         addConstraint(ConstraintKind::Equal, typeVar, type);
-        if (!solveRec(solutions, depth + 1))
+        if (!solveRec(solutions))
           anySolved = true;
 
         if (TC.getLangOpts().DebugConstraintSolver) {
-          llvm::errs().indent(depth * 2) << ")\n";
+          llvm::errs().indent(solverState->depth * 2) << ")\n";
         }
       }
 
@@ -1452,20 +1462,11 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // Try each of the overloads.
   bool anySolved = false;
   for (unsigned i = 0, n = bestOvl->getChoices().size(); i != n; ++i) {
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(depth * 2) << "(overload set #" << bestOvl->getID()
-        << " ";
-    }
-
     // Try to solve the system with this overload choice.
     SolverScope scope(*this);
-    resolveOverload(bestOvl, i, depth + 1);
-    if (!solveRec(solutions, depth + 1))
+    resolveOverload(bestOvl, i);
+    if (!solveRec(solutions))
       anySolved = true;
-
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(depth * 2) << ")\n";
-    }
   }
 
   // Put the best overload set back in place.

@@ -944,7 +944,17 @@ void ConstraintSystem::addOverloadSet(OverloadSet *ovl) {
   // If we have a locator, we can use it to find this overload set.
   // FIXME: We want to get to the point where we always have a locator.
   if (auto locator = ovl->getLocator()) {
-    assert(!GeneratedOverloadSets[locator]);
+    if (TC.getLangOpts().DebugConstraintSolver && solverState) {
+      llvm::errs().indent(solverState->depth * 2)
+        << "(bind locator ";
+      locator->dump(&getASTContext().SourceMgr);
+      llvm::errs() << " to overload set #" << ovl->getID() << ")\n";
+    }
+
+    // FIXME: Strengthen this condition; we shouldn't have re-insertion of
+    // generated overload sets.
+    assert(!GeneratedOverloadSets[locator] ||
+           GeneratedOverloadSets[locator] == ovl);
     GeneratedOverloadSets[locator] = ovl;
     if (solverState) {
       solverState->generatedOverloadSets.push_back(locator);
@@ -1848,8 +1858,7 @@ static Type getMateralizedType(Type type, ASTContext &context) {
   return type;
 }
 
-void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx,
-                                       unsigned depth) {
+void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   // Determie the type to which we'll bind the overload set's type.
   auto &choice = ovl->getChoices()[idx];
   Type refType;
@@ -1910,9 +1919,10 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx,
     solverState->resolvedOverloadSets.push_back(ovl);
 
     if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs() << "choice #" << idx << ": "
+      llvm::errs().indent(solverState->depth * 2)
+        << "(overload set #" << ovl->getID() << " choice #" << idx << ": "
         << ovl->getBoundType()->getString() << " := "
-        << refType->getString() << "\n";
+        << refType->getString() << ")\n";
     }
   }
 }

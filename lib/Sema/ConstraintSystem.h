@@ -1434,6 +1434,9 @@ class ConstraintSystem {
 public:
   /// \brief Describes the current solver state.
   struct SolverState {
+    /// \brief Depth of the solution stack.
+    unsigned depth = 0;
+
     /// \brief The overload sets that have been resolved along the current path.
     SmallVector<OverloadSet *, 4> resolvedOverloadSets;
 
@@ -1448,7 +1451,6 @@ public:
     /// \brief The set of constraints that have been retired along the
     /// current path.
     SmallVector<Constraint *, 32> retiredConstraints;
-
   };
 
   /// \brief The current solver state.
@@ -2111,7 +2113,7 @@ public:
 
   /// \brief Resolve the given overload set to the choice with the given
   /// index within this constraint system.
-  void resolveOverload(OverloadSet *ovl, unsigned idx, unsigned depth = 0);
+  void resolveOverload(OverloadSet *ovl, unsigned idx);
 
   /// \brief Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.
@@ -2207,10 +2209,9 @@ private:
   /// recursion formulation.
   ///
   /// \param solutions The set of solutions to this system of constraints.
-  /// \param depth The depth of the recursion.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveRec(SmallVectorImpl<Solution> &solutions, unsigned depth);
+  bool solveRec(SmallVectorImpl<Solution> &solutions);
 
   /// \brief Determine whether the given \p type matches the default literal
   /// type for a literal constraint placed on the type variable \p tv.
