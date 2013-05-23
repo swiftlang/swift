@@ -1768,7 +1768,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
 
       trivial = false;
-      return SolutionKind::Solved;
+      return SolutionKind::TriviallySolved;
     }
   }
   
@@ -2435,7 +2435,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
   auto compareTypeVariables =
     [&](const Solution &sol1, const Solution &sol2) -> SolutionCompareResult {
       SolutionCompareResult result = SolutionCompareResult::Identical;
-
+      
       for (auto fixedTV1 : sol1.typeBindings) {
         auto boundTV1 = fixedTV1.first;
 
@@ -2466,26 +2466,53 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
         // If one type is a subtype of the other, but not vice-verse,
         // we prefer the system with the more-constrained type.
-        // FIXME: Should we allow conversions, then rank based on what kind
-        // of match we actually had?
-        bool trivial = false;
+        // FIXME: Collapse this check into the second check.
+        bool type1Trivial = false;
         bool type1Better = cs.matchTypes(type1, type2,
                                          TypeMatchKind::Subtype,
                                          TMF_None,
                                          ConstraintLocatorBuilder(nullptr),
-                                         trivial)
+                                         type1Trivial)
                              == SolutionKind::TriviallySolved;
+        bool type2Trivial = false;
         bool type2Better = cs.matchTypes(type2, type1,
                                          TypeMatchKind::Subtype,
                                          TMF_None,
                                          ConstraintLocatorBuilder(nullptr),
-                                         trivial)
+                                         type2Trivial)
                              == SolutionKind::TriviallySolved;
+        if (type1Better && type2Better) {
+          if (updateSolutionCompareResult(result, type1Trivial, type2Trivial))
+            return result;
+        } else {
+          if (updateSolutionCompareResult(result, type1Better, type2Better))
+            return result;
+        }
+        if (type1Better || type2Better) {
+          continue;
+        }
+
+        // If one type is convertible to of the other, but not vice-versa.
+        type1Trivial = false;
+        type1Better = cs.matchTypes(type1, type2,
+                                    TypeMatchKind::Conversion,
+                                    TMF_None,
+                                    ConstraintLocatorBuilder(nullptr),
+                                    type1Trivial)
+                        == SolutionKind::TriviallySolved;
+        type2Trivial = false;
+        type2Better = cs.matchTypes(type2, type1,
+                                    TypeMatchKind::Conversion,
+                                    TMF_None,
+                                    ConstraintLocatorBuilder(nullptr),
+                                    type2Trivial)
+                        == SolutionKind::TriviallySolved;
         if (updateSolutionCompareResult(result, type1Better, type2Better))
           return result;
-        if (type1Better || type2Better)
+        if (type1Better || type2Better) {
           continue;
-
+        }
+        
         // If the type variable was bound by a literal constraint, and the
         // type it is bound to happens to match the default literal
         // constraint in one system but not the other, we prefer the one
