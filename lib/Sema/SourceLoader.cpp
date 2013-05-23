@@ -93,6 +93,10 @@ Module *SourceLoader::loadModule(
     return nullptr;
   }
 
+  // Turn off debugging while parsing other modules.
+  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
+                                          false);
+
   unsigned bufferID = Ctx.SourceMgr.AddNewSourceBuffer(inputFile.take(),
                                                        moduleID.second.Value);
 
