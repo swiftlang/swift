@@ -29,10 +29,6 @@ namespace swift {
     /// solver is the only type checker.
     bool UseConstraintSolver = true;
 
-    /// \brief Use the new constraint solver, as opposed to the old constraint
-    /// solver.
-    bool UseNewConstraintSolver = false;
-    
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint

@@ -2205,14 +2205,6 @@ public:
   bool isSolved() const { return State == Solved; }
 
 private:
-  /// \brief Solve the system of constraints using the direct
-  /// recursion formulation.
-  ///
-  /// \param solutions The set of solutions to this system of constraints.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool solveRec(SmallVectorImpl<Solution> &solutions);
-
   /// \brief Determine whether the given \p type matches the default literal
   /// type for a literal constraint placed on the type variable \p tv.
   bool typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
