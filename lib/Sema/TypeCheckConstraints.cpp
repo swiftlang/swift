@@ -941,7 +941,7 @@ ConstraintSystem::getSelectedOverloadFromSet(OverloadSet *ovl) {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraint simplification
 
-ConstraintSystem::SolutionKind
+Optional<ConstraintSystem::SolutionKind>
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
                                   ConstraintLocatorBuilder locator,
@@ -952,6 +952,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
     if (tuple1->getFields().size() != tuple2->getFields().size()) {
+      // If the second tuple can be initialized from a scalar, fall back to
+      // that.
+      if (tuple2->getFieldForScalarInit() >= 0)
+        return Nothing;
+
       // Record this failure.
       if (flags & TMF_RecordFailures) {
         recordFailure(getConstraintLocator(locator),
@@ -970,6 +975,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
         if (kind == TypeMatchKind::SameType) {
+          // If the second tuple can be initialized from a scalar, fall back to
+          // that.
+          if (tuple2->getFieldForScalarInit() >= 0)
+            return Nothing;
+
           // Record this failure.
           if (flags & TMF_RecordFailures) {
             recordFailure(getConstraintLocator(
@@ -986,6 +996,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         if (!elt2.getName().empty()) {
           int matched = tuple1->getNamedElementId(elt2.getName());
           if (matched != -1) {
+            // If the second tuple can be initialized from a scalar,
+            // fall back to that.
+            if (tuple2->getFieldForScalarInit() >= 0)
+              return Nothing;
+
             // Record this failure.
             if (flags & TMF_RecordFailures) {
               recordFailure(getConstraintLocator(
@@ -1001,6 +1016,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
       // Variadic bit must match.
       if (elt1.isVararg() != elt2.isVararg()) {
+        // If the second tuple can be initialized from a scalar, fall back to
+        // that.
+        if (tuple2->getFieldForScalarInit() >= 0)
+          return Nothing;
+
         // Record this failure.
         if (flags & TMF_RecordFailures) {
           recordFailure(getConstraintLocator(
@@ -1041,6 +1061,11 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
   if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments)) {
+    // If the second tuple can be initialized from a scalar, fall back to
+    // that.
+    if (tuple2->getFieldForScalarInit() >= 0)
+      return Nothing;
+    
     // FIXME: Record why the tuple shuffle couldn't be computed.
     return SolutionKind::Error;
   }
@@ -1393,7 +1418,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Tuple: {
       auto tuple1 = cast<TupleType>(desugar1);
       auto tuple2 = cast<TupleType>(desugar2);
-      return matchTupleTypes(tuple1, tuple2, kind, flags, locator, trivial);
+      if (auto result = matchTupleTypes(tuple1, tuple2, kind, flags, locator,
+                                        trivial))
+        return *result;
+
+      // Break out to attempt scalar-to-tuple conversion, below.
+      break;
     }
 
     case TypeKind::OneOf:
