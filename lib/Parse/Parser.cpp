@@ -239,12 +239,14 @@ void Parser::skipUntilDeclStmtRBrace() {
 /// parseIdentifier - Consume an identifier (but not an operator) if
 /// present and return its name in Result.  Otherwise, emit an error and
 /// return true.
-bool Parser::parseIdentifier(Identifier &Result, const Diagnostic &D) {
+bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
+                             const Diagnostic &D) {
   switch (Tok.getKind()) {
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:
 #include "swift/Parse/Tokens.def"
   case tok::identifier:
     Result = Context.getIdentifier(Tok.getText());
+    Loc = Tok.getLoc();
     consumeToken();
     return false;
   default:
