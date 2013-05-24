@@ -47,7 +47,7 @@ namespace irgen {
                                          bool isSuper);
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
-                                          CallEmission &emission,
+                                          Explosion &emission,
                                           SILConstant method,
                                           llvm::Value *self,
                                           SILType searchType);

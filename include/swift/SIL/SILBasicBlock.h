@@ -102,6 +102,8 @@ public:
   bbarg_iterator bbarg_end() { return BBArgList.end(); }
   const_bbarg_iterator bbarg_begin() const { return BBArgList.begin(); }
   const_bbarg_iterator bbarg_end() const { return BBArgList.end(); }
+  
+  ArrayRef<SILArgument*> getBBArgs() const { return BBArgList; }
 
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors

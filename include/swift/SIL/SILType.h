@@ -143,18 +143,10 @@ public:
     return value.getPointer().get<SILFunctionTypeInfo*>();
   }
   
-  /// Returns the uncurry level of the type. Returns zero for non-function
-  /// types.
-  unsigned getUncurryLevel() const;
-  
-  /// Returns the Swift return type of a function type at the right uncurry
-  /// level.
+  /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   CanType getFunctionResultType() const {
     auto *fty = castTo<AnyFunctionType>();
-    for (unsigned uncurry = 0; uncurry < getUncurryLevel(); ++uncurry) {
-      fty = fty->getResult()->castTo<AnyFunctionType>();
-    }
     return CanType(fty->getResult());
   }
   
@@ -266,8 +258,7 @@ class alignas(8) SILFunctionTypeInfo {
   // for SILType.
   CanType swiftType;
   SILType resultType;
-  unsigned inputTypeCount;
-  unsigned uncurryCount : 31;
+  unsigned inputTypeCount : 31;
   unsigned indirectReturn : 1;
 
   SILType *getInputTypeBuffer() {
@@ -277,33 +268,20 @@ class alignas(8) SILFunctionTypeInfo {
     return reinterpret_cast<SILType const *>(this+1);
   }
   
-  unsigned *getUncurryBuffer() {
-    return reinterpret_cast<unsigned*>(getInputTypeBuffer() + inputTypeCount);
-  }
-  unsigned const *getUncurryBuffer() const {
-    return reinterpret_cast<unsigned const *>(
-                                        getInputTypeBuffer() + inputTypeCount);
-  }
-  
   SILFunctionTypeInfo(CanType swiftType,
                       unsigned inputTypeCount,
                       SILType resultType,
-                      unsigned uncurryCount,
                       bool hasIndirectReturn)
     : swiftType(swiftType),
       resultType(resultType),
       inputTypeCount(inputTypeCount),
-      uncurryCount(uncurryCount),
       indirectReturn(hasIndirectReturn)
-  {
-    assert(uncurryCount >= 1 && "negative uncurry level?!");
-  }
+  {}
 
 public:
   static SILFunctionTypeInfo *create(CanType swiftType,
                                      ArrayRef<SILType> inputTypes,
                                      SILType resultType,
-                                     ArrayRef<unsigned> uncurriedInputCounts,
                                      bool hasIndirectReturn,
                                      SILModule &M);
   
@@ -329,66 +307,21 @@ public:
   /// Get the indirect return argument type. Always an address.
   SILType getIndirectReturnType() const {
     assert(hasIndirectReturn() && "type doesn't have an indirect return?!");
-    return getInputTypes().back();
+    return getInputTypes().front();
   }
   
   /// Returns the list of input types, excluding the indirect return argument,
   /// if any.
   ArrayRef<SILType> getInputTypesWithoutIndirectReturnType() const {
     auto inputs = getInputTypes();
-    return hasIndirectReturn()
-      ? inputs.slice(0, inputs.size() - 1)
-      : inputs;
+    return hasIndirectReturn() ? inputs.slice(1) : inputs;
   }
   
   /// Returns the type of the return type or the indirect return slot if
   /// present.
   SILType getSemanticResultType() const {
     return hasIndirectReturn() ? getIndirectReturnType() : getResultType();
-  }
-  
-  /// Get the uncurry level of this type.
-  unsigned getUncurryLevel() const {
-    return uncurryCount - 1;
-  }
-  
-  /// True if this function type can be curried with a CurryInst.
-  bool isUncurried() const {
-    return uncurryCount > 1;
-  }
-
-  /// Returns an ArrayRef containing the offset of the first SIL argument
-  /// used by each uncurry level of the function. For example, for a simple
-  /// function of type (Int, Int) -> Int, this will contain {0}. For a curried
-  /// function (Int, Int)(Int)(Int, (Int, Int)) -> Int, this will contain
-  /// {0, 2, 3}.
-  ArrayRef<unsigned> getUncurriedInputBegins() const {
-    return {getUncurryBuffer(), uncurryCount};
-  }
-  
-  /// Returns an ArrayRef containing the offset of the last SIL argument
-  /// used by each uncurry level of the function. For example, for a simple
-  /// function of type (Int, Int) -> Int, this will contain {2}. For a curried
-  /// function (Int, Int)(Int)(Int, (Int, Int)) -> Int, this will contain
-  /// {2, 3, 6}.
-  ArrayRef<unsigned> getUncurriedInputEnds() const {
-    return {getUncurryBuffer()+1, uncurryCount};
-  }
-  
-  /// Returns the list of input types needed to partially apply a function of
-  /// this function type with a CurryInst.
-  ArrayRef<SILType> getCurryInputTypes() const {
-    assert(isUncurried());
-    return {getInputTypeBuffer(), getUncurryBuffer()[uncurryCount-1]};
-  }
-  
-  /// Returns the list of input types corresponding to an uncurry level.
-  ArrayRef<SILType> getInputTypesForCurryLevel(unsigned level) const {
-    assert(level < uncurryCount && "uncurry level out of range");
-    return getInputTypes().slice(
-                       getUncurryBuffer()[level],
-                       getUncurryBuffer()[level+1] - getUncurryBuffer()[level]);
-  }
+  }  
 };
   
 inline CanType SILType::getSwiftRValueType() const {

@@ -24,7 +24,19 @@
 using namespace swift;
 using namespace Lowering;
 
-AnyFunctionType *TypeConverter::uncurryFunctionType(AnyFunctionType *t,
+UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
+  switch (cc) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    return UncurryDirection::LeftToRight;
+
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    return UncurryDirection::RightToLeft;
+  }
+}
+
+AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
                                                     unsigned uncurryLevel) {
   if (uncurryLevel == 0)
     return t;
@@ -73,17 +85,10 @@ AnyFunctionType *TypeConverter::uncurryFunctionType(AnyFunctionType *t,
   }
   
   // Put the inputs in the order expected by the calling convention.
-  switch (outerCC) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    // C/ObjC functions are curried left-to-right.
-    // They shouldn't be generic though.
-    assert(!isPolymorphic && "c/objc function shouldn't be generic");
+  switch (getUncurryDirection(outerCC)) {
+  case UncurryDirection::LeftToRight:
     break;
-    
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-    // Swift functions uncurry right-to-left.
+  case UncurryDirection::RightToLeft:
     std::reverse(inputs.begin(), inputs.end());
     break;
   }
@@ -274,22 +279,10 @@ namespace {
   };
 } // end anonymous namespace
   
-SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
-                                                            unsigned uncurries)
+SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
 {
-  CanType topType(ft);
   SmallVector<SILType, 8> inputTypes;
-  SmallVector<unsigned, 3> uncurriedInputCounts;
-  // Destructure the uncurried input tuple types.
-  for (;;) {
-    LoweredFunctionInputTypeVisitor(*this, inputTypes)
-      .visit(ft->getInput()->getCanonicalType());
-    uncurriedInputCounts.push_back(inputTypes.size());
-    if (uncurries-- == 0)
-      break;
-    ft = ft->getResult()->castTo<AnyFunctionType>();
-  }
-  
+
   // If the result type lowers to an address-only type, add it as an indirect
   // return argument.
   SILType resultType = getLoweredType(ft->getResult());
@@ -298,10 +291,13 @@ SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft,
     inputTypes.push_back(resultType);
     resultType = getEmptyTupleType();
   }
+
+  // Destructure the input tuple type.
+  LoweredFunctionInputTypeVisitor(*this, inputTypes)
+    .visit(ft->getInput()->getCanonicalType());
   
-  return SILFunctionTypeInfo::create(topType, inputTypes, resultType,
-                                     uncurriedInputCounts, hasIndirectReturn,
-                                     M);
+  return SILFunctionTypeInfo::create(CanType(ft), inputTypes, resultType,
+                                     hasIndirectReturn, M);
 }
 
 const TypeLoweringInfo &
@@ -329,12 +325,16 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   }
 
   // Make a SILFunctionTypeInfo for function types.
-  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>())
-    theInfo->loweredType = SILType(makeInfoForFunctionType(ft, uncurryLevel),
+  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
+    auto *uncurried = getUncurriedFunctionType(ft, uncurryLevel);
+    theInfo->loweredType = SILType(makeInfoForFunctionType(uncurried),
                                    /*address=*/ addressOnly);
-  // Otherwise, create a SILType from just the Swift type.
-  else
+  } else {
+    // Otherwise, create a SILType from just the Swift type.
+    assert(uncurryLevel == 0 &&
+           "non-function type cannot have an uncurry level");
     theInfo->loweredType = SILType(t, /*address=*/ addressOnly);
+  }
   
   return *theInfo;
 }

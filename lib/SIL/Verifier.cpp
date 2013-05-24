@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
 
@@ -197,8 +199,6 @@ public:
     require(!calleeTy.isAddress(), "callee of closure cannot be an address");
     require(calleeTy.is<FunctionType>(),
             "callee of closure must have concrete function type");
-    require(calleeTy.castTo<FunctionType>()->isThin(),
-            "callee of closure must have a thin function type");
     SILType appliedTy = PAI->getType();
     require(!appliedTy.isAddress(), "result of closure cannot be an address");
     require(appliedTy.is<FunctionType>(),
@@ -207,33 +207,35 @@ public:
     require(!appliedTy.castTo<FunctionType>()->isThin(),
             "result of closure cannot have a thin function type");
 
-    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
+    SILFunctionTypeInfo *info = calleeTy.getFunctionTypeInfo();
+    SILFunctionTypeInfo *resultInfo = appliedTy.getFunctionTypeInfo();
     
-    // Check that the arguments match the curry levels.
-    require(PAI->getArguments().size() == ti->getCurryInputTypes().size(),
-           "closure doesn't have right number of curry arguments for function");
-    for (size_t i = 0, size = PAI->getArguments().size(); i < size; ++i) {
-      DEBUG(llvm::dbgs() << "  argument type ";
-            PAI->getArguments()[i].getType().print(llvm::dbgs());
-            llvm::dbgs() << " for input type ";
-            ti->getCurryInputTypes()[i].print(llvm::dbgs());
-            llvm::dbgs() << '\n');
-      require(PAI->getArguments()[i].getType() == ti->getCurryInputTypes()[i],
-              "input types to closure don't match function input types");
+    // The arguments must match the suffix of the original function's input
+    // types.
+    require(PAI->getArguments().size() + resultInfo->getInputTypes().size()
+              == info->getInputTypes().size(),
+            "result of partial_apply should take as many inputs as were not "
+            "applied by the instruction");
+    
+    unsigned offset = info->getInputTypes().size() - PAI->getArguments().size();
+    
+    for (unsigned i = 0; i < PAI->getArguments().size(); ++i) {
+      require(PAI->getArguments()[i].getType()
+                == info->getInputTypes()[i + offset],
+              "applied argument types do not match suffix of function type's "
+              "inputs");
     }
-    DEBUG(llvm::dbgs() << "result type ";
-          PAI->getType().print(llvm::dbgs());
-          llvm::dbgs() << '\n');
     
-    // The result type should match the uncurried type.
-    FunctionType *ft = calleeTy.castTo<FunctionType>();
-    for (unsigned i = 0; i < calleeTy.getUncurryLevel(); ++i)
-      ft = ft->getResult()->castTo<FunctionType>();
-    
-    require(PAI->getType().getSwiftType()->isEqual(ft)
-            && PAI->getType().getUncurryLevel() == 0,
-            "type of apply instruction doesn't match function result type");
-    
+    // The arguments to the result function type must match the prefix of the
+    // original function's input types.
+    for (unsigned i = 0; i < resultInfo->getInputTypes().size(); ++i) {
+      require(resultInfo->getInputTypes()[i] == info->getInputTypes()[i],
+              "inputs to result function type do not match unapplied inputs "
+              "of original function");
+    }
+    require(resultInfo->getResultType() == info->getResultType(),
+            "result type of result function type does not match original "
+            "function");
   }
 
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
@@ -310,9 +312,6 @@ public:
             "Specialize source should have a polymorphic function type");
     require(operandTy.castTo<AnyFunctionType>()->isThin(),
             "Specialize source should have a thin function type");
-    require(SI->getType().getUncurryLevel()
-             == SI->getOperand().getType().getUncurryLevel(),
-            "Specialize source and dest uncurry levels must match");
   }
 
   void checkStructInst(StructInst *SI) {
@@ -520,11 +519,25 @@ public:
     // generic types.
   }
   
+  CanType getMethodThisType(AnyFunctionType *ft) {
+    Lowering::UncurryDirection direction
+      = F.getModule().Types.getUncurryDirection(ft->getCC());
+    
+    auto *inputTuple = ft->getInput()->getAs<TupleType>();
+    if (!inputTuple)
+      return ft->getInput()->getCanonicalType();
+    
+    switch (direction) {
+    case Lowering::UncurryDirection::LeftToRight:
+      return inputTuple->getFields()[0].getType()->getCanonicalType();
+    case Lowering::UncurryDirection::RightToLeft:
+      return inputTuple->getFields().back().getType()->getCanonicalType();
+    }
+  }
+  
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
-    require(AMI->getType(0).getUncurryLevel() == AMI->getMember().uncurryLevel,
-            "result method must be at natural uncurry level of method");
     FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
     DEBUG(llvm::dbgs() << "method type ";
           methodType->print(llvm::dbgs());
@@ -539,11 +552,10 @@ public:
           llvm::dbgs() << "\n");
     require(operandType.is<ArchetypeType>(),
             "operand type must be an archetype");
-    require(methodType->getResult()->is<FunctionType>(),
-            "result must be a method");
-            
-    require(methodType->getInput()->isEqual(operandType.getSwiftType())
-            || methodType->getInput()->isEqual(
+    
+    CanType thisType = getMethodThisType(methodType);
+    require(thisType == operandType.getSwiftType()
+            || thisType->isEqual(
                             MetaTypeType::get(operandType.getSwiftRValueType(),
                                               operandType.getASTContext())),
             "result must be method of operand type");
@@ -558,10 +570,6 @@ public:
   }
   
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
-    require(EMI->getType(0).getUncurryLevel() == EMI->getMember().uncurryLevel,
-            "result method must be at natural uncurry level of method");
-    require(EMI->getType(0).getUncurryLevel() == 1,
-            "protocol method result must be at uncurry level 1");
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     require(methodType,
             "result method must be of a concrete function type");
@@ -570,11 +578,9 @@ public:
     SILType operandType = EMI->getOperand().getType();
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
-      require(methodType->getInput()->isEqual(
-                              operandType.getASTContext().TheOpaquePointerType),
+      require(getMethodThisType(methodType)->isEqual(
+                            operandType.getASTContext().TheOpaquePointerType),
               "result must be a method of opaque pointer");
-      require(methodType->getResult()->is<FunctionType>(),
-              "result must be a method");
       require(operandType.isAddress(),
               "instance protocol_method must apply to an existential address");
       require(operandType.isExistentialType(),
@@ -587,10 +593,8 @@ public:
       require(operandType.castTo<MetaTypeType>()
                 ->getInstanceType()->isExistentialType(),
               "static protocol_method must apply to an existential metatype");
-      require(methodType->getResult()->is<FunctionType>(),
-              "result must be a method");
-      require(methodType->getInput()->isEqual(
-                                  EMI->getOperand().getType().getSwiftType()),
+      require(getMethodThisType(methodType) ==
+                                  EMI->getOperand().getType().getSwiftType(),
               "result must be a method of the existential metatype");
     }
   }
@@ -604,8 +608,6 @@ public:
   }
   
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    require(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel,
-            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
@@ -614,15 +616,11 @@ public:
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(methodType->getInput()),
+    require(isClassOrClassMetatype(getMethodThisType(methodType)),
             "result must be a method of a class");
-    require(methodType->getResult()->is<AnyFunctionType>(),
-            "result must be a method");
   }
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    require(CMI->getType(0).getUncurryLevel() == CMI->getMember().uncurryLevel,
-            "result method must be at natural uncurry level of method");
     auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
@@ -631,10 +629,8 @@ public:
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
             "operand must be of a class type");
-    require(isClassOrClassMetatype(methodType->getInput()),
+    require(isClassOrClassMetatype(getMethodThisType(methodType)),
             "result must be a method of a class");
-    require(methodType->getResult()->is<AnyFunctionType>(),
-            "result must be a method");
   }
   
   void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
@@ -698,10 +694,6 @@ public:
             "bridge_to_block operand must be a function type");
     require(resultTy.is<FunctionType>(),
             "bridge_to_block result must be a function type");
-    require(operandTy.getUncurryLevel() == 0,
-            "bridge_to_block operand cannot be uncurried");
-    require(resultTy.getUncurryLevel() == 0,
-            "bridge_to_block result cannot be uncurried");
     
     auto *operandFTy = BBI->getOperand().getType().castTo<FunctionType>();
     auto *resultFTy = BBI->getType().castTo<FunctionType>();
@@ -732,10 +724,6 @@ public:
             "thin_to_thick_function operand must be a function");
     require(TTFI->getType().is<AnyFunctionType>(),
             "thin_to_thick_function result must be a function");
-    require(TTFI->getType().getUncurryLevel()
-              == TTFI->getOperand().getType().getUncurryLevel(),
-            "thin_to_thick_function operand and result type must have same "
-            "uncurry level");
     if (auto *opFTy = dyn_cast<FunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
       auto *resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
@@ -777,10 +765,6 @@ public:
             "convert_cc operand must be a function");
     require(CCI->getType().is<AnyFunctionType>(),
             "convert_cc result must be a function");
-    require(CCI->getType().getUncurryLevel()
-              == CCI->getOperand().getType().getUncurryLevel(),
-            "convert_cc operand and result type must have same "
-            "uncurry level");
     if (auto *opFTy = dyn_cast<FunctionType>(
                                  CCI->getOperand().getType().getSwiftType())) {
       auto *resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());

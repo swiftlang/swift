@@ -79,32 +79,20 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
 SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
                                        ArrayRef<SILType> inputTypes,
                                        SILType resultType,
-                                       ArrayRef<unsigned> uncurriedInputCounts,
                                        bool hasIndirectReturn,
                                        SILModule &M) {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
   // return both the begins and ends of each uncurried argument group.
   void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
-                                 + sizeof(SILType)*inputTypes.size()
-                             + sizeof(unsigned)*(1+uncurriedInputCounts.size()),
-                               alignof(SILFunctionTypeInfo));
+                              + sizeof(SILType)*inputTypes.size(),
+                            alignof(SILFunctionTypeInfo));
   SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
                                                     swiftType,
                                                     inputTypes.size(),
                                                     resultType,
-                                                    uncurriedInputCounts.size(),
                                                     hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
-  fi->getUncurryBuffer()[0] = 0;
-  memcpy(fi->getUncurryBuffer()+1, uncurriedInputCounts.data(),
-         sizeof(unsigned) * uncurriedInputCounts.size());
   return fi;
-}
-
-unsigned SILType::getUncurryLevel() const {
-  if (auto *finfo = value.getPointer().dyn_cast<SILFunctionTypeInfo*>())
-    return finfo->getUncurryLevel();
-  return 0;
 }

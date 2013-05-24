@@ -571,33 +571,46 @@ static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
 void SILGenFunction::emitProlog(CapturingExpr *ce,
                                 ArrayRef<Pattern*> paramPatterns,
                                 Type resultType) {
-  // Emit the capture argument variables. These are placed first because they
+  emitProlog(paramPatterns, resultType);
+
+  // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   for (auto capture : ce->getCaptures()) {
     makeCaptureSILArguments(*this, capture);
   }
-
-  emitProlog(paramPatterns, resultType);
 }
 
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
-  // Emit the argument variables.
-  for (size_t i = 0; i < paramPatterns.size(); ++i) {
-    // Allocate the local mutable argument storage and set up an Initialization.
-    InitializationPtr argInit
-      = InitializationForPattern(*this, InitializationForPattern::Argument)
-        .visit(paramPatterns[i]);
-    // Add the SILArguments and use them to initialize the local argument
-    // values.
-    ArgumentInitVisitor(*this, F).visit(paramPatterns[i], argInit.get());
-  }
-
   // If the return type is address-only, emit the indirect return argument.
   const TypeLoweringInfo &returnTI = getTypeLoweringInfo(resultType);
   if (returnTI.isAddressOnly(SGM.M)) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
-                                                   F.begin());
+                                                    F.begin());
+  }
+  
+  auto emitPattern = [&](Pattern *p) {
+    // Allocate the local mutable argument storage and set up an Initialization.
+    InitializationPtr argInit
+      = InitializationForPattern(*this, InitializationForPattern::Argument)
+        .visit(p);
+    // Add the SILArguments and use them to initialize the local argument
+    // values.
+    ArgumentInitVisitor(*this, F).visit(p, argInit.get());
+    
+  };
+  
+  // Emit the argument variables in calling convention order.
+  UncurryDirection direction = SGM.Types.getUncurryDirection(F.getAbstractCC());
+  switch (direction) {
+  case UncurryDirection::LeftToRight:
+    for (Pattern *p : paramPatterns)
+      emitPattern(p);
+    break;
+  case UncurryDirection::RightToLeft:
+    for (Pattern *p : reversed(paramPatterns))
+      emitPattern(p);
+    break;
   }
 }
 
@@ -1018,8 +1031,12 @@ void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
   auto ownership = OwnershipConventions::get(*this, thunk, thunkTy);
   
   SmallVector<SILValue, 4> args;
-  
   SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  if (info->hasIndirectReturn()) {
+    args.push_back(new(F.getModule()) SILArgument(info->getIndirectReturnType(),
+                                                  F.begin()));
+  }
+  
   ArrayRef<SILType> inputs
     = info->getInputTypesWithoutIndirectReturnType();
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
@@ -1031,10 +1048,11 @@ void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
     args.push_back(arg);
   }
   
-  if (info->hasIndirectReturn()) {
-    args.push_back(new (F.getModule()) SILArgument(info->getIndirectReturnType(),
-                                                   F.begin()));
-  }
+  // Reorder the 'this' argument for the Swift calling convention.
+  size_t thisIndex = info->hasIndirectReturn() ? 1 : 0;
+  SILValue thisArg = args[thisIndex];
+  args.erase(args.begin() + thisIndex);
+  args.push_back(thisArg);
   
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(),
@@ -1051,17 +1069,17 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
   auto ownership = OwnershipConventions::get(*this, getter, thunkTy);
   SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
 
-  SILValue thisValue
-    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
   SILValue indirectReturn;
   SILType resultType;
   if (info->hasIndirectReturn()) {
-    indirectReturn = new (F.getModule()) SILArgument(info->getIndirectReturnType(),
-                                                     F.begin());
+    indirectReturn
+      = new(F.getModule()) SILArgument(info->getIndirectReturnType(),F.begin());
     resultType = indirectReturn.getType();
   } else {
     resultType = info->getResultType();
   }
+  SILValue thisValue
+    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
   
   auto *var = cast<VarDecl>(getter.getDecl());
   if (var->isProperty()) {
@@ -1069,9 +1087,9 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
     if (!ownership.isArgumentConsumed(0))
       emitObjCUnconsumedArgument(*this, var, thisValue);
     SmallVector<SILValue, 2> args;
-    args.push_back(thisValue);
     if (indirectReturn)
       args.push_back(indirectReturn);
+    args.push_back(thisValue);
     SILValue nativeFn = emitGlobalFunctionRef(var, getter.asObjC(false));
     SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
     emitObjCReturnValue(*this, var, result, ownership);
@@ -1123,8 +1141,8 @@ void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
     if (!ownership.isArgumentConsumed(1))
       emitObjCUnconsumedArgument(*this, var, setValue);
     SmallVector<SILValue, 2> args;
-    args.push_back(thisValue);
     args.push_back(setValue);
+    args.push_back(thisValue);
     SILValue nativeFn = emitGlobalFunctionRef(var, setter.asObjC(false));
     SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
     // Result should always be void.
@@ -1150,4 +1168,3 @@ void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
   
   B.createReturn(var, emitEmptyTuple(var));
 }
-

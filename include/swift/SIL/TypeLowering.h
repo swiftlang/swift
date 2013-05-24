@@ -168,6 +168,12 @@ public:
     return loweredType;
   }
 };
+  
+/// Argument order of uncurried functions.
+enum class UncurryDirection {
+  LeftToRight,
+  RightToLeft
+};
 
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
 class TypeConverter {
@@ -183,8 +189,7 @@ class TypeConverter {
   
   const TypeLoweringInfo &makeTypeLoweringInfo(CanType t,
                                                unsigned uncurryLevel);
-  SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft,
-                                               unsigned uncurryLevel);
+  SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft);
 
   Type makeConstantType(SILConstant constant);
   
@@ -238,8 +243,11 @@ public:
                               GenericParamList *genericParams = nullptr) const;
   
   /// Convert a nested function type into an uncurried representation.
-  static AnyFunctionType *uncurryFunctionType(AnyFunctionType *t,
-                                              unsigned uncurryLevel);
+  static AnyFunctionType *getUncurriedFunctionType(AnyFunctionType *t,
+                                                   unsigned uncurryLevel);
+  
+  /// Get the uncurried argument order for a calling convention.
+  static UncurryDirection getUncurryDirection(AbstractCC cc);
 };
   
 } // namespace Lowering

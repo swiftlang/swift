@@ -664,9 +664,9 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
   // FIXME: Emit dynamic dispatch instruction (class_method, super_method, etc.)
   // if needed.
   
-  SILType methodType = SGM.getConstantType(methodConstant);
   SILValue methodValue = B.createFunctionRef(loc,
                                              SGM.getFunction(methodConstant));
+  SILType methodType = SGM.getConstantType(methodConstant.atUncurryLevel(0));
   
   /// If the 'this' type is a bound generic, specialize the method ref with
   /// its substitutions.
@@ -717,7 +717,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
     }
     
     SILType specType = getLoweredLoadableType(outerMethodTy,
-                              methodValue.getType().getUncurryLevel());
+                                              methodConstant.uncurryLevel);
     
     methodValue = B.createSpecialize(loc, methodValue, allSubs, specType);
   }
@@ -1118,8 +1118,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
          && "curried local functions not yet supported");
 
   auto captures = body->getCaptures();
-  if (!captures.empty()) {
-    
+  if (!captures.empty()) {    
     llvm::SmallVector<SILValue, 4> capturedArgs;
     for (ValueDecl *capture : captures) {
       switch (getDeclCaptureKind(capture)) {
@@ -1168,9 +1167,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
     }
     
     SILValue functionRef = emitGlobalFunctionRef(loc, constant);
-    Type closureSwiftTy
-      = functionRef.getType().getAs<AnyFunctionType>()->getResult();
-    SILType closureTy = getLoweredLoadableType(closureSwiftTy);
+    SILType closureTy = getLoweredLoadableType(body->getType());
     return emitManagedRValueWithCleanup(
                     B.createPartialApply(loc, functionRef, capturedArgs,
                                          closureTy));
@@ -1390,8 +1387,11 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     return emitImplicitValueDefaultConstructor(gen, ctor);
   }
 
-  emitConstructorMetatypeArg(gen, ctor);
-
+  // Emit the indirect return argument, if any.
+  SILValue resultSlot;
+  if (thisTy.isAddressOnly(gen.SGM.M))
+    resultSlot = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
+  
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
   for (size_t i = 0; i < TP->getFields().size(); ++i) {
@@ -1400,13 +1400,12 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     elements.push_back(
                      emitImplicitValueConstructorArg(gen, ctor, P->getType()));
   }
+
+  emitConstructorMetatypeArg(gen, ctor);
   
   // If we have an indirect return slot, initialize it in-place in the implicit
   // return slot.
-  if (thisTy.isAddressOnly(gen.SGM.M)) {
-    SILValue resultSlot
-      = new (gen.F.getModule()) SILArgument(thisTy, gen.F.begin());
-    
+  if (resultSlot) {
     auto *decl = cast<StructDecl>(thisTy.getSwiftRValueType()
                                   ->getNominalOrBoundGenericNominal());
     unsigned memberIndex = 0;
@@ -1459,8 +1458,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     return emitImplicitValueConstructor(*this, ctor);
   
   // Emit the prolog.
-  emitConstructorMetatypeArg(*this, ctor);
   emitProlog(ctor->getArguments(), ctor->getImplicitThisDecl()->getType());
+  emitConstructorMetatypeArg(*this, ctor);
   
   // Get the 'this' decl and type.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
@@ -1592,10 +1591,14 @@ namespace {
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
-  emitConstructorMetatypeArg(*this, ctor);
 
   SmallVector<SILValue, 8> args;
   
+  // Forward the constructor arguments.
+  ArgumentForwardVisitor(*this, args).visit(ctor->getArguments());
+
+  emitConstructorMetatypeArg(*this, ctor);
+
   // Allocate the "this" value.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredType(thisDecl->getType());
@@ -1615,9 +1618,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     thisValue = B.createAllocRef(ctor, AllocKind::Heap, thisTy);
   }
   args.push_back(thisValue);
-
-  // Forward the constructor arguments.
-  ArgumentForwardVisitor(*this, args).visit(ctor->getArguments());
 
   // Call the initializer.
   SILConstant initConstant = SILConstant(ctor, SILConstant::Kind::Initializer);
@@ -1653,6 +1653,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!ctor->getBody())
     return emitClassImplicitConstructorInitializer(*this, ctor);
   
+  // Emit the prolog for the non-this arguments.
+  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getASTContext()));
+  
   // Emit the 'this' argument and make an lvalue for it.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
   SILType thisTy = getLoweredLoadableType(thisDecl->getType());
@@ -1666,9 +1669,6 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILValue thisLV = VarLocs[thisDecl].address;
   emitStore(ctor, ManagedValue(thisArg, ManagedValue::Unmanaged), thisLV);
   
-  // Emit the prolog for the non-this arguments.
-  emitProlog(ctor->getArguments(), TupleType::getEmpty(F.getASTContext()));
-
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit the block until after we've emitted the body.
   epilogBB = new (SGM.M) SILBasicBlock(&F);
@@ -1747,17 +1747,35 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   
   unsigned paramCount = from.uncurryLevel + 1;
   
-  // If the function has implicit closure context arguments, forward them.
-  if (!fe->getCaptures().empty()) {
-    for (auto capture : fe->getCaptures())
-      forwardCaptureArgs(*this, curriedArgs, capture);
+  /// Forward implicit closure context arguments.
+  bool hasCaptures = !fe->getCaptures().empty();
+  if (hasCaptures)
     --paramCount;
-  }
+  
+  auto forwardCaptures = [&] {
+    if (hasCaptures)
+      for (auto capture : fe->getCaptures())
+        forwardCaptureArgs(*this, curriedArgs, capture);
+  };
 
   // Forward the curried formal arguments.
+  auto forwardedPatterns = fe->getBodyParamPatterns().slice(0, paramCount);
   ArgumentForwardVisitor forwarder(*this, curriedArgs);
-  for (auto *paramPattern : fe->getBodyParamPatterns().slice(0, paramCount))
-    forwarder.visit(paramPattern);
+  UncurryDirection direction
+    = SGM.Types.getUncurryDirection(F.getAbstractCC());
+  switch (direction) {
+  case UncurryDirection::LeftToRight:
+    forwardCaptures();
+    for (auto *paramPattern : forwardedPatterns)
+      forwarder.visit(paramPattern);
+    break;
+
+  case UncurryDirection::RightToLeft:
+    for (auto *paramPattern : reversed(forwardedPatterns))
+      forwarder.visit(paramPattern);
+    forwardCaptures();
+    break;
+  }
   
   // FIXME: Forward archetypes and specialize if the function is generic.
   
@@ -1870,8 +1888,6 @@ RValue SILGenFunction::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) 
 }
 
 SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
-  assert(v.getType().getUncurryLevel() == 0 &&
-         "uncurried functions shouldn't be used as swift values");
   // Thicken thin functions.
   if (v.getType().is<AnyFunctionType>() &&
       v.getType().castTo<AnyFunctionType>()->isThin()) {

@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "OwnershipConventions.h"
 #include "RValue.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Range.h"
@@ -29,56 +30,169 @@ class CallEmission;
 class Callee {
 public:
   enum class Kind {
-    /// A generic SIL value.
-    /// FIXME: We should use more specific kinds so we can emit curried calls
-    /// to methods.
-    GenericValue,
-    /// A standalone function, referenceable by a FunctionRefInst.
+    /// An indirect function value.
+    IndirectValue,
+    /// A direct standalone function call, referenceable by a FunctionRefInst.
     StandaloneFunction,
+
+    VirtualMethod_First,
+      /// A method call using class method dispatch.
+      ClassMethod = VirtualMethod_First,
+      /// A method call using super method dispatch.
+      SuperMethod,
+    VirtualMethod_Last = SuperMethod,
+  
+    GenericMethod_First,
+      /// A method call using archetype dispatch.
+      ArchetypeMethod = GenericMethod_First,
+      /// A method call using protocol dispatch.
+      ProtocolMethod,
+    GenericMethod_Last = ProtocolMethod
   };
-  
+
   const Kind kind;
-  
+
   using SpecializedEmitter = ManagedValue (*)(SILGenFunction &,
                                               SILLocation,
                                               ArrayRef<Substitution>,
                                               ArrayRef<ManagedValue>,
                                               SGFContext);
-  
+
   // Move, don't copy.
   Callee(const Callee &) = delete;
   Callee &operator=(const Callee &) = delete;
 private:
   union {
-    ManagedValue genericValue;
+    ManagedValue indirectValue;
     SILConstant standaloneFunction;
+    struct {
+      SILValue thisValue;
+      SILConstant methodName;
+    } method;
+    struct {
+      SILValue thisValue;
+      SILConstant methodName;
+      CanType origType;
+    } genericMethod;
   };
   std::vector<Substitution> substitutions;
-  SILType specializedType;
-  SpecializeExpr *specializeLoc = nullptr;
-  OwnershipConventions ownership;
-  
+  // There is an initialization order dependency between genericMethod and
+  // specializedType.
+  CanType specializedType;
+  SILLocation specializeLoc;
+
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILConstant c);
-  
-public:
-  Callee(ManagedValue genericValue, OwnershipConventions &&ownership)
-    : kind(Kind::GenericValue), genericValue(genericValue),
-      specializedType(genericValue.getType()),
-      ownership(std::move(ownership))
+
+  Callee(ManagedValue indirectValue)
+    : kind(Kind::IndirectValue),
+      indirectValue(indirectValue),
+      specializedType(indirectValue.getType().getSwiftRValueType())
   {}
-  
+
   Callee(SILGenFunction &gen, SILConstant standaloneFunction)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
-      specializedType(gen.SGM.getConstantType(standaloneFunction)),
-      ownership(OwnershipConventions::get(gen, standaloneFunction,
-                                          specializedType))
+      specializedType(
+                gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
+                  .getSwiftRValueType())
   {}
+
+  Callee(Kind methodKind,
+         SILGenFunction &gen,
+         SILValue thisValue,
+         SILConstant methodName)
+    : kind(methodKind), method{thisValue, methodName},
+      specializedType(
+                gen.SGM.getConstantType(methodName.atUncurryLevel(0))
+                  .getSwiftRValueType())
+  {
+    assert(kind >= Kind::VirtualMethod_First &&
+           kind <= Kind::VirtualMethod_Last &&
+           "this constructor is only used for class/super method callees");
+  }
   
+  static const enum class ForArchetype_t {} ForArchetype{};
+  static const enum class ForProtocol_t {} ForProtocol{};
+  
+  Callee(ForArchetype_t,
+         SILGenFunction &gen,
+         SILValue archetype, SILConstant methodName, Type memberType)
+    : kind(Kind::ArchetypeMethod),
+      genericMethod{archetype, methodName,
+                    FunctionType::get(archetype.getType().getSwiftType(),
+                                      memberType,
+                                      /*isAutoClosure*/ false,
+                                      /*isBlock*/ false,
+                                      /*isThin*/ false,
+                                      gen.SGM.getConstantCC(methodName),
+                                      memberType->getASTContext())
+                      ->getCanonicalType()},
+    specializedType(genericMethod.origType)
+  {
+  }
+
+  static CanType getProtocolMethodType(SILGenFunction &gen,
+                                       SILValue proto,
+                                       SILConstant methodName,
+                                       Type memberType) {
+    // 'this' for instance methods is projected out of the existential container
+    // as an OpaquePointer.
+    // 'this' for existential metatypes is the metatype itself.
+    Type thisTy = methodName.getDecl()->isInstanceMember()
+      ? memberType->getASTContext().TheOpaquePointerType
+      : proto.getType().getSwiftType();
+    
+    // This is a method reference. Extract the method implementation from the
+    // archetype and apply the "this" argument.
+    return FunctionType::get(thisTy,
+                             memberType,
+                             /*isAutoClosure*/ false,
+                             /*isBlock*/ false,
+                             /*isThin*/ false,
+                             gen.SGM.getConstantCC(methodName),
+                             memberType->getASTContext())
+      ->getCanonicalType();
+  }
+
+  Callee(ForProtocol_t,
+         SILGenFunction &gen,
+         SILValue proto, SILConstant methodName, Type memberType)
+    : kind(Kind::ProtocolMethod),
+      genericMethod{proto, methodName,
+                    getProtocolMethodType(gen, proto, methodName, memberType)},
+      specializedType(genericMethod.origType)
+  {}
+
+public:
+  static Callee forIndirect(ManagedValue indirectValue) {
+    return Callee(indirectValue);
+  }
+  static Callee forDirect(SILGenFunction &gen, SILConstant c) {
+    return Callee(gen, c);
+  }
+  static Callee forClassMethod(SILGenFunction &gen, SILValue thisValue,
+                               SILConstant name) {
+    return Callee(Kind::ClassMethod, gen, thisValue, name);
+  }
+  static Callee forSuperMethod(SILGenFunction &gen, SILValue thisValue,
+                               SILConstant name) {
+    return Callee(Kind::SuperMethod, gen, thisValue, name);
+  }
+  static Callee forArchetype(SILGenFunction &gen, SILValue archetypeValue,
+                             SILConstant name, Type memberType) {
+    return Callee(ForArchetype, gen, archetypeValue, name, memberType);
+  }
+  static Callee forProtocol(SILGenFunction &gen, SILValue proto,
+                            SILConstant name, Type memberType) {
+    return Callee(ForProtocol, gen, proto, name, memberType);
+  }
+
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
-  
+
   void addSubstitutions(SILGenFunction &gen,
-                        SpecializeExpr *e,
+                        SILLocation loc,
+                        ArrayRef<Substitution> newSubs,
+                        CanType subType,
                         unsigned callDepth) {
     // Currently generic methods of generic types are the deepest we should
     // be able to stack specializations.
@@ -86,76 +200,164 @@ public:
     // depth.
     assert(callDepth < 2 && "specialization below 'this' or argument depth?!");
     substitutions.insert(substitutions.end(),
-                         e->getSubstitutions().begin(),
-                         e->getSubstitutions().end());
+                         newSubs.begin(),
+                         newSubs.end());
     // Save the type of the SpecializeExpr at the right depth in the type.
-    assert(specializedType.getUncurryLevel() >= callDepth
+    assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
-    AbstractCC cc = specializedType.getFunctionCC();
+    AbstractCC cc = cast<AnyFunctionType>(specializedType)->getCC();
     if (callDepth == 0) {
-      specializedType = gen.getLoweredLoadableType(
-                                             getThinFunctionType(e->getType(),
-                                                                 cc),
-                                             specializedType.getUncurryLevel());
+      specializedType = getThinFunctionType(subType, cc)
+        ->getCanonicalType();
     } else {
-      FunctionType *ft = specializedType.castTo<FunctionType>();
+      FunctionType *ft = cast<FunctionType>(specializedType);
       Type outerInput = ft->getInput();
-      Type newSpecialized = FunctionType::get(outerInput,
-                                              e->getType(),
-                                              /*isAutoClosure*/ false,
-                                              /*isBlock*/ false,
-                                              /*isThin*/ true,
-                                              cc,
-                                              outerInput->getASTContext());
-      specializedType = gen.getLoweredLoadableType(newSpecialized,
-                                             specializedType.getUncurryLevel());
+      specializedType = CanType(FunctionType::get(outerInput,
+                                                  subType,
+                                                  /*isAutoClosure*/ false,
+                                                  /*isBlock*/ false,
+                                                  /*isThin*/ true,
+                                                  cc,
+                                                  outerInput->getASTContext()));
     }
-    specializeLoc = e;
-    
-    // Recalculate the ownership conventions because the substitutions may
-    // have changed the function signature.
-    // FIXME: Currently only native methods can be specialized, so always use
-    // default ownership semantics.
-    ownership = OwnershipConventions::getDefault(specializedType);
+    specializeLoc = loc;
+  }
+  
+  void addSubstitutions(SILGenFunction &gen,
+                        SpecializeExpr *e,
+                        unsigned callDepth) {
+    addSubstitutions(gen, e, e->getSubstitutions(),
+                     e->getType()->getCanonicalType(), callDepth);
   }
   
   unsigned getNaturalUncurryLevel() const {
-    return specializedType.getUncurryLevel();
+    switch (kind) {
+    case Kind::IndirectValue:
+      return 0;
+        
+    case Kind::StandaloneFunction:
+      return standaloneFunction.uncurryLevel;
+
+    case Kind::ClassMethod:
+    case Kind::SuperMethod:
+    case Kind::ArchetypeMethod:
+    case Kind::ProtocolMethod:
+      return method.methodName.uncurryLevel;
+    }
   }
   
-  ManagedValue getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
+  std::pair<ManagedValue, OwnershipConventions>
+  getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
+    OwnershipConventions ownership;
+
+    /// Get the SILConstant for a method at an uncurry level, and store its
+    /// ownership conventions into the 'ownership' local variable.
+    auto getMethodAndSetOwnership = [&]() -> SILConstant {
+      assert(level >= 1
+             && "currying 'this' of dynamic method dispatch not yet supported");
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+      SILConstant c = method.methodName.atUncurryLevel(level);
+      ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
+      return c;
+    };
 
     switch (kind) {
-    case Kind::GenericValue:
-      assert(level == genericValue.getType().getUncurryLevel()
-             && "currying non-standalone function not yet supported");
-      mv = genericValue;
+    case Kind::IndirectValue:
+      assert(level == 0 && "can't curry indirect function");
+      mv = indirectValue;
+      ownership = OwnershipConventions::getDefault(mv.getType());
       break;
+
     case Kind::StandaloneFunction: {
       assert(level <= standaloneFunction.uncurryLevel
-             && "currying past natural uncurry level of standalone function");
+             && "uncurrying past natural uncurry level of standalone function");
       SILConstant constant = standaloneFunction.atUncurryLevel(level);
       SILValue ref = gen.emitGlobalFunctionRef(SILLocation(), constant);
       mv = ManagedValue(ref, ManagedValue::Unmanaged);
+      ownership = OwnershipConventions::get(gen, constant, ref.getType());
       break;
     }
-    };
+
+    case Kind::ClassMethod: {
+      SILConstant constant = getMethodAndSetOwnership();
+      SILValue classMethod = gen.B.createClassMethod(SILLocation(),
+                                           method.thisValue,
+                                           constant,
+                                           gen.SGM.getConstantType(constant));
+      mv = ManagedValue(classMethod, ManagedValue::Unmanaged);
+      break;
+    }
+    case Kind::SuperMethod: {
+      SILConstant constant = getMethodAndSetOwnership();
+      SILValue superMethod = gen.B.createSuperMethod(SILLocation(),
+                                           method.thisValue,
+                                           constant,
+                                           gen.SGM.getConstantType(constant));
+      mv = ManagedValue(superMethod, ManagedValue::Unmanaged);
+      break;
+    }
+    case Kind::ArchetypeMethod: {
+      assert(level >= 1
+             && "currying 'this' of dynamic method dispatch not yet supported");
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+
+      SILConstant constant = genericMethod.methodName.atUncurryLevel(level);
+      CanType archetypeType
+        = genericMethod.thisValue.getType().getSwiftRValueType();
+      if (auto *metatype = dyn_cast<MetaTypeType>(archetypeType))
+        archetypeType = CanType(metatype->getInstanceType());
+      SILValue method = gen.B.createArchetypeMethod(SILLocation(),
+                           gen.getLoweredType(archetypeType),
+                           constant,
+                           gen.getLoweredType(genericMethod.origType, level));
+      mv = ManagedValue(method, ManagedValue::Unmanaged);
+      
+      // FIXME: We currently assume all archetype methods have native ownership
+      // semantics.
+      ownership = OwnershipConventions::getDefault(method.getType());
+      break;
+    }
+    case Kind::ProtocolMethod: {
+      assert(level >= 1
+             && "currying 'this' of dynamic method dispatch not yet supported");
+      assert(level <= method.methodName.uncurryLevel
+             && "uncurrying past natural uncurry level of method");
+      
+      SILConstant constant = genericMethod.methodName.atUncurryLevel(level);
+      SILValue method = gen.B.createProtocolMethod(SILLocation(),
+                            genericMethod.thisValue,
+                            constant,
+                            gen.getLoweredType(genericMethod.origType, level));
+      mv = ManagedValue(method, ManagedValue::Unmanaged);
+      
+      // FIXME: We currently assume all protocol methods have native ownership
+      // semantics.
+      ownership = OwnershipConventions::getDefault(method.getType());
+      break;
+    }
+    }
     
     // If the callee needs to be specialized, do so.
     if (specializeLoc) {
+      SILType specializedUncurriedType
+        = gen.getLoweredLoadableType(specializedType, level);
+      
       CleanupsDepth cleanup = mv.getCleanup();
       SILValue spec = gen.B.createSpecialize(specializeLoc, mv.getValue(),
-                                             substitutions, specializedType);
+                                             substitutions,
+                                             specializedUncurriedType);
       mv = ManagedValue(spec, cleanup);
+      // Recalculate the ownership conventions because the substitutions may
+      // have changed the function signature.
+      // FIXME: Currently only native methods can be specialized, so always use
+      // default ownership semantics.
+      ownership = OwnershipConventions::getDefault(specializedUncurriedType);
     }
     
-    return mv;
-  }
-  
-  OwnershipConventions const &getOwnershipConventions() const {
-    // FIXME: May need to adjust ownership conventions with uncurry level?
-    return ownership;
+    return {mv, ownership};
   }
   
   ArrayRef<Substitution> getSubstitutions() const {
@@ -176,10 +378,13 @@ public:
             = getSpecializedEmitterForSILBuiltin(standaloneFunction))
         return e;
     }
-    case Kind::GenericValue:
-      break;
+    case Kind::IndirectValue:
+    case Kind::ClassMethod:
+    case Kind::SuperMethod:
+    case Kind::ArchetypeMethod:
+    case Kind::ProtocolMethod:
+      return nullptr;
     }
-    return nullptr;
   }
 };
 
@@ -202,18 +407,11 @@ public:
     : gen(gen), sideEffect(nullptr), callDepth(0)
   {}
   
-  void setCallee(ManagedValue theCallee, OwnershipConventions &&ownership) {
+  void setCallee(Callee &&c) {
     assert((thisParam ? callDepth == 1 : callDepth == 0)
            && "setting callee at non-zero call depth?!");
     assert(!callee && "already set callee!");
-    callee.emplace(theCallee, std::move(ownership));
-  }
-  
-  void setCallee(SILConstant standaloneCallee) {
-    assert((thisParam ? callDepth == 1 : callDepth == 0)
-           && "setting callee at non-zero call depth?!");
-    assert(!callee && "already set callee!");
-    callee.emplace(gen, standaloneCallee);
+    callee.emplace(std::move(c));
   }
   
   void setSideEffect(Expr *sideEffectExpr) {
@@ -230,7 +428,7 @@ public:
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
     ManagedValue fn = gen.visit(e).getAsSingleValue(gen);
-    setCallee(fn, OwnershipConventions::getDefault(fn.getType()));
+    setCallee(Callee::forIndirect(fn));
   }
   
   /// Add a call site to the curry.
@@ -268,13 +466,9 @@ public:
                              SILConstant::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(fd));
         
-        SILValue classMethod = gen.B.createClassMethod(thisCallSite,
-                                             thisParam.peekScalarValue(),
-                                             constant,
-                                             gen.SGM.getConstantType(constant));
-        setCallee(ManagedValue(classMethod, ManagedValue::Unmanaged),
-                  OwnershipConventions::get(gen, constant,
-                                            classMethod.getType()));
+        setCallee(Callee::forClassMethod(gen, thisParam.peekScalarValue(),
+                                         constant));
+        
         // setThisParam bumps the callDepth, but we aren't really past the
         // 'this' call depth in this case.
         --callDepth;
@@ -291,15 +485,15 @@ public:
     // Obtain a reference for a local closure.
     if (gen.LocalConstants.count(constant)) {
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
-      setCallee(localFn,
-                OwnershipConventions::getDefault(localFn.getType()));
+      setCallee(Callee::forIndirect(localFn));
     }
     // Otherwise, stash the SILConstant.
     else
-      setCallee(constant);
+      setCallee(Callee::forDirect(gen, constant));
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
-    setCallee(SILConstant(e->getDecl(), SILConstant::Kind::Initializer));
+    setCallee(Callee::forDirect(gen,
+                    SILConstant(e->getDecl(), SILConstant::Kind::Initializer)));
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -323,18 +517,20 @@ public:
       setThisParam(RValue(gen, existential));
     }
     
-    ManagedValue protoMethod(gen.emitProtocolMethod(e, existential.getValue()),
-                             ManagedValue::Unmanaged);
-    setCallee(protoMethod,
-              OwnershipConventions::getDefault(protoMethod.getType()));
+    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
+    assert(fd && "existential properties not yet supported");
+    
+    setCallee(Callee::forProtocol(gen, existential.getValue(),
+                                  SILConstant(fd), e->getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()));
-    ManagedValue archeMethod(
-                      gen.emitArchetypeMethod(e, thisParam.peekScalarValue()),
-                      ManagedValue::Unmanaged);
-    setCallee(archeMethod,
-              OwnershipConventions::getDefault(archeMethod.getType()));
+    
+    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
+    assert(fd && "archetype properties not yet supported");
+    
+    setCallee(Callee::forArchetype(gen, thisParam.peekScalarValue(),
+                                   SILConstant(fd), e->getType()));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     visit(e->getSubExpr());
@@ -377,26 +573,21 @@ public:
       llvm_unreachable("invalid super callee");
 
     // Upcast 'this' parameter to the super type.
-    SILType constantTy = gen.SGM.getConstantType(constant);
-    SILType constantThisTy
-      = gen.getLoweredLoadableType(constantTy.castTo<FunctionType>()->getInput());
+    SILType superTy
+      = gen.getLoweredLoadableType(apply->getArg()->getType()->getRValueType());
     SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
-                                           constantThisTy);
+                                              superTy);
     
     setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
     
     SILValue superMethod;
     if (constant.isObjC) {
       // ObjC super calls require dynamic dispatch.
-      superMethod = gen.B.createSuperMethod(apply, super.getValue(),
-                                            constant, constantTy);
+      setCallee(Callee::forSuperMethod(gen, super.getValue(), constant));
     } else {
       // Native Swift super calls are direct.
-      superMethod = gen.emitGlobalFunctionRef(apply, constant);
+      setCallee(Callee::forDirect(gen, constant));
     }
-    setCallee(ManagedValue(superMethod, ManagedValue::Unmanaged),
-              OwnershipConventions::get(gen, constant,
-                                        superMethod.getType()));
   }
   
   Callee getCallee() {
@@ -422,56 +613,58 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
   const TypeLoweringInfo &resultTI = getTypeLoweringInfo(resultTy);
+  SILType instructionTy = resultTI.getLoweredType();
   
   // Get the callee value.
   SILValue fnValue = Ownership.isCalleeConsumed()
     ? Fn.forward(*this)
     : Fn.getValue();
+
+  SmallVector<SILValue, 4> argValues;
+
+  // Prepare a buffer for an indirect return if needed.
+  SILValue indirectReturn;
+  if (resultTI.isAddressOnly(F.getModule())) {
+    indirectReturn = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
+    instructionTy = SGM.Types.getEmptyTupleType();
+    argValues.push_back(indirectReturn);
+  }
   
   // Gather the arguments.
-  SmallVector<SILValue, 4> argValues;
   for (size_t i = 0; i < Args.size(); ++i)
     argValues.push_back(
                   forwardIfConsumed(Args[i], Ownership.isArgumentConsumed(i)));
   
-  if (resultTI.isAddressOnly(F.getModule())) {
-    // Allocate a temporary to house the indirect return, and pass it to the
-    // function as an implicit argument.
-    SILValue buffer = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
-    argValues.push_back(buffer);
-    B.createApply(Loc, fnValue, SGM.Types.getEmptyTupleType(),
-                  argValues);
-
+  SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues);
+  
+  if (indirectReturn) {
     /// FIXME: Can ObjC/C functions return types SIL considers address-only?
     /// Do we need to copy here if the return value is Unretained?
-    return emitManagedRValueWithCleanup(buffer);
-  } else {
-    // Receive the result by value.
-    SILValue result = B.createApply(Loc, fnValue,
-                                    resultTI.getLoweredType(),
-                                    argValues);
-    
-    // Take ownership of the return value, if necessary.
-    switch (Ownership.getReturn()) {
-    case OwnershipConventions::Return::Retained:
-      // Already retained.
-      break;
-
-    case OwnershipConventions::Return::Autoreleased:
-      // Autoreleased. Retain using retain_autoreleased.
-      B.createRetainAutoreleased(Loc, result);
-      break;
-        
-    case OwnershipConventions::Return::Unretained:
-      // Unretained. Retain the value.
-      emitRetainRValue(Loc, result);
-      break;
-    }
-    
-    return resultTy->is<LValueType>()
-      ? ManagedValue(result, ManagedValue::LValue)
-      : emitManagedRValueWithCleanup(result);
+    assert(Ownership.getReturn() == OwnershipConventions::Return::Retained
+           && "address-only result with non-Retained ownership not implemented");
+    return emitManagedRValueWithCleanup(indirectReturn);
   }
+
+  // Take ownership of the return value, if necessary.
+  switch (Ownership.getReturn()) {
+  case OwnershipConventions::Return::Retained:
+    // Already retained.
+    break;
+
+  case OwnershipConventions::Return::Autoreleased:
+    // Autoreleased. Retain using retain_autoreleased.
+    B.createRetainAutoreleased(Loc, result);
+    break;
+      
+  case OwnershipConventions::Return::Unretained:
+    // Unretained. Retain the value.
+    emitRetainRValue(Loc, result);
+    break;
+  }
+  
+  return resultTy->is<LValueType>()
+    ? ManagedValue(result, ManagedValue::LValue)
+    : emitManagedRValueWithCleanup(result);
 }
 
 namespace {
@@ -585,16 +778,37 @@ namespace {
         = callee.getSpecializedEmitter(uncurryLevel);
 
       ManagedValue calleeValue;
-      if (!specializedEmitter)
-        calleeValue = callee.getAtUncurryLevel(gen, uncurryLevel);
+      OwnershipConventions ownership;
+      auto cc = AbstractCC::Freestanding;
+      if (!specializedEmitter) {
+        std::tie(calleeValue, ownership)
+          = callee.getAtUncurryLevel(gen, uncurryLevel);
+        cc = calleeValue.getType().getFunctionCC();
+      }
       
       // Collect the arguments to the uncurried call.
-      SmallVector<ManagedValue, 4> args;
+      SmallVector<SmallVector<ManagedValue, 4>, 2> args;
       SILLocation uncurriedLoc;
       for (auto &site : uncurriedSites) {
         uncurriedLoc = site.loc;
-        std::move(site).emit(gen, args);
+        args.push_back({});
+        std::move(site).emit(gen, args.back());
       }
+      
+      // Uncurry the arguments in calling convention order.
+      SmallVector<ManagedValue, 4> uncurriedArgs;
+      UncurryDirection direction = gen.SGM.Types.getUncurryDirection(cc);
+      switch (direction) {
+      case UncurryDirection::LeftToRight:
+        for (auto &argSet : args)
+          uncurriedArgs.append(argSet.begin(), argSet.end());
+        break;
+      case UncurryDirection::RightToLeft:
+        for (auto &argSet : reversed(args))
+          uncurriedArgs.append(argSet.begin(), argSet.end());
+        break;
+      }
+      args = {};
       
       // We use the context emit-into initialization only for the outermost
       // call.
@@ -607,22 +821,19 @@ namespace {
         result = specializedEmitter(gen,
                                     uncurriedLoc,
                                     callee.getSubstitutions(),
-                                    args,
+                                    uncurriedArgs,
                                     uncurriedContext);
       else
-        result = gen.emitApply(uncurriedLoc, calleeValue, args,
-                               callee.getOwnershipConventions(),
-                               uncurriedContext);
+        result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
+                               ownership, uncurriedContext);
       
       // If there are remaining call sites, apply them to the result function.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
-        args.clear();
+        uncurriedArgs.clear();
         SILLocation loc = extraSites[i].loc;
-        std::move(extraSites[i]).emit(gen, args);
+        std::move(extraSites[i]).emit(gen, uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
-        result = gen.emitApply(loc, result, args,
-                               callee.getOwnershipConventions(),
-                               context);
+        result = gen.emitApply(loc, result, uncurriedArgs, ownership, context);
       }
       
       return result;
@@ -969,7 +1180,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   return emission.apply();
 }
 
-ManagedValue SILGenFunction::emitSpecializedPropertyFunctionRef(
+Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
                                           SILLocation loc,
                                           SILConstant constant,
                                           ArrayRef<Substitution> substitutions,
@@ -977,33 +1188,28 @@ ManagedValue SILGenFunction::emitSpecializedPropertyFunctionRef(
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
-  if (LocalConstants.count(constant)) {
-    SILValue v = LocalConstants[constant];
-    emitRetainRValue(loc, v);
-    return emitManagedRValueWithCleanup(v);
+  if (gen.LocalConstants.count(constant)) {
+    SILValue v = gen.LocalConstants[constant];
+    gen.emitRetainRValue(loc, v);
+    return Callee::forIndirect(gen.emitManagedRValueWithCleanup(v));
   }
   
   // Get the accessor function. The type will be a polymorphic function if
   // the This type is generic.
-  SILValue method = emitGlobalFunctionRef(loc, constant);
+  // FIXME: Dynamic dispatch for class/arch/proto methods.
+  Callee callee = Callee::forDirect(gen, constant);
   
-  // If there are substitutions, specialize the generic getter.
+  // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
   // substitutions.
   if (!substitutions.empty()) {
-    assert(method.getType().is<PolymorphicFunctionType>() &&
-           "generic getter is not of a poly function type");
     substPropertyType = getThinFunctionType(substPropertyType,
-                                            SGM.getConstantCC(constant));
-    SILType loweredPropertyType = getLoweredLoadableType(substPropertyType,
-                                                   constant.uncurryLevel);
+                                            gen.SGM.getConstantCC(constant));
     
-    method = B.createSpecialize(loc, method, substitutions,
-                                loweredPropertyType);
+    callee.addSubstitutions(gen, loc, substitutions,
+                            substPropertyType->getCanonicalType(), 0);
   }
-  assert(method.getType().is<FunctionType>() &&
-         "getter is not of a concrete function type");
-  return ManagedValue(method, ManagedValue::Unmanaged);
+  return callee;
 }
 
 /// Emit a call to a getter and materialize its result.
@@ -1026,13 +1232,10 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
                                          propType);
   
-  ManagedValue getter = emitSpecializedPropertyFunctionRef(loc, get,
-                                                           substitutions,
-                                                           propType);
+  Callee getter = emitSpecializedPropertyFunctionRef(*this, loc, get,
+                                                     substitutions, propType);
   
-  CallEmission emission(*this, Callee(getter,
-                                      OwnershipConventions::get(*this, get,
-                                                            getter.getType())));
+  CallEmission emission(*this, std::move(getter));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));
@@ -1066,13 +1269,10 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
                                          propType);
 
-  ManagedValue setter = emitSpecializedPropertyFunctionRef(loc, set,
-                                                           substitutions,
-                                                           propType);
+  Callee setter = emitSpecializedPropertyFunctionRef(*this, loc, set,
+                                                     substitutions, propType);
 
-  CallEmission emission(*this, Callee(setter,
-                                      OwnershipConventions::get(*this, set,
-                                                            setter.getType())));
+  CallEmission emission(*this, std::move(setter));
   // This ->
   if (thisValue)
     emission.addCallSite(loc, std::move(thisValue));

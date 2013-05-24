@@ -158,13 +158,12 @@ namespace irgen {
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel) {
-      SILFunctionTypeInfo *info = origSILType.getFunctionTypeInfo();
       return forKnownFunction(origSILType.getFunctionCC(),
                               origSILType.getSwiftType(),
                               substResultType.getSwiftRValueType(),
                               subs,
                               fn, data, explosionLevel,
-                              info->getUncurryLevel());
+                              0);
     }
 
     /// Prepare a callee for a known function with a known data pointer.

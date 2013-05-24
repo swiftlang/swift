@@ -427,7 +427,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
   auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
                                       origType.getSwiftRValueType(),
                                       ExplosionKind::Minimal,
-                                      /*uncurryLevel*/ 1,
+                                      0,
                                       ExtraData::None,
                                       attrs);
   bool indirectResult = requiresExternalIndirectResult(IGF.IGM,
@@ -466,15 +466,13 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
 
 /// Emit the 'self'/'super' and '_cmd' arguments for an ObjC method dispatch.
 void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
-                                               CallEmission &emission,
+                                               Explosion &args,
                                                SILConstant method,
                                                llvm::Value *self,
                                                SILType searchType) {
   // Compute the selector.
   Selector selector(method.getDecl());
-  
-  Explosion args(ExplosionKind::Minimal);
-  
+    
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member).
   bool isInstanceMethod
@@ -505,9 +503,6 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                IGF.IGM.getPointerAlignment()));
   }
   args.add(selectorV);
-  
-  // Add that to the emission.
-  emission.addArg(args);
 }
 
 /// Create the LLVM function declaration for a thunk that acts like

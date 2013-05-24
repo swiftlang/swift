@@ -120,12 +120,6 @@ void SILType::print(raw_ostream &OS) const {
   if (is<AnyFunctionType>()) {
     auto info = getFunctionTypeInfo();
 
-    if (info->getUncurryLevel()) {
-      if (!Attributes.empty()) Attributes += ", ";
-      Attributes += "sil_uncurry=";
-      Attributes += llvm::utostr(info->getUncurryLevel());
-    }
-
     if (info->hasIndirectReturn()) {
       if (!Attributes.empty()) Attributes += ", ";
       Attributes += "sil_sret";
@@ -677,15 +671,6 @@ void SILFunction::dump() const {
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS) const {
-  // FIXME: Temporary testing comment until we actually use uncurried function
-  // types during SILGen.
-  OS << "// uncurried type: ";
-  getModule().Types.uncurryFunctionType(
-                  cast<AnyFunctionType>(getLoweredType().getSwiftRValueType()),
-                  getLoweredType().getUncurryLevel())
-    ->print(OS);
-  OS << '\n';
-  
   OS << "sil ";
   switch (getLinkage()) {
   case SILLinkage::Internal:

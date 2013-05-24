@@ -255,6 +255,9 @@ public:
   OperandValueArrayRef slice(unsigned begin, unsigned length) const {
     return OperandValueArrayRef(Operands.slice(begin, length));
   }
+  OperandValueArrayRef slice(unsigned begin) const {
+    return OperandValueArrayRef(Operands.slice(begin));
+  }
 };
 
 /// An iterator over all uses of a ValueBase.

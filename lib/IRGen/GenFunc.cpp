@@ -529,46 +529,13 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
                        SmallVectorImpl<llvm::Type*> &argTypes,
                        SmallVectorImpl<std::pair<unsigned, Alignment>> &byvals,
                        llvm::AttributeSet &attrs) {
+  // Ask SIL's TypeLowering to uncurry the function type.
+  type = CanType(Lowering::getThinFunctionType(type, cc));
   auto fn = cast<AnyFunctionType>(type);
+  fn = Lowering::TypeConverter::getUncurriedFunctionType(fn, uncurryLevel);
 
-  // Save up the formal parameter types.
-  llvm::SmallVector<AnyFunctionType*, 8> formalFnTypes;
-  switch (cc) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-    formalFnTypes.resize(uncurryLevel+1);
-    // Save the parameter types in reverse order.
-    formalFnTypes[uncurryLevel] = fn;
-    while (uncurryLevel--) {
-      fn = cast<AnyFunctionType>(CanType(fn->getResult()));
-      formalFnTypes[uncurryLevel] = fn;
-    }
-    break;
-
-  case AbstractCC::ObjCMethod:
-    // An ObjC method should be at uncurry level one, with the first uncurried
-    // clause taking 'self' and the second taking the method arguments. The
-    // '_cmd' argument gets magicked in between.
-    assert(uncurryLevel == 1 && "objc method should be at uncurry level 1");
-    // self
-    decomposeFunctionArg(IGM, CanType(fn->getInput()), cc, explosionKind,
-                         argTypes, byvals, attrs);
-    // _cmd
-    argTypes.push_back(IGM.Int8PtrTy);
-    fn = cast<AnyFunctionType>(CanType(fn->getResult()));
-    formalFnTypes.push_back(fn);
-    break;
-      
-  case AbstractCC::C:
-    // C functions cannot be curried.
-    assert(uncurryLevel == 0 && "c function cannot be curried");
-    formalFnTypes.push_back(fn);
-    break;
-  }
-
-  // Explode the argument clusters.
-  for (AnyFunctionType *fnTy : formalFnTypes) {
-    CanType inputTy = CanType(fnTy->getInput());
+  // Explode the argument.
+  auto decomposeTopLevelArg = [&](CanType inputTy) {
     if (TupleType *tupleTy = inputTy->getAs<TupleType>()) {
       for (auto &field : tupleTy->getFields()) {
         decomposeFunctionArg(IGM, CanType(field.getType()), cc, explosionKind,
@@ -578,10 +545,29 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
       decomposeFunctionArg(IGM, inputTy, cc, explosionKind,
                            argTypes, byvals, attrs);
     }
-    
-    if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fnTy))
-      expandPolymorphicSignature(IGM, polyTy, argTypes);
+  };
+
+  CanType inputTy = CanType(fn->getInput());
+  switch (cc) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+  case AbstractCC::C:
+    decomposeTopLevelArg(inputTy);
+    break;
+
+  case AbstractCC::ObjCMethod: {
+    // ObjC methods take an implicit _cmd argument after the self argument.
+    TupleType *inputTuple = cast<TupleType>(inputTy);
+    assert(inputTuple->getFields().size() == 2 && "invalid objc method type");
+    decomposeTopLevelArg(CanType(inputTuple->getFields()[0].getType()));
+    argTypes.push_back(IGM.Int8PtrTy);
+    decomposeTopLevelArg(CanType(inputTuple->getFields()[1].getType()));
+    break;
   }
+  }
+
+  if (auto polyTy = dyn_cast<PolymorphicFunctionType>(fn))
+    expandPolymorphicSignature(IGM, polyTy, argTypes);
 
   return CanType(fn->getResult());
 }
@@ -683,9 +669,8 @@ IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
                              llvm::AttributeSet &attrs) {
   assert(!type.isAddress());
   assert(type.is<AnyFunctionType>());
-  SILFunctionTypeInfo *info = type.getFunctionTypeInfo();
   return getFunctionType(type.getFunctionCC(), type.getSwiftType(),
-                         explosionKind, info->getUncurryLevel(),
+                         explosionKind, 0,
                          extraData, attrs);
 }
 
@@ -1393,24 +1378,17 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
 }
 
 /// Convert exploded Swift arguments into C-compatible arguments.
-void CallEmission::externalizeArguments(Explosion &arg,
+void CallEmission::externalizeArguments(Explosion &out, Explosion &arg,
                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                     CanType inputsTy) {
-  Explosion externalized(arg.getKind());
-
   if (TupleType *tupleTy = inputsTy->getAs<TupleType>()) {
     for (auto &elt : tupleTy->getFields()) {
-      externalizeArgument(externalized, arg, newByvals,
+      externalizeArgument(out, arg, newByvals,
                           elt.getType()->getCanonicalType());
     }
   } else {
-    externalizeArgument(externalized, arg, newByvals, inputsTy);
-  }
-  
-  // Sometimes we get extra args such as the selector argument. Pass those
-  // through.
-  externalized.add(arg.claimAll());
-  arg = std::move(externalized);
+    externalizeArgument(out, arg, newByvals, inputsTy);
+  }  
 }
 
 /// Add a new set of arguments to the function.
@@ -1420,12 +1398,32 @@ void CallEmission::addArg(Explosion &arg) {
   
   // Convert arguments to a representation appropriate to the calling
   // convention.
-  switch (CurCallee.getConvention()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    externalizeArguments(arg, newByvals,
-                 CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
+  AbstractCC cc = CurCallee.getConvention();
+  switch (cc) {
+  case AbstractCC::C: {
+    Explosion externalized(arg.getKind());
+    externalizeArguments(externalized, arg, newByvals,
+                   CanType(CurOrigType->castTo<AnyFunctionType>()->getInput()));
+    arg = std::move(externalized);
     break;
+  }
+  case AbstractCC::ObjCMethod: {
+    // The method will be uncurried to (Self, (Args...)). The _cmd argument
+    // goes in between.
+    Explosion externalized(arg.getKind());
+    // self
+    externalized.add(arg.claimNext());
+    // _cmd
+    externalized.add(arg.claimNext());
+    // method args
+    TupleType *inputTuple = CurOrigType->castTo<AnyFunctionType>()->getInput()
+      ->castTo<TupleType>();
+    assert(inputTuple->getFields().size() == 2 && "invalid objc method type");
+    externalizeArguments(externalized, arg, newByvals,
+                         CanType(inputTuple->getFields()[1].getType()));
+    arg = std::move(externalized);
+    break;
+  }
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
     // Nothing to do.
@@ -1776,18 +1774,6 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   IRGenFunction subIGF(IGM, explosionLevel, spec);
 
-  // Unravel the substituted function types for each uncurry level.
-  unsigned level = substType.getUncurryLevel();
-  llvm::SmallVector<FunctionType*, 4> uncurriedTypes;
-  FunctionType *uncurriedType = substType.castTo<FunctionType>();
-  for (;;) {
-    uncurriedTypes.push_back(uncurriedType);
-    if (level-- != 0)
-      uncurriedType = uncurriedType->getResult()->castTo<FunctionType>();
-    else
-      break;
-  }
-
   Explosion params = subIGF.collectParameters();
   
   // Collect the indirect return address, if present.
@@ -1799,17 +1785,6 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   if (schema.requiresIndirectResult())
     indirectReturn = retTI.getAddressForPointer(params.claimNext());
   
-  // Collect the LLVM arguments from the thunk, in reverse curry level order.
-  llvm::SmallVector<Explosion, 2> paramLevels;
-  
-  for (FunctionType *uncurriedType : reversed(uncurriedTypes)) {
-    TypeInfo const &argTI = IGM.getFragileTypeInfo(uncurriedType->getInput());
-    paramLevels.push_back(Explosion(explosionLevel));
-    argTI.reexplode(subIGF, params, paramLevels.back());
-  }
-
-  assert(params.empty() && "did not claim all parameters?!");
-  
   // Apply the arguments in a call to the generic function.
   Callee callee = Callee::forKnownFunction(genericType,
                                            retTy,
@@ -1818,12 +1793,9 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
                                            nullptr,
                                            explosionLevel);
   CallEmission emission(subIGF, callee);
-  
-  for (size_t i = 0; i < paramLevels.size(); ++i) {
-    Explosion &paramLevel = paramLevels.rbegin()[i];
-    FunctionType *uncurriedType = uncurriedTypes[i];
-    emission.addSubstitutedArg(CanType(uncurriedType->getInput()), paramLevel);
-  }
+  FunctionType *ft = substType.castTo<FunctionType>();
+  emission.addSubstitutedArg(CanType(ft->getInput()), params);
+  assert(params.empty() && "did not claim all parameters?!");
   
   // Return the result of the call.
   if (indirectReturn.isValid()) {

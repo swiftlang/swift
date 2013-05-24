@@ -73,11 +73,6 @@ public:
     return LoweredType.getFunctionTypeInfo();
   }
   
-  /// Returns the uncurry level of this entry point.
-  unsigned getUncurryLevel() const {
-    return getFunctionTypeInfo()->getUncurryLevel();
-  }
-  
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
     return getLoweredType().getFunctionCC();

@@ -585,12 +585,6 @@ public:
                           LValue const &dest);
   ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
                                               LValue const &src);
-  ManagedValue emitSpecializedPropertyFunctionRef(
-                                          SILLocation loc,
-                                          SILConstant constant,
-                                          ArrayRef<Substitution> substitutions,
-                                          Type substPropertyType);
-
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,
                              SILConstant methodConstant,

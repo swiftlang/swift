@@ -64,6 +64,8 @@ private:
                                                        SILFunctionTypeInfo *ft);
   
 public:
+  OwnershipConventions() = default;
+  
   /// Derive the ownership conventions for a SILConstant.
   static OwnershipConventions get(SILGenFunction &gen,
                                   SILConstant c,

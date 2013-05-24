@@ -327,7 +327,13 @@ public:
   
   SILValue getIndirectReturn() const {
     assert(hasIndirectReturn() && "apply inst does not have indirect return!");
-    return getArguments().back();
+    return getArguments().front();
+  }
+  
+  OperandValueArrayRef getArgumentsWithoutIndirectReturn() const {
+    if (hasIndirectReturn())
+      return getArguments().slice(1);
+    return getArguments();
   }
   
   static bool classof(const ValueBase *V) {

@@ -1759,11 +1759,12 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   return asOpaquePtr(IGM, fn);
 }
 
-/// Look through any single-element labelled tuple types.
+/// Look through any single-element labelled or curried tuple types.
+/// FIXME: We could get fulfillments from any tuple element.
 static CanType stripLabel(CanType input) {
   if (auto tuple = dyn_cast<TupleType>(input))
-    if (tuple->getFields().size() == 1)
-      return stripLabel(CanType(tuple->getFields()[0].getType()));
+    if (tuple->getFields().size() > 0)
+      return stripLabel(CanType(tuple->getFields().back().getType()));
   return input;
 }
 

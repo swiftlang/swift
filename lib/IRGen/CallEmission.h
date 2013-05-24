@@ -75,7 +75,7 @@ private:
   void externalizeArgument(Explosion &out, Explosion &in,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                      CanType ty);
-  void externalizeArguments(Explosion &arg,
+  void externalizeArguments(Explosion &out, Explosion &in,
                      SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                      CanType inputsTy);
   llvm::CallSite emitInvoke(llvm::CallingConv::ID cc, llvm::Value *fn,
