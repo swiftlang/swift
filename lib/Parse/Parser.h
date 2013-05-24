@@ -210,20 +210,27 @@ public:
   /// parseIdentifier - Consume an identifier (but not an operator) if
   /// present and return its name in Result.  Otherwise, emit an error and
   /// return true.
-  bool parseIdentifier(Identifier &Result, const Diagnostic &D);
+  bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
   
-  template<typename ...ArgTypes>
-  bool parseIdentifier(Identifier &Result,  ArgTypes... Args) {
-    return parseIdentifier(Result, Diagnostic(Args...));
+  bool parseIdentifier(Identifier &Result, const Diagnostic &D) {
+    SourceLoc L;
+    return parseIdentifier(Result, L, D);
+  }
+
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
+                       ArgTypes... Args) {
+    return parseIdentifier(Result, Diagnostic(ID, Args...));
   }
   
   /// parseAnyIdentifier - Consume an identifier or operator if present and
   /// return its name in Result.  Otherwise, emit an error and return true.
   bool parseAnyIdentifier(Identifier &Result, const Diagnostic &D);
 
-  template<typename ...ArgTypes>
-  bool parseAnyIdentifier(Identifier &Result,  ArgTypes... Args) {
-    return parseAnyIdentifier(Result, Diagnostic(Args...));
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseAnyIdentifier(Identifier &Result, Diag<DiagArgTypes...> ID,
+                          ArgTypes... Args) {
+    return parseAnyIdentifier(Result, Diagnostic(ID, Args...));
   }
 
   /// parseToken - The parser expects that 'K' is next in the input.  If so, it
