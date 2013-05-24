@@ -15,6 +15,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -54,6 +55,11 @@ namespace {
     SILBasicBlock *getBBForReference(Identifier Name, SourceLoc Loc);
 
 
+    
+  public:
+    // Parsing logic.
+    bool parseSILInstruction(SILBasicBlock *BB);
+    bool parseSILBasicBlock();
   };
 } // end anonymous namespace.
 
@@ -234,9 +240,7 @@ bool Parser::parseSILType(SILType &Result) {
 
 ///   sil-instruction:
 ///     sil_local_name '=' identifier ...
-static bool parseSILInstruction(SILBasicBlock *BB, SILParserFunctionState &FS) {
-  Parser &P = FS.P;
-
+bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
   if (P.Tok.isNot(tok::sil_local_name)) {
     P.diagnose(P.Tok, diag::expected_sil_instr_name);
     return true;
@@ -254,8 +258,7 @@ static bool parseSILInstruction(SILBasicBlock *BB, SILParserFunctionState &FS) {
 
 ///   sil-basic-block:
 ///     identifier /*TODO: argument list*/ ':' sil-instruction+
-static bool parseSILBasicBlock(SILParserFunctionState &FS) {
-  Parser &P = FS.P;
+bool SILParserFunctionState::parseSILBasicBlock() {
   Identifier BBName;
   SourceLoc NameLoc = P.Tok.getLoc();
 
@@ -263,10 +266,10 @@ static bool parseSILBasicBlock(SILParserFunctionState &FS) {
       P.parseToken(tok::colon, diag::expected_sil_block_colon))
     return true;
 
-  SILBasicBlock *BB = FS.getBBForDefinition(BBName, NameLoc);
+  SILBasicBlock *BB = getBBForDefinition(BBName, NameLoc);
 
   do {
-    if (parseSILInstruction(BB, FS))
+    if (parseSILInstruction(BB))
       return true;
   } while (P.Tok.is(tok::sil_local_name));
 
@@ -309,7 +312,7 @@ bool Parser::parseDeclSIL() {
   if (consumeIf(tok::l_brace)) {
     // Parse the basic block list.
     do {
-      if (parseSILBasicBlock(FunctionState))
+      if (FunctionState.parseSILBasicBlock())
         return true;
     } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
 
