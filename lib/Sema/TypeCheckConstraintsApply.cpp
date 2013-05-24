@@ -1827,6 +1827,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto selected = knownOverload->second;
 
+      // If we chose the identity constructor, coerce to the expected type
+      // based on the application argument locator.
+      if (selected.first.getKind() == OverloadChoiceKind::IdentityFunction) {
+        return coerceToType(expr, toType,
+                            locator.withPathElement(
+                              ConstraintLocator::ApplyArgument));
+      }
+
       // FIXME: Location information is suspect throughout.
       // Form a reference to the constructor.
       
