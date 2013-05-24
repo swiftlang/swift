@@ -521,7 +521,7 @@ public:
   
   CanType getMethodThisType(AnyFunctionType *ft) {
     Lowering::UncurryDirection direction
-      = F.getModule().Types.getUncurryDirection(ft->getCC());
+      = F.getModule().Types.getUncurryDirection(ft->getAbstractCC());
     
     auto *inputTuple = ft->getInput()->getAs<TupleType>();
     if (!inputTuple)

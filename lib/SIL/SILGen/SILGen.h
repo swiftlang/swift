@@ -70,7 +70,7 @@ public:
   
   /// Returns the calling convention for a function.
   AbstractCC getConstantCC(SILConstant constant) {
-    return getConstantType(constant).getFunctionCC();
+    return getConstantType(constant).getAbstractCC();
   }
   
   /// Determine the linkage of a constant.

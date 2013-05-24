@@ -152,8 +152,8 @@ public:
   
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.
-  AbstractCC getFunctionCC() const {
-    return castTo<AnyFunctionType>()->getCC();
+  AbstractCC getAbstractCC() const {
+    return castTo<AnyFunctionType>()->getAbstractCC();
   }
 
   /// Cast the Swift type referenced by this SIL type, or return null if the

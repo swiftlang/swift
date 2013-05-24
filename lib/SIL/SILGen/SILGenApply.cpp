@@ -205,7 +205,7 @@ public:
     // Save the type of the SpecializeExpr at the right depth in the type.
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
-    AbstractCC cc = cast<AnyFunctionType>(specializedType)->getCC();
+    AbstractCC cc = cast<AnyFunctionType>(specializedType)->getAbstractCC();
     if (callDepth == 0) {
       specializedType = getThinFunctionType(subType, cc)
         ->getCanonicalType();
@@ -783,7 +783,7 @@ namespace {
       if (!specializedEmitter) {
         std::tie(calleeValue, ownership)
           = callee.getAtUncurryLevel(gen, uncurryLevel);
-        cc = calleeValue.getType().getFunctionCC();
+        cc = calleeValue.getType().getAbstractCC();
       }
       
       // Collect the arguments to the uncurried call.

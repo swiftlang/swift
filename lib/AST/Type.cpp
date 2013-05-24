@@ -780,7 +780,7 @@ CanType TypeBase::getCanonicalType() {
     Type Out = FT->getResult()->getCanonicalType();
     Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
                                           FT->isThin(),
-                                          FT->getCC(),
+                                          FT->getAbstractCC(),
                                           In->getASTContext());
     break;
   }
@@ -792,7 +792,7 @@ CanType TypeBase::getCanonicalType() {
                                FT->isAutoClosure(),
                                FT->isBlock(),
                                FT->isThin(),
-                               FT->getCC(),
+                               FT->getAbstractCC(),
                                In->getASTContext());
     break;
   }
@@ -1521,7 +1521,7 @@ void FunctionType::print(raw_ostream &OS) const {
 
   if (isAutoClosure())
     attrs.next() << "auto_closure";
-  printCC(attrs, getCC());
+  printCC(attrs, getAbstractCC());
   if (isBlock())
     attrs.next() << "objc_block";
   if (isThin())
@@ -1550,7 +1550,7 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
 
 void PolymorphicFunctionType::print(raw_ostream &OS) const {
   AttributePrinter attrs(OS);
-  printCC(attrs, getCC());
+  printCC(attrs, getAbstractCC());
   if (isThin())
     attrs.next() << "thin";
   attrs.finish();

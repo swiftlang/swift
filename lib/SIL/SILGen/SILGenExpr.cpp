@@ -692,7 +692,7 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                          /*isAutoClosure*/ false,
                                          /*isBlock*/ false,
                                          /*isThin*/ true,
-                                         methodType.getFunctionCC(),
+                                         methodType.getAbstractCC(),
                                          F.getASTContext());
 
   if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
@@ -1892,7 +1892,7 @@ SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
   if (v.getType().is<AnyFunctionType>() &&
       v.getType().castTo<AnyFunctionType>()->isThin()) {
     // Thunk functions to the standard "freestanding" calling convention.
-    if (v.getType().getFunctionCC() != AbstractCC::Freestanding) {
+    if (v.getType().getAbstractCC() != AbstractCC::Freestanding) {
       auto freestandingType = getThinFunctionType(v.getType().getSwiftType(),
                                                   AbstractCC::Freestanding);
       SILType freestandingSILType = getLoweredLoadableType(freestandingType, 0);

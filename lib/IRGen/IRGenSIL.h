@@ -49,7 +49,7 @@ public:
   {}
   
   llvm::Function *getFunction() const { return function; }
-  AbstractCC getCC() const { return cc; }
+  AbstractCC getAbstractCC() const { return cc; }
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };

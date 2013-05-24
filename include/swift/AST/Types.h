@@ -1108,7 +1108,7 @@ public:
   Type getInput() const { return InputAndCC.getPointer(); }
   Type getResult() const { return OutputAndIsThin.getPointer(); }
   
-  AbstractCC getCC() const { return InputAndCC.getInt(); }
+  AbstractCC getAbstractCC() const { return InputAndCC.getInt(); }
   
   /// True if the function type is "thin", meaning values of the type can be
   /// represented as simple function pointers without context.

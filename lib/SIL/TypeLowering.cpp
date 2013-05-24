@@ -41,7 +41,7 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   if (uncurryLevel == 0)
     return t;
   
-  AbstractCC outerCC = t->getCC();
+  AbstractCC outerCC = t->getAbstractCC();
   bool outerThinness = t->isThin();
   assert(!t->isAutoClosure() && "auto_closures cannot be curried");
   assert(!t->isBlock() && "objc blocks cannot be curried");
@@ -136,7 +136,7 @@ Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
 }
 
 Type Lowering::getThinFunctionType(Type t) {
-  return getThinFunctionType(t, t->castTo<AnyFunctionType>()->getCC());
+  return getThinFunctionType(t, t->castTo<AnyFunctionType>()->getAbstractCC());
 }
 
 Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
@@ -159,7 +159,7 @@ Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
 }
 
 Type Lowering::getThickFunctionType(Type t) {
-  return getThickFunctionType(t, t->castTo<AnyFunctionType>()->getCC());
+  return getThickFunctionType(t, t->castTo<AnyFunctionType>()->getAbstractCC());
 }
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {

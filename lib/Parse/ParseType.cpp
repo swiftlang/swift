@@ -79,7 +79,7 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
                                           attrs.isObjCBlock(),
                                           /*thin*/ false,
                                           attrs.hasCC()
-                                           ? attrs.getCC()
+                                           ? attrs.getAbstractCC()
                                            : AbstractCC::Freestanding,
                                           Context);
       SourceRange resultRange = { attrs.LSquareLoc,

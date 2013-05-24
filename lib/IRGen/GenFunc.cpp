@@ -669,7 +669,7 @@ IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
                              llvm::AttributeSet &attrs) {
   assert(!type.isAddress());
   assert(type.is<AnyFunctionType>());
-  return getFunctionType(type.getFunctionCC(), type.getSwiftType(),
+  return getFunctionType(type.getAbstractCC(), type.getSwiftType(),
                          explosionKind, 0,
                          extraData, attrs);
 }
@@ -1095,7 +1095,7 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
 
   // Determine the calling convention.
   // FIXME: collect attributes in the CallEmission.
-  auto cc = expandAbstractCC(IGF.IGM, getCallee().getConvention());
+  auto cc = expandAbstractCC(IGF.IGM, getCallee().getAbstractCC());
 
   // Make the call and clear the arguments array.
   auto fnPtr = getCallee().getFunctionPointer();  
@@ -1398,7 +1398,7 @@ void CallEmission::addArg(Explosion &arg) {
   
   // Convert arguments to a representation appropriate to the calling
   // convention.
-  AbstractCC cc = CurCallee.getConvention();
+  AbstractCC cc = CurCallee.getAbstractCC();
   switch (cc) {
   case AbstractCC::C: {
     Explosion externalized(arg.getKind());
@@ -1437,7 +1437,7 @@ void CallEmission::addArg(Explosion &arg) {
 
   size_t targetIndex;
 
-  if (isLeftToRight(getCallee().getConvention())) {
+  if (isLeftToRight(getCallee().getAbstractCC())) {
     // Shift the existing arguments to the left.
     size_t numArgsToMove = Args.size() - LastArgWritten;
     for (size_t i = 0, e = numArgsToMove; i != e; ++i) {

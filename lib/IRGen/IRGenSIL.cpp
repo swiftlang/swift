@@ -565,7 +565,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
-    cc = lv.getStaticFunction().getCC();
+    cc = lv.getStaticFunction().getAbstractCC();
     calleeData = nullptr;
     extraData = ExtraData::None;
     break;
@@ -803,7 +803,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 
   auto *calleeFn = lv.getStaticFunction().getFunction();
   
-  switch (lv.getStaticFunction().getCC()) {
+  switch (lv.getStaticFunction().getAbstractCC()) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
     assert(false && "partial_apply of foreign functions not implemented");

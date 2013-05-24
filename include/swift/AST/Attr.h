@@ -171,7 +171,7 @@ public:
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
   bool hasCC() const { return cc.hasValue(); }
-  AbstractCC getCC() const { return *cc; }
+  AbstractCC getAbstractCC() const { return *cc; }
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&

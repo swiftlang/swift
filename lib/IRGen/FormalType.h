@@ -39,7 +39,7 @@ public:
   CanType getType() const { return Ty; }
 
   /// Return the abstract calling convention of this function.
-  AbstractCC getCC() const { return CC; }
+  AbstractCC getAbstractCC() const { return CC; }
 
   /// Return the natural uncurry level of this function.
   unsigned getNaturalUncurryLevel() const { return NaturalUncurry; }

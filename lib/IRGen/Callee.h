@@ -66,7 +66,7 @@ namespace irgen {
                             ExtraData::Retainable);
     }
 
-    AbstractCC getConvention() const {
+    AbstractCC getAbstractCC() const {
       return AbstractCC(Convention);
     }
 
@@ -158,7 +158,7 @@ namespace irgen {
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
                                    ExplosionKind explosionLevel) {
-      return forKnownFunction(origSILType.getFunctionCC(),
+      return forKnownFunction(origSILType.getAbstractCC(),
                               origSILType.getSwiftType(),
                               substResultType.getSwiftRValueType(),
                               subs,
@@ -193,7 +193,7 @@ namespace irgen {
       return result;
     }
     
-    AbstractCC getConvention() const { return Convention; }
+    AbstractCC getAbstractCC() const { return Convention; }
 
     CanType getOrigFormalType() const { return OrigFormalType; }
     CanType getSubstResultType() const { return SubstResultType; }

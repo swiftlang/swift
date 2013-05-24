@@ -1288,9 +1288,9 @@ llvm::Function *IRGenModule::getAddrOfGetter(ValueDecl *value,
   if (entry) return entry;
 
   llvm::AttributeSet attrs;
-  auto convention = expandAbstractCC(*this, formal.getCC());
+  auto convention = expandAbstractCC(*this, formal.getAbstractCC());
   llvm::FunctionType *fnType =
-    getFunctionType(formal.getCC(),
+    getFunctionType(formal.getAbstractCC(),
                     formal.getType(), explosionLevel,
                     formal.getNaturalUncurryLevel(), ExtraData::None,
                     attrs);
@@ -1338,11 +1338,11 @@ llvm::Function *IRGenModule::getAddrOfSetter(ValueDecl *value,
 
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-    getFunctionType(formal.getCC(),
+    getFunctionType(formal.getAbstractCC(),
                     formal.getType(), explosionLevel,
                     formal.getNaturalUncurryLevel(), ExtraData::None, attrs);
 
-  auto convention = expandAbstractCC(*this, formal.getCC());
+  auto convention = expandAbstractCC(*this, formal.getAbstractCC());
 
   LinkInfo link = LinkInfo::get(*this, entity);
   entry = link.createFunction(*this, fnType, convention, attrs);
