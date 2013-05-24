@@ -1031,7 +1031,7 @@ void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
   auto ownership = OwnershipConventions::get(*this, thunk, thunkTy);
   
   SmallVector<SILValue, 4> args;
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
   if (info->hasIndirectReturn()) {
     args.push_back(new(F.getModule()) SILArgument(info->getIndirectReturnType(),
                                                   F.begin()));
@@ -1067,7 +1067,7 @@ void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
 void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
   SILType thunkTy = SGM.getConstantType(getter);
   auto ownership = OwnershipConventions::get(*this, getter, thunkTy);
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
 
   SILValue indirectReturn;
   SILType resultType;
@@ -1126,7 +1126,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
 void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
   SILType thunkTy = SGM.getConstantType(setter);
   auto ownership = OwnershipConventions::get(*this, setter, thunkTy);
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
   
   SILValue thisValue
     = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());

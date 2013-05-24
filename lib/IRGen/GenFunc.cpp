@@ -1778,7 +1778,8 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   
   // Collect the indirect return address, if present.
   Address indirectReturn;
-  SILType retTy = substType.getFunctionTypeInfo()->getSemanticResultType();
+  SILType retTy
+    = substType.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
   TypeInfo const &retTI = IGM.getFragileTypeInfo(retTy);
                 
   ExplosionSchema schema = retTI.getSchema(explosionLevel);

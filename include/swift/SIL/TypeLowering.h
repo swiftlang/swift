@@ -189,7 +189,6 @@ class TypeConverter {
   
   const TypeLoweringInfo &makeTypeLoweringInfo(CanType t,
                                                unsigned uncurryLevel);
-  SILFunctionTypeInfo *makeInfoForFunctionType(AnyFunctionType *ft);
 
   Type makeConstantType(SILConstant constant);
   

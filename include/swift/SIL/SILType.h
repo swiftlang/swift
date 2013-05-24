@@ -34,36 +34,12 @@ namespace Lowering {
 
 } // end namespace swift
   
-namespace llvm {
-  template<typename T>
-  class PointerLikeTypeTraits;
-  
-  // SILTypeInfo* is always at least eight-byte aligned; make the three tag bits
-  // available through PointerLikeTypeTraits.
-  template<>
-  class PointerLikeTypeTraits<swift::SILFunctionTypeInfo*> {
-  public:
-    static inline void *getAsVoidPointer(swift::SILFunctionTypeInfo *I) {
-      return (void*)I;
-    }
-    static inline swift::SILFunctionTypeInfo *getFromVoidPointer(void *P) {
-      return (swift::SILFunctionTypeInfo*)P;
-    }
-    enum { NumLowBitsAvailable = 3 };
-  };
-}  // end namespace llvm
- 
 namespace swift {
 
 /// SILType - A Swift type that has been lowered to a SIL representation type.
-/// In addition to the Swift type system, SIL adds the following types:
-///
-/// - an "address" type that can reference any Swift type (but cannot take the
-///   address of an address). *T is the type of an address pointing at T.
-/// - uncurried function types. For the function type (T) -> (U) -> (V) -> W,
-///   there are uncurried function type levels:
-///     (T)(U) -> (V) -> W
-///     (T)(U)(V) -> W
+/// In addition to the Swift type system, SIL adds "address" types that can
+/// reference any Swift type (but cannot take the address of an address). *T
+/// is the type of an address pointing at T.
 ///
 /// SIL also has the notion of "loadable" vs "address-only" types: loadable
 /// types have a fixed size and compile-time binary representation and thus
@@ -72,9 +48,8 @@ namespace swift {
 /// indirectly in memory.
 class SILType {
 public:
-  using PointerType = llvm::PointerUnion<TypeBase *, SILFunctionTypeInfo *>;
   // The bool value of the PointerIntPair is the "isAddress" bit.
-  using ValueType = llvm::PointerIntPair<PointerType, 1, bool>;
+  using ValueType = llvm::PointerIntPair<TypeBase *, 1, bool>;
 private:
   ValueType value;
 
@@ -85,11 +60,6 @@ private:
 
     assert(!ty->is<LValueType>() &&
            "LValueTypes should be eliminated by SIL lowering");
-    assert(!ty->is<AnyFunctionType>() &&
-           "SIL lowering must produce a SILFunctionTypeInfo for functions");
-  }
-  
-  SILType(SILFunctionTypeInfo *ti, bool isAddress) : value(ti, isAddress) {
   }
   
   SILType(ValueType value) : value(value) {
@@ -100,15 +70,13 @@ private:
 public:
   SILType() = default;
   
-  
   /// getPrimitiveType - Form a SILType for a primitive type that does not
   /// require any special handling (i.e., not a function or aggregate type).
   static SILType getPrimitiveType(CanType T, bool isAddress) {
     return SILType(T, isAddress);
   }
-  
-  
-  bool isNull() const { return value.getPointer().isNull(); }
+
+  bool isNull() const { return bool(value.getPointer()); }
   explicit operator bool() const { return bool(value.getPointer()); }
   
   /// Gets the address type referencing this type, or the type itself if it is
@@ -124,7 +92,9 @@ public:
   }
   
   /// Returns the Swift type referenced by this SIL type.
-  CanType getSwiftRValueType() const;
+  CanType getSwiftRValueType() const {
+    return CanType(value.getPointer());
+  }
 
   /// Returns the Swift type equivalent to this SIL type. If the SIL type is
   /// an address type, returns an LValueType.
@@ -139,9 +109,7 @@ public:
   
   /// Gives the SILFunctionTypeInfo for a function type. The type must be
   /// derived from a Swift FunctionType or PolymorphicFunctionType.
-  SILFunctionTypeInfo *getFunctionTypeInfo() const {
-    return value.getPointer().get<SILFunctionTypeInfo*>();
-  }
+  SILFunctionTypeInfo *getFunctionTypeInfo(SILModule &M) const;
   
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
@@ -250,12 +218,11 @@ inline raw_ostream &operator<<(raw_ostream &OS, SILType T) {
   return OS;
 }
 
-/// SILFunctionTypeInfo - SILType for a FunctionType or PolymorphicFunctionType.
-/// Specifies the uncurry level and SIL-level calling convention for the
-/// function.
-class alignas(8) SILFunctionTypeInfo {
-  // alignas(8) because we need three tag bits on SILFunctionTypeInfo*
-  // for SILType.
+/// Redundant but expensive-to-recompute information about a SIL
+/// FunctionType or PolymorphicFunctionType. Contains the details of the
+/// SIL-level calling convention for the function, including its exploded
+/// input argument types and whether it uses an indirect return argument.
+class SILFunctionTypeInfo {
   CanType swiftType;
   SILType resultType;
   unsigned inputTypeCount : 31;
@@ -324,15 +291,6 @@ public:
   }  
 };
   
-inline CanType SILType::getSwiftRValueType() const {
-  PointerType p = value.getPointer();
-  if (auto *ty = p.dyn_cast<TypeBase*>())
-    return CanType(ty);
-  if (auto *ti = p.dyn_cast<SILFunctionTypeInfo*>())
-    return ti->getSwiftType();
-  llvm_unreachable("unknown SILType pointer type");
-}
-
 } // end swift namespace
 
 namespace llvm {

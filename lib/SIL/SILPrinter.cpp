@@ -117,15 +117,6 @@ void SILType::print(raw_ostream &OS) const {
 
   // Build up the attributes for a SIL type, if any.
   llvm::SmallString<64> Attributes;
-  if (is<AnyFunctionType>()) {
-    auto info = getFunctionTypeInfo();
-
-    if (info->hasIndirectReturn()) {
-      if (!Attributes.empty()) Attributes += ", ";
-      Attributes += "sil_sret";
-    }
-  }
-
 
   // If we have any attributes, print them out.
   if (!Attributes.empty())

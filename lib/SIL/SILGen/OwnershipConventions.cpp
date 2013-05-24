@@ -92,9 +92,9 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
                                                SILType ty) {
   // Native functions use the default Swift convention.
   if (!c.isObjC)
-    return getDefault(ty);
+    return getDefault(gen, ty);
   
-  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo();
+  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo(gen.SGM.M);
   
   // If we have a clang decl associated with the Swift decl, derive its
   // ownership conventions.
@@ -109,8 +109,9 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
   return getForObjCSelectorFamily(getSelectorFamily(c), ft);
 }
 
-OwnershipConventions OwnershipConventions::getDefault(SILType ty) {
-  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo();
+OwnershipConventions OwnershipConventions::getDefault(SILGenFunction &gen,
+                                                      SILType ty) {
+  SILFunctionTypeInfo *ft = ty.getFunctionTypeInfo(gen.SGM.M);
   size_t inputTypeCount = ft->getInputTypes().size();
   return {
     /*calleeConsumed*/ true,

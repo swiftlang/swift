@@ -1782,7 +1782,7 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   // Partially apply the next uncurry level and return the result closure.
   auto toFn = B.createFunctionRef(fe, SGM.getFunction(to));
   SILType resultTy
-    = SGM.getConstantType(from).getFunctionTypeInfo()->getResultType();
+    = SGM.getConstantType(from).getFunctionTypeInfo(SGM.M)->getResultType();
   auto toClosure = B.createPartialApply(fe, toFn, curriedArgs, resultTy);
   B.createReturn(fe, toClosure);
 }

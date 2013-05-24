@@ -197,7 +197,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                             SILBasicBlock *entry,
                                             Explosion &params,
                                             SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
   
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
@@ -265,7 +265,7 @@ static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
                                                 SILBasicBlock *entry,
                                                 Explosion &params,
                                                 SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
 
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
@@ -294,7 +294,7 @@ static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
                                        SILBasicBlock *entry,
                                        Explosion &params,
                                        SILType funcTy) {
-  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo();
+  SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
 
   // Map the indirect return if present.
   ArrayRef<SILArgument*> args
@@ -697,8 +697,8 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   auto argValues = i->getArguments();
   
   Address indirectResult;
-  if (i->hasIndirectReturn()) {
-    indirectResult = IGF.getLoweredAddress(i->getIndirectReturn());
+  if (i->hasIndirectReturn(*IGF.IGM.SILMod)) {
+    indirectResult =IGF.getLoweredAddress(i->getIndirectReturn(*IGF.IGM.SILMod));
     argValues = argValues.slice(0, argValues.size() - 1);
   }
   
@@ -727,7 +727,8 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   }
 
   SILType calleeTy = i->getCallee().getType();
-  SILType resultTy = calleeTy.getFunctionTypeInfo()->getSemanticResultType();
+  SILType resultTy
+    = calleeTy.getFunctionTypeInfo(*IGM.SILMod)->getSemanticResultType();
   
   CallEmission emission = getCallEmissionForLoweredValue(*this,
                                                      i->getCallee().getType(),
@@ -737,10 +738,10 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   Explosion llArgs(CurExplosionLevel);
   
   // Save off the indirect return argument, if any.
-  OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn();
+  OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn(*IGM.SILMod);
   SILValue indirectReturn;
-  if (i->hasIndirectReturn()) {
-    indirectReturn = i->getIndirectReturn();
+  if (i->hasIndirectReturn(*IGM.SILMod)) {
+    indirectReturn = i->getIndirectReturn(*IGM.SILMod);
   }
   
   // ObjC message sends need special handling for the 'this' argument. It may

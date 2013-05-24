@@ -321,17 +321,17 @@ public:
                            ArrayRef<SILValue> Args,
                            SILFunction &F);
 
-  bool hasIndirectReturn() const {
-    return getCallee().getType().getFunctionTypeInfo()->hasIndirectReturn();
+  bool hasIndirectReturn(SILModule &M) const {
+    return getCallee().getType().getFunctionTypeInfo(M)->hasIndirectReturn();
   }
   
-  SILValue getIndirectReturn() const {
-    assert(hasIndirectReturn() && "apply inst does not have indirect return!");
+  SILValue getIndirectReturn(SILModule &M) const {
+    assert(hasIndirectReturn(M) && "apply inst does not have indirect return!");
     return getArguments().front();
   }
   
-  OperandValueArrayRef getArgumentsWithoutIndirectReturn() const {
-    if (hasIndirectReturn())
+  OperandValueArrayRef getArgumentsWithoutIndirectReturn(SILModule &M) const {
+    if (hasIndirectReturn(M))
       return getArguments().slice(1);
     return getArguments();
   }

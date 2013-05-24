@@ -73,7 +73,8 @@ public:
   
   /// Derive the default Swift ownership conventions for a SILType, which must
   /// represent a function type.
-  static OwnershipConventions getDefault(SILType ty);
+  static OwnershipConventions getDefault(SILGenFunction &gen,
+                                         SILType ty);
   
   /// True if the callee consumes itself when called.
   bool isCalleeConsumed() const { return calleeConsumed; }

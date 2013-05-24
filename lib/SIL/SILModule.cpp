@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/TypeVisitor.h"
 #include "llvm/ADT/FoldingSet.h"
 using namespace swift;
 
@@ -85,3 +86,49 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   UniqueMap->InsertNode(NewList, InsertPoint);
   return NewList;
 }
+
+namespace {
+  /// Recursively destructure tuple-type arguments into SIL argument types.
+  class LoweredFunctionInputTypeVisitor
+    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor>
+  {
+    SILModule &M;
+    SmallVectorImpl<SILType> &inputTypes;
+  public:
+    LoweredFunctionInputTypeVisitor(SILModule &M,
+                                    SmallVectorImpl<SILType> &inputTypes)
+    : M(M), inputTypes(inputTypes) {}
+    
+    void visitType(TypeBase *t) {
+      inputTypes.push_back(M.Types.getLoweredType(t));
+    }
+    
+    void visitTupleType(TupleType *tt) {
+      for (auto &field : tt->getFields()) {
+        visit(field.getType()->getCanonicalType());
+      }
+    }
+  };
+} // end anonymous namespace
+
+SILFunctionTypeInfo *SILModule::makeFunctionTypeInfo(AnyFunctionType *ft)
+{
+  SmallVector<SILType, 8> inputTypes;
+  
+  // If the result type lowers to an address-only type, add it as an indirect
+  // return argument.
+  SILType resultType = Types.getLoweredType(ft->getResult());
+  bool hasIndirectReturn = resultType.isAddressOnly(*this);
+  if (hasIndirectReturn) {
+    inputTypes.push_back(resultType);
+    resultType = Types.getEmptyTupleType();
+  }
+  
+  // Destructure the input tuple type.
+  LoweredFunctionInputTypeVisitor(*this, inputTypes)
+    .visit(ft->getInput()->getCanonicalType());
+  
+  return SILFunctionTypeInfo::create(CanType(ft), inputTypes, resultType,
+                                     hasIndirectReturn, *this);
+}
+

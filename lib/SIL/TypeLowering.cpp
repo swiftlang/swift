@@ -256,50 +256,6 @@ TypeConverter::~TypeConverter() {
   }
 }
   
-namespace {
-  /// Recursively destructure tuple-type arguments into SIL argument types.
-  class LoweredFunctionInputTypeVisitor
-    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor> {
-    TypeConverter &tc;
-    SmallVectorImpl<SILType> &inputTypes;
-  public:
-    LoweredFunctionInputTypeVisitor(TypeConverter &tc,
-                                    SmallVectorImpl<SILType> &inputTypes)
-      : tc(tc), inputTypes(inputTypes) {}
-    
-    void visitType(TypeBase *t) {
-      inputTypes.push_back(tc.getLoweredType(t));
-    }
-    
-    void visitTupleType(TupleType *tt) {
-      for (auto &field : tt->getFields()) {
-        visit(field.getType()->getCanonicalType());
-      }
-    }
-  };
-} // end anonymous namespace
-  
-SILFunctionTypeInfo *TypeConverter::makeInfoForFunctionType(AnyFunctionType *ft)
-{
-  SmallVector<SILType, 8> inputTypes;
-
-  // If the result type lowers to an address-only type, add it as an indirect
-  // return argument.
-  SILType resultType = getLoweredType(ft->getResult());
-  bool hasIndirectReturn = resultType.isAddressOnly(M);
-  if (hasIndirectReturn) {
-    inputTypes.push_back(resultType);
-    resultType = getEmptyTupleType();
-  }
-
-  // Destructure the input tuple type.
-  LoweredFunctionInputTypeVisitor(*this, inputTypes)
-    .visit(ft->getInput()->getCanonicalType());
-  
-  return SILFunctionTypeInfo::create(CanType(ft), inputTypes, resultType,
-                                     hasIndirectReturn, M);
-}
-
 const TypeLoweringInfo &
 TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
@@ -324,13 +280,14 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
     LoadableTypeLoweringInfoVisitor(*theInfo).visit(t);
   }
 
-  // Make a SILFunctionTypeInfo for function types.
+  // Uncurry function types.
   if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
+    assert(!addressOnly && "function types should never be address-only");
     auto *uncurried = getUncurriedFunctionType(ft, uncurryLevel);
-    theInfo->loweredType = SILType(makeInfoForFunctionType(uncurried),
-                                   /*address=*/ addressOnly);
+    theInfo->loweredType = SILType(uncurried->getCanonicalType(),
+                                   /*address=*/ false);
   } else {
-    // Otherwise, create a SILType from just the Swift type.
+    // Otherwise, the Swift type maps directly to a SILType.
     assert(uncurryLevel == 0 &&
            "non-function type cannot have an uncurry level");
     theInfo->loweredType = SILType(t, /*address=*/ addressOnly);

@@ -35,6 +35,7 @@ namespace swift {
   class FuncDecl;
   class SILFunction;
   class SILTypeList;
+  class AnyFunctionType;
   
   namespace Lowering {
     class SILGenModule;
@@ -68,9 +69,14 @@ private:
   /// The collection of global variables used in the module.
   llvm::SetVector<VarDecl*> globals;
 
-  /// AddressOnlyTypeCache - This is a cache that memoizes the result of
-  /// SILType::isAddressOnly, to avoid recomputing it repeatedly.
+  /// This is a cache that memoizes the result of SILType::isAddressOnly.
   llvm::DenseMap<TypeBase*, bool> AddressOnlyTypeCache;
+  
+  /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
+  llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
+  
+  /// Derive the SILFunctionTypeInfo for a type.
+  SILFunctionTypeInfo *makeFunctionTypeInfo(AnyFunctionType *ft);
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
@@ -85,7 +91,6 @@ public:
   /// getSILTypeList - Get a uniqued pointer to a SIL type list.
   SILTypeList *getSILTypeList(llvm::ArrayRef<SILType> Types) const;
 
-  
   /// Types - This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;
   

@@ -156,7 +156,7 @@ public:
     require(!calleeTy.isAddress(), "callee of apply cannot be an address");
     require(calleeTy.is<FunctionType>(),
             "callee of apply must have concrete function type");
-    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo();
+    SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo(F.getModule());
     
     DEBUG(llvm::dbgs() << "function input types:\n";
           for (SILType t : ti->getInputTypes()) {
@@ -207,8 +207,10 @@ public:
     require(!appliedTy.castTo<FunctionType>()->isThin(),
             "result of closure cannot have a thin function type");
 
-    SILFunctionTypeInfo *info = calleeTy.getFunctionTypeInfo();
-    SILFunctionTypeInfo *resultInfo = appliedTy.getFunctionTypeInfo();
+    SILFunctionTypeInfo *info
+      = calleeTy.getFunctionTypeInfo(F.getModule());
+    SILFunctionTypeInfo *resultInfo
+      = appliedTy.getFunctionTypeInfo(F.getModule());
     
     // The arguments must match the suffix of the original function's input
     // types.
@@ -912,8 +914,9 @@ public:
             "convert_function cannot change function thinness");
     
     SILFunctionTypeInfo *opTI
-      = ICI->getOperand().getType().getFunctionTypeInfo();
-    SILFunctionTypeInfo *resTI = ICI->getType().getFunctionTypeInfo();
+      = ICI->getOperand().getType().getFunctionTypeInfo(F.getModule());
+    SILFunctionTypeInfo *resTI
+      = ICI->getType().getFunctionTypeInfo(F.getModule());
 
     require(opTI->getResultType() == resTI->getResultType(),
             "result types of convert_function operand and result do no match");
@@ -929,7 +932,7 @@ public:
     DEBUG(RI->print(llvm::dbgs()));
     
     SILFunctionTypeInfo *ti =
-      F.getLoweredType().getFunctionTypeInfo();
+      F.getLoweredType().getFunctionTypeInfo(F.getModule());
     SILType functionResultType = ti->getResultType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
@@ -944,7 +947,7 @@ public:
     DEBUG(RI->print(llvm::dbgs()));
     
     SILFunctionTypeInfo *ti =
-    F.getLoweredType().getFunctionTypeInfo();
+    F.getLoweredType().getFunctionTypeInfo(F.getModule());
     SILType functionResultType = ti->getResultType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
@@ -997,7 +1000,7 @@ public:
   
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILType ty = F.getLoweredType();
-    SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo();
+    SILFunctionTypeInfo *ti = ty.getFunctionTypeInfo(F.getModule());
     
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))

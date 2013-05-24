@@ -267,7 +267,7 @@ public:
     case Kind::IndirectValue:
       assert(level == 0 && "can't curry indirect function");
       mv = indirectValue;
-      ownership = OwnershipConventions::getDefault(mv.getType());
+      ownership = OwnershipConventions::getDefault(gen, mv.getType());
       break;
 
     case Kind::StandaloneFunction: {
@@ -317,7 +317,7 @@ public:
       
       // FIXME: We currently assume all archetype methods have native ownership
       // semantics.
-      ownership = OwnershipConventions::getDefault(method.getType());
+      ownership = OwnershipConventions::getDefault(gen, method.getType());
       break;
     }
     case Kind::ProtocolMethod: {
@@ -335,7 +335,7 @@ public:
       
       // FIXME: We currently assume all protocol methods have native ownership
       // semantics.
-      ownership = OwnershipConventions::getDefault(method.getType());
+      ownership = OwnershipConventions::getDefault(gen, method.getType());
       break;
     }
     }
@@ -354,7 +354,7 @@ public:
       // have changed the function signature.
       // FIXME: Currently only native methods can be specialized, so always use
       // default ownership semantics.
-      ownership = OwnershipConventions::getDefault(specializedUncurriedType);
+      ownership = OwnershipConventions::getDefault(gen, specializedUncurriedType);
     }
     
     return {mv, ownership};

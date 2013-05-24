@@ -70,7 +70,7 @@ public:
   SILModule &getModule() const { return *ModuleAndLinkage.getPointer(); }
   SILType getLoweredType() const { return LoweredType; }
   SILFunctionTypeInfo *getFunctionTypeInfo() const {
-    return LoweredType.getFunctionTypeInfo();
+    return LoweredType.getFunctionTypeInfo(getModule());
   }
   
   /// Returns the calling convention used by this entry point.

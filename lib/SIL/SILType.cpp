@@ -16,7 +16,7 @@
 #include "swift/AST/Decl.h"
 using namespace swift;
 
-/// isAddressOnly - True if the type, or the referenced type of an address
+/// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
 bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
@@ -75,23 +75,34 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   return false;
 }
 
+SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
+  AnyFunctionType *ft = cast<AnyFunctionType>(getSwiftRValueType());
+  
+  auto found = M.FunctionTypeInfoCache.find(ft);
+  if (found != M.FunctionTypeInfoCache.end())
+    return found->second;
+  
+  SILFunctionTypeInfo *info = M.makeFunctionTypeInfo(ft);
+  M.FunctionTypeInfoCache[ft] = info;
+  return info;
+}
 
 SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
-                                       ArrayRef<SILType> inputTypes,
-                                       SILType resultType,
-                                       bool hasIndirectReturn,
-                                       SILModule &M) {
+                                                 ArrayRef<SILType> inputTypes,
+                                                 SILType resultType,
+                                                 bool hasIndirectReturn,
+                                                 SILModule &M) {
   // We allocate room for an extra unsigned in the uncurriedInputCounts array,
   // so that we can stuff a leading zero in there and be able to efficiently
   // return both the begins and ends of each uncurried argument group.
   void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
                               + sizeof(SILType)*inputTypes.size(),
                             alignof(SILFunctionTypeInfo));
-  SILFunctionTypeInfo *fi = ::new (buffer) SILFunctionTypeInfo(
-                                                    swiftType,
-                                                    inputTypes.size(),
-                                                    resultType,
-                                                    hasIndirectReturn);
+  SILFunctionTypeInfo *fi
+    = ::new (buffer) SILFunctionTypeInfo(swiftType,
+                                         inputTypes.size(),
+                                         resultType,
+                                         hasIndirectReturn);
   memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
          sizeof(SILType) * inputTypes.size());
   return fi;
