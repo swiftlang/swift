@@ -2067,6 +2067,29 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
   return  SolutionKind::Error;
 }
 
+/// \brief Determine whether the given protocol member's signature involves
+/// any associated types.
+///
+/// Used to
+static bool involvesAssociatedTypes(TypeChecker &tc, ValueDecl *decl) {
+  Type type = decl->getType();
+
+  // For a function or constructor,
+  // Note that there are no destructor requirements, so we don't need to check
+  // for destructors.
+  if (isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl))
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+  // FIXME: Lame way to perform a search.
+  return tc.transformType(type, [](Type type) -> Type {
+    if (auto archetype = type->getAs<ArchetypeType>()) {
+      if (archetype->getParent())
+        return nullptr;
+    }
+    return type;
+  }).isNull();
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
@@ -2116,6 +2139,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // constraint to be unsolved. This effectively requires us to solve the
   // left-hand side of a dot expression before we look for members.
 
+  bool isExistential = baseObjTy->isExistentialType();
   if (name.str() == "constructor") {
     // Constructors have their own approach to name lookup.
     SmallVector<ValueDecl *, 4> ctors;
@@ -2158,6 +2182,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Introduce a new overload set.
     SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : ctors) {
+      // If our base is an existential type, we can't make use of any
+      // constructor whose signature involves associated types.
+      // FIXME: Mark this as 'unavailable'.
+      if (isExistential &&
+          involvesAssociatedTypes(getTypeChecker(), constructor))
+        continue;
+
       choices.push_back(OverloadChoice(baseTy, constructor));
     }
 
@@ -2169,6 +2200,12 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        OverloadChoiceKind::IdentityFunction));
     }
 
+    if (choices.empty()) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+      return SolutionKind::Error;
+    }
+    
     addOverloadSet(OverloadSet::getNew(*this, memberTy, constraint.getLocator(),
                                        choices));
     return SolutionKind::Solved;
@@ -2188,9 +2225,20 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
   for (auto &result : lookup.Results) {
+    // If our base is an existential type, we can't make use of any
+    // member whose signature involves associated types.
+    // FIXME: Mark this as 'unavailable'.
+    if (isExistential && involvesAssociatedTypes(getTypeChecker(), result.D))
+      continue;
+
     choices.push_back(OverloadChoice(baseTy, result.D));
   }
 
+  if (choices.empty()) {
+    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                  baseObjTy, name);
+    return SolutionKind::Error;
+  }
   auto locator = getConstraintLocator(constraint.getLocator());
   addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
   return SolutionKind::Solved;
