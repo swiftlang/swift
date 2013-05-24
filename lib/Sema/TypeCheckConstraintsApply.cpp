@@ -491,6 +491,8 @@ namespace {
       index = coerceToType(index, indexTy,
                            locator.withPathElement(
                              ConstraintLocator::SubscriptIndex));
+      if (!index)
+        return nullptr;
 
       // Determine the result type of the subscript expression.
       resultTy = LValueType::get(resultTy->getRValueType(),
@@ -503,6 +505,8 @@ namespace {
       if (baseTy->is<ArchetypeType>() && containerTy->is<ProtocolType>()) {
         // Coerce as an object argument.
         base = coerceObjectArgumentToType(base, baseTy, locator);
+        if (!base)
+          return nullptr;
 
         // Create the archetype subscript operation.
         auto subscriptExpr = new (tc.Context) ArchetypeSubscriptExpr(base,
@@ -526,6 +530,8 @@ namespace {
 
         // Coerce the base to the (substituted) container type.
         base = coerceObjectArgumentToType(base, containerTy, locator);
+        if (!base)
+          return nullptr;
 
         // Form the generic subscript expression.
         auto subscriptExpr = new (tc.Context) GenericSubscriptExpr(base, index,
@@ -539,6 +545,8 @@ namespace {
 
       // Coerce the base to the container type.
       base = coerceObjectArgumentToType(base, containerTy, locator);
+      if (!base)
+        return nullptr;
 
       // Handle subscripting of existential types.
       if (baseTy->isExistentialType()) {
