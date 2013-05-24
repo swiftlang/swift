@@ -1397,7 +1397,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto &tc = cs.getTypeChecker();
 
   // Capture the tuple expression, if there is one.
-  TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(expr);
+  Expr *innerExpr = expr;
+  while (auto paren = dyn_cast<ParenExpr>(innerExpr))
+    innerExpr = paren->getSubExpr();
+  TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
   bool hasVarArg = false;
@@ -1539,8 +1542,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Compute the updated 'from' tuple type, since we may have
   // performed some conversions in place.
   Type fromTupleType = TupleType::get(fromTupleExprFields, tc.Context);
-  if (fromTupleExpr)
+  if (fromTupleExpr) {
     fromTupleExpr->setType(fromTupleType);
+
+    // Update the types of parentheses around the tuple expression.
+    for (auto paren = dyn_cast<ParenExpr>(expr); paren;
+         paren = dyn_cast<ParenExpr>(paren->getSubExpr()))
+      paren->setType(fromTupleType);
+  }
 
   // Compute the re-sugared tuple type.
   Type toSugarType = hasInits? toTuple
@@ -1548,7 +1557,13 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   // If we don't have to shuffle anything, we're done.
   if (!anythingShuffled && fromTupleExpr) {
-    expr->setType(toSugarType);
+    fromTupleExpr->setType(toSugarType);
+
+    // Update the types of parentheses around the tuple expression.
+    for (auto paren = dyn_cast<ParenExpr>(expr); paren;
+         paren = dyn_cast<ParenExpr>(paren->getSubExpr()))
+      paren->setType(toSugarType);
+
     return expr;
   }
   
