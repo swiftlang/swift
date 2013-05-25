@@ -213,6 +213,7 @@ namespace impl {
   /// \sa BCRecordLayout::emitRecord
   template<typename Last>
   class BCRecordWriter<Last> {
+  public:
     template <typename BufferTy, typename LastData>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
                      unsigned abbrCode, LastData data) {

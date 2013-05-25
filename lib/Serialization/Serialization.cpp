@@ -21,6 +21,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+#include <array>
 #include <queue>
 
 using namespace swift;
@@ -88,6 +89,8 @@ namespace {
     /// decl-or-type might trigger the serialization of another one.
     std::queue<DeclTypeUnion> DeclsAndTypesToWrite;
 
+    std::array<unsigned, 256> DeclTypeAbbrCodes;
+
     /// The offset of each Decl in the bitstream, indexed by DeclID.
     std::vector<BitOffset> DeclOffsets;
 
@@ -98,7 +101,7 @@ namespace {
     DeclID LastDeclID;
 
     /// The last assigned DeclID for types from this module.
-    DeclID LastTypeID;
+    TypeID LastTypeID;
 
     /// The first assigned DeclID for decls from this module.
     ///
@@ -108,7 +111,7 @@ namespace {
     /// The first assigned DeclID for types from this module.
     ///
     /// Types with IDs less than this come from other modules.
-    DeclID FirstLocalTypeID;
+    TypeID FirstLocalTypeID;
 
     /// True if this module does not fully represent the original source file.
     ///
@@ -127,7 +130,7 @@ namespace {
     /// The Type will be scheduled for serialization if necessary.
     ///
     /// \returns The ID for the given Type in this module.
-    DeclID addTypeRef(Type ty);
+    TypeID addTypeRef(Type ty);
 
     /// Writes the BLOCKINFO block.
     void writeBlockInfoBlock();
@@ -138,6 +141,27 @@ namespace {
 
     /// Writes the input file paths.
     void writeInputFiles(llvm::SourceMgr &sourceMgr, FileBufferIDs inputFiles);
+
+    /// Writes the given decl.
+    ///
+    /// Returns false if the decl cannot be serialized without losing
+    /// information.
+    bool writeDecl(const Decl *D);
+
+    /// Writes the given type.
+    ///
+    /// Returns false if the type cannot be serialized without losing
+    /// information.
+    bool writeType(Type ty);
+
+    /// Registers the abbreviation for the given decl or type layout.
+    template <typename Layout>
+    void registerDeclTypeAbbr() {
+      using AbbrArrayTy = decltype(DeclTypeAbbrCodes);
+      static_assert(Layout::Code <= std::tuple_size<AbbrArrayTy>::value,
+                    "layout has invalid record code");
+      DeclTypeAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
+    }
 
     /// Writes all decls and types in the DeclsToWrite queue.
     ///
@@ -194,11 +218,11 @@ DeclID Serializer::addDeclRef(const Decl *D) {
   return id;
 }
 
-DeclID Serializer::addTypeRef(Type ty) {
+TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
-  DeclID &id = DeclIDs[ty];
+  TypeID &id = DeclIDs[ty];
   if (id != 0)
     return id;
 
@@ -249,7 +273,8 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, BUILTIN_TYPE);
-  RECORD(decls_block, TYPEALIAS_DECL);
+  RECORD(decls_block, NAME_ALIAS_TYPE);
+  RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, NAME_HACK);
 
   BLOCK(INDEX_BLOCK);
@@ -300,16 +325,184 @@ void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
   }
 }
 
+bool Serializer::writeDecl(const Decl *D) {
+  using namespace decls_block;
+
+  assert(!D->isInvalid() && "cannot create a module with an invalid decl");
+  if (D->hasClangNode())
+    return false;
+
+  switch (D->getKind()) {
+  case DeclKind::Import:
+    // FIXME: Do imported module names appear in the DeclContext of the
+    // serialized module?
+    return true;
+
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::TopLevelCode:
+    return false;
+
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+
+  case DeclKind::TypeAlias: {
+    auto typeAlias = cast<TypeAliasDecl>(D);
+    assert(!typeAlias->isObjC() && "ObjC typealias is not meaningful");
+
+    // FIXME: Handle attributes.
+    // FIXME: Do typealiases have any interesting attributes? Resilience?
+    if (!typeAlias->getAttrs().empty())
+      return false;
+
+    Type underlying;
+    if (typeAlias->hasUnderlyingType())
+      underlying = typeAlias->getUnderlyingType();
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : typeAlias->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
+    TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addTypeRef(underlying),
+                                typeAlias->isGenericParameter(),
+                                typeAlias->isImplicit(),
+                                inherited);
+
+    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
+    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                               typeAlias->getName().str());
+    return true;
+  }
+
+  case DeclKind::OneOf:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+    return false;
+
+  case DeclKind::Var:
+  case DeclKind::Func:
+  case DeclKind::OneOfElement:
+  case DeclKind::Subscript:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+    return false;
+  }
+}
+
+bool Serializer::writeType(Type ty) {
+  using namespace decls_block;
+
+  switch (ty.getPointer()->getKind()) {
+  case TypeKind::Error:
+    llvm_unreachable("should not serialize an error type");
+
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
+  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinObjCPointer:
+    llvm_unreachable("should always be accessed through an implicit typealias");
+
+  case TypeKind::UnstructuredUnresolved:
+    return false;
+
+  case TypeKind::NameAlias: {
+    auto nameAlias = cast<NameAliasType>(ty.getPointer());
+    const TypeAliasDecl *typeAlias = nameAlias->getDecl();
+
+    // Short-circuit builtin typealiases by just serializing their names; we'll
+    // look them up in the Builtin module upon deserialization.
+    if (isa<BuiltinModule>(typeAlias->getModuleContext())) {
+      // FIXME: Come up with a compact code for common builtins.
+      unsigned abbrCode = DeclTypeAbbrCodes[BuiltinTypeLayout::Code];
+      BuiltinTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    typeAlias->getName().str());
+      return true;
+    }
+
+    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
+    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    addDeclRef(nameAlias->getDecl()));
+    return true;
+  }
+
+  case TypeKind::Identifier:
+    // FIXME: this is very wrong!
+    return writeType(cast<IdentifierType>(ty.getPointer())->getMappedType());
+
+  case TypeKind::Paren:
+    // FIXME: trivial.
+    return false;
+
+  case TypeKind::Tuple:
+    return false;
+
+  case TypeKind::OneOf:
+  case TypeKind::Struct:
+  case TypeKind::Class:
+  case TypeKind::Protocol:
+    return false;
+
+  case TypeKind::MetaType:
+    return false;
+
+  case TypeKind::Module:
+    return false;
+
+  case TypeKind::Archetype:
+  case TypeKind::DeducibleGenericParam:
+    return false;
+
+  case TypeKind::Substituted:
+    return false;
+
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction:
+    return false;
+
+  case TypeKind::Array:
+  case TypeKind::ArraySlice:
+    return false;
+
+  case TypeKind::ProtocolComposition:
+  case TypeKind::LValue:
+  case TypeKind::UnboundGeneric:
+    return false;
+
+  case TypeKind::BoundGenericClass:
+  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericStruct:
+    return false;
+
+  case TypeKind::TypeVariable:
+    return false;
+  }
+}
+
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 3);
+
+  registerDeclTypeAbbr<decls_block::BuiltinTypeLayout>();
+  registerDeclTypeAbbr<decls_block::NameAliasTypeLayout>();
+  registerDeclTypeAbbr<decls_block::TypeAliasLayout>();
+  registerDeclTypeAbbr<decls_block::NameHackLayout>();
 
   while (!DeclsAndTypesToWrite.empty()) {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();
     DeclsAndTypesToWrite.pop();
 
     // If we can't handle a decl or type, mark the module as incomplete.
-    // FIXME: actually write the thing.
-    ShouldFallBackToTranslationUnit = true;
+    // FIXME: Eventually we should assert this.
+    bool success = next.isDecl() ? writeDecl(next.getDecl())
+                                 : writeType(next.getType());
+    if (!success)
+      ShouldFallBackToTranslationUnit = true;
 
     DeclID id = DeclIDs[next];
     assert(id != 0 && "decl or type not referenced properly");

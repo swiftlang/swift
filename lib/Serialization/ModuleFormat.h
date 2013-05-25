@@ -115,6 +115,10 @@ namespace input_block {
 using DeclID = uint32_t;
 using DeclIDField = BCFixed<32>;
 
+// These two types must be the same because they are stored in the same way.
+using TypeID = DeclID;
+using TypeIDField = DeclIDField;
+
 using BitOffset = uint32_t;
 using BitOffsetField = BCFixed<32>;
 
@@ -126,8 +130,9 @@ namespace decls_block {
   // VERSION_MAJOR.
   enum {
     BUILTIN_TYPE = 1,
+    NAME_ALIAS_TYPE,
 
-    TYPEALIAS_DECL = 100,
+    TYPE_ALIAS_DECL = 100,
 
     NAME_HACK = 200
   };
@@ -137,11 +142,17 @@ namespace decls_block {
     BCBlob // name of the builtin type
   >;
 
+  using NameAliasTypeLayout = BCRecordLayout<
+    NAME_ALIAS_TYPE,
+    DeclIDField // typealias decl
+  >;
+
   using TypeAliasLayout = BCRecordLayout<
-    TYPEALIAS_DECL,
-    DeclIDField, // underlying type
+    TYPE_ALIAS_DECL,
+    TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
-    BCArray<DeclIDField> // inherited types
+    BCFixed<1>,  // implicit flag
+    BCArray<TypeIDField> // inherited types
   >;
 
   /// Names will eventually be uniqued in an identifier table, but for now we
