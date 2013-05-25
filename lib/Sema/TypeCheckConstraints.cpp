@@ -3520,11 +3520,4 @@ void ConstraintSystem::dump() {
     failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
     out << "\n";
   }
-
-  if (isSolved()) {
-    out << "SOLVED (completely)\n";
-  } else {
-    out << "UNSOLVED\n";
-  }
-  
 }

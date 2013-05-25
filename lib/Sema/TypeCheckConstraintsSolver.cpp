@@ -53,33 +53,13 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 }
 
 Optional<Solution> ConstraintSystem::finalize() {
-  switch (State) {
-  case Unsolvable:
+  // If any free type variables remain, we're done.
+  if (hasFreeTypeVariables())
     return Nothing;
 
-  case Solved:
-    llvm_unreachable("Already finalized (?)");
-    break;
-
-  case Active:
-    // Check whether we have a proper solution.
-    if (Constraints.empty() && UnresolvedOverloadSets.empty() &&
-        !hasFreeTypeVariables()) {
-      State = Solved;
-      auto result = createSolution();
-      return std::move(result);
-    }
-
-    // We don't have a solution;
-    State = Unsolvable;
-    return Nothing;
-  }
-}
-
-Solution ConstraintSystem::createSolution() {
-  assert(State == Solved);
-
+  // Create the solution.
   Solution solution(*this);
+
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
     solution.typeBindings[tv] = simplifyType(tv);
@@ -92,7 +72,7 @@ Solution ConstraintSystem::createSolution() {
           resolved.second.second };
   }
 
-  return solution;
+  return std::move(solution);
 }
 
 /// \brief Restore the type variable bindings to what they were before
@@ -373,7 +353,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
-  cs.State = Active;
 }
 
 /// \brief Retrieve the set of potential type bindings for the given type

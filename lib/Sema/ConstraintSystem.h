@@ -1345,11 +1345,6 @@ class ConstraintSystem {
   /// implied by that overload.
   llvm::DenseMap<OverloadSet *, std::pair<unsigned, Type>> ResolvedOverloads;
 
-  /// \brief The state of the constraint system.
-  ///
-  /// FIXME: This notion is antiquated.
-  enum { Active, Unsolvable, Solved } State = Active;
-
   SmallVector<TypeVariableType *, 16> TypeVariables;
   SmallVector<Constraint *, 16> Constraints;
   SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
@@ -1461,9 +1456,6 @@ private:
   ///
   /// \returns an empty solution if this constraint system is unsolvable.
   Optional<Solution> finalize();
-
-  /// \brief Create the solution based on this constraint system.
-  Solution createSolution();
 
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
@@ -2006,10 +1998,6 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool solve(SmallVectorImpl<Solution> &solutions);
-
-  /// \brief Determine whether this constraint system is fully solved, with
-  /// no free variables.
-  bool isSolved() const { return State == Solved; }
 
 private:
   /// \brief Determine whether the given \p type matches the default literal
