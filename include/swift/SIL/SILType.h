@@ -209,6 +209,7 @@ public:
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
   
+  std::string getAsString() const;
   void dump() const;
   void print(raw_ostream &OS) const;
 };

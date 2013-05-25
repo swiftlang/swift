@@ -112,6 +112,14 @@ void SILConstant::dump() const {
   llvm::errs() << '\n';
 }
 
+std::string SILType::getAsString() const {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  print(OS);
+  return OS.str();
+}
+
+      
 void SILType::print(raw_ostream &OS) const {
   OS << '$';
 
@@ -610,13 +618,15 @@ ID SILPrinter::getID(SILValue V) {
     else
       ParentBB = cast<SILArgument>(V)->getParent();
 
+    // Keep the values in ValueToIDMap with a +1 bias so that lookups will get
+    // 0 for invalid numbers.
     unsigned idx = 0;
     for (auto &BB : *ParentBB->getParent()) {
       for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
-        ValueToIDMap[*I] = idx++;
+        ValueToIDMap[*I] = ++idx;
 
       for (auto &I : BB)
-        ValueToIDMap[&I] = idx++;
+        ValueToIDMap[&I] = ++idx;
     }
   }
 
@@ -624,7 +634,7 @@ ID SILPrinter::getID(SILValue V) {
   if (V.getDef()->getTypes().size() > 1)
     ResultNumber = V.getResultNumber();
 
-  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
+  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()]-1, ResultNumber };
   return R;
 }
 
