@@ -78,12 +78,13 @@ Optional<Solution> ConstraintSystem::finalize() {
 /// \brief Restore the type variable bindings to what they were before
 /// we attempted to solve this constraint system.
 void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
-  std::for_each(SavedBindings.rbegin(), SavedBindings.rbegin() + numBindings,
+  auto &savedBindings = *getSavedBindings();
+  std::for_each(savedBindings.rbegin(), savedBindings.rbegin() + numBindings,
                 [](SavedTypeVariableBinding &saved) {
                   saved.restore();
                 });
-  SavedBindings.erase(SavedBindings.end() - numBindings,
-                      SavedBindings.end());
+  savedBindings.erase(savedBindings.end() - numBindings,
+                      savedBindings.end());
 }
 
 SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
@@ -292,7 +293,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numUnresolvedOverloadSets = cs.UnresolvedOverloadSets.size();
   numGeneratedOverloadSets = cs.solverState->generatedOverloadSets.size();
-  numSavedBindings = cs.SavedBindings.size();
+  numSavedBindings = cs.solverState->savedBindings.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   numRetiredConstraints = cs.solverState->retiredConstraints.size();
 }
@@ -323,7 +324,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.solverState->generatedOverloadSets, numGeneratedOverloadSets);
 
   // Restore bindings.
-  cs.restoreTypeVariableBindings(cs.SavedBindings.size() - numSavedBindings);
+  cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
+                                   numSavedBindings);
 
   // Add the retired constraints back into circulation.
   for (unsigned i = numRetiredConstraints,

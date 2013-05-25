@@ -169,16 +169,18 @@ public:
   ///
   /// \param record The record of state changes.
   void mergeEquivalenceClasses(TypeVariableType *other,
-                               constraints::SavedTypeVariableBindings &record) {
+                               constraints::SavedTypeVariableBindings *record) {
     // Merge the equivalence classes corresponding to these two type
     // variables. Always merge 'up' the constraint stack, because it is simpler.
     if (getID() < other->getImpl().getID()) {
-      auto rep = other->getImpl().getRepresentative(&record);
-      rep->getImpl().recordBinding(record);
+      auto rep = other->getImpl().getRepresentative(record);
+      if (record)
+        rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = getTypeVariable();
     } else {
-      auto rep = getRepresentative(&record);
-      rep->getImpl().recordBinding(record);
+      auto rep = getRepresentative(record);
+      if (record)
+        rep->getImpl().recordBinding(*record);
       rep->getImpl().ParentOrFixed = other;
     }
   }
@@ -228,11 +230,12 @@ public:
 
   /// \brief Assign a fixed type to this equivalence class.
   void assignFixedType(Type type,
-                       constraints::SavedTypeVariableBindings &record) {
+                       constraints::SavedTypeVariableBindings *record) {
     assert((!getFixedType(0) || getFixedType(0)->isEqual(type)) &&
            "Already has a fixed type!");
-    auto rep = getRepresentative(&record);
-    rep->getImpl().recordBinding(record);
+    auto rep = getRepresentative(record);
+    if (record)
+      rep->getImpl().recordBinding(*record);
     rep->getImpl().ParentOrFixed = type.getPointer();
   }
 
@@ -1350,10 +1353,6 @@ class ConstraintSystem {
   SmallVector<OverloadSet *, 4> UnresolvedOverloadSets;
   llvm::DenseMap<ConstraintLocator *, OverloadSet *> GeneratedOverloadSets;
 
-  /// \brief The set of type variable bindings that have changed while
-  /// processing this constraint system.
-  SavedTypeVariableBindings SavedBindings;
-
   typedef llvm::PointerUnion<TypeVariableType *, TypeBase *>
     RepresentativeOrFixed;
 
@@ -1389,6 +1388,10 @@ public:
     /// \brief The set of constraints that have been retired along the
     /// current path.
     SmallVector<Constraint *, 32> retiredConstraints;
+
+    /// \brief The set of type variable bindings that have changed while
+    /// processing this constraint system.
+    SavedTypeVariableBindings savedBindings;
   };
 
   /// \brief The current solver state.
@@ -1523,6 +1526,13 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
+  /// \brief Retrieve the set of saved type variable bindings, if available.
+  ///
+  /// \returns null when we aren't currently solving the system.
+  SavedTypeVariableBindings *getSavedBindings() const {
+    return solverState? &solverState->savedBindings : nullptr;
+  }
+
   /// \brief Record failure with already-simplified arguments.
   template<typename ...Args>
   void recordFailureSimplified(ConstraintLocator *locator,
@@ -1649,7 +1659,7 @@ public:
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
-    return typeVar->getImpl().getRepresentative(&SavedBindings);
+    return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
   /// \brief Merge the equivalence sets of the two type variables.
@@ -1664,18 +1674,18 @@ public:
     assert(typeVar2 == getRepresentative(typeVar2) &&
            "typeVar2 is not the representative");
     assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-    typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, SavedBindings);
+    typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getSavedBindings());
   }
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
   Type getFixedType(TypeVariableType *typeVar) {
-    return typeVar->getImpl().getFixedType(&SavedBindings);
+    return typeVar->getImpl().getFixedType(getSavedBindings());
   }
 
   /// \brief Assign a fixed type to the given type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type) {
-    typeVar->getImpl().assignFixedType(type, SavedBindings);
+    typeVar->getImpl().assignFixedType(type, getSavedBindings());
   }
 
   /// \brief "Open" the given type by replacing any occurrences of archetypes
