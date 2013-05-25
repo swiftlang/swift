@@ -37,7 +37,7 @@ static bool EncodeToUTF8(unsigned CharValue,
                          llvm::SmallVectorImpl<char> &Result) {
   assert(CharValue >= 0x80 && "Single-byte encoding should be already handled");
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::CountLeadingZeros_32(CharValue);
+  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
   unsigned LowHalf = CharValue & 0xFFFF;
 
   // Reserved values in each plane
@@ -146,7 +146,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::CountLeadingZeros_32(CharValue);
+  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
   
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;
