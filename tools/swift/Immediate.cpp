@@ -217,7 +217,10 @@ static bool IRGenImportedModules(TranslationUnit *TU,
       continue;
     }
 
-    // FIXME: Handle Swift modules here.
+    // FIXME: Handle Swift modules that need IRGen here.
+    if (isa<LoadedModule>(ModPair.second))
+      continue;
+    
     TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);
     if (!ImportedModules.insert(SubTU))
       continue;
