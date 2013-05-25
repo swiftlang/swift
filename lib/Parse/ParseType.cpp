@@ -235,9 +235,9 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
   SmallVector<IdentifierType::Component, 4> Components;
   SourceLoc EndLoc;
   while (true) {
-    SourceLoc Loc = Tok.getLoc();
+    SourceLoc Loc;
     Identifier Name;
-    if (parseIdentifier(Name, diag::expected_identifier_in_dotted_type))
+    if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
       return true;
     SourceLoc LAngle, RAngle;
     MutableArrayRef<TypeLoc> GenericArgs;

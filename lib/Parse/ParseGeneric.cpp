@@ -45,8 +45,8 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   do {
     // Parse the name of the parameter.
     Identifier Name;
-    SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, diag::expected_generics_parameter_name)) {
+    SourceLoc NameLoc;
+    if (parseIdentifier(Name, NameLoc, diag::expected_generics_parameter_name)) {
       Invalid = true;
       break;
     }

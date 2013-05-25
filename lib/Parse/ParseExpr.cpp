@@ -607,9 +607,10 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       return new (Context) RebindThisInConstructorExpr(result, thisDecl);
     } else {
       // super.foo
-      SourceLoc nameLoc = Tok.getLoc();
+      SourceLoc nameLoc;
       Identifier name;
-      if (parseIdentifier(name, diag::expected_identifier_after_super_dot_expr))
+      if (parseIdentifier(name, nameLoc,
+                          diag::expected_identifier_after_super_dot_expr))
         return nullptr;
       
       if (!thisDecl)
@@ -713,8 +714,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::period_prefix: {     // .foo
     SourceLoc DotLoc = consumeToken(tok::period_prefix);
     Identifier Name;
-    SourceLoc NameLoc = Tok.getLoc();
-    if (parseIdentifier(Name, diag::expected_identifier_after_dot_expr))
+    SourceLoc NameLoc;
+    if (parseIdentifier(Name, NameLoc,diag::expected_identifier_after_dot_expr))
       return 0;
     
     // Handle .foo by just making an AST node.
@@ -1280,9 +1281,9 @@ NullablePtr<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
     // follows a proper subexpression.
     if (Tok.is(tok::oper_binary) &&
         (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
-      SourceLoc Loc = Tok.getLoc();
+      SourceLoc Loc;
       Identifier OperName;
-      if (parseAnyIdentifier(OperName, diag::expected_operator_ref)) {
+      if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
         return true;
       }
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the

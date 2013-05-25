@@ -169,9 +169,9 @@ bool Parser::parseSILType(SILType &Result) {
     do {
       consumeToken();
 
-      SourceLoc AttrTokenLoc = Tok.getLoc();
+      SourceLoc AttrTokenLoc;
       Identifier AttrToken;
-      if (parseIdentifier(AttrToken,
+      if (parseIdentifier(AttrToken, AttrTokenLoc,
                           diag::expected_identifier_sil_type_attributes))
         return true;
 
@@ -260,9 +260,9 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
 ///     identifier /*TODO: argument list*/ ':' sil-instruction+
 bool SILParserFunctionState::parseSILBasicBlock() {
   Identifier BBName;
-  SourceLoc NameLoc = P.Tok.getLoc();
+  SourceLoc NameLoc;
 
-  if (P.parseIdentifier(BBName, diag::expected_sil_block_name) ||
+  if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
       P.parseToken(tok::colon, diag::expected_sil_block_colon))
     return true;
 

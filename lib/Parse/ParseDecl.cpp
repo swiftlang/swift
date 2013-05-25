@@ -602,8 +602,8 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   
   Identifier Id;
   TypeLoc UnderlyingLoc;
-  SourceLoc IdLoc = Tok.getLoc();
-  if (parseIdentifier(Id, diag::expected_identifier_in_decl, "typealias"))
+  SourceLoc IdLoc;
+  if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
     return nullptr;
 
   // Parse optional inheritance clause.
@@ -1242,8 +1242,9 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
   
   Identifier OneOfName;
-  SourceLoc OneOfNameLoc = Tok.getLoc();
-  if (parseIdentifier(OneOfName, diag::expected_identifier_in_decl, "oneof"))
+  SourceLoc OneOfNameLoc;
+  if (parseIdentifier(OneOfName, OneOfNameLoc,
+                      diag::expected_identifier_in_decl, "oneof"))
     return true;
 
   // Parse the generic-params, if present.
@@ -1408,8 +1409,9 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
 
   Identifier StructName;
-  SourceLoc StructNameLoc = Tok.getLoc();
-  if (parseIdentifier(StructName, diag::expected_identifier_in_decl, "struct"))
+  SourceLoc StructNameLoc;
+  if (parseIdentifier(StructName, StructNameLoc,
+                      diag::expected_identifier_in_decl, "struct"))
     return true;
 
   // Parse the generic-params, if present.
@@ -1484,9 +1486,10 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   parseAttributeList(Attributes);
 
   Identifier ClassName;
-  SourceLoc ClassNameLoc = Tok.getLoc();
+  SourceLoc ClassNameLoc;
   SourceLoc LBLoc, RBLoc;
-  if (parseIdentifier(ClassName, diag::expected_identifier_in_decl, "class"))
+  if (parseIdentifier(ClassName, ClassNameLoc,
+                      diag::expected_identifier_in_decl, "class"))
     return true;
 
   // Parse the generic-params, if present.
@@ -1583,9 +1586,9 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  SourceLoc NameLoc = Tok.getLoc();
+  SourceLoc NameLoc;
   Identifier ProtocolName;
-  if (parseIdentifier(ProtocolName,
+  if (parseIdentifier(ProtocolName, NameLoc,
                       diag::expected_identifier_in_decl, "protocol"))
     return 0;
   
