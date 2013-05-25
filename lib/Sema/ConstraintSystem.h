@@ -1336,8 +1336,18 @@ class ConstraintSystem {
   llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
 
   /// \brief Folding set containing all of the failures that have occurred
-  /// while exploring this constraint system.
-  llvm::FoldingSet<Failure> Failures;
+  /// while building and initially simplifying this constraint system.
+  ///
+  /// These failures are unavoidable, in the sense that they occur before
+  /// we have made any (potentially incorrect) assumptions at all.
+  llvm::SmallVector<Failure *, 1> unavoidableFailures;
+
+  /// \brief Failures that occured while solving.
+  ///
+  /// FIXME: We really need to track overload sets and type variable bindings
+  /// to make any sense of this data. Also, it probably belongs within
+  /// SolverState.
+  llvm::FoldingSet<Failure> failures;
 
   /// \brief A mapping from each overload set that is resolved in this
   /// constraint system to a pair (index, type), where index is the index of
@@ -1361,10 +1371,10 @@ class ConstraintSystem {
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
-    /// \brief Whether
+    /// \brief Whether to record failures or not.
     ///
-    /// FIXME: Flip the default to false initially, then solve a second
-    /// time if we failed.
+    /// FIXME: This should default 'false', then switch to true when we're
+    /// trying to diagnose a problem.
     bool recordFailures = true;
 
     /// \brief The overload sets that have been resolved along the current path.
@@ -1534,16 +1544,24 @@ private:
   void recordFailureSimplified(ConstraintLocator *locator,
                                Failure::FailureKind kind,
                                Args &&...args) {
+    // If there is no solver state, this failure is unavoidable.
+    if (!solverState) {
+      unavoidableFailures.push_back(
+        Failure::create(getAllocator(), locator, kind,
+                        std::forward<Args>(args)...));
+      return;
+    }
+
     // Check whether we've recorded this failure already. If so, we're done.
     llvm::FoldingSetNodeID id;
     Failure::Profile(id, locator, kind, args...);
     void *insertPos = nullptr;
-    if (Failures.FindNodeOrInsertPos(id, insertPos))
+    if (failures.FindNodeOrInsertPos(id, insertPos))
       return;
 
     // Allocate a new failure and record it.
     auto failure = Failure::create(getAllocator(), locator, kind, args...);
-    Failures.InsertNode(failure, insertPos);
+    failures.InsertNode(failure, insertPos);
   }
 
   /// \brief Simplifies an argument to the failure by simplifying the type.
