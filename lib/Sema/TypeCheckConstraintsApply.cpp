@@ -2456,7 +2456,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   return rewriter.finishApply(apply, openedType, locator);
 }
 
-/// b\rief Determine whether the given type is a Builtin i1.
+/// \brief Determine whether the given type is a Builtin i1.
 static bool isBuiltinI1(Type type) {
   if (auto builtinIntTy = type->getAs<BuiltinIntegerType>()) {
     return builtinIntTy->getBitWidth() == 1;

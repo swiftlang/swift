@@ -99,7 +99,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 ///   stmt-assign-basic:
 ///     expr-basic '=' expr-basic
 ///
-/// \para usesExprBasic If true, parse expr-or-stmt-assign-basic rather than
+/// \param usesExprBasic If true, parse expr-or-stmt-assign-basic rather than
 /// expr-or-stmt-assign.
 bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result, bool usesExprBasic) {
   NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr, usesExprBasic);
