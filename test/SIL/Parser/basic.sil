@@ -31,6 +31,6 @@ bb0:                                  // CHECK: bb0:
 // TODO: Use control flow to avoid building incorrect SSA.
 sil @test2 : $() -> () {              // CHECK: sil @test2 : $() -> ()
 bb0:                                  // CHECK: bb0:
-  %1 = return %0 : $()                // CHECK:   %0 = return %1 : $()
-  %0 = tuple ()                       // CHECK:   %1 = tuple ()
+  %b = return %a : $()                // CHECK:   %0 = return %1 : $()
+  %a = tuple ()                       // CHECK:   %1 = tuple ()
 }

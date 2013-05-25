@@ -1275,8 +1275,8 @@ Restart:
     }
     return lexOperatorIdentifier();
   case '%':
-    // Lex %[0-9+] as a local SIL value
-    if (InSILBody && isdigit(CurPtr[0])) {
+    // Lex %[0-9a-zA-Z]+ as a local SIL value
+    if (InSILBody && isalnum(CurPtr[0])) {
       do {
         ++CurPtr;
       } while (isdigit(CurPtr[0]));
