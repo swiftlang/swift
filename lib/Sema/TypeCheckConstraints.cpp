@@ -2224,12 +2224,23 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
+  bool isMetatype = baseObjTy->is<MetaTypeType>();
   for (auto &result : lookup.Results) {
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     // FIXME: Mark this as 'unavailable'.
     if (isExistential && involvesAssociatedTypes(getTypeChecker(), result.D))
       continue;
+
+    // If we are looking for a metatype member, don't include members that can
+    // only be accessed on an instance of the object.
+    // FIXME: Mark as 'unavailable' somehow.
+    if (isMetatype &&
+        !(isa<FuncDecl>(result.D) ||
+          isa<OneOfElementDecl>(result.D) ||
+          !result.D->isInstanceMember())) {
+      continue;
+    }
 
     choices.push_back(OverloadChoice(baseTy, result.D));
   }
