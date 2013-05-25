@@ -129,6 +129,43 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
 
+    case INDEX_BLOCK_ID: {
+      if (!hasValidControlBlock)
+        return error();
+
+      cursor.EnterSubBlock(INDEX_BLOCK_ID);
+
+      auto next = cursor.advanceSkippingSubblocks();
+      while (next.Kind == llvm::BitstreamEntry::Record) {
+        scratch.clear();
+        StringRef blobData;
+        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+
+        switch (kind) {
+        case index_block::DECL_OFFSETS:
+          assert(blobData.empty());
+          // FIXME: Use proper BCRecordLayout for this.
+          Decls.assign(scratch.begin()+1, scratch.end());
+          break;
+        case index_block::TYPE_OFFSETS:
+          assert(blobData.empty());
+          // FIXME: Use proper BCRecordLayout for this.
+          Types.assign(scratch.begin()+1, scratch.end());
+          break;
+        default:
+          // Unknown index kind, which this version of the compiler won't use.
+          break;
+        }
+
+        next = cursor.advanceSkippingSubblocks();
+      }
+
+      if (next.Kind != llvm::BitstreamEntry::EndBlock)
+        return error();
+
+      break;
+    }
+
     case FALL_BACK_TO_TRANSLATION_UNIT_ID:
       // This is a bring-up hack and will eventually go away.
       Status = ModuleStatus::FallBackToTranslationUnit;

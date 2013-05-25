@@ -13,6 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
+#include "ModuleFormat.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/PointerIntUnion.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -25,6 +28,7 @@ namespace llvm {
 }
 
 namespace swift {
+class Decl;
 
 /// Describes whether a loaded module can be used.
 enum class ModuleStatus {
@@ -53,8 +57,18 @@ class ModuleFile {
   /// The reader attached to InputFile.
   llvm::BitstreamReader InputReader;
 
+  /// The cursor used to lazily load things from the file.
+  llvm::BitstreamCursor In;
+
   /// Paths to the source files used to build this module.
   SmallVector<StringRef, 4> SourcePaths;
+
+  /// Decls referenced by this module.
+  std::vector<PointerIntUnion<const Decl *, serialization::BitOffset,
+                              uint64_t>> Decls;
+
+  /// Types referenced by this module.
+  std::vector<PointerIntUnion<Type, serialization::BitOffset, uint64_t>> Types;
 
   /// Whether this module file can be used.
   ModuleStatus Status;
