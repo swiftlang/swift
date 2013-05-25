@@ -30,7 +30,6 @@ bb0:                                  // CHECK: bb0:
 // Forward referenced values.
 // TODO: Use control flow to avoid building incorrect SSA.
 sil @test2 : $() -> () {              // CHECK: sil @test2 : $() -> ()
-bb0:                                  // CHECK: bb0:
   %b = return %a : $()                // CHECK:   %0 = return %1 : $()
   %a = tuple ()                       // CHECK:   %1 = tuple ()
 }

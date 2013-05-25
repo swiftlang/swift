@@ -106,6 +106,10 @@ bool SILParserFunctionState::diagnoseProblems() {
 /// specified block.
 SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name,
                                                           SourceLoc Loc) {
+  // If there was no name specified for this block, just create a new one.
+  if (Name.empty())
+    return new (SILMod) SILBasicBlock(F);
+  
   SILBasicBlock *&BB = BlocksByName[Name];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
@@ -433,14 +437,17 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
 
 
 ///   sil-basic-block:
-///     identifier /*TODO: argument list*/ ':' sil-instruction+
+///     (identifier /*TODO: argument list*/ ':')? sil-instruction+
 bool SILParserFunctionState::parseSILBasicBlock() {
   Identifier BBName;
   SourceLoc NameLoc;
 
-  if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
-      P.parseToken(tok::colon, diag::expected_sil_block_colon))
-    return true;
+  // The basic block name is optional.
+  if (P.Tok.isNot(tok::sil_local_name)) {
+    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
+        P.parseToken(tok::colon, diag::expected_sil_block_colon))
+      return true;
+  }
 
   SILBasicBlock *BB = getBBForDefinition(BBName, NameLoc);
 
