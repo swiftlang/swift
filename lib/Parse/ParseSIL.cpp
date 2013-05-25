@@ -38,8 +38,8 @@ namespace {
                    std::pair<SourceLoc, Identifier>> UndefinedBlocks;
   public:
 
-    SILParserFunctionState(Parser &P, SILFunction *F)
-      : P(P), SILMod(F->getModule()), F(F) {}
+    SILParserFunctionState(Parser &P)
+      : P(P), SILMod(*P.SIL) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -58,6 +58,10 @@ namespace {
     
   public:
     // Parsing logic.
+    bool parseSILType(SILType &Result);
+    bool parseTypedValueRef();
+    bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
+                        StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseSILBasicBlock();
   };
@@ -156,80 +160,80 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 ///     'sil_sret'
 ///     'sil_uncurry' '=' integer_literal
 ///
-bool Parser::parseSILType(SILType &Result) {
+bool SILParserFunctionState::parseSILType(SILType &Result) {
   bool IsSRet = false;
   unsigned UncurryLevel = 0;
 
   // If we have sil-type-attribute list, parse it.
-  if (Tok.is(tok::l_square) && peekToken().is(tok::identifier) &&
-      peekToken().getText().startswith("sil_")) {
-    SourceLoc LeftLoc = Tok.getLoc(), RightLoc;
+  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
+      P.peekToken().getText().startswith("sil_")) {
+    SourceLoc LeftLoc = P.Tok.getLoc(), RightLoc;
 
     // The attribute list is always guaranteed to have at least one attribute.
     do {
-      consumeToken();
+      P.consumeToken();
 
       SourceLoc AttrTokenLoc;
       Identifier AttrToken;
-      if (parseIdentifier(AttrToken, AttrTokenLoc,
-                          diag::expected_identifier_sil_type_attributes))
+      if (P.parseIdentifier(AttrToken, AttrTokenLoc,
+                            diag::expected_identifier_sil_type_attributes))
         return true;
 
       if (AttrToken.str() == "sil_sret") {
         IsSRet = true;
-        consumeToken(tok::identifier);
+        P.consumeToken(tok::identifier);
       } else if (AttrToken.str() == "sil_uncurry") {
-        if (parseToken(tok::identifier, diag::malformed_sil_uncurry_attribute)||
-            parseToken(tok::equal, diag::malformed_sil_uncurry_attribute))
+        if (P.parseToken(tok::identifier,diag::malformed_sil_uncurry_attribute)||
+            P.parseToken(tok::equal, diag::malformed_sil_uncurry_attribute))
           return true;
-        if (Tok.isNot(tok::integer_literal) ||
-            Tok.getText().getAsInteger(10, UncurryLevel)) {
-          diagnose(Tok, diag::malformed_sil_uncurry_attribute);
+        if (P.Tok.isNot(tok::integer_literal) ||
+            P.Tok.getText().getAsInteger(10, UncurryLevel)) {
+          P.diagnose(P.Tok, diag::malformed_sil_uncurry_attribute);
           return true;
         }
 
-        consumeToken(tok::integer_literal);
+        P.consumeToken(tok::integer_literal);
       } else {
-        diagnose(AttrTokenLoc, diag::unknown_sil_type_attribute);
+        P.diagnose(AttrTokenLoc, diag::unknown_sil_type_attribute);
         return true;
       }
 
       // Continue parsing the next token.
-    } while (Tok.is(tok::comma));
+    } while (P.Tok.is(tok::comma));
 
-    if (parseMatchingToken(tok::r_square, RightLoc,
+    if (P.parseMatchingToken(tok::r_square, RightLoc,
                            diag::expected_bracket_sil_type_attributes, LeftLoc))
       return true;
   }
 
   // If we have a '*', then this is an address type.
   bool isAddress = false;
-  if (Tok.isAnyOperator() && Tok.getText() == "*") {
+  if (P.Tok.isAnyOperator() && P.Tok.getText() == "*") {
     isAddress = true;
-    consumeToken();
+    P.consumeToken();
   }
 
   TypeLoc Ty;
-  if (parseToken(tok::sil_dollar, diag::expected_sil_type) ||
-      parseType(Ty, diag::expected_sil_type))
+  if (P.parseToken(tok::sil_dollar, diag::expected_sil_type) ||
+      P.parseType(Ty, diag::expected_sil_type))
     return true;
 
   // If we successfully parsed the type, do some type checking / name binding
   // of it.
   {
     // We have to lie and say we're done with parsing to make this happen.
-    assert(TU->ASTStage == TranslationUnit::Parsing &&
+    assert(P.TU->ASTStage == TranslationUnit::Parsing &&
            "Unexpected stage during parsing!");
-    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(TU->ASTStage,
+    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
                                                       TranslationUnit::Parsed);
-    if (performTypeLocChecking(TU, Ty))
+    if (performTypeLocChecking(P.TU, Ty))
       return true;
   }
 
   // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
   // SILTypes itself.
   (void)IsSRet;
-  Result = SIL->Types.getLoweredType(Ty.getType(), UncurryLevel);
+  Result = SILMod.Types.getLoweredType(Ty.getType(), UncurryLevel);
 
   // If this is an address type, apply the modifier.
   if (isAddress)
@@ -237,6 +241,41 @@ bool Parser::parseSILType(SILType &Result) {
   return false;
 }
 
+/// parseTypedValueRef - Parse a type/value reference pair.
+///
+///    sil-typed-valueref:
+///       sil-type ':' sil-value-ref
+bool SILParserFunctionState::parseTypedValueRef() {
+  SILType Ty;
+  if (parseSILType(Ty) ||
+      P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+      P.parseToken(tok::sil_local_name, diag::expected_sil_value_name))
+    return true;
+  
+  return false;
+}
+
+/// getInstructionKind - This method maps the string form of a SIL instruction
+/// opcode to an enum.
+bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
+                                            SourceLoc &OpcodeLoc,
+                                            StringRef &OpcodeName) {
+  OpcodeLoc = P.Tok.getLoc();
+  OpcodeName = P.Tok.getText();
+  // Parse this textually to avoid Swift keywords (like 'return') from
+  // interfering with opcode recognition.
+  Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+    .Case("tuple", ValueKind::TupleInst)
+    .Case("return", ValueKind::ReturnInst)
+    .Default(ValueKind::SILArgument);
+  
+  if (Opcode != ValueKind::SILArgument) {
+    P.consumeToken();
+    return false;
+  }
+  P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
+  return true;
+}
 
 ///   sil-instruction:
 ///     sil_local_name '=' identifier ...
@@ -245,14 +284,42 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
     P.diagnose(P.Tok, diag::expected_sil_instr_name);
     return true;
   }
+
+  // We require SIL instructions to be at the start of a line to assist
+  // recovery.
+  if (!P.Tok.isAtStartOfLine()) {
+    P.diagnose(P.Tok, diag::expected_sil_instr_start_of_line);
+    return true;
+  }
   P.consumeToken(tok::sil_local_name);
   
-  // Eat away, nom nom nom.
-  while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof) &&
-         !P.Tok.isAtStartOfLine())
-    P.consumeToken();
+  ValueKind Opcode;
+  SourceLoc OpcodeLoc;
+  StringRef OpcodeName;
+  
+  // Parse the equal and opcode name.
+  if (P.parseToken(tok::equal, diag::expected_equal_in_sil_instr) ||
+      parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
+    return true;
 
-  return false;
+  // Validate the opcode name, and do opcode-specific parsing logic based on the
+  // opcode we find.
+  switch (Opcode) {
+  default: assert(0 && "Unreachable");
+  case ValueKind::TupleInst: {
+    if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr,
+                     "(", OpcodeName))
+      return true;
+    while (P.Tok.isNot(tok::r_paren)) {
+    if (parseTypedValueRef()) return true;
+    }
+    P.consumeToken(tok::r_paren);
+    return false;
+  }
+  case ValueKind::ReturnInst:
+    if (parseTypedValueRef()) return true;
+    return false;
+  }
 }
 
 
@@ -289,6 +356,8 @@ bool Parser::parseDeclSIL() {
 
   consumeToken(tok::kw_sil);
 
+  SILParserFunctionState FunctionState(*this);
+
   SILLinkage FnLinkage;
   Identifier FnName;
   SILType FnType;
@@ -297,14 +366,13 @@ bool Parser::parseDeclSIL() {
       parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type) ||
-      parseSILType(FnType))
+      FunctionState.parseSILType(FnType))
     return true;
 
   // TODO: Verify it is a function type.
-  SILFunction *Fn = new (*SIL) SILFunction(*SIL, FnLinkage,
+  FunctionState.F = new (*SIL) SILFunction(*SIL, FnLinkage,
                                            FnName.str(), FnType);
 
-  SILParserFunctionState FunctionState(*this, Fn);
 
   // Now that we have a SILFunction parse the body, if present.
 

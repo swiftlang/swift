@@ -37,7 +37,6 @@ namespace swift {
   struct TypeLoc;
   class TupleType;
   class SILModule;
-  class SILType;
   
   struct OneOfElementInfo;
   
@@ -248,14 +247,19 @@ public:
   /// is consumed and false is returned.
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
-  /// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
-  /// true is returned.
-  bool parseToken(tok K, Diag<> D, tok SkipToTok = tok::unknown) {
+  bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
+  
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
-    return parseToken(K, L, D, SkipToTok);
+    return parseToken(K, L, Diagnostic(ID, Args...));
   }
-  bool parseToken(tok K, SourceLoc &TokLoc, Diag<> D,
-                  tok SkipToTok = tok::unknown);
+  template<typename ...DiagArgTypes, typename ...ArgTypes>
+  bool parseToken(tok K, SourceLoc &L,
+                  Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+    return parseToken(K, L, Diagnostic(ID, Args...));
+  }
+
   
   /// parseMatchingToken - Parse the specified expected token and return its
   /// location on success.  On failure, emit the specified error diagnostic, and
@@ -351,7 +355,6 @@ public:
   //===--------------------------------------------------------------------===//
   // SIL Parsing.
 
-  bool parseSILType(SILType &Type);
   bool parseDeclSIL();
 
 

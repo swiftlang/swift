@@ -315,10 +315,24 @@ ERROR(expected_infix_operator_precedence,decl_parsing,none,
 // SIL
 ERROR(expected_sil_type, decl_parsing,none,
       "expected type in SIL code", ())
+ERROR(expected_sil_colon_value_ref,decl_parsing,none,
+      "expected ':' after type in SIL value reference", ())
+ERROR(expected_sil_value_name,decl_parsing,none,
+      "expected SIL value name", ())
 
 // SIL Instructions
 ERROR(expected_sil_instr_name,decl_parsing,none,
       "expected instruction name", ())
+ERROR(expected_sil_instr_start_of_line,decl_parsing,none,
+      "SIL instructions must be at the start of a line", ())
+ERROR(expected_equal_in_sil_instr,decl_parsing,none,
+      "expected '=' in SIL instruction", ())
+ERROR(expected_sil_instr_opcode,decl_parsing,none,
+      "expected SIL instruction opcode", ())
+ERROR(expected_tok_in_sil_instr,decl_parsing,none,
+      "expected '%0' in SIL instruction %1", (StringRef, StringRef))
+
+
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

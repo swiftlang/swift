@@ -274,21 +274,13 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
 /// consumed and false is returned.
 ///
 /// If the input is malformed, this emits the specified error diagnostic.
-/// Next, if SkipToTok is specified, it calls skipUntil(SkipToTok).  Finally,
-/// true is returned.
-bool Parser::parseToken(tok K, SourceLoc &TokLoc, Diag<> ID, tok SkipToTok) {
+bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   if (Tok.is(K)) {
     TokLoc = consumeToken(K);
     return false;
   }
   
-  diagnose(Tok.getLoc(), ID);
-  skipUntil(SkipToTok);
-  
-  // If we skipped ahead to the missing token and found it, consume it as if
-  // there were no error.
-  if (K == SkipToTok && Tok.is(SkipToTok))
-    consumeToken();
+  diagnose(Tok.getLoc(), D);
   return true;
 }
 
@@ -304,7 +296,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   case tok::r_brace:  OtherNote = diag::opening_brace;    break;
   default:            assert(!"unknown matching token!"); break;
   }
-  if (parseToken(K, TokLoc, ErrorDiag, tok::unknown)) {
+  if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
     return true;
   }
