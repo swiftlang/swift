@@ -44,7 +44,7 @@ class Substitution;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
-class SILInstruction : public ValueBase, public llvm::ilist_node<SILInstruction> {
+class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   friend struct llvm::ilist_traits<SILInstruction>;
 
   /// A backreference to the containing basic block.  This is maintained by

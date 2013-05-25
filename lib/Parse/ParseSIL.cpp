@@ -37,7 +37,10 @@ namespace {
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
     llvm::DenseMap<SILBasicBlock*,
                    std::pair<SourceLoc, Identifier>> UndefinedBlocks;
-    llvm::DenseMap<unsigned, SILValue> NumberedLocalValues;
+
+    /// Data structures used to perform name lookup for local values.
+    llvm::StringMap<SILValue> LocalValues;
+    llvm::StringMap<SourceLoc> ForwardRefLocalValues;
   public:
 
     SILParserFunctionState(Parser &P)
@@ -82,7 +85,7 @@ bool SILParserFunctionState::diagnoseProblems() {
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterminstic order.
     for (auto Entry : UndefinedBlocks)
-      P.diagnose(Entry.second.first, diag::undefined_basicblock_use,
+      P.diagnose(Entry.second.first, diag::sil_undefined_basicblock_use,
                  Entry.second.second);
 
     HadError = true;
@@ -105,7 +108,7 @@ SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name,
   if (!UndefinedBlocks.erase(BB)) {
     // If we have a redefinition, return a new BB to avoid inserting
     // instructions after the terminator.
-    P.diagnose(Loc, diag::basicblock_redefinition, Name);
+    P.diagnose(Loc, diag::sil_basicblock_redefinition, Name);
     HadError = true;
     return new (SILMod) SILBasicBlock(F);
   }
@@ -137,26 +140,51 @@ SILBasicBlock *SILParserFunctionState::getBBForReference(Identifier Name,
 /// and type.
 SILValue SILParserFunctionState::getLocalValue(StringRef Name, SILType Type,
                                                SourceLoc NameLoc) {
-  unsigned ID;
-  if (Name.substr(1).getAsInteger(10, ID)) { // Strip off '%'
-    assert(0 && "Only support local values right now");
+  SILValue &Entry = LocalValues[Name];
+  
+  // This is a forward reference.  Create a dummy node to represent
+  // it until we see a real definition.
+  if (!Entry) {
+    ForwardRefLocalValues[Name] = NameLoc;
+    Entry = new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+    return Entry;
   }
-  assert(NumberedLocalValues[ID] && "FIXME: Support forward refs");
-  assert(NumberedLocalValues[ID].getType() == Type && "Diagnose type errors");
-  return NumberedLocalValues[ID];
+  
+  // If this value is already defined, check it.
+  if (Entry.getType() != Type) {
+    P.diagnose(NameLoc, diag::sil_value_use_type_mismatch, Name,
+               Entry.getType().getAsString());
+    // Make sure to return something of the requested type.
+    return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+  }
+
+  return Entry;
 }
 
 /// setLocalValue - When an instruction or block argument is defined, this
 /// method is used to register it and update our symbol table.
 void SILParserFunctionState::setLocalValue(SILValue Value, StringRef Name,
                                            SourceLoc NameLoc) {
-  unsigned ID;
-  if (Name.substr(1).getAsInteger(10, ID)) { // Strip off '%'
-    assert(0 && "Only support local values right now");
-  }
+  SILValue &Entry = LocalValues[Name];
 
-  assert(!NumberedLocalValues[ID] && "FIXME: diagnose redefn");
-  NumberedLocalValues[ID] = Value;
+  if (!Entry) {
+    Entry = Value;
+    return;
+  }
+  
+  // If this value was already defined, it is either a redefinition, or a
+  // specification for a forward referenced value.
+  if (!ForwardRefLocalValues.erase(Name)) {
+    P.diagnose(NameLoc, diag::sil_value_redefinition, Name);
+    return;
+  }
+  
+  // If the forward reference was of the wrong type, diagnose this now.
+  if (Entry.getType() != Value.getType())
+    P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
+               Entry.getType().getAsString());
+  Entry.replaceAllUsesWith(Value);
+  Entry = Value;
 }
 
 
@@ -279,6 +307,7 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
 ///
 ///    sil-typed-valueref:
 ///       sil-value-ref ':' sil-type
+///
 bool SILParserFunctionState::parseTypedValueRef(SILValue &Result) {
   SILType Ty;
   SourceLoc NameLoc;
@@ -355,16 +384,22 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
                      "(", OpcodeName))
       return true;
     
+    // TODO: Check for a type here.  This is how tuples with "interesting" types
+    // are described.
+    
     // This form is used with tuples that have elements with no names or default
     // values.
     // FIXME: Handle varargs.
     SmallVector<TupleTypeElt, 4> TypeElts;
-    while (P.Tok.isNot(tok::r_paren)) {
-      if (parseTypedValueRef(Val)) return true;
-      OpList.push_back(Val);
-      TypeElts.push_back(Val.getType().getSwiftRValueType());
+    if (P.Tok.isNot(tok::r_paren)) {
+      do {
+        if (parseTypedValueRef(Val)) return true;
+        OpList.push_back(Val);
+        TypeElts.push_back(Val.getType().getSwiftRValueType());
+      } while (P.consumeIf(tok::comma));
     }
-    P.consumeToken(tok::r_paren);
+    HadError |= P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr,
+                             ")", "tuple");
     
     auto Ty = TupleType::get(TypeElts, P.Context);
     // FIXME: Stop using TypeConverter

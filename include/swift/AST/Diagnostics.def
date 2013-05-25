@@ -320,6 +320,14 @@ ERROR(expected_sil_colon_value_ref,decl_parsing,none,
 ERROR(expected_sil_value_name,decl_parsing,none,
       "expected SIL value name", ())
 
+// SIL Values
+ERROR(sil_value_redefinition, decl_parsing,none,
+      "redefinition of value '%0'", (StringRef))
+ERROR(sil_value_use_type_mismatch, decl_parsing,none,
+      "value '%0' defined with mismatching type '%1'", (StringRef, StringRef))
+ERROR(sil_value_def_type_mismatch, decl_parsing,none,
+      "value '%0' used with mismatching type '%1'", (StringRef, StringRef))
+
 // SIL Instructions
 ERROR(expected_sil_instr_name,decl_parsing,none,
       "expected instruction name", ())
@@ -330,18 +338,16 @@ ERROR(expected_equal_in_sil_instr,decl_parsing,none,
 ERROR(expected_sil_instr_opcode,decl_parsing,none,
       "expected SIL instruction opcode", ())
 ERROR(expected_tok_in_sil_instr,decl_parsing,none,
-      "expected '%0' in SIL instruction %1", (StringRef, StringRef))
-
-
+      "expected '%0' in SIL instruction '%1'", (StringRef, StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
       "expected basic block name or '}'", ())
 ERROR(expected_sil_block_colon, decl_parsing,none,
       "expected ':' after basic block name", ())
-ERROR(undefined_basicblock_use, decl_parsing,none,
+ERROR(sil_undefined_basicblock_use, decl_parsing,none,
       "use of undefined basic block %0", (Identifier))
-ERROR(basicblock_redefinition, decl_parsing,none,
+ERROR(sil_basicblock_redefinition, decl_parsing,none,
       "redefinition of basic block %0", (Identifier))
 
 // SIL Functions
