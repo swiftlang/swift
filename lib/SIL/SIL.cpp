@@ -21,6 +21,13 @@
 using namespace swift;
 
 
+void SILValue::replaceAllUsesWith(SILValue V) {
+  assert(*this != V && "Cannot RAUW a value with itself");
+  while (!use_empty())
+    (**use_begin()).set(V);
+}
+
+
 static unsigned getNaturalUncurryLevel(CapturingExpr *func) {
   assert(func && "no function body?!");
   assert(func->getParamPatterns().size() >= 1 && "no arguments for func?!");

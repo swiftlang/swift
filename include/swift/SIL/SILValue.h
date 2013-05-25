@@ -130,6 +130,8 @@ public:
   inline ValueUseIterator use_begin();
   inline ValueUseIterator use_end();
   inline Range<ValueUseIterator> getUses();
+  
+  void replaceAllUsesWith(SILValue V);
 
   // Check validity.
   bool isValid() const { return getDef() != nullptr; }
@@ -199,7 +201,7 @@ public:
 private:
   void removeFromCurrent() {
     if (!Back) return;
-    (*Back)->NextUse = NextUse;
+    *Back = NextUse;
     if (NextUse) NextUse->Back = Back;
   }
 
