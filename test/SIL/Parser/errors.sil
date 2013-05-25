@@ -15,5 +15,5 @@ bb0:
   %0 = tuple ()
   %0 = tuple ()           // expected-error {{redefinition of value '%0'}}
   %1 = tuple (%0 : $(), %0 : $(Int))  // expected-error {{value '%0' defined with mismatching type '$()'}}
-
+  %2 = tuple (%199 : $())  // expected-error {{use of undefined value '%199'}}
 }

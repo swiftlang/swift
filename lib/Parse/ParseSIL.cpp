@@ -90,7 +90,15 @@ bool SILParserFunctionState::diagnoseProblems() {
 
     HadError = true;
   }
-
+  
+  if (!ForwardRefLocalValues.empty()) {
+    // FIXME: These are going to come out in nondeterminstic order.
+    for (auto &Entry : ForwardRefLocalValues)
+      P.diagnose(Entry.second, diag::sil_use_of_undefined_value,
+                 Entry.first());
+    HadError = true;
+  }
+  
   return HadError;
 }
 
@@ -152,6 +160,7 @@ SILValue SILParserFunctionState::getLocalValue(StringRef Name, SILType Type,
   
   // If this value is already defined, check it.
   if (Entry.getType() != Type) {
+    HadError = true;
     P.diagnose(NameLoc, diag::sil_value_use_type_mismatch, Name,
                Entry.getType().getAsString());
     // Make sure to return something of the requested type.
@@ -176,14 +185,18 @@ void SILParserFunctionState::setLocalValue(SILValue Value, StringRef Name,
   // specification for a forward referenced value.
   if (!ForwardRefLocalValues.erase(Name)) {
     P.diagnose(NameLoc, diag::sil_value_redefinition, Name);
+    HadError = true;
     return;
   }
   
   // If the forward reference was of the wrong type, diagnose this now.
-  if (Entry.getType() != Value.getType())
+  if (Entry.getType() != Value.getType()) {
     P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
                Entry.getType().getAsString());
-  Entry.replaceAllUsesWith(Value);
+    HadError = true;
+  } else {
+    Entry.replaceAllUsesWith(Value);
+  }
   Entry = Value;
 }
 

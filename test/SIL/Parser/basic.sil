@@ -34,4 +34,3 @@ bb0:                                  // CHECK: bb0:
   %1 = return %0 : $()                // CHECK:   %0 = return %1 : $()
   %0 = tuple ()                       // CHECK:   %1 = tuple ()
 }
-

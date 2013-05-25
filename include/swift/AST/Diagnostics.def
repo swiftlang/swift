@@ -327,6 +327,8 @@ ERROR(sil_value_use_type_mismatch, decl_parsing,none,
       "value '%0' defined with mismatching type '%1'", (StringRef, StringRef))
 ERROR(sil_value_def_type_mismatch, decl_parsing,none,
       "value '%0' used with mismatching type '%1'", (StringRef, StringRef))
+ERROR(sil_use_of_undefined_value, decl_parsing,none,
+      "use of undefined value '%0'", (StringRef))
 
 // SIL Instructions
 ERROR(expected_sil_instr_name,decl_parsing,none,
