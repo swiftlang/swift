@@ -664,6 +664,28 @@ public:
   
 } // end anonymous namespace.
 
+/// \brief Determine whether the given type is a suitable argument type for
+/// a string literal conversion function.
+static bool isStringLiteralArg(Type argType) {
+  if (argType->is<BuiltinRawPointerType>())
+    return true;
+
+  TupleType *tt = argType->getAs<TupleType>();
+  if (!tt)
+    return false;
+  if (tt->getFields().size() != 2)
+    return false;
+  if (!tt->getElementType(0)->is<BuiltinRawPointerType>())
+    return false;
+  BuiltinIntegerType *intTy
+  = tt->getElementType(1)->getAs<BuiltinIntegerType>();
+  if (!intTy)
+    return false;
+  if (intTy->getBitWidth() != 64)
+    return false;
+  return true;
+}
+
 std::pair<FuncDecl*, Type>
 TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
                                      bool Complain) {
@@ -751,7 +773,22 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   if (TupleType *TT = ArgType->getAs<TupleType>())
     if (TT->getFields().size() == 1)
       ArgType = TT->getFields()[0].getType();
-  
+
+  // FIXME: This duplicated code will be unnecessary when we switch
+  // literals over to formal protocols.
+  if (!((LitTy == LiteralKind::Int && ArgType->is<BuiltinIntegerType>()) ||
+        (LitTy == LiteralKind::Float && ArgType->is<BuiltinFloatType>()) ||
+        (LitTy == LiteralKind::Char &&
+         (ArgType->is<BuiltinIntegerType>() &&
+          ArgType->castTo<BuiltinIntegerType>()->getBitWidth() == 32)) ||
+        ((LitTy == LiteralKind::ASCIIString ||
+          LitTy == LiteralKind::UTFString) &&
+         isStringLiteralArg(ArgType))) &&
+      !isLiteralCompatibleType(ArgType, Loc, LitTy, Complain).first) {
+    return { nullptr, nullptr };
+  }
+
+
   return std::pair<FuncDecl*, Type>(Method, ArgType);
 }
 
