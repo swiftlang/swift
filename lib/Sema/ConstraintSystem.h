@@ -1372,10 +1372,7 @@ class ConstraintSystem {
     unsigned depth = 0;
 
     /// \brief Whether to record failures or not.
-    ///
-    /// FIXME: This should default 'false', then switch to true when we're
-    /// trying to diagnose a problem.
-    bool recordFailures = true;
+    bool recordFailures = false;
 
     /// \brief The overload sets that have been resolved along the current path.
     SmallVector<OverloadSet *, 4> resolvedOverloadSets;

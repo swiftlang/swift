@@ -93,6 +93,29 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
 }
 
 bool ConstraintSystem::diagnose() {
+  // If there were no unavoidable failures, attempt to solve again, capturing
+  // any failures that come from our attempts to select overloads or bind
+  // type variables.
+  if (unavoidableFailures.empty()) {
+    SmallVector<Solution, 4> solutions;
+    
+    // Set up solver state.
+    SolverState state;
+    state.recordFailures = true;
+    this->solverState = &state;
+
+    // Solve the system.
+    solve(solutions);
+
+    // FIXME: If we were able to actually fix things along the way,
+    // we may have to hunt for the best solution. For now, we don't care.
+
+    // Remove the solver state.
+    this->solverState = nullptr;
+
+    // Fall through to produce diagnostics.
+  }
+
   if (unavoidableFailures.size() + failures.size() == 1) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
