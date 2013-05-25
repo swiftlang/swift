@@ -800,7 +800,7 @@ namespace {
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
-      llvm_unreachable("Already type-checked");
+      return simplifyExprType(expr);
     }
 
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
