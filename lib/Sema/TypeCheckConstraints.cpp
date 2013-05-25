@@ -958,7 +958,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
         return Nothing;
 
       // Record this failure.
-      if (flags & TMF_RecordFailures) {
+      if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
                       Failure::TupleSizeMismatch, tuple1, tuple2);
       }
@@ -981,7 +981,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
             return Nothing;
 
           // Record this failure.
-          if (flags & TMF_RecordFailures) {
+          if (shouldRecordFailures()) {
             recordFailure(getConstraintLocator(
                             locator.withPathElement(
                               LocatorPathElt::getNamedTupleElement(i))),
@@ -1002,7 +1002,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
               return Nothing;
 
             // Record this failure.
-            if (flags & TMF_RecordFailures) {
+            if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(
                               locator.withPathElement(
                                 LocatorPathElt::getNamedTupleElement(i))),
@@ -1022,7 +1022,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
           return Nothing;
 
         // Record this failure.
-        if (flags & TMF_RecordFailures) {
+        if (shouldRecordFailures()) {
           recordFailure(getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::getNamedTupleElement(i))),
@@ -1154,7 +1154,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
     if (func2->isAutoClosure() || kind < TypeMatchKind::TrivialSubtype) {
       // Record this failure.
-      if (flags & TMF_RecordFailures) {
+      if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
                       Failure::FunctionAutoclosureMismatch, func1, func2);
       }
@@ -1398,7 +1398,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         }
 
         // Record this failure.
-        if (flags & TMF_RecordFailures) {
+        if (shouldRecordFailures()) {
           recordFailure(getConstraintLocator(locator),
                         getRelationalFailureKind(kind), type1, type2);
         }
@@ -1497,7 +1497,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           !(kind >= TypeMatchKind::TrivialSubtype &&
             lvalue1->getQualifiers() < lvalue2->getQualifiers())) {
         // Record this failure.
-        if (flags & TMF_RecordFailures) {
+        if (shouldRecordFailures()) {
           recordFailure(getConstraintLocator(locator),
                         Failure::LValueQualifiers, type1, type2);
         }
@@ -1540,7 +1540,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
               break;
 
             // Record this failure.
-            if (flags & TMF_RecordFailures) {
+            if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(
                               locator.withPathElement(
                                 ConstraintLocator::ParentType)),
@@ -1583,7 +1583,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             }
 
             // Record this failure.
-            if (flags & TMF_RecordFailures) {
+            if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(
                               locator.withPathElement(
                                 LocatorPathElt::getGenericArgument(i))),
@@ -1727,7 +1727,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       for (auto proto : protocols) {
         if (!TC.conformsToProtocol(substType1, proto)) {
           // Record this failure.
-          if (flags & TMF_RecordFailures) {
+          if (shouldRecordFailures()) {
             recordFailure(getConstraintLocator(locator),
                           Failure::DoesNotConformToProtocol, type1,
                           proto->getDeclaredType());
@@ -1787,7 +1787,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     return SolutionKind::Unsolved;
 
   // If we are supposed to record failures, do so.
-  if (flags & TMF_RecordFailures) {
+  if (shouldRecordFailures()) {
     recordFailure(getConstraintLocator(locator),
                   getRelationalFailureKind(kind), type1, type2);
   }
@@ -1983,7 +1983,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::LValue:
   case TypeKind::Protocol:
     // If we are supposed to record failures, do so.
-    if (flags & TMF_RecordFailures) {
+    if (shouldRecordFailures()) {
       recordFailure(locator, Failure::TypesNotConstructible,
                     valueType, argType);
     }
@@ -1994,7 +1994,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   SmallVector<ValueDecl *, 4> ctors;
   if (!TC.lookupConstructors(valueType, ctors)) {
     // If we are supposed to record failures, do so.
-    if (flags & TMF_RecordFailures) {
+    if (shouldRecordFailures()) {
       recordFailure(locator, Failure::TypesNotConstructible,
                     valueType, argType);
     }
@@ -2317,13 +2317,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     bool trivial = true;
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       getTypeMatchKind(constraint.getKind()),
-                      TMF_RecordFailures, constraint.getLocator(), trivial);
+                      TMF_None, constraint.getLocator(), trivial);
   }
 
   case ConstraintKind::Construction:
     return simplifyConstructionConstraint(constraint.getSecondType(),
                                           constraint.getFirstType(),
-                                          TMF_RecordFailures,
+                                          TMF_None,
                                           constraint.getLocator());
 
   case ConstraintKind::Literal:

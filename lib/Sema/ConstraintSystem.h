@@ -1361,6 +1361,12 @@ class ConstraintSystem {
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
+    /// \brief Whether
+    ///
+    /// FIXME: Flip the default to false initially, then solve a second
+    /// time if we failed.
+    bool recordFailures = true;
+
     /// \brief The overload sets that have been resolved along the current path.
     SmallVector<OverloadSet *, 4> resolvedOverloadSets;
 
@@ -1568,12 +1574,21 @@ private:
   }
 
 public:
+  /// \brief Whether we should be recording failures.
+  bool shouldRecordFailures() {
+    return !solverState || solverState->recordFailures;
+  }
+
   /// \brief Record a failure at the given location with the given kind,
   /// along with any additional arguments to be passed to the failure
   /// constructor.
   template<typename ...Args>
   void recordFailure(ConstraintLocator *locator, Failure::FailureKind kind,
                      Args &&...args) {
+    // If we don't want to record failures, don't.
+    if (!shouldRecordFailures())
+      return;
+
     recordFailureSimplified(locator, kind,
                             simplifyFailureArg(std::forward<Args>(args))...);
   }
@@ -1826,10 +1841,7 @@ private:
     /// This flag is automatically introduced when type matching destructures
     /// a type constructor (tuple, function type, etc.), solving that
     /// constraint while potentially generating others.
-    TMF_GenerateConstraints = 0x01,
-
-    /// \brief Record failures when they occur.
-    TMF_RecordFailures = 0x02
+    TMF_GenerateConstraints = 0x01
   };
 
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
