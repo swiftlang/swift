@@ -175,12 +175,18 @@ namespace index_block {
   // VERSION_MAJOR.
   enum {
     TYPE_OFFSETS = 1,
-    DECL_OFFSETS
+    DECL_OFFSETS,
+    TOP_LEVEL_DECLS
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
     BCFixed<2>,  // record ID
     BCArray<BitOffsetField>
+  >;
+
+  using TopLevelDeclsLayout = BCRecordLayout<
+    TOP_LEVEL_DECLS,
+    BCArray<DeclIDField>
   >;
 }
 

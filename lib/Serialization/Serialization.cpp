@@ -158,7 +158,6 @@ namespace {
     void writeTranslationUnit(const TranslationUnit *TU);
 
   public:
-    // FIXME: Use real local offsets.
     Serializer()
       : Out(Buffer), LastDeclID(0), LastTypeID(0),
         ShouldFallBackToTranslationUnit(false) {
@@ -259,6 +258,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(INDEX_BLOCK);
   RECORD(index_block, TYPE_OFFSETS);
   RECORD(index_block, DECL_OFFSETS);
+  RECORD(index_block, TOP_LEVEL_DECLS);
 
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
@@ -507,10 +507,11 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     if (!isa<BuiltinModule>(M.second))
       ShouldFallBackToTranslationUnit = true;
 
+  SmallVector<DeclID, 32> topLevelIDs;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
       continue;
-    (void)addDeclRef(D);
+    topLevelIDs.push_back(addDeclRef(D));
   }
 
   writeAllDeclsAndTypes();
@@ -521,6 +522,9 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
 
     writeOffsets(Offsets, DeclOrType::IsDecl);
     writeOffsets(Offsets, DeclOrType::IsType);
+
+    index_block::TopLevelDeclsLayout TopLevelDecls(Out);
+    TopLevelDecls.emit(ScratchRecord, topLevelIDs);
   }
 }
 

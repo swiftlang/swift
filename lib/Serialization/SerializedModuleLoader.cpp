@@ -182,6 +182,22 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   return module;
 }
 
+void SerializedModuleLoader::lookupValue(Module *module,
+                                         Module::AccessPathTy accessPath,
+                                         Identifier name, NLKind lookupKind,
+                                         SmallVectorImpl<ValueDecl*> &results) {
+  // FIXME: handle nested modules.
+  if (!accessPath.empty())
+    return;
+
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+
+  moduleFile->lookupValue(name, results);
+}
+
+
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
                                             unsigned previousGeneration) {
   // FIXME: Look for extensions of the given nominal type within the

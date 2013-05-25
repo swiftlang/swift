@@ -62,7 +62,7 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-const Decl *ModuleFile::getDecl(DeclID DID) {
+Decl *ModuleFile::getDecl(DeclID DID) {
   if (DID == 0)
     return nullptr;
 
@@ -296,13 +296,15 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
         switch (kind) {
         case index_block::DECL_OFFSETS:
           assert(blobData.empty());
-          // FIXME: Use proper BCRecordLayout for this.
           Decls.assign(scratch.begin(), scratch.end());
           break;
         case index_block::TYPE_OFFSETS:
           assert(blobData.empty());
-          // FIXME: Use proper BCRecordLayout for this.
           Types.assign(scratch.begin(), scratch.end());
+          break;
+        case index_block::TOP_LEVEL_DECLS:
+          assert(blobData.empty());
+          RawTopLevelIDs.assign(scratch.begin(), scratch.end());
           break;
         default:
           // Unknown index kind, which this version of the compiler won't use.
@@ -336,4 +338,23 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
     return error();
+}
+
+void ModuleFile::buildTopLevelDeclMap() {
+  // FIXME: be more lazy about deserialization by encoding this some other way.
+  for (DeclID ID : RawTopLevelIDs) {
+    auto value = cast<ValueDecl>(getDecl(ID));
+    TopLevelIDs[value->getName()] = ID;
+  }
+
+  RawTopLevelIDs.clear();
+}
+
+void ModuleFile::lookupValue(Identifier name,
+                             SmallVectorImpl<ValueDecl*> &results) {
+  if (!RawTopLevelIDs.empty())
+    buildTopLevelDeclMap();
+
+  if (DeclID ID = TopLevelIDs.lookup(name))
+    results.push_back(cast<ValueDecl>(getDecl(ID)));
 }

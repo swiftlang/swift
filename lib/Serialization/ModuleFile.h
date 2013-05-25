@@ -14,10 +14,12 @@
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
 #include "ModuleFormat.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/PointerIntUnion.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 
@@ -30,6 +32,7 @@ namespace llvm {
 namespace swift {
 class Decl;
 class Module;
+class ValueDecl;
 
 /// Describes whether a loaded module can be used.
 enum class ModuleStatus {
@@ -68,11 +71,17 @@ class ModuleFile {
   SmallVector<StringRef, 4> SourcePaths;
 
   /// Decls referenced by this module.
-  std::vector<PointerIntUnion<const Decl *, serialization::BitOffset,
-                              uint64_t>> Decls;
+  std::vector<PointerIntUnion<Decl*, serialization::BitOffset, uint64_t>> Decls;
 
   /// Types referenced by this module.
   std::vector<PointerIntUnion<Type, serialization::BitOffset, uint64_t>> Types;
+
+  /// All top-level decls in this module.
+  // FIXME: A single identifier may refer to multiple decls.
+  llvm::DenseMap<Identifier, serialization::DeclID> TopLevelIDs;
+
+  /// FIXME: HACK: an array of the top-level decl IDs.
+  std::vector<serialization::DeclID> RawTopLevelIDs;
 
   /// Whether this module file can be used.
   ModuleStatus Status;
@@ -88,10 +97,13 @@ class ModuleFile {
   }
 
   /// Returns the decl with the given ID, deserializing it if needed.
-  const Decl *getDecl(serialization::DeclID DID);
+  Decl *getDecl(serialization::DeclID DID);
 
   /// Returns the type with the current ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);
+
+  /// Populates TopLevelIDs for name lookup.
+  void buildTopLevelDeclMap();
 
 public:
   /// Loads a module from the given memory buffer.
@@ -112,10 +124,6 @@ public:
   void associateWithModule(Module *module) {
     assert(!ModuleContext && "already associated with an AST module");
     ModuleContext = module;
-
-    // Force all the decls for testing purposes.
-    for (serialization::DeclID i = 1; i <= Decls.size(); ++i)
-      assert(getDecl(i) != nullptr);
   }
 
   /// Checks whether this module can be used.
@@ -127,6 +135,9 @@ public:
            getStatus() == ModuleStatus::FallBackToTranslationUnit);
     return SourcePaths;
   }
+
+  /// Searches the module's top-level decls for the given identifier.
+  void lookupValue(Identifier name, SmallVectorImpl<ValueDecl*> &results);
 };
 
 } // end namespace swift
