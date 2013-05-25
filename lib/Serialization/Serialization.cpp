@@ -45,37 +45,34 @@ namespace {
     };
     
     /// Stores a declaration or a type to be written to the AST file.
+    ///
+    /// Convenience wrapper around a PointerUnion.
     class DeclTypeUnion {
-      union {
-        const Decl *D;
-        Type T;
-        const void *Opaque;
-      };
-      static_assert(sizeof(Type) == sizeof(void *),
-                    "cannot use simple opaque union");
+      using DataTy = llvm::PointerUnion<const Decl *, Type>;
+      DataTy Data;
 
-      DeclOrType Kind;
+      explicit DeclTypeUnion(const void *val)
+        : Data(DataTy::getFromOpaqueValue(const_cast<void *>(val))) {}
+
     public:
       /*implicit*/ DeclTypeUnion(const Decl *d)
-        : D(d), Kind(DeclOrType::IsDecl) { }
+        : Data(d) { }
       /*implicit*/ DeclTypeUnion(Type ty)
-        : T(ty), Kind(DeclOrType::IsType) { }
+        : Data(ty) { }
 
-      bool isDecl() const { return Kind == DeclOrType::IsDecl; }
-      bool isType() const { return Kind == DeclOrType::IsType; }
+      bool isDecl() const { return Data.is<const Decl *>(); }
+      bool isType() const { return Data.is<Type>(); }
 
-      Type getType() const {
-        assert(isType() && "Not a type!");
-        return T;
-      }
+      Type getType() const { return Data.get<Type>(); }
+      const Decl *getDecl() const { return Data.get<const Decl *>(); }
 
-      const Decl *getDecl() const {
-        assert(isDecl() && "Not a decl!");
-        return D;
+      const void *getOpaqueValue() const { return Data.getOpaqueValue(); }
+      static DeclTypeUnion getFromOpaqueValue(void *opaqueVal) {
+        return DeclTypeUnion(opaqueVal);
       }
 
       bool operator==(const DeclTypeUnion &other) const {
-        return Kind == other.Kind && Opaque == other.Opaque;
+        return Data == other.Data;
       }
     };
 
@@ -195,9 +192,7 @@ namespace llvm {
     static inline DeclTypeUnion getEmptyKey() { return nullptr; }
     static inline DeclTypeUnion getTombstoneKey() { return Type(); }
     static unsigned getHashValue(const DeclTypeUnion &val) {
-      if (val.isType())
-        return DenseMapInfo<Type>::getHashValue(val.getType());
-      return DenseMapInfo<const Decl *>::getHashValue(val.getDecl());
+      return DenseMapInfo<const void *>::getHashValue(val.getOpaqueValue());
     }
     static bool isEqual(const DeclTypeUnion &lhs, const DeclTypeUnion &rhs) {
       return lhs == rhs;
