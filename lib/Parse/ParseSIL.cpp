@@ -12,6 +12,7 @@
 
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -36,6 +37,7 @@ namespace {
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
     llvm::DenseMap<SILBasicBlock*,
                    std::pair<SourceLoc, Identifier>> UndefinedBlocks;
+    llvm::DenseMap<unsigned, SILValue> NumberedLocalValues;
   public:
 
     SILParserFunctionState(Parser &P)
@@ -54,12 +56,18 @@ namespace {
     /// being defined.
     SILBasicBlock *getBBForReference(Identifier Name, SourceLoc Loc);
 
-
+    /// getLocalValue - Get a reference to a local value with the specified name
+    /// and type.
+    SILValue getLocalValue(StringRef Name, SILType Type, SourceLoc NameLoc);
+    
+    /// setLocalValue - When an instruction or block argument is defined, this
+    /// method is used to register it and update our symbol table.
+    void setLocalValue(SILValue Value, StringRef Name, SourceLoc NameLoc);
     
   public:
     // Parsing logic.
     bool parseSILType(SILType &Result);
-    bool parseTypedValueRef();
+    bool parseTypedValueRef(SILValue &Result);
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
@@ -124,6 +132,32 @@ SILBasicBlock *SILParserFunctionState::getBBForReference(Identifier Name,
   return BB;
 }
 
+
+/// getLocalValue - Get a reference to a local value with the specified name
+/// and type.
+SILValue SILParserFunctionState::getLocalValue(StringRef Name, SILType Type,
+                                               SourceLoc NameLoc) {
+  unsigned ID;
+  if (Name.substr(1).getAsInteger(10, ID)) { // Strip off '%'
+    assert(0 && "Only support local values right now");
+  }
+  assert(NumberedLocalValues[ID] && "FIXME: Support forward refs");
+  assert(NumberedLocalValues[ID].getType() == Type && "Diagnose type errors");
+  return NumberedLocalValues[ID];
+}
+
+/// setLocalValue - When an instruction or block argument is defined, this
+/// method is used to register it and update our symbol table.
+void SILParserFunctionState::setLocalValue(SILValue Value, StringRef Name,
+                                           SourceLoc NameLoc) {
+  unsigned ID;
+  if (Name.substr(1).getAsInteger(10, ID)) { // Strip off '%'
+    assert(0 && "Only support local values right now");
+  }
+
+  assert(!NumberedLocalValues[ID] && "FIXME: diagnose redefn");
+  NumberedLocalValues[ID] = Value;
+}
 
 
 //===----------------------------------------------------------------------===//
@@ -244,14 +278,17 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
 /// parseTypedValueRef - Parse a type/value reference pair.
 ///
 ///    sil-typed-valueref:
-///       sil-type ':' sil-value-ref
-bool SILParserFunctionState::parseTypedValueRef() {
+///       sil-value-ref ':' sil-type
+bool SILParserFunctionState::parseTypedValueRef(SILValue &Result) {
   SILType Ty;
-  if (parseSILType(Ty) ||
+  SourceLoc NameLoc;
+  StringRef Name = P.Tok.getText();
+  if (P.parseToken(tok::sil_local_name, NameLoc,diag::expected_sil_value_name)||
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-      P.parseToken(tok::sil_local_name, diag::expected_sil_value_name))
+      parseSILType(Ty))
     return true;
   
+  Result = getLocalValue(Name, Ty, NameLoc);
   return false;
 }
 
@@ -291,6 +328,8 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
     P.diagnose(P.Tok, diag::expected_sil_instr_start_of_line);
     return true;
   }
+  StringRef ResultName = P.Tok.getText();
+  SourceLoc ResultNameLoc = P.Tok.getLoc();
   P.consumeToken(tok::sil_local_name);
   
   ValueKind Opcode;
@@ -302,24 +341,46 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
       parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
     return true;
 
+  SILBuilder B(BB);
+  SmallVector<SILValue, 4> OpList;
+  SILValue Val;
+
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
+  SILValue ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
   case ValueKind::TupleInst: {
     if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr,
                      "(", OpcodeName))
       return true;
+    
+    // This form is used with tuples that have elements with no names or default
+    // values.
+    // FIXME: Handle varargs.
+    SmallVector<TupleTypeElt, 4> TypeElts;
     while (P.Tok.isNot(tok::r_paren)) {
-    if (parseTypedValueRef()) return true;
+      if (parseTypedValueRef(Val)) return true;
+      OpList.push_back(Val);
+      TypeElts.push_back(Val.getType().getSwiftRValueType());
     }
     P.consumeToken(tok::r_paren);
-    return false;
+    
+    auto Ty = TupleType::get(TypeElts, P.Context);
+    // FIXME: Stop using TypeConverter
+    auto Ty2 = SILMod.Types.getLoweredType(Ty, 0);
+    ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
+    break;
   }
-  case ValueKind::ReturnInst:
-    if (parseTypedValueRef()) return true;
-    return false;
+  case ValueKind::ReturnInst: {
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createReturn(SILLocation(), Val);
+    break;
   }
+  }
+  
+  setLocalValue(ResultVal, ResultName, ResultNameLoc);
+  return false;
 }
 
 
