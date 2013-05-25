@@ -1314,9 +1314,6 @@ class ConstraintSystem {
 
   /// \brief Arena used for memory management of constraint-checker-related
   /// allocations.
-  ///
-  /// This arena will automatically be destroyed when the top constraint
-  /// system is destroyed.
   ConstraintCheckerArenaRAII Arena;
 
   /// \brief Counter for type variables introduced.
@@ -1359,16 +1356,6 @@ class ConstraintSystem {
   // Valid everywhere, for debugging
   SmallVector<Constraint *, 16> SolvedConstraints;
 
-  unsigned assignTypeVariableID() {
-    return TypeCounter++;
-  }
-
-  unsigned assignOverloadSetID() {
-    return OverloadSetCounter++;
-  }
-  friend class OverloadSet;
-
-public:
   /// \brief Describes the current solver state.
   struct SolverState {
     /// \brief Depth of the solution stack.
@@ -1395,8 +1382,22 @@ public:
   };
 
   /// \brief The current solver state.
+  ///
+  /// This will be non-null when we're actively solving the constraint
+  /// system, and carries temporary state related to the current path
+  /// we're exploring. 
   SolverState *solverState = nullptr;
 
+  unsigned assignTypeVariableID() {
+    return TypeCounter++;
+  }
+
+  unsigned assignOverloadSetID() {
+    return OverloadSetCounter++;
+  }
+  friend class OverloadSet;
+
+public:
   /// \brief Introduces a new solver scope, which any changes to the
   /// solver state or constraint system are temporary and will be undone when
   /// this object is destroyed.
@@ -1443,17 +1444,11 @@ public:
   /// \brief Retrieve the AST context.
   ASTContext &getASTContext() const { return TC.Context; }
 
-  /// \brief Retrieve the constraints.
-  ArrayRef<Constraint *> getConstraints() const { return Constraints; }
-  
+private:
   /// \brief Determine whether this constraint system has any free type
   /// variables.
   bool hasFreeTypeVariables();
 
-  /// \brief Retrieve the constraint that caused this system to fail.
-  Constraint *getFailedConstraint() const { return failedConstraint; }
-
-private:
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
@@ -1466,6 +1461,13 @@ private:
   /// \param numBindings The number of bindings to restore, from the end of
   /// the saved-binding stack.
   void restoreTypeVariableBindings(unsigned numBindings);
+
+  /// \brief Retrieve the set of saved type variable bindings, if available.
+  ///
+  /// \returns null when we aren't currently solving the system.
+  SavedTypeVariableBindings *getSavedBindings() const {
+    return solverState? &solverState->savedBindings : nullptr;
+  }
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -1483,12 +1485,6 @@ public:
   /// \brief Retrieve an unresolved overload set.
   OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {
     return UnresolvedOverloadSets[Idx];
-  }
-
-  /// \brief Determine the number of unresolved overload sets in
-  /// this constraint system.
-  unsigned getNumUnresolvedOverloadSets() const {
-    return UnresolvedOverloadSets.size();
   }
 
   /// \brief Create a new type variable.
@@ -1526,13 +1522,7 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
-  /// \brief Retrieve the set of saved type variable bindings, if available.
-  ///
-  /// \returns null when we aren't currently solving the system.
-  SavedTypeVariableBindings *getSavedBindings() const {
-    return solverState? &solverState->savedBindings : nullptr;
-  }
-
+private:
   /// \brief Record failure with already-simplified arguments.
   template<typename ...Args>
   void recordFailureSimplified(ConstraintLocator *locator,
@@ -1577,6 +1567,7 @@ public:
     return arg;
   }
 
+public:
   /// \brief Record a failure at the given location with the given kind,
   /// along with any additional arguments to be passed to the failure
   /// constructor.

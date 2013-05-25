@@ -459,12 +459,14 @@ getPotentialBindings(ConstraintSystem &cs,
 /// to the given constraint system.
 ///
 /// \param cs The constraint system we're solving in.
+/// \param depth The depth of the solution stack.
 /// \param tvc The type variable and its constraints that we're solving for.
 /// \param bindings The initial set of bindings to explore.
 /// \param solutions The set of solutions.
 ///
 /// \returns true if there are no solutions.
 static bool tryTypeVariableBindings(ConstraintSystem &cs,
+                                    unsigned depth,
                                     TypeVariableConstraints &tvc,
                                     ArrayRef<std::pair<Type, bool>> bindings,
                                     SmallVectorImpl<Solution> &solutions) {
@@ -480,7 +482,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
     for (auto binding : bindings) {
       auto type = binding.first;
       if (tc.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(cs.solverState->depth * 2)
+        llvm::errs().indent(depth * 2)
           << "(trying " << typeVar->getString()
           << " := " << type->getString() << "\n";
       }
@@ -504,7 +506,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(cs.solverState->depth * 2) << ")\n";
+        llvm::errs().indent(depth * 2) << ")\n";
       }
     }
 
@@ -661,6 +663,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     if (!bestBindings.empty() &&
         (!bestInvolvesTypeVariables || UnresolvedOverloadSets.empty())) {
       return tryTypeVariableBindings(*this,
+                                     solverState->depth,
                                      typeVarConstraints[bestTypeVarIndex],
                                      bestBindings,
                                      solutions);
