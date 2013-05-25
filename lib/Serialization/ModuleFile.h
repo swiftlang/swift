@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
 class Decl;
+class Module;
 
 /// Describes whether a loaded module can be used.
 enum class ModuleStatus {
@@ -51,6 +52,9 @@ enum class ModuleStatus {
 
 /// A serialized module, along with the tools to access it.
 class ModuleFile {
+  /// A reference back to the AST representation of the module.
+  Module *ModuleContext;
+
   /// The module file data.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
 
@@ -58,7 +62,7 @@ class ModuleFile {
   llvm::BitstreamReader InputReader;
 
   /// The cursor used to lazily load things from the file.
-  llvm::BitstreamCursor In;
+  llvm::BitstreamCursor DeclTypeCursor;
 
   /// Paths to the source files used to build this module.
   SmallVector<StringRef, 4> SourcePaths;
@@ -83,6 +87,12 @@ class ModuleFile {
     Status = issue;
   }
 
+  /// Returns the decl with the given ID, deserializing it if needed.
+  const Decl *getDecl(serialization::DeclID DID);
+
+  /// Returns the type with the current ID, deserializing it if needed.
+  Type getType(serialization::TypeID TID);
+
 public:
   /// Loads a module from the given memory buffer.
   ///
@@ -98,11 +108,21 @@ public:
     return module->getStatus();
   }
 
+  /// Associates this module file with an AST module.
+  void associateWithModule(Module *module) {
+    assert(!ModuleContext && "already associated with an AST module");
+    ModuleContext = module;
+
+    // Force all the decls for testing purposes.
+    for (serialization::DeclID i = 1; i <= Decls.size(); ++i)
+      assert(getDecl(i) != nullptr);
+  }
+
   /// Checks whether this module can be used.
-  ModuleStatus getStatus() { return Status; }
+  ModuleStatus getStatus() const { return Status; }
 
   /// Returns paths to the source files that were used to build this module.
-  ArrayRef<StringRef> getInputSourcePaths() {
+  ArrayRef<StringRef> getInputSourcePaths() const {
     assert(getStatus() == ModuleStatus::Valid ||
            getStatus() == ModuleStatus::FallBackToTranslationUnit);
     return SourcePaths;

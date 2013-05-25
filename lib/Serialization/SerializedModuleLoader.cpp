@@ -169,12 +169,14 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     break;
   }
 
-  if (loadedModuleFile)
-    LoadedModuleFiles.push_back(std::move(loadedModuleFile));
-
   auto comp = new (Ctx.Allocate<Component>(1)) Component();
   auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first, comp,
                                            loadedModuleFile.get());
+
+  if (loadedModuleFile) {
+    loadedModuleFile->associateWithModule(module);
+    LoadedModuleFiles.push_back(std::move(loadedModuleFile));
+  }
 
   Ctx.LoadedModules[moduleID.first.str()] = module;
   return module;

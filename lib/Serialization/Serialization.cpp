@@ -37,13 +37,7 @@ namespace {
     /// A reusable buffer for emitting records.
     SmallVector<uint64_t, 64> ScratchRecord;
 
-  public:
-    /// Discriminator between Decls and Types.
-    enum class DeclOrType {
-      IsDecl,
-      IsType
-    };
-    
+  public:    
     /// Stores a declaration or a type to be written to the AST file.
     ///
     /// Convenience wrapper around a PointerUnion.
@@ -482,13 +476,6 @@ void Serializer::writeAllDeclsAndTypes() {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();
     DeclsAndTypesToWrite.pop();
 
-    // If we can't handle a decl or type, mark the module as incomplete.
-    // FIXME: Eventually we should assert this.
-    bool success = next.isDecl() ? writeDecl(next.getDecl())
-                                 : writeType(next.getType());
-    if (!success)
-      ShouldFallBackToTranslationUnit = true;
-
     DeclID id = DeclIDs[next];
     assert(id != 0 && "decl or type not referenced properly");
 
@@ -496,6 +483,13 @@ void Serializer::writeAllDeclsAndTypes() {
     assert((id - 1) == offsets.size());
     
     offsets.push_back(Out.GetCurrentBitNo());
+
+    // If we can't handle a decl or type, mark the module as incomplete.
+    // FIXME: Eventually we should assert this.
+    bool success = next.isDecl() ? writeDecl(next.getDecl())
+                                 : writeType(next.getType());
+    if (!success)
+      ShouldFallBackToTranslationUnit = true;
   }
 }
 

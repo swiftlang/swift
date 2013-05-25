@@ -39,6 +39,23 @@ const unsigned VERSION_MAJOR = 1;
 /// be incremented.
 const unsigned VERSION_MINOR = 0;
 
+/// Discriminator between Decls and Types.
+enum class DeclOrType {
+  IsDecl,
+  IsType
+};
+
+using DeclIDField = BCFixed<32>;
+using DeclID = DeclIDField::value_type;
+
+// TypeID must be the same as DeclID because it is stored in the same way.
+using TypeIDField = DeclIDField;
+using TypeID = DeclID;
+
+using BitOffsetField = BCFixed<32>;
+using BitOffset = BitOffsetField::value_type;
+
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -111,16 +128,6 @@ namespace input_block {
     BCBlob // path
   >;
 }
-
-using DeclID = uint32_t;
-using DeclIDField = BCFixed<32>;
-
-// These two types must be the same because they are stored in the same way.
-using TypeID = DeclID;
-using TypeIDField = DeclIDField;
-
-using BitOffset = uint32_t;
-using BitOffsetField = BCFixed<32>;
 
 /// The record types within the "decls-and-types" block.
 ///

@@ -36,6 +36,9 @@
 #define SWIFT_SERIALIZATION_BCRECORDLAYOUT_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Bitcode/BitCodes.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Support/MathExtras.h"
@@ -47,13 +50,21 @@ namespace impl {
   /// Convenience base for all kinds of bitcode abbreviation fields.
   ///
   /// This just defines common properties queried by the metaprogramming.
-  template<bool LAST = false>
+  template<bool COMPOUND = false>
   class BCField {
   public:
-    static const bool MUST_BE_LAST = LAST;
+    static const bool IS_COMPOUND = COMPOUND;
 
+    /// Asserts that the given data is a valid value for this field.
     template<typename T>
-    static bool assertValid(const T &data) {}
+    static void assertValid(const T &data) {}
+
+    /// Converts a raw numeric representation of this value to its preferred
+    /// type.
+    template<typename T>
+    static T convert(T rawValue) {
+      return rawValue;
+    }
   };
 } // end namespace impl
 
@@ -82,9 +93,11 @@ public:
 /// Represents a fixed-width value in a bitcode record.
 ///
 /// Note that the LLVM bitcode format only supports unsigned values.
-template<uint64_t Width>
+template<unsigned Width>
 class BCFixed : public impl::BCField<> {
 public:
+  static_assert(Width <= 64, "fixed-width field is too large");
+
   static void emitOp(llvm::BitCodeAbbrev &abbrev) {
     abbrev.Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::Fixed, Width));
   }
@@ -95,6 +108,16 @@ public:
     assert(llvm::isUInt<Width>(data) &&
            "data value does not fit in the given bit width");
   }
+
+  using value_type = typename std::conditional<(Width <= 8), uint8_t,
+                     typename std::conditional<(Width <= 16), uint16_t,
+                     typename std::conditional<(Width <= 32), uint32_t,
+                     uint64_t>::type>::type>::type;
+
+  template<typename T>
+  static value_type convert(T rawValue) {
+    return static_cast<value_type>(rawValue);
+  }
 };
 
 /// Represents a variable-width value in a bitcode record.
@@ -102,7 +125,7 @@ public:
 /// The \p Width parameter should include the continuation bit.
 ///
 /// Note that the LLVM bitcode format only supports unsigned values.
-template<uint64_t Width>
+template<unsigned Width>
 class BCVBR : public impl::BCField<> {
   static_assert(Width >= 2, "width does not have room for continuation bit");
 
@@ -133,6 +156,11 @@ public:
   static void assertValid(const T &data) {
     assert(llvm::BitCodeAbbrevOp::isChar6(data) && "invalid Char6 data");
   }
+
+  template<typename T>
+  char convert(T rawValue) {
+    return static_cast<char>(rawValue);
+  }
 };
 
 /// Represents an untyped blob of bytes.
@@ -150,8 +178,7 @@ public:
 /// If present, this must be the last field in a record.
 template<typename Element>
 class BCArray : public impl::BCField<true> {
-  static_assert(!std::is_same<Element, BCBlob>::value,
-                "arrays of blobs are not permitted");
+  static_assert(!Element::IS_COMPOUND, "arrays can only contain scalar types");
 public:
   static void emitOp(llvm::BitCodeAbbrev &abbrev) {
     abbrev.Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::Array));
@@ -179,57 +206,79 @@ namespace impl {
   template<typename First, typename... Rest>
   static typename std::enable_if<sizeof...(Rest) != 0, void>::type
   emitOps(llvm::BitCodeAbbrev &abbrev) {
-    static_assert(!First::MUST_BE_LAST,
+    static_assert(!First::IS_COMPOUND,
                   "arrays and blobs may not appear in the middle of a record");
     First::emitOp(abbrev);
     emitOps<Rest...>(abbrev);
   }
 
 
-  /// Helper class for emitting a scalar element in the middle of a record.
+  /// Helper class for dealing with a scalar element in the middle of a record.
   ///
-  /// \sa BCRecordLayout::emitRecord
+  /// \sa BCRecordLayout
   template<typename First, typename... Fields>
-  class BCRecordWriter {
+  class BCRecordCoding {
   public:
     template <typename BufferTy, typename FirstData, typename... Data>
-    static typename std::enable_if<sizeof...(Fields) != 0, void>::type
-    emit(llvm::BitstreamWriter &out, BufferTy &buffer, unsigned abbrCode,
-         FirstData data, Data... rest) {
-      static_assert(!First::MUST_BE_LAST,
+    static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
+                     unsigned abbrCode, FirstData data, Data... rest) {
+      static_assert(!First::IS_COMPOUND,
                     "arrays and blobs may not appear in the middle of a record");
       First::assertValid(data);
       buffer.push_back(data);
-      BCRecordWriter<Fields...>::emit(out, buffer, abbrCode, rest...);
+      BCRecordCoding<Fields...>::emit(out, buffer, abbrCode, rest...);
+    }
+
+    template <typename ElementTy, typename FirstData, typename... Data>
+    static void read(ArrayRef<ElementTy> buffer,
+                     FirstData &data, Data &... rest) {
+      assert(!buffer.empty() && "too few elements in buffer");
+      data = First::convert(buffer.front());
+      BCRecordCoding<Fields...>::read(buffer.slice(1), rest...);
     }
   };
 
-  /// Helper class for emitting a scalar element at the end of a record.
+  /// Helper class for dealing with a scalar element at the end of a record.
   ///
   /// This has a separate implementation because up until now we've only been
   /// \em building the record (into a data buffer), and now we need to hand it
   /// off to the BitstreamWriter to be emitted.
   ///
-  /// \sa BCRecordLayout::emitRecord
+  /// \sa BCRecordLayout
   template<typename Last>
-  class BCRecordWriter<Last> {
+  class BCRecordCoding<Last> {
   public:
     template <typename BufferTy, typename LastData>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
                      unsigned abbrCode, LastData data) {
-      static_assert(!Last::MUST_BE_LAST,
+      static_assert(!Last::IS_COMPOUND,
                     "arrays and blobs need special handling");
       Last::assertValid(data);
       buffer.push_back(data);
       out.EmitRecordWithAbbrev(abbrCode, buffer);
     }
+
+    template <typename ElementTy, typename LastData>
+    static void read(ArrayRef<ElementTy> buffer, LastData &data) {
+      assert(buffer.size() == 1 && "record data does not match layout");
+      data = Last::convert(buffer.front());
+    }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer, Nothing_t) {
+      assert(buffer.size() == 1 && "record data does not match layout");
+      (void)buffer;
+    }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer) = delete;
   };
 
-  /// Helper class for emitting an array element at the end of a record.
+  /// Helper class for dealing with an array at the end of a record.
   ///
   /// \sa BCRecordLayout::emitRecord
   template<typename EleTy>
-  class BCRecordWriter<BCArray<EleTy>> {
+  class BCRecordCoding<BCArray<EleTy>> {
   public:
     template <typename BufferTy>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
@@ -250,19 +299,46 @@ namespace impl {
                 std::back_inserter(buffer));
       out.EmitRecordWithAbbrev(abbrCode, buffer);
     }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer, ArrayRef<ElementTy> &rawData) {
+      rawData = buffer;
+    }
+
+    template <typename ElementTy, typename ArrayTy>
+    static void read(ArrayRef<ElementTy> buffer, ArrayTy &array) {
+      array.append(llvm::map_iterator(buffer.begin(), ElementTy::convert),
+                   llvm::map_iterator(buffer.end(), ElementTy::convert));
+    }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer, Nothing_t) {
+      (void)buffer;
+    }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer) = delete;
   };
 
-  /// Helper class for emitting a blob element at the end of a record.
+  /// Helper class for dealing with a blob at the end of a record.
   ///
-  /// \sa BCRecordLayout::emitRecord
+  /// \sa BCRecordLayout
   template<>
-  class BCRecordWriter<BCBlob> {
+  class BCRecordCoding<BCBlob> {
   public:
     template <typename BufferTy>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
                      unsigned abbrCode, StringRef blobData) {
       out.EmitRecordWithBlob(abbrCode, buffer, blobData);
     }
+
+    template <typename ElementTy>
+    static void read(ArrayRef<ElementTy> buffer) {
+      (void)buffer;
+    }
+
+    template <typename ElementTy, typename DataTy>
+    static void read(ArrayRef<ElementTy> buffer, DataTy &data) = delete;
   };
 } // end namespace impl
 
@@ -270,7 +346,7 @@ namespace impl {
 ///
 /// This class template is meant to be instantiated and then given a name,
 /// so that from then on that name can be used 
-template<typename... Fields>
+template<typename IDField, typename... Fields>
 class BCGenericRecordLayout {
   llvm::BitstreamWriter &Out;
   unsigned AbbrevCode;
@@ -294,7 +370,7 @@ public:
   /// \returns The abbreviation code for the newly-registered record type.
   static unsigned emitAbbrev(llvm::BitstreamWriter &out) {
     auto *abbrev = new llvm::BitCodeAbbrev();
-    impl::emitOps<Fields...>(*abbrev);
+    impl::emitOps<IDField, Fields...>(*abbrev);
     return out.EmitAbbrev(abbrev);
   }
 
@@ -306,13 +382,32 @@ public:
   template <typename BufferTy, typename... Data>
   static void emitRecord(llvm::BitstreamWriter &out, BufferTy &buffer,
                          unsigned abbrCode, unsigned recordID, Data... data) {
-    static_assert(sizeof...(data)+1 <= sizeof...(Fields),
+    static_assert(sizeof...(data) <= sizeof...(Fields),
+                  "Too many record elements");
+    static_assert(sizeof...(data) >= sizeof...(Fields),
+                  "Too few record elements");
+    buffer.clear();
+    impl::BCRecordCoding<IDField, Fields...>::emit(out, buffer, abbrCode,
+                                                   recordID, data...);
+  }
+
+  /// Read a record identified by \p abbrCode from bitstream cursor \p in,
+  /// using \p buffer for scratch space.
+  ///
+  /// Note that even fixed arguments must be specified here. Pass \c Nothing
+  /// if you don't care about a particular parameter. Blob data is returned via
+  /// StringRef, while array data can be returned raw as an ArrayRef or
+  /// \em appended (not assigned) to an existing vector-like type.
+  template <typename BufferTy, typename... Data>
+  static void readRecord(BufferTy buffer, Data &... data) {
+    // Weaker bounds checks here: a trailing blob is not decoded through the
+    // layout.
+    static_assert(sizeof...(data) <= sizeof...(Fields),
                   "Too many record elements");
     static_assert(sizeof...(data)+1 >= sizeof...(Fields),
                   "Too few record elements");
-    buffer.clear();
-    impl::BCRecordWriter<Fields...>::emit(out, buffer, abbrCode, recordID,
-                                          data...);
+    return impl::BCRecordCoding<Fields...>::read(llvm::makeArrayRef(buffer),
+                                                 data...);
   }
 };
 
