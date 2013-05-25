@@ -474,6 +474,127 @@ getPotentialBindings(ConstraintSystem &cs,
   return bindings;
 }
 
+/// \brief Try each of the given type variable bindings to find solutions
+/// to the given constraint system.
+///
+/// \param cs The constraint system we're solving in.
+/// \param tvc The type variable and its constraints that we're solving for.
+/// \param bindings The initial set of bindings to explore.
+/// \param solutions The set of solutions.
+///
+/// \returns true if there are no solutions.
+static bool tryTypeVariableBindings(ConstraintSystem &cs,
+                                    TypeVariableConstraints &tvc,
+                                    ArrayRef<std::pair<Type, bool>> bindings,
+                                    SmallVectorImpl<Solution> &solutions) {
+  auto typeVar = tvc.TypeVar;
+  bool anySolved = false;
+  llvm::SmallPtrSet<CanType, 4> exploredTypes;
+
+  SmallVector<std::pair<Type, bool>, 4> storedBindings;
+  auto &tc = cs.getTypeChecker();
+  for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
+    // Try each of the bindings in turn.
+    bool sawFirstLiteralConstraint = false;
+    for (auto binding : bindings) {
+      auto type = binding.first;
+      if (tc.getLangOpts().DebugConstraintSolver) {
+        llvm::errs().indent(cs.solverState->depth * 2)
+          << "(trying " << typeVar->getString()
+          << " := " << type->getString() << "\n";
+      }
+
+      // Try to solve the system with typeVar := type
+      ConstraintSystem::SolverScope scope(cs);
+      if (binding.second) {
+        // FIXME: If we were able to solve this without considering
+        // default literals, don't bother looking at default literals.
+        if (!sawFirstLiteralConstraint) {
+          sawFirstLiteralConstraint = true;
+          if (anySolved)
+            break;
+        }
+        type = cs.openType(type);
+      }
+
+      // FIXME: Use a 'bind' constraint here.
+      cs.addConstraint(ConstraintKind::Equal, typeVar, type);
+      if (!cs.solve(solutions))
+        anySolved = true;
+
+      if (tc.getLangOpts().DebugConstraintSolver) {
+        llvm::errs().indent(cs.solverState->depth * 2) << ")\n";
+      }
+    }
+
+    // If we found any solution, we're done.
+    if (anySolved)
+      break;
+
+    // None of the children had solutions, enumerate supertypes and
+    // try again.
+    SmallVector<std::pair<Type, bool>, 4> newBindings;
+
+    // If this is our first attempt, note which bindings we already visited.
+    if (tryCount == 0) {
+      for (auto binding : bindings)
+        exploredTypes.insert(binding.first->getCanonicalType());
+    }
+
+    // If we didn't find any solutions, introduce more potential types.
+    bool handledLiteralConstraints = false;
+    for (auto binding : bindings) {
+      auto type = binding.first;
+
+      // If this is a literal constraint, find all of the types that
+      // conform to the literal constraint protocol.
+      // FIXME: Except that we actually need said protocol :)
+      if (binding.second) {
+        if (handledLiteralConstraints)
+          continue;
+
+        for (auto constraint : tvc.KindConstraints) {
+          if (constraint->getKind() != ConstraintKind::Literal)
+            continue;
+
+          // FIXME: Total hack. integer literal -> default floating
+          // literal kind.
+          if (constraint->getLiteralKind() == LiteralKind::Int) {
+            auto newType = tc.getDefaultLiteralType(LiteralKind::Float);
+            if (exploredTypes.insert(newType->getCanonicalType()))
+              newBindings.push_back({newType, false});
+          }
+        }
+
+        handledLiteralConstraints = true;
+        continue;
+      }
+
+      // Enumerate the supertypes of each of the types we tried.
+      for (auto supertype : cs.enumerateDirectSupertypes(type)) {
+        // If we're not allowed to try this binding, skip it.
+        auto simpleSuper = checkTypeOfBinding(cs, typeVar, supertype);
+        if (!simpleSuper)
+          continue;
+
+        // If we haven't seen this supertype, add it.
+        if (exploredTypes.insert((*simpleSuper)->getCanonicalType()))
+          newBindings.push_back({*simpleSuper, false});
+      }
+    }
+
+    // If we didn't compute any new bindings, we're done.
+    if (newBindings.empty())
+      break;
+
+    // We have a new set of bindings; use them for our next loop.
+    storedBindings = std::move(newBindings);
+    bindings = storedBindings;
+  }
+
+  return !anySolved;
+}
+
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
@@ -558,105 +679,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     // no other option, go ahead and try the bindings for this type variable.
     if (!bestBindings.empty() &&
         (!bestInvolvesTypeVariables || UnresolvedOverloadSets.empty())) {
-      auto typeVar = typeVarConstraints[bestTypeVarIndex].TypeVar;
-      bool anySolved = false;
-      unsigned tryCount = 0;
-      llvm::SmallPtrSet<CanType, 4> exploredTypes;
-      
-    retry:
-      anySolved = false;
-      bool sawFirstLiteralConstraint = false;
-      for (auto binding : bestBindings) {
-        auto type = binding.first;
-        if (TC.getLangOpts().DebugConstraintSolver) {
-          llvm::errs().indent(solverState->depth * 2)
-            << "(trying " << typeVar->getString()
-            << " := " << type->getString() << "\n";
-        }
-
-        // Try to solve the system with typeVar := type
-        SolverScope scope(*this);
-        if (binding.second) {
-          // FIXME: If we were able to solve this without considering
-          // default literals.
-          if (!sawFirstLiteralConstraint) {
-            sawFirstLiteralConstraint = true;
-            if (anySolved)
-              break;
-          }
-          type = openType(type);
-        }
-
-        addConstraint(ConstraintKind::Equal, typeVar, type);
-        if (!solve(solutions))
-          anySolved = true;
-
-        if (TC.getLangOpts().DebugConstraintSolver) {
-          llvm::errs().indent(solverState->depth * 2) << ")\n";
-        }
-      }
-
-      if (!anySolved) {
-        // If none of the children had solutions, enumerate supertypes and
-        // try again.
-        SmallVector<std::pair<Type, bool>, 4> oldBindings;
-        oldBindings.swap(bestBindings);
-
-        // If this is our first attempt, note which bindings we already visited.
-        if (tryCount == 0) {
-          for (auto binding : oldBindings)
-            exploredTypes.insert(binding.first->getCanonicalType());
-        }
-
-        // Enumerate the supertypes of each of the types we tried.
-        bool handledLiteralConstraints = false;
-        for (auto binding : oldBindings) {
-          auto type = binding.first;
-
-          // If this is a literal constraint, find all of the types that
-          // conform to the literal constraint protocol.
-          // FIXME: Except that we actually need said protocol :)
-          if (binding.second) {
-            if (handledLiteralConstraints)
-              continue;
-
-            for (auto constraint
-                   : typeVarConstraints[bestTypeVarIndex].KindConstraints) {
-              if (constraint->getKind() != ConstraintKind::Literal)
-                continue;
-
-              // FIXME: Total hack. integer literal -> default floating
-              // literal kind.
-              if (constraint->getLiteralKind() == LiteralKind::Int) {
-                auto newType = TC.getDefaultLiteralType(LiteralKind::Float);
-                if (exploredTypes.insert(newType->getCanonicalType()))
-                  bestBindings.push_back({newType, false});
-              }
-            }
-
-            handledLiteralConstraints = true;
-            continue;
-          }
-
-          for (auto supertype : enumerateDirectSupertypes(type)) {
-            // If we're not allowed to try this binding, skip it.
-            auto simpleSuper = checkTypeOfBinding(*this, typeVar, supertype);
-            if (!simpleSuper)
-              continue;
-
-            // If we haven't seen this supertype, add it.
-            if (exploredTypes.insert((*simpleSuper)->getCanonicalType()))
-              bestBindings.push_back({*simpleSuper, false});
-          }
-        }
-
-        if (!bestBindings.empty()) {
-          ++tryCount;
-          goto retry;
-        }
-      }
-      
-      return !anySolved;
+      return tryTypeVariableBindings(*this,
+                                     typeVarConstraints[bestTypeVarIndex],
+                                     bestBindings,
+                                     solutions);
     }
 
     // Fall through to resolve an overload set.

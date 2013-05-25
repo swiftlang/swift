@@ -1816,13 +1816,13 @@ public:
     Error
   };
 
-private:
   /// \brief Enumerates all of the 'direct' supertypes of the given type.
   ///
   /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
   /// such that there is no type U where T < U and U < S.
   SmallVector<Type, 4> enumerateDirectSupertypes(Type type);
 
+private:
   /// \brief Flags that direct type matching.
   enum TypeMatchFlags {
     TMF_None = 0,
