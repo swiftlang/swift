@@ -373,7 +373,7 @@ struct ArgumentInitVisitor :
   SILFunction &f;
   SILBuilder initB;
   ArgumentInitVisitor(SILGenFunction &gen, SILFunction &f)
-    : gen(gen), f(f), initB(f.begin(), f) {}
+    : gen(gen), f(f), initB(f.begin()) {}
 
   SILValue makeArgument(Type ty, SILBasicBlock *parent) {
     assert(ty && "no type?!");

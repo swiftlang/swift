@@ -13,8 +13,7 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
 
@@ -29,11 +28,12 @@ public:
 
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
-  SILBuilder(SILInstruction *I, SILFunction &F) : F(F) {
+  explicit SILBuilder(SILInstruction *I)
+    : F(*I->getParent()->getParent()) {
     setInsertionPoint(I);
   }
 
-  SILBuilder(SILBasicBlock *BB, SILFunction &F) : F(F) {
+  explicit SILBuilder(SILBasicBlock *BB) : F(*BB->getParent()) {
     setInsertionPoint(BB);
   }
 

@@ -33,7 +33,7 @@ static bool isVoidableType(Type type) {
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                bool hasVoidReturn)
-  : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F), F),
+  : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F)),
     Cleanups(*this),
     hasVoidReturn(hasVoidReturn),
     epilogBB(nullptr) {
