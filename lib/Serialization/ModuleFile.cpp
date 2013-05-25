@@ -145,12 +145,12 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
         case index_block::DECL_OFFSETS:
           assert(blobData.empty());
           // FIXME: Use proper BCRecordLayout for this.
-          Decls.assign(scratch.begin()+1, scratch.end());
+          Decls.assign(scratch.begin(), scratch.end());
           break;
         case index_block::TYPE_OFFSETS:
           assert(blobData.empty());
           // FIXME: Use proper BCRecordLayout for this.
-          Types.assign(scratch.begin()+1, scratch.end());
+          Types.assign(scratch.begin(), scratch.end());
           break;
         default:
           // Unknown index kind, which this version of the compiler won't use.

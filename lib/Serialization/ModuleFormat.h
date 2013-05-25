@@ -173,7 +173,6 @@ namespace index_block {
 
   using OffsetsLayout = BCGenericRecordLayout<
     BCFixed<2>,  // record ID
-    DeclIDField, // first ID in this module
     BCArray<BitOffsetField>
   >;
 }

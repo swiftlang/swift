@@ -100,16 +100,6 @@ namespace {
     /// The last assigned DeclID for types from this module.
     TypeID LastTypeID;
 
-    /// The first assigned DeclID for decls from this module.
-    ///
-    /// Decls with IDs less than this come from other modules.
-    DeclID FirstLocalDeclID;
-
-    /// The first assigned DeclID for types from this module.
-    ///
-    /// Types with IDs less than this come from other modules.
-    TypeID FirstLocalTypeID;
-
     /// True if this module does not fully represent the original source file.
     ///
     /// This is a bring-up hack and will eventually go away.
@@ -176,8 +166,8 @@ namespace {
   public:
     // FIXME: Use real local offsets.
     Serializer()
-      : Out(Buffer), LastDeclID(0), LastTypeID(0), FirstLocalDeclID(1),
-        FirstLocalTypeID(1), ShouldFallBackToTranslationUnit(false) {
+      : Out(Buffer), LastDeclID(0), LastTypeID(0),
+        ShouldFallBackToTranslationUnit(false) {
     }
 
     /// Serialize a translation unit to the given stream.
@@ -503,10 +493,7 @@ void Serializer::writeAllDeclsAndTypes() {
     assert(id != 0 && "decl or type not referenced properly");
 
     auto &offsets = next.isDecl() ? DeclOffsets : TypeOffsets;
-    auto firstOffset = next.isDecl() ? FirstLocalDeclID :
-                                       FirstLocalTypeID;
-    assert((id - firstOffset) == offsets.size());
-    (void)firstOffset;
+    assert((id - 1) == offsets.size());
     
     offsets.push_back(Out.GetCurrentBitNo());
   }
@@ -515,11 +502,9 @@ void Serializer::writeAllDeclsAndTypes() {
 void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
                               DeclOrType which) {
   if (which == DeclOrType::IsDecl)
-    Offsets.emit(ScratchRecord, index_block::DECL_OFFSETS, FirstLocalDeclID,
-                 DeclOffsets);
+    Offsets.emit(ScratchRecord, index_block::DECL_OFFSETS, DeclOffsets);
   else
-    Offsets.emit(ScratchRecord, index_block::TYPE_OFFSETS, FirstLocalTypeID,
-                 TypeOffsets);
+    Offsets.emit(ScratchRecord, index_block::TYPE_OFFSETS, TypeOffsets);
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
