@@ -71,7 +71,11 @@ namespace {
     // Parsing logic.
     bool parseSILType(SILType &Result);
     bool parseValueRef(SILValue &Result, SILType Ty);
-    bool parseTypedValueRef(SILValue &Result);
+    bool parseTypedValueRef(SILValue &Result, SourceLoc &Loc);
+    bool parseTypedValueRef(SILValue &Result) {
+      SourceLoc Tmp;
+      return parseTypedValueRef(Result, Tmp);
+    }
     bool parseAllocKind(AllocKind &Result);
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
@@ -293,16 +297,15 @@ bool SILParser::parseValueRef(SILValue &Result, SILType Ty) {
 ///    sil-typed-valueref:
 ///       sil-value-ref ':' sil-type
 ///
-bool SILParser::parseTypedValueRef(SILValue &Result) {
+bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc) {
   SILType Ty;
-  SourceLoc NameLoc;
   StringRef Name = P.Tok.getText();
-  if (P.parseToken(tok::sil_local_name, NameLoc,diag::expected_sil_value_name)||
+  if (P.parseToken(tok::sil_local_name, Loc, diag::expected_sil_value_name)||
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
       parseSILType(Ty))
     return true;
   
-  Result = getLocalValue(Name, Ty, NameLoc);
+  Result = getLocalValue(Name, Ty, Loc);
   return false;
 }
 
@@ -343,6 +346,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("load", ValueKind::LoadInst)
+    .Case("store", ValueKind::StoreInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("tuple", ValueKind::TupleInst)
@@ -411,6 +415,33 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::LoadInst: {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(SILLocation(), Val);
+    break;
+  }
+  case ValueKind::StoreInst: {
+    SourceLoc FromNameLoc, ToLoc, AddrLoc;
+    StringRef FromName = P.Tok.getText();
+    Identifier ToToken;
+    SILValue AddrVal;
+    if (P.parseToken(tok::sil_local_name, FromNameLoc,
+                     diag::expected_sil_value_name) ||
+        P.parseIdentifier(ToToken, ToLoc,
+                          diag::expected_tok_in_sil_instr, "to") ||
+        parseTypedValueRef(AddrVal, AddrLoc))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+    
+    if (!AddrVal.getType().isAddress()) {
+      P.diagnose(AddrLoc, diag::sil_invalid_instr_operands);
+      return true;
+    }
+    
+    SILValue FromVal =
+      getLocalValue(FromName, AddrVal.getType().getObjectType(), FromNameLoc);
+    ResultVal = B.createStore(SILLocation(), FromVal, AddrVal);
     break;
   }
   case ValueKind::AllocVarInst: {

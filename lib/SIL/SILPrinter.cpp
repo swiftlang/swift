@@ -335,7 +335,8 @@ public:
     OS << "load " << getIDAndType(LI->getOperand());
   }
   void visitStoreInst(StoreInst *SI) {
-    OS << "store " << getID(SI->getSrc()) << " to " << getID(SI->getDest());
+    OS << "store " << getID(SI->getSrc()) << " to "
+       << getIDAndType(SI->getDest());
   }
   void visitCopyAddrInst(CopyAddrInst *CI) {
     OS << "copy_addr " << getID(CI->getSrc());

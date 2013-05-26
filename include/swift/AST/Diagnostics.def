@@ -347,6 +347,8 @@ ERROR(sil_tuple_inst_wrong_value_count,decl_parsing,none,
       "tuple instruction requires %0 values", (unsigned))
 ERROR(sil_expected_allocation_kind,decl_parsing,none,
       "expected allocation kind (heap, pseudo, or stack)", ())
+ERROR(sil_invalid_instr_operands,decl_parsing,none,
+      "invalid instruction operands", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
