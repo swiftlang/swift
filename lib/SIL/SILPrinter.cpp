@@ -123,13 +123,6 @@ std::string SILType::getAsString() const {
 void SILType::print(raw_ostream &OS) const {
   OS << '$';
 
-  // Build up the attributes for a SIL type, if any.
-  llvm::SmallString<64> Attributes;
-
-  // If we have any attributes, print them out.
-  if (!Attributes.empty())
-    OS << '[' << Attributes << "] ";
-
   if (isAddress())
     OS << '*';
 
