@@ -141,6 +141,7 @@ public:
   StringRef AsmName;
   bool Byref = false;
   bool AutoClosure = false;
+  bool Thin = false;
   bool Assignment = false;
   bool Conversion = false;
   bool ForceInline = false;
@@ -160,6 +161,7 @@ public:
   ResilienceData getResilienceData() const { return Resilience; }
   bool isByref() const { return Byref; }
   bool isAutoClosure() const { return AutoClosure; }
+  bool isThin() const { return Thin; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
   bool isForceInline() const { return ForceInline; }
@@ -175,8 +177,8 @@ public:
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
-           !isAutoClosure() && !isAssignment() && !isConversion() &&
-           !isForceInline() && !isPostfix() && !isPrefix() &&
+           !isAutoClosure() && !isThin() && !isAssignment() &&
+           !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !hasCC();
   }

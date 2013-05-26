@@ -234,12 +234,7 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 
 
 ///   sil-type:
-///     '$' sil-type-attributes? '*'? type
-///   sil-type-attributes:
-///     '[' sil-type-attribute (',' sil-type-attribute)* ']'
-///   sil-type-attribute:
-///     'sil_sret'
-///     'sil_uncurry' '=' integer_literal
+///     '$' '*'? type-annotation
 ///
 bool SILParserFunctionState::parseSILType(SILType &Result) {
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
@@ -253,7 +248,7 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
   }
 
   TypeLoc Ty;
-  if (P.parseType(Ty, diag::expected_sil_type))
+  if (P.parseTypeAnnotation(Ty, diag::expected_sil_type))
     return true;
 
   // If we successfully parsed the type, do some type checking / name binding

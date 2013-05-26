@@ -41,7 +41,7 @@ sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
   %10 = return %9 : $(x : Builtin.Int64, Builtin.Int64)
 }
 
-sil @return_int : $(a : Int64) -> Int64 {
+sil @return_int : $[thin] (a : Int64) -> Int64 { // CHECK: $[thin] (a : Int64) -> Int64 {
 bb0: //(%0 : $Int64):
   %1 = alloc_var stack $Int64              // CHECK: alloc_var stack $Int64
 //  %2 = store %0 to %1

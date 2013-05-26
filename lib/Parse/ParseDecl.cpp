@@ -265,6 +265,14 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     Attributes.AutoClosure = true;
     return false;
   }
+  case AttrName::thin: {
+    if (Attributes.isThin())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+    
+    Attributes.Thin = true;
+    return false;
+  }
 
   case AttrName::assignment: {
     if (Attributes.isAssignment())
