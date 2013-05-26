@@ -20,11 +20,11 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-// SILParserFunctionState
+// SILParser
 //===----------------------------------------------------------------------===//
 
 namespace {
-  class SILParserFunctionState {
+  class SILParser {
   public:
     Parser &P;
     SILModule &SILMod;
@@ -43,8 +43,7 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
   public:
 
-    SILParserFunctionState(Parser &P)
-      : P(P), SILMod(*P.SIL) {}
+    SILParser(Parser &P) : P(P), SILMod(*P.SIL) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -82,7 +81,7 @@ namespace {
 
 /// diagnoseProblems - After a function is fully parse, emit any diagnostics
 /// for errors and return true if there were any.
-bool SILParserFunctionState::diagnoseProblems() {
+bool SILParser::diagnoseProblems() {
   // Check for any uses of basic blocks that were not defined.
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterminstic order.
@@ -106,7 +105,7 @@ bool SILParserFunctionState::diagnoseProblems() {
 
 /// getBBForDefinition - Return the SILBasicBlock for a definition of the
 /// specified block.
-SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name,
+SILBasicBlock *SILParser::getBBForDefinition(Identifier Name,
                                                           SourceLoc Loc) {
   // If there was no name specified for this block, just create a new one.
   if (Name.empty())
@@ -135,8 +134,7 @@ SILBasicBlock *SILParserFunctionState::getBBForDefinition(Identifier Name,
 /// getBBForReference - return the SILBasicBlock of the specified name.  The
 /// source location is used to diagnose a failure if the block ends up never
 /// being defined.
-SILBasicBlock *SILParserFunctionState::getBBForReference(Identifier Name,
-                                                         SourceLoc Loc) {
+SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
   // If the block has already been created, use it.
   SILBasicBlock *&BB = BlocksByName[Name];
   if (BB != nullptr)
@@ -152,8 +150,8 @@ SILBasicBlock *SILParserFunctionState::getBBForReference(Identifier Name,
 
 /// getLocalValue - Get a reference to a local value with the specified name
 /// and type.
-SILValue SILParserFunctionState::getLocalValue(StringRef Name, SILType Type,
-                                               SourceLoc NameLoc) {
+SILValue SILParser::getLocalValue(StringRef Name, SILType Type,
+                                  SourceLoc NameLoc) {
   SILValue &Entry = LocalValues[Name];
   
   // This is a forward reference.  Create a dummy node to represent
@@ -178,8 +176,8 @@ SILValue SILParserFunctionState::getLocalValue(StringRef Name, SILType Type,
 
 /// setLocalValue - When an instruction or block argument is defined, this
 /// method is used to register it and update our symbol table.
-void SILParserFunctionState::setLocalValue(SILValue Value, StringRef Name,
-                                           SourceLoc NameLoc) {
+void SILParser::setLocalValue(SILValue Value, StringRef Name,
+                              SourceLoc NameLoc) {
   SILValue &Entry = LocalValues[Name];
 
   if (!Entry) {
@@ -236,7 +234,7 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 ///   sil-type:
 ///     '$' '*'? type-annotation
 ///
-bool SILParserFunctionState::parseSILType(SILType &Result) {
+bool SILParser::parseSILType(SILType &Result) {
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
     return true;
 
@@ -279,7 +277,7 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
 ///     sil-value-ref:
 ///       sil-local-name
 ///
-bool SILParserFunctionState::parseValueRef(SILValue &Result, SILType Ty) {
+bool SILParser::parseValueRef(SILValue &Result, SILType Ty) {
   SourceLoc NameLoc;
   StringRef Name = P.Tok.getText();
   if (P.parseToken(tok::sil_local_name, NameLoc,diag::expected_sil_value_name))
@@ -294,7 +292,7 @@ bool SILParserFunctionState::parseValueRef(SILValue &Result, SILType Ty) {
 ///    sil-typed-valueref:
 ///       sil-value-ref ':' sil-type
 ///
-bool SILParserFunctionState::parseTypedValueRef(SILValue &Result) {
+bool SILParser::parseTypedValueRef(SILValue &Result) {
   SILType Ty;
   SourceLoc NameLoc;
   StringRef Name = P.Tok.getText();
@@ -313,7 +311,7 @@ bool SILParserFunctionState::parseTypedValueRef(SILValue &Result) {
 ///      'heap'
 ///      'pseudo'
 ///      'stack'
-bool SILParserFunctionState::parseAllocKind(AllocKind &Result) {
+bool SILParser::parseAllocKind(AllocKind &Result) {
   Identifier Id;
   SourceLoc Loc;
   if (P.parseIdentifier(Id, Loc, diag::sil_expected_allocation_kind))
@@ -335,9 +333,8 @@ bool SILParserFunctionState::parseAllocKind(AllocKind &Result) {
 
 /// getInstructionKind - This method maps the string form of a SIL instruction
 /// opcode to an enum.
-bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
-                                            SourceLoc &OpcodeLoc,
-                                            StringRef &OpcodeName) {
+bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
+                               StringRef &OpcodeName) {
   OpcodeLoc = P.Tok.getLoc();
   OpcodeName = P.Tok.getText();
   // Parse this textually to avoid Swift keywords (like 'return') from
@@ -361,7 +358,7 @@ bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
 
 ///   sil-instruction:
 ///     sil_local_name '=' identifier ...
-bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
+bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   if (P.Tok.isNot(tok::sil_local_name)) {
     P.diagnose(P.Tok, diag::expected_sil_instr_name);
     return true;
@@ -519,7 +516,7 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
 
 ///   sil-basic-block:
 ///     (identifier /*TODO: argument list*/ ':')? sil-instruction+
-bool SILParserFunctionState::parseSILBasicBlock() {
+bool SILParser::parseSILBasicBlock() {
   Identifier BBName;
   SourceLoc NameLoc;
 
@@ -553,7 +550,7 @@ bool Parser::parseDeclSIL() {
 
   consumeToken(tok::kw_sil);
 
-  SILParserFunctionState FunctionState(*this);
+  SILParser FunctionState(*this);
 
   SILLinkage FnLinkage;
   Identifier FnName;
