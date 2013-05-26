@@ -50,3 +50,16 @@ bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
   %5 = return %3 : $Int64                  // CHECK: return {{.*}} : $Int64
 }
 
+
+sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant
+bb0:
+  %0 = tuple ()
+//  %1 = function_ref $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64, @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si // user: %4
+  %2 = metatype $Int64.metatype                   // metatype $Int64.metatype
+  %3 = integer_literal $Builtin.Int64, 1          // integer_literal $Builtin.Int64, 1
+  //%4 = apply %1(%3, %2)                           //
+  //%5 = return %4 : $Int64
+}
+
+sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
+

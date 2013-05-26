@@ -349,6 +349,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("store", ValueKind::StoreInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
+    .Case("metatype", ValueKind::MetatypeInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("return", ValueKind::ReturnInst)
     .Default(ValueKind::SILArgument);
@@ -461,6 +462,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     
     ResultVal = B.createDeallocVar(SILLocation(), Kind, Val);
+    break;
+  }
+  case ValueKind::MetatypeInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+    ResultVal = B.createMetatype(SILLocation(), Ty);
     break;
   }
   case ValueKind::TupleInst: {
