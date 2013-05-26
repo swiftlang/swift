@@ -357,6 +357,8 @@ ERROR(sil_undefined_basicblock_use, decl_parsing,none,
       "use of undefined basic block %0", (Identifier))
 ERROR(sil_basicblock_redefinition, decl_parsing,none,
       "redefinition of basic block %0", (Identifier))
+ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
+      "expected ')' in basic block argument list", ())
 
 // SIL Functions
 ERROR(expected_sil_linkage_or_function, decl_parsing,none,

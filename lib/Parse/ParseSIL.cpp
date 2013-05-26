@@ -12,6 +12,7 @@
 
 #include "Parser.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
@@ -515,19 +516,46 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
 
 ///   sil-basic-block:
-///     (identifier /*TODO: argument list*/ ':')? sil-instruction+
+///     sil-instruction+
+///     identifier sil-bb-argument-list? ':' sil-instruction+
+///   sil-bb-argument-list:
+///     '(' sil-typed-valueref (',' sil-typed-valueref)+ ')'
 bool SILParser::parseSILBasicBlock() {
-  Identifier BBName;
-  SourceLoc NameLoc;
+  SILBasicBlock *BB;
 
   // The basic block name is optional.
-  if (P.Tok.isNot(tok::sil_local_name)) {
-    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
-        P.parseToken(tok::colon, diag::expected_sil_block_colon))
+  if (P.Tok.is(tok::sil_local_name)) {
+    BB = getBBForDefinition(Identifier(), SourceLoc());
+  } else {
+    Identifier BBName;
+    SourceLoc NameLoc;
+    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
+      return true;
+
+    BB = getBBForDefinition(BBName, NameLoc);
+    
+    // If there is a basic block argument list, process it.
+    if (P.consumeIf(tok::l_paren)) {
+      do {
+        SILType Ty;
+        SourceLoc NameLoc;
+        StringRef Name = P.Tok.getText();
+        if (P.parseToken(tok::sil_local_name, NameLoc,
+                         diag::expected_sil_value_name) ||
+            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+            parseSILType(Ty))
+          return true;
+        auto Arg = new (SILMod) SILArgument(Ty, BB);
+        setLocalValue(Arg, Name, NameLoc);
+      } while (P.consumeIf(tok::comma));
+      
+      if (P.parseToken(tok::r_paren, diag::sil_basicblock_arg_rparen))
+        return true;
+    }
+    
+    if (P.parseToken(tok::colon, diag::expected_sil_block_colon))
       return true;
   }
-
-  SILBasicBlock *BB = getBBForDefinition(BBName, NameLoc);
 
   do {
     if (parseSILInstruction(BB))
