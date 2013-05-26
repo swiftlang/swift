@@ -532,7 +532,7 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
   // Ask SIL's TypeLowering to uncurry the function type.
   type = CanType(Lowering::getThinFunctionType(type, cc));
   auto fn = cast<AnyFunctionType>(type);
-  fn = Lowering::TypeConverter::getUncurriedFunctionType(fn, uncurryLevel);
+  fn = IGM.SILMod->Types.getUncurriedFunctionType(fn, uncurryLevel);
 
   // Explode the argument.
   auto decomposeTopLevelArg = [&](CanType inputTy) {

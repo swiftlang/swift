@@ -13,6 +13,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
@@ -23,6 +25,38 @@
 
 using namespace swift;
 using namespace Lowering;
+
+static CanType getKnownType(Optional<CanType> &cacheSlot,
+                            ASTContext &C,
+                            StringRef moduleName,
+                            StringRef typeName) {
+  CanType t = cacheSlot.cache([&] {
+    Optional<UnqualifiedLookup> lookup
+      = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
+    if (!lookup)
+      return CanType();
+    if (TypeDecl *typeDecl = lookup->getSingleTypeResult())
+      return typeDecl->getDeclaredType()->getCanonicalType();
+    return CanType();
+  });
+  
+  DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
+          << " mapped to ";
+        if (t)
+          t->print(llvm::dbgs());
+        else
+          llvm::dbgs() << "<null>";
+        llvm::dbgs() << '\n');
+  return t;
+}
+
+CanType TypeConverter::getStringType() {
+  return getKnownType(StringTy, M.getASTContext(), "swift", "String");
+}
+
+CanType TypeConverter::getNSStringType() {
+  return getKnownType(NSStringTy, M.getASTContext(), "Foundation", "NSString");
+}
 
 UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
   switch (cc) {
@@ -36,10 +70,80 @@ UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
   }
 }
 
-AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
-                                                    unsigned uncurryLevel) {
-  if (uncurryLevel == 0)
+/// Bridge the elements of an input tuple type.
+static Type getBridgedInputType(TypeConverter &tc,
+                                AbstractCC cc,
+                                Type input) {
+  if (auto *tuple = input->getAs<TupleType>()) {
+    SmallVector<TupleTypeElt, 4> bridgedFields;
+    bool changed = false;
+    for (TupleTypeElt const &field : tuple->getFields()) {
+      Type bridged = tc.getLoweredBridgedType(field.getType(), cc);
+      if (!bridged->isEqual(field.getType())) {
+        changed = true;
+        bridgedFields.push_back(TupleTypeElt(bridged,
+                                             field.getName(),
+                                             field.getInit(),
+                                             field.getVarargBaseTy()));
+      } else {
+        bridgedFields.push_back(field);
+      }
+    }
+    
+    if (!changed)
+      return input;
+    return TupleType::get(bridgedFields, input->getASTContext());
+  }
+  
+  return tc.getLoweredBridgedType(input, cc);
+}
+
+/// Bridge a result type.
+static Type getBridgedResultType(TypeConverter &tc,
+                                 AbstractCC cc,
+                                 Type result) {
+  return tc.getLoweredBridgedType(result, cc);
+}
+
+/// Fast path for bridging types in a function type without uncurrying.
+static AnyFunctionType *getBridgedFunctionType(TypeConverter &tc,
+                                               AnyFunctionType *t) {
+  if (!tc.BridgingEnabled)
     return t;
+  
+  switch (t->getAbstractCC()) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // No bridging needed for native functions.
+    return t;
+
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    if (auto *pft = dyn_cast<PolymorphicFunctionType>(t)) {
+      return PolymorphicFunctionType::get(
+                  getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
+                  getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
+                  &pft->getGenericParams(),
+                  t->isThin(),
+                  t->getAbstractCC(),
+                  t->getASTContext());
+    }
+    auto *ft = cast<FunctionType>(t);
+    return FunctionType::get(
+                getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
+                getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
+                ft->isAutoClosure(),
+                ft->isBlock(),
+                t->isThin(),
+                t->getAbstractCC(),
+                t->getASTContext());
+  }
+}
+
+AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
+                                                       unsigned uncurryLevel) {
+  if (uncurryLevel == 0)
+    return getBridgedFunctionType(*this, t);
   
   AbstractCC outerCC = t->getAbstractCC();
   bool outerThinness = t->isThin();
@@ -84,6 +188,30 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
     t = t->getResult()->castTo<AnyFunctionType>();
   }
   
+  Type resultType = t->getResult();
+  
+  // Bridge input and result types.
+  if (BridgingEnabled) {
+    switch (outerCC) {
+    case AbstractCC::Freestanding:
+    case AbstractCC::Method:
+      // Native functions don't need bridging.
+      break;
+    
+    case AbstractCC::C:
+      for (auto &input : inputs)
+        input = getBridgedInputType(*this, outerCC, input.getType());
+      resultType = getBridgedResultType(*this, outerCC, resultType);
+      break;
+    case AbstractCC::ObjCMethod:
+      // The "this" parameter should not get bridged.
+      for (auto &input : make_range(inputs.begin()+1, inputs.end()))
+        input = getBridgedInputType(*this, outerCC, input.getType());
+      resultType = getBridgedResultType(*this, outerCC, resultType);
+      break;
+    }
+  }
+  
   // Put the inputs in the order expected by the calling convention.
   switch (getUncurryDirection(outerCC)) {
   case UncurryDirection::LeftToRight:
@@ -106,14 +234,14 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
     curriedGenericParams->setAllArchetypes(C.AllocateCopy(allArchetypes));
     curriedGenericParams->setOuterParameters(outerParameters);
     
-    return PolymorphicFunctionType::get(inputType, t->getResult(),
+    return PolymorphicFunctionType::get(inputType, resultType,
                                         curriedGenericParams,
                                         outerThinness, outerCC, C);
   } else {
-    return FunctionType::get(inputType, t->getResult(),
+    return FunctionType::get(inputType, resultType,
                              /*autoClosure*/ false, /*block*/ false,
                              outerThinness, outerCC, C);
-  }
+  }    
 }
 
 Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
@@ -244,8 +372,8 @@ public:
   }
 };
   
-TypeConverter::TypeConverter(SILModule &m)
-  : M(m), Context(m.getASTContext()) {
+TypeConverter::TypeConverter(SILModule &m, bool bridgingEnabled)
+  : M(m), Context(m.getASTContext()), BridgingEnabled(bridgingEnabled) {
 }
 
 TypeConverter::~TypeConverter() {
@@ -271,7 +399,7 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
     return *theInfo;
   }
   
-  bool addressOnly = SILType::isAddressOnly(t, M);;
+  bool addressOnly = SILType::isAddressOnly(t, M);
   if (t->hasReferenceSemantics()) {
     // Reference types need only to retain/release themselves.
     theInfo->referenceTypeElements.push_back(ReferenceTypePath());
@@ -561,5 +689,23 @@ Type TypeConverter::makeConstantType(SILConstant c) {
     assert(!var->isProperty() && "constant ref to non-physical global var");
     return getGlobalAccessorType(var->getType(), Context);
   }
+  }
+}
+
+Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
+  if (!BridgingEnabled)
+    return t;
+  
+  switch (cc) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // No bridging needed for native CCs.
+    return t;
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // Swift String maps to ObjC NSString.
+    if (getStringType() && getNSStringType() && t->isEqual(getStringType()))
+      return getNSStringType();
+    return t;
   }
 }

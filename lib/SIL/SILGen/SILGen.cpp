@@ -13,6 +13,8 @@
 #include "SILGen.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Diagnostics.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/Subsystems.h"
@@ -77,6 +79,105 @@ SILGenModule::~SILGenModule() {
         toplevel->print(llvm::dbgs()));
   toplevel->verify();
   M.verify();
+}
+
+static SILConstant getBridgingFn(Optional<SILConstant> &cacheSlot,
+                                 SILGenModule &SGM,
+                                 StringRef moduleName,
+                                 StringRef functionName,
+                                 std::initializer_list<SILType> inputTypes,
+                                 SILType outputType) {
+  SILConstant fn = cacheSlot.cache([&] {
+    Optional<UnqualifiedLookup> lookup
+      = UnqualifiedLookup::forModuleAndName(SGM.M.getASTContext(),
+                                            moduleName,
+                                            functionName);
+    // Check that we can find the module and function.
+    // FIXME: Can we recover more gracefully?
+    if (!lookup) {
+      SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
+                   moduleName, functionName);
+      exit(1);
+    }
+    if (lookup->Results.size() == 0) {
+      SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
+                   moduleName, functionName);
+      exit(1);
+    }
+    // FIXME: Resolve overloads.
+    if (lookup->Results.size() > 1) {
+      SGM.diagnose(SourceLoc(), diag::bridging_function_overloaded,
+                   moduleName, functionName);
+      exit(1);
+    }
+    auto &result = lookup->Results[0];
+    // Check that the bridging function is actually a function.
+    if (!result.hasValueDecl()) {
+      SGM.diagnose(SourceLoc(), diag::bridging_function_not_function,
+                   moduleName, functionName);
+      exit(1);
+    }
+    FuncDecl *fd = dyn_cast<FuncDecl>(result.getValueDecl());
+    if (!fd) {
+      SGM.diagnose(result.getValueDecl()->getLoc(),
+                   diag::bridging_function_not_function,
+                   moduleName, functionName);
+      exit(1);
+    }
+    // Check that the function takes the expected arguments and returns the
+    // expected result type.
+    SILConstant c(fd);
+    SILFunctionTypeInfo *funcInfo
+      = SGM.getConstantType(c).getFunctionTypeInfo(SGM.M);
+    
+    if (funcInfo->getInputTypes().size() != inputTypes.size()
+        || !std::equal(funcInfo->getInputTypes().begin(),
+                       funcInfo->getInputTypes().end(),
+                       inputTypes.begin())) {
+      SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
+                   moduleName, functionName);
+      exit(1);
+    }
+    
+    if (funcInfo->getResultType() != outputType) {
+      SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
+                   moduleName, functionName);
+      exit(1);
+    }
+    
+    return c;
+  });
+  
+  DEBUG(llvm::dbgs() << "bridging function "
+          << moduleName << '.' << functionName
+          << " mapped to ";
+        fn.print(llvm::dbgs()));
+  
+  return fn;
+}
+
+static SILType getByrefStringTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(LValueType::get(SGM.Types.getStringType(),
+                                            LValueType::Qual::DefaultForType,
+                                            SGM.M.getASTContext()));
+}
+
+static SILType getNSStringTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getNSStringType());
+}
+
+SILConstant SILGenModule::getNSStringToStringFn() {
+  return getBridgingFn(NSStringToStringFn, *this,
+                       "Foundation", "convertNSStringToString",
+                       {getNSStringTy(*this), getByrefStringTy(*this)},
+                       Types.getEmptyTupleType());
+}
+
+SILConstant SILGenModule::getStringToNSStringFn() {
+  return getBridgingFn(StringToNSStringFn, *this,
+                       "Foundation", "convertStringToNSString",
+                       {getByrefStringTy(*this)},
+                       getNSStringTy(*this));
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction() {
@@ -318,8 +419,10 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
 
-SILModule *SILModule::constructSIL(TranslationUnit *tu, unsigned startElem) {
-  SILModule *m = new SILModule(tu->getASTContext());
+SILModule *SILModule::constructSIL(TranslationUnit *tu,
+                                   unsigned startElem) {
+  bool enableBridging = tu->getASTContext().LangOpts.NSStringIsString;
+  SILModule *m = new SILModule(tu->getASTContext(), enableBridging);
   SILGenModule sgm(*m);
   for (Decl *D : llvm::makeArrayRef(tu->Decls).slice(startElem))
     sgm.visit(D);

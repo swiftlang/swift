@@ -1339,6 +1339,25 @@ ERROR(tuple_default_local_ref,sema_tct,none,
       "cannot refer to local declaration from default value of"
       " tuple element", ())
 
+//==============================================================================
+// SIL Generation Diagnostics
+//==============================================================================
+
+ERROR(bridging_module_missing,sil_gen,none,
+      "unable to find module '%0' for implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_missing,sil_gen,none,
+      "unable to find implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_overloaded,sil_gen,none,
+      "multiple definitions of implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_not_function,sil_gen,none,
+      "definition of implicit conversion function '%0.%1' is not a function",
+      (StringRef, StringRef))
+ERROR(bridging_function_not_correct_type,sil_gen,none,
+      "definition of implicit conversion function '%0.%1' is not of the correct type",
+      (StringRef, StringRef))
 
 //==============================================================================
 // IR Generation Diagnostics

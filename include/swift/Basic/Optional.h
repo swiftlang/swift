@@ -160,6 +160,16 @@ namespace swift {
       reset();
       return result;
     }
+    
+    /// Return the value inside the optional if populated; otherwise, execute
+    /// the given block, store its result inside the optional, and return it.
+    template<typename NullaryFunctor>
+    T const &cache(NullaryFunctor &&f) {
+      if (hasValue())
+        return getValue();
+      emplace(f());
+      return getValue();
+    }
   };
 }
 

@@ -96,22 +96,19 @@ public:
   }
   
   /// Forward this value as an argument.
-  SILValue forwardArgument(SILGenFunction &gen, SILLocation loc) {
-    // Forward the value.
-    SILValue v = forward(gen);
-    // Thicken thin function values.
-    // FIXME: Swift type-checking should do this.
-    v = gen.emitGeneralizedValue(loc, v);
-    return v;
+  SILValue forwardArgument(SILGenFunction &gen, SILLocation loc,
+                           AbstractCC cc, CanType bridgedTy) {
+    // Bridge the value to the current calling convention.
+    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc, bridgedTy);
+    return v.forward(gen);
   }
   
-  /// Get this value as an argument without forwarding its cleanup.
-  SILValue getArgumentValue(SILGenFunction &gen, SILLocation loc) {
-    SILValue v = getValue();
-    // Thicken thin function value.
-    // FIXME: Swift type-checking should do this.
-    v = gen.emitGeneralizedValue(loc, v);
-    return v;
+  /// Get this value as an argument without consuming it.
+  SILValue getArgumentValue(SILGenFunction &gen, SILLocation loc,
+                            AbstractCC cc, CanType bridgedTy) {
+    // Bridge the value to the current calling convention.
+    ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc, bridgedTy);
+    return v.getValue();
   }
   
   /// Forward this value into memory by storing it to the given address.

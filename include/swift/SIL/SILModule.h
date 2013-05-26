@@ -17,6 +17,8 @@
 #ifndef SWIFT_SIL_SILMODULE_H
 #define SWIFT_SIL_SILMODULE_H
 
+#include "swift/AST/ASTContext.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILConstant.h"
 #include "swift/SIL/SILFunction.h"
@@ -80,7 +82,7 @@ private:
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &TheASTContext);
+  SILModule(ASTContext &TheASTContext, bool bridgingEnabled);
   
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -96,12 +98,13 @@ public:
   
   /// Construct a SIL module from a translation unit.  It is the caller's
   /// responsibility to 'delete' this object.
-  static SILModule *constructSIL(TranslationUnit *tu, unsigned startElem);
+  static SILModule *constructSIL(TranslationUnit *tu,
+                                 unsigned startElem);
 
   /// createEmptyModule - Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static SILModule *createEmptyModule(ASTContext &Context) {
-    return new SILModule(Context);
+    return new SILModule(Context, Context.LangOpts.NSStringIsString);
   }
   
   ASTContext &getASTContext() const { return TheASTContext; }

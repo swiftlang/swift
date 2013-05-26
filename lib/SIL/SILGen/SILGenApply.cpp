@@ -399,12 +399,13 @@ public:
   SILGenFunction &gen;
   Optional<Callee> callee;
   RValue thisParam;
+  Expr *thisApplyExpr = nullptr;
   std::vector<ApplyExpr*> callSites;
-  Expr *sideEffect;
-  unsigned callDepth;
+  Expr *sideEffect = nullptr;
+  unsigned callDepth = 0;
   
   SILGenApply(SILGenFunction &gen)
-    : gen(gen), sideEffect(nullptr), callDepth(0)
+    : gen(gen)
   {}
   
   void setCallee(Callee &&c) {
@@ -419,9 +420,10 @@ public:
     sideEffect = sideEffectExpr;
   }
   
-  void setThisParam(RValue &&theThisParam) {
+  void setThisParam(RValue &&theThisParam, Expr *theThisApplyExpr) {
     assert(!thisParam && "already set this!");
     thisParam = std::move(theThisParam);
+    thisApplyExpr = theThisApplyExpr;
     ++callDepth;
   }
 
@@ -461,7 +463,7 @@ public:
       if (isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
-        setThisParam(gen.visit(thisCallSite->getArg()));
+        setThisParam(gen.visit(thisCallSite->getArg()), thisCallSite);
         SILConstant constant(fd,
                              SILConstant::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(fd));
@@ -510,11 +512,11 @@ public:
         = ManagedValue(gen.B.createProjectExistential(e, existential.getValue()),
                        existential.getCleanup());
       
-      setThisParam(RValue(gen, projection));
+      setThisParam(RValue(gen, projection), e);
     } else {
       assert(existential.getType().is<MetaTypeType>() &&
              "non-existential-metatype for existential static method?!");
-      setThisParam(RValue(gen, existential));
+      setThisParam(RValue(gen, existential), e);
     }
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
@@ -524,7 +526,7 @@ public:
                                   SILConstant(fd), e->getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
-    setThisParam(gen.visit(e->getBase()));
+    setThisParam(gen.visit(e->getBase()), e);
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
@@ -578,7 +580,8 @@ public:
     SILValue superUpcast = gen.B.createUpcast(apply->getArg(), super.getValue(),
                                               superTy);
     
-    setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())));
+    setThisParam(RValue(gen, ManagedValue(superUpcast, super.getCleanup())),
+                 apply);
     
     SILValue superMethod;
     if (constant.isObjC) {
@@ -601,14 +604,18 @@ public:
 ManagedValue SILGenFunction::emitApply(SILLocation Loc,
                                        ManagedValue Fn,
                                        ArrayRef<ManagedValue> Args,
+                                       CanType NativeResultTy,
                                        OwnershipConventions const &Ownership,
                                        SGFContext C) {
-  // Conditionally consume the cleanup on an input value.
-  auto forwardIfConsumed = [&](ManagedValue v, bool consumed) -> SILValue {
-    return consumed
-      ? v.forwardArgument(*this, Loc)
-      : v.getArgumentValue(*this, Loc);
-  };
+  AbstractCC cc = Fn.getType().getAbstractCC();
+  
+  // Bridge and conditionally consume the cleanup on an input value.
+  auto forwardIfConsumed
+    = [&](ManagedValue v, SILType destTy, bool consumed) -> SILValue {
+      return consumed
+        ? v.forwardArgument(*this, Loc, cc, destTy.getSwiftType())
+        : v.getArgumentValue(*this, Loc, cc, destTy.getSwiftType());
+    };
   
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
@@ -630,41 +637,53 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     argValues.push_back(indirectReturn);
   }
   
+  ArrayRef<SILType> inputTypes
+    = Fn.getType().getFunctionTypeInfo(SGM.M)
+        ->getInputTypesWithoutIndirectReturnType();
+  
   // Gather the arguments.
-  for (size_t i = 0; i < Args.size(); ++i)
-    argValues.push_back(
-                  forwardIfConsumed(Args[i], Ownership.isArgumentConsumed(i)));
+  for (size_t i = 0; i < Args.size(); ++i) {
+    SILValue argValue
+      = forwardIfConsumed(Args[i],
+                          inputTypes[i],
+                          Ownership.isArgumentConsumed(i));
+    argValues.push_back(argValue);
+  }
   
   SILValue result = B.createApply(Loc, fnValue, instructionTy, argValues);
   
+  // Take ownership of the return value, if necessary.
+  ManagedValue bridgedResult;
   if (indirectReturn) {
     /// FIXME: Can ObjC/C functions return types SIL considers address-only?
     /// Do we need to copy here if the return value is Unretained?
     assert(Ownership.getReturn() == OwnershipConventions::Return::Retained
            && "address-only result with non-Retained ownership not implemented");
-    return emitManagedRValueWithCleanup(indirectReturn);
-  }
+    bridgedResult = emitManagedRValueWithCleanup(indirectReturn);
+  } else {
+    switch (Ownership.getReturn()) {
+    case OwnershipConventions::Return::Retained:
+      // Already retained.
+      break;
 
-  // Take ownership of the return value, if necessary.
-  switch (Ownership.getReturn()) {
-  case OwnershipConventions::Return::Retained:
-    // Already retained.
-    break;
-
-  case OwnershipConventions::Return::Autoreleased:
-    // Autoreleased. Retain using retain_autoreleased.
-    B.createRetainAutoreleased(Loc, result);
-    break;
-      
-  case OwnershipConventions::Return::Unretained:
-    // Unretained. Retain the value.
-    emitRetainRValue(Loc, result);
-    break;
+    case OwnershipConventions::Return::Autoreleased:
+      // Autoreleased. Retain using retain_autoreleased.
+      B.createRetainAutoreleased(Loc, result);
+      break;
+    
+    case OwnershipConventions::Return::Unretained:
+      // Unretained. Retain the value.
+      emitRetainRValue(Loc, result);
+      break;
+    }
+  
+    bridgedResult = resultTy->is<LValueType>()
+      ? ManagedValue(result, ManagedValue::LValue)
+      : emitManagedRValueWithCleanup(result);
   }
   
-  return resultTy->is<LValueType>()
-    ? ManagedValue(result, ManagedValue::LValue)
-    : emitManagedRValueWithCleanup(result);
+  // Convert the result to a native value.
+  return emitBridgedToNativeValue(Loc, bridgedResult, cc, NativeResultTy);
 }
 
 namespace {
@@ -677,6 +696,7 @@ namespace {
 
     const Kind kind;
     SILLocation loc;
+    CanType resultType;
 
   private:
     union {
@@ -686,14 +706,26 @@ namespace {
     
   public:
     CallSite(ApplyExpr *apply)
-      : kind(Kind::Expr), loc(apply), expr(apply->getArg()) {}
-    
-    CallSite(SILLocation loc, Expr *expr)
-      : kind(Kind::Expr), loc(loc), expr(expr) {}
-    
-    CallSite(SILLocation loc, RValue &&value)
-      : kind(Kind::Value), loc(loc), value(std::move(value)) {}
-    
+      : kind(Kind::Expr), loc(apply),
+        resultType(apply->getType()->getCanonicalType()),
+        expr(apply->getArg()) {
+      assert(resultType);
+    }
+  
+    CallSite(SILLocation loc, Expr *expr, Type resultType)
+      : kind(Kind::Expr), loc(loc),
+        resultType(resultType->getCanonicalType()),
+        expr(expr) {
+      assert(resultType);
+    }
+  
+    CallSite(SILLocation loc, RValue &&value, Type resultType)
+      : kind(Kind::Value), loc(loc),
+        resultType(resultType->getCanonicalType()),
+        value(std::move(value)) {
+      assert(resultType);
+    }
+  
     ~CallSite() {
       switch (kind) {
       case Kind::Expr:
@@ -704,7 +736,9 @@ namespace {
       }
     }
     
-    CallSite(CallSite &&o) : kind(o.kind), loc(o.loc) {
+    CallSite(CallSite &&o)
+      : kind(o.kind), loc(o.loc), resultType(o.resultType)
+    {
       switch (kind) {
       case Kind::Expr:
         expr = o.expr;
@@ -789,8 +823,10 @@ namespace {
       // Collect the arguments to the uncurried call.
       SmallVector<SmallVector<ManagedValue, 4>, 2> args;
       SILLocation uncurriedLoc;
+      CanType uncurriedResultTy;
       for (auto &site : uncurriedSites) {
         uncurriedLoc = site.loc;
+        uncurriedResultTy = site.resultType;
         args.push_back({});
         std::move(site).emit(gen, args.back());
       }
@@ -825,7 +861,7 @@ namespace {
                                     uncurriedContext);
       else
         result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
-                               ownership, uncurriedContext);
+                               uncurriedResultTy, ownership, uncurriedContext);
       
       // If there are remaining call sites, apply them to the result function.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
@@ -833,7 +869,9 @@ namespace {
         SILLocation loc = extraSites[i].loc;
         std::move(extraSites[i]).emit(gen, uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
-        result = gen.emitApply(loc, result, uncurriedArgs, ownership, context);
+        result = gen.emitApply(loc, result, uncurriedArgs,
+                               extraSites[i].resultType,
+                               ownership, context);
       }
       
       return result;
@@ -1134,7 +1172,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   
   // Apply 'this' if provided.
   if (apply.thisParam)
-    emission.addCallSite(SILLocation(), std::move(apply.thisParam));
+    emission.addCallSite(SILLocation(), std::move(apply.thisParam),
+                         apply.thisApplyExpr->getType());
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.callSites.rbegin(), end = apply.callSites.rend();
@@ -1165,10 +1204,10 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
 
   // Construct a call to the injection function.
   CallEmission emission = prepareApplyExpr(*this, ArrayInjectionFunction);
+  auto *injectionFnTy
+    = ArrayInjectionFunction->getType()->getAs<FunctionType>();
   
-  CanType injectionArgsTy
-   = ArrayInjectionFunction->getType()->getAs<FunctionType>()->getInput()
-     ->getCanonicalType();
+  CanType injectionArgsTy = injectionFnTy->getInput()->getCanonicalType();
   RValue InjectionArgs(injectionArgsTy);
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(BasePtr, ManagedValue::Unmanaged)));
@@ -1176,7 +1215,8 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   InjectionArgs.addElement(RValue(*this,
                                 ManagedValue(Length, ManagedValue::Unmanaged)));
   
-  emission.addCallSite(SILLocation(), std::move(InjectionArgs));
+  emission.addCallSite(SILLocation(), std::move(InjectionArgs),
+                       injectionFnTy->getResult());
   return emission.apply();
 }
 
@@ -1236,14 +1276,19 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
                                                      substitutions, propType);
   
   CallEmission emission(*this, std::move(getter));
+  auto *propFnTy = propType->castTo<AnyFunctionType>();
   // This ->
-  if (thisValue)
-    emission.addCallSite(loc, std::move(thisValue));
+  if (thisValue) {
+    emission.addCallSite(loc, std::move(thisValue), propFnTy->getResult());
+    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+  }
   // Index ->
-  if (subscripts)
-    emission.addCallSite(loc, std::move(subscripts));
+  if (subscripts) {
+    emission.addCallSite(loc, std::move(subscripts), propFnTy->getResult());
+    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+  }
   // () ->
-  emission.addCallSite(loc, emitEmptyTupleRValue(loc));
+  emission.addCallSite(loc, emitEmptyTupleRValue(loc), propFnTy->getResult());
   // T
   ManagedValue result = emission.apply();
   return emitMaterialize(loc, result);
@@ -1273,14 +1318,19 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
                                                      substitutions, propType);
 
   CallEmission emission(*this, std::move(setter));
+  auto *propFnTy = propType->castTo<AnyFunctionType>();
   // This ->
-  if (thisValue)
-    emission.addCallSite(loc, std::move(thisValue));
+  if (thisValue) {
+    emission.addCallSite(loc, std::move(thisValue), propFnTy->getResult());
+    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+  }
   // Index ->
-  if (subscripts)
-    emission.addCallSite(loc, std::move(subscripts));
+  if (subscripts) {
+    emission.addCallSite(loc, std::move(subscripts), propFnTy->getResult());
+    propFnTy = propFnTy->getResult()->castTo<AnyFunctionType>();
+  }
   // T ->
-  emission.addCallSite(loc, std::move(setValue));
+  emission.addCallSite(loc, std::move(setValue), propFnTy->getResult());
   // ()
   emission.apply();
 }

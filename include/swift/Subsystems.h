@@ -32,6 +32,7 @@ namespace swift {
   class Component;
   class Expr;
   class SILModule;
+  class LangOptions;
   struct TypeLoc;
 
   namespace irgen {
@@ -86,7 +87,8 @@ namespace swift {
 
   /// Turn the given translation unit into SIL IR. The returned SILModule must
   /// be deleted by the caller.
-  SILModule *performSILGeneration(TranslationUnit *TU, unsigned StartElem = 0);
+  SILModule *performSILGeneration(TranslationUnit *TU,
+                                  unsigned StartElem = 0);
 
   /// Serializes a translation unit to the given output file.
   ///

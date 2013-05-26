@@ -826,6 +826,16 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   }
 }
 
+Optional<UnqualifiedLookup>
+UnqualifiedLookup::forModuleAndName(ASTContext &C,
+                                    StringRef Mod, StringRef Name) {
+  auto foundModule = C.LoadedModules.find(Mod);
+  if (foundModule == C.LoadedModules.end())
+    return Nothing;
+
+  Module *m = foundModule->second;
+  return UnqualifiedLookup(C.getIdentifier(Name), m);
+}
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
   if (Results.size() != 1 || !Results.back().hasValueDecl() ||

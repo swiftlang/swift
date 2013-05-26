@@ -37,8 +37,8 @@ namespace swift {
 /// SILModule that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
 
-SILModule::SILModule(ASTContext &Context)
-: TheASTContext(Context), Types(*this) {
+SILModule::SILModule(ASTContext &Context, bool bridgingEnabled)
+: TheASTContext(Context), Types(*this, bridgingEnabled) {
   TypeListUniquing = new SILTypeListUniquingType();
 }
 
@@ -97,7 +97,7 @@ namespace {
   public:
     LoweredFunctionInputTypeVisitor(SILModule &M,
                                     SmallVectorImpl<SILType> &inputTypes)
-    : M(M), inputTypes(inputTypes) {}
+      : M(M), inputTypes(inputTypes) {}
     
     void visitType(TypeBase *t) {
       inputTypes.push_back(M.Types.getLoweredType(t));

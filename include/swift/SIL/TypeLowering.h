@@ -13,6 +13,7 @@
 #ifndef SIL_TypeLowering_h
 #define SIL_TypeLowering_h
 
+#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILConstant.h"
 #include "llvm/ADT/DenseMap.h"
@@ -192,11 +193,16 @@ class TypeConverter {
 
   Type makeConstantType(SILConstant constant);
   
+  // Types converted during foreign bridging.
+  Optional<CanType> StringTy;
+  Optional<CanType> NSStringTy;
+  
 public:
   SILModule &M;
   ASTContext &Context;
+  const bool BridgingEnabled;
 
-  TypeConverter(SILModule &sgm);
+  TypeConverter(SILModule &m, bool bridgingEnabled);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -242,11 +248,19 @@ public:
                               GenericParamList *genericParams = nullptr) const;
   
   /// Convert a nested function type into an uncurried representation.
-  static AnyFunctionType *getUncurriedFunctionType(AnyFunctionType *t,
-                                                   unsigned uncurryLevel);
+  AnyFunctionType *getUncurriedFunctionType(AnyFunctionType *t,
+                                            unsigned uncurryLevel);
   
   /// Get the uncurried argument order for a calling convention.
   static UncurryDirection getUncurryDirection(AbstractCC cc);
+  
+  /// Map an AST-level type to the corresponding foreign representation type we
+  /// implicitly convert to for a given calling convention.
+  Type getLoweredBridgedType(Type t, AbstractCC cc);
+  
+  /// Known types for bridging.
+  CanType getStringType();
+  CanType getNSStringType();
 };
   
 } // namespace Lowering

@@ -1909,6 +1909,94 @@ SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
   return v;
 }
 
+static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
+                                               SILLocation loc,
+                                               ManagedValue str) {
+  // func convertStringToNSString([byref] String) -> NSString
+  SILValue stringToNSStringFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
+  
+  // Materialize the string so we can pass a reference.
+  // Assume StringToNSString won't consume or modify the string, so leave the
+  // cleanup on the original value intact.
+  SILValue strTemp = gen.emitTemporaryAllocation(loc,
+                                                 str.getType());
+  gen.B.createStore(loc, str.getValue(), strTemp);
+  
+  SILValue nsstr = gen.B.createApply(loc, stringToNSStringFn,
+                           gen.getLoweredType(gen.SGM.Types.getNSStringType()),
+                           strTemp);
+  return gen.emitManagedRValueWithCleanup(nsstr);
+}
+
+static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
+                                               SILLocation loc,
+                                               ManagedValue nsstr) {
+  // func convertNSStringToString(NSString, [byref] String) -> ()
+  SILValue nsstringToStringFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
+  
+  // Allocate and initialize a temporary to receive the result String.
+  SILValue strTemp = gen.emitTemporaryAllocation(loc,
+                             gen.getLoweredType(gen.SGM.Types.getStringType()));
+  gen.B.createInitializeVar(loc, strTemp, true);
+  
+  SILValue args[2] = {nsstr.forward(gen), strTemp};
+  gen.B.createApply(loc, nsstringToStringFn,
+                    gen.SGM.Types.getEmptyTupleType(),
+                    args);
+  
+  // Load the result string, taking ownership of the value. There's no cleanup
+  // on the value in the temporary allocation.
+  SILValue str = gen.B.createLoad(loc, strTemp);
+  return gen.emitManagedRValueWithCleanup(str);
+}
+
+ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
+                                                      ManagedValue v,
+                                                      AbstractCC destCC,
+                                                      CanType bridgedTy) {
+  // First, generalize the value representation.
+  SILValue generalized = emitGeneralizedValue(loc, v.getValue());
+  v = ManagedValue(generalized, v.getCleanup());
+
+  switch (destCC) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // No additional bridging needed for native functions.
+    return v;
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // If the input is a String, convert it to an NSString.
+    if (v.getType().getSwiftType() == SGM.Types.getStringType()
+        && bridgedTy == SGM.Types.getNSStringType()) {
+      return emitBridgeStringToNSString(*this, loc, v);
+    }
+    return v;
+  }
+}
+
+ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
+                                                      ManagedValue v,
+                                                      AbstractCC srcCC,
+                                                      CanType nativeTy) {
+  switch (srcCC) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // No additional bridging needed for native functions.
+    return v;
+
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // If the output is an NSString, convert it back to a String.
+    if (v.getType().getSwiftType() == SGM.Types.getNSStringType()
+        && nativeTy == SGM.Types.getStringType()) {
+      return emitBridgeNSStringToString(*this, loc, v);
+    }
+    return v;
+  }
+}
+
 void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
                                SILValue destAddr) {
   SILValue fwdSrc = src.forward(*this);

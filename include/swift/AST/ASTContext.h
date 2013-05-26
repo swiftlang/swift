@@ -364,7 +364,7 @@ public:
   ///
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
-
+  
 private:
   friend class Decl;
   ClangNode getClangNode(Decl *decl);

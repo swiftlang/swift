@@ -20,6 +20,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
@@ -330,6 +331,11 @@ public:
   UnqualifiedLookup(Identifier Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
+  
+  /// Look up an identifier 'Name' in the module named 'Module'.
+  static Optional<UnqualifiedLookup> forModuleAndName(ASTContext &C,
+                                                      StringRef Module,
+                                                      StringRef Name);
 
   llvm::SmallVector<UnqualifiedLookupResult, 4> Results;
 

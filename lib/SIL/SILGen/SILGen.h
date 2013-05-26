@@ -16,6 +16,9 @@
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "Scope.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
@@ -25,7 +28,7 @@
 
 namespace swift {
   class SILBasicBlock;
-  
+
 namespace Lowering {
   class Condition;
   class LValue;
@@ -57,6 +60,9 @@ public:
   SILFunction *emitTopLevelFunction();
   
   size_t anonymousFunctionCounter = 0;
+  
+  Optional<SILConstant> StringToNSStringFn;
+  Optional<SILConstant> NSStringToStringFn;
   
 public:
   SILGenModule(SILModule &M);
@@ -156,6 +162,17 @@ public:
   /// True if super-calling the given method from a subclass should use ObjC
   /// dispatch.
   bool requiresObjCSuperDispatch(ValueDecl *vd);
+  
+  /// Known functions for bridging.
+  SILConstant getStringToNSStringFn();
+  SILConstant getNSStringToStringFn();
+  
+  /// Report a diagnostic.
+  template<typename...T, typename...U>
+  void diagnose(SourceLoc loc, Diag<T...> diag,
+                U &&...args) {
+    M.getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
 };
   
 /// Materialize - Represents a temporary allocation.
@@ -601,6 +618,19 @@ public:
   /// to a variable or passed as an argument or return value.
   SILValue emitGeneralizedValue(SILLocation loc, SILValue thinFn);
   
+  /// Convert a native Swift value to a value that can be passed as an argument
+  /// to or returned as the result of a function with the given calling
+  /// convention.
+  ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
+                                        AbstractCC destCC,
+                                        CanType bridgedTy);
+  
+  /// Convert a value received as the result or argument of a function with
+  /// the given calling convention to a native Swift value of the given type.
+  ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
+                                        AbstractCC srcCC,
+                                        CanType nativeTy);
+
   //
   // Helpers for emitting ApplyExpr chains.
   //
@@ -612,6 +642,7 @@ public:
 
   ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,
                          ArrayRef<ManagedValue> Args,
+                         CanType NativeResultTy,
                          OwnershipConventions const &Ownership,
                          SGFContext C = SGFContext());
 
