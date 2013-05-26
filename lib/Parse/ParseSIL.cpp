@@ -345,6 +345,9 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
+    .Case("retain", ValueKind::RetainInst)
+    .Case("release", ValueKind::ReleaseInst)
+    .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("load", ValueKind::LoadInst)
     .Case("store", ValueKind::StoreInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
@@ -413,11 +416,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     P.consumeToken(tok::integer_literal);
     break;
   }
-  case ValueKind::LoadInst: {
+  case ValueKind::RetainInst:
+    if (parseTypedValueRef(Val)) return true;
+    B.createRetainInst(SILLocation(), Val);
+    break;
+  case ValueKind::ReleaseInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createReleaseInst(SILLocation(), Val);
+    break;
+  case ValueKind::RetainAutoreleasedInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createRetainAutoreleased(SILLocation(), Val);
+    break;
+  case ValueKind::LoadInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(SILLocation(), Val);
     break;
-  }
   case ValueKind::StoreInst: {
     SourceLoc FromNameLoc, ToLoc, AddrLoc;
     StringRef FromName = P.Tok.getText();

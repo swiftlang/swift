@@ -439,15 +439,23 @@ public:
   void createRetain(SILLocation Loc, SILValue Operand) {
     // Retaining a function_ref is a no-op.
     if (!isa<FunctionRefInst>(Operand))
-      insert(new RetainInst(Loc, Operand));
+      createRetainInst(Loc, Operand);
+  }
+  RetainInst *createRetainInst(SILLocation Loc, SILValue Operand) {
+    // Retaining a function_ref is a no-op.
+    return insert(new RetainInst(Loc, Operand));
   }
   void createRelease(SILLocation Loc, SILValue Operand) {
     // Releasing a function_ref is a no-op.
     if (!isa<FunctionRefInst>(Operand))
-      insert(new ReleaseInst(Loc, Operand));
+      createReleaseInst(Loc, Operand);
   }
-  void createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
-    insert(new RetainAutoreleasedInst(Loc, Operand));
+  ReleaseInst *createReleaseInst(SILLocation Loc, SILValue Operand) {
+    return insert(new ReleaseInst(Loc, Operand));
+  }
+  RetainAutoreleasedInst *
+  createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
+    return insert(new RetainAutoreleasedInst(Loc, Operand));
   }
   DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
                                    SILValue operand) {
