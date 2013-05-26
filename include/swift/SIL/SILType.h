@@ -72,7 +72,7 @@ public:
   
   /// getPrimitiveType - Form a SILType for a primitive type that does not
   /// require any special handling (i.e., not a function or aggregate type).
-  static SILType getPrimitiveType(CanType T, bool isAddress) {
+  static SILType getPrimitiveType(CanType T, bool isAddress = false) {
     return SILType(T, isAddress);
   }
 

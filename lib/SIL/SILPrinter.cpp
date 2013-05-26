@@ -437,11 +437,33 @@ public:
   }
 
   void visitTupleInst(TupleInst *TI) {
-    OS << "tuple (";
-    interleave(TI->getElements(),
-               [&](const SILValue &V){ OS << getIDAndType(V); },
-               [&] { OS << ", "; });
-    OS << ')';
+    OS << "tuple ";
+    
+    // Check to see if the type of the tuple can be inferred accurately from the
+    // elements.
+    bool SimpleType = true;
+    for (auto &Elt : TI->getType().castTo<TupleType>()->getFields()) {
+      if (Elt.hasName() || Elt.isVararg() || Elt.hasInit()) {
+        SimpleType = false;
+        break;
+      }
+    }
+    
+    // If the type is simple, just print the tuple elements.
+    if (SimpleType) {
+      OS << '(';
+      interleave(TI->getElements(),
+                 [&](const SILValue &V){ OS << getIDAndType(V); },
+                 [&] { OS << ", "; });
+      OS << ')';
+    } else {
+      // Otherwise, print the type, then each value.
+      OS << TI->getType() << " (";
+      interleave(TI->getElements(),
+                 [&](const SILValue &V){ OS << getID(V); },
+                 [&] { OS << ", "; });
+      OS << ')';
+    }
   }
   void visitTupleExtractInst(TupleExtractInst *EI) {
     OS << "tuple_extract " << getID(EI->getOperand()) << ", "

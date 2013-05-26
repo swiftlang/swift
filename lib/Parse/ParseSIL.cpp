@@ -70,6 +70,7 @@ namespace {
   public:
     // Parsing logic.
     bool parseSILType(SILType &Result);
+    bool parseValueRef(SILValue &Result, SILType Ty);
     bool parseTypedValueRef(SILValue &Result);
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
@@ -320,6 +321,22 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
   return false;
 }
 
+
+/// parseValueRef - Parse a value, given a contextual type.
+///
+///     sil-value-ref:
+///       sil-local-name
+///
+bool SILParserFunctionState::parseValueRef(SILValue &Result, SILType Ty) {
+  SourceLoc NameLoc;
+  StringRef Name = P.Tok.getText();
+  if (P.parseToken(tok::sil_local_name, NameLoc,diag::expected_sil_value_name))
+    return true;
+  
+  Result = getLocalValue(Name, Ty, NameLoc);
+  return false;
+}
+
 /// parseTypedValueRef - Parse a type/value reference pair.
 ///
 ///    sil-typed-valueref:
@@ -350,6 +367,7 @@ bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("tuple", ValueKind::TupleInst)
     .Case("return", ValueKind::ReturnInst)
+    .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Default(ValueKind::SILArgument);
   
   if (Opcode != ValueKind::SILArgument) {
@@ -396,32 +414,90 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
   SILValue ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
-  case ValueKind::TupleInst: {
-    if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr,
-                     "(", OpcodeName))
+  case ValueKind::IntegerLiteralInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
     
-    // TODO: Check for a type here.  This is how tuples with "interesting" types
-    // are described.
+    if (P.Tok.getKind() != tok::integer_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
+      return true;
+    }
     
-    // This form is used with tuples that have elements with no names or default
-    // values.
-    // FIXME: Handle varargs.
+    ResultVal = B.createIntegerLiteral(SILLocation(), Ty, P.Tok.getText());
+    P.consumeToken(tok::integer_literal);
+    break;
+  }
+  case ValueKind::TupleInst: {
+    // Tuple instructions have two different syntaxes, one for simple tuple
+    // types, one for complicated ones.
+    if (P.Tok.isNot(tok::sil_dollar)) {
+      // If there is no type, parse the simple form.
+      if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+        return true;
+      
+      // TODO: Check for a type here.  This is how tuples with "interesting"
+      // types are described.
+      
+      // This form is used with tuples that have elements with no names or
+      // default values.
+      SmallVector<TupleTypeElt, 4> TypeElts;
+      if (P.Tok.isNot(tok::r_paren)) {
+        do {
+          if (parseTypedValueRef(Val)) return true;
+          OpList.push_back(Val);
+          TypeElts.push_back(Val.getType().getSwiftRValueType());
+        } while (P.consumeIf(tok::comma));
+      }
+      HadError |= P.parseToken(tok::r_paren,
+                               diag::expected_tok_in_sil_instr,")");
+      
+      auto Ty = TupleType::get(TypeElts, P.Context);
+      // FIXME: Stop using TypeConverter
+      auto Ty2 = SILMod.Types.getLoweredType(Ty, 0);
+      ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
+      break;
+    }
+    
+    // Otherwise, parse the fully general form.
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      return true;
+    
+    TupleType *TT = Ty.getAs<TupleType>();
+    if (TT == nullptr) {
+      P.diagnose(OpcodeLoc, diag::expected_tuple_type_in_tuple);
+      return true;
+    }
+    
     SmallVector<TupleTypeElt, 4> TypeElts;
     if (P.Tok.isNot(tok::r_paren)) {
       do {
-        if (parseTypedValueRef(Val)) return true;
+        if (TypeElts.size() > TT->getFields().size()) {
+          P.diagnose(P.Tok, diag::tuple_inst_wrong_value_count,
+                     TT->getFields().size());
+          return true;
+        }
+        Type EltTy = TT->getFields()[TypeElts.size()].getType();
+        if (parseValueRef(Val,
+                          SILType::getPrimitiveType(EltTy->getCanonicalType())))
+          return true;
         OpList.push_back(Val);
         TypeElts.push_back(Val.getType().getSwiftRValueType());
       } while (P.consumeIf(tok::comma));
     }
-    HadError |= P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr,
-                             ")", "tuple");
-    
-    auto Ty = TupleType::get(TypeElts, P.Context);
-    // FIXME: Stop using TypeConverter
-    auto Ty2 = SILMod.Types.getLoweredType(Ty, 0);
-    ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
+    HadError |= P.parseToken(tok::r_paren,
+                             diag::expected_tok_in_sil_instr,")");
+
+    if (TypeElts.size() != TT->getFields().size()) {
+      P.diagnose(OpcodeLoc, diag::tuple_inst_wrong_value_count,
+                 TT->getFields().size());
+      return true;
+    }
+
+    ResultVal = B.createTuple(SILLocation(), Ty, OpList);
     break;
   }
   case ValueKind::ReturnInst: {

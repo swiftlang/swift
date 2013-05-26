@@ -1,6 +1,7 @@
 // RUN: %swift %s -emit-sil | FileCheck %s
 
-var dummy : Int
+import Builtin
+import swift
 
 // Linkage types.
 
@@ -33,3 +34,10 @@ sil @test2 : $() -> () {              // CHECK: sil @test2 : $() -> ()
   %b = return %a : $()                // CHECK:   %0 = return %1 : $()
   %a = tuple ()                       // CHECK:   %1 = tuple ()
 }
+
+sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
+  %0 = integer_literal $Builtin.Int64, 42      // CHECK: integer_literal $Builtin.Int64, 42
+  %9 = tuple $(x : Builtin.Int64, Builtin.Int64) (%0, %0)
+  %10 = return %9 : $(x : Builtin.Int64, Builtin.Int64)
+}
+
