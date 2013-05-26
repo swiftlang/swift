@@ -72,6 +72,7 @@ namespace {
     bool parseSILType(SILType &Result);
     bool parseValueRef(SILValue &Result, SILType Ty);
     bool parseTypedValueRef(SILValue &Result);
+    bool parseAllocKind(AllocKind &Result);
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
@@ -241,50 +242,8 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 ///     'sil_uncurry' '=' integer_literal
 ///
 bool SILParserFunctionState::parseSILType(SILType &Result) {
-  bool IsSRet = false;
-  unsigned UncurryLevel = 0;
-
-  // If we have sil-type-attribute list, parse it.
-  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
-      P.peekToken().getText().startswith("sil_")) {
-    SourceLoc LeftLoc = P.Tok.getLoc(), RightLoc;
-
-    // The attribute list is always guaranteed to have at least one attribute.
-    do {
-      P.consumeToken();
-
-      SourceLoc AttrTokenLoc;
-      Identifier AttrToken;
-      if (P.parseIdentifier(AttrToken, AttrTokenLoc,
-                            diag::expected_identifier_sil_type_attributes))
-        return true;
-
-      if (AttrToken.str() == "sil_sret") {
-        IsSRet = true;
-        P.consumeToken(tok::identifier);
-      } else if (AttrToken.str() == "sil_uncurry") {
-        if (P.parseToken(tok::identifier,diag::malformed_sil_uncurry_attribute)||
-            P.parseToken(tok::equal, diag::malformed_sil_uncurry_attribute))
-          return true;
-        if (P.Tok.isNot(tok::integer_literal) ||
-            P.Tok.getText().getAsInteger(10, UncurryLevel)) {
-          P.diagnose(P.Tok, diag::malformed_sil_uncurry_attribute);
-          return true;
-        }
-
-        P.consumeToken(tok::integer_literal);
-      } else {
-        P.diagnose(AttrTokenLoc, diag::unknown_sil_type_attribute);
-        return true;
-      }
-
-      // Continue parsing the next token.
-    } while (P.Tok.is(tok::comma));
-
-    if (P.parseMatchingToken(tok::r_square, RightLoc,
-                           diag::expected_bracket_sil_type_attributes, LeftLoc))
-      return true;
-  }
+  if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
+    return true;
 
   // If we have a '*', then this is an address type.
   bool isAddress = false;
@@ -294,8 +253,7 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
   }
 
   TypeLoc Ty;
-  if (P.parseToken(tok::sil_dollar, diag::expected_sil_type) ||
-      P.parseType(Ty, diag::expected_sil_type))
+  if (P.parseType(Ty, diag::expected_sil_type))
     return true;
 
   // If we successfully parsed the type, do some type checking / name binding
@@ -312,8 +270,7 @@ bool SILParserFunctionState::parseSILType(SILType &Result) {
 
   // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
   // SILTypes itself.
-  (void)IsSRet;
-  Result = SILMod.Types.getLoweredType(Ty.getType(), UncurryLevel);
+  Result = SILMod.Types.getLoweredType(Ty.getType(), 0);
 
   // If this is an address type, apply the modifier.
   if (isAddress)
@@ -355,6 +312,32 @@ bool SILParserFunctionState::parseTypedValueRef(SILValue &Result) {
   return false;
 }
 
+
+/// parseAllocKind - Parse an allocation specifier.
+///    sil-alloc-kind:
+///      'heap'
+///      'pseudo'
+///      'stack'
+bool SILParserFunctionState::parseAllocKind(AllocKind &Result) {
+  Identifier Id;
+  SourceLoc Loc;
+  if (P.parseIdentifier(Id, Loc, diag::sil_expected_allocation_kind))
+    return true;
+  if (Id.str() == "heap")
+    Result = AllocKind::Heap;
+  else if (Id.str() == "pseudo")
+    Result = AllocKind::Pseudo;
+  else if (Id.str() == "stack")
+    Result = AllocKind::Stack;
+  else {
+    P.diagnose(Loc, diag::sil_expected_allocation_kind);
+    return true;
+  }
+    
+  return false;
+}
+
+
 /// getInstructionKind - This method maps the string form of a SIL instruction
 /// opcode to an enum.
 bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
@@ -365,9 +348,12 @@ bool SILParserFunctionState::parseSILOpcode(ValueKind &Opcode,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+    .Case("integer_literal", ValueKind::IntegerLiteralInst)
+    .Case("load", ValueKind::LoadInst)
+    .Case("alloc_var", ValueKind::AllocVarInst)
+    .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("return", ValueKind::ReturnInst)
-    .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Default(ValueKind::SILArgument);
   
   if (Opcode != ValueKind::SILArgument) {
@@ -429,6 +415,30 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
     P.consumeToken(tok::integer_literal);
     break;
   }
+  case ValueKind::LoadInst: {
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createLoad(SILLocation(), Val);
+    break;
+  }
+  case ValueKind::AllocVarInst: {
+    AllocKind Kind;
+    SILType Ty;
+    if (parseAllocKind(Kind) ||
+        parseSILType(Ty))
+      return true;
+    
+    ResultVal = B.createAllocVar(SILLocation(), Kind, Ty);
+    break;
+  }
+  case ValueKind::DeallocVarInst: {
+    AllocKind Kind;
+    if (parseAllocKind(Kind) ||
+        parseTypedValueRef(Val))
+      return true;
+    
+    ResultVal = B.createDeallocVar(SILLocation(), Kind, Val);
+    break;
+  }
   case ValueKind::TupleInst: {
     // Tuple instructions have two different syntaxes, one for simple tuple
     // types, one for complicated ones.
@@ -476,7 +486,7 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
     if (P.Tok.isNot(tok::r_paren)) {
       do {
         if (TypeElts.size() > TT->getFields().size()) {
-          P.diagnose(P.Tok, diag::tuple_inst_wrong_value_count,
+          P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_value_count,
                      TT->getFields().size());
           return true;
         }
@@ -492,7 +502,7 @@ bool SILParserFunctionState::parseSILInstruction(SILBasicBlock *BB) {
                              diag::expected_tok_in_sil_instr,")");
 
     if (TypeElts.size() != TT->getFields().size()) {
-      P.diagnose(OpcodeLoc, diag::tuple_inst_wrong_value_count,
+      P.diagnose(OpcodeLoc, diag::sil_tuple_inst_wrong_value_count,
                  TT->getFields().size());
       return true;
     }

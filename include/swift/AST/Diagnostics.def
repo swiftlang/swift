@@ -343,8 +343,10 @@ ERROR(expected_tok_in_sil_instr,decl_parsing,none,
       "expected '%0' in SIL instruction", (StringRef))
 ERROR(expected_tuple_type_in_tuple,decl_parsing,none,
       "tuple instruction requires a tuple type", ())
-ERROR(tuple_inst_wrong_value_count,decl_parsing,none,
+ERROR(sil_tuple_inst_wrong_value_count,decl_parsing,none,
       "tuple instruction requires %0 values", (unsigned))
+ERROR(sil_expected_allocation_kind,decl_parsing,none,
+      "expected allocation kind (heap, pseudo, or stack)", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
