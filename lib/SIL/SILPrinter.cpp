@@ -289,7 +289,7 @@ public:
     interleave(FI->getArguments(),
                [&](const SILValue &arg) { OS << getID(arg); },
                [&] { OS << ", "; });
-    OS << ')';
+    OS << ") : " << FI->getCallee().getType();
   }
 
   void visitApplyInst(ApplyInst *AI) {
