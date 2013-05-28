@@ -4,9 +4,14 @@ typedef struct objc_object { void *isa; } *id;
 
 typedef unsigned long NSUInteger;
 
+@class NSString;
+
 @interface NSArray : NSObject
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
+
+@property NSString *nsstringProperty;
+
 @end
 
 @interface NSString : NSObject

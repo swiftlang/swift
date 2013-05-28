@@ -68,13 +68,18 @@ enum class ImportTypeKind {
   Normal,
   /// \brief Import the result type of a function.
   ///
-  /// This provides special treatment for 'void', among other things.
+  /// This provides special treatment for 'void', among other things, and
+  /// enables the conversion of bridged types.
   Result,
   /// \brief Import the type of a function parameter.
   ///
   /// This provides special treatment for C++ references (which become
-  /// [byref] parameters), among other things.
-  Parameter
+  /// [byref] parameters), among other things, and enables the conversion of
+  /// bridged types.
+  Parameter,
+  /// \brief Import the type of an ObjC property. This enables the conversion
+  /// of bridged types.
+  Property
 };
 
 /// \brief Implementation of the Clang importer.

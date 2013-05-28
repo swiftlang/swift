@@ -2116,7 +2116,7 @@ namespace {
           overridden = var;
       }
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Property);
       if (!type)
         return nullptr;
 

@@ -8,6 +8,8 @@
 
 - (NSString*) description;
 
+@property NSString *stringProperty;
+
 @end
 
 @interface NSString : NSObject

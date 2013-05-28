@@ -457,7 +457,8 @@ namespace {
       // result type, map it to String.
       if (Impl.SwiftContext.LangOpts.NSStringIsString &&
           (kind == ImportTypeKind::Parameter ||
-           kind == ImportTypeKind::Result) &&
+           kind == ImportTypeKind::Result ||
+           kind == ImportTypeKind::Property) &&
           !imported->getName().empty() &&
           imported->getName().str() == "NSString") {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "String");
