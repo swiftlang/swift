@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -970,13 +971,13 @@ namespace {
     
     /// Build the property attribute string for a property decl.
     void buildPropertyAttributes(VarDecl *prop,
-                                 llvm::SmallVectorImpl<char> &out) {
+                                 llvm::SmallVectorImpl<char> &out,
+                                 ClassDecl *theClass) {
       llvm::raw_svector_ostream outs(out);
       
       // Emit the type encoding.
       // FIXME: Only correct for class types.
       outs << "T@";
-      ClassDecl *theClass = prop->getType()->getClassOrBoundGenericClass();
       // FIXME: Assume 'NSObject' really means 'id'.
       if (theClass->getName() != prop->getASTContext().getIdentifier("NSObject"))
         outs << '"' << theClass->getName().str() << '"';
@@ -1001,14 +1002,17 @@ namespace {
     /// };
     llvm::Constant *buildProperty(VarDecl *prop) {
       // FIXME: For now we only emit properties of ObjC class type.
-      ClassDecl *theClass = prop->getType()->getClassOrBoundGenericClass();
+      ClassDecl *theClass
+        = IGM.SILMod->Types.getLoweredBridgedType(prop->getType(),
+                                                  AbstractCC::ObjCMethod)
+          ->getClassOrBoundGenericClass();
       if (!theClass)
         return nullptr;
       if (!theClass->isObjC())
         return nullptr;
 
       llvm::SmallString<16> propertyAttributes;
-      buildPropertyAttributes(prop, propertyAttributes);
+      buildPropertyAttributes(prop, propertyAttributes, theClass);
       
       llvm::Constant *fields[] = {
         IGM.getAddrOfGlobalString(prop->getName().str()),

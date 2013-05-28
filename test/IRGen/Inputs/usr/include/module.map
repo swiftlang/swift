@@ -1,1 +1,2 @@
 module gizmo { header "Gizmo.h" }
+module Foundation { header "BridgeTestFoundation.h" }

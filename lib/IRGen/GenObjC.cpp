@@ -22,6 +22,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -618,9 +619,16 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                           uncurryLevel);
 }
 
+/// True if the value is of class type, or of a type that is bridged to class
+/// type.
+bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
+  return IGM.SILMod->Types.getLoweredBridgedType(t, AbstractCC::ObjCMethod)
+    ->getClassOrBoundGenericClass();
+}
+
 static bool isObjCGetterSignature(IRGenModule &IGM,
                                   AnyFunctionType *methodType) {
-  return methodType->getResult()->getClassOrBoundGenericClass() &&
+  return hasObjCClassRepresentation(IGM, methodType->getResult()) &&
     methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context));
 }
 
@@ -628,11 +636,11 @@ static bool isObjCSetterSignature(IRGenModule &IGM,
                                   AnyFunctionType *methodType) {
   if (!methodType->getResult()->isEqual(TupleType::getEmpty(IGM.Context)))
     return false;
-  if (methodType->getInput()->getClassOrBoundGenericClass())
+  if (hasObjCClassRepresentation(IGM, methodType->getInput()))
     return true;
   if (TupleType *inputTuple = methodType->getInput()->getAs<TupleType>()) {
     return inputTuple->getFields().size() == 1
-      && inputTuple->getFields()[0].getType()->getClassOrBoundGenericClass();
+      && hasObjCClassRepresentation(IGM, inputTuple->getFields()[0].getType());
   }
   return false;
 }
@@ -680,7 +688,7 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
                                           llvm::Constant *&selectorRef,
                                           llvm::Constant *&atEncoding,
                                           llvm::Constant *&impl) {
-  bool isClassProperty = property->getType()->getClassOrBoundGenericClass();
+  bool isClassProperty = hasObjCClassRepresentation(IGM, property->getType());
   
   Selector getterSel(property, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
@@ -699,7 +707,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                           llvm::Constant *&impl) {
   assert(property->isSettable() && "not a settable property?!");
 
-  bool isClassProperty = property->getType()->getClassOrBoundGenericClass();
+  bool isClassProperty = hasObjCClassRepresentation(IGM, property->getType());
   
   Selector setterSel(property, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());

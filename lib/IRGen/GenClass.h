@@ -31,6 +31,7 @@ namespace swift {
   class CanType;
   class VarDecl;
   class SILType;
+  class Type;
 
 namespace irgen {
   class HeapLayout;
@@ -55,6 +56,10 @@ namespace irgen {
                                   ClassDecl *theClass,
                                   llvm::Function *deallocator,
                                   llvm::Function *destroyer);
+  
+  /// True if the value is of class type, or of a type that is bridged to class
+  /// type in the ObjC world.
+  bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
 } // end namespace irgen
 } // end namespace swift
 
