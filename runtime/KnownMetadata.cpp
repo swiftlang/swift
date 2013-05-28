@@ -51,6 +51,7 @@ const Metadata *swift::swift_staticTypeof(OpaqueValue *src,
 // instantiating this function template at the types we'll need.
 #define INSTANTIATE(TYPE) \
   template TYPE *copy<TYPE>(TYPE*, TYPE*, const Metadata*);
+INSTANTIATE(bool);
 INSTANTIATE(uint8_t);
 INSTANTIATE(uint16_t);
 INSTANTIATE(uint32_t);
@@ -326,6 +327,12 @@ const ValueWitnessTable swift::_TWVT_ = {
   (value_witness_types::stride) 0
 };
 
+/*** Bool ********************************************************************/
+
+// FIXME: The compiler should generate this.
+
+const ValueWitnessTable swift::_TWVSb = POD_VALUE_WITNESS_TABLE(bool, 1);
+
 /*** Known metadata **********************************************************/
 
 // Define some builtin opaque metadata.
@@ -340,6 +347,8 @@ OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(BO)
+// FIXME: The compiler should generate OneOf metadata for Bool.
+OPAQUE_METADATA(Sb)
 
 /// The standard metadata for the empty tuple.
 const FullMetadata<TupleTypeMetadata> swift::_TMdT_ = {

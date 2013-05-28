@@ -431,6 +431,10 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
+  
+// The Bool value witness table.
+// FIXME: The compiler should generate this.
+extern "C" const ValueWitnessTable _TWVSb;        // swift.Bool
 
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -543,6 +547,9 @@ extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
 extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
+  
+// FIXME: The compiler should generate this.
+extern "C" const FullOpaqueMetadata _TMdSb;        // swift.Bool
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {
