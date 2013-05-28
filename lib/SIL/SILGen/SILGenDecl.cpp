@@ -989,13 +989,32 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
 // ObjC method thunks
 //===----------------------------------------------------------------------===//
 
+static SILValue emitBridgeObjCReturnValue(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          SILValue result,
+                                          SILType resultTy) {
+  Scope scope(gen.Cleanups);
+  
+  ManagedValue native = gen.emitManagedRValueWithCleanup(result);
+  ManagedValue bridged = gen.emitNativeToBridgedValue(loc, native,
+                                                      AbstractCC::ObjCMethod,
+                                                      resultTy.getSwiftType());
+  return bridged.forward(gen);
+}
+
 /// Take a return value at +1 and adjust it to the retain count expected by
 /// the given ownership conventions.
 static void emitObjCReturnValue(SILGenFunction &gen,
                                 SILLocation loc,
                                 SILValue result,
+                                SILType resultTy,
                                 OwnershipConventions const &ownership) {
-  // Autorelease the retained native result if necessary.
+  // Bridge the result.
+  if (gen.SGM.M.Types.BridgingEnabled) {
+    result = emitBridgeObjCReturnValue(gen, loc, result, resultTy);
+  }
+  
+  // Autorelease the bridged result if necessary.
   switch (ownership.getReturn()) {
   case OwnershipConventions::Return::Autoreleased:
     gen.B.createAutoreleaseReturn(loc, result);
@@ -1024,81 +1043,115 @@ static void emitObjCUnconsumedArgument(SILGenFunction &gen,
   gen.emitRetainRValue(loc, arg);
 }
 
-void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
-  SILType thunkTy = SGM.getConstantType(thunk);
+/// Reorder arguments from ObjC method order (self-first) to Swift method order
+/// (self-last), and bridge argument types.
+static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
+                                             SILConstant thunk,
+                                             SmallVectorImpl<SILValue> &args) {
+  SILType objcTy = gen.SGM.getConstantType(thunk),
+          swiftTy = gen.SGM.getConstantType(thunk.asObjC(false));
   
-  // Take ownership of any +0 arguments.
-  auto ownership = OwnershipConventions::get(*this, thunk, thunkTy);
+  SILFunctionTypeInfo
+    *objcInfo = objcTy.getFunctionTypeInfo(gen.SGM.M),
+    *swiftInfo = swiftTy.getFunctionTypeInfo(gen.SGM.M);
   
-  SmallVector<SILValue, 4> args;
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
-  if (info->hasIndirectReturn()) {
-    args.push_back(new(F.getModule()) SILArgument(info->getIndirectReturnType(),
-                                                  F.begin()));
-  }
+  // Emit the indirect return argument, if any.
+  if (objcInfo->hasIndirectReturn())
+    args.push_back(new (gen.F.getModule())
+                 SILArgument(objcInfo->getIndirectReturnType(), gen.F.begin()));
   
+  // Emit the other arguments, taking ownership of arguments if necessary.
+  auto ownership = OwnershipConventions::get(gen, thunk, objcTy);
   ArrayRef<SILType> inputs
-    = info->getInputTypesWithoutIndirectReturnType();
+    = objcInfo->getInputTypesWithoutIndirectReturnType();
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
-    SILValue arg = new (F.getModule()) SILArgument(inputs[i], F.begin());
+    SILValue arg = new(gen.F.getModule()) SILArgument(inputs[i], gen.F.begin());
     
     if (!ownership.isArgumentConsumed(i))
-      emitObjCUnconsumedArgument(*this, thunk.getDecl(), arg);
+      emitObjCUnconsumedArgument(gen, thunk.getDecl(), arg);
       
     args.push_back(arg);
   }
-  
+
+  assert(args.size() == objcInfo->getInputTypes().size() &&
+         "objc inputs don't match number of arguments?!");
+  assert(args.size() == swiftInfo->getInputTypes().size() &&
+         "swift inputs don't match number of arguments?!");
+
   // Reorder the 'this' argument for the Swift calling convention.
-  size_t thisIndex = info->hasIndirectReturn() ? 1 : 0;
+  size_t thisIndex = objcInfo->hasIndirectReturn() ? 1 : 0;
   SILValue thisArg = args[thisIndex];
   args.erase(args.begin() + thisIndex);
   args.push_back(thisArg);
+
+  if (!gen.SGM.M.Types.BridgingEnabled)
+    return ownership;
+
+  // Bridge the input types.
+  Scope scope(gen.Cleanups);
+  for (unsigned i = 0; i < args.size(); ++i) {
+    ManagedValue bridged = gen.emitManagedRValueWithCleanup(args[i]);
+    ManagedValue native = gen.emitBridgedToNativeValue(thunk.getDecl(),
+                               bridged,
+                               AbstractCC::ObjCMethod,
+                               swiftInfo->getInputTypes()[i].getSwiftType());
+    args[i] = native.forward(gen);
+  }
+  
+  return ownership;
+}
+
+void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
+  SILConstant native = thunk.asObjC(false);
+  
+  SmallVector<SILValue, 4> args;  
+  auto ownership = emitObjCThunkArguments(*this, thunk, args);
+  SILType swiftResultTy
+    = SGM.getConstantType(native).getFunctionTypeInfo(SGM.M)->getResultType();
+  SILType objcResultTy
+    = SGM.getConstantType(thunk).getFunctionTypeInfo(SGM.M)->getResultType();
   
   // Call the native entry point.
-  SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(),
-                                            thunk.asObjC(false));
-  SILValue result = B.createApply(thunk.getDecl(), nativeFn,
-                                  info->getResultType(),
-                                  args);
+  SILValue nativeFn = emitGlobalFunctionRef(thunk.getDecl(), native);
+  SILValue result = B.createApply(thunk.getDecl(),
+                                  nativeFn, swiftResultTy, args);
   
-  emitObjCReturnValue(*this, thunk.getDecl(), result, ownership);
+  emitObjCReturnValue(*this, thunk.getDecl(), result, objcResultTy, ownership);
 }
 
 void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
-  SILType thunkTy = SGM.getConstantType(getter);
-  auto ownership = OwnershipConventions::get(*this, getter, thunkTy);
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
+  SmallVector<SILValue, 2> args;
+  auto ownership = emitObjCThunkArguments(*this, getter, args);
+  SILConstant native = getter.asObjC(false);
+  SILType swiftResultTy
+    = SGM.getConstantType(native).getFunctionTypeInfo(SGM.M)->getResultType();
+  SILType objcResultTy
+    = SGM.getConstantType(getter).getFunctionTypeInfo(SGM.M)->getResultType();
 
-  SILValue indirectReturn;
-  SILType resultType;
-  if (info->hasIndirectReturn()) {
-    indirectReturn
-      = new(F.getModule()) SILArgument(info->getIndirectReturnType(),F.begin());
-    resultType = indirectReturn.getType();
-  } else {
-    resultType = info->getResultType();
-  }
-  SILValue thisValue
-    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
-  
+  // If the property is logical, forward to the native getter.
   auto *var = cast<VarDecl>(getter.getDecl());
   if (var->isProperty()) {
-    // If the native property is logical, forward to the native getter.
-    if (!ownership.isArgumentConsumed(0))
-      emitObjCUnconsumedArgument(*this, var, thisValue);
-    SmallVector<SILValue, 2> args;
-    if (indirectReturn)
-      args.push_back(indirectReturn);
-    args.push_back(thisValue);
-    SILValue nativeFn = emitGlobalFunctionRef(var, getter.asObjC(false));
-    SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
-    emitObjCReturnValue(*this, var, result, ownership);
+    SILValue nativeFn = emitGlobalFunctionRef(var, native);
+    SILValue result = B.createApply(var, nativeFn, swiftResultTy, args);
+    emitObjCReturnValue(*this, var, result, objcResultTy, ownership);
     return;
   }
 
   // If the native property is physical, load it.
+  SILFunctionTypeInfo *info
+    = SGM.getConstantType(getter).getFunctionTypeInfo(SGM.M);
+  SILValue indirectReturn, thisValue;
+  if (info->hasIndirectReturn()) {
+    assert(args.size() == 2 && "wrong number of arguments for getter");
+    indirectReturn = args[0];
+    thisValue = args[1];
+  } else {
+    assert(args.size() == 1 && "wrong number of arguments for getter");
+    thisValue = args[0];
+  }
+  
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
-                                         resultType.getAddressType());
+                                         swiftResultTy.getAddressType());
   if (indirectReturn) {
     assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
            && "any address-only type should appear Unretained to ObjC");
@@ -1106,12 +1159,22 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
     // "Take" because we return at +0.
     B.createCopyAddr(var, addr, indirectReturn,
                      /*isTake*/ true, /*isInitialize*/ true);
+    B.createRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;
   }
+
+  // Bridge the result.
+  SILValue result = B.createLoad(var, addr);
+  B.createRelease(getter.getDecl(), thisValue);
+  
+  if (SGM.M.Types.BridgingEnabled) {
+    emitRetainRValue(getter.getDecl(), result);
+    return emitObjCReturnValue(*this, getter.getDecl(), result, objcResultTy,
+                               ownership);
+  }
   
   // Retain the result if the calling convention calls for it.
-  SILValue result = B.createLoad(var, addr);
   switch (ownership.getReturn()) {
   case OwnershipConventions::Return::Retained:
     emitRetainRValue(var, result);
@@ -1124,47 +1187,39 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
 }
 
 void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
-  SILType thunkTy = SGM.getConstantType(setter);
-  auto ownership = OwnershipConventions::get(*this, setter, thunkTy);
-  SILFunctionTypeInfo *info = thunkTy.getFunctionTypeInfo(SGM.M);
+  SmallVector<SILValue, 2> args;
+  auto ownership = emitObjCThunkArguments(*this, setter, args);
+  SILConstant native = setter.asObjC(false);
   
-  SILValue thisValue
-    = new (F.getModule()) SILArgument(info->getInputTypes()[0], F.begin());
-  SILValue setValue
-    = new (F.getModule()) SILArgument(info->getInputTypes()[1], F.begin());
-  
+  // If the native property is logical, store to the native setter.
   auto *var = cast<VarDecl>(setter.getDecl());
   if (var->isProperty()) {
-    // If the native property is logical, forward to the native setter.
-    if (!ownership.isArgumentConsumed(0))
-      emitObjCUnconsumedArgument(*this, var, thisValue);
-    if (!ownership.isArgumentConsumed(1))
-      emitObjCUnconsumedArgument(*this, var, setValue);
-    SmallVector<SILValue, 2> args;
-    args.push_back(setValue);
-    args.push_back(thisValue);
-    SILValue nativeFn = emitGlobalFunctionRef(var, setter.asObjC(false));
-    SILValue result = B.createApply(var, nativeFn, info->getResultType(), args);
-    // Result should always be void.
-    B.createReturn(var, result);
+    SILValue nativeFn = emitGlobalFunctionRef(var, native);
+    SILValue result = B.createApply(var, nativeFn,
+                                    SGM.Types.getEmptyTupleType(),
+                                    args);
+    // Result should be void.
+    B.createReturn(setter.getDecl(), result);
     return;
   }
+
+  assert(args.size() == 2 && "wrong number of args for setter");
+  SILValue thisValue = args[1];
+  SILValue setValue = args[0];
   
   // If the native property is physical, store to it.
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
                                          setValue.getType().getAddressType());
   if (setValue.getType().isAddressOnly(SGM.M)) {
-    // "Take" if the argument was received at +0.
     B.createCopyAddr(var, setValue, addr,
-                     /*isTake*/ !ownership.isArgumentConsumed(1),
+                     /*isTake*/ true,
                      /*isInitialize*/ false);
   } else {
     SILValue old = B.createLoad(var, addr);
-    if (!ownership.isArgumentConsumed(1))
-      emitRetainRValue(var, setValue);
     B.createStore(var, setValue, addr);
     emitReleaseRValue(var, old);
   }
   
+  B.createRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));
 }
