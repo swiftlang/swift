@@ -364,10 +364,14 @@ static SmallVector<std::pair<Type, bool>, 4>
 getPotentialBindings(ConstraintSystem &cs,
                      TypeVariableConstraints &tvc,
                      bool &involvesTypeVariables,
-                     bool &hasLiteralBindings) {
+                     bool &hasLiteralBindings,
+                     bool &hasExistentialBindings,
+                     bool &hasConcreteTypes) {
   involvesTypeVariables = tvc.HasNonConcreteConstraints;
   hasLiteralBindings = false;
-
+  hasExistentialBindings = false;
+  hasConcreteTypes = false;
+  
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   SmallVector<std::pair<Type, bool>, 4> bindings;
 
@@ -387,8 +391,15 @@ getPotentialBindings(ConstraintSystem &cs,
       continue;
     }
 
-    if (exactTypes.insert(type->getCanonicalType()))
+    if (exactTypes.insert(type->getCanonicalType())) {
+      // Track whether we have any concrete types.
+      if (!type->isExistentialType())
+        hasConcreteTypes = true;
+      else
+        hasExistentialBindings = true;
+      
       bindings.push_back({type, false});
+    }
   }
 
   // Add the types above this type variable.
@@ -407,8 +418,14 @@ getPotentialBindings(ConstraintSystem &cs,
       continue;
     }
 
-    if (exactTypes.insert(type->getCanonicalType()))
+    if (exactTypes.insert(type->getCanonicalType())) {
+      // Track whether we have any concrete types.
+      if (!type->isExistentialType())
+        hasConcreteTypes = true;
+      else
+        hasExistentialBindings = true;
       bindings.push_back({type, false});
+    }
   }
 
   // Add the default literal types.
@@ -443,6 +460,7 @@ getPotentialBindings(ConstraintSystem &cs,
 
       if (!matched) {
         hasLiteralBindings = true;
+        hasConcreteTypes = true;
         exactTypes.insert(type->getCanonicalType());
         bindings.push_back({type, true});
       }
@@ -630,27 +648,42 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     unsigned bestTypeVarIndex = 0;
     bool bestInvolvesTypeVariables = false;
     bool bestHasLiteralBindings = false;
+    bool bestHasExistentialBindings = false;
+    bool bestHasConcreteTypes = false;
     SmallVector<std::pair<Type, bool>, 4> bestBindings
       = getPotentialBindings(*this,
                              typeVarConstraints[0],
                              bestInvolvesTypeVariables,
-                             bestHasLiteralBindings);
+                             bestHasLiteralBindings,
+                             bestHasExistentialBindings,
+                             bestHasConcreteTypes);
     for (unsigned i = 1, n = typeVarConstraints.size(); i != n; ++i) {
       bool involvesTypeVariables = false;
       bool hasLiteralBindings = false;
+      bool hasExistentialTypes = false;
+      bool hasConcreteTypes = false;
       SmallVector<std::pair<Type, bool>, 4> bindings
         = getPotentialBindings(*this, typeVarConstraints[i],
-                               involvesTypeVariables, hasLiteralBindings);
+                               involvesTypeVariables,
+                               hasLiteralBindings,
+                               hasExistentialTypes,
+                               hasConcreteTypes);
       if (bindings.empty())
         continue;
       
       // Prefer type variables whose bindings don't involve type variables or,
       // if neither involves type variables, those with fewer bindings.
       if (bestBindings.empty() ||
-          std::make_tuple(involvesTypeVariables, hasLiteralBindings,
+          std::make_tuple(hasExistentialTypes,
+                          !hasConcreteTypes,
+                          involvesTypeVariables,
+                          hasLiteralBindings,
                           -bindings.size())
             <
-          std::make_tuple(bestInvolvesTypeVariables, bestHasLiteralBindings,
+          std::make_tuple(bestHasExistentialBindings,
+                          !bestHasConcreteTypes,
+                          bestInvolvesTypeVariables,
+                          bestHasLiteralBindings,
                           -bestBindings.size())) {
         bestTypeVarIndex = i;
         bestInvolvesTypeVariables = involvesTypeVariables;
