@@ -786,9 +786,16 @@ bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
           ->is<BoundGenericType>())
     return false;
 
-  if (property->isObjC())
-    return true;
   if (auto override = property->getOverriddenDecl())
     return requiresObjCPropertyDescriptor(override);
-  return false;
+
+  if (!property->isObjC())
+    return false;
+  
+  // Don't expose objc properties for function types. We can't autorelease them,
+  // and eventually we want to map them back to blocks.
+  if (property->getType()->is<AnyFunctionType>())
+    return false;
+  
+  return true;
 }
