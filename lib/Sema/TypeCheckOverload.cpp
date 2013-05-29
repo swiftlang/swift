@@ -811,6 +811,12 @@ static Expr *replaceSemanticsProvidingExpr(Expr *Orig, Expr *New, Expr *E) {
   llvm_unreachable("Unhandled expression sugar");
 }
 
+static Expr *recheckTypes(TypeChecker &TC, Expr *E) {
+  if (TC.typeCheckExpressionShallow(E))
+    return nullptr;
+  return E;
+}
+
 Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
                                             ArrayRef<ValueDecl *> Remaining) {
   Expr *expr = Ovl.getExpr()->getSemanticsProvidingExpr();
@@ -826,7 +832,7 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
     if (!result)
       return nullptr;
 
-    result = recheckTypes(result);
+    result = recheckTypes(*this, result);
     if (!result)
       return nullptr;
   } else {
@@ -853,12 +859,13 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
   if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
     result = new (Context) DeclRefExpr(Candidate.getDecl(), DRE->getLoc(),
                              Candidate.getDecl()->getTypeOfReference());
-    result = recheckTypes(result);
+    result = recheckTypes(*this, result);
     if (!result)
       return nullptr;
   } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
     SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
-    result = recheckTypes(buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+    result = recheckTypes(*this,
+                          buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
                                              decls, MRE->getMemberLoc()));
     if (!result)
       return nullptr;
@@ -990,7 +997,7 @@ Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
                              dre->getLoc());
       if (!E)
         return nullptr;
-      E = recheckTypes(E);
+      E = recheckTypes(*this, E);
       if (!E)
         return nullptr;
     }
@@ -1091,7 +1098,7 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                  "can't call a static method on an instance");
           apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
         }
-        return recheckTypes(apply);
+        return recheckTypes(*this, apply);
       }
 
       return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,

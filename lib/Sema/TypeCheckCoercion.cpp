@@ -137,6 +137,12 @@ enum CoercionFlags {
   CF_NotPropagated = CF_Assignment|CF_ImplicitLValue
 };
 
+static Expr *recheckTypes(TypeChecker &TC, Expr *E) {
+  if (TC.typeCheckExpressionShallow(E))
+    return nullptr;
+  return E;
+}
+
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
 /// leaf", using the type of "+" to infer the type of "a" in "a+1") of an
 /// already-existing expression tree.  This is performed when an expression with
@@ -425,7 +431,7 @@ public:
     Expr *E = new (TC.Context) MetatypeExpr(nullptr, UME->getDotLoc(),
                                             MetaTypeType::get(DT, TC.Context));
     E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getDotLoc());
-    return coerced(TC.recheckTypes(E));
+    return coerced(recheckTypes(TC, E));
   }  
   
   CoercedResult visitParenExpr(ParenExpr *E) {
@@ -962,7 +968,7 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
 
   Expr *DRE = new (TC.Context) MetatypeExpr(nullptr, Intermediate->getStartLoc(),
                                             Method->computeThisType());
-  DRE = TC.recheckTypes(TC.buildMemberRefExpr(DRE, SourceLoc(), Method,
+  DRE = recheckTypes(TC, TC.buildMemberRefExpr(DRE, SourceLoc(), Method,
                                               Intermediate->getStartLoc()));
 
   // Return a new call of the conversion function, passing in the integer
@@ -1106,7 +1112,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
                                                    Segment->getStartLoc(),
                                                    Best.getDecl()->getType());
       CtorRef = new (TC.Context) ConstructorRefCallExpr(CtorRef, TypeBase);
-      CtorRef = TC.recheckTypes(CtorRef);
+      CtorRef = recheckTypes(TC, CtorRef);
       if (!CtorRef)
         return nullptr;
 

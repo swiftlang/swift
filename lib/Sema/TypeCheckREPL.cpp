@@ -96,13 +96,13 @@ getArgRefExpr(TypeChecker &TC,
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
-      ArgRef = TC.recheckTypes(ArgRef);
+      TC.typeCheckExpressionShallow(ArgRef);
       continue;
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
-      ArgRef = TC.recheckTypes(ArgRef);
+      TC.typeCheckExpressionShallow(ArgRef);
       continue;
     }
     TupleType *TT = cast<TupleType>(CurT);
@@ -137,9 +137,8 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
                                                     MetaT);
-    Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(Meta, Loc, Lookup,
-                                                      EndLoc));
-    if (!Res)
+    Expr *Res = TC.buildMemberRefExpr(Meta, Loc, Lookup, EndLoc);
+    if (TC.typeCheckExpressionShallow(Res))
       return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
@@ -311,9 +310,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   
   if (Lookup.isSuccess()) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
-    Expr *Res = TC.recheckTypes(TC.buildMemberRefExpr(ArgRef, Loc, Lookup,
-                                                      EndLoc));
-    if (!Res)
+    Expr *Res = TC.buildMemberRefExpr(ArgRef, Loc, Lookup, EndLoc);
+    if (TC.typeCheckExpressionShallow(Res))
       return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,

@@ -892,8 +892,11 @@ Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
   if (!Base->getType()->is<LValueType>())
     Base = coerceToMaterializable(Base);
 
-  return recheckTypes(buildMemberRefExpr(Base, E->getDotLoc(), Lookup,
-                                         E->getNameLoc()));
+  Expr *Result = buildMemberRefExpr(Base, E->getDotLoc(), Lookup,
+                                    E->getNameLoc());
+  if (typeCheckExpressionShallow(Result))
+    return nullptr;
+  return Result;
 }
 
 
@@ -1147,13 +1150,6 @@ Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E,
                               TypeCheckAST);
   assert(Elts.empty());
   return Result;
-}
-
-Expr *TypeChecker::recheckTypes(Expr *E) {
-  if (!E)
-    return nullptr;
-  
-  return SemaExpressionTree(*this).visit(E);
 }
 
 namespace {
