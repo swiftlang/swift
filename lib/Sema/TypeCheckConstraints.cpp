@@ -1621,7 +1621,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   bool concrete = !typeVar1 && !typeVar2;
   if (concrete && kind >= TypeMatchKind::TrivialSubtype) {
-    if (auto tuple2 = type2->getAs<TupleType>()) {
+    auto tuple1 = type1->getAs<TupleType>();
+    auto tuple2 = type2->getAs<TupleType>();
+
+    // Detect when the source and destination are both permit scalar
+    // conversions, but the source has a name and the destination does not have
+    // the same name.
+    bool tuplesWithMismatchedNames = false;
+    if (tuple1 && tuple2) {
+      int scalar1 = tuple1->getFieldForScalarInit();
+      int scalar2 = tuple2->getFieldForScalarInit();
+      if (scalar1 >= 0 && scalar2 >= 0) {
+        auto name1 = tuple1->getFields()[scalar1].getName();
+        auto name2 = tuple2->getFields()[scalar2].getName();
+        tuplesWithMismatchedNames = !name1.empty() && name1 != name2;
+      }
+    }
+
+    if (tuple2 && !tuplesWithMismatchedNames) {
       // A scalar type is a trivial subtype of a one-element, non-variadic tuple
       // containing a single element if the scalar type is a subtype of
       // the type of that tuple's element.
@@ -1649,6 +1666,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
 
+    if (tuple1 && !tuplesWithMismatchedNames) {
+      // A single-element tuple can be a trivial subtype of a scalar.
+      if (tuple1->getFields().size() == 1 &&
+          !tuple1->getFields()[0].isVararg()) {
+        return matchTypes(tuple1->getElementType(0), type2, kind, subFlags,
+                          locator.withPathElement(
+                            LocatorPathElt::getTupleElement(0)),
+                          trivial);
+      }
+    }
+    
     if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
       // Determines whether the first type is derived from the second.
       auto solveDerivedFrom =
