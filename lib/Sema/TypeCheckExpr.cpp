@@ -1550,49 +1550,6 @@ Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
   return StringLiteralType;
 }
 
-bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
-  struct UpdateWalker : ASTWalker {
-    UpdateWalker(TypeChecker &TC) : TC(TC) {}
-    
-    Expr *walkToExprPost(Expr *E) {
-      // Process unresolved literals.
-      if (!E->getType()->isUnresolvedType())
-        return E;
-      
-      if (LiteralExpr *Lit = dyn_cast<LiteralExpr>(E))
-        return TC.coerceToType(Lit, TC.getDefaultLiteralType(Lit));
-        
-      // func{} defaults to return () if we can't infer a result type.
-      if (auto FE = dyn_cast<FuncExpr>(E)) {
-        TC.semaFuncExpr(FE, false, false);
-        return FE;
-      }
-      return E;
-    }
-    
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      // Never recurse into statements.
-      return { false, S };
-    }
-    
-  private:    
-    TypeChecker &TC;
-    Type IntLiteralType, FloatLiteralType, CharacterLiteralType;
-    Type StringLiteralType;
-  };
-  
-  // Walk the tree again to update all the entries.  If this fails, give up.
-  E = E->walk(UpdateWalker(*this));
-  if (!E)
-    return true;
-  
-  // Now that we've added some types to the mix, re-type-check the expression
-  // tree and recheck for unresolved types.
-  SemaExpressionTree SET(*this);
-  E = SET.doIt(E);
-  return E == nullptr;
-}
-
 Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
   return SemaExpressionTree(*this).visitSequenceExpr(expr,
                                                      /*TypeCheckAST=*/false);

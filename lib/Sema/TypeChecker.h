@@ -553,11 +553,6 @@ public:
   /// expression.
   Type getDefaultLiteralType(LiteralExpr *E);
 
-  /// resolveUnresolvedLiterals - Given an expression containing unresolved
-  /// literals, resolve those unresolved literals to their default types and
-  /// type-check the expression again.
-  bool resolveUnresolvedLiterals(Expr *&E);
-
   /// coerceToType - Do semantic analysis of an expression in a context that
   /// expects a particular type.  This performs a conversion to that type if
   /// the types don't match and diagnoses cases where the conversion cannot be
