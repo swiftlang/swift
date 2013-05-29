@@ -1440,6 +1440,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::TriviallySolved;
 
         // Match up the parents, exactly.
+        // FIXME: If the parents fail to match, try conversions.
         return matchTypes(nominal1->getParent(), nominal2->getParent(),
                           TypeMatchKind::SameType, subFlags,
                           locator.withPathElement(
@@ -1524,6 +1525,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (bound1->getDecl() == bound2->getDecl()) {
         // Match up the parents, exactly, if there are parents.
         SolutionKind result = SolutionKind::TriviallySolved;
+        bool checkConversions = false;
         assert((bool)bound1->getParent() == (bool)bound2->getParent() &&
                "Mismatched parents of bound generics");
         if (bound1->getParent()) {
@@ -1536,8 +1538,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             // There may still be a conversion that can satisfy the constraint.
             // FIXME: The recursive match may have introduced new equality
             // constraints that are now invalid. rdar://problem/13140447
-            if (kind >= TypeMatchKind::Conversion)
+            if (kind >= TypeMatchKind::Conversion) {
+              checkConversions = true;
               break;
+            }
 
             // Record this failure.
             if (shouldRecordFailures()) {
@@ -1561,11 +1565,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             break;
           }
         }
-
+        if (checkConversions)
+          break;
+        
         // Match up the generic arguments, exactly.
         auto args1 = bound1->getGenericArgs();
         auto args2 = bound2->getGenericArgs();
-        bool checkConversions = false;
         assert(args1.size() == args2.size() && "Mismatched generic args");
         for (unsigned i = 0, n = args1.size(); i != n; ++i) {
           switch (matchTypes(args1[i], args2[i], TypeMatchKind::SameType,
