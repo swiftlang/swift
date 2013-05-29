@@ -556,14 +556,14 @@ namespace {
       return true;
     }
 
-    bool walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (FuncExpr *FE = dyn_cast<FuncExpr>(E))
         FuncExprs.push_back(FE);
 
       if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E))
         CurDeclContexts.push_back(CE);
 
-      return true;
+      return { true, E } ;
     }
 
     Expr *walkToExprPost(Expr *E) {

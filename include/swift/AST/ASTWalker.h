@@ -14,6 +14,7 @@
 #define SWIFT_AST_ASTWALKER_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include <utility>
 
 namespace swift {
 
@@ -28,11 +29,18 @@ public:
   llvm::PointerUnion<Expr *, Stmt *> Parent;
 
   /// This method is called when first visiting an expression,
-  /// before walking into its children.  If it returns false, the
-  /// subtree is ignored.
+  /// before walking into its children.
   ///
-  /// The default implementation always returns true.
-  virtual bool walkToExprPre(Expr *E) { return true; }
+  /// \param E The expression to check.
+  ///
+  /// \returns a pair indicating whether to visit the children along with
+  /// the expression that should replace this expression in the tree. If the
+  /// latter is null, the traversal will be terminated.
+  ///
+  /// The default implementation returns \c (true, E).
+  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+    return { true, E };
+  }
 
   /// This method is called after visiting an expression's children.
   /// If it returns null, the walk is terminated; otherwise, the
@@ -43,11 +51,18 @@ public:
   virtual Expr *walkToExprPost(Expr *E) { return E; }
 
   /// This method is called when first visiting a statement, before
-  /// walking into its children.  If it returns false, the subtree is
-  /// ignored.
+  /// walking into its children.
   ///
-  /// The default implementation always returns true.
-  virtual bool walkToStmtPre(Stmt *S) { return true; }
+  /// \param S The statement to check.
+  ///
+  /// \returns a pair indicating whether to visit the children along with
+  /// the statement that should replace this statement in the tree. If the
+  /// latter is null, the traversal will be terminated.
+  ///
+  /// The default implementation returns \c (true, S).
+  virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) {
+    return { true, S };
+  }
 
   /// This method is called after visiting a statement's children.  If
   /// it returns null, the walk is terminated; otherwise, the returned
@@ -60,6 +75,9 @@ public:
   
   /// walkToDeclPre - This method is called when first visiting a decl, before
   /// walking into its children.  If it returns false, the subtree is skipped.
+  ///
+  /// \param D The declaration to check. The callee may update this declaration
+  /// in-place.
   virtual bool walkToDeclPre(Decl *D) { return true; }
 
   /// walkToDeclPost - This method is called after visiting the children of a

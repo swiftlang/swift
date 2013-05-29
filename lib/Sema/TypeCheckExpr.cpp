@@ -1314,19 +1314,22 @@ public:
     return E->walk(*this);
   }
 
-  bool walkToExprPre(Expr *E) {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     // Do not walk into FuncExpr or explicit closures.  They are analyzed
     // modularly, so we don't need to recurse into them and reanalyze their
     // body.  This prevents N^2 re-sema activity with lots of nested closures.
     if (FuncExpr *FE = dyn_cast<FuncExpr>(E)) {
       TC.semaFuncExpr(FE, /*isFirstPass*/false, /*allowUnknownTypes*/true);
-      return false;
+      return { false, E };
     }
 
     // Only walk into Explicit Closures if they haven't been seen at all yet.
     // This ensures that everything gets a type, even if it is an
     // UnstructuredUnresolvedType.
-    return !isa<ExplicitClosureExpr>(E) || E->getType().isNull();
+    return {
+      !isa<ExplicitClosureExpr>(E) || E->getType().isNull(),
+      E
+    };
   }
 
   Expr *walkToExprPost(Expr *E) {
@@ -1335,9 +1338,9 @@ public:
     return this->visit(E);
   }
 
-  bool walkToStmtPre(Stmt *S) {
-    // Never recur into statements.
-    return false;
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    // Never recurse into statements.
+    return { false, S };
   }
 };
 } // end anonymous namespace.
@@ -1793,9 +1796,9 @@ namespace {
       return E;
     }
     
-    bool walkToStmtPre(Stmt *S) {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       // Never recurse into statements.
-      return false;
+      return { false, S };
     }
     
     Expr *OneUnresolvedExpr;
@@ -1929,9 +1932,9 @@ bool TypeChecker::resolveUnresolvedLiterals(Expr *&E) {
       return E;
     }
     
-    bool walkToStmtPre(Stmt *S) {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       // Never recurse into statements.
-      return false;
+      return { false, S };
     }
     
   private:    
@@ -2322,7 +2325,7 @@ namespace {
     CapturingExpr *curExpr;
 
   public:
-    bool walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
         if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
             DRE->getDecl()->getDeclContext() != curExpr) {
@@ -2336,15 +2339,15 @@ namespace {
           }
           captures.insert(DRE->getDecl());
         }
-        return false;
+        return { false, E };
       }
       if (CapturingExpr *SubCE = dyn_cast<CapturingExpr>(E)) {
         for (auto D : SubCE->getCaptures())
           if (D->getDeclContext() != curExpr)
             captures.insert(D);
-        return false;
+        return { false, E };
       }
-      return true;
+      return { true, E };
     }
 
     FindCapturedVars(TypeChecker &tc,

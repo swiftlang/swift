@@ -40,9 +40,9 @@ namespace {
     Verifier(TranslationUnit *TU) : TU(TU), Ctx(TU->Ctx), Out(llvm::errs()),
                                     HadError(TU->Ctx.hadError()) {}
 
-    bool walkToExprPre(Expr *E) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       switch (E->getKind()) {
-#define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Expr*>(E))
+#define DISPATCH(ID) return dispatchVisitPreExpr(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
         DISPATCH(ID);
@@ -74,9 +74,9 @@ namespace {
       llvm_unreachable("not all cases handled!");
     }
 
-    bool walkToStmtPre(Stmt *S) {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       switch (S->getKind()) {
-#define DISPATCH(ID) return dispatchVisitPre(static_cast<ID##Stmt*>(S))
+#define DISPATCH(ID) return dispatchVisitPreStmt(static_cast<ID##Stmt*>(S))
 #define STMT(ID, PARENT) \
       case StmtKind::ID: \
         DISPATCH(ID);
@@ -129,6 +129,20 @@ namespace {
     /// just check whether we should stop further descent.
     template <class T> bool dispatchVisitPre(T node) {
       return shouldVerify(node);
+    }
+
+    /// Helper template for dispatching pre-visitation.
+    /// If we're visiting in pre-order, don't validate the node yet;
+    /// just check whether we should stop further descent.
+    template <class T> std::pair<bool, Expr *> dispatchVisitPreExpr(T node) {
+      return { shouldVerify(node), node };
+    }
+
+    /// Helper template for dispatching pre-visitation.
+    /// If we're visiting in pre-order, don't validate the node yet;
+    /// just check whether we should stop further descent.
+    template <class T> std::pair<bool, Stmt *> dispatchVisitPreStmt(T node) {
+      return { shouldVerify(node), node };
     }
 
     /// Helper template for dispatching post-visitation.

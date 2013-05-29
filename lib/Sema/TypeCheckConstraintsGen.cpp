@@ -958,9 +958,12 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
   public:
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
-    virtual bool walkToExprPre(Expr *expr) {
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // Don't recurse into array-new or default-value expressions.
-      return !isa<NewArrayExpr>(expr) && !isa<DefaultValueExpr>(expr);
+      return {
+        !isa<NewArrayExpr>(expr) && !isa<DefaultValueExpr>(expr),
+        expr
+      };
     }
 
     virtual Expr *walkToExprPost(Expr *expr) {
@@ -1009,7 +1012,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
   public:
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
-    virtual bool walkToExprPre(Expr *expr) {
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, we visit the closure first to assign a type with
       // appropriate type variables.
       // Don't walk into the bodies of function expressions.
@@ -1020,7 +1023,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
         // For explicit closures, we visit the body, which participates in
         // type checking. The bodies of func expressions, on the other hand,
         // do not participate in type checking.
-        return isa<ExplicitClosureExpr>(expr);
+        return { isa<ExplicitClosureExpr>(expr), expr };
       }
 
       // For closures containing only a single expression, the body participates
@@ -1032,7 +1035,7 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
           expr->setType(funcTy);
         }
 
-        return true;
+        return { true, expr };
       }
 
       // For new array expressions, we visit the node but not any of its
@@ -1042,16 +1045,16 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         auto type = CG.visitNewArrayExpr(newArray);
         expr->setType(type);
-        return false;
+        return { false, expr };
       }
 
       // We don't visit default value expressions; they've already been
       // type-checked.
       if (isa<DefaultValueExpr>(expr)) {
-        return false;
+        return { false, expr };
       }
 
-      return true;
+      return { true, expr };
     }
 
     /// \brief Once we've visited the children of the given expression,
@@ -1097,7 +1100,9 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     /// \brief Ignore statements.
-    virtual bool walkToStmtPre(Stmt *stmt) { return false; }
+    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
 
     /// \brief Ignore declarations.
     virtual bool walkToDeclPre(Decl *decl) { return false; }

@@ -680,8 +680,9 @@ public:
   Expr *doIt(Expr *E) {
     // Do the pre-order visitation.  If it returns false, we just
     // skip entering subnodes of this tree.
-    if (!Walker.walkToExprPre(E))
-      return E;
+    auto Pre = Walker.walkToExprPre(E);
+    if (!Pre.first || !Pre.second)
+      return Pre.second;
 
     // Otherwise, visit the children.
     E = visit(E);
@@ -695,8 +696,9 @@ public:
   Stmt *doIt(Stmt *S) {
     // Do the pre-order visitation.  If it returns false, we just
     // skip entering subnodes of this tree.
-    if (!Walker.walkToStmtPre(S))
-      return S;
+    auto Pre = Walker.walkToStmtPre(S);
+    if (!Pre.first || !Pre.second)
+      return Pre.second;
 
     // Otherwise, visit the children.
     S = visit(S);

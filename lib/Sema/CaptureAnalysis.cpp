@@ -91,12 +91,12 @@ namespace {
 // 2. A DeclRefExpr referring to a variable is an "lvalue use" if it is not
 //    the operand of a LoadExpr.
 class CaptureAnalysisVisitor : public ASTWalker {
-  bool walkToExprPre(Expr *E) {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (LoadExpr *LE = dyn_cast<LoadExpr>(E)) {
       // A DeclRefExpr which is immediately loaded can't extend the lifetime of
       // a variable, and can't modify it.
       if (FindValueDecl(LE->getSubExpr()))
-        return false;
+        return { false, E };
     } else if (AddressOfExpr *AOE = dyn_cast<AddressOfExpr>(E)) {
       // A DeclRefExpr passed byref can't extend the lifetime of a variable.
       // FIXME: Doesn't handle implicit address-of operations. We need
@@ -104,7 +104,7 @@ class CaptureAnalysisVisitor : public ASTWalker {
       if (ValueDecl *D = FindValueDecl(AOE->getSubExpr())) {
         if (D->getDeclContext()->isLocalContext())
           D->setNeverUsedAsLValue(false);
-        return false;
+        return { false, E };
       }
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       // We can't reason about the decl referred to by a general DeclRefExpr.
@@ -135,7 +135,7 @@ class CaptureAnalysisVisitor : public ASTWalker {
       for (ValueDecl *D : CE->getCaptures())
         D->setHasFixedLifetime(false);
     }
-    return true;
+    return { true, E };
   }
 
   void analyzeAssignmentLHS(Expr *E) {
@@ -152,12 +152,12 @@ class CaptureAnalysisVisitor : public ASTWalker {
     }
   }
 
-  bool walkToStmtPre(Stmt *S) {
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (AssignStmt *AS = dyn_cast<AssignStmt>(S)) {
       // An assignment to a variable can't extend its lifetime.
       analyzeAssignmentLHS(AS->getDest());
       AS->getSrc()->walk(*this);
-      return false;
+      return { false, S };
     } else if (ForEachStmt *FES = dyn_cast<ForEachStmt>(S)) {
       // The normal ASTWalker walk doesn't examine everything we care about;
       // use a custom walk which does the right thing.
@@ -167,9 +167,9 @@ class CaptureAnalysisVisitor : public ASTWalker {
       WalkPattern(FES->getElementInit()->getPattern());
       FES->getElementInit()->getInit()->walk(*this);
       FES->getBody()->walk(*this);
-      return false;
+      return { false, S };
     }
-    return true;
+    return { true, S };
   }
 
   bool walkToDeclPre(Decl *D) {

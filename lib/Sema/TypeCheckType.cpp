@@ -382,13 +382,13 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
 
         CheckForLocalRef(TypeChecker &TC) : TC(TC) {}
 
-        bool walkToExprPre(Expr *E) {
+        std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
             if (DRE->getDecl()->getDeclContext()->isLocalContext()) {
               TC.diagnose(E->getLoc(), diag::tuple_default_local_ref);
             }
           }
-          return true;
+          return { true, E };
         }
       };
 

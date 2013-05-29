@@ -2666,13 +2666,13 @@ namespace {
   public:
     PreCheckExpression(TypeChecker &tc) : TC(tc) { }
 
-    bool walkToExprPre(Expr *expr) {
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For FuncExprs, we just want to type-check the patterns as written,
       // but not walk into the body. The body will by type-checked separately.
       if (auto func = dyn_cast<FuncExpr>(expr)) {
         TC.semaFuncExpr(func, /*isFirstPass=*/false,
                         /*allowUnknownTypes=*/true);
-        return false;
+        return { false, expr };
       }
 
       // For closures, type-check the patterns and result type as written,
@@ -2682,20 +2682,20 @@ namespace {
         // Validate the parameters.
         if (TC.typeCheckPattern(closure->getParams(), true, true)) {
           expr->setType(ErrorType::get(TC.Context));
-          return false;
+          return { false, expr };
         }
 
         // Validate the result type, if present.
         if (closure->hasExplicitResultType() &&
             TC.validateType(closure->getExplicitResultTypeLoc())) {
           expr->setType(ErrorType::get(TC.Context));
-          return false;
+          return { false, expr };
         }
         
-        return closure->hasSingleExpressionBody();
+        return { closure->hasSingleExpressionBody(), expr };
       }
 
-      return true;
+      return { true, expr };
     }
 
     Expr *walkToExprPost(Expr *expr) {
@@ -2759,9 +2759,9 @@ namespace {
       return expr;
     }
 
-    bool walkToStmtPre(Stmt *stmt) {
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
       // Never walk into statements.
-      return false;
+      return { false, stmt };
     }
   };
 }

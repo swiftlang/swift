@@ -2285,7 +2285,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
-    virtual bool walkToExprPre(Expr *expr) {
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       if (auto closure = dyn_cast<ExplicitClosureExpr>(expr)) {
         // Update the types of the $I variables with their simplified versions.
         // We do this before walking into the body of the closure expression,
@@ -2295,14 +2295,14 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         for (auto var : closure->getParserVarDecls())
           var->overwriteType(cs.simplifyType(var->getType()));
 
-        return true;
+        return { true, expr };
       }
 
       // For an array, just walk the expression itself; its children have
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         Rewriter.visitNewArrayExpr(newArray);
-        return false;
+        return { false, expr };
       }
 
       // For ternary expressions, visit the then and else branches;
@@ -2318,15 +2318,15 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         }
 
         Rewriter.visitIfExpr(ifExpr);
-        return false;
+        return { false, expr };
       }
 
       // For a default-value expression, do nothing.
       if (isa<DefaultValueExpr>(expr)) {
-        return false;
+        return { false, expr };
       }
 
-      return true;
+      return { true, expr };
     }
 
     virtual Expr *walkToExprPost(Expr *expr) {
@@ -2334,7 +2334,9 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     }
 
     /// \brief Ignore statements.
-    virtual bool walkToStmtPre(Stmt *stmt) { return false; }
+    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) {
+      return { false, stmt };
+    }
 
     /// \brief Ignore declarations.
     virtual bool walkToDeclPre(Decl *decl) { return false; }
