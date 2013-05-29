@@ -258,47 +258,6 @@ public:
     return TC.coerceToRValue(Result);
   }
   
-  /// callNullaryMemberOf - Form a call (with no arguments) to a method of the
-  /// given base.
-  Expr *callNullaryMethodOf(Expr *Base, Identifier Name, SourceLoc Loc,
-                            Diag<Type> MissingMember,
-                            Diag<Type> NonFuncMember) {
-    Type BaseType = Base->getType()->getRValueType();
-
-    // Look for name.
-    MemberLookup Lookup(BaseType, Name, TC.TU);
-    if (!Lookup.isSuccess()) {
-      TC.diagnose(Loc, MissingMember, BaseType)
-        .highlight(Base->getSourceRange());
-      return nullptr;
-    }
-    
-    // Make sure we found a function (which may be overloaded, of course).
-    if (!isa<FuncDecl>(Lookup.Results.front().D)) {
-      TC.diagnose(Loc, NonFuncMember, BaseType)
-        .highlight(Base->getSourceRange());
-      TC.diagnose(Lookup.Results.front().D,
-                  diag::decl_declared_here,
-                  Lookup.Results.front().D->getName());
-      return nullptr;
-    }
-    
-    // Form base.name
-    Expr *Mem = TC.buildMemberRefExpr(Base, Loc, Lookup, Loc);
-    Mem = TC.recheckTypes(Mem);
-    if (!Mem) return nullptr;
-    
-    // Call base.name()
-    Expr *EmptyArgs
-      = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
-                                   /*hasTrailingClosure=*/false,
-                                   TupleType::getEmpty(TC.Context));
-    ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
-    Expr *Result = TC.semaApplyExpr(Call);
-    if (!Result) return nullptr;
-    return TC.coerceToRValue(Result);
-  }
-  
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // Type-check the container and convert it to an rvalue.
     Expr *Container = S->getContainer();
