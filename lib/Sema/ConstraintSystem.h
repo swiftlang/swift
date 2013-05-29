@@ -1817,8 +1817,8 @@ public:
 
   /// \brief Generate constraints for the given (unchecked) expression.
   ///
-  /// \returns true if an error occurred.
-  bool generateConstraints(Expr *E);
+  /// \returns a possibly-sanitized expression, or null if an error occurred.
+  Expr *generateConstraints(Expr *E);
 
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.

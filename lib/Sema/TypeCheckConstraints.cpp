@@ -2817,6 +2817,9 @@ static Expr *cleanupIllFormedExpression(ConstraintSystem &cs, Expr *expr) {
     }
   };
 
+  if (!expr)
+    return expr;
+  
   return expr->walk(CleanupIllFormedExpression(cs));
 }
 
@@ -2862,7 +2865,8 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  if (cs.generateConstraints(expr)) {
+  expr = cs.generateConstraints(expr);
+  if (!expr) {
     return true;
   }
 
@@ -3027,8 +3031,15 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
   ConstraintSystem cs(*this);
   CleanupIllFormedExpressionRAII cleanupSrc(cs, src);
   CleanupIllFormedExpressionRAII cleanupDest(cs, dest);
-  if (cs.generateConstraints(dest) || cs.generateConstraints(src))
+  dest = cs.generateConstraints(dest);
+  if (!dest) {
     return { nullptr, nullptr };
+  }
+
+  src = cs.generateConstraints(src);
+  if (!src) {
+    return { nullptr, nullptr };
+  }
 
   // Compute the type to which the source must be converted to allow assignment
   // to the destination.
@@ -3146,7 +3157,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr) {
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  if (cs.generateConstraints(expr))
+  expr = cs.generateConstraints(expr);
+  if (!expr)
     return true;
 
   // The result must be a LogicValue.
@@ -3276,7 +3288,8 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
-  if (cs.generateConstraints(expr))
+  expr = cs.generateConstraints(expr);
+  if (!expr)
     return true;
 
   // The result must be an ArrayBound.

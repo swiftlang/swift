@@ -68,7 +68,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
   } while (true);
 }
 
-bool ConstraintSystem::generateConstraints(Expr *expr) {
+Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
 
@@ -980,9 +980,10 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       }
 
       if (auto dotIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
-        // A DotSyntaxCallExpr is a member reference that has already been
-        // type-checked down to a call where the argument doesn't actually
-        // matter; turn it back into an overloaded member reference expression.
+        // A DotSyntaxBaseIgnoredExpr is a static member reference that has
+        // already been type-checked down to a call where the argument doesn't
+        // actually matter; turn it back into an overloaded member reference
+        // expression.
         SourceLoc memberLoc;
         if (auto member = findReferencedDecl(dotIgnored->getRHS(), memberLoc)) {
           auto base = skipImplicitConversions(dotIgnored->getLHS());
@@ -1112,8 +1113,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
   // Walk the expression, generating constraints.
-  ConstraintGenerator CG(*this);
-  ConstraintWalker CW(CG);
-  return expr->walk(CW) == nullptr;
+  ConstraintGenerator cg(*this);
+  ConstraintWalker cw(cg);
+  return expr->walk(cw);
 }
 
