@@ -581,6 +581,25 @@ public:
   /// isn't already.
   Expr *coerceToMaterializable(Expr *expr);
 
+  /// \brief Build a call to the witness with the given name and no arguments.
+  ///
+  /// \param base The base expression, whose witness will be invoked.
+  ///
+  /// \param protocol The protocol to call through.
+  ///
+  /// \param conformance The conformance of the base type to the given
+  /// protocol.
+  ///
+  /// \param name The name of the method to call.
+  ///
+  /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
+  ///
+  /// \returns a fully type-checked call, or null if the protocol was broken.
+  Expr *callWitness(Expr *base, ProtocolDecl *protocol,
+                    ProtocolConformance *conformance,
+                    Identifier name,
+                    Diag<> brokenProtocolDiag);
+
   /// conformsToProtocol - Determine whether the given type conforms to the
   /// given protocol.
   ///

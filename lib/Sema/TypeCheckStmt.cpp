@@ -238,26 +238,6 @@ public:
     return FS;
   }
   
-  /// callNullaryMethodOf - Form a call (with no arguments) to the given
-  /// method of the given base.
-  Expr *callNullaryMethodOf(Expr *Base, FuncDecl *Method, SourceLoc Loc) {
-    // Form the method reference.
-    Expr *Mem = TC.buildMemberRefExpr(Base, Loc, Method, Loc);
-    if (!Mem) return nullptr;
-    Mem = TC.recheckTypes(Mem);
-    if (!Mem) return nullptr;
-
-    // Call the method.
-    Expr *EmptyArgs
-      = new (TC.Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, Loc,
-                                   /*hasTrailingClosure=*/false,
-                                   TupleType::getEmpty(TC.Context));
-    ApplyExpr *Call = new (TC.Context) CallExpr(Mem, EmptyArgs);
-    Expr *Result = TC.semaApplyExpr(Call);
-    if (!Result) return nullptr;
-    return TC.coerceToRValue(Result);
-  }
-  
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // Type-check the container and convert it to an rvalue.
     Expr *Container = S->getContainer();
@@ -292,10 +272,6 @@ public:
                                  Container->getLoc()))
         return nullptr;
 
-      // Gather the witness from the Enumerable protocol conformance. This are
-      // the functions we'll call.
-      FuncDecl *getElementsFn = 0;
-      
       for (auto Member : EnumerableProto->getMembers()) {
         auto Value = dyn_cast<ValueDecl>(Member);
         if (!Value)
@@ -311,21 +287,18 @@ public:
             RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
           }
           RangeTy = TC.substMemberTypeWithBase(RangeTy, Value, ContainerType);
-        } else if (Name.equals("getEnumeratorType") && isa<FuncDecl>(Value)) {
-          if (Conformance)
-            getElementsFn = cast<FuncDecl>(Conformance->Mapping[Value]);
-          else
-            getElementsFn = cast<FuncDecl>(Value);
         }
       }
 
-      if (!getElementsFn || !RangeTy) {
+      if (!RangeTy) {
         TC.diagnose(EnumerableProto->getLoc(), diag::enumerable_protocol_broken);
         return nullptr;
       }
-      
-      Expr *GetElements = callNullaryMethodOf(Container, getElementsFn,
-                                              S->getInLoc());
+
+      Expr *GetElements
+        = TC.callWitness(Container, EnumerableProto, Conformance,
+                         TC.Context.getIdentifier("getEnumeratorType"),
+                         diag::enumerable_protocol_broken);
       if (!GetElements) return nullptr;
       
       // Create a local variable to capture the range.
@@ -351,7 +324,6 @@ public:
     
     // Gather the witnesses from the Range protocol conformance. These are
     // the functions we'll call.
-    FuncDecl *isEmptyFn = 0;
     FuncDecl *nextFn = 0;
     Type ElementTy;
     
@@ -370,13 +342,7 @@ public:
           ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
         }
         ElementTy = TC.substMemberTypeWithBase(ElementTy, Value, RangeTy);
-      } else if (Name.equals("isEmpty") && isa<FuncDecl>(Value)) {
-        if (Conformance)
-          isEmptyFn = cast<FuncDecl>(Conformance->Mapping[Value]);
-        else
-          isEmptyFn = cast<FuncDecl>(Value);
-      }
-      else if (Name.equals("next") && isa<FuncDecl>(Value)) {
+      } else if (Name.equals("next") && isa<FuncDecl>(Value)) {
         if (Conformance)
           nextFn = cast<FuncDecl>(Conformance->Mapping[Value]);
         else
@@ -384,28 +350,31 @@ public:
       }
     }
     
-    if (!isEmptyFn || !nextFn || !ElementTy) {
+    if (!nextFn || !ElementTy) {
       TC.diagnose(EnumeratorProto->getLoc(), diag::range_protocol_broken);
       return nullptr;
     }
     
     // Compute the expression that determines whether the range is empty.
     Expr *Empty
-      = callNullaryMethodOf(
-          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                       Range->getTypeOfReference()),
-          isEmptyFn, S->getInLoc());
+      = TC.callWitness(new (TC.Context) DeclRefExpr(
+                                          Range, S->getInLoc(),
+                                          Range->getTypeOfReference()),
+                       EnumeratorProto, Conformance,
+                       TC.Context.getIdentifier("isEmpty"),
+                       diag::range_protocol_broken);
     if (!Empty) return nullptr;
     if (TC.typeCheckCondition(Empty)) return nullptr;
     S->setRangeEmpty(Empty);
     
     // Compute the expression that extracts a value from the range.
     Expr *GetFirstAndAdvance
-      = callNullaryMethodOf(
-          new (TC.Context) DeclRefExpr(Range, S->getInLoc(),
-                                       Range->getTypeOfReference()),
-          nextFn,
-          S->getInLoc());
+      = TC.callWitness(new (TC.Context) DeclRefExpr(
+                                          Range, S->getInLoc(),
+                                          Range->getTypeOfReference()),
+                       EnumeratorProto, Conformance,
+                       TC.Context.getIdentifier("next"),
+                       diag::range_protocol_broken);
     if (!GetFirstAndAdvance) return nullptr;
     
     S->setElementInit(new (TC.Context) PatternBindingDecl(S->getForLoc(),

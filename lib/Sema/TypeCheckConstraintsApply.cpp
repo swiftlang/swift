@@ -2399,6 +2399,41 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   return rewriter.coerceToType(expr, toType, locator);
 }
 
+Expr *TypeChecker::callWitness(Expr *base, ProtocolDecl *protocol,
+                               ProtocolConformance *conformance,
+                               Identifier name,
+                               Diag<> brokenProtocolDiag) {
+  // Construct an empty constraint system and solution.
+  ConstraintSystem cs(*this);
+  Solution solution(cs);
+  ExprRewriter rewriter(cs, solution);
+
+  // Find the witness we need to use.
+  auto type = base->getType();
+  auto witness = findNamedWitness(*this, type->getRValueType(), protocol,
+                                  name, brokenProtocolDiag);
+  if (!witness)
+    return nullptr;
+
+  // FIXME: Could be smarter here w.r.t. generics.
+  auto openedType
+    = witness->getType()->castTo<AnyFunctionType>()->getResult();
+
+  auto locator = cs.getConstraintLocator(base, { });
+  auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
+                                           witness, base->getEndLoc(),
+                                           openedType, locator);
+
+  // Call the witness.
+  Expr *arg = new (Context) TupleExpr(base->getStartLoc(),
+                                      { }, nullptr,
+                                      base->getEndLoc(),
+                                      /*hasTrailingClosure=*/false,
+                                      TupleType::getEmpty(Context));
+  ApplyExpr *apply = new (Context) CallExpr(memberRef, arg);
+  return rewriter.finishApply(apply, openedType, locator);
+}
+
 /// \brief Convert an expression via a builtin protocol.
 ///
 /// \param solution The solution to the expression's constraint system,
@@ -2436,11 +2471,11 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   // general name via the witness table.
   MemberLookup lookup(type->getRValueType(), builtinName, tc.TU);
   if (!lookup.isSuccess()) {
-    // Find the getLogicValue witness we need to use.
+    // Find the witness we need to use.
     auto witness = findNamedWitness(tc, type->getRValueType(), protocol,
                                     generalName, brokenProtocolDiag);
 
-    // Form a reference to getLogicValue.
+    // Form a reference to the general name.
     // FIXME: openedType won't capture generics. The protocol definition
     // prevents this, but it feels hacky.
     auto openedType
