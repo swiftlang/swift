@@ -328,8 +328,15 @@ namespace {
       auto elements = type->getFields();
 
       switch (elements.size()) {
-      case 0: // Special case the empty tuple, just use the global descriptor.
-        return IGF.IGM.getEmptyTupleMetadata();
+      case 0: {// Special case the empty tuple, just use the global descriptor.
+        llvm::Constant *fullMetadata = IGF.IGM.getEmptyTupleMetadata();
+        llvm::Constant *indices[] = {
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
+        };
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(fullMetadata,
+                                                            indices);
+      }
 
       case 1:
           // For metadata purposes, we consider a singleton tuple to be
