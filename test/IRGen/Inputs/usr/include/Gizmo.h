@@ -1,9 +1,4 @@
-@interface NSObject
-+ (NSObject*) alloc;
-- (NSObject*) init;
-+ (NSObject*) new;
-+ (void) load;
-@end
+@import Foundation;
 
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
 #define NS_CONSUMES_SELF __attribute__((ns_consumes_self))
@@ -42,9 +37,6 @@ typedef long NSInteger;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 + (void) runce;
-@end
-
-@interface NSString : NSObject
 @end
 
 @interface NSView : NSObject
