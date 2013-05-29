@@ -23,12 +23,6 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
-    /// \brief Whether to use the constraint solver for type checking.
-    ///
-    /// FIXME: This option is temporary, and will be removed once the constraint
-    /// solver is the only type checker.
-    bool UseConstraintSolver = true;
-
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint

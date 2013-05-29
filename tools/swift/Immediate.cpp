@@ -1113,11 +1113,7 @@ public:
         } else if (L.peekNextToken().getText() == "constraints") {
           L.lex(Tok);
           L.lex(Tok);
-          if (Tok.getText() == "on") {
-            TU->getASTContext().LangOpts.UseConstraintSolver = true;
-          } else if (Tok.getText() == "off") {
-            TU->getASTContext().LangOpts.UseConstraintSolver = false;
-          } else if (Tok.getText() == "debug") {
+          if (Tok.getText() == "debug") {
             L.lex(Tok);
             if (Tok.getText() == "on") {
               TU->getASTContext().LangOpts.DebugConstraintSolver = true;

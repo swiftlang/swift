@@ -2877,11 +2877,6 @@ namespace {
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
-  // FIXME: Old type checker.
-  if (!getLangOpts().UseConstraintSolver) {
-    return typeCheckExpressionOld(expr, convertType);
-  }
-
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
@@ -3032,14 +3027,6 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
 std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
                                                            SourceLoc equalLoc,
                                                            Expr *src) {
-  // FIXME: Old type checker.
-  if (!getLangOpts().UseConstraintSolver) {
-    if (typeCheckAssignmentOld(dest, equalLoc, src))
-      return { nullptr, nullptr };
-
-    return { dest, src };
-  }
-
   // First, pre-check the destination and source, validating any types that
   // occur in the expression and folding sequence expressions.
 
@@ -3169,11 +3156,6 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr) {
-  // FIXME: Old type checker.
-  if (!getLangOpts().UseConstraintSolver) {
-    return typeCheckConditionOld(expr);
-  }
-
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
@@ -3301,10 +3283,6 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
     return true;
   }
 
-  // FIXME: Old type checker.
-  if (!getLangOpts().UseConstraintSolver)
-    return typeCheckArrayBoundOld(expr);
-  
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   expr = expr->walk(PreCheckExpression(*this));
@@ -3406,18 +3384,11 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, bool &isTrivial) {
-  if (!getLangOpts().UseConstraintSolver) {
-    return isSubtypeOfOld(type1, type2, isTrivial);
-  }
-  
   ConstraintSystem cs(*this);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  if (!getLangOpts().UseConstraintSolver)
-    return convertToRValueOld(expr);
-
   // If we already have an rvalue, we're done.
   auto lvalueTy = expr->getType()->getAs<LValueType>();
   if (!lvalueTy)
@@ -3436,10 +3407,6 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
-  if (!getLangOpts().UseConstraintSolver) {
-    return convertToMaterializableOld(expr);
-  }
-
   // Load lvalues.
   if (auto lvalue = expr->getType()->getAs<LValueType>()) {
     return new (Context) LoadExpr(expr, lvalue->getObjectType());

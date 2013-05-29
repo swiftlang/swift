@@ -193,8 +193,7 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
     return nullptr;
 
   // Parse trailing closure, if we're allowed to.
-  while (!isExprBasic && Tok.is(tok::l_brace) &&
-      Context.LangOpts.UseConstraintSolver) {
+  while (!isExprBasic && Tok.is(tok::l_brace)) {
     // Parse the closure.
     Expr *closure = parseExprClosure();
 
@@ -705,10 +704,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
 
   case tok::l_brace:     // expr-closure
-    if (Context.LangOpts.UseConstraintSolver)
-      Result = parseExprClosure();
-    else
-      Result = parseExprExplicitClosure();
+    Result = parseExprClosure();
     break;
 
   case tok::period_prefix: {     // .foo
