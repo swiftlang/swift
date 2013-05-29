@@ -1017,9 +1017,7 @@ static void emitObjCReturnValue(SILGenFunction &gen,
                                 SILType resultTy,
                                 OwnershipConventions const &ownership) {
   // Bridge the result.
-  if (gen.SGM.M.Types.BridgingEnabled) {
-    result = emitBridgeObjCReturnValue(gen, loc, result, resultTy);
-  }
+  result = emitBridgeObjCReturnValue(gen, loc, result, resultTy);
   
   // Autorelease the bridged result if necessary.
   switch (ownership.getReturn()) {
@@ -1090,9 +1088,6 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   SILValue thisArg = args[thisIndex];
   args.erase(args.begin() + thisIndex);
   args.push_back(thisArg);
-
-  if (!gen.SGM.M.Types.BridgingEnabled)
-    return ownership;
 
   // Bridge the input types.
   Scope scope(gen.Cleanups);
@@ -1175,22 +1170,9 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
   SILValue result = B.createLoad(var, addr);
   B.createRelease(getter.getDecl(), thisValue);
   
-  if (SGM.M.Types.BridgingEnabled) {
-    emitRetainRValue(getter.getDecl(), result);
-    return emitObjCReturnValue(*this, getter.getDecl(), result, objcResultTy,
-                               ownership);
-  }
-  
-  // Retain the result if the calling convention calls for it.
-  switch (ownership.getReturn()) {
-  case OwnershipConventions::Return::Retained:
-    emitRetainRValue(var, result);
-    break;
-  case OwnershipConventions::Return::Unretained:
-  case OwnershipConventions::Return::Autoreleased:
-    break;
-  }
-  B.createReturn(var, result);
+  emitRetainRValue(getter.getDecl(), result);
+  return emitObjCReturnValue(*this, getter.getDecl(), result, objcResultTy,
+                             ownership);
 }
 
 void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {

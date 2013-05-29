@@ -82,7 +82,7 @@ private:
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(ASTContext &TheASTContext, bool bridgingEnabled);
+  SILModule(ASTContext &TheASTContext);
   
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -104,7 +104,7 @@ public:
   /// createEmptyModule - Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static SILModule *createEmptyModule(ASTContext &Context) {
-    return new SILModule(Context, Context.LangOpts.NSStringIsString);
+    return new SILModule(Context);
   }
   
   ASTContext &getASTContext() const { return TheASTContext; }

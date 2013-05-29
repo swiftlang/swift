@@ -34,10 +34,6 @@ namespace swift {
     /// This option enables verbose debugging output from the constraint
     /// solver.
     bool DebugConstraintSolver = false;
-
-    /// \brief Map NSString -> String in function parameters and results.
-    bool NSStringIsString = false;
-
   };
 }
 

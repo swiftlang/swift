@@ -108,9 +108,6 @@ static Type getBridgedResultType(TypeConverter &tc,
 /// Fast path for bridging types in a function type without uncurrying.
 static AnyFunctionType *getBridgedFunctionType(TypeConverter &tc,
                                                AnyFunctionType *t) {
-  if (!tc.BridgingEnabled)
-    return t;
-  
   switch (t->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -191,25 +188,23 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   Type resultType = t->getResult();
   
   // Bridge input and result types.
-  if (BridgingEnabled) {
-    switch (outerCC) {
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
-      // Native functions don't need bridging.
-      break;
-    
-    case AbstractCC::C:
-      for (auto &input : inputs)
-        input = getBridgedInputType(*this, outerCC, input.getType());
-      resultType = getBridgedResultType(*this, outerCC, resultType);
-      break;
-    case AbstractCC::ObjCMethod:
-      // The "this" parameter should not get bridged.
-      for (auto &input : make_range(inputs.begin()+1, inputs.end()))
-        input = getBridgedInputType(*this, outerCC, input.getType());
-      resultType = getBridgedResultType(*this, outerCC, resultType);
-      break;
-    }
+  switch (outerCC) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+    // Native functions don't need bridging.
+    break;
+  
+  case AbstractCC::C:
+    for (auto &input : inputs)
+      input = getBridgedInputType(*this, outerCC, input.getType());
+    resultType = getBridgedResultType(*this, outerCC, resultType);
+    break;
+  case AbstractCC::ObjCMethod:
+    // The "this" parameter should not get bridged.
+    for (auto &input : make_range(inputs.begin()+1, inputs.end()))
+      input = getBridgedInputType(*this, outerCC, input.getType());
+    resultType = getBridgedResultType(*this, outerCC, resultType);
+    break;
   }
   
   // Put the inputs in the order expected by the calling convention.
@@ -372,8 +367,8 @@ public:
   }
 };
   
-TypeConverter::TypeConverter(SILModule &m, bool bridgingEnabled)
-  : M(m), Context(m.getASTContext()), BridgingEnabled(bridgingEnabled) {
+TypeConverter::TypeConverter(SILModule &m)
+  : M(m), Context(m.getASTContext()) {
 }
 
 TypeConverter::~TypeConverter() {
@@ -692,10 +687,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
   }
 }
 
-Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
-  if (!BridgingEnabled)
-    return t;
-  
+Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {  
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:

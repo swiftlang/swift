@@ -455,8 +455,7 @@ namespace {
 
       // When NSString* is the type of a function parameter or as a function
       // result type, map it to String.
-      if (Impl.SwiftContext.LangOpts.NSStringIsString &&
-          (kind == ImportTypeKind::Parameter ||
+      if ((kind == ImportTypeKind::Parameter ||
            kind == ImportTypeKind::Result ||
            kind == ImportTypeKind::Property) &&
           !imported->getName().empty() &&

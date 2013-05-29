@@ -200,9 +200,8 @@ class TypeConverter {
 public:
   SILModule &M;
   ASTContext &Context;
-  const bool BridgingEnabled;
 
-  TypeConverter(SILModule &m, bool bridgingEnabled);
+  TypeConverter(SILModule &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;

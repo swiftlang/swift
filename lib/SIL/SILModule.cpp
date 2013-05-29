@@ -37,8 +37,8 @@ namespace swift {
 /// SILModule that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
 
-SILModule::SILModule(ASTContext &Context, bool bridgingEnabled)
-: TheASTContext(Context), Types(*this, bridgingEnabled) {
+SILModule::SILModule(ASTContext &Context)
+: TheASTContext(Context), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
 }
 
