@@ -56,10 +56,6 @@ bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
   return false;
 }
 
-Expr *TypeChecker::semaSubscriptExpr(SubscriptExpr *SE) {
-  llvm_unreachable("Shouldn't get here");
-}
-
 /// collectArchetypeToExistentialSubstitutions - Collect a set of substitutions
 /// from each archetype in the given protocol to a protocol composition type
 /// that describes the requirements placed on that archetype.
@@ -94,18 +90,6 @@ collectArchetypeToExistentialSubstitutions(ASTContext &Context,
       }
     }
   }
-}
-
-Expr *TypeChecker::semaSubscriptExpr(ExistentialSubscriptExpr *E) {
-  llvm_unreachable("Shouldn't get here");
-}
-
-Expr *TypeChecker::semaSubscriptExpr(ArchetypeSubscriptExpr *E) {
-  llvm_unreachable("Shouldn't get here");
-}
-
-Expr *TypeChecker::semaSubscriptExpr(GenericSubscriptExpr *E) {
-  llvm_unreachable("Shouldn't get here");
 }
 
 /// \brief Retrieve the declaration that this expression references.
@@ -667,13 +651,13 @@ public:
   }
 
   Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
-    return TC.semaSubscriptExpr(E);
+    llvm_unreachable("can't get here");
   }
   Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
-    return TC.semaSubscriptExpr(E);
+    llvm_unreachable("can't get here");
   }
   Expr *visitGenericSubscriptExpr(GenericSubscriptExpr *E) {
-    return TC.semaSubscriptExpr(E);
+    llvm_unreachable("can't get here");
   }
 
   Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {

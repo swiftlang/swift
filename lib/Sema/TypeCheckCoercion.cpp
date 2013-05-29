@@ -298,35 +298,7 @@ public:
                                      Viable);
     
     if (Best) {
-      // FIXME: Deal with substitution here!
-      SubscriptDecl *BestSub = cast<SubscriptDecl>(Best.getDecl());
-      Type ResultTy = LValueType::get(BestSub->getElementType(),
-                                      LValueType::Qual::DefaultForVar,
-                                      TC.Context);
-      if (!(Flags & CF_Apply))
-        return ResultTy;
-
-      Type ContainerTy
-        = Best.getDecl()->getDeclContext()->getDeclaredTypeOfContext();
-      if (ContainerTy->isExistentialType()) {
-        ExistentialSubscriptExpr *Result
-          = new (TC.Context) ExistentialSubscriptExpr(E->getBase(),
-                                                      E->getIndex(),
-                                                      BestSub);
-        return coerced(TC.semaSubscriptExpr(Result));
-      }
-      
-      if (ContainerTy->is<ArchetypeType>()) {
-        ArchetypeSubscriptExpr *Result
-          = new (TC.Context) ArchetypeSubscriptExpr(E->getBase(),
-                                                    E->getIndex(),
-                                                    BestSub);
-        return coerced(TC.semaSubscriptExpr(Result));
-      }
-
-      SubscriptExpr *Result
-        = new (TC.Context) SubscriptExpr(E->getBase(), E->getIndex(), BestSub);
-      return coerced(TC.semaSubscriptExpr(Result));
+      llvm_unreachable("can't get here");
     }
     
     if (!(Flags & CF_Apply))

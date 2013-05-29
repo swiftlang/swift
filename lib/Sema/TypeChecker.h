@@ -418,10 +418,6 @@ public:
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
   bool semaTupleExpr(TupleExpr *TE);
-  Expr *semaSubscriptExpr(SubscriptExpr *SE);
-  Expr *semaSubscriptExpr(ExistentialSubscriptExpr *SE);
-  Expr *semaSubscriptExpr(ArchetypeSubscriptExpr *SE);
-  Expr *semaSubscriptExpr(GenericSubscriptExpr *SE);
   Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
   
