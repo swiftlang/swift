@@ -2766,6 +2766,82 @@ namespace {
   };
 }
 
+/// \brief Clean up the given ill-formed expression, removing any references
+/// to type variables and setting error types on erroneous expression nodes.
+static Expr *cleanupIllFormedExpression(ConstraintSystem &cs, Expr *expr) {
+  class CleanupIllFormedExpression : public ASTWalker {
+    ConstraintSystem &cs;
+
+  public:
+    CleanupIllFormedExpression(ConstraintSystem &cs) : cs(cs) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // For FuncExprs, we just want to type-check the patterns as written,
+      // but not walk into the body. The body will by type-checked separately.
+      if (isa<FuncExpr>(expr)) {
+        return { false, walkToExprPost(expr) };
+      }
+
+      // For closures, type-check the patterns and result type as written,
+      // but do not walk into the body. That will be type-checked after
+      // we've determine the complete function type.
+      if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
+        if (!closure->hasSingleExpressionBody()) {
+          return { false, walkToExprPost(expr) };
+        }
+
+        return { true, expr };
+      }
+
+      return { true, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) {
+      Type type;
+      if (expr->getType()) {
+        type = cs.simplifyType(expr->getType());
+      }
+
+      if (!type || type->hasTypeVariable())
+        expr->setType(ErrorType::get(cs.getASTContext()));
+      else
+        expr->setType(type);
+      return expr;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      // Never walk into statements.
+      return { false, stmt };
+    }
+  };
+
+  return expr->walk(CleanupIllFormedExpression(cs));
+}
+
+namespace {
+  /// \brief RAII object that cleans up the given expression if not explicitly
+  /// disabled.
+  class CleanupIllFormedExpressionRAII {
+    ConstraintSystem &cs;
+    Expr **expr;
+
+  public:
+    CleanupIllFormedExpressionRAII(ConstraintSystem &cs, Expr *&expr)
+      : cs(cs), expr(&expr) { }
+
+    ~CleanupIllFormedExpressionRAII() {
+      if (expr) {
+        *expr = cleanupIllFormedExpression(cs, *expr);
+      }
+    }
+
+    /// \brief Disable the cleanup of this expression; it doesn't need it.
+    void disable() {
+      expr = nullptr;
+    }
+  };
+}
+
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
   // FIXME: Old type checker.
@@ -2783,8 +2859,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
-  if (cs.generateConstraints(expr))
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  if (cs.generateConstraints(expr)) {
     return true;
+  }
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
@@ -2865,6 +2943,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
   }
 
   expr = result;
+  cleanup.disable();
   return false;
 }
 
@@ -2944,6 +3023,8 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
 
   // Construct a constraint system from the destination and source.
   ConstraintSystem cs(*this);
+  CleanupIllFormedExpressionRAII cleanupSrc(cs, src);
+  CleanupIllFormedExpressionRAII cleanupDest(cs, dest);
   if (cs.generateConstraints(dest) || cs.generateConstraints(src))
     return { nullptr, nullptr };
 
@@ -3041,6 +3122,8 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
     log << "\n";
   }
 
+  cleanupSrc.disable();
+  cleanupDest.disable();
   return { dest, src };
 }
 
@@ -3060,6 +3143,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr) {
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
   if (cs.generateConstraints(expr))
     return true;
 
@@ -3144,6 +3228,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr) {
   }
 
   expr = result;
+  cleanup.disable();
   return false;
 }
 
@@ -3188,6 +3273,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this);
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
   if (cs.generateConstraints(expr))
     return true;
 
@@ -3272,6 +3358,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
   }
   
   expr = result;
+  cleanup.disable();
   return false;
 }
 
