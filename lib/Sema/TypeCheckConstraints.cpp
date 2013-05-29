@@ -1653,9 +1653,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Determines whether the first type is derived from the second.
       auto solveDerivedFrom =
         [&](Type type1, Type type2) -> Optional<SolutionKind> {
-          if (auto archetype2 = type2->getAs<ArchetypeType>()) {
-            type2 = archetype2->getSuperclass();
+          // If the type we're converting to is an archetype, fail; we have
+          // no idea which class the archetype will end up being at run time.
+          if (type2->is<ArchetypeType>()) {
+            return Nothing;
           }
+
           auto classDecl2 = type2->getClassOrBoundGenericClass();
 
           for (auto super1 = TC.getSuperClassOf(type1); super1;
