@@ -197,3 +197,20 @@ extern "C" bool swift_comparePointers(id x, id y) {
   [y release];
   return x == y;
 }
+
+/// (String, CPointer<BOOL>) -> () block shim
+using block_type = void (^)(id, BOOL*);
+using code_type = void (*)(const char*, size_t, HeapObject*, BOOL*, HeapObject*);
+
+extern "C"
+block_type _TTbbTSSGVSs8CPointerV10ObjectiveC8ObjCBool__T_(code_type code,
+                                                           HeapObject *data) {
+  SwiftRAII dataRAII(data, true);
+  return Block_copy(^void (id a, BOOL *b) {
+    [a retain];
+    SwiftString s;
+    swift_NSStringToString((NSString*)a, &s);
+    return code(s.base, s.len, s.owner, b, swift_retain(*dataRAII));
+  });
+}
+
