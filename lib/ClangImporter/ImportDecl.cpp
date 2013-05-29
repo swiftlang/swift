@@ -1103,6 +1103,7 @@ namespace {
         initExpr = new (Impl.SwiftContext) CallExpr(allocCall, emptyTuple);
 
         // Cast the result of the alloc call to the (metatype) 'this'.
+        // FIXME: instancetype should make this unnecessary.
         initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
                                              initExpr,
                                              SourceLoc(),
@@ -1173,6 +1174,7 @@ namespace {
       initExpr = new (Impl.SwiftContext) CallExpr(initExpr, callArg);
 
       // Cast the result of the alloc call to the (metatype) 'this'.
+      // FIXME: instancetype should make this unnecessary.
       initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
                                            initExpr,
                                            SourceLoc(),

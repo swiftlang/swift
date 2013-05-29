@@ -900,16 +900,8 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
     }
 
     Type visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
-      Type ty = expr->getTypeLoc().getType();
-      
-      auto tv = CS.createTypeVariable();
-      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
-           expr->getSubExpr()->getType(),
-           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-
-      CS.addConstraint(ConstraintKind::Subtype,
-                       ty, tv);
-      return ty;
+      // FIXME: Open this type.
+      return expr->getTypeLoc().getType();
     }
 
     Type visitUncheckedSuperToArchetypeExpr(
@@ -1044,6 +1036,14 @@ bool ConstraintSystem::generateConstraints(Expr *expr) {
       // visit that first.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         auto type = CG.visitNewArrayExpr(newArray);
+        expr->setType(type);
+        return { false, expr };
+      }
+
+      // For unchecked downcast expressions, we visit the subexpression
+      // separately.
+      if (auto unchecked = dyn_cast<UncheckedDowncastExpr>(expr)) {
+        auto type = CG.visitUncheckedDowncastExpr(unchecked);
         expr->setType(type);
         return { false, expr };
       }

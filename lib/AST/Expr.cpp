@@ -130,6 +130,11 @@ bool Expr::isImplicit() const {
     return true;
   }
 
+  if (auto downcast = dyn_cast<UncheckedDowncastExpr>(this)) {
+    return downcast->getLoc().isInvalid() &&
+           downcast->getSubExpr()->isImplicit();
+  }
+
   if (isa<ZeroValueExpr>(this) || isa<DefaultValueExpr>(this))
     return true;  
 

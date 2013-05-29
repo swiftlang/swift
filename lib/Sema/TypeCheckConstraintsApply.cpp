@@ -1342,32 +1342,125 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &C = cs.getASTContext();
 
-      expr->setType(simplifyType(expr->getType()));
+      // Simplify the type we're converting to.
+      Type toType = simplifyType(expr->getType());
+      expr->setType(toType);
 
-      Expr *sub = tc.coerceToRValue(expr->getSubExpr());
-      if (!sub) return nullptr;
+      // Type-check the subexpression in isolation.
+      Expr *sub = expr->getSubExpr();
+      if (tc.typeCheckExpression(sub)) {
+        // FIXME: Mark as error.
+        return nullptr;
+      }
+      sub = tc.coerceToRValue(sub);
+      if (!sub) {
+        // FIXME: Mark as error.
+        return nullptr;
+      }
       expr->setSubExpr(sub);
 
-      // If the source had archetype type, convert to its superclass first.
-      // We then downcast that value.
-      if (auto *srcArchetype
-          = expr->getSubExpr()->getType()->getAs<ArchetypeType>()) {
-        auto *subExpr = new (C) ArchetypeToSuperExpr(expr->getSubExpr(),
-                                                     srcArchetype->getSuperclass());
-        expr->setSubExpr(subExpr);
+      // A downcast is okay when:
+      Type fromType = sub->getType();
+      Type origFromType = fromType;
+      bool toArchetype = toType->is<ArchetypeType>();
+      bool fromArchetype = fromType->is<ArchetypeType>();
+
+      // A downcast can:
+      //   - convert an archetype to a (different) archetype type.
+      if (fromArchetype && toArchetype) {
+        // FIXME: We don't support this yet.
+        tc.diagnose(expr->getLoc(), diag::downcast_archetype,
+                    fromType, toType);
+        return nullptr;
       }
-      
-      // If the destination type is an archetype, this is a super-to-archetype
-      // cast.
-      if (expr->getType()->is<ArchetypeType>()) {
-        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(expr->getSubExpr(),
+
+      //   - convert an archetype to a subclass of its superclass type.
+      if (fromArchetype) {
+        // Introduce the archetype-to-super conversion.
+        auto fromSuperType = fromType->castTo<ArchetypeType>()->getSuperclass();
+        if (!fromSuperType) {
+          // FIXME: We should be able to do this without the to-super
+          // conversion. Specifically, we should be able to cast to any
+          // concrete type that meets the requirements of the archetype.
+          tc.diagnose(expr->getLoc(), diag::downcast_archetype_without_super,
+                      fromType, toType);
+          return nullptr;
+        }
+
+        sub = new (C) ArchetypeToSuperExpr(sub, fromSuperType);
+        expr->setSubExpr(sub);
+        fromArchetype = false;
+        fromType = fromSuperType;
+      }
+
+      //   - convert from a superclass to an archetype.
+      if (toArchetype) {
+        auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
+        if (!toSuperType) {
+          // FIXME: We should be able to do this.
+          tc.diagnose(expr->getLoc(), diag::downcast_archetype_without_super,
+                      origFromType, toType);
+          return nullptr;
+        }
+
+        // Coerce to the supertype of the archetype.
+        sub = tc.coerceToType(sub, toSuperType);
+        if (!sub) {
+          return nullptr;
+        }
+        
+        // The source type must be equivalent to or a supertype of the supertype
+        // of the destination archetype.
+        if (!tc.isSubtypeOf(toSuperType, fromType)) {
+          // FIXME: Still too strong?
+          tc.diagnose(expr->getLoc(), diag::downcast_not_class_cast,
+                      origFromType, toType);
+          return nullptr;
+        }
+
+        // Construct the supertype-to-archetype cast.
+        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(sub,
                                                            expr->getLoc(),
                                                            expr->getBangLoc(),
                                                            expr->getTypeLoc());
         stoa->setType(expr->getType());
         return stoa;
       }
-      
+
+      assert(!fromArchetype && "archetypes should have been handled above");
+      assert(!toArchetype && "archetypes should have been handled above");
+
+      // If the from/to types are equivalent, this should have been a
+      // coercion expression (b as A) rather than a cast (a as! B). Complain.
+      if (fromType->isEqual(toType) || tc.isSubtypeOf(fromType, toType)) {
+        // Only complain if the cast itself was implicitly generated.
+        // FIXME: This leniency is here for the Clang module importer,
+        // which doesn't necessarily know whether it needs to force the
+        // cast or not. instancetype should eliminate the need for it.
+        if (!expr->isImplicit()) {
+          tc.diagnose(expr->getLoc(), diag::downcast_to_supertype,
+                      origFromType, toType)
+            .highlight(sub->getSourceRange())
+            .highlight(expr->getTypeLoc().getSourceRange())
+            .fixItRemove(SourceRange(expr->getBangLoc()));
+        }
+
+        Expr *coerce = new (C) CoerceExpr(sub, expr->getLoc(),
+                                          expr->getTypeLoc());
+        coerce->setType(expr->getType());
+        return coerce;
+      }
+
+      // The destination type must be a subtype of the source type.
+      if (!tc.isSubtypeOf(toType, fromType)) {
+        tc.diagnose(expr->getLoc(), diag::downcast_to_unrelated,
+                    origFromType, toType)
+          .highlight(sub->getSourceRange())
+          .highlight(expr->getTypeLoc().getSourceRange());
+        return nullptr;
+      }
+
+      // Okay, we're done.
       return expr;
     }
     
@@ -2319,6 +2412,12 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
         Rewriter.visitIfExpr(ifExpr);
         return { false, expr };
+      }
+
+      // For unchecked downcast expressions, the subexpression is checked
+      // separately.
+      if (auto unchecked = dyn_cast<UncheckedDowncastExpr>(expr)) {
+        return { false, Rewriter.visitUncheckedDowncastExpr(unchecked) };
       }
 
       // For a default-value expression, do nothing.

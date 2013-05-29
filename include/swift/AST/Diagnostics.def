@@ -950,7 +950,19 @@ ERROR(does_not_have_member,sema_tcc,none,
   (Type, Identifier))
 ERROR(cannot_construct_type,sema_tcc,none,
   "cannot construct a value of type %0", (Type))
-
+ERROR(downcast_archetype,sema_tcc,none,
+      "unsupported archetype downcast from %0 to %1", (Type, Type))
+ERROR(downcast_archetype_without_super,sema_tcc,none,
+      "unsupported archetype downcast from %0 to %1 via superclass", 
+      (Type, Type))
+ERROR(downcast_not_class_cast,sema_tcc,none,
+      "unsupported non-class downcast from %0 to %1", (Type, Type))
+ERROR(downcast_to_supertype,sema_tcc,none,
+      "downcast from %0 to supertype %1 is a coercion; remove the '!'", 
+      (Type, Type))
+ERROR(downcast_to_unrelated,sema_tcc,none,
+      "downcast from %0 to unrelated type %1", (Type, Type))
+      
 //------------------------------------------------------------------------------
 // Type Check Declarations
 //------------------------------------------------------------------------------
