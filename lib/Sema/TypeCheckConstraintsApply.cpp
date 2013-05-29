@@ -2065,13 +2065,13 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   // If the destination type is equivalent to the default literal type, use
   // the default literal type as the sugared type of the literal.
   Type defaultLiteralTy = tc.getDefaultLiteralType(kind);
-  if (type->isEqual(defaultLiteralTy))
+  if (defaultLiteralTy && type->isEqual(defaultLiteralTy))
     type = defaultLiteralTy;
   // Additionally, if an integer literal gets used as the default floating-point
   // type, use the default floating-point literal type as the sugared type.
   else if (kind == LiteralKind::Int) {
     Type defaultFloatLiteralTy = tc.getDefaultLiteralType(LiteralKind::Float);
-    if (type->isEqual(defaultFloatLiteralTy))
+    if (defaultFloatLiteralTy && type->isEqual(defaultFloatLiteralTy))
       type = defaultFloatLiteralTy;
   }
   

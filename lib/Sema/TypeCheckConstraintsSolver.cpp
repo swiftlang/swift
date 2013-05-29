@@ -544,7 +544,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
           // literal kind.
           if (constraint->getLiteralKind() == LiteralKind::Int) {
             auto newType = tc.getDefaultLiteralType(LiteralKind::Float);
-            if (exploredTypes.insert(newType->getCanonicalType()))
+            if (newType && exploredTypes.insert(newType->getCanonicalType()))
               newBindings.push_back({newType, false});
           }
         }

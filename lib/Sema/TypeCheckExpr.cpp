@@ -1857,7 +1857,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
 
     // Strip off one level of sugar; we don't actually want to print
     // IntegerLiteralType anywhere.
-    if (type) {
+    if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
         *type = typeAlias->getDecl()->getUnderlyingType();
     }

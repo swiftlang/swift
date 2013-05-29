@@ -631,9 +631,11 @@ public:
   ///
   /// \returns The function that will perform the conversion, along with the
   /// type of the argument of this function.
-  std::pair<FuncDecl*, Type> isLiteralCompatibleType(Type Ty, SourceLoc Loc,
-                                                     LiteralKind LitTy,
-                                                     bool Complain);
+  std::pair<FuncDecl*, Type> isLiteralCompatibleType(
+                               Type Ty, SourceLoc Loc,
+                               LiteralKind LitTy,
+                               bool Complain,
+                               bool RequiresBuiltinArg = false);
 
   /// \brief Lookup a member in the given type.
   ///

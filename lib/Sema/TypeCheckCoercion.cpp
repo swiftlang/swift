@@ -688,7 +688,7 @@ static bool isStringLiteralArg(Type argType) {
 
 std::pair<FuncDecl*, Type>
 TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
-                                     bool Complain) {
+                                     bool Complain, bool RequiresBuiltinArg) {
   if (Ty->is<LValueType>()) {
     if (Complain)
       diagnose(Loc, diag::type_not_compatible_literal, Ty);
@@ -784,7 +784,8 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
         ((LitTy == LiteralKind::ASCIIString ||
           LitTy == LiteralKind::UTFString) &&
          isStringLiteralArg(ArgType))) &&
-      !isLiteralCompatibleType(ArgType, Loc, LitTy, Complain).first) {
+      (RequiresBuiltinArg ||
+       !isLiteralCompatibleType(ArgType, Loc, LitTy, Complain, true).first)) {
     return { nullptr, nullptr };
   }
 
