@@ -2801,11 +2801,6 @@ bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial,
   return matchTypes(*this, T1, T2, Flags, Trivial, CC);
 }
 
-bool TypeChecker::isSubtypeOfOld(Type t1, Type t2, bool &isTrivial) {
-  isTrivial = true;
-  return isSubtypeOf(t1, t2, isTrivial, nullptr);
-}
-
 bool TypeChecker::isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC) {
   bool trivial = false;
   unsigned flags = ST_AllowSubtype;

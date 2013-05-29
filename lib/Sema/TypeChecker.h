@@ -414,8 +414,6 @@ public:
   /// relationship.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubtypeOfOld(Type t1, Type t2, bool &isTrivial);
-
   bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
@@ -501,8 +499,6 @@ public:
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
 
-  bool typeCheckExpressionOld(Expr *&E, Type ConvertType = Type());
-
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -546,11 +542,6 @@ public:
   bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, Type Ty);
   
-  bool typeCheckConditionOld(Expr *&E);
-  bool typeCheckArrayBoundOld(Expr *&E);
-  bool typeCheckAssignmentOld(Expr *&Dest, SourceLoc EqualLoc, Expr *&Src);
-
-
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
 
@@ -591,7 +582,6 @@ public:
                              CoercionContext *CC = nullptr);
   
   Expr *convertToRValueOld(Expr *E);
-  Expr *convertToMaterializableOld(Expr *E);
 
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
