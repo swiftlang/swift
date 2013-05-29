@@ -418,9 +418,8 @@ public:
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
   bool semaTupleExpr(TupleExpr *TE);
-  Expr *semaApplyExpr(ApplyExpr *E);
   Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
-  
+
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
@@ -500,11 +499,23 @@ public:
   /// \param expr The expression to type-check, which will be modified in
   /// place.
   ///
-  /// \param coerceType The type that the expression is being coerced to,
+  /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpression(Expr *&expr, Type coerceType = Type());
+  bool typeCheckExpression(Expr *&expr, Type convertType = Type());
+
+  /// \brief Type check the given expression assuming that its children
+  /// have already been fully type-checked.
+  ///
+  /// \param expr The expression to type-check, which will be modified in
+  /// place.
+  ///
+  /// \param convertType The type that the expression is being converted to,
+  /// or null if the expression is standalone.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool typeCheckExpressionShallow(Expr *&expr, Type convertType = Type());
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.

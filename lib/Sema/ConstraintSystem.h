@@ -1820,6 +1820,12 @@ public:
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   Expr *generateConstraints(Expr *E);
 
+  /// \brief Generate constraints for the given top-level expression,
+  /// assuming that its children are already type-checked.
+  ///
+  /// \returns a possibly-sanitized expression, or null if an error occurred.
+  Expr *generateConstraintsShallow(Expr *E);
+
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
   enum class SolutionKind : char {
@@ -2044,6 +2050,10 @@ public:
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.
   Expr *applySolution(const Solution &solution, Expr *expr);
+
+  /// \brief Apply a given solution to the expression to the top-level
+  /// expression, producing a fully type-checked expression.
+  Expr *applySolutionShallow(const Solution &solution, Expr *expr);
 
   void dump();
 };

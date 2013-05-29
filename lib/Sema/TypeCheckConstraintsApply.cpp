@@ -2385,6 +2385,12 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   return expr->walk(walker);
 }
 
+Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
+                                             Expr *expr) {
+  ExprRewriter rewriter(*this, solution);
+  return rewriter.visit(expr);
+}
+
 Expr *Solution::coerceToType(Expr *expr, Type toType) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this);

@@ -68,7 +68,7 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
   } while (true);
 }
 
-Expr *ConstraintSystem::generateConstraints(Expr *expr) {
+namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
 
@@ -366,11 +366,12 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       
       // We currently only support explicit specialization of generic types.
       // FIXME: We could support explicit function specialization.
+      auto &tc = CS.getTypeChecker();
       if (baseTy->is<AnyFunctionType>()) {
-        CS.TC.diagnose(expr->getSubExpr()->getLoc(),
-                       diag::cannot_explicitly_specialize_generic_function);
-        CS.TC.diagnose(expr->getLAngleLoc(),
-                      diag::while_parsing_as_left_angle_bracket);
+        tc.diagnose(expr->getSubExpr()->getLoc(),
+                    diag::cannot_explicitly_specialize_generic_function);
+        tc.diagnose(expr->getLAngleLoc(),
+                    diag::while_parsing_as_left_angle_bracket);
         return Type();
       }
       
@@ -383,11 +384,11 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
           // FIXME: We could potentially allow unspecified type parameters
           // to be deduced if there are fewer parameters than type variables.
           if (typeVars.size() != specializations.size()) {
-            CS.TC.diagnose(expr->getSubExpr()->getLoc(),
-                           diag::type_parameter_count_mismatch,
-                           typeVars.size(), specializations.size());
-            CS.TC.diagnose(expr->getLAngleLoc(),
-                           diag::while_parsing_as_left_angle_bracket);
+            tc.diagnose(expr->getSubExpr()->getLoc(),
+                        diag::type_parameter_count_mismatch,
+                        typeVars.size(), specializations.size());
+            tc.diagnose(expr->getLAngleLoc(),
+                        diag::while_parsing_as_left_angle_bracket);
             return Type();
           }
           
@@ -398,10 +399,9 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
           
           return baseTy;
         } else {
-          CS.TC.diagnose(expr->getSubExpr()->getLoc(),
-                         diag::not_a_generic_type);
-          CS.TC.diagnose(expr->getLAngleLoc(),
-                         diag::while_parsing_as_left_angle_bracket);
+          tc.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type);
+          tc.diagnose(expr->getLAngleLoc(),
+                      diag::while_parsing_as_left_angle_bracket);
           return Type();
         }
       }
@@ -409,10 +409,10 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       // FIXME: If the base type is a type variable, constrain it to a metatype
       // of a bound generic type.
       
-      CS.TC.diagnose(expr->getSubExpr()->getLoc(),
-                     diag::not_a_generic_definition);
-      CS.TC.diagnose(expr->getLAngleLoc(),
-                     diag::while_parsing_as_left_angle_bracket);
+      tc.diagnose(expr->getSubExpr()->getLoc(),
+                  diag::not_a_generic_definition);
+      tc.diagnose(expr->getLAngleLoc(),
+                  diag::while_parsing_as_left_angle_bracket);
       return Type();
     }
     
@@ -447,10 +447,11 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       // FIXME: This isn't actually used for anything at the moment.
+      auto &tc = CS.getTypeChecker();
       ProtocolDecl *arrayProto
-        = CS.TC.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
+        = tc.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
       if (!arrayProto) {
-        CS.TC.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
+        tc.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
         return Type();
       }
 
@@ -473,7 +474,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
                                  C.getIdentifier("Element"),
                                  arrayElementTy);
       
-      Type arrayEltsTy = CS.TC.getArraySliceType(expr->getLoc(),
+      Type arrayEltsTy = tc.getArraySliceType(expr->getLoc(),
                                                  arrayElementTy);
       TupleTypeElt arrayEltsElt{arrayEltsTy,
                                 /*name=*/ Identifier(),
@@ -501,10 +502,11 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       // A dictionary expression can be of a type T that conforms to the
       // DictionaryLiteralConvertible protocol.
       // FIXME: This isn't actually used for anything at the moment.
+      auto &tc = CS.getTypeChecker();
       ProtocolDecl *dictionaryProto
-        = CS.TC.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
+        = tc.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
       if (!dictionaryProto) {
-        CS.TC.diagnose(expr->getStartLoc(), diag::dictionary_expr_missing_proto);
+        tc.diagnose(expr->getStartLoc(), diag::dictionary_expr_missing_proto);
         return Type();
       }
 
@@ -535,8 +537,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };
       Type elementTy = TupleType::get(tupleElts, C);
-      Type dictionaryEltsTy = CS.TC.getArraySliceType(expr->getLoc(),
-                                                      elementTy);
+      Type dictionaryEltsTy = tc.getArraySliceType(expr->getLoc(), elementTy);
       TupleTypeElt dictionaryEltsElt(dictionaryEltsTy,
                                      /*name=*/ Identifier(),
                                      /*init=*/ nullptr,
@@ -809,15 +810,16 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
                       Diag<> diag_no_base_class) {
       DeclContext *typeContext = thisDecl->getDeclContext()->getParent();
       assert(typeContext && "constructor without parent context?!");
+      auto &tc = CS.getTypeChecker();
       const ClassType *classType
         = typeContext->getDeclaredTypeInContext()->getAs<ClassType>();
       if (!classType) {
-        CS.TC.diagnose(diagLoc, diag_not_in_class);
+        tc.diagnose(diagLoc, diag_not_in_class);
         return Type();
       }
       ClassDecl *classDecl = classType->getDecl();
       if (!classDecl->hasBaseClass()) {
-        CS.TC.diagnose(diagLoc, diag_no_base_class);
+        tc.diagnose(diagLoc, diag_no_base_class);
         return Type();
       }
 
@@ -903,16 +905,17 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
                        expr->getTypeLoc().getType(), tv);
       
       // The result is Bool.
+      auto &tc = CS.getTypeChecker();
       UnqualifiedLookup boolLookup(C.getIdentifier("Bool"),
-                                   &CS.TC.TU);
+                                   &tc.TU);
       if (!boolLookup.isSuccess()) {
-        CS.TC.diagnose(expr->getLoc(), diag::bool_type_broken);
+        tc.diagnose(expr->getLoc(), diag::bool_type_broken);
         return nullptr;
       }
       TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
       
       if (!tyDecl) {
-        CS.TC.diagnose(expr->getLoc(), diag::bool_type_broken);
+        tc.diagnose(expr->getLoc(), diag::bool_type_broken);
         return nullptr;
       }
       
@@ -1071,7 +1074,9 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
     /// \brief Ignore declarations.
     virtual bool walkToDeclPre(Decl *decl) { return false; }
   };
+} // end anonymous namespace
 
+Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
@@ -1079,5 +1084,18 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   ConstraintGenerator cg(*this);
   ConstraintWalker cw(cg);
   return expr->walk(cw);
+}
+
+Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
+  // Sanitize the expression.
+  expr = SanitizeExpr(getTypeChecker()).walkToExprPost(expr);
+
+  // Visit the top-level expression generating constraints.
+  ConstraintGenerator cg(*this);
+  auto type = cg.visit(expr);
+  if (!type)
+    return nullptr;
+  expr->setType(type);
+  return expr;
 }
 

@@ -2976,6 +2976,99 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
   return false;
 }
 
+bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, Type convertType) {
+  // Construct a constraint system from this expression.
+  ConstraintSystem cs(*this);
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  expr = cs.generateConstraintsShallow(expr);
+  if (!expr) {
+    return true;
+  }
+
+  // If there is a type that we're expected to convert to, add the conversion
+  // constraint.
+  if (convertType) {
+    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
+                     cs.getConstraintLocator(expr, { }));
+  }
+
+  llvm::raw_ostream &log = llvm::errs();
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Initial constraints for the given expression---\n";
+    expr->print(log);
+    log << "\n";
+    cs.dump();
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (cs.solve(viable)) {
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return true;
+    }
+
+    // FIXME: Dumping constraints by default due to crummy diagnostics.
+    if (getLangOpts().DebugConstraintSolver || true) {
+      log << "---Solved constraints---\n";
+      cs.dump();
+
+      if (!viable.empty()) {
+        unsigned idx = 0;
+        for (auto &solution : viable) {
+          log << "---Solution #" << ++idx << "---\n";
+          solution.dump(&Context.SourceMgr);
+        }
+      }
+
+      if (viable.size() == 0)
+        log << "No solution found.\n";
+      else if (viable.size() == 1)
+        log << "Unique solution found.\n";
+      else {
+        log << "Found " << viable.size() << " potential solutions.\n";
+      }
+    }
+
+    // FIXME: Crappy diagnostic.
+    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+      .highlight(expr->getSourceRange());
+
+    return true;
+  }
+
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Solution---\n";
+    solution.dump(&Context.SourceMgr);
+  }
+
+  // Apply the solution to the expression.
+  auto result = cs.applySolutionShallow(solution, expr);
+  if (!result) {
+    // Failure already diagnosed, above, as part of applying the solution.
+    return true;
+  }
+
+  // If we're supposed to convert the expression to some particular type,
+  // do so now.
+  if (convertType) {
+    result = solution.coerceToType(result, convertType);
+    if (!result) {
+      return true;
+    }
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Type-checked expression---\n";
+    result->dump();
+  }
+
+  expr = result;
+  cleanup.disable();
+  return false;
+}
+
 /// \brief Compute the rvalue type of the given expression, which is the
 /// destination of an assignment statement.
 static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,

@@ -970,6 +970,12 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
   return coerced(new (TC.Context) CallExpr(DRE, Intermediate, DestTy));
 }
 
+static Expr *semaApplyExpr(TypeChecker &TC, Expr *E) {
+  if (semaApplyExpr(TC, E))
+    return nullptr;
+  return E;
+}
+
 CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   assert((Flags & CF_UserConversions)
          && "Not allowed to perform user conversions!");
@@ -1033,7 +1039,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   ApplyExpr *ApplyThis = new (TC.Context) DotSyntaxCallExpr(FnRef,
                                                             SourceLoc(),
                                                             E);
-  Expr *BoundFn = TC.semaApplyExpr(ApplyThis);
+  Expr *BoundFn = semaApplyExpr(TC, ApplyThis);
   if (!BoundFn)
     return nullptr;
   
@@ -1044,7 +1050,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   TC.semaTupleExpr(Args);
 
   ApplyExpr *Call = new (TC.Context) CallExpr(BoundFn, Args);
-  return coerced(TC.semaApplyExpr(Call));
+  return coerced(semaApplyExpr(TC, Call));
 }
 
 CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
@@ -1105,7 +1111,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         return nullptr;
 
       ApplyExpr *Call = new (TC.Context) CallExpr(CtorRef, Segment);
-      Expr *Checked = TC.semaApplyExpr(Call);
+      Expr *Checked = semaApplyExpr(TC, Call);
       if (!Checked)
         return nullptr;
       
@@ -1168,7 +1174,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     }
 
     Expr *Fn = TC.buildRefExpr(Best, Segment->getStartLoc());
-    Result = TC.semaApplyExpr(new (TC.Context) BinaryExpr(Fn, Arg));
+    Result = semaApplyExpr(TC, new (TC.Context) BinaryExpr(Fn, Arg));
     if (!Result)
       return nullptr;
   }
@@ -1213,7 +1219,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       Fn = TC.convertToRValueOld(Fn);
       E->setFn(Fn);
 
-      if (Expr *Result = TC.semaApplyExpr(E))
+      if (Expr *Result = semaApplyExpr(TC, E))
         return coerceToType(Result, DestTy, CC, Flags);
       
       return CoercionResult::Failed;
@@ -1257,7 +1263,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
                                         /*ArchetypesAreOpen=*/true,
                                         /*OnlyInnermostParams=*/true);
       E->setFn(Fn);
-      return coerceToType(TC.semaApplyExpr(E), DestTy, CC, Flags);
+      return coerceToType(semaApplyExpr(TC, E), DestTy, CC, Flags);
     }
   }
 
@@ -1271,7 +1277,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     E->setFn(CoRes.getExpr());
     
     // FIXME: is this needed?
-    if (Expr *Result = TC.semaApplyExpr(E))
+    if (Expr *Result = semaApplyExpr(TC, E))
       return coerced(Result);
 
     return nullptr;

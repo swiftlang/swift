@@ -145,16 +145,17 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
-    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    Res = TC.semaApplyExpr(CE);
-    if (!Res)
+    Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    if (TC.typeCheckExpressionShallow(CE))
       goto dynamicTypeFailed;
-    
+    Res = CE;
+
     Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
-    Res = TC.semaApplyExpr(new (Context) CallExpr(PrintStrFn, Res));
-    if (!Res)
+    CE = new (Context) CallExpr(PrintStrFn, Res);
+    if (TC.typeCheckExpressionShallow(CE))
       goto dynamicTypeFailed;
-    
+    Res = CE;
+
     BodyContent.push_back(Res);
     showedDynamicType = true;
   }
@@ -318,10 +319,10 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
-    CallExpr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    Res = TC.semaApplyExpr(CE);
-    if (!Res)
+    Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
+    if (TC.typeCheckExpressionShallow(CE))
       return;
+    Res = CE;
     BodyContent.push_back(Res);
     return;
   }
@@ -499,7 +500,9 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   FE->setBody(Body);
   TC->typeCheckFunctionBody(FE);
   
-  Expr *TheCall = TC->semaApplyExpr(new (C) CallExpr(FE, E));
+  Expr *TheCall = new (C) CallExpr(FE, E);
+  if (TC->typeCheckExpressionShallow(TheCall))
+    return ;
   
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(C, Loc, BraceStmt::ExprStmtOrDecl(TheCall),
