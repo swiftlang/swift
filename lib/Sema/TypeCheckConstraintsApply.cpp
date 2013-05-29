@@ -2217,8 +2217,8 @@ void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
 
   // Open up the owning context of the member.
-  Type ownerTy = cs.openTypeOfContext(member->getDeclContext(), true,
-                                      replacements, &genericParams);
+  Type ownerTy = cs.openTypeOfContext(member->getDeclContext(), replacements,
+                                      &genericParams);
 
   // The base type of the member access needs to be convertible to the
   // opened type of the member's context.

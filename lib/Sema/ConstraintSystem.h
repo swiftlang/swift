@@ -1752,9 +1752,6 @@ public:
   ///
   /// \param dc The context to open.
   ///
-  /// \param openAllLevels If true, we open all levels of the type, not just the
-  /// outermost level. FIXME: Should this always be true?
-  ///
   /// \param replacements Will receive the set of type variable replacements
   /// for each of the archetypes in \c dc.
   ///
@@ -1764,7 +1761,6 @@ public:
   /// \returns The opened type of the base.
   Type openTypeOfContext(
          DeclContext *dc,
-         bool openAllLevels,
          llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
          GenericParamList **genericParams);
 

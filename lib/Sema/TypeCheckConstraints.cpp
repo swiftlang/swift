@@ -760,7 +760,6 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
 
 Type ConstraintSystem::openTypeOfContext(
        DeclContext *dc,
-       bool openAllLevels,
        llvm::DenseMap<ArchetypeType *, TypeVariableType *> &replacements,
        GenericParamList **genericParams) {
   GenericParamList *dcGenericParams = nullptr;
@@ -795,8 +794,8 @@ Type ConstraintSystem::openTypeOfContext(
   if (dcGenericParams) {
     openArchetypes = dcGenericParams->getAllArchetypes();
 
-    // If we have multiple levels and are supposed to open them all, do so now.
-    if (openAllLevels && dcGenericParams->getOuterParameters()) {
+    // If we have multiple levels, open them now.
+    if (dcGenericParams->getOuterParameters()) {
       for (auto gp = dcGenericParams; gp; gp = gp->getOuterParameters()) {
         allOpenArcheTypes.append(gp->getAllArchetypes().begin(),
                                  gp->getAllArchetypes().end());
@@ -826,7 +825,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
 
   // Figure out the type of the owner.
-  Type ownerTy = openTypeOfContext(value->getDeclContext(), false, replacements,
+  Type ownerTy = openTypeOfContext(value->getDeclContext(), replacements,
                                    nullptr);
 
   // The base type must be convertible to the owner type. For most cases,
