@@ -405,20 +405,6 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
-void ExplicitClosureExpr::GenerateVarDecls(unsigned NumDecls,
-                                           std::vector<VarDecl*> &Decls,
-                                           ASTContext &Context) {
-  while (NumDecls >= Decls.size()) {
-    unsigned NextIdx = Decls.size();
-    llvm::SmallVector<char, 4> StrBuf;
-    StringRef VarName = ("$" + Twine(NextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(VarName);
-    SourceLoc VarLoc; // FIXME: Location?
-    VarDecl *var = new (Context) VarDecl(VarLoc, ident, Type(), this);
-    Decls.push_back(var);
-  }
-}
-
 /// getImplicitThisDecl - If this FuncExpr is a non-static method in an
 /// extension context, it will have a 'this' argument.  This method returns it
 /// if present, or returns null if not.
@@ -828,11 +814,6 @@ public:
       printRec(expr->getSingleExpressionBody());
     } else
       printRec(expr->getBody());
-    OS << ')';
-  }
-  void visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-    printCapturing(E, "explicit_closure_expr") << '\n';
-    printRec(E->getBody());
     OS << ')';
   }
   void visitImplicitClosureExpr(ImplicitClosureExpr *E) {

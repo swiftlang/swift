@@ -1165,55 +1165,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
-      auto type = simplifyType(expr->getType())->castTo<FunctionType>();
-
-      // Count the number of arguments.
-      unsigned numInputArgs = 1;
-      TupleType *inputTT = type->getInput()->getAs<TupleType>();
-      if (inputTT)
-        numInputArgs = inputTT->getFields().size();
-
-      // Build up the set of VarDecls (building more if necessary).
-      std::vector<VarDecl*> argVars(expr->getParserVarDecls().begin(),
-                                    expr->getParserVarDecls().end());
-      Pattern *argPat;
-      SourceLoc loc = expr->getLoc();
-      expr->GenerateVarDecls(numInputArgs, argVars, cs.getASTContext());
-
-      // Build the patterns and update the variable types.
-      if (inputTT) {
-        std::vector<TuplePatternElt> argElts;
-        for (unsigned i = 0; i < numInputArgs; ++i) {
-          argVars[i]->overwriteType(inputTT->getElementType(i));
-          auto p = new (cs.getASTContext()) NamedPattern(argVars[i]);
-          p->setType(inputTT->getElementType(i));
-          argElts.emplace_back(p);
-        }
-        argPat = TuplePattern::create(cs.getASTContext(), loc, argElts, loc);
-      } else {
-        argVars[0]->overwriteType(type->getInput());
-        argPat = new (cs.getASTContext()) NamedPattern(argVars[0]);
-      }
-      argPat->setType(type->getInput());
-      expr->setPattern(argPat);
-
-      // Convert the expression in the body to the result type of the explicit
-      // closure.
-      auto resultType = type->getResult();
-      if (Expr *body = coerceToType(expr->getBody(), resultType,
-                                    cs.getConstraintLocator(
-                                      expr,
-                                      ConstraintLocator::ClosureResult)))
-        expr->setBody(body);
-      expr->setType(type);
-
-      // Compute the capture list, now that we have analyzed the expression.
-      cs.getTypeChecker().computeCaptures(expr);
-
-      return expr;
-    }
-
     Expr *visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -2379,18 +2330,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto closure = dyn_cast<ExplicitClosureExpr>(expr)) {
-        // Update the types of the $I variables with their simplified versions.
-        // We do this before walking into the body of the closure expression,
-        // so that the body will have proper types for its references to the
-        // $I variables.
-        auto &cs = Rewriter.getConstraintSystem();
-        for (auto var : closure->getParserVarDecls())
-          var->overwriteType(cs.simplifyType(var->getType()));
-
-        return { true, expr };
-      }
-
       // For an array, just walk the expression itself; its children have
       // already been type-checked.
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {

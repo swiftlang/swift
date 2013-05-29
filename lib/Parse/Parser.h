@@ -460,7 +460,6 @@ public:
   ///     '->' type
   Expr *parseExprClosure();
 
-  NullablePtr<Expr> parseExprExplicitClosure();
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
   NullablePtr<Expr> parseExprCollection();

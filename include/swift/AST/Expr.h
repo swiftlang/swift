@@ -1852,8 +1852,7 @@ public:
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ImplicitClosure ||
-           E->getKind() == ExprKind::ExplicitClosure;
+    return E->getKind() == ExprKind::ImplicitClosure;
   }
   static bool classof(const DeclContext *DC) {
     return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
@@ -1861,46 +1860,6 @@ public:
   static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
 };
 
-/// ExplicitClosureExpr - An explicitly formed closure expression in braces,
-/// e.g. "{ foo() }" or "{}".  This may contain AnonClosureArgExprs within it
-/// that reference the formal arguments of the closure.
-class ExplicitClosureExpr : public ClosureExpr {
-  SourceLoc LBraceLoc, RBraceLoc;
-
-  ArrayRef<VarDecl*> ParserVarDecls;
-
-public:
-  ExplicitClosureExpr(SourceLoc LBraceLoc, DeclContext *Parent,
-                      Expr *Body = 0, SourceLoc RBraceLoc = SourceLoc())
-    : ClosureExpr(ExprKind::ExplicitClosure, Body, Parent),
-      LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc) {}
-  
-  void setRBraceLoc(SourceLoc L) {
-    RBraceLoc = L;
-  }
-  
-  SourceRange getSourceRange() const {
-    return SourceRange(LBraceLoc, RBraceLoc);
-  }
-
-  ArrayRef<VarDecl*> getParserVarDecls() { return ParserVarDecls; }
-  void setParserVarDecls(ArrayRef<VarDecl*> decls) {
-    ParserVarDecls = decls;
-  }
-  void GenerateVarDecls(unsigned NumDecls,
-                        std::vector<VarDecl*> &Decls,
-                        ASTContext &Context);
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ExplicitClosure;
-  }
-  static bool classof(const DeclContext *DC) {
-    return isa<CapturingExpr>(DC) && classof(cast<CapturingExpr>(DC));
-  }
-  static bool classof(const CapturingExpr *E) { return classof(cast<Expr>(E)); }
-};
-  
 /// ImplicitClosureExpr - This is a closure of the contained subexpression that
 /// is formed when an scalar expression is converted to [auto_closure] function
 /// type.  For example:  
@@ -1910,7 +1869,7 @@ class ImplicitClosureExpr : public ClosureExpr {
 public:
   ImplicitClosureExpr(Expr *Body, DeclContext *Parent, Type ResultTy)
     : ClosureExpr(ExprKind::ImplicitClosure, Body, Parent, ResultTy) {}
-  
+
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
 
   ArrayRef<Pattern*> getParamPatterns() const {

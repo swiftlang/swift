@@ -104,7 +104,6 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::CharacterLiteral:
   case ExprKind::DeclRef:
   case ExprKind::Dictionary:
-  case ExprKind::ExplicitClosure:
   case ExprKind::FloatLiteral:
   case ExprKind::Func:
   case ExprKind::MemberRef:
@@ -643,7 +642,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///   expr-primary:
 ///     expr-literal
 ///     expr-identifier
-///     expr-explicit-closure
+///     expr-closure
 ///     expr-anon-closure-argument
 ///     expr-delayed-identifier
 ///     expr-paren
@@ -1112,45 +1111,6 @@ Expr *Parser::parseExprClosure() {
   return closure;
 }
 
-///   expr-explicit-closure:
-///     '{' expr? '}'
-NullablePtr<Expr> Parser::parseExprExplicitClosure() {
-  SourceLoc LBLoc = consumeToken(tok::l_brace);
-
-  ExplicitClosureExpr *ThisClosure =
-      new (Context) ExplicitClosureExpr(LBLoc, CurDeclContext);
-
-  ContextChange CC(*this, ThisClosure);
-  AnonClosureVars.emplace_back();
-
-  NullablePtr<Expr> Body;
-  if (Tok.isNot(tok::r_brace)) {
-    // The pipe is not a delimiter in the body of the closure.
-    llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
-
-    Body = parseExpr(diag::expected_expr_closure);
-    if (Body.isNull()) return 0;
-  } else {
-    Body = new (Context) TupleExpr(LBLoc, MutableArrayRef<Expr *>(), 0, LBLoc,
-                                   /*hasTrailingClosure=*/false);
-  }
-  ThisClosure->setBody(Body.get());
-  
-  SourceLoc RBLoc;
-  if (parseMatchingToken(tok::r_brace, RBLoc,
-                         diag::expected_rbrace_in_closure, LBLoc))
-    RBLoc = Body.get()->getEndLoc();
-
-  ThisClosure->setRBraceLoc(RBLoc);
-
-  auto& Vars = AnonClosureVars.back();
-  VarDecl** VarsCopy = Context.AllocateCopy<VarDecl*>(Vars.begin(), Vars.end());
-  ThisClosure->setParserVarDecls(llvm::makeArrayRef(VarsCopy, Vars.size()));
-  AnonClosureVars.pop_back();
-
-  return ThisClosure;
-}
-
 ///   expr-anon-closure-argument:
 ///     dollarident
 Expr *Parser::parseExprAnonClosureArg() {
@@ -1174,34 +1134,24 @@ Expr *Parser::parseExprAnonClosureArg() {
 
   // If this is a closure expression that did not have any named parameters,
   // generate the anonymous variables we need.
-  if (auto closure = dyn_cast<PipeClosureExpr>(CurDeclContext)) {
-    if (!closure->getParams()) {
-      auto &decls = AnonClosureVars.back();
-      while (ArgNo >= decls.size()) {
-        unsigned nextIdx = decls.size();
-        llvm::SmallVector<char, 4> StrBuf;
-        StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-        Identifier ident = Context.getIdentifier(varName);
-        SourceLoc varLoc; // FIXME: Location?
-        VarDecl *var = new (Context) VarDecl(varLoc, ident, Type(), closure);
-        decls.push_back(var);
-      }
-
-      return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
-    }
-
-    // FIXME: If we have named parameters, and there is a name for this
-    // parameter, provide a Fix-It to remap to that parameter.
-  }
-
-  // Make sure that this is located in an explicit closure expression.
-  ExplicitClosureExpr *ECE = dyn_cast<ExplicitClosureExpr>(CurDeclContext);
-  if (!ECE) {
+  auto closure = dyn_cast<PipeClosureExpr>(CurDeclContext);
+  if (!closure || closure->getParams()) {
+    // FIXME: specialize diagnostic when there were closure parameters.
+    // We can be fairly smart here.
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }
 
-  ECE->GenerateVarDecls(ArgNo, AnonClosureVars.back(), Context);
+  auto &decls = AnonClosureVars.back();
+  while (ArgNo >= decls.size()) {
+    unsigned nextIdx = decls.size();
+    llvm::SmallVector<char, 4> StrBuf;
+    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
+    Identifier ident = Context.getIdentifier(varName);
+    SourceLoc varLoc; // FIXME: Location?
+    VarDecl *var = new (Context) VarDecl(varLoc, ident, Type(), closure);
+    decls.push_back(var);
+  }
 
   return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc);
 }

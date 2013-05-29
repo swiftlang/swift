@@ -517,8 +517,6 @@ public:
     return failed(expr);
   }
 
-  CoercedResult visitExplicitClosureExpr(ExplicitClosureExpr *E);
-
   CoercedResult visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     llvm_unreachable("This node doesn't exist for unresolved types");
   }
@@ -1310,80 +1308,6 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   }
 }
 
-
-CoercedResult SemaCoerce::visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-  // Make sure that we're converting the closure to a function type.  If not,
-  // diagnose the error.
-  FunctionType *FT = DestTy->getAs<FunctionType>();
-  if (FT == 0) {
-    diagnose(E->getStartLoc(), diag::closure_not_function_type, DestTy)
-      .highlight(E->getSourceRange());
-    return nullptr;
-  }
-
-  // Now that we have a FunctionType for the closure, we can know how many
-  // arguments are allowed.
-  if (Flags & CF_Apply)
-    E->setType(FT);
-  
-  // If the input to the function is a non-tuple, only $0 is valid, if it is a
-  // tuple, then $0..$N are valid depending on the number of inputs to the
-  // tuple.
-  unsigned NumInputArgs = 1;
-  TupleType *FuncInputTT = dyn_cast<TupleType>(FT->getInput().getPointer());
-  if (FuncInputTT)
-    NumInputArgs = FuncInputTT->getFields().size();
-
-  if (NumInputArgs < E->getParserVarDecls().size()) {
-    diagnose(E->getLoc(), diag::invalid_anonymous_argument,
-             E->getParserVarDecls().size() - 1, NumInputArgs);
-    return nullptr;
-  }
-
-  // FIXME: We actually do want to perform type-checking again, to make sure
-  // that the closure expression type-checks with the given function type.
-  // For now, we just assume that it does type-check, since we don't have a
-  // way to silence the errors (yet).
-  if (!(Flags & CF_Apply))
-    return DestTy;
-  
-  // Build pattern for parameters.
-  // FIXME: This pattern is currently unused!
-  std::vector<VarDecl*> ArgVars(E->getParserVarDecls().begin(),
-                                E->getParserVarDecls().end());
-  Pattern *ArgPat;
-  SourceLoc loc = E->getLoc();
-
-  E->GenerateVarDecls(NumInputArgs, ArgVars, TC.Context);
-
-  if (FuncInputTT) {
-    std::vector<TuplePatternElt> ArgElts;
-    for (unsigned i = 0; i < NumInputArgs; ++i) {
-      ArgVars[i]->setType(FuncInputTT->getElementType(i));
-      auto p = new (TC.Context) NamedPattern(ArgVars[i]);
-      p->setType(FuncInputTT->getElementType(i));
-      ArgElts.emplace_back(p);
-    }
-    ArgPat = TuplePattern::create(TC.Context, loc, ArgElts, loc);
-  } else {
-    ArgVars[0]->setType(FT->getInput());
-    ArgPat = new (TC.Context) NamedPattern(ArgVars[0]);
-  }
-  ArgPat->setType(FT->getInput());
-  E->setPattern(ArgPat);
-
-  Expr *Result = E->getBody();
-
-  // Type check the full expression, verifying that it is fully typed.
-  if (TC.typeCheckExpression(Result, FT->getResult()))
-    return 0;
-  
-  E->setBody(Result);
-
-  TC.computeCaptures(E);
-
-  return unchanged(E);
-}
 
 CoercedResult SemaCoerce::visitFuncExpr(FuncExpr *E) {
   // Make sure that we're converting the closure to a function type.  If not,

@@ -961,12 +961,6 @@ public:
     return E;
   }
 
-  Expr *visitExplicitClosureExpr(ExplicitClosureExpr *E) {
-    assert(E->getType().isNull() &&
-           "Shouldn't walk into typed ExplicitClosures");
-    E->setType(UnstructuredUnresolvedType::get(TC.Context));
-    return E;
-  }
   Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
     // ImplicitClosureExpr is fully resolved.
     assert(!E->getType()->isUnresolvedType());
@@ -1013,10 +1007,7 @@ public:
     // Only walk into Explicit Closures if they haven't been seen at all yet.
     // This ensures that everything gets a type, even if it is an
     // UnstructuredUnresolvedType.
-    return {
-      !isa<ExplicitClosureExpr>(E) || E->getType().isNull(),
-      E
-    };
+    return { E->getType().isNull(), E };
   }
 
   Expr *walkToExprPost(Expr *E) {

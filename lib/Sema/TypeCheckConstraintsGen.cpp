@@ -683,25 +683,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
       return funcTy;
     }
 
-    Type visitExplicitClosureExpr(ExplicitClosureExpr *expr) {
-      // Explicit closure expressions have function type (T1, T2, ... TN) -> T0,
-      // for fresh type variables Ti, 0 <= i <= N, where N is the number of
-      // the largest closure argument (e.g., N=5 in an explicit closure { $5 }).
-      auto varDecls = expr->getParserVarDecls();
-      unsigned n = varDecls.size();
-      SmallVector<TupleTypeElt, 4> tupleTypeElts;
-      tupleTypeElts.reserve(n);
-      for (unsigned i = 0; i != n; ++i) {
-        auto tv = CS.createTypeVariable(expr);
-        tupleTypeElts.push_back(tv);
-        varDecls[i]->setType(tv);
-      }
-      ASTContext &Context = CS.getASTContext();
-      auto inputTy = TupleType::get(tupleTypeElts, Context);
-      auto outputTy = CS.createTypeVariable(expr);
-      return FunctionType::get(inputTy, outputTy, Context);
-    }
-
     Type visitImplicitClosureExpr(ImplicitClosureExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
@@ -1006,17 +987,13 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For closures, we visit the closure first to assign a type with
-      // appropriate type variables.
+      // For function expressions, we visit the closure first to assign a type
+      // with appropriate type variables. We don't walk into the bodies.
       // Don't walk into the bodies of function expressions.
-      if (isa<ClosureExpr>(expr)) {
-        auto type = CG.visit(expr);
-        expr->setType(type);
-
-        // For explicit closures, we visit the body, which participates in
-        // type checking. The bodies of func expressions, on the other hand,
-        // do not participate in type checking.
-        return { isa<ExplicitClosureExpr>(expr), expr };
+      if (auto func = dyn_cast<FuncExpr>(expr)) {
+        auto type = CG.visitFuncExpr(func);
+        func->setType(type);
+        return { false, func };
       }
 
       // For closures containing only a single expression, the body participates
@@ -1061,20 +1038,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
     /// \brief Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     virtual Expr *walkToExprPost(Expr *expr) {
-      if (auto explicitClosure = dyn_cast<ExplicitClosureExpr>(expr)) {
-        // For explicit closures, we've already assigned a type to the
-        // closure expression. All that remains is to convert the type of the
-        // body expression to the type of the closure.
-        CG.getConstraintSystem()
-          .addConstraint(ConstraintKind::Conversion,
-            explicitClosure->getBody()->getType(),
-            explicitClosure->getType()->castTo<FunctionType>()
-              ->getResult(),
-            CG.getConstraintSystem()
-              .getConstraintLocator(expr, ConstraintLocator::ClosureResult));
-        return expr;
-      }
-
       if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
           // Visit the body. It's type needs to be convertible to the function's
