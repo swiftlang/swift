@@ -647,13 +647,8 @@ public:
   }
 
   Expr *makeBinOp(Expr *Op, Expr *LHS, Expr *RHS, bool TypeCheckAST);
-  Expr *foldSequence(Expr *LHS,
-                     ArrayRef<Expr*> &S, unsigned MinPrecedence,
-                     bool TypeCheckAST);
-  Expr *visitSequenceExpr(SequenceExpr *E, bool TypeCheckAST);
-
   Expr *visitSequenceExpr(SequenceExpr *E) {
-    return visitSequenceExpr(E, /*TypeCheckAST=*/true);
+    return TC.foldSequence(E);
   }
 
   void PreProcessBraceStmt(BraceStmt *BS);
@@ -932,8 +927,7 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   return InfixData(~0U, Associativity::Left);
 }
 
-Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS,
-                                    bool TypeCheckAST) {
+static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   if (!LHS || !RHS)
     return nullptr;
 
@@ -943,23 +937,17 @@ Expr *SemaExpressionTree::makeBinOp(Expr *Op, Expr *LHS, Expr *RHS,
   TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
                                               ArgElts2, 0, SourceLoc(),
                                               /*hasTrailingClosure=*/false);
-  if (TypeCheckAST && TC.semaTupleExpr(Arg))
-    return nullptr;
 
   // Build the operation.
-  auto result = new (TC.Context) BinaryExpr(Op, Arg);
-  if (!TypeCheckAST)
-    return result;
-
-  return visit(result);
+  return new (TC.Context) BinaryExpr(Op, Arg);
 }
 
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
-Expr *SemaExpressionTree::foldSequence(Expr *LHS,
-                                       ArrayRef<Expr*> &S,
-                                       unsigned MinPrecedence,
-                                       bool TypeCheckAST) {
+static Expr *foldSequence(TypeChecker &TC,
+                          Expr *LHS,
+                          ArrayRef<Expr*> &S,
+                          unsigned MinPrecedence) {
   // Invariant: S is even-sized.
   // Invariant: All elements at even indices are operator references.
   assert(!S.empty());
@@ -1019,7 +1007,7 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS,
       assert(S.size() >= 4 &&
              "SequenceExpr doesn't have enough elts to complete ternary");
       S = S.slice(2);
-      MHS = foldSequence(MHS, S, 0, TypeCheckAST);
+      MHS = foldSequence(TC, MHS, S, 0);
       assert(S.size() >= 2 &&
              "folding MHS of ternary did not leave enough elts to complete ternary");
       assert(isa<UnresolvedElseExpr>(S[0]) &&
@@ -1036,7 +1024,7 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS,
       llvm_unreachable("should have break'ed on null Op");
         
     case Op::Binary:
-      return makeBinOp(Operator.binary, LHS, RHS, TypeCheckAST);
+      return makeBinOp(TC, Operator.binary, LHS, RHS);
     
     case Op::Ternary:
       return new (TC.Context) IfExpr(LHS,
@@ -1089,8 +1077,7 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS,
     // higher-precedence operators starting from this point, then
     // repeat.
     if (Op1.infixData.getPrecedence() < Op2Info.getPrecedence()) {
-      RHS = foldSequence(RHS, S, Op1.infixData.getPrecedence() + 1,
-                         TypeCheckAST);
+      RHS = foldSequence(TC, RHS, S, Op1.infixData.getPrecedence() + 1);
       continue;
     }
 
@@ -1099,15 +1086,14 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS,
     // recursively fold operators starting from this point, then
     // immediately fold LHS and RHS.
     if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
-      RHS = foldSequence(RHS, S, Op1.infixData.getPrecedence(),
-                         TypeCheckAST);
+      RHS = foldSequence(TC, RHS, S, Op1.infixData.getPrecedence());
       LHS = makeOperatorExpr(LHS, Op1, RHS);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
       // Otherwise, start all over with our new LHS.
-      return foldSequence(LHS, S, MinPrecedence, TypeCheckAST);
+      return foldSequence(TC, LHS, S, MinPrecedence);
     }
 
     // If we ended up here, it's because we have two operators
@@ -1127,29 +1113,12 @@ Expr *SemaExpressionTree::foldSequence(Expr *LHS,
     
     // Recover by arbitrarily binding the first two.
     LHS = makeOperatorExpr(LHS, Op1, RHS);
-    return foldSequence(LHS, S, MinPrecedence, TypeCheckAST);
+    return foldSequence(TC, LHS, S, MinPrecedence);
   }
 
   // Fold LHS (and MHS, if ternary) and RHS together and declare completion.
 
   return makeOperatorExpr(LHS, Op1, RHS);
-}
-
-/// foldSequence - Take a SequenceExpr and fold it into a tree of
-/// BinaryExprs using precedence parsing.
-Expr *SemaExpressionTree::visitSequenceExpr(SequenceExpr *E,
-                                            bool TypeCheckAST) {
-  ArrayRef<Expr*> Elts = E->getElements();
-  assert(Elts.size() > 1 && "inadequate number of elements in sequence");
-  assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
-
-  Expr *LHS = Elts[0];
-  Elts = Elts.slice(1);
-
-  Expr *Result = foldSequence(LHS, Elts, /*min precedence*/ 0,
-                              TypeCheckAST);
-  assert(Elts.empty());
-  return Result;
 }
 
 namespace {
@@ -1301,8 +1270,16 @@ Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
-  return SemaExpressionTree(*this).visitSequenceExpr(expr,
-                                                     /*TypeCheckAST=*/false);
+  ArrayRef<Expr*> Elts = expr->getElements();
+  assert(Elts.size() > 1 && "inadequate number of elements in sequence");
+  assert((Elts.size() & 1) == 1 && "even number of elements in sequence");
+
+  Expr *LHS = Elts[0];
+  Elts = Elts.slice(1);
+
+  Expr *Result = ::foldSequence(*this, LHS, Elts, /*min precedence*/ 0);
+  assert(Elts.empty());
+  return Result;
 }
 
 static bool semaFuncParamPatterns(TypeChecker *checker,
