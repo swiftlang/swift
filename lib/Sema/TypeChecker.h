@@ -39,17 +39,6 @@ enum class LiteralKind : char {
 typedef llvm::DenseMap<SubstitutableType *,
                        SmallVector<ProtocolConformance *, 2>> ConformanceMap;
 
-/// \brief Describes the kind of coercion being performed.
-enum class CoercionKind {
-  // Normal coercion to the given type.
-  Normal,
-  // Coercion of a tuple when calling an assignment operator, which permits
-  // the first operand to be an implicit lvalue.
-  Assignment,
-  // Coercion to an implicit lvalue.
-  ImplicitLValue
-};
-
 /// \brief The set of known protocols.
 enum class KnownProtocolKind : unsigned {
   /// \brief The 'ArrayBound' protocol, used for array bounds.
