@@ -216,10 +216,14 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
 }
 
 RValue SILGenFunction::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
+  if (E->getType()->is<LValueType>())
+    return emitLValueAsRValue(E);
   return RValue(*this, emitReferenceToDecl(E, E->getDecl(), E->getType(), 0));
 }
 
 RValue SILGenFunction::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
+  if (E->getType()->is<LValueType>())
+    return emitLValueAsRValue(E);
   return RValue(*this, emitReferenceToDecl(E, E->getThis(), E->getType(), 0));
 }
 
@@ -352,11 +356,8 @@ ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
 }
 
 RValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {
-  // Evaluate the value, then use it to initialize a new temporary and return
-  // the temp's address.
-  ManagedValue V = visit(E->getSubExpr()).getAsSingleValue(*this);
-  return RValue(*this,
-            ManagedValue(emitMaterialize(E, V).address, ManagedValue::LValue));
+  // Always an lvalue.
+  return emitLValueAsRValue(E);
 }
 
 RValue SILGenFunction::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
@@ -577,85 +578,8 @@ RValue SILGenFunction::visitSpecializeExpr(SpecializeExpr *E,
 
 RValue SILGenFunction::visitAddressOfExpr(AddressOfExpr *E,
                                           SGFContext C) {
-  return visit(E->getSubExpr(), C);
+  return emitLValueAsRValue(E);
 }
-
-namespace {
-
-static ManagedValue emitExtractFromStruct(SILGenFunction &gen,
-                                          Expr *e, ManagedValue base,
-                                          VarDecl *field) {
-  assert(!base.getType().hasReferenceSemantics() &&
-         "can't extract from reference types here");
-  if (e->getType()->is<LValueType>()) {
-    // Get the element address relative to the aggregate's address.
-    SILValue address;
-    assert(base.getType().isAddress() &&
-           "base of lvalue member ref must be ref type or address");
-    address = gen.B.createStructElementAddr(e,
-                                    base.getUnmanagedValue(),
-                                    field,
-                                    gen.getLoweredType(e->getType()));
-    return ManagedValue(address, ManagedValue::LValue);
-  } else {
-    // Extract the element from the original aggregate value.
-    SILValue extract = gen.B.createStructExtract(e,
-                                        base.getValue(),
-                                        field,
-                                        gen.getLoweredType(e->getType()));
-    
-    gen.emitRetainRValue(e, extract);
-    return gen.emitManagedRValueWithCleanup(extract);
-  }
-}
-  
-static ManagedValue emitExtractFromClass(SILGenFunction &gen,
-                                         Expr *e, ManagedValue base,
-                                         VarDecl *field) {
-  return ManagedValue(gen.B.createRefElementAddr(e,
-                                             base.getValue(),
-                                             field,
-                                             gen.getLoweredType(e->getType())),
-                      ManagedValue::LValue);
-}
-
-template<typename ANY_MEMBER_REF_EXPR>
-ManagedValue emitAnyMemberRefExpr(SILGenFunction &gen,
-                                  ANY_MEMBER_REF_EXPR *e,
-                                  ArrayRef<Substitution> substitutions) {
-  SILType ty = gen.getLoweredType(e->getBase()->getType()->getRValueType());
-  
-  // If this is a physical field, derive its address directly.
-  if (VarDecl *var = dyn_cast<VarDecl>(e->getDecl())) {
-    if (!var->isProperty()) {
-      // We can get to the element directly with element_addr or
-      // ref_element_addr.
-      ManagedValue base = gen.visit(e->getBase()).getAsSingleValue(gen);
-      if (ty.hasReferenceSemantics())
-        return emitExtractFromClass(gen, e, base, var);
-      return emitExtractFromStruct(gen, e, base, var);
-    }
-  }
-
-  // Otherwise, call the getter.
-  Type baseTy = e->getBase()->getType();
-  (void)baseTy;
-  // We have to load the element indirectly through a property.
-  assert((baseTy->is<LValueType>() || baseTy->hasReferenceSemantics()) &&
-         "member ref of a non-lvalue?!");
-  RValue base = gen.visit(e->getBase());
-  // Get the getter function, which will have type This -> () -> T.
-  // The type will be a polymorphic function if the This type is generic.
-  SILConstant get(e->getDecl(), SILConstant::Kind::Getter);
-  
-  // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, get, substitutions,
-                                             std::move(base), RValue(),
-                                             e->getType()->getRValueType());
-  return ManagedValue(propTemp.address, ManagedValue::LValue);
-}
-
-} // end anonymous namespace
 
 ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                            SILValue thisValue,
@@ -726,8 +650,8 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
 }
 
 RValue SILGenFunction::visitMemberRefExpr(MemberRefExpr *E,
-                                                SGFContext C) {
-  return RValue(*this, emitAnyMemberRefExpr(*this, E, {}));
+                                          SGFContext C) {
+  return emitLValueAsRValue(E);
 }
 
 RValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
@@ -746,7 +670,7 @@ RValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
                         ManagedValue::Unmanaged));
 
   }
-  return RValue(*this, emitAnyMemberRefExpr(*this, E, E->getSubstitutions()));
+  return emitLValueAsRValue(E);
 }
 
 SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
@@ -840,48 +764,21 @@ RValue SILGenFunction::visitModuleExpr(ModuleExpr *E, SGFContext C) {
   return RValue(*this, ManagedValue(module, ManagedValue::Unmanaged));
 }
 
-namespace {
-
-template<typename ANY_SUBSCRIPT_EXPR>
-ManagedValue emitAnySubscriptExpr(SILGenFunction &gen,
-                                  ANY_SUBSCRIPT_EXPR *e,
-                                  ArrayRef<Substitution> substitutions) {
-  SubscriptDecl *sd = e->getDecl();
-  RValue base = gen.visit(e->getBase());
-  
-  // Get the getter function, which will have type This -> Index -> () -> T.
-  SILConstant get(sd, SILConstant::Kind::Getter);
-
-  // Evaluate the index.
-  RValue index = gen.visit(e->getIndex());
-  
-  // Apply the getter.
-  Materialize propTemp = gen.emitGetProperty(e, get, substitutions,
-                                             std::move(base), std::move(index),
-                                             e->getType()->getRValueType());
-  return ManagedValue(propTemp.address, ManagedValue::LValue);
-}
-
-}
-
 RValue SILGenFunction::visitSubscriptExpr(SubscriptExpr *E,
-                                                SGFContext C) {
-  return RValue(*this, emitAnySubscriptExpr(*this, E, {}));
+                                          SGFContext C) {
+  return emitLValueAsRValue(E);
 }
 
 RValue SILGenFunction::visitGenericSubscriptExpr(GenericSubscriptExpr *E,
-                                                       SGFContext C)
+                                                 SGFContext C)
 {
-  return RValue(*this, emitAnySubscriptExpr(*this, E, E->getSubstitutions()));
+  return emitLValueAsRValue(E);
 }
 
 RValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E,
                                              SGFContext C) {
   if (E->getType()->is<LValueType>()) {
-    SILValue baseAddr = visit(E->getBase()).getUnmanagedSingleValue(*this);
-    SILValue eltAddr = B.createTupleElementAddr(E, baseAddr, E->getFieldNumber(),
-                                 getLoweredType(E->getType()).getAddressType());
-    return RValue(*this, ManagedValue(eltAddr, ManagedValue::LValue));
+    return emitLValueAsRValue(E);
   } else {
     return visit(E->getBase()).extractElement(E->getFieldNumber());
   }

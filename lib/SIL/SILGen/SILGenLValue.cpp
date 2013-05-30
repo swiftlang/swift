@@ -22,6 +22,52 @@
 using namespace swift;
 using namespace Lowering;
 
+/// SILGenLValue - An ASTVisitor for building logical lvalues.
+/// Used to visit the left-hand sides of AssignStmts and [byref] arguments of
+/// ApplyExprs.
+class LLVM_LIBRARY_VISIBILITY SILGenLValue
+  : public ExprVisitor<SILGenLValue, LValue>
+{
+public:
+  SILGenFunction &gen;
+  SILGenLValue(SILGenFunction &gen) : gen(gen) {}
+  
+  LValue visitRec(Expr *e);
+  
+  /// Dummy handler to log unimplemented nodes.
+  LValue visitExpr(Expr *e);
+
+  // Nodes that form the root of lvalue paths
+
+  LValue visitDeclRefExpr(DeclRefExpr *e);
+  LValue visitSuperRefExpr(SuperRefExpr *e);
+  LValue visitMaterializeExpr(MaterializeExpr *e);
+
+  // Nodes that make up components of lvalue paths
+  
+  LValue visitMemberRefExpr(MemberRefExpr *e);
+  LValue visitGenericMemberRefExpr(GenericMemberRefExpr *e);
+  LValue visitSubscriptExpr(SubscriptExpr *e);
+  LValue visitGenericSubscriptExpr(GenericSubscriptExpr *e);
+  LValue visitTupleElementExpr(TupleElementExpr *e);
+  
+  // Expressions that wrap lvalues
+  
+  LValue visitAddressOfExpr(AddressOfExpr *e);
+  LValue visitParenExpr(ParenExpr *e);
+  LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
+  LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
+};
+
+LValue SILGenFunction::emitLValue(Expr *e) {
+  return SILGenLValue(*this).visit(e);
+}
+
+RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
+  LValue lv = emitLValue(e);
+  return RValue(*this, emitMaterializedLoadFromLValue(e, lv));
+}
+
 void PathComponent::_anchor() {}
 void PhysicalPathComponent::_anchor() {}
 void LogicalPathComponent::_anchor() {}
@@ -249,33 +295,46 @@ LValue SILGenLValue::visitExpr(Expr *e) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
+static LValue emitLValueForDecl(SILGenLValue &sgl,
+                                SILLocation loc, ValueDecl *decl,
+                                Type ty) {
   LValue lv;
-  ValueDecl *decl = e->getDecl();
-
+  
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
       lv.add<GetterSetterComponent>(SILConstant(var, SILConstant::Kind::Getter),
                                     SILConstant(var, SILConstant::Kind::Setter),
                                     ArrayRef<Substitution>{},
-                                    e->getType()->getRValueType());
+                                    ty->getRValueType());
       return ::std::move(lv);
     }
   }
-
+  
   // If it's a physical value, push its address.
-  SILValue address = gen.emitReferenceToDecl(e, decl).getUnmanagedValue();
+  SILValue address = sgl.gen.emitReferenceToDecl(loc, decl).getUnmanagedValue();
   assert(address.getType().isAddress() &&
          "physical lvalue decl ref must evaluate to an address");
   lv.add<AddressComponent>(address);
   return ::std::move(lv);
 }
 
+LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
+  return emitLValueForDecl(*this, e, e->getDecl(), e->getType());
+}
+
+LValue SILGenLValue::visitSuperRefExpr(SuperRefExpr *e) {
+  return emitLValueForDecl(*this, e, e->getThis(), e->getType());
+}
+
 LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
   LValue lv;
-  SILValue materialized = gen.visit(e).getUnmanagedSingleValue(gen);
-  lv.add<AddressComponent>(materialized);
+
+  // Evaluate the value, then use it to initialize a new temporary and return
+  // the temp's address.
+  ManagedValue v = gen.visit(e->getSubExpr()).getAsSingleValue(gen);
+  SILValue addr = gen.emitMaterialize(e, v).address;
+  lv.add<AddressComponent>(addr);
   return ::std::move(lv);
 }
 
@@ -354,11 +413,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
   // FIXME: address-only tuples
-  const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(e->getType());
-  assert(ti.isLoadable(gen.SGM.M) &&
-         "address-only tuples not yet implemented");
   lv.add<TupleElementComponent>(e->getFieldNumber(),
-                                  ti.getLoweredType());
+                                gen.getLoweredType(e->getType()));
   return ::std::move(lv);
 }
 

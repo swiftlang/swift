@@ -122,7 +122,7 @@ static void emitAssignStmtRecursive(AssignStmt *S, RValue &&Src, Expr *Dest,
   }
   
   // Otherwise, emit the scalar assignment.
-  LValue DstLV = SILGenLValue(Gen).visit(Dest);
+  LValue DstLV = Gen.emitLValue(Dest);
   Gen.emitAssignToLValue(S, std::move(Src), DstLV);
 }
 

@@ -681,42 +681,13 @@ public:
   
   /// Deallocate an uninitialized local variable.
   void deallocateUninitializedLocalVariable(VarDecl *D);
-};
   
-/// SILGenLValue - An ASTVisitor for building logical lvalues.
-/// Used to visit the left-hand sides of AssignStmts and [byref] arguments of
-/// ApplyExprs.
-class LLVM_LIBRARY_VISIBILITY SILGenLValue
-  : public ExprVisitor<SILGenLValue, LValue>
-{
-  SILGenFunction &gen;
-public:
-  SILGenLValue(SILGenFunction &gen) : gen(gen) {}
+  /// Evaluate an Expr as an lvalue.
+  LValue emitLValue(Expr *E);
   
-  LValue visitRec(Expr *e);
-  
-  /// Dummy handler to log unimplemented nodes.
-  LValue visitExpr(Expr *e);
-
-  // Nodes that form the root of lvalue paths
-
-  LValue visitDeclRefExpr(DeclRefExpr *e);
-  LValue visitMaterializeExpr(MaterializeExpr *e);
-
-  // Nodes that make up components of lvalue paths
-  
-  LValue visitMemberRefExpr(MemberRefExpr *e);
-  LValue visitGenericMemberRefExpr(GenericMemberRefExpr *e);
-  LValue visitSubscriptExpr(SubscriptExpr *e);
-  LValue visitGenericSubscriptExpr(GenericSubscriptExpr *e);
-  LValue visitTupleElementExpr(TupleElementExpr *e);
-  
-  // Expressions that wrap lvalues
-  
-  LValue visitAddressOfExpr(AddressOfExpr *e);
-  LValue visitParenExpr(ParenExpr *e);
-  LValue visitRequalifyExpr(RequalifyExpr *e); // FIXME kill lvalue qualifiers
-  LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
+  /// Evaluate an Expr as an lvalue, and take the materialized address as an
+  /// rvalue.
+  RValue emitLValueAsRValue(Expr *E);
 };
   
 } // end namespace Lowering
