@@ -76,6 +76,21 @@ public:
       : getType().getSwiftRValueType();
   }
   
+  /// Emit a copy of this value with independent ownership.
+  ManagedValue copy(SILGenFunction &gen) {
+    if (!cleanup.isValid())
+      return *this;
+    
+    if (getType().isAddressOnly(gen.SGM.M)) {
+      SILValue buf = gen.emitTemporaryAllocation(SILLocation(), getType());
+      gen.B.createCopyAddr(SILLocation(), getValue(), buf,
+                           /*isTake*/ false, /*isInitialize*/ true);
+      return gen.emitManagedRValueWithCleanup(buf);
+    }
+    gen.emitRetainRValue(SILLocation(), getValue());
+    return gen.emitManagedRValueWithCleanup(getValue());
+  }
+  
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
 
@@ -186,6 +201,9 @@ class RValue {
     elementOffsets = {};
   }
   
+  /// Private constructor used by copy().
+  RValue(const RValue &copied, SILGenFunction &gen);
+  
 public:
   /// Creates an invalid RValue object, in a "used" state.
   RValue() : elementsToBeAdded(Used) {}
@@ -289,6 +307,11 @@ public:
   void extractElements(llvm::SmallVectorImpl<RValue> &elements) &&;
   
   CanType getType() const & { return type; }
+  
+  /// Emit an equivalent value with independent ownership.
+  RValue copy(SILGenFunction &gen) const & {
+    return RValue(*this, gen);
+  }
 };
 
 } // end namespace Lowering

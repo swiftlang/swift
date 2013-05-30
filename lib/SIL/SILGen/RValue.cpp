@@ -453,3 +453,16 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   }
   makeUsed();
 }
+
+RValue::RValue(const RValue &copied, SILGenFunction &gen)
+  : elementOffsets(copied.elementOffsets),
+    type(copied.type),
+    elementsToBeAdded(copied.elementsToBeAdded)
+{
+  assert((copied.isComplete() || copied.isUsed())
+         && "can't copy incomplete rvalue");
+  values.reserve(copied.values.size());
+  for (ManagedValue value : copied.values) {
+    values.push_back(value.copy(gen));
+  }
+}

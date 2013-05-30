@@ -28,18 +28,6 @@ namespace Lowering {
 class PhysicalPathComponent;
 class LogicalPathComponent;
 
-/// Whether or not an object should be emitted on the heap.
-enum OnHeap_t : unsigned char {
-  NotOnHeap,
-  OnHeap
-};
-  
-/// An enumeration indicating whether to "preserve" a value or "consume" it.
-enum ShouldPreserveValues : bool {
-  ConsumeValues = false,
-  PreserveValues = true
-};
-
 /// An l-value path component represents a chunk of the access path to
 /// an object.  Path components may be either "physical" or "logical".
 /// A physical path involves elementary address manipulations; these
@@ -131,7 +119,8 @@ protected:
 
 public:
   /// Clone the path component onto the heap.
-  virtual std::unique_ptr<LogicalPathComponent> clone() const = 0;
+  virtual std::unique_ptr<LogicalPathComponent>
+  clone(SILGenFunction &gen) const = 0;
   
   /// True if the property is settable.
   virtual bool isSettable() const = 0;
