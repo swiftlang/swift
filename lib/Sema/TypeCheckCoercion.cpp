@@ -1254,7 +1254,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       return nullptr;
     }
 
-    Expr *Fn = TC.buildRefExpr(Best, Segment->getStartLoc());
+    Expr *Fn = buildCandidateRefExpr(TC, Best, Segment->getStartLoc());
     Result = semaApplyExpr(TC, new (TC.Context) BinaryExpr(Fn, Arg));
     if (!Result)
       return nullptr;

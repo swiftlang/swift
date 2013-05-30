@@ -26,6 +26,10 @@ CoercionResult isCoercibleToType(TypeChecker &tc, Expr *E, Type Ty,
 bool isSameType(TypeChecker &tc, Type T1, Type T2,
                 CoercionContext *CC = nullptr, bool Labeled = true);
 
+static Expr *specializeOverloadResult(TypeChecker &TC, 
+                                      const OverloadCandidate &Candidate,
+                                      Expr *E);
+
 static Identifier getFirstOverloadedIdentifier(const Expr *Fn) {
   if (const DeclRefExpr *DR = dyn_cast<DeclRefExpr>(Fn))
     return DR->getDecl()->getName();
@@ -842,7 +846,7 @@ Expr * buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
     result = expr;
   }
 
-  result = TC.specializeOverloadResult(Candidate, result);
+  result = specializeOverloadResult(TC, Candidate, result);
 
   // Replace the semantics-providing expression with the newly-built result.
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
@@ -941,39 +945,40 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) 
                          UnstructuredUnresolvedType::get(Context));
 }
 
-Expr *TypeChecker::buildRefExpr(const OverloadCandidate &Candidate,
-                                SourceLoc NameLoc) {
+Expr *buildCandidateRefExpr(TypeChecker &TC, const OverloadCandidate &Candidate,
+                            SourceLoc NameLoc) {
   auto decl = Candidate.getDecl();
-  Expr *result = new (Context) DeclRefExpr(decl, NameLoc,
-                                           decl->getTypeOfReference());
+  Expr *result = new (TC.Context) DeclRefExpr(decl, NameLoc,
+                                              decl->getTypeOfReference());
 
-  return specializeOverloadResult(Candidate, result);
+  return specializeOverloadResult(TC, Candidate, result);
 }
 
-Expr *TypeChecker::specializeOverloadResult(const OverloadCandidate &Candidate,
-                                            Expr *E) {
+static Expr *specializeOverloadResult(TypeChecker &TC, 
+                                      const OverloadCandidate &Candidate,
+                                      Expr *E) {
   if (Type baseTy = Candidate.getInferredBaseType()) {
     if (auto dre = dyn_cast<DeclRefExpr>(E)) {
       Expr *baseExpr
-        = new (Context) MetatypeExpr(nullptr, E->getLoc(),
-                                     MetaTypeType::get(baseTy, Context));
+        = new (TC.Context) MetatypeExpr(nullptr, E->getLoc(),
+                                        MetaTypeType::get(baseTy, TC.Context));
       ValueDecl *decl = dre->getDecl();
-      E = buildMemberRefExpr(baseExpr, SourceLoc(), { &decl, 1 },
+      E = TC.buildMemberRefExpr(baseExpr, SourceLoc(), { &decl, 1 },
                              dre->getLoc());
       if (!E)
         return nullptr;
-      E = recheckTypes(*this, E);
+      E = recheckTypes(TC, E);
       if (!E)
         return nullptr;
     }
   }
 
   if (Candidate.hasSubstitutions()) {
-    E = buildSpecializeExpr(E, Candidate.getType(),
-                            Candidate.getSubstitutions(),
-                            Candidate.getConformances(),
-                            /*ArchetypesAreOpen=*/true,
-                            /*OnlyInnermostParams=*/true);
+    E = TC.buildSpecializeExpr(E, Candidate.getType(),
+                               Candidate.getSubstitutions(),
+                               Candidate.getConformances(),
+                               /*ArchetypesAreOpen=*/true,
+                               /*OnlyInnermostParams=*/true);
   }
 
   return E;

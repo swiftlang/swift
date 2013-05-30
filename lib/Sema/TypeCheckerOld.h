@@ -96,10 +96,83 @@ public:
   }
 };
 
+/// \brief An overload candidate.
+/// FIXME: Encode the actual substitutions here in some efficient manner.
+class OverloadCandidate {
+public:
+  /// SubstitutionInfoType - Information about the substitution of generic
+  /// parameters required to produce this overload candidate.
+  struct SubstitutionInfoType {
+    TypeSubstitutionMap Substitutions;
+    ConformanceMap Conformances;
+  };
+
+private:
+  llvm::PointerIntPair<ValueDecl *, 1, bool> DeclAndComplete;
+  Type Ty;
+  std::unique_ptr<SubstitutionInfoType> SubstitutionInfo;
+  Type InferredBaseTy;
+  
+public:
+  OverloadCandidate() : DeclAndComplete(0, false), Ty() { }
+  OverloadCandidate(ValueDecl *Value, Type Ty, bool Complete)
+    : DeclAndComplete(Value, Complete), Ty(Ty) { }
+  OverloadCandidate(ValueDecl *Value, Type Ty, Type InferredBaseTy)
+    : DeclAndComplete(Value, true), Ty(Ty), InferredBaseTy(InferredBaseTy){}
+  OverloadCandidate(ValueDecl *Value, Type Ty,
+                    SubstitutionInfoType &&SubstitutionInfo)
+    : DeclAndComplete(Value, true), Ty(Ty),
+      SubstitutionInfo(new SubstitutionInfoType(std::move(SubstitutionInfo))) {}
+
+  /// \brief Whether this overload candidate is 'complete', meaning that we
+  /// can use the declaration (possibly by applying the given substitutions)
+  /// immediately.
+  bool isComplete() const { return DeclAndComplete.getInt(); }
+
+  /// \brief Retrieve the declaration 
+  ValueDecl *getDecl() const { return DeclAndComplete.getPointer(); }
+
+  /// \brief Set the declaration.
+  void setDecl(ValueDecl *D) { DeclAndComplete.setPointer(D); }
+
+  /// \brief Retrieve the type of a reference to this overload candidate,
+  /// after substitution.
+  Type getType() const { return Ty; }
+
+  /// \brief Retrieve the inferred base type to be used when referencing
+  /// this declaration.
+  ///
+  /// This inferred base type is used when we're performing operator lookup
+  /// into, e.g., protocols, and we need to record the inferred type of 'This'.
+  Type getInferredBaseType() const { return InferredBaseTy; }
+
+  /// \brief Evaluates true if the selected candidate is complete.
+  explicit operator bool() const { return isComplete(); }
+
+  /// \brief Determine whether this overload candidate has any substitutions.
+  bool hasSubstitutions() const { return SubstitutionInfo != nullptr; }
+
+  /// \brief Retrieve the substitutions for this overload candidate.
+  TypeSubstitutionMap &getSubstitutions() const {
+    assert(hasSubstitutions() && "Candidate does not have substitutions");
+    return SubstitutionInfo->Substitutions;
+  }
+
+  /// \brief Retrieve the set of protocol conformance records that go with the
+  /// substitutions.
+  ConformanceMap &getConformances() const {
+    assert(hasSubstitutions() && "Candidate does not have substitutions");
+    return SubstitutionInfo->Conformances;
+  }
+};
+
 Expr *buildFilteredOverloadSet(TypeChecker &TC,
                                OverloadedExpr Ovl,
                                ArrayRef<ValueDecl *> Remaining);
 Expr *buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
                                const OverloadCandidate &Candidate);
+
+Expr *buildCandidateRefExpr(TypeChecker &TC, const OverloadCandidate &Candidate,
+                            SourceLoc NameLoc);
 
 #endif
