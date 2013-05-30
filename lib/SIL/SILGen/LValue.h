@@ -133,6 +133,9 @@ public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent> clone() const = 0;
   
+  /// True if the property is settable.
+  virtual bool isSettable() const = 0;
+  
   /// Set the property.
   virtual void set(SILGenFunction &gen, SILLocation loc,
                    RValue &&rvalue, SILValue base) const = 0;
@@ -212,7 +215,7 @@ public:
 /// RAII object to enable writebacks for logical lvalues evaluated within the
 /// scope, which will be applied when the object goes out of scope.
 class WritebackScope {
-  SILGenFunction &gen;
+  SILGenFunction *gen;
   bool wasInWritebackScope;
   size_t savedDepth;
 public:
@@ -221,8 +224,28 @@ public:
   
   WritebackScope(const WritebackScope &) = delete;
   WritebackScope &operator=(const WritebackScope &) = delete;
+  
+  WritebackScope(WritebackScope &&o);
+  WritebackScope &operator=(WritebackScope &&o);
 };
   
+/// RAII object to disable writebacks for logical lvalues evaluated within the
+/// scope. Used for LoadExprs.
+class DisableWritebackScope {
+  SILGenFunction &gen;
+  bool wasInWritebackScope;
+public:
+  DisableWritebackScope(SILGenFunction &gen)
+    : gen(gen), wasInWritebackScope(gen.InWritebackScope)
+  {
+    gen.InWritebackScope = false;
+  }
+  
+  ~DisableWritebackScope() {
+    gen.InWritebackScope = wasInWritebackScope;
+  }
+};
+
 } // end namespace Lowering
 } // end namespace swift
 

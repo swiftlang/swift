@@ -273,10 +273,11 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
 }
 
 RValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
-  RValue SubV = visit(E->getSubExpr());
-  assert(SubV.isLValue() && "subexpr did not produce an lvalue");
-  SILValue addr = SubV.getUnmanagedSingleValue(*this);
+  // No need to write back to a loaded lvalue.
+  DisableWritebackScope scope(*this);
   
+  LValue lv = emitLValue(E->getSubExpr());
+  SILValue addr = emitAddressOfLValue(E, lv).getUnmanagedValue();  
   return RValue(*this, emitLoad(E, addr, C, /*isTake*/ false));
 }
 

@@ -64,7 +64,8 @@ Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                   SILValue base) const {
   ManagedValue value = get(gen, loc, base);
   Materialize temp = gen.emitMaterialize(loc, value);
-  gen.pushWritebackIfInScope(loc, *this, base, temp);
+  if (isSettable())
+    gen.pushWritebackIfInScope(loc, *this, base, temp);
   return temp;
 }
 
@@ -79,25 +80,45 @@ SILGenFunction::pushWritebackIfInScope(SILLocation loc,
 }
 
 WritebackScope::WritebackScope(SILGenFunction &gen)
-  : gen(gen), wasInWritebackScope(gen.InWritebackScope),
+  : gen(&gen), wasInWritebackScope(gen.InWritebackScope),
     savedDepth(gen.WritebackStack.size())
 {
   gen.InWritebackScope = true;
 }
 
 WritebackScope::~WritebackScope() {
-  gen.InWritebackScope = wasInWritebackScope;
-  auto i = gen.WritebackStack.end(),
-       deepest = gen.WritebackStack.begin() + savedDepth;
+  if (!gen)
+    return;
+  
+  gen->InWritebackScope = wasInWritebackScope;
+  auto i = gen->WritebackStack.end(),
+       deepest = gen->
+  WritebackStack.begin() + savedDepth;
   while (i-- > deepest) {
     if (i->temp.valueCleanup.isValid())
-      gen.Cleanups.setCleanupState(i->temp.valueCleanup, CleanupState::Dead);
+      gen->Cleanups.setCleanupState(i->temp.valueCleanup, CleanupState::Dead);
     ManagedValue mv
-      = gen.emitLoad(i->loc, i->temp.address, SGFContext(), /*isTake*/ true);
-    i->component->set(gen, i->loc, RValue(gen, mv), i->base);
+      = gen->emitLoad(i->loc, i->temp.address, SGFContext(), /*isTake*/ true);
+    i->component->set(*gen, i->loc, RValue(*gen, mv), i->base);
   }
   
-  gen.WritebackStack.erase(deepest, gen.WritebackStack.end());
+  gen->WritebackStack.erase(deepest, gen->WritebackStack.end());
+}
+
+WritebackScope::WritebackScope(WritebackScope &&o)
+  : gen(o.gen),
+    wasInWritebackScope(o.wasInWritebackScope),
+    savedDepth(o.savedDepth)
+{
+  o.gen = nullptr;
+}
+
+WritebackScope &WritebackScope::operator=(WritebackScope &&o) {
+  gen = o.gen;
+  wasInWritebackScope = o.wasInWritebackScope;
+  savedDepth = o.savedDepth;
+  o.gen = nullptr;
+  return *this;
 }
 
 SILGenFunction::Writeback::~Writeback() {}
@@ -271,34 +292,35 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(SILConstant getter, SILConstant setter,
+    GetterSetterComponent(ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           Type substType)
-      : getter(getter), setter(setter), substitutions(substitutions.begin(),
-                                                      substitutions.end()),
-        subscriptExpr(nullptr),
-        substType(substType)
+      : GetterSetterComponent(decl, substitutions, nullptr, substType)
     {
-      assert(!getter.isNull() && !setter.isNull() &&
-             "settable lvalue must have both getter and setter");
     }
 
-    GetterSetterComponent(SILConstant getter, SILConstant setter,
+    GetterSetterComponent(ValueDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           Expr *subscriptExpr,
                           Type substType)
-      : getter(getter), setter(setter), substitutions(substitutions.begin(),
-                                                      substitutions.end()),
+      : getter(SILConstant(decl, SILConstant::Kind::Getter)),
+        setter(decl->isSettable()
+                 ? SILConstant(decl, SILConstant::Kind::Setter)
+                 : SILConstant()),
+        substitutions(substitutions.begin(), substitutions.end()),
         subscriptExpr(subscriptExpr),
         substType(substType)
     {
-      assert(!getter.isNull() && !setter.isNull() &&
-             "settable lvalue must have both getter and setter");
+    }
+    
+    bool isSettable() const override {
+      return !setter.isNull();
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
              RValue &&rvalue, SILValue base) const override
     {
+      assert(!setter.isNull() && "not settable!");      
       auto args = prepareAccessorArgs(gen, loc, base);
       
       return gen.emitSetProperty(loc, setter, substitutions,
@@ -353,8 +375,7 @@ static LValue emitLValueForDecl(SILGenLValue &sgl,
   // If it's a property, push a reference to the getter and setter.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (var->isProperty()) {
-      lv.add<GetterSetterComponent>(SILConstant(var, SILConstant::Kind::Getter),
-                                    SILConstant(var, SILConstant::Kind::Setter),
+      lv.add<GetterSetterComponent>(var,
                                     ArrayRef<Substitution>{},
                                     ty->getRValueType());
       return ::std::move(lv);
@@ -420,8 +441,7 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
   }
   
   // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(SILConstant(decl, SILConstant::Kind::Getter),
-                                SILConstant(decl, SILConstant::Kind::Setter),
+  lv.add<GetterSetterComponent>(decl,
                                 substitutions,
                                 e->getType()->getRValueType());
   return ::std::move(lv);
@@ -434,8 +454,7 @@ LValue emitAnySubscriptExpr(SILGenLValue &sgl,
                             ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
   SubscriptDecl *sd = e->getDecl();
-  lv.add<GetterSetterComponent>(SILConstant(sd, SILConstant::Kind::Getter),
-                                SILConstant(sd, SILConstant::Kind::Setter),
+  lv.add<GetterSetterComponent>(sd,
                                 substitutions,
                                 e->getIndex(),
                                 e->getType()->getRValueType());

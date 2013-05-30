@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "LValue.h"
 #include "OwnershipConventions.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
@@ -768,6 +769,7 @@ namespace {
     std::vector<CallSite> uncurriedSites;
     std::vector<CallSite> extraSites;
     Callee callee;
+    Optional<WritebackScope> initialWritebackScope;
     unsigned uncurries;
     bool applied;
     
@@ -778,6 +780,13 @@ namespace {
         uncurries(callee.getNaturalUncurryLevel() + 1),
         applied(false)
     {}
+    
+    CallEmission(SILGenFunction &gen, Callee &&callee,
+                 WritebackScope &&writebackScope)
+      : CallEmission(gen, std::move(callee))
+    {
+      initialWritebackScope.emplace(std::move(writebackScope));
+    }
     
     void addCallSite(CallSite &&site) {
       assert(!applied && "already applied!");
@@ -863,8 +872,13 @@ namespace {
         result = gen.emitApply(uncurriedLoc, calleeValue, uncurriedArgs,
                                uncurriedResultTy, ownership, uncurriedContext);
       
+      // End the initial writeback scope, if any.
+      initialWritebackScope.reset();
+      
       // If there are remaining call sites, apply them to the result function.
+      // Each chained call gets its own writeback scope.
       for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
+        WritebackScope scope(gen);
         uncurriedArgs.clear();
         SILLocation loc = extraSites[i].loc;
         std::move(extraSites[i]).emit(gen, uncurriedArgs);
@@ -1158,6 +1172,9 @@ namespace {
 } // end anonymous namespace
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
+  // Set up writebacks for the call(s).
+  WritebackScope writebacks(gen);
+  
   SILGenApply apply(gen);
   
   // Decompose the call site.
@@ -1168,7 +1185,9 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
     gen.visit(apply.sideEffect);
   
   // Build the call.
-  CallEmission emission(gen, apply.getCallee());
+  // Pass the writeback scope on to CallEmission so it can thread scopes through
+  // nested calls.
+  CallEmission emission(gen, apply.getCallee(), std::move(writebacks));
   
   // Apply 'this' if provided.
   if (apply.thisParam)
