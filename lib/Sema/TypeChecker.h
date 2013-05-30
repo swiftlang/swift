@@ -417,8 +417,6 @@ public:
   bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
-  bool semaTupleExpr(TupleExpr *TE);
-  Expr *semaUnresolvedDotExpr(UnresolvedDotExpr *E);
 
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
@@ -546,7 +544,6 @@ public:
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
 
-
   /// \brief Retrieve the default literal type for the given literal kind.
   Type getDefaultLiteralType(LiteralKind kind);
 
@@ -577,8 +574,6 @@ public:
   Expr *coerceObjectArgument(Expr *E, Type ContainerTy,
                              CoercionContext *CC = nullptr);
   
-  Expr *convertToRValueOld(Expr *E);
-
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
   

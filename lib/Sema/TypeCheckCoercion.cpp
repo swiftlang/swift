@@ -36,6 +36,7 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
 bool isSameType(TypeChecker &tc, Type T1, Type T2,
                 CoercionContext *CC = nullptr, bool Labeled = true);
 Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
+Expr *convertToRValueOld(TypeChecker &TC, Expr *E);
 
 namespace {
 
@@ -358,7 +359,7 @@ public:
 
       Expr *Result = TC.buildFilteredOverloadSet(Ovl, Best);
       if (!DestTy->is<LValueType>())
-        Result = TC.convertToRValueOld(Result);
+        Result = convertToRValueOld(TC, Result);
       return coerceToType(Result, DestTy, CC, SubFlags);
     }
 
@@ -982,6 +983,20 @@ static Expr *semaApplyExpr(TypeChecker &TC, Expr *E) {
   return E;
 }
 
+static bool semaTupleExpr(TypeChecker &TC, TupleExpr *TE) {
+  // Compute the result type.
+  SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
+
+  for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
+    Type EltTy = TE->getElement(i)->getType();
+    Identifier Name = TE->getElementName(i);
+    ResultTyElts[i] = TupleTypeElt(EltTy, Name);
+  }
+  
+  TE->setType(TupleType::get(ResultTyElts, TC.Context));
+  return false;
+}
+
 CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
   assert((Flags & CF_UserConversions)
          && "Not allowed to perform user conversions!");
@@ -1053,7 +1068,7 @@ CoercedResult SemaCoerce::tryUserConversion(Expr *E) {
                                                MutableArrayRef<Expr *>(),
                                                nullptr, E->getEndLoc(),
                                                /*hasTrailingClosure=*/false);
-  TC.semaTupleExpr(Args);
+  semaTupleExpr(TC, Args);
 
   ApplyExpr *Call = new (TC.Context) CallExpr(BoundFn, Args);
   return coerced(semaApplyExpr(TC, Call));
@@ -1158,7 +1173,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
                       TC.Context.AllocateCopy(MutableArrayRef<Expr *>(Args, 2)),
                                                 nullptr, SourceLoc(),
                                                 /*hasTrailingClosure=*/false);
-    if (TC.semaTupleExpr(Arg))
+    if (semaTupleExpr(TC, Arg))
       return nullptr;
     
     // Perform overload resolution.
@@ -1222,7 +1237,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
       }
       
       Expr *Fn = TC.buildFilteredOverloadSet(Ovl, Best);
-      Fn = TC.convertToRValueOld(Fn);
+      Fn = convertToRValueOld(TC, Fn);
       E->setFn(Fn);
 
       if (Expr *Result = semaApplyExpr(TC, E))
@@ -2522,6 +2537,15 @@ Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E) {
   }
 
   return nullptr;
+}
+
+Expr *convertToRValueOld(TypeChecker &TC, Expr *E) {
+  assert(E && "no expression to load!");
+
+  if (LValueType *lv = E->getType()->getAs<LValueType>())
+    return convertLValueToRValue(TC, lv, E);
+
+  return E;
 }
 
 namespace {

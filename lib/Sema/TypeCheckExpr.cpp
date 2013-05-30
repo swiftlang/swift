@@ -31,67 +31,6 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
-
-Expr *TypeChecker::convertToRValueOld(Expr *E) {
-  assert(E && "no expression to load!");
-
-  if (LValueType *lv = E->getType()->getAs<LValueType>())
-    return convertLValueToRValue(*this, lv, E);
-
-  return E;
-}
-
-bool TypeChecker::semaTupleExpr(TupleExpr *TE) {
-  // Compute the result type.
-  SmallVector<TupleTypeElt, 8> ResultTyElts(TE->getNumElements());
-
-  for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i) {
-    Type EltTy = TE->getElement(i)->getType();
-    Identifier Name = TE->getElementName(i);
-    ResultTyElts[i] = TupleTypeElt(EltTy, Name);
-  }
-  
-  TE->setType(TupleType::get(ResultTyElts, Context));
-  return false;
-}
-
-/// collectArchetypeToExistentialSubstitutions - Collect a set of substitutions
-/// from each archetype in the given protocol to a protocol composition type
-/// that describes the requirements placed on that archetype.
-static void
-collectArchetypeToExistentialSubstitutions(ASTContext &Context,
-                                           ProtocolDecl *Proto,
-                                           Type ThisTy,
-                                           TypeSubstitutionMap &Substitutions) {
-  for (auto Member : Proto->getMembers()) {
-    auto AssocType = dyn_cast<TypeAliasDecl>(Member);
-    if (!AssocType)
-      continue;
-    
-    ArchetypeType *Archetype
-      = AssocType->getDeclaredType()->castTo<ArchetypeType>();
-    
-    // FIXME: Identify 'this' in a rather more sane way.
-    if (AssocType->getName().str().equals("This"))
-      Substitutions[Archetype] = ThisTy;
-    else {
-      if (Archetype->getConformsTo().size() == 1)
-        Substitutions[Archetype]
-          = Archetype->getConformsTo().front()->getDeclaredType();
-      else {
-        SmallVector<Type, 4> ConformsTo;
-        std::transform(Archetype->getConformsTo().begin(),
-                       Archetype->getConformsTo().end(),
-                       std::back_inserter(ConformsTo),
-                       [](ProtocolDecl *P) { return P->getDeclaredType(); });
-        Substitutions[Archetype]
-          = ProtocolCompositionType::get(Context, ConformsTo);
-      }
-    }
-  }
-}
-
 void substituteInputSugarArgumentType(Type argTy,
                                       CanType resultTy,
                                       Type &resultSugarTy,
@@ -159,11 +98,12 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                MetaTypeType::get(sliceType, Context));
 
   // Build the expression "Slice<T>.convertFromHeapArray".
-  Expr *injectionFn = semaUnresolvedDotExpr(
-    new (Context) UnresolvedDotExpr(sliceTypeRef, Loc,
-               Context.getIdentifier("convertFromHeapArray"),
-                                     Loc));
-  if (!injectionFn) return nullptr;
+  Expr *injectionFn = new (Context) UnresolvedDotExpr(
+                                      sliceTypeRef, Loc,
+                                      Context.getIdentifier("convertFromHeapArray"),
+                                      Loc);
+  if (typeCheckExpressionShallow(injectionFn))
+    return nullptr;
 
   // The input is a tuple type:
   TupleTypeElt argTypes[3] = {
@@ -190,126 +130,6 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   // FIXME: this produces terrible diagnostics.
   return coerceToType(injectionFn, fnTy);
 }
-
-static Type makeSimilarLValue(Type objectType, Type lvalueType,
-                              ASTContext &Context) {
-  LValueType::Qual qs = lvalueType->castTo<LValueType>()->getQualifiers();
-  return LValueType::get(objectType, qs, Context);
-}
-
-Expr *TypeChecker::semaUnresolvedDotExpr(UnresolvedDotExpr *E) {
-  // If we already diagnosed this as an error, don't complain again.
-  if (E->getType() && E->getType()->is<ErrorType>())
-    return nullptr;
-
-  Expr *Base = E->getBase();
-  Type BaseTy = Base->getType();
-  Identifier MemberName = E->getName();
-  
-  if (BaseTy->isUnresolvedType()) {
-    E->setType(UnstructuredUnresolvedType::get(Context));
-    return E;
-  }
-  
-  if (BaseTy->is<ErrorType>())
-    return nullptr;  // Squelch an erroneous subexpression.
-
-  // If the base expression is not an lvalue, make everything inside it
-  // materializable.
-  if (!BaseTy->is<LValueType>()) {
-    Base = coerceToMaterializable(Base);
-    if (!Base)
-      return nullptr;
-
-    BaseTy = Base->getType();
-  }
-
-  if (TupleType *TT = BaseTy->getRValueType()->getAs<TupleType>()) {
-    // Try to look up the field by name; if that doesn't work, look for a
-    // numbered field.
-    int FieldNo = TT->getNamedElementId(MemberName);
-    if (FieldNo == -1) {
-      StringRef NameStr = MemberName.str();
-      unsigned Value = 0;
-      if (!NameStr.getAsInteger(10, Value) && Value < TT->getFields().size())
-        FieldNo = Value;
-    }
-    if (FieldNo == -1) {
-      // FIXME: This diagnostic is a bit painful.
-      diagnose(E->getDotLoc(), diag::no_member_of_tuple, TT, MemberName)
-        .highlight(Base->getSourceRange())
-        .highlight(SourceRange(E->getNameLoc()));
-      return 0;
-    }
-
-    Type FieldType = TT->getElementType(FieldNo);
-    if (BaseTy->is<LValueType>())
-      FieldType = makeSimilarLValue(FieldType, Base->getType(), Context);
-
-    return new (Context) TupleElementExpr(Base, E->getDotLoc(), FieldNo,
-                                          E->getNameLoc(), FieldType);
-  }
-
-  // Perform name lookup.
-  MemberLookup Lookup(BaseTy, MemberName, TU);
-  
-  if (!Lookup.isSuccess()) {
-    // Strip off any lvalue-ness for diagnostic purposes.
-    BaseTy = BaseTy->getRValueType();
-    
-    if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-      diagnose(E->getDotLoc(), diag::no_member_of_module, MT->getModule()->Name,
-               MemberName)
-        .highlight(Base->getSourceRange())
-        .highlight(SourceRange(E->getNameLoc()));
-    } else if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
-      diagnose(E->getDotLoc(), diag::no_member_of_metatype,
-               MTT->getInstanceType(), MemberName)
-        .highlight(Base->getSourceRange())
-        .highlight(SourceRange(E->getNameLoc()));
-    } else if (BaseTy->is<ProtocolType>() ||
-               BaseTy->is<ProtocolCompositionType>()) {
-      diagnose(E->getDotLoc(), diag::no_member_of_protocol,
-               BaseTy, MemberName)
-        .highlight(Base->getSourceRange())
-        .highlight(SourceRange(E->getNameLoc()));
-      
-    } else {
-      // FIXME: This diagnostic is ridiculously painful.
-      diagnose(E->getDotLoc(), diag::no_valid_dot_expression, BaseTy,
-               MemberName)
-        .highlight(Base->getSourceRange())
-        .highlight(SourceRange(E->getNameLoc()));
-    }
-    return 0;
-      
-  }
-
-  bool IsMetatypeBase = BaseTy->is<MetaTypeType>();
-  if (IsMetatypeBase && Lookup.Results.size() == 1) {
-    MemberLookupResult R = Lookup.Results[0];
-    // If we're looking in a metatype and find a use of a field of the type,
-    // diagnose it.
-    if (R.Kind == MemberLookupResult::MemberProperty) {
-      diagnose(E->getNameLoc(), diag::no_member_of_metatype,
-               BaseTy->castTo<MetaTypeType>()->getInstanceType(), MemberName)
-        .highlight(SourceRange(E->getNameLoc()));
-      return 0;
-    }
-  }
-
-  // If the base is a tuple, we need to force it to be either a proper lvalue
-  // or a proper rvalue; otherwise, the semantics are strange.
-  if (!Base->getType()->is<LValueType>())
-    Base = coerceToMaterializable(Base);
-
-  Expr *Result = buildMemberRefExpr(Base, E->getDotLoc(), Lookup,
-                                    E->getNameLoc());
-  if (typeCheckExpressionShallow(Result))
-    return nullptr;
-  return Result;
-}
-
 
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
@@ -535,48 +355,6 @@ static Expr *foldSequence(TypeChecker &TC,
   // Fold LHS (and MHS, if ternary) and RHS together and declare completion.
 
   return makeOperatorExpr(LHS, Op1, RHS);
-}
-
-namespace {
-  // Check the initializer/body to make sure that we succeeded in resolving
-  // all of the types contained within it.  If we've resolved everything, then
-  // we're done processing the expression.  While we're doing the walk, keep
-  // track of whether we have any literals without a resolved type.
-  struct DependenceWalker : ASTWalker {
-    DependenceWalker() { reset(); }
-    
-    void reset() {
-      OneUnresolvedExpr = nullptr;
-      HasUnresolvedLiterals = false;
-    }
-    
-    Expr *walkToExprPost(Expr *E) {    
-      assert(!isa<SequenceExpr>(E) && "Should have resolved this");
-      
-      if (E->getType()->isUnresolvedType()) {
-        // Remember the first unresolved expression we come across.
-        if (OneUnresolvedExpr == 0)
-          OneUnresolvedExpr = E;
-        
-        // Also remember if we see any literals with unresolved types.
-        if (isa<LiteralExpr>(E))
-          HasUnresolvedLiterals = true;
-      
-        // func{} defaults to return () if we can't infer a result type.
-        if (isa<FuncExpr>(E))
-          HasUnresolvedLiterals = true;
-      }
-      return E;
-    }
-    
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      // Never recurse into statements.
-      return { false, S };
-    }
-    
-    Expr *OneUnresolvedExpr;
-    bool HasUnresolvedLiterals;
-  }; 
 }
 
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
