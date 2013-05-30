@@ -137,7 +137,7 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
                                                     MetaT);
-    Expr *Res = TC.buildMemberRefExpr(Meta, Loc, Lookup, EndLoc);
+    Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc);
     if (TC.typeCheckExpressionShallow(Res))
       return;
     TupleExpr *CallArgs
@@ -310,7 +310,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   
   if (Lookup.isSuccess()) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
-    Expr *Res = TC.buildMemberRefExpr(ArgRef, Loc, Lookup, EndLoc);
+    Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
+                                                   EndLoc);
     if (TC.typeCheckExpressionShallow(Res))
       return;
     TupleExpr *CallArgs

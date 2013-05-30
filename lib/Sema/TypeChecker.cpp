@@ -284,7 +284,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc,
                                               Base->getTypeOfReference());
     }
-    return TC.buildMemberRefExpr(BaseExpr, SourceLoc(), ResultValues, Loc);
+    return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc);
   }
 
   llvm_unreachable("Can't represent lookup result");

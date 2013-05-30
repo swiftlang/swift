@@ -491,7 +491,7 @@ public:
 
     Expr *E = new (TC.Context) MetatypeExpr(nullptr, UME->getDotLoc(),
                                             MetaTypeType::get(DT, TC.Context));
-    E = TC.buildMemberRefExpr(E, SourceLoc(), DED, UME->getDotLoc());
+    E = buildMemberRefExpr(TC, E, SourceLoc(), DED, UME->getDotLoc());
     return coerced(recheckTypes(TC, E));
   }  
   
@@ -1029,8 +1029,8 @@ CoercedResult SemaCoerce::visitLiteralExpr(LiteralExpr *E) {
 
   Expr *DRE = new (TC.Context) MetatypeExpr(nullptr, Intermediate->getStartLoc(),
                                             Method->computeThisType());
-  DRE = recheckTypes(TC, TC.buildMemberRefExpr(DRE, SourceLoc(), Method,
-                                              Intermediate->getStartLoc()));
+  DRE = recheckTypes(TC, buildMemberRefExpr(TC, DRE, SourceLoc(), Method,
+                                            Intermediate->getStartLoc()));
 
   // Return a new call of the conversion function, passing in the integer
   // literal.

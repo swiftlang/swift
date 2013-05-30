@@ -175,4 +175,16 @@ Expr *buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
 Expr *buildCandidateRefExpr(TypeChecker &TC, const OverloadCandidate &Candidate,
                             SourceLoc NameLoc);
 
+/// \brief Build a reference to a member of the given base expression, where
+/// name lookup for the member returned the given set of declarations. 
+Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
+                         ArrayRef<ValueDecl *> Decls,
+                         SourceLoc MemberLoc);
+
+/// \brief Build a reference to a member of the given base expression,
+/// given the results of a successful member lookup.
+Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
+                         MemberLookup &Results,
+                         SourceLoc NameLoc);
+
 #endif

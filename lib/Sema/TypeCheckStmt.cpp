@@ -623,11 +623,13 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
     return nullptr;
 
   case PatternKind::Named:
-    return tc.buildMemberRefExpr(
+    return new (tc.Context) UnresolvedDotExpr(
              new (tc.Context) DeclRefExpr(thisDecl,
                                           SourceLoc(),
                                           thisDecl->getTypeOfReference()),
-             SourceLoc(), cast<NamedPattern>(pattern)->getDecl(), SourceLoc());
+             SourceLoc(), 
+             cast<NamedPattern>(pattern)->getDecl()->getName(), 
+             SourceLoc());
 
   case PatternKind::Paren:
     return createPatternMemberRefExpr(
@@ -745,6 +747,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                              ctor->getImplicitThisDecl(),
                              patternBind->getPattern())) {
             initializer = new (Context) DefaultValueExpr(initializer);
+            llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
+                                                               initializer);
             defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
                                                             initializer));
             continue;
@@ -782,11 +786,15 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           // Create the assignment.
           auto thisDecl = ctor->getImplicitThisDecl();
           Expr *dest
-            = buildMemberRefExpr(
+            = new (Context) UnresolvedDotExpr(
                 new (Context) DeclRefExpr(thisDecl,
                                           SourceLoc(),
                                           thisDecl->getTypeOfReference()),
-                SourceLoc(), var, SourceLoc());
+                SourceLoc(), 
+                var->getName(),
+                SourceLoc());
+          llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
+                                                             initializer);
           defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
                                                           initializer));
         }

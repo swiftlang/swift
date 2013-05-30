@@ -797,7 +797,7 @@ Expr *buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
   if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
     result = TC.buildRefExpr(Remaining, DRE->getLoc());
   } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
-    result = TC.buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+    result = buildMemberRefExpr(TC, MRE->getBase(), MRE->getDotLoc(),
                                 Remaining, MRE->getMemberLoc());
     if (!result)
       return nullptr;
@@ -834,8 +834,8 @@ Expr * buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
   } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
     SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
     result = recheckTypes(TC,
-                          TC.buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
-                                                decls, MRE->getMemberLoc()));
+                          buildMemberRefExpr(TC, MRE->getBase(), MRE->getDotLoc(),
+                                             decls, MRE->getMemberLoc()));
     if (!result)
       return nullptr;
   } else {
@@ -870,7 +870,7 @@ static Expr *specializeOverloadResult(TypeChecker &TC,
         = new (TC.Context) MetatypeExpr(nullptr, E->getLoc(),
                                         MetaTypeType::get(baseTy, TC.Context));
       ValueDecl *decl = dre->getDecl();
-      E = TC.buildMemberRefExpr(baseExpr, SourceLoc(), { &decl, 1 },
+      E = buildMemberRefExpr(TC, baseExpr, SourceLoc(), { &decl, 1 },
                              dre->getLoc());
       if (!E)
         return nullptr;
@@ -891,9 +891,9 @@ static Expr *specializeOverloadResult(TypeChecker &TC,
   return E;
 }
 
-Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                      ArrayRef<ValueDecl *> Decls,
-                                      SourceLoc MemberLoc) {
+Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
+                         ArrayRef<ValueDecl *> Decls,
+                         SourceLoc MemberLoc) {
   assert(!Decls.empty() && "Must have at least one declaration");
   
   // Figure out the actual base type, and whether we have an instance of that
@@ -910,14 +910,14 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   // classes of entities (e.g., variables and types cannot be overloaded).
   // If not, complain now.
   if (!baseIsInstance && isa<VarDecl>(Decls[0])) {
-    diagnose(MemberLoc, diag::member_ref_metatype_variable,
-             Decls[0]->getName(), baseTy);
-    diagnose(Decls[0], diag::decl_declared_here, Decls[0]->getName());
-
-    Expr *BadExpr = new (Context) UnresolvedDotExpr(Base, DotLoc,
-                                                    Decls[0]->getName(),
-                                                    MemberLoc);
-    BadExpr->setType(ErrorType::get(Context));
+    TC.diagnose(MemberLoc, diag::member_ref_metatype_variable,
+                Decls[0]->getName(), baseTy);
+    TC.diagnose(Decls[0], diag::decl_declared_here, Decls[0]->getName());
+    
+    Expr *BadExpr = new (TC.Context) UnresolvedDotExpr(Base, DotLoc,
+                                                       Decls[0]->getName(),
+                                                       MemberLoc);
+    BadExpr->setType(ErrorType::get(TC.Context));
     return BadExpr;
   }
 
@@ -929,14 +929,14 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
     // FIXME: ExistentialMemberRefExpr needs to cope with a base of metatype
     // type.
     if (baseTy->isExistentialType()) {
-      return new (Context) ExistentialMemberRefExpr(Base, DotLoc, Member,
-                                                    MemberLoc);
+      return new (TC.Context) ExistentialMemberRefExpr(Base, DotLoc, Member,
+                                                       MemberLoc);
     }
 
     // Okay to refer to a member of an archetype.
     if (baseTy->is<ArchetypeType>()) {
-      return new (Context) ArchetypeMemberRefExpr(Base, DotLoc, Member,
-                                                  MemberLoc);
+      return new (TC.Context) ArchetypeMemberRefExpr(Base, DotLoc, Member,
+                                                     MemberLoc);
     }
 
     // Reference to a member of a generic type.
@@ -947,75 +947,75 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         // type, which we build as a reference to the underlying declaration
         // specialized based on the deducing the arguments of the generic
         // type.
-        CoercionContext CC(*this);
-        Type substTy = substBaseForGenericTypeMember(*this,
+        CoercionContext CC(TC);
+        Type substTy = substBaseForGenericTypeMember(TC,
                                                      Member, baseTy,
                                                      Member->getTypeOfReference(),
                                                      MemberLoc, CC);
             // FIXME: Check for errors here?
 
         // Reference to the generic member.
-        Expr *ref = new (Context) DeclRefExpr(Member, MemberLoc,
-                                              Member->getTypeOfReference());
+        Expr *ref = new (TC.Context) DeclRefExpr(Member, MemberLoc,
+                                                 Member->getTypeOfReference());
 
         // Specialize the member with the types deduced from the object
         // argument. This eliminates the genericity that comes from being
         // an instance method of a generic class.
         Expr *specializedRef
-          = buildSpecializeExpr(ref, substTy, CC.Substitutions,
-                                CC.Conformance,
-                                /*ArchetypesAreOpen=*/true,
-                                /*OnlyInnermostParams=*/false);
+          = TC.buildSpecializeExpr(ref, substTy, CC.Substitutions,
+                                   CC.Conformance,
+                                   /*ArchetypesAreOpen=*/true,
+                                   /*OnlyInnermostParams=*/false);
 
         Expr *apply;
         if (!baseIsInstance && Member->isInstanceMember()) {
-          apply = new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc,
-                                                         specializedRef);
+          apply = new (TC.Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc,
+                                                            specializedRef);
         } else {
           assert((!baseIsInstance || Member->isInstanceMember()) &&
                  "can't call a static method on an instance");
-          apply = new (Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
+          apply = new (TC.Context) DotSyntaxCallExpr(specializedRef, DotLoc, Base);
         }
-        return recheckTypes(*this, apply);
+        return recheckTypes(TC, apply);
       }
 
-      return new (Context) GenericMemberRefExpr(Base, DotLoc, Member,
-                                                MemberLoc);
+      return new (TC.Context) GenericMemberRefExpr(Base, DotLoc, Member,
+                                                   MemberLoc);
     }
 
     // Refer to a member variable of an instance.
     if (!baseTy->is<ModuleType>()) {
       if (auto Var = dyn_cast<VarDecl>(Member)) {
         assert(baseIsInstance && "Referencing variable of metatype!");
-        return new (Context) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
+        return new (TC.Context) MemberRefExpr(Base, DotLoc, Var, MemberLoc);
       }
     }
 
-    Expr *Ref = new (Context) DeclRefExpr(Member, MemberLoc,
-                                          Member->getTypeOfReference());
+    Expr *Ref = new (TC.Context) DeclRefExpr(Member, MemberLoc,
+                                             Member->getTypeOfReference());
 
     // Refer to a member function that binds 'this':
     if ((isa<FuncDecl>(Member) && Member->getDeclContext()->isTypeContext()) ||
         isa<OneOfElementDecl>(Member) || isa<ConstructorDecl>(Member)) {
       if (baseIsInstance == Member->isInstanceMember())
-        return new (Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
+        return new (TC.Context) DotSyntaxCallExpr(Ref, DotLoc, Base);
 
       assert((!baseIsInstance || Member->isInstanceMember()) &&
              "can't call a static method on an instance");
     }
 
-    return new (Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Ref);
+    return new (TC.Context) DotSyntaxBaseIgnoredExpr(Base, DotLoc, Ref);
   }
 
   // We have multiple declarations. Build an overloaded member reference.
-  Decls = Context.AllocateCopy(Decls);
-  return new (Context) OverloadedMemberRefExpr(Base, DotLoc, Decls, MemberLoc,
-                         UnstructuredUnresolvedType::get(Context));
+  Decls = TC.Context.AllocateCopy(Decls);
+  return new (TC.Context) OverloadedMemberRefExpr(Base, DotLoc, Decls, MemberLoc,
+                         UnstructuredUnresolvedType::get(TC.Context));
 }
 
-Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                      MemberLookup &Results,
-                                      SourceLoc MemberLoc) {
+Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
+                         MemberLookup &Results,
+                         SourceLoc MemberLoc) {
   assert(Results.isSuccess() && "Cannot build non-successful member reference");
 
   // If we have an ambiguous result, build an overload set.
@@ -1023,6 +1023,6 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
   for (MemberLookupResult X : Results.Results)
     ResultSet.push_back(X.D);
 
-  return buildMemberRefExpr(Base, DotLoc, ResultSet, MemberLoc);
+  return buildMemberRefExpr(TC, Base, DotLoc, ResultSet, MemberLoc);
 }
 
