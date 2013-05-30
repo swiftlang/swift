@@ -313,34 +313,6 @@ GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
          "use SubscriptExpr for non-generic type subscript");
 }
 
-Expr *OverloadedSubscriptExpr::createWithCopy(Expr *Base,
-                                              ArrayRef<ValueDecl*> Decls,
-                                              Expr *Index) {
-  assert(!Decls.empty() &&
-         "Cannot create an overloaded member ref with no decls");
-  ASTContext &C = Decls[0]->getASTContext();
-  
-  if (Decls.size() == 1) {
-    Type ContainerTy = Decls[0]->getDeclContext()->getDeclaredTypeOfContext();
-    if (ContainerTy->isExistentialType())
-      return new (C) ExistentialSubscriptExpr(Base, Index,
-                                              cast<SubscriptDecl>(Decls[0]));
-    if (ContainerTy->is<ArchetypeType>())
-      return new (C) ArchetypeSubscriptExpr(Base, Index,
-                                            cast<SubscriptDecl>(Decls[0]));
-
-    if (ContainerTy->isSpecialized())
-      return new (C) GenericSubscriptExpr(Base, Index,
-                                          cast<SubscriptDecl>(Decls[0]));
-
-    return new (C) SubscriptExpr(Base, Index, cast<SubscriptDecl>(Decls[0]));
-  }
-  
-  // Otherwise, copy the overload set into the ASTContext's memory.
-  return new (C) OverloadedSubscriptExpr(Base, C.AllocateCopy(Decls), Index,
-                                         UnstructuredUnresolvedType::get(C));
-}
-
 ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
   if (auto *func = dyn_cast<FuncExpr>(this))
     return func->getArgParamPatterns();
@@ -672,14 +644,6 @@ public:
     printCommon(E, "generic_subscript_expr");
     OS << '\n';
     printSubstitutions(E->getSubstitutions());
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getIndex());
-    OS << ')';
-  }
-  void visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) {
-    printCommon(E, "overloaded_subscript_expr");
-    OS << '\n';
     printRec(E->getBase());
     OS << '\n';
     printRec(E->getIndex());

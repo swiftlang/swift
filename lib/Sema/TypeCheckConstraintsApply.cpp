@@ -1059,11 +1059,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
-      return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
-    }
-
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr, { }));

@@ -213,7 +213,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     
     return E;
   }
-  Expr *visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *E) { return E; }
   Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *E) {
     if (!E->getBase())
       return E;

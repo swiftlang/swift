@@ -152,7 +152,6 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::OpaqueValue:
   case ExprKind::OtherConstructorDeclRef:
   case ExprKind::OverloadedMemberRef:
-  case ExprKind::OverloadedSubscript:
   case ExprKind::Requalify:
   case ExprKind::ScalarToTuple:
   case ExprKind::Specialize:

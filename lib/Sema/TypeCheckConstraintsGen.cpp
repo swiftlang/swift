@@ -560,10 +560,6 @@ namespace {
       return dictionaryTy;
     }
 
-    Type visitOverloadedSubscriptExpr(OverloadedSubscriptExpr *expr) {
-      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
-    }
-    
     Type visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }

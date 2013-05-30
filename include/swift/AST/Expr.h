@@ -1058,48 +1058,6 @@ public:
   }
 };
 
-
-/// OverloadedSubscriptExpr - Subscripting expressions like a[i] that refer to
-/// an element within a container for which overload resolution has found
-/// multiple potential subscript declarations that may apply.
-///
-/// Instances of OverloadedSubscriptExpr are mapped down to SubscriptExpr
-/// instances by type-checking.
-class OverloadedSubscriptExpr : public Expr {
-  ArrayRef<ValueDecl *> Decls;
-  Expr *Base;
-  Expr *Index;
-  
-  OverloadedSubscriptExpr(Expr *Base, ArrayRef<ValueDecl *> Decls,
-                          Expr *Index, Type Ty)
-    : Expr(ExprKind::OverloadedSubscript, Ty), Decls(Decls), Base(Base),
-      Index(Index) { }
-  
-public:
-  Expr *getBase() const { return Base; }
-  Expr *getIndex() const { return Index; }
-  
-  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
-
-  SourceLoc getLoc() const { return Index->getStartLoc(); }
-  SourceLoc getStartLoc() const { return getBase()->getStartLoc(); }
-  SourceLoc getEndLoc() const { return Index->getEndLoc(); }
-  
-  SourceRange getSourceRange() const {
-    return SourceRange(getBase()->getStartLoc(), getEndLoc());
-  }
-  
-  /// createWithCopy - Create and return a new OverloadedSubscriptExpr or a
-  /// new SubscriptExpr (if the list of decls has a single entry) from the
-  /// specified (non-empty) list of decls and with the given base/index.
-  static Expr *createWithCopy(Expr *Base, ArrayRef<ValueDecl*> Decls,
-                              Expr *Index);
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OverloadedSubscript;
-  }
-};
-
 /// UnresolvedDotExpr - A field access (foo.bar) on an expression with
 /// unresolved type.
 class UnresolvedDotExpr : public Expr {
