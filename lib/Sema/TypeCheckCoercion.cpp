@@ -2338,11 +2338,11 @@ static bool finalizeSubstitutions(CoercionContext &CC, SourceLoc ComplainLoc) {
                                ComplainLoc, &CC.Substitutions);
 }
 
-CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
-                                      CoercionContext *CC) {
+CoercedExpr coerceToType(TypeChecker &TC, Expr *E, Type DestTy, CoercionKind Kind,
+                         CoercionContext *CC) {
   // Preserve the input as-is if it's already of the appropriate type.
   if (E->getType()->isEqual(DestTy))
-    return CoercedExpr(*this, CoercionResult::Succeeded, E, DestTy);
+    return CoercedExpr(TC, CoercionResult::Succeeded, E, DestTy);
   
   unsigned Flags = CF_Apply | CF_UserConversions;
   switch (Kind) {
@@ -2358,7 +2358,7 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
     break;
   }
 
-  CoercionContext MyCC(*this);
+  CoercionContext MyCC(TC);
   if (!CC)
     CC = &MyCC;
 
@@ -2373,25 +2373,25 @@ CoercedExpr TypeChecker::coerceToType(Expr *E, Type DestTy, CoercionKind Kind,
 
       // If we failed here, we're done.
       if (Res.getKind() == CoercionResult::Failed) {
-        return CoercedExpr(*this, Res.getKind(), E, DestTy);
+        return CoercedExpr(TC, Res.getKind(), E, DestTy);
       }
     }
 
     // Substitute the deduced arguments into the type.
-    DestTy = substType(DestTy, CC->Substitutions);
-    validateTypeSimple(DestTy);
+    DestTy = TC.substType(DestTy, CC->Substitutions);
+    TC.validateTypeSimple(DestTy);
     if (!DestTy)
-      return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
+      return CoercedExpr(TC, CoercionResult::Failed, E, DestTy);
   }
 
   // If we've completed our substitutions, finalize them by gathering
   // protocol-conformance information for all of the associated types.
   if (CC->requiresSubstitution() && CC->hasCompleteSubstitutions() &&
       finalizeSubstitutions(*CC, E->getLoc()))
-    return CoercedExpr(*this, CoercionResult::Failed, E, DestTy);
+    return CoercedExpr(TC, CoercionResult::Failed, E, DestTy);
 
   CoercedResult Res = SemaCoerce::coerceToType(E, DestTy, *CC, Flags);
-  return CoercedExpr(*this, Res.getKind(),
+  return CoercedExpr(TC, Res.getKind(),
                      Res.getKind() == CoercionResult::Succeeded? Res.getExpr()
                                                                : E,
                      DestTy);

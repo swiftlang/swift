@@ -18,6 +18,48 @@
 #include "TypeChecker.h"
 using namespace swift;
 
+/// CoercionResult - Describes the result of attempting to coerce an
+/// expression to a given type.
+enum class CoercionResult {
+  Succeeded,
+  Failed,
+  Unknowable
+};
+
+/// CoercedExpr - Describes the result of coercing an expression to a given
+/// type.
+class CoercedExpr {
+  TypeChecker &TC;
+  CoercionResult Kind;
+  Expr *E;
+  Type DestTy;
+
+  void diagnose() const;
+
+public:
+  CoercedExpr(TypeChecker &TC, CoercionResult Kind, Expr *E, Type DestTy)
+    : TC(TC), Kind(Kind), E(E), DestTy(DestTy) {}
+
+  CoercionResult getKind() const { return Kind; }
+  Expr *getExpr() const { return E; }
+
+  explicit operator bool() const { return Kind == CoercionResult::Succeeded; }
+
+  operator Expr*() const {
+    switch (Kind) {
+    case CoercionResult::Succeeded:
+      return E;
+
+    case CoercionResult::Unknowable:
+      diagnose();
+      SWIFT_FALLTHROUGH;
+
+    case CoercionResult::Failed:
+      return 0;
+    }
+  }
+};
+
 /// \brief Wraps an expression that refers to an overloaded set of declarations,
 /// which may have various syntactic forms (normal reference, member reference,
 /// operator name) and may also refer to a single, generic declaration.
@@ -186,5 +228,20 @@ Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
 Expr *buildMemberRefExpr(TypeChecker &TC, Expr *Base, SourceLoc DotLoc,
                          MemberLookup &Results,
                          SourceLoc NameLoc);
+
+  /// coerceToType - Do semantic analysis of an expression in a context that
+  /// expects a particular type.  This performs a conversion to that type if
+  /// the types don't match and diagnoses cases where the conversion cannot be
+  /// performed.
+  ///
+  /// \param Kind The kind of coercion being performed.
+  ///
+  /// On success, returns the coerced expression. Otherwise, returns either
+  /// failure (in which case a diagnostic was produced) or 'unknowable', if
+  /// it is unknown whether the coercion can occur (e.g., due to literals that
+  /// have not been coerced to any specific type).
+CoercedExpr coerceToType(TypeChecker &TC, Expr *E, Type Ty,
+                         CoercionKind Kind = CoercionKind::Normal,
+                         CoercionContext *CC = nullptr);
 
 #endif

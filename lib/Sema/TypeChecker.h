@@ -29,48 +29,6 @@ namespace swift {
 class MemberLookup;
 class TypeChecker;
 
-/// CoercionResult - Describes the result of attempting to coerce an
-/// expression to a given type.
-enum class CoercionResult {
-  Succeeded,
-  Failed,
-  Unknowable
-};
-
-/// CoercedExpr - Describes the result of coercing an expression to a given
-/// type.
-class CoercedExpr {
-  TypeChecker &TC;
-  CoercionResult Kind;
-  Expr *E;
-  Type DestTy;
-
-  void diagnose() const;
-
-public:
-  CoercedExpr(TypeChecker &TC, CoercionResult Kind, Expr *E, Type DestTy)
-    : TC(TC), Kind(Kind), E(E), DestTy(DestTy) {}
-
-  CoercionResult getKind() const { return Kind; }
-  Expr *getExpr() const { return E; }
-
-  explicit operator bool() const { return Kind == CoercionResult::Succeeded; }
-
-  operator Expr*() const {
-    switch (Kind) {
-    case CoercionResult::Succeeded:
-      return E;
-
-    case CoercionResult::Unknowable:
-      diagnose();
-      SWIFT_FALLTHROUGH;
-
-    case CoercionResult::Failed:
-      return 0;
-    }
-  }
-};
-
 /// \brief Describes the kind of a literal.
 enum class LiteralKind : char {
   Int, Float, Char, UTFString, ASCIIString, Array, Dictionary
@@ -394,22 +352,15 @@ public:
   /// \brief Retrieve the default literal type for the given literal
   /// expression.
   Type getDefaultLiteralType(LiteralExpr *E);
-
-  /// coerceToType - Do semantic analysis of an expression in a context that
-  /// expects a particular type.  This performs a conversion to that type if
-  /// the types don't match and diagnoses cases where the conversion cannot be
-  /// performed.
-  ///
-  /// \param Kind The kind of coercion being performed.
-  ///
-  /// On success, returns the coerced expression. Otherwise, returns either
-  /// failure (in which case a diagnostic was produced) or 'unknowable', if
-  /// it is unknown whether the coercion can occur (e.g., due to literals that
-  /// have not been coerced to any specific type).
-  CoercedExpr coerceToType(Expr *E, Type Ty,
-                           CoercionKind Kind = CoercionKind::Normal,
-                           CoercionContext *CC = nullptr);
     
+  /// \brief Convert the given expression to the given type.
+  ///
+  /// \param expr The expression, which will be updated in place.
+  /// \param type The type to convert to.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool convertToType(Expr *&expr, Type type);
+
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
   

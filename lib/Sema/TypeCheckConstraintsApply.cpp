@@ -1355,10 +1355,8 @@ namespace {
         }
 
         // Coerce to the supertype of the archetype.
-        sub = tc.coerceToType(sub, toSuperType);
-        if (!sub) {
+        if (tc.convertToType(sub, toSuperType))
           return nullptr;
-        }
         
         // The source type must be equivalent to or a supertype of the supertype
         // of the destination archetype.

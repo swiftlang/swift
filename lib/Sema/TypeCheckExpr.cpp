@@ -128,7 +128,10 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   FunctionType *fnTy = FunctionType::get(input, result, Context);
 
   // FIXME: this produces terrible diagnostics.
-  return coerceToType(injectionFn, fnTy);
+  if (convertToType(injectionFn, fnTy))
+    return nullptr;
+
+  return injectionFn;
 }
 
 /// getInfixData - If the specified expression is an infix binary
