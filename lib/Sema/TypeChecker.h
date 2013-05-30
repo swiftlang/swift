@@ -50,41 +50,6 @@ enum class CoercionKind {
   ImplicitLValue
 };
 
-/// \brief Captures information about the context of a type coercion, including
-/// the type checker instance and the type substitutions deduced by the
-/// coercion.
-struct CoercionContext {
-  CoercionContext(TypeChecker &TC) : TC(TC) { }
-  
-  TypeChecker &TC;
-  TypeSubstitutionMap Substitutions;
-
-  /// \brief Mapping from each of the substitutable types to the set of
-  /// protocol-conformance mappings for each of the requirements on the
-  /// type.
-  ConformanceMap Conformance;
-
-  /// \brief Identify the set of generic parameters for which we want to
-  /// compute substitutions.
-  void requestSubstitutionsFor(ArrayRef<DeducibleGenericParamType *> Params);
-  
-  /// \brief Retrieve the substitution for the given deducible generic
-  /// parameter type.
-  Type getSubstitution(DeducibleGenericParamType *Deducible) const {
-    TypeSubstitutionMap::const_iterator Pos = Substitutions.find(Deducible);
-    assert(Pos != Substitutions.end() && "Not deducible");
-    return Pos->second;
-  }
-
-  /// \brief Determine whether the given coercion context requires
-  /// substitutions.
-  bool requiresSubstitution() const { return !Substitutions.empty(); }
-
-  /// \brief Determine whether this coercion context has complete substitution
-  /// information.
-  bool hasCompleteSubstitutions() const;
-};
-
 /// \brief The set of known protocols.
 enum class KnownProtocolKind : unsigned {
   /// \brief The 'ArrayBound' protocol, used for array bounds.

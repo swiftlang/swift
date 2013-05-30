@@ -4,7 +4,6 @@ add_swift_library(swiftSema
   NameBinding.cpp
   SourceLoader.cpp
   TypeChecker.cpp
-  TypeCheckCoercion.cpp
   TypeCheckConstraints.cpp
   TypeCheckConstraintsApply.cpp
   TypeCheckConstraintsDiag.cpp
@@ -14,7 +13,6 @@ add_swift_library(swiftSema
   TypeCheckDecl.cpp
   TypeCheckGeneric.cpp
   TypeCheckNameLookup.cpp
-  TypeCheckOverload.cpp
   TypeCheckPattern.cpp
   TypeCheckProtocol.cpp
   TypeCheckREPL.cpp
