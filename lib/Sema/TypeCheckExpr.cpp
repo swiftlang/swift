@@ -357,6 +357,19 @@ static Expr *foldSequence(TypeChecker &TC,
   return makeOperatorExpr(LHS, Op1, RHS);
 }
 
+Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
+  assert(!Decls.empty() && "Must have at least one declaration");
+
+  if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
+    return new (Context) DeclRefExpr(Decls[0], NameLoc,
+                                     Decls[0]->getTypeOfReference());
+  }
+
+  Decls = Context.AllocateCopy(Decls);
+  return new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
+                         UnstructuredUnresolvedType::get(Context));
+}
+
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
   UnqualifiedLookup lookup(TC.Context.getIdentifier(name), &TC.TU);
   TypeDecl *TD = lookup.getSingleTypeResult();
