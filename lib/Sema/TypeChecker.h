@@ -237,14 +237,6 @@ public:
   /// the type has no supertype.
   Type getSuperClassOf(Type type);
 
-  bool isSubtypeOf(Type T1, Type T2, bool &Trivial,
-                   CoercionContext *CC);
-  bool isSubtypeOf(Type T1, Type T2, CoercionContext *CC) {
-    bool Trivial = false;
-    return isSubtypeOf(T1, T2, Trivial, CC);
-  }
-  bool isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC = nullptr);
-
   /// \brief Determine whether one type is a subtype of another.
   ///
   /// \param t1 The first type.

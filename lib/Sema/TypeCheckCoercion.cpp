@@ -36,6 +36,14 @@ static bool recordDeduction(CoercionContext &CC, SourceLoc Loc,
                             Type DeducedTy, unsigned Flags);
 bool isSameType(TypeChecker &tc, Type T1, Type T2,
                 CoercionContext *CC = nullptr, bool Labeled = true);
+bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, bool &Trivial,
+                 CoercionContext *CC);
+bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, CoercionContext *CC) {
+  bool Trivial = false;
+  return isSubtypeOf(TC, T1, T2, Trivial, CC);
+}
+
+bool isTrivialSubtypeOf(TypeChecker &TC, Type T1, Type T2, CoercionContext *CC = nullptr);
 Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
 Expr *convertToRValueOld(TypeChecker &TC, Expr *E);
 void diagnoseEmptyOverloadSet(TypeChecker &TC, Expr *E,
@@ -1803,7 +1811,7 @@ SemaCoerce::coerceObjectArgument(Expr *E, Type ContainerTy, CoercionContext &CC,
   // Check whether the source object is the same as or a subtype of the
   // container type.
   bool Trivial;
-  if (!TC.isSubtypeOf(SrcObjectTy, ContainerTy, Trivial, &CC)) {
+  if (!isSubtypeOf(TC, SrcObjectTy, ContainerTy, Trivial, &CC)) {
     if (Flags & CF_Apply)
       TC.diagnose(E->getLoc(), diag::no_convert_object_arg, SrcObjectTy,
                   ContainerTy);
@@ -2193,8 +2201,9 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // conversion might be okay.
   if (auto destMetatype = DestTy->getAs<MetaTypeType>()) {
     if (auto srcMetatype = E->getType()->getAs<MetaTypeType>()) {
-      if (TC.isTrivialSubtypeOf(srcMetatype->getInstanceType(),
-                                destMetatype->getInstanceType())) {
+      if (isTrivialSubtypeOf(TC, 
+                             srcMetatype->getInstanceType(),
+                             destMetatype->getInstanceType())) {
         return coerced(new (TC.Context) MetatypeConversionExpr(E, DestTy),
                        Flags);
       }
@@ -2205,7 +2214,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   // type, so long as the source is a subtype of the destination.
   if (E->getType()->is<AnyFunctionType>() && DestTy->is<AnyFunctionType>()) {
     bool Trivial;
-    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
+    if (isSubtypeOf(TC, E->getType(), DestTy, Trivial, &CC)) {
       if (!(Flags & CF_Apply))
         return DestTy;
       
@@ -2220,7 +2229,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
   if (E->getType()->mayHaveSuperclass() &&
       DestTy->getClassOrBoundGenericClass()) {
     bool Trivial;
-    if (TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC)) {
+    if (isSubtypeOf(TC, E->getType(), DestTy, Trivial, &CC)) {
       if (!(Flags & CF_Apply))
         return DestTy;
 
@@ -2281,7 +2290,7 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // Could not do the conversion.
   bool Trivial;
-  assert(!TC.isSubtypeOf(E->getType(), DestTy, Trivial, &CC) &&
+  assert(!isSubtypeOf(TC, E->getType(), DestTy, Trivial, &CC) &&
          "subtype relationship not handled by type coercion");
   (void)Trivial;
 
@@ -2478,8 +2487,8 @@ namespace {
   };
 }
 
-/// \brief Helper routine for TypeChecker::isSubtypeOf and
-/// TypeChecker::isSameType that performs the actual comparison between types.
+/// \brief Helper routine for isSubtypeOf and
+/// isSameType that performs the actual comparison between types.
 static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
                        bool &Trivial, CoercionContext *CC) {
   assert((!(Flags & ST_AllowNonTrivialFunctionSubtype) ||
@@ -2712,18 +2721,18 @@ static bool matchTypes(TypeChecker &TC, Type T1, Type T2, unsigned Flags,
 /// representation change (such as introducing a protocol-conformance mapping).
 ///
 /// This checks for a non-strict subtyping relationship T1 <= T2.
-bool TypeChecker::isSubtypeOf(Type T1, Type T2, bool &Trivial,
-                              CoercionContext *CC) {
+bool isSubtypeOf(TypeChecker &TC, Type T1, Type T2, bool &Trivial,
+                 CoercionContext *CC) {
   Trivial = true;
   unsigned Flags = ST_Unlabeled | ST_AllowSubtype | ST_AllowNonTrivialSubtype
                  |  ST_AllowNonTrivialFunctionSubtype;
-  return matchTypes(*this, T1, T2, Flags, Trivial, CC);
+  return matchTypes(TC, T1, T2, Flags, Trivial, CC);
 }
 
-bool TypeChecker::isTrivialSubtypeOf(Type T1, Type T2, CoercionContext *CC) {
+bool isTrivialSubtypeOf(TypeChecker &TC, Type T1, Type T2, CoercionContext *CC) {
   bool trivial = false;
   unsigned flags = ST_AllowSubtype;
-  return matchTypes(*this, T1, T2, flags, trivial, CC);
+  return matchTypes(TC, T1, T2, flags, trivial, CC);
 }
 
 bool isSameType(TypeChecker &tc, Type T1, Type T2, CoercionContext *CC,
