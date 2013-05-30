@@ -565,15 +565,7 @@ public:
   CoercedExpr coerceToType(Expr *E, Type Ty,
                            CoercionKind Kind = CoercionKind::Normal,
                            CoercionContext *CC = nullptr);
-  
-  /// coerceObjectArgument - Coerce the given expression to an object argument
-  /// of the given container type.
-  ///
-  /// The resulting expression will always be an lvalue, but may be an lvalue
-  /// to a subtype of the requested container type.
-  Expr *coerceObjectArgument(Expr *E, Type ContainerTy,
-                             CoercionContext *CC = nullptr);
-  
+    
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
   
@@ -663,80 +655,6 @@ public:
   /// to overload resolution.
   /// @{
   
-  /// diagnoseEmptyOverloadSet - Diagnose a case where we disproved all of the
-  /// possible candidates in an overload set of a call.
-  void diagnoseEmptyOverloadSet(Expr *E, ArrayRef<ValueDecl *> Candidates);
-  void printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates);
-
-  /// \brief "Open" the archetypes of a type to make them deducible.
-  ///
-  /// \param T The type to be opened.
-  ///
-  /// \param GenericParams The generic parameter list, which contains the
-  /// archetypes to be opened up (made deducible).
-  ///
-  /// \param CC The coercion context into which the types will be opened.
-  /// After having opened the types, the coercion context contains the mappings
-  /// needed to determine when all types have been deduced.
-  ///
-  /// \param OnlyInnermostParams Whether we should only up the innermost
-  /// generic parameters. Otherwise, parameters from all levels will be opened.
-  ///
-  /// \returns The type T, with each of the archetypes in \c GenericParams
-  /// substitued for deducible types.
-  Type openPolymorphicType(Type T, const GenericParamList &GenericParams,
-                           CoercionContext &CC, bool OnlyInnermostParams);
-
-  /// \brief "Open" the archetypes of a set of types to make them deducible.
-  ///
-  /// \param Types The type to be opened, which will be mutated in place.
-  ///
-  /// \param GenericParams The generic parameter list, which contains the
-  /// archetypes to be opened up (made deducible).
-  ///
-  /// \param CC The coercion context into which the types will be opened.
-  /// After having opened the types, the coercion context contains the mappings
-  /// needed to determine when all types have been deduced.
-  ///
-  /// \param OnlyInnermostParams Whether we should only up the innermost
-  /// generic parameters. Otherwise, parameters from all levels will be opened.
-  void openPolymorphicTypes(MutableArrayRef<Type> Types,
-                            const GenericParamList &GenericParams,
-                            CoercionContext &CC, bool OnlyInnermostParams);
-
-  /// \brief Substitute a specific base type into the type T of a generic type
-  /// member, returning the appropriately substituted type along with a coercion
-  /// context.
-  ///
-  /// \param VD The declaration we're referring to.
-  /// \param BaseTy The type of the base of the member reference.
-  /// \param T The type of the declaration.
-  /// \param Loc The location of this substitution.
-  /// \param CC A fresh coercion context that will be populated with the
-  /// substitutions.
-  /// \param [out] GenericParams If non-NULL, will be provided with the generic
-  /// parameter list used for substitution.
-  Type substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy, Type T,
-                                     SourceLoc Loc, CoercionContext &CC,
-                                     GenericParamList **GenericParams =nullptr);
-
-  /// \brief Substitute a specific base type into the type T of a generic type
-  /// member, returning the appropriately substituted type along with a coercion
-  /// context.
-  ///
-  /// \param VD The declaration we're referring to.
-  /// \param BaseTy The type of the base of the member reference.
-  /// \param Types An array of types that we'll substitute into.
-  /// \param Loc The location of this substitution.
-  /// \param CC A fresh coercion context that will be populated with the
-  /// substitutions.
-  /// \param [out] GenericParams If non-NULL, will be provided with the generic
-  /// parameter list used for substitution.
-  bool substBaseForGenericTypeMember(ValueDecl *VD, Type BaseTy,
-                                     MutableArrayRef<Type> Types,
-                                     SourceLoc Loc, CoercionContext &CC,
-                                     GenericParamList **GenericParams =nullptr);
-
   /// checkPolymorphicApply - Check the application of a function of the given
   /// polymorphic type to a particular argument with, optionally, a destination
   /// type.

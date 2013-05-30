@@ -37,6 +37,9 @@ bool isSameType(TypeChecker &tc, Type T1, Type T2,
                 CoercionContext *CC = nullptr, bool Labeled = true);
 Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E);
 Expr *convertToRValueOld(TypeChecker &TC, Expr *E);
+void diagnoseEmptyOverloadSet(TypeChecker &TC, Expr *E,
+                              ArrayRef<ValueDecl *> Candidates);
+void printOverloadSetCandidates(TypeChecker &TC, ArrayRef<ValueDecl *> Candidates);
 
 namespace {
 
@@ -315,7 +318,7 @@ public:
              !Viable.empty(), BaseTy, E->getIndex()->getType())
       .highlight(E->getBase()->getSourceRange())
       .highlight(E->getIndex()->getSourceRange());
-    TC.printOverloadSetCandidates(Viable);
+    printOverloadSetCandidates(TC, Viable);
     E->setType(ErrorType::get(TC.Context));
     return nullptr;
 
@@ -368,11 +371,11 @@ public:
         diagnose(Loc, diag::no_candidates_ref,
                  Ovl.getCandidates()[0]->getName())
           .highlight(Ovl.getExpr()->getSourceRange());
-        TC.printOverloadSetCandidates(Ovl.getCandidates());
+        printOverloadSetCandidates(TC, Ovl.getCandidates());
       } else {
         diagnose(Loc, diag::overloading_ambiguity)
           .highlight(Ovl.getExpr()->getSourceRange());
-        TC.printOverloadSetCandidates(Viable);
+        printOverloadSetCandidates(TC, Viable);
       }
     }
 
@@ -1144,7 +1147,7 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
       // FIXME: We want range information here.
       diagnose(Segment->getLoc(), diag::string_interpolation_overload_fail,
                Segment->getType(), DestTy);
-      TC.printOverloadSetCandidates(Viable.empty()? ctors : Viable);
+      printOverloadSetCandidates(TC, Viable.empty()? ctors : Viable);
     }
     return nullptr;
   }
@@ -1186,9 +1189,9 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
         diagnose(E->getStartLoc(), diag::string_interpolation_overload_fail,
                  Result->getType(), Segment->getType());
         if (Viable.empty())
-          TC.printOverloadSetCandidates(plusResults);
+          printOverloadSetCandidates(TC, plusResults);
         else
-          TC.printOverloadSetCandidates(Viable);
+          printOverloadSetCandidates(TC, Viable);
       }
       
       return nullptr;
@@ -1248,13 +1251,13 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
     
     if (Flags & CF_Apply) {
       if (Viable.empty()) {
-        TC.diagnoseEmptyOverloadSet(E, Ovl.getCandidates());
+        diagnoseEmptyOverloadSet(TC, E, Ovl.getCandidates());
       } else if (E->getArg()->getType()->isUnresolvedType()) {
         return CoercionResult::Unknowable;
       } else {
         diagnose(E->getFn()->getLoc(), diag::overloading_ambiguity)
           .highlight(E->getSourceRange());
-        TC.printOverloadSetCandidates(Viable);
+        printOverloadSetCandidates(TC, Viable);
       }
       E->setType(ErrorType::get(TC.Context));
 
@@ -2503,26 +2506,6 @@ CoercionResult isCoercibleToType(TypeChecker &tc, Expr *E, Type Ty,
     return CoercionResult::Failed;
 
   return SemaCoerce::coerceToType(E, Ty, *CC, Flags).getKind();
-}
-
-Expr *TypeChecker::coerceObjectArgument(Expr *E, Type ContainerTy,
-                                        CoercionContext *CC) {
-  CoercionContext MyCC(*this);
-  if (!CC)
-    CC = &MyCC;
-
-  if (CoercedResult Res = SemaCoerce::coerceObjectArgument(E, ContainerTy,
-                                                           *CC, CF_Apply))
-    return Res.getExpr();
-  else if (Res.getKind() == CoercionResult::Unknowable) {
-    ContainerTy = ContainerTy->getRValueType();
-
-    Type SrcObjectTy = E->getType()->getRValueType();
-    diagnose(E->getLoc(), diag::no_convert_object_arg, SrcObjectTy,
-             ContainerTy);
-  }
-
-  return nullptr;
 }
 
 Expr *convertLValueToRValue(TypeChecker &tc, LValueType *srcLV, Expr *E) {

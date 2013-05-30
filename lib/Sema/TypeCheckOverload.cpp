@@ -38,8 +38,13 @@ static bool displayOperandType(Type T) {
   return !T->isUnresolvedType() && !T->is<ErrorType>();
 }
 
-void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
-                                           ArrayRef<ValueDecl *> Candidates) {
+void printOverloadSetCandidates(TypeChecker &TC, ArrayRef<ValueDecl *> Candidates) {
+  for (auto TheDecl : Candidates)
+    TC.diagnose(TheDecl, diag::found_candidate);
+}
+
+void diagnoseEmptyOverloadSet(TypeChecker &TC, Expr *E,
+                              ArrayRef<ValueDecl *> Candidates) {
   if (const BinaryExpr *BE = dyn_cast<BinaryExpr>(E)) {
     // FIXME: this feels a bit ad hoc with how we dig through the AST, and
     // it possibly makes assumptions that aren't true or I don't understand.
@@ -55,12 +60,12 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     Type TypeA = Elements[0]->getType();
     Type TypeB = Elements[1]->getType();
     if (displayOperandType(TypeA) && displayOperandType(TypeB)) {
-      diagnose(L, diag::no_candidates_binop, I, TypeA, TypeB)
+      TC.diagnose(L, diag::no_candidates_binop, I, TypeA, TypeB)
         .highlight(Elements[0]->getSourceRange())
         .highlight(Elements[1]->getSourceRange());
     }
     else {
-      diagnose(L, diag::no_candidates_op, 0, I)
+      TC.diagnose(L, diag::no_candidates_op, 0, I)
         .highlight(Elements[0]->getSourceRange())
         .highlight(Elements[1]->getSourceRange());
     }
@@ -78,24 +83,19 @@ void TypeChecker::diagnoseEmptyOverloadSet(Expr *E,
     // so if it is a unresolved type.  Otherwise, the diagnostic is confusing.
     Type TypeArg = Arg->getType();
     if (displayOperandType(TypeArg)) {      
-      diagnose(Arg->getLoc(), diag::no_candidates_unary, I, TypeArg)
+      TC.diagnose(Arg->getLoc(), diag::no_candidates_unary, I, TypeArg)
         .highlight(Arg->getSourceRange());
     }
     else {
-      diagnose(Arg->getLoc(), diag::no_candidates_op, 1, I)
+      TC.diagnose(Arg->getLoc(), diag::no_candidates_op, 1, I)
         .highlight(Arg->getSourceRange());
     }
   }
   else {
-    diagnose(E->getLoc(), diag::no_candidates)
+    TC.diagnose(E->getLoc(), diag::no_candidates)
       .highlight(E->getSourceRange());
   }
-  printOverloadSetCandidates(Candidates);
-}
-
-void TypeChecker::printOverloadSetCandidates(ArrayRef<ValueDecl *> Candidates) {
-  for (auto TheDecl : Candidates)
-    diagnose(TheDecl, diag::found_candidate);
+  printOverloadSetCandidates(TC, Candidates);
 }
 
 static void
@@ -147,12 +147,12 @@ getDeducibleType(TypeChecker &TC, Type T, ArrayRef<GenericParam> GenericParams,
   return T;
 }
 
-Type TypeChecker::openPolymorphicType(Type T,
-                                      const GenericParamList &GenericParams,
-                                      CoercionContext &CC,
-                                      bool OnlyInnermostParams) {
+static Type openPolymorphicType(TypeChecker &TC, Type T,
+                                const GenericParamList &GenericParams,
+                                CoercionContext &CC,
+                                bool OnlyInnermostParams) {
   SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
-  T = getDeducibleType(*this, T, GenericParams.getParams(),
+  T = getDeducibleType(TC, T, GenericParams.getParams(),
                        OnlyInnermostParams? nullptr
                                           : GenericParams.getOuterParameters(),
                        deducibleParams);
@@ -160,12 +160,12 @@ Type TypeChecker::openPolymorphicType(Type T,
   return T;
 }
 
-void TypeChecker::openPolymorphicTypes(MutableArrayRef<Type> Types,
-                                       const GenericParamList &GenericParams,
-                                       CoercionContext &CC,
-                                       bool OnlyInnermostParams) {
+static void openPolymorphicTypes(TypeChecker &TC, MutableArrayRef<Type> Types,
+                                 const GenericParamList &GenericParams,
+                                 CoercionContext &CC,
+                                 bool OnlyInnermostParams) {
   SmallVector<DeducibleGenericParamType *, 2> deducibleParams;
-  getDeducibleTypes(*this, Types, GenericParams.getParams(),
+  getDeducibleTypes(TC, Types, GenericParams.getParams(),
                     OnlyInnermostParams? nullptr
                                        : GenericParams.getOuterParameters(),
                     deducibleParams);
@@ -184,7 +184,7 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   // function.
   CoercionContext CC(*this);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), CC,
+    = openPolymorphicType(*this, PolyFn, PolyFn->getGenericParams(), CC,
                           /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
@@ -234,7 +234,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   // function.
   CoercionContext LocalCC(*this);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(PolyFn, PolyFn->getGenericParams(), LocalCC,
+    = openPolymorphicType(*this, PolyFn, PolyFn->getGenericParams(), LocalCC,
                           /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
@@ -333,12 +333,12 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   return OverloadCandidate(nullptr, SrcTy, std::move(SubstitutionInfo));
 }
 
-Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
-                                                Type BaseTy,
-                                                Type T,
-                                                SourceLoc Loc,
-                                                CoercionContext &CC,
-                                          GenericParamList **OutGenericParams) {
+static Type substBaseForGenericTypeMember(TypeChecker &TC, ValueDecl *VD,
+                                          Type BaseTy,
+                                          Type T,
+                                          SourceLoc Loc,
+                                          CoercionContext &CC,
+                                          GenericParamList **OutGenericParams = nullptr) {
   // Dig out the instance type we're dealing with for the base.
   BaseTy = BaseTy->getRValueType();
   if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
@@ -363,7 +363,7 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Open up the owner type so we can deduce its arguments.
   Type openedTypes[2] = { ownerTy, T };
-  openPolymorphicTypes(openedTypes, *genericParams, CC,
+  openPolymorphicTypes(TC, openedTypes, *genericParams, CC,
                        /*OnlyInnermostParams=*/false);
 
   if (OutGenericParams)
@@ -371,7 +371,7 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
-  CoercionResult cr = isCoercibleToType(*this, &base, openedTypes[0],
+  CoercionResult cr = isCoercibleToType(TC, &base, openedTypes[0],
                                         CoercionKind::Normal, &CC);
   if (cr == CoercionResult::Failed)
     return nullptr;
@@ -379,24 +379,25 @@ Type TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   assert(CC.hasCompleteSubstitutions() && "Incomplete substitution?");
 
   // Substitute the deduced arguments into the type T.
-  T = substType(openedTypes[1], CC.Substitutions);
+  T = TC.substType(openedTypes[1], CC.Substitutions);
 
   // We've already substituted through the parameters of the polymorphic
   // function type, so make it a monomorphic function type.
   if (auto polyFn = T->getAs<PolymorphicFunctionType>()) {
-    T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), Context);
+    T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), TC.Context);
   }
 
-  validateTypeSimple(T);
+  TC.validateTypeSimple(T);
   return T;
 }
 
-bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
-                                                Type BaseTy,
-                                                MutableArrayRef<Type> Types,
-                                                SourceLoc Loc,
-                                                CoercionContext &CC,
-                                          GenericParamList **OutGenericParams) {
+static bool substBaseForGenericTypeMember(TypeChecker &TC, 
+                                          ValueDecl *VD,
+                                          Type BaseTy,
+                                          MutableArrayRef<Type> Types,
+                                          SourceLoc Loc,
+                                          CoercionContext &CC,
+                                          GenericParamList **OutGenericParams = nullptr) {
   // Dig out the instance type we're dealing with for the base.
   BaseTy = BaseTy->getRValueType();
   if (auto BaseMeta = BaseTy->getAs<MetaTypeType>())
@@ -412,7 +413,7 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   openedTypes.reserve(Types.size() + 1);
   openedTypes.append(Types.begin(), Types.end());
   openedTypes.push_back(ownerTy);
-  openPolymorphicTypes(openedTypes, *genericParams, CC,
+  openPolymorphicTypes(TC, openedTypes, *genericParams, CC,
                        /*OnlyInnermostParams=*/false);
 
   if (OutGenericParams)
@@ -420,7 +421,7 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
 
   // Deduce the arguments.
   OpaqueValueExpr base(Loc, BaseTy);
-  CoercionResult cr = isCoercibleToType(*this, &base, openedTypes.back(),
+  CoercionResult cr = isCoercibleToType(TC, &base, openedTypes.back(),
                                         CoercionKind::Normal, &CC);
   if (cr == CoercionResult::Failed)
     return true;
@@ -428,12 +429,12 @@ bool TypeChecker::substBaseForGenericTypeMember(ValueDecl *VD,
   assert(CC.hasCompleteSubstitutions() && "Incomplete substitution?");
 
   for (unsigned i = 0, n = Types.size(); i != n; ++i) {
-    Type T = substType(openedTypes[i], CC.Substitutions);
+    Type T = TC.substType(openedTypes[i], CC.Substitutions);
 
     // We've already substituted through the parameters of the polymorphic
     // function type, so make it a monomorphic function type.
     if (auto polyFn = T->getAs<PolymorphicFunctionType>()) {
-      T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), Context);
+      T = FunctionType::get(polyFn->getInput(), polyFn->getResult(), TC.Context);
     }
 
     Types[i] = T;
@@ -486,7 +487,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         if (isa<ConstructorDecl>(VD) || isa<OneOfElementDecl>(VD) ||
             isa<FuncDecl>(VD)) {
           CoercionContext InitialCC(*this);
-          FunctionTy = substBaseForGenericTypeMember(VD, BaseTy, FunctionTy,
+          FunctionTy = substBaseForGenericTypeMember(*this, VD, BaseTy, FunctionTy,
                                                      Arg->getLoc(), InitialCC)
                            ->castTo<AnyFunctionType>();
           substitutedWithBase = true;
@@ -1071,7 +1072,8 @@ Expr *TypeChecker::buildMemberRefExpr(Expr *Base, SourceLoc DotLoc,
         // specialized based on the deducing the arguments of the generic
         // type.
         CoercionContext CC(*this);
-        Type substTy = substBaseForGenericTypeMember(Member, baseTy,
+        Type substTy = substBaseForGenericTypeMember(*this,
+                                                     Member, baseTy,
                                                      Member->getTypeOfReference(),
                                                      MemberLoc, CC);
             // FIXME: Check for errors here?
