@@ -123,6 +123,12 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
       result.push_back(superclass);
   }
 
+  if (auto lvalue = type->getAs<LValueType>()) {
+    if (lvalue->getQualifiers().isImplicit()) {
+      result.push_back(lvalue->getObjectType());
+    }
+  }
+
   // FIXME: lots of other cases to consider!
   return result;
 }
