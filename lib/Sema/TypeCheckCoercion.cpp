@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckerOld.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -40,7 +41,28 @@ Expr *convertToRValueOld(TypeChecker &TC, Expr *E);
 void diagnoseEmptyOverloadSet(TypeChecker &TC, Expr *E,
                               ArrayRef<ValueDecl *> Candidates);
 void printOverloadSetCandidates(TypeChecker &TC, ArrayRef<ValueDecl *> Candidates);
-
+OverloadCandidate checkPolymorphicApply(TypeChecker &TC,
+                                        PolymorphicFunctionType *PolyFn,
+                                        CoercionKind Kind,
+                                        Expr *Arg,
+                                        Type DestTy);
+OverloadCandidate checkPolymorphicUse(TypeChecker &TC, 
+                                      PolymorphicFunctionType *PolyFn, Type DestTy,
+                                      SourceLoc Loc,
+                                      CoercionContext *CC);
+OverloadCandidate filterOverloadSet(TypeChecker &TC, ArrayRef<ValueDecl *> Candidates,
+                                    bool OperatorSyntax,
+                                    Type BaseTy,
+                                    Expr *Arg,
+                                    Type DestTy,
+                                    SmallVectorImpl<ValueDecl *> &Viable);
+OverloadCandidate filterOverloadSetForValue(TypeChecker &TC, 
+                                            ArrayRef<ValueDecl *> Candidates,
+                                            SourceLoc Loc,
+                                            Type BaseTy,
+                                            Type DestTy,
+                                            SmallVectorImpl<ValueDecl *> &Viable,
+                                            CoercionContext *CC);
 namespace {
 
 /// CoercedResult - The result of coercing a given expression to a given
@@ -145,6 +167,41 @@ static Expr *recheckTypes(TypeChecker &TC, Expr *E) {
   if (TC.typeCheckExpressionShallow(E))
     return nullptr;
   return E;
+}
+
+static OverloadedExpr getOverloadedExpr(Expr *E) {
+  Expr *expr = E->getSemanticsProvidingExpr();
+
+  // Handle overloaded set references.
+  if (auto OSE = dyn_cast<OverloadSetRefExpr>(expr)) {
+    return OverloadedExpr(E, OSE->getBaseType(), OSE->getDecls());
+  }
+
+  // Only expressions with polymorphic function type can be overloaded beyond
+  // this point.
+  if (!expr->getType()->is<PolymorphicFunctionType>()) {
+    return OverloadedExpr();
+  }
+
+  // Handle expressions that refer to a given overloadable declaration.
+  if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
+    return OverloadedExpr(E, Type(), DRE->getDecl());
+  }
+  if (auto AMR = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
+    return OverloadedExpr(E, AMR->getBase()->getType(), AMR->getDecl());
+  }
+  if (auto ASR = dyn_cast<ArchetypeSubscriptExpr>(expr)) {
+    return OverloadedExpr(E, ASR->getBase()->getType(), ASR->getDecl());
+  }
+  if (auto EMR = dyn_cast<ExistentialMemberRefExpr>(expr)) {
+    return OverloadedExpr(E, EMR->getBase()->getType(), EMR->getDecl());
+  }
+  if (auto ESR = dyn_cast<ExistentialSubscriptExpr>(expr)) {
+    return OverloadedExpr(E, ESR->getBase()->getType(), ESR->getDecl());
+  }
+
+  // There is no declaration here to overload on.
+  return OverloadedExpr();
 }
 
 /// SemaCoerce - This class implements top-down semantic analysis (aka "root to
@@ -303,9 +360,9 @@ public:
     Type DestElementTy = DestTy->getRValueType();
 
     llvm::SmallVector<ValueDecl *, 2> Viable;
-    auto Best = TC.filterOverloadSet(E->getDecls(), /*OperatorSyntax=*/true,
-                                     BaseTy, E->getIndex(), DestElementTy,
-                                     Viable);
+    auto Best = filterOverloadSet(TC, E->getDecls(), /*OperatorSyntax=*/true,
+                                  BaseTy, E->getIndex(), DestElementTy,
+                                  Viable);
     
     if (Best) {
       llvm_unreachable("can't get here");
@@ -328,9 +385,9 @@ public:
     SourceLoc Loc = Ovl.getExpr()->getLoc();
     SmallVector<ValueDecl *, 4> Viable;
     if (OverloadCandidate Best
-          = TC.filterOverloadSetForValue(Ovl.getCandidates(), Loc,
-                                         Ovl.getBaseType(), DestTy,
-                                         Viable, &CC)) {
+          = filterOverloadSetForValue(TC, Ovl.getCandidates(), Loc,
+                                      Ovl.getBaseType(), DestTy,
+                                      Viable, &CC)) {
 
       // We can only perform this coercion in a context where we can
       // implicitly treat the expression as an lvalue.
@@ -360,7 +417,7 @@ public:
         return coerceToType(&OVE, DestTy, CC, SubFlags);
       }
 
-      Expr *Result = TC.buildFilteredOverloadSet(Ovl, Best);
+      Expr *Result = buildFilteredOverloadSet(TC, Ovl, Best);
       if (!DestTy->is<LValueType>())
         Result = convertToRValueOld(TC, Result);
       return coerceToType(Result, DestTy, CC, SubFlags);
@@ -388,7 +445,7 @@ public:
   }
 
   CoercedResult visitOverloadSetRefExpr(OverloadSetRefExpr *E) {
-    return visitOverloadedExpr(TC.getOverloadedExpr(E));
+    return visitOverloadedExpr(getOverloadedExpr(E));
   }
   
   // If this is an UnresolvedMemberExpr, then this provides the type we've
@@ -1116,8 +1173,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
 
     // Second, try to find a constructor to explicitly perform the conversion.
     SmallVector<ValueDecl *, 4> Viable;
-    auto Best = TC.filterOverloadSet(ctors, /*OperatorSyntax=*/true,
-                                     DestTy, Segment, Type(), Viable);
+    auto Best = filterOverloadSet(TC, ctors, /*OperatorSyntax=*/true,
+                                  DestTy, Segment, Type(), Viable);
     if (Best) {
       if (!(Flags & CF_Apply))
         continue;
@@ -1181,8 +1238,8 @@ CoercedResult SemaCoerce::visitInterpolatedStringLiteralExpr(
     
     // Perform overload resolution.
     SmallVector<ValueDecl *, 16> Viable;
-    auto Best = TC.filterOverloadSet(plusResults, /*OperatorSyntax=*/true,
-                                     Type(), Arg, Type(), Viable);
+    auto Best = filterOverloadSet(TC, plusResults, /*OperatorSyntax=*/true,
+                                  Type(), Arg, Type(), Viable);
     if (!Best) {
       if (Flags & CF_Apply) {
         // FIXME: We want range information here.
@@ -1220,15 +1277,15 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
   // prune the second one, and then recursively apply 'int' to b.
   //
 
-  if (OverloadedExpr Ovl = TC.getOverloadedExpr(E->getFn())) {
+  if (OverloadedExpr Ovl = getOverloadedExpr(E->getFn())) {
     SmallVector<ValueDecl*, 4> Viable;
-    if (auto Best = TC.filterOverloadSet(Ovl.getCandidates(),
-                                         (isa<PrefixUnaryExpr>(E) ||
-                                          isa<PostfixUnaryExpr>(E) ||
-                                          isa<BinaryExpr>(E)),
-                                          Ovl.getBaseType(),
-                                          E->getArg(),
-                                          DestTy, Viable)) {
+    if (auto Best = filterOverloadSet(TC, Ovl.getCandidates(),
+                                      (isa<PrefixUnaryExpr>(E) ||
+                                       isa<PostfixUnaryExpr>(E) ||
+                                       isa<BinaryExpr>(E)),
+                                      Ovl.getBaseType(),
+                                      E->getArg(),
+                                      DestTy, Viable)) {
       if (!(Flags & CF_Apply)) {
         // Determine the type of the resulting call expression.
         Type Ty = Best.getType()->getRValueType();
@@ -1239,7 +1296,7 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
         return Ty;
       }
       
-      Expr *Fn = TC.buildFilteredOverloadSet(Ovl, Best);
+      Expr *Fn = buildFilteredOverloadSet(TC, Ovl, Best);
       Fn = convertToRValueOld(TC, Fn);
       E->setFn(Fn);
 
@@ -1274,9 +1331,9 @@ CoercedResult SemaCoerce::visitApplyExpr(ApplyExpr *E) {
 
   // Handle polymorphic function types.
   if (auto PolyFn = E->getFn()->getType()->getAs<PolymorphicFunctionType>()) {
-    if (OverloadCandidate Ovl = TC.checkPolymorphicApply(PolyFn,
-                                                         CoercionKind::Normal,
-                                                         E->getArg(), DestTy)) {
+    if (OverloadCandidate Ovl = checkPolymorphicApply(TC, PolyFn,
+                                                      CoercionKind::Normal,
+                                                      E->getArg(), DestTy)) {
       if (!(Flags & CF_Apply)) {
         return DestTy;
       }
@@ -2126,8 +2183,8 @@ CoercedResult SemaCoerce::coerceToType(Expr *E, Type DestTy,
 
   // If our expression has polymorphic function type, perform deduction for it.
   if (auto polyFn = E->getType()->getAs<PolymorphicFunctionType>()) {
-    if (OverloadCandidate Cand = TC.checkPolymorphicUse(polyFn, DestTy,
-                                                        E->getLoc(), &CC)) {
+    if (OverloadCandidate Cand = checkPolymorphicUse(TC, polyFn, DestTy,
+                                                     E->getLoc(), &CC)) {
       if (!(Flags & CF_Apply)) {
         return Cand.getType();
       }

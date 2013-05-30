@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypeCheckerOld.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
@@ -175,28 +176,28 @@ static void openPolymorphicTypes(TypeChecker &TC, MutableArrayRef<Type> Types,
 /// checkPolymorphicApply - Check the application of a function of the given
 /// polymorphic type to a particular argument with, optionally, a destination
 /// type.
-OverloadCandidate
-TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
-                                   CoercionKind Kind,
-                                   Expr *Arg,
-                                   Type DestTy) {
+OverloadCandidate checkPolymorphicApply(TypeChecker &TC,
+                                        PolymorphicFunctionType *PolyFn,
+                                        CoercionKind Kind,
+                                        Expr *Arg,
+                                        Type DestTy) {
   // Set up a coercion context to deduce the parameters to the polymorphic
   // function.
-  CoercionContext CC(*this);
+  CoercionContext CC(TC);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(*this, PolyFn, PolyFn->getGenericParams(), CC,
+    = openPolymorphicType(TC, PolyFn, PolyFn->getGenericParams(), CC,
                           /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
   // Check whether arguments are suitable for this function.
-  if (isCoercibleToType(*this, Arg, FunctionTy->getInput(), Kind, &CC)
+  if (isCoercibleToType(TC, Arg, FunctionTy->getInput(), Kind, &CC)
         == CoercionResult::Failed)
     return OverloadCandidate();
 
   // Check whether we can coerce the result type.
   if (DestTy) { 
     OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &CC)
+    if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &CC)
           == CoercionResult::Failed)
       return OverloadCandidate();
   }
@@ -205,10 +206,10 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
     return OverloadCandidate(nullptr, PolyFn, false);
 
   // We have a complete set of substitutions. Apply them.
-  Type SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+  Type SubstFunctionTy = TC.substType(FunctionTy, CC.Substitutions);
   if (!SubstFunctionTy)
     return OverloadCandidate();
-  validateTypeSimple(SubstFunctionTy);
+  TC.validateTypeSimple(SubstFunctionTy);
 
   FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
 
@@ -217,7 +218,7 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   // monomorphic function type.
   FunctionTy = FunctionType::get(FunctionTy->getInput(),
                                  FunctionTy->getResult(),
-                                 Context);
+                                 TC.Context);
 
   // FIXME: Check coercibility again.
 
@@ -226,15 +227,15 @@ TypeChecker::checkPolymorphicApply(PolymorphicFunctionType *PolyFn,
   return OverloadCandidate(nullptr, FunctionTy, std::move(SubstitutionInfo));
 }
 
-OverloadCandidate
-TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
-                                 SourceLoc Loc,
-                                 CoercionContext *CC) {
+OverloadCandidate checkPolymorphicUse(TypeChecker &TC, 
+                                      PolymorphicFunctionType *PolyFn, Type DestTy,
+                                      SourceLoc Loc,
+                                      CoercionContext *CC) {
   // Set up a coercion context to deduce the parameters to the polymorphic
   // function.
-  CoercionContext LocalCC(*this);
+  CoercionContext LocalCC(TC);
   AnyFunctionType *FunctionTy
-    = openPolymorphicType(*this, PolyFn, PolyFn->getGenericParams(), LocalCC,
+    = openPolymorphicType(TC, PolyFn, PolyFn->getGenericParams(), LocalCC,
                           /*OnlyInnermostParams=*/true)
         ->castTo<AnyFunctionType>();
 
@@ -246,25 +247,25 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   // the match.
   Type SrcTy = FunctionType::get(FunctionTy->getInput(),
                                  FunctionTy->getResult(),
-                                 Context);
+                                 TC.Context);
 
   // Match against the polymorphic type.
   if (DestLV) {
     // Check for trivial subtyping, to deduce any generic parameters
     // that require deduction. We'll do a specific type check later,
     // after substitution.
-    if (!isSameType(*this, SrcTy, DestTy, &LocalCC))
+    if (!isSameType(TC, SrcTy, DestTy, &LocalCC))
       return OverloadCandidate();
   } else {
     OpaqueValueExpr OVE(Loc, SrcTy);
-    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &LocalCC)
+    if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &LocalCC)
           == CoercionResult::Failed) {
       return OverloadCandidate();
     }
   }
 
   // Substitute deduced types.
-  SrcTy = substType(SrcTy, LocalCC.Substitutions);
+  SrcTy = TC.substType(SrcTy, LocalCC.Substitutions);
   if (!SrcTy)
     return OverloadCandidate();
 
@@ -276,7 +277,7 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
 
   // If either the source or destination type is still unresolved,
   // we may need to deduce arguments.
-  CoercionContext GlobalCC(*this);
+  CoercionContext GlobalCC(TC);
   // Establish a context in which we will compute substitutions.
   if (CC && CC->requiresSubstitution()) {
     GlobalCC.Substitutions = CC->Substitutions;
@@ -288,21 +289,21 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
   if (GlobalCC.requiresSubstitution()) {
     // Deduce arguments.
     if (DestLV) {
-      if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
+      if (!isSameType(TC, SrcTy, DestTy, &GlobalCC))
         return OverloadCandidate();
     } else {
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+      if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
             == CoercionResult::Failed) {
         return OverloadCandidate();
       }
     }
 
     // Substitute deductions.
-    SrcTy = substType(SrcTy, GlobalCC.Substitutions);
+    SrcTy = TC.substType(SrcTy, GlobalCC.Substitutions);
     if (!SrcTy)
       return OverloadCandidate();
-    DestTy = substType(DestTy, GlobalCC.Substitutions);
+    DestTy = TC.substType(DestTy, GlobalCC.Substitutions);
     if (!DestTy)
       return OverloadCandidate();
 
@@ -315,19 +316,19 @@ TypeChecker::checkPolymorphicUse(PolymorphicFunctionType *PolyFn, Type DestTy,
 
   if (DestLV) {
     // Simply checking for type equality suffices.
-    if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
+    if (!isSameType(TC, SrcTy, DestTy, &GlobalCC))
       return OverloadCandidate();
   } else {
     // Check that the source is coercible to the destination.
     OpaqueValueExpr OVE(Loc, SrcTy);
-    if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+    if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
           == CoercionResult::Failed) {
       return OverloadCandidate();
     }
   }
 
 
-  validateTypeSimple(SrcTy);
+  TC.validateTypeSimple(SrcTy);
   OverloadCandidate::SubstitutionInfoType SubstitutionInfo
     = { std::move(LocalCC.Substitutions), std::move(LocalCC.Conformance) };
   return OverloadCandidate(nullptr, SrcTy, std::move(SubstitutionInfo));
@@ -461,13 +462,12 @@ static bool lookPastThisArgument(Type BaseTy, ValueDecl *VD) {
   return false;
 }
 
-OverloadCandidate
-TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
-                               bool OperatorSyntax,
-                               Type BaseTy,
-                               Expr *Arg,
-                               Type DestTy,
-                               SmallVectorImpl<ValueDecl *> &Viable) {
+OverloadCandidate filterOverloadSet(TypeChecker &TC, ArrayRef<ValueDecl *> Candidates,
+                                    bool OperatorSyntax,
+                                    Type BaseTy,
+                                    Expr *Arg,
+                                    Type DestTy,
+                                    SmallVectorImpl<ValueDecl *> &Viable) {
   SmallVector<OverloadCandidate, 4> ViableCandidates;
   for (ValueDecl *VD : Candidates) {
     Type VDType = VD->getTypeOfReference()->getRValueType();
@@ -486,8 +486,8 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       if (BaseTy && nominalOwner->getGenericParamsOfContext()) {
         if (isa<ConstructorDecl>(VD) || isa<OneOfElementDecl>(VD) ||
             isa<FuncDecl>(VD)) {
-          CoercionContext InitialCC(*this);
-          FunctionTy = substBaseForGenericTypeMember(*this, VD, BaseTy, FunctionTy,
+          CoercionContext InitialCC(TC);
+          FunctionTy = substBaseForGenericTypeMember(TC, VD, BaseTy, FunctionTy,
                                                      Arg->getLoc(), InitialCC)
                            ->castTo<AnyFunctionType>();
           substitutedWithBase = true;
@@ -508,7 +508,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
 
     if (!substitutedWithBase) {
       // Substitute into the type of this member, if indeed it is a member.
-      Type SubstFunctionTy = substMemberTypeWithBase(FunctionTy, VD, BaseTy);
+      Type SubstFunctionTy = TC.substMemberTypeWithBase(FunctionTy, VD, BaseTy);
       if (!SubstFunctionTy)
         continue;
       FunctionTy = SubstFunctionTy->castTo<AnyFunctionType>();
@@ -520,7 +520,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
       if (OperatorSyntax && VD->getAttrs().isAssignment())
         Kind = CoercionKind::Assignment;
       OverloadCandidate Candidate
-        = checkPolymorphicApply(polyFn, Kind, Arg, DestTy);
+        = checkPolymorphicApply(TC, polyFn, Kind, Arg, DestTy);
       if (!Candidate.getType())
         continue;
 
@@ -532,7 +532,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     
     // Establish the coercion context, which is required when this coercion
     // involves generic functions.
-    CoercionContext CC(*this);
+    CoercionContext CC(TC);
     // As a temporary hack, manually introduce the substitutions for operators
     // which are members of protocols.  (This will go away once we start using
     // PolymorphicFunctionTypes for protocol members.)
@@ -545,7 +545,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
         FunctionTy = FunctionTy->getResult()->castTo<AnyFunctionType>();
         if (ProtocolType *P = Extension->getAs<ProtocolType>()) {
           GenericParam Param = P->getDecl()->getThis();
-          FunctionTy = getDeducibleType(*this, FunctionTy, { &Param, 1 },
+          FunctionTy = getDeducibleType(TC, FunctionTy, { &Param, 1 },
                                         nullptr, operatorDeducibleParams)
                          ->castTo<AnyFunctionType>();
           CC.requestSubstitutionsFor(operatorDeducibleParams);
@@ -557,14 +557,14 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     CoercionKind Kind = CoercionKind::Normal;
     if (OperatorSyntax && VD->getAttrs().isAssignment())
       Kind = CoercionKind::Assignment;
-    if (isCoercibleToType(*this, Arg, FunctionTy->getInput(), Kind, &CC)
+    if (isCoercibleToType(TC, Arg, FunctionTy->getInput(), Kind, &CC)
           == CoercionResult::Failed)
       continue;
 
     // Check whether we can coerce the result type.
     if (DestTy) {
       OpaqueValueExpr OVE(Arg->getLoc(), FunctionTy->getResult());
-      if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &CC)
+      if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &CC)
             == CoercionResult::Failed)
         continue;
     }
@@ -577,7 +577,7 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     }
 
     // We have a complete set of substitutions. Apply them.
-    Type SubstFunctionTy = substType(FunctionTy, CC.Substitutions);
+    Type SubstFunctionTy = TC.substType(FunctionTy, CC.Substitutions);
     if (!SubstFunctionTy)
       continue;
 
@@ -588,8 +588,8 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
     // monomorphic function type.
     FunctionTy = FunctionType::get(FunctionTy->getInput(),
                                    FunctionTy->getResult(),
-                                   Context);
-    validateTypeSimple(FunctionTy);
+                                   TC.Context);
+    TC.validateTypeSimple(FunctionTy);
 
     if (!operatorDeducibleParams.empty()) {
       // For an operator found in a protocol, use the type inferred for 'This'
@@ -626,13 +626,13 @@ TypeChecker::filterOverloadSet(ArrayRef<ValueDecl *> Candidates,
   return OverloadCandidate();
 }
 
-OverloadCandidate
-TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
-                                       SourceLoc Loc,
-                                       Type BaseTy,
-                                       Type DestTy,
-                                       SmallVectorImpl<ValueDecl *> &Viable,
-                                       CoercionContext *CC) {
+OverloadCandidate filterOverloadSetForValue(TypeChecker &TC, 
+                                            ArrayRef<ValueDecl *> Candidates,
+                                            SourceLoc Loc,
+                                            Type BaseTy,
+                                            Type DestTy,
+                                            SmallVectorImpl<ValueDecl *> &Viable,
+                                            CoercionContext *CC) {
   SmallVector<OverloadCandidate, 4> ViableCandidates;
 
   auto DestLV = DestTy->getAs<LValueType>();
@@ -666,12 +666,12 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     }
 
     // Substitute into the type of this member, if indeed it is a member.
-    SrcTy = substMemberTypeWithBase(SrcTy, VD, BaseTy);
+    SrcTy = TC.substMemberTypeWithBase(SrcTy, VD, BaseTy);
     if (!SrcTy)
       continue;
 
     if (auto polyFn = SrcTy->getAs<PolymorphicFunctionType>()) {
-      OverloadCandidate Candidate = checkPolymorphicUse(polyFn, DestTy, Loc,
+      OverloadCandidate Candidate = checkPolymorphicUse(TC, polyFn, DestTy, Loc,
                                                         CC);
 
       if (!Candidate.getType())
@@ -684,7 +684,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
 
     // If either the source or destination type is still unresolved,
     // we may need to deduce arguments.
-    CoercionContext GlobalCC(*this);
+    CoercionContext GlobalCC(TC);
     // Establish a context in which we will compute substitutions.
     if (CC && CC->requiresSubstitution()) {
       GlobalCC.Substitutions = CC->Substitutions;
@@ -697,11 +697,11 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     if (GlobalCC.requiresSubstitution()) {
       // Deduce arguments.
       if (DestLV) {
-        if (!isSameType(*this, SrcTy, DestTy, &GlobalCC))
+        if (!isSameType(TC, SrcTy, DestTy, &GlobalCC))
           continue;
       } else {
         OpaqueValueExpr OVE(Loc, SrcTy);
-        if (isCoercibleToType(*this, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
+        if (isCoercibleToType(TC, &OVE, DestTy, CoercionKind::Normal, &GlobalCC)
               == CoercionResult::Failed) {
           continue;
         }
@@ -714,25 +714,25 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
         continue;
       }
 
-      SrcTy = substType(SrcTy, GlobalCC.Substitutions);
+      SrcTy = TC.substType(SrcTy, GlobalCC.Substitutions);
       if (!SrcTy)
         continue;
-      EffectiveDestTy = substType(EffectiveDestTy, GlobalCC.Substitutions);
+      EffectiveDestTy = TC.substType(EffectiveDestTy, GlobalCC.Substitutions);
       if (!EffectiveDestTy)
         continue;
 
-      validateTypeSimple(SrcTy);
-      validateTypeSimple(EffectiveDestTy);
+      TC.validateTypeSimple(SrcTy);
+      TC.validateTypeSimple(EffectiveDestTy);
     }
 
     if (DestLV) {
       // Simply checking for type equality suffices.
-      if (!isSameType(*this, SrcTy, EffectiveDestTy, &GlobalCC))
+      if (!isSameType(TC, SrcTy, EffectiveDestTy, &GlobalCC))
         continue;
     } else {
     // Check that the source is coercible to the destination.
       OpaqueValueExpr OVE(Loc, SrcTy);
-      if (isCoercibleToType(*this, &OVE, EffectiveDestTy, CoercionKind::Normal,
+      if (isCoercibleToType(TC, &OVE, EffectiveDestTy, CoercionKind::Normal,
                             &GlobalCC)
             == CoercionResult::Failed) {
         continue;
@@ -742,7 +742,7 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     // Compute the type of the reference, which may be an lvalue.
     Type ResultTy = SrcTy;
     if (SrcLV)
-      ResultTy = LValueType::get(ResultTy, SrcLV->getQualifiers(), Context);
+      ResultTy = LValueType::get(ResultTy, SrcLV->getQualifiers(), TC.Context);
     ViableCandidates.push_back(OverloadCandidate(VD, ResultTy, true));
   }
 
@@ -756,41 +756,6 @@ TypeChecker::filterOverloadSetForValue(ArrayRef<ValueDecl *> Candidates,
     Viable.push_back(VC.getDecl());
   
   return OverloadCandidate();
-}
-
-OverloadedExpr TypeChecker::getOverloadedExpr(Expr *E) {
-  Expr *expr = E->getSemanticsProvidingExpr();
-
-  // Handle overloaded set references.
-  if (auto OSE = dyn_cast<OverloadSetRefExpr>(expr)) {
-    return OverloadedExpr(E, OSE->getBaseType(), OSE->getDecls());
-  }
-
-  // Only expressions with polymorphic function type can be overloaded beyond
-  // this point.
-  if (!expr->getType()->is<PolymorphicFunctionType>()) {
-    return OverloadedExpr();
-  }
-
-  // Handle expressions that refer to a given overloadable declaration.
-  if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
-    return OverloadedExpr(E, Type(), DRE->getDecl());
-  }
-  if (auto AMR = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
-    return OverloadedExpr(E, AMR->getBase()->getType(), AMR->getDecl());
-  }
-  if (auto ASR = dyn_cast<ArchetypeSubscriptExpr>(expr)) {
-    return OverloadedExpr(E, ASR->getBase()->getType(), ASR->getDecl());
-  }
-  if (auto EMR = dyn_cast<ExistentialMemberRefExpr>(expr)) {
-    return OverloadedExpr(E, EMR->getBase()->getType(), EMR->getDecl());
-  }
-  if (auto ESR = dyn_cast<ExistentialSubscriptExpr>(expr)) {
-    return OverloadedExpr(E, ESR->getBase()->getType(), ESR->getDecl());
-  }
-
-  // There is no declaration here to overload on.
-  return OverloadedExpr();
 }
 
 /// \brief Replace the original semantics-providing expression (\c Orig) with
@@ -818,22 +783,22 @@ static Expr *recheckTypes(TypeChecker &TC, Expr *E) {
   return E;
 }
 
-Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
-                                            ArrayRef<ValueDecl *> Remaining) {
+Expr *buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
+                               ArrayRef<ValueDecl *> Remaining) {
   Expr *expr = Ovl.getExpr()->getSemanticsProvidingExpr();
 
   // Create an appropriate expression to refer to the remaining set of
   // declarations.
   Expr *result;
   if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
-    result = buildRefExpr(Remaining, DRE->getLoc());
+    result = TC.buildRefExpr(Remaining, DRE->getLoc());
   } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
-    result = buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+    result = TC.buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
                                 Remaining, MRE->getMemberLoc());
     if (!result)
       return nullptr;
 
-    result = recheckTypes(*this, result);
+    result = recheckTypes(TC, result);
     if (!result)
       return nullptr;
   } else {
@@ -849,25 +814,24 @@ Expr *TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
 }
 
-Expr *
-TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
-                                      const OverloadCandidate &Candidate){
+Expr * buildFilteredOverloadSet(TypeChecker &TC, OverloadedExpr Ovl,
+                                const OverloadCandidate &Candidate){
   assert(Candidate.isComplete() && "Incomplete overload candidate!");
 
   Expr *expr = Ovl.getExpr()->getSemanticsProvidingExpr();
 
   Expr *result = nullptr;
   if (auto DRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
-    result = new (Context) DeclRefExpr(Candidate.getDecl(), DRE->getLoc(),
-                             Candidate.getDecl()->getTypeOfReference());
-    result = recheckTypes(*this, result);
+    result = new (TC.Context) DeclRefExpr(Candidate.getDecl(), DRE->getLoc(),
+                                          Candidate.getDecl()->getTypeOfReference());
+    result = recheckTypes(TC, result);
     if (!result)
       return nullptr;
   } else if (auto MRE = dyn_cast<OverloadedMemberRefExpr>(expr)) {
     SmallVector<ValueDecl *, 1> decls(1, Candidate.getDecl());
-    result = recheckTypes(*this,
-                          buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
-                                             decls, MRE->getMemberLoc()));
+    result = recheckTypes(TC,
+                          TC.buildMemberRefExpr(MRE->getBase(), MRE->getDotLoc(),
+                                                decls, MRE->getMemberLoc()));
     if (!result)
       return nullptr;
   } else {
@@ -878,7 +842,7 @@ TypeChecker::buildFilteredOverloadSet(OverloadedExpr Ovl,
     result = expr;
   }
 
-  result = specializeOverloadResult(Candidate, result);
+  result = TC.specializeOverloadResult(Candidate, result);
 
   // Replace the semantics-providing expression with the newly-built result.
   return replaceSemanticsProvidingExpr(expr, result, Ovl.getExpr());
