@@ -181,14 +181,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for vars");
 
-    // If it's a property, invoke its getter.
-    if (var->isProperty()) {
-      SILConstant getter(decl, SILConstant::Kind::Getter);
-      return ManagedValue(emitGetProperty(loc, getter, {},
-                                      RValue(), RValue(),
-                                      var->getType()->getRValueType()).address,
-                          ManagedValue::LValue);
-    }
+    assert(!var->isProperty() &&
+           "property accessors should go through ");
     
     // For local decls, use the address we allocated.
     if (VarLocs.count(decl)) {
@@ -345,14 +339,6 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   }
   
   return Materialize{tmpMem, valueCleanup};
-}
-
-ManagedValue Materialize::consume(SILGenFunction &gen, SILLocation loc) {
-  assert(!address.getType().isAddressOnly(gen.SGM.M) &&
-         "address-only value must be consumed with consumeInto");
-  if (valueCleanup.isValid())
-    gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
-  return gen.emitManagedRValueWithCleanup(gen.B.createLoad(loc, address));
 }
 
 RValue SILGenFunction::visitMaterializeExpr(MaterializeExpr *E, SGFContext C) {

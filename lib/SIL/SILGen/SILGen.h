@@ -31,6 +31,7 @@ namespace swift {
 
 namespace Lowering {
   class Condition;
+  class LogicalPathComponent;
   class LValue;
   class RValue;
   class ManagedValue;
@@ -38,7 +39,6 @@ namespace Lowering {
   class SILGenFunction;
   class Initialization;
   class OwnershipConventions;
-  struct Writeback;
 
 /// SILGenModule - an ASTVisitor for generating SIL from top-level declarations
 /// in a translation unit.
@@ -182,11 +182,6 @@ struct Materialize {
   /// The cleanup to dispose of the value before deallocating the buffer.
   /// This cleanup can be killed by calling the consume method.
   CleanupsDepth valueCleanup;
-  
-  /// Load the value out of the temporary buffer and deactivate its value
-  /// cleanup. Returns the loaded value, which becomes the caller's
-  /// responsibility to release.
-  ManagedValue consume(SILGenFunction &gen, SILLocation loc);
 };
   
 /// SGFContext - Internal context information for the SILGenFunction visitor.
@@ -257,6 +252,33 @@ public:
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
+  
+  /// A pending writeback.
+  struct Writeback {
+    SILLocation loc;
+    std::unique_ptr<LogicalPathComponent> component;
+    SILValue base;
+    Materialize temp;
+    
+    // Instantiate the unique_ptr destructor in a scope where
+    // LogicalPathComponent is defined.
+    ~Writeback();
+    Writeback(Writeback&&) = default;
+    Writeback &operator=(Writeback&&) = default;
+    
+    Writeback() = default;
+    Writeback(SILLocation loc, std::unique_ptr<LogicalPathComponent> &&comp,
+              SILValue base, Materialize temp);
+  };
+
+  /// The stack of pending writebacks.
+  std::vector<Writeback> WritebackStack;
+  bool InWritebackScope = false;
+  
+  void pushWritebackIfInScope(SILLocation loc,
+                              const LogicalPathComponent &component,
+                              SILValue base,
+                              Materialize temp);
 
   /// VarLoc - representation of an emitted local variable.
   struct VarLoc {
@@ -580,12 +602,12 @@ public:
                                            CapturingExpr *body);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
-  Materialize emitGetProperty(SILLocation loc,
-                              SILConstant getter,
-                              ArrayRef<Substitution> substitutions,
-                              RValue &&optionalthisValue,
-                              RValue &&optionalSubscripts,
-                              Type resultType);
+  ManagedValue emitGetProperty(SILLocation loc,
+                               SILConstant getter,
+                               ArrayRef<Substitution> substitutions,
+                               RValue &&optionalthisValue,
+                               RValue &&optionalSubscripts,
+                               Type resultType);
   void emitSetProperty(SILLocation loc,
                        SILConstant setter,
                        ArrayRef<Substitution> substitutions,
@@ -600,7 +622,7 @@ public:
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);
-  ManagedValue emitMaterializedLoadFromLValue(SILLocation loc,
+  ManagedValue emitAddressOfLValue(SILLocation loc,
                                               LValue const &src);
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,

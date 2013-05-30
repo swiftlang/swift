@@ -59,13 +59,62 @@ public:
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
 
+Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
+                                                  SILLocation loc,
+                                                  SILValue base) const {
+  ManagedValue value = get(gen, loc, base);
+  Materialize temp = gen.emitMaterialize(loc, value);
+  gen.pushWritebackIfInScope(loc, *this, base, temp);
+  return temp;
+}
+
+void
+SILGenFunction::pushWritebackIfInScope(SILLocation loc,
+                                       const LogicalPathComponent &component,
+                                       SILValue base,
+                                       Materialize temp) {
+  if (InWritebackScope) {
+    WritebackStack.emplace_back(loc, component.clone(), base, temp);
+  }
+}
+
+WritebackScope::WritebackScope(SILGenFunction &gen)
+  : gen(gen), wasInWritebackScope(gen.InWritebackScope),
+    savedDepth(gen.WritebackStack.size())
+{
+  gen.InWritebackScope = true;
+}
+
+WritebackScope::~WritebackScope() {
+  gen.InWritebackScope = wasInWritebackScope;
+  auto i = gen.WritebackStack.end(),
+       deepest = gen.WritebackStack.begin() + savedDepth;
+  while (i-- > deepest) {
+    if (i->temp.valueCleanup.isValid())
+      gen.Cleanups.setCleanupState(i->temp.valueCleanup, CleanupState::Dead);
+    ManagedValue mv
+      = gen.emitLoad(i->loc, i->temp.address, SGFContext(), /*isTake*/ true);
+    i->component->set(gen, i->loc, RValue(gen, mv), i->base);
+  }
+  
+  gen.WritebackStack.erase(deepest, gen.WritebackStack.end());
+}
+
+SILGenFunction::Writeback::~Writeback() {}
+SILGenFunction::Writeback::Writeback(SILLocation loc,
+                                   std::unique_ptr<LogicalPathComponent> &&comp,
+                                   SILValue base, Materialize temp)
+  : loc(loc), component(std::move(comp)), base(base), temp(temp)
+{
+}
+
 LValue SILGenFunction::emitLValue(Expr *e) {
   return SILGenLValue(*this).visit(e);
 }
 
 RValue SILGenFunction::emitLValueAsRValue(Expr *e) {
   LValue lv = emitLValue(e);
-  return RValue(*this, emitMaterializedLoadFromLValue(e, lv));
+  return RValue(*this, emitAddressOfLValue(e, lv));
 }
 
 void PathComponent::_anchor() {}
@@ -247,27 +296,23 @@ namespace {
              "settable lvalue must have both getter and setter");
     }
     
-    void storeRValue(SILGenFunction &gen, SILLocation loc,
-                     RValue &&rvalue, SILValue base) const override
+    void set(SILGenFunction &gen, SILLocation loc,
+             RValue &&rvalue, SILValue base) const override
     {
-      auto args
-        = prepareAccessorArgs(gen, loc, base);
+      auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitSetProperty(loc,
-                                 setter, substitutions,
+      return gen.emitSetProperty(loc, setter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
                                  std::move(rvalue));
     }
     
-    Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                   SILValue base) const override
+    ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                     SILValue base) const override
     {
-      auto args
-        = prepareAccessorArgs(gen, loc, base);
+      auto args = prepareAccessorArgs(gen, loc, base);
       
-      return gen.emitGetProperty(loc,
-                                 getter, substitutions,
+      return gen.emitGetProperty(loc, getter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
                                  substType);
@@ -275,6 +320,11 @@ namespace {
     
     Type getObjectType() const override {
       return substType;
+    }
+    
+    std::unique_ptr<LogicalPathComponent> clone() const override {
+      return std::unique_ptr<LogicalPathComponent>(
+                                             new GetterSetterComponent(*this));
     }
   };
 }
@@ -412,7 +462,6 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   LValue lv = visitRec(e->getBase());
-  // FIXME: address-only tuples
   lv.add<TupleElementComponent>(e->getFieldNumber(),
                                 gen.getLoweredType(e->getType()));
   return ::std::move(lv);

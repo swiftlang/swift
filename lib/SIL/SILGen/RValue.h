@@ -32,10 +32,8 @@ namespace Lowering {
 
 /// ManagedValue - represents a SIL rvalue. It consists of a SILValue and an
 /// optional cleanup. Ownership of the ManagedValue can be "forwarded" to
-/// disable its cleanup when the rvalue is consumed. Read-only addresses may
-/// also be stored in a ManagedValue, but for general lvalues, the LValue type
-/// must be used instead, which also handles writeback through logical
-/// properties.
+/// disable its cleanup when the rvalue is consumed. A ManagedValue can also
+/// represent an LValue used as a value, such as a [byref] function argument.
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
   /// whether it represents an lvalue.

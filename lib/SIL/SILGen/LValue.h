@@ -130,15 +130,21 @@ protected:
   LogicalPathComponent() : PathComponent(false) {}
 
 public:
-  /// Perform a store operation with a value produced by the given
-  /// expression.
-  virtual void storeRValue(SILGenFunction &gen, SILLocation loc,
-                           RValue &&rvalue, SILValue base) const = 0;
+  /// Clone the path component onto the heap.
+  virtual std::unique_ptr<LogicalPathComponent> clone() const = 0;
+  
+  /// Set the property.
+  virtual void set(SILGenFunction &gen, SILLocation loc,
+                   RValue &&rvalue, SILValue base) const = 0;
 
-  /// Perform a load operation from this path into temporary
-  /// memory.
-  virtual Materialize loadAndMaterialize(SILGenFunction &gen, SILLocation loc,
-                                         SILValue base) const = 0;
+  /// Get the property.
+  virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                           SILValue base) const = 0;
+  
+  /// Get the property, materialize a temporary lvalue for it, and if
+  /// we're in a writeback scope, register a writeback.
+  Materialize getMaterialized(SILGenFunction &gen, SILLocation loc,
+                              SILValue base) const;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {
@@ -203,16 +209,20 @@ public:
   Type getObjectType() const { return ObjectType; }
 };
   
-/// Writeback - Represents a writeback of a temporary value to a logical
-/// property.
-struct Writeback {
-  /// lvalue - The logical lvalue representing the destination of the writeback.
-  LValue lvalue;
-  /// tempAddress - The address containing the source value to write back to
-  /// the lvalue.
-  SILValue tempAddress;
+/// RAII object to enable writebacks for logical lvalues evaluated within the
+/// scope, which will be applied when the object goes out of scope.
+class WritebackScope {
+  SILGenFunction &gen;
+  bool wasInWritebackScope;
+  size_t savedDepth;
+public:
+  WritebackScope(SILGenFunction &gen);
+  ~WritebackScope();
+  
+  WritebackScope(const WritebackScope &) = delete;
+  WritebackScope &operator=(const WritebackScope &) = delete;
 };
-
+  
 } // end namespace Lowering
 } // end namespace swift
 

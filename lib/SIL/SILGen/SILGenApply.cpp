@@ -1252,13 +1252,13 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   return callee;
 }
 
-/// Emit a call to a getter and materialize its result.
-Materialize SILGenFunction::emitGetProperty(SILLocation loc,
-                                            SILConstant get,
-                                            ArrayRef<Substitution> substitutions,
-                                            RValue &&thisValue,
-                                            RValue &&subscripts,
-                                            Type resultType) {
+/// Emit a call to a getter.
+ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
+                                             SILConstant get,
+                                             ArrayRef<Substitution> substitutions,
+                                             RValue &&thisValue,
+                                             RValue &&subscripts,
+                                             Type resultType) {
   // Derive the specialized type of the accessor.
   auto &tc = SGM.Types;
   Type propType;
@@ -1290,8 +1290,7 @@ Materialize SILGenFunction::emitGetProperty(SILLocation loc,
   // () ->
   emission.addCallSite(loc, emitEmptyTupleRValue(loc), propFnTy->getResult());
   // T
-  ManagedValue result = emission.apply();
-  return emitMaterialize(loc, result);
+  return emission.apply();
 }
 
 void SILGenFunction::emitSetProperty(SILLocation loc,

@@ -449,7 +449,7 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
            FallthroughDestStack.back().getDestForCase(S->getFallthroughDest()));
 }
 
-ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
+ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                            LValue const &src) {
   SILValue addr;
   
@@ -459,7 +459,7 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
       addr = component.asPhysical().offset(*this, loc, addr);
     } else {
       addr = component.asLogical()
-        .loadAndMaterialize(*this, loc, addr)
+        .getMaterialized(*this, loc, addr)
         .address;
     }
     assert((addr.getType().isAddress() ||
@@ -474,56 +474,41 @@ ManagedValue SILGenFunction::emitMaterializedLoadFromLValue(SILLocation loc,
 
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         RValue &&src, LValue const &dest) {
-  struct StoreWriteback {
-    SILValue base;
-    Materialize member;
-    LogicalPathComponent const *component;
-  };
+  WritebackScope scope(*this);
+  
   SILValue destAddr;
-  SmallVector<StoreWriteback, 4> writebacks;
 
   assert(dest.begin() != dest.end() &&
          "lvalue must have at least one component");
   
-  auto component = dest.begin(), next = dest.begin(), end = dest.end();
-  ++next;
-  
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
+  auto component = dest.begin(), next = dest.begin(), end = dest.end();
+  ++next;
   for (; next != end; component = next, ++next) {
     if (component->isPhysical()) {
       destAddr = component->asPhysical().offset(*this, loc, destAddr);
     } else {
       LogicalPathComponent const &lcomponent = component->asLogical();
-      Materialize newDest = lcomponent
-        .loadAndMaterialize(*this, loc, destAddr);
-      if (!newDest.address.getType().hasReferenceSemantics())
-        writebacks.push_back({destAddr, newDest, &lcomponent});
+      Materialize newDest = lcomponent.getMaterialized(*this, loc, destAddr);
       destAddr = newDest.address;
     }
-    
-    if (destAddr.getType().hasReferenceSemantics())
-      writebacks.clear();
   }
   
   // Write to the tail component.
   if (component->isPhysical()) {
-    SILValue finalDestAddr = component->asPhysical().offset(*this, loc, destAddr);
+    SILValue finalDestAddr
+      = component->asPhysical().offset(*this, loc, destAddr);
     
     std::move(src).getAsSingleValue(*this)
       .assignInto(*this, loc, finalDestAddr);
   } else {
-    component->asLogical().storeRValue(*this, loc,
+    component->asLogical().set(*this, loc,
                                        std::move(src), destAddr);
   }
-  
-  // Write back through value-type logical properties.
-  for (auto wb = writebacks.rbegin(), wend = writebacks.rend();
-       wb != wend; ++wb) {
-    ManagedValue wbValue = wb->member.consume(*this, loc);
-    wb->component->storeRValue(*this, loc,
-                               RValue(*this, wbValue), wb->base);
-  }
+
+  // The writeback scope closing will propagate the value back up through the
+  // writeback chain.
 }
 
 //===--------------------------------------------------------------------===//
