@@ -47,6 +47,10 @@ enum class KnownProtocolKind : unsigned {
   /// \brief The 'ArrayLiteralConvertible' protocol, used for array literals.
   ArrayLiteralConvertible,
 
+  /// \brief The 'BuiltinFloatLiteralConvertible' protocol, used for floating
+  /// point literals.
+  BuiltinFloatLiteralConvertible,
+
   /// \brief The 'DictionaryLiteralConvertible' protocol, used for dictionary
   /// literals.
   DictionaryLiteralConvertible,
@@ -56,6 +60,10 @@ enum class KnownProtocolKind : unsigned {
 
   /// \brief The 'Enumerator' protocol, used by the for-each loop.
   Enumerator,
+
+  /// \brief The 'FloatLiteralConvertible' protocol, used for floating
+  /// point literals.
+  FloatLiteralConvertible,
 
   /// \brief The 'LogicValue' protocol, used for places where a value is
   /// considered to be a logic value, such as in an 'if' statement.
@@ -322,7 +330,26 @@ public:
   /// isn't already.
   Expr *coerceToMaterializable(Expr *expr);
 
-  /// \brief Build a call to the witness with the given name and no arguments.
+  /// \brief Retrieve the witness type with the given name.
+  ///
+  /// \param type The type that conforms to the given protocol.
+  ///
+  /// \param protocol The protocol through which we're looking.
+  ///
+  /// \param conformance The protocol conformance.
+  ///
+  /// \param name The name of the associated type.
+  ///
+  /// \param brokenProtocolDiag Diagnostic to emit if the type cannot be
+  /// accessed.
+  ///
+  /// \return the witness type, or null if an error occurs.
+  Type getWitnessType(Type type, ProtocolDecl *protocol,
+                      ProtocolConformance *conformance,
+                      Identifier name,
+                      Diag<> brokenProtocolDiag);
+
+  /// \brief Build a call to the witness with the given name and arguments.
   ///
   /// \param base The base expression, whose witness will be invoked.
   ///
@@ -333,12 +360,15 @@ public:
   ///
   /// \param name The name of the method to call.
   ///
+  /// \param arguments The arguments to 
+  ///
   /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
   ///
   /// \returns a fully type-checked call, or null if the protocol was broken.
   Expr *callWitness(Expr *base, ProtocolDecl *protocol,
                     ProtocolConformance *conformance,
                     Identifier name,
+                    MutableArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
 
   /// conformsToProtocol - Determine whether the given type conforms to the

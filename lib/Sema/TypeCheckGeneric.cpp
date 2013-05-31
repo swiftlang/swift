@@ -161,3 +161,38 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
   
   return false; 
 }
+
+Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
+                                 ProtocolConformance *conformance,
+                                 Identifier name,
+                                 Diag<> brokenProtocolDiag) {
+  // For an archetype, retrieve the nested type with the appropriate name.
+  // There are no conformance tables.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    return archetype->getNestedType(name);
+  }
+
+  // Find the named requirement.
+  TypeAliasDecl *requirement = nullptr;
+  for (auto member : protocol->getMembers()) {
+    auto td = dyn_cast<TypeAliasDecl>(member);
+    if (!td || td->getName().empty())
+      continue;
+
+    if (td->getName() == name) {
+      requirement = td;
+      break;
+    }
+  }
+
+  if (!requirement) {
+    diagnose(protocol->getLoc(), brokenProtocolDiag);
+    return nullptr;
+  }
+
+  assert(conformance && "Missing conformance information");
+  auto reqType = requirement->getDeclaredType()->castTo<SubstitutableType>();
+  assert(conformance->TypeMapping.count(reqType) && "Missing conformance");
+  // FIXME: substMemberTypeWithBase when we deal with generic conformance.
+  return conformance->TypeMapping[reqType];
+}

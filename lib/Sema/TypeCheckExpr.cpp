@@ -419,13 +419,14 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   const char *AltMethodName = 0;
   switch (LitTy) {
   case LiteralKind::Int:    MethodName = "convertFromIntegerLiteral"; break;
-  case LiteralKind::Float:  MethodName = "convertFromFloatLiteral"; break;
   case LiteralKind::Char:   MethodName = "convertFromCharacterLiteral"; break;
   case LiteralKind::UTFString: MethodName = "convertFromStringLiteral"; break;
   case LiteralKind::ASCIIString:
     MethodName = "convertFromASCIIStringLiteral";
     AltMethodName = "convertFromStringLiteral";
     break;
+  case LiteralKind::Float:
+    llvm_unreachable("Cannot handle float literals here");
   case LiteralKind::Array:
     llvm_unreachable("Cannot handle array literals here");
   case LiteralKind::Dictionary:

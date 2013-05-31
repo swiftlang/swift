@@ -87,6 +87,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
     name = Context.getIdentifier("ArrayLiteralConvertible");
     break;
 
+  case KnownProtocolKind::BuiltinFloatLiteralConvertible:
+    name = Context.getIdentifier("BuiltinFloatLiteralConvertible");
+    break;
+      
   case KnownProtocolKind::DictionaryLiteralConvertible:
     name = Context.getIdentifier("DictionaryLiteralConvertible");
     break;
@@ -97,6 +101,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
 
   case KnownProtocolKind::Enumerator:
     name = Context.getIdentifier("Enumerator");
+    break;
+
+  case KnownProtocolKind::FloatLiteralConvertible:
+    name = Context.getIdentifier("FloatLiteralConvertible");
     break;
 
   case KnownProtocolKind::LogicValue:

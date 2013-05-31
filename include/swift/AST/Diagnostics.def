@@ -656,6 +656,11 @@ ERROR(expected_rparen_expr_list,expr_parsing,none,
 ERROR(expected_rsquare_expr_list,expr_parsing,none,
       "expected ']' in expression list", ())
 
+ERROR(builtin_float_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinFloatLiteralConvertible' is broken", ())
+ERROR(float_literal_broken_proto,sema_tce,none,
+      "protocol 'FloatLiteralConvertible' is broken", ())
+
 // Array literal expressions
 ERROR(expected_expr_array,expr_parsing,none,
       "expected subexpression in container literal", ())

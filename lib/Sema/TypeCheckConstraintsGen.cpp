@@ -152,9 +152,19 @@ namespace {
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
+      auto protocol
+        = CS.getTypeChecker().getProtocol(
+            KnownProtocolKind::FloatLiteralConvertible);
+      if (!protocol) {
+        return nullptr;
+      }
+
       auto tv = CS.createTypeVariable(expr);
       CS.addLiteralConstraint(tv, LiteralKind::Float,
                               CS.getConstraintLocator(expr, { }));
+
+      // FIXME: Require conformance to the FloatLiteralConvertible protocol.
+
       return tv;
     }
 
@@ -474,8 +484,7 @@ namespace {
                                  C.getIdentifier("Element"),
                                  arrayElementTy);
       
-      Type arrayEltsTy = tc.getArraySliceType(expr->getLoc(),
-                                                 arrayElementTy);
+      Type arrayEltsTy = tc.getArraySliceType(expr->getLoc(), arrayElementTy);
       TupleTypeElt arrayEltsElt{arrayEltsTy,
                                 /*name=*/ Identifier(),
                                 /*init=*/ nullptr,
@@ -483,8 +492,11 @@ namespace {
       Type arrayEltsTupleTy = TupleType::get(arrayEltsElt, C);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(),
-                       arrayEltsTupleTy);
-      
+                       arrayEltsTupleTy,
+                       CS.getConstraintLocator(
+                         expr,
+                         ConstraintLocator::ApplyArgument));
+
       // FIXME: Use the protocol constraint instead of this value constraint.
       Type converterFuncTy = FunctionType::get(arrayEltsTupleTy,
                                                arrayTy, C);
@@ -545,8 +557,11 @@ namespace {
       Type dictionaryEltsTupleTy = TupleType::get(dictionaryEltsElt, C);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(),
-                       dictionaryEltsTupleTy);
-      
+                       dictionaryEltsTupleTy,
+                       CS.getConstraintLocator(
+                         expr,
+                         ConstraintLocator::ApplyArgument));
+
       // FIXME: Use the protocol constraint instead of this value constraint.
       Type converterFuncTy = FunctionType::get(dictionaryEltsTupleTy,
                                                dictionaryTy, C);

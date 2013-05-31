@@ -388,6 +388,64 @@ namespace {
     Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind,
                          Type openedType);
 
+    /// \brief Convert the given literal expression via a protocol pair.
+    ///
+    /// This routine handles the two-step literal conversion process used
+    /// by integer, float, character, and string literals. The first step
+    /// uses \c protocol while the second step uses \c builtinProtocol.
+    ///
+    /// \param literal The literal expression.
+    ///
+    /// \param type The literal type. This type conforms to \c protocol,
+    /// and may also conform to \c builtinProtocol.
+    ///
+    /// \param type The literal type as it was opened in the type system.
+    ///
+    /// \param protocol The protocol that describes the literal requirement.
+    ///
+    /// \param literalTypeName The name of the associated type in \c protocol
+    /// that describes the argument type of the conversion function
+    /// (\c literalFuncName).
+    ///
+    /// \param literalFuncName The name of the conversion function requirement
+    /// in \c protocol.
+    ///
+    /// \param builtinProtocol The "builtin" form of the protocol, which
+    /// always takes builtin types and can only be properly implemented
+    /// by standard library types. If \c type does not conform to this
+    /// protocol, it's literal type will.
+    ///
+    /// \param builtinLiteralTypeName The name of the associated type in
+    /// \c builtinProtocol
+    /// that describes the argument type of the builtin conversion function
+    /// (\c builtinLiteralFuncName).
+    ///
+    /// \param builtinLiteralFuncName The name of the conversion function
+    /// requirement in \c builtinProtocol.
+    ///
+    /// \param isBuiltinArgType Function that determines whether the given
+    /// type is acceptable as the argument type for the builtin conversion.
+    ///
+    /// \param brokenProtocolDiag The diagnostic to emit if the protocol
+    /// is broken.
+    ///
+    /// \param brokenBuiltinProtocolDiag The diagnostic to emit if the builtin
+    /// protocol is broken.
+    ///
+    /// \returns the converted literal expression.
+    Expr *convertLiteral(Expr *literal,
+                         Type type,
+                         Type openedType,
+                         ProtocolDecl *protocol,
+                         Identifier literalTypeName,
+                         Identifier literalFuncName,
+                         ProtocolDecl *builtinProtocol,
+                         Identifier builtinLiteralTypeName,
+                         Identifier builtinLiteralFuncName,
+                         bool (*isBuiltinArgType)(Type),
+                         Diag<> brokenProtocolDiag,
+                         Diag<> brokenBuiltinProtocolDiag);
+
     /// \brief Finish a function application by performing the appropriate
     /// conversions on the function and argument expressions and setting
     /// the resulting type.
@@ -626,8 +684,35 @@ namespace {
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
-      return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Float, expr->getType());
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *protocol
+        = tc.getProtocol(KnownProtocolKind::FloatLiteralConvertible);
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(KnownProtocolKind::BuiltinFloatLiteralConvertible);
+
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      auto type = simplifyType(expr->getType());
+      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Float)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
+      }
+
+      return convertLiteral(expr,
+                            type,
+                            expr->getType(),
+                            protocol,
+                            tc.Context.getIdentifier("FloatLiteralType"),
+                            tc.Context.getIdentifier("convertFromFloatLiteral"),
+                            builtinProtocol,
+                            tc.Context.getIdentifier("BuiltinFloatLiteralType"),
+                            tc.Context.getIdentifier(
+                              "_convertFromBuiltinFloatLiteral"),
+                            [] (Type type) -> bool {
+                              return type->is<BuiltinFloatType>();
+                            },
+                            diag::float_literal_broken_proto,
+                            diag::builtin_float_literal_broken_proto);
     }
 
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
@@ -2147,7 +2232,88 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   // Return a new call of the conversion function, passing in the (possibly
   // converted) argument.
   return new (tc.Context) CallExpr(result, intermediate, type);
+}
 
+Expr *ExprRewriter::convertLiteral(Expr *literal,
+                                   Type type,
+                                   Type openedType,
+                                   ProtocolDecl *protocol,
+                                   Identifier literalTypeName,
+                                   Identifier literalFuncName,
+                                   ProtocolDecl *builtinProtocol,
+                                   Identifier builtinLiteralTypeName,
+                                   Identifier builtinLiteralFuncName,
+                                   bool (*isBuiltinArgType)(Type),
+                                   Diag<> brokenProtocolDiag,
+                                   Diag<> brokenBuiltinProtocolDiag) {
+  auto &tc = cs.getTypeChecker();
+
+  // Check whether this literal type conforms to the builtin protocol.
+  ProtocolConformance *builtinConformance = nullptr;
+  if (tc.conformsToProtocol(type, builtinProtocol, &builtinConformance)) {
+    // Find the builtin argument type we'll use.
+    auto argType = tc.getWitnessType(type, builtinProtocol,
+                                     builtinConformance,
+                                     builtinLiteralTypeName,
+                                     brokenBuiltinProtocolDiag);
+    if (!argType)
+      return nullptr;
+
+    // Make sure it's of an appropriate builtin type.
+    if (!isBuiltinArgType(argType)) {
+      tc.diagnose(builtinProtocol->getLoc(), brokenBuiltinProtocolDiag);
+      return nullptr;
+    }
+
+    // The literal expression has this type.
+    literal->setType(argType);
+
+    // Call the builtin conversion operation.
+    Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
+                                               MetaTypeType::get(type,
+                                                                 tc.Context));
+    Expr *result = tc.callWitness(base, builtinProtocol, builtinConformance,
+                                  builtinLiteralFuncName,
+                                  literal,
+                                  brokenBuiltinProtocolDiag);
+    if (result)
+      result->setType(type);
+    return result;
+  }
+
+  // This literal type must conform to the (non-builtin) protocol.
+  assert(protocol && "requirements should have stopped recursion");
+  ProtocolConformance *conformance = nullptr;
+  bool conforms = tc.conformsToProtocol(type, protocol, &conformance);
+  assert(conforms && "must conform to literal protocol");
+  (void)conforms;
+
+  // Figure out the (non-builtin) argument type.
+  auto argType = tc.getWitnessType(type, protocol, conformance, literalTypeName,
+                                   brokenProtocolDiag);
+  if (!argType)
+    return nullptr;
+
+  // Convert the literal to the non-builtin argument type via the
+  // builtin protocol, first.
+  // FIXME: Do we need an opened type here?
+  literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
+                           Identifier(), builtinProtocol,
+                           builtinLiteralTypeName, builtinLiteralFuncName,
+                           isBuiltinArgType, brokenProtocolDiag,
+                           brokenBuiltinProtocolDiag);
+  if (!literal)
+    return nullptr;
+
+  // Convert the resulting expression to the final literal type.
+  Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
+                                             MetaTypeType::get(type,
+                                                               tc.Context));
+  literal = tc.callWitness(base, protocol, conformance, literalFuncName,
+                           literal, brokenProtocolDiag);
+  if (literal)
+    literal->setType(type);
+  return literal;
 }
 
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
@@ -2401,6 +2567,7 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
 Expr *TypeChecker::callWitness(Expr *base, ProtocolDecl *protocol,
                                ProtocolConformance *conformance,
                                Identifier name,
+                               MutableArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this);
@@ -2409,12 +2576,16 @@ Expr *TypeChecker::callWitness(Expr *base, ProtocolDecl *protocol,
 
   // Find the witness we need to use.
   auto type = base->getType();
+  if (auto metaType = type->getAs<MetaTypeType>())
+    type = metaType->getInstanceType();
+  
   auto witness = findNamedWitness(*this, type->getRValueType(), protocol,
                                   name, brokenProtocolDiag);
   if (!witness)
     return nullptr;
 
-  // FIXME: Could be smarter here w.r.t. generics.
+  // FIXME: Could be smarter here w.r.t. generics, e.g., by opening up the
+  // type appropriately and 
   auto openedType
     = witness->getType()->castTo<AnyFunctionType>()->getResult();
 
@@ -2424,11 +2595,22 @@ Expr *TypeChecker::callWitness(Expr *base, ProtocolDecl *protocol,
                                            openedType, locator);
 
   // Call the witness.
-  Expr *arg = new (Context) TupleExpr(base->getStartLoc(),
-                                      { }, nullptr,
-                                      base->getEndLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      TupleType::getEmpty(Context));
+  Expr *arg;
+  if (arguments.size() == 1)
+    arg = arguments[0];
+  else {
+    SmallVector<TupleTypeElt, 4> elementTypes;
+    for (auto elt : arguments)
+      elementTypes.push_back(TupleTypeElt(elt->getType()));
+
+    arg = new (Context) TupleExpr(base->getStartLoc(),
+                                  Context.AllocateCopy(arguments),
+                                  nullptr,
+                                  base->getEndLoc(),
+                                  /*hasTrailingClosure=*/false,
+                                  TupleType::get(elementTypes, Context));
+  }
+  
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg);
   return rewriter.finishApply(apply, openedType, locator);
 }

@@ -2072,15 +2072,30 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
     type = fixed;
   }
 
-  // Collection literals are special, because all of the real
-  // requirements for them are kept separate from the
-  // collection-literal requirement. Let this constraint be satisfied
-  // when we've picked a concrete type.
+  // For floating-point literals, check for conformance against the
+  // FloatLiteralConvertible protocol.
+  if (kind == LiteralKind::Float) {
+    if (type->hasTypeVariable())
+      return SolutionKind::Unsolved;
+
+    auto protocol = TC.getProtocol(KnownProtocolKind::FloatLiteralConvertible);
+    if (TC.conformsToProtocol(type, protocol))
+      return SolutionKind::TriviallySolved;
+
+    // Record this failure.
+    recordFailure(locator, Failure::IsNotLiteralType, type, kind);
+    return SolutionKind::Error;
+  }
+
+  // Collection literals are handled via separate protocol
+  // requirements, so let this constraint be satisfied when we've picked a
+  // concrete type.
   if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary) {
     return (type->is<NominalType>() || type->is<BoundGenericType>())
              ? SolutionKind::TriviallySolved
              : SolutionKind::Unsolved;
   }
+
 
   // Look up the entry for this type/literalkind pair in LiteralChecks.
   unsigned &known = LiteralChecks[{type->getCanonicalType(), (unsigned)kind}];
@@ -2099,7 +2114,7 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
 
   // Record this failure.
   recordFailure(locator, Failure::IsNotLiteralType, type, kind);
-  return  SolutionKind::Error;
+  return SolutionKind::Error;
 }
 
 /// \brief Determine whether the given protocol member's signature involves

@@ -298,6 +298,7 @@ public:
       Expr *GetElements
         = TC.callWitness(Container, EnumerableProto, Conformance,
                          TC.Context.getIdentifier("getEnumeratorType"),
+                         { },
                          diag::enumerable_protocol_broken);
       if (!GetElements) return nullptr;
       
@@ -362,6 +363,7 @@ public:
                                           Range->getTypeOfReference()),
                        EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("isEmpty"),
+                       { },
                        diag::range_protocol_broken);
     if (!Empty) return nullptr;
     if (TC.typeCheckCondition(Empty)) return nullptr;
@@ -374,6 +376,7 @@ public:
                                           Range->getTypeOfReference()),
                        EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("next"),
+                       { },
                        diag::range_protocol_broken);
     if (!GetFirstAndAdvance) return nullptr;
     
