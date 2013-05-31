@@ -503,7 +503,7 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
   switch (tokBegin[-1]) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case '(': case '[': case '{':              // opening delimiters
-  case ',': case ';':                        // expression separators
+  case ',': case ';': case ':':              // expression separators
   case '\0':                                 // whitespace / last char in file
     return false;
 
@@ -518,7 +518,7 @@ static bool isRightBound(const char *tokEnd) {
   switch (*tokEnd) {
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
-  case ',': case ';':                        // expression separators
+  case ',': case ';': case ':':              // expression separators
   case '\0':                                 // whitespace / last char in file
     return false;
 
