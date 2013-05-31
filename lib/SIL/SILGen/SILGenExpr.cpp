@@ -1472,6 +1472,39 @@ namespace {
   };
 } // end anonymous namespace
 
+ArrayRef<Substitution>
+SILGenFunction::buildForwardingSubstitutions(GenericParamList *gp) {
+  if (!gp)
+    return {};
+  
+  ASTContext &C = F.getASTContext();
+  ArrayRef<ArchetypeType*> params = gp->getAllArchetypes();
+  
+  size_t paramCount = params.size();
+  Substitution *resultBuf = C.Allocate<Substitution>(paramCount);
+  MutableArrayRef<Substitution> results{resultBuf, paramCount};
+  
+  for (size_t i = 0; i < paramCount; ++i) {
+    // FIXME: better way to do this?
+    ArchetypeType *archetype = params[i];
+    // "Check conformance" on each declared protocol to build a
+    // conformance map.
+    SmallVector<ProtocolConformance*, 2> conformances;
+    
+    for (ProtocolDecl *conformsTo : archetype->getConformsTo()) {
+      (void)conformsTo;
+      conformances.push_back(nullptr);
+    }
+    
+    // Build an identity mapping with the derived conformances.
+    auto replacement = SubstitutedType::get(archetype, archetype, C);
+    results[i] = {archetype, replacement,
+                  C.AllocateCopy(conformances)};
+  }
+  
+  return results;
+}
+
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
@@ -1505,8 +1538,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SILConstant initConstant = SILConstant(ctor, SILConstant::Kind::Initializer);
+  auto forwardingSubs = buildForwardingSubstitutions(ctor->getGenericParams());
   ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant,
-                                       ctor->getForwardingSubstitutions());
+                                       forwardingSubs);
   
   SILValue initedThisValue
     = B.createApply(ctor, initVal.forward(*this), thisTy, args);

@@ -714,6 +714,11 @@ public:
   /// Evaluate an Expr as an lvalue, and take the materialized address as an
   /// rvalue.
   RValue emitLValueAsRValue(Expr *E);
+  
+  /// Build an identity substitution map for the archetypes in a generic
+  /// parameter list.
+  ArrayRef<Substitution>
+  buildForwardingSubstitutions(GenericParamList *gp);
 };
   
 } // end namespace Lowering

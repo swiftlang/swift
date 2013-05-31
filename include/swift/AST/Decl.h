@@ -1573,10 +1573,6 @@ class ConstructorDecl : public ValueDecl, public DeclContext {
   /// allocate 'this'.
   Expr *AllocThis = nullptr;
   
-  /// \brief When non-null, an identity map of substitutions for this
-  /// constructor's generic parameters.
-  ArrayRef<Substitution> ForwardingSubstitutions;
-
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *Arguments, VarDecl *ImplicitThisDecl,
@@ -1636,20 +1632,6 @@ public:
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
   void setInitializerType(Type t) { InitializerType = t; }
-  
-  /// Get an identity map of substitutions for this
-  /// constructor's generic parameters. Used by SILGen to emit a call from
-  /// a generic allocating constructor to the corresponding generic initializing
-  /// constructor.
-  ArrayRef<Substitution> getForwardingSubstitutions() const {
-    return ForwardingSubstitutions;
-  }
-  
-  /// Set the forwarding substitution map. 'subs' must reference an array
-  /// allocated in the constructor's ASTContext.
-  void setForwardingSubstitutions(ArrayRef<Substitution> subs) {
-    ForwardingSubstitutions = subs;
-  }
   
   using DeclContext::operator new;
 };
