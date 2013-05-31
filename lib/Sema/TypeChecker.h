@@ -311,6 +311,16 @@ public:
   /// \brief Retrieve the default literal type for the given literal kind.
   Type getDefaultLiteralType(LiteralKind kind);
 
+  /// \brief Retrieve the default type for the given protocol.
+  ///
+  /// Some protocols, particularly those that correspond to literals, have
+  /// default types associated with them. This routine retrieves that default
+  /// type.
+  ///
+  /// \returns the default type, or null if there is no default type for
+  /// this protocol.
+  Type getDefaultType(ProtocolDecl *protocol);
+
   /// \brief Convert the given expression to the given type.
   ///
   /// \param expr The expression, which will be updated in place.

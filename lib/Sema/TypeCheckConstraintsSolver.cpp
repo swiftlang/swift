@@ -471,15 +471,9 @@ getPotentialBindings(ConstraintSystem &cs,
 
   // When we see conformance to a known protocol, add the default type for
   // that protocol.
-  ProtocolDecl *floatLiteralProtocol
-    = tc.getProtocol(KnownProtocolKind::FloatLiteralConvertible);
   for (auto constraint : tvc.ConformsToConstraints) {
-    // FIXME: Generalize this to a lookup for the default type of any given
-    // protocol?
-    if (constraint->getProtocol() == floatLiteralProtocol) {
-      if (auto type = tc.getDefaultLiteralType(LiteralKind::Float)) {
-        addDefaultLiteralType(type);
-      }
+    if (auto type = tc.getDefaultType(constraint->getProtocol())) {
+      addDefaultLiteralType(type);
     }
   }
 

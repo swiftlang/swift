@@ -2460,13 +2460,12 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
     // constraint, we found what we're looking for.
     // FIXME: isEqual() isn't right for Slice<T>.
     Type defaultType;
-    if (constraint->getKind() == ConstraintKind::Literal)
+    if (constraint->getKind() == ConstraintKind::Literal) {
       defaultType = TC.getDefaultLiteralType(constraint->getLiteralKind());
-    else if (constraint->getProtocol()
-               == TC.getProtocol(KnownProtocolKind::FloatLiteralConvertible)) {
-      defaultType = TC.getDefaultLiteralType(LiteralKind::Float);
+    } else {
+      defaultType = TC.getDefaultType(constraint->getProtocol());
     }
-
+    
     if (defaultType && type->isEqual(defaultType))
       return true;
   }

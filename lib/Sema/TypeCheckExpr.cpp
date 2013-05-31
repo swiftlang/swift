@@ -495,7 +495,6 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   // FIXME: This duplicated code will be unnecessary when we switch
   // literals over to formal protocols.
   if (!((LitTy == LiteralKind::Int && ArgType->is<BuiltinIntegerType>()) ||
-        (LitTy == LiteralKind::Float && ArgType->is<BuiltinFloatType>()) ||
         (LitTy == LiteralKind::Char &&
          (ArgType->is<BuiltinIntegerType>() &&
           ArgType->castTo<BuiltinIntegerType>()->getBitWidth() == 32)) ||
@@ -552,7 +551,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
     *type = lookupGlobalType(*this, name);
 
     // Strip off one level of sugar; we don't actually want to print
-    // IntegerLiteralType anywhere.
+    // the name of the typealias itself anywhere.
     if (type && *type) {
       if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
         *type = typeAlias->getDecl()->getUnderlyingType();
@@ -560,6 +559,14 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
   }
 
   return *type;
+}
+
+Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
+  // FloatLiteralConvertible -> FloatLiteralType
+  if (protocol == getProtocol(KnownProtocolKind::FloatLiteralConvertible))
+    return getDefaultLiteralType(LiteralKind::Float);
+
+  return nullptr;
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr) {

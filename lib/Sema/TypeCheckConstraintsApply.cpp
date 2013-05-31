@@ -2080,6 +2080,8 @@ static bool isRawPtrAndInt64(Type ty) {
 
 Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
                                    Type openedType) {
+  assert(kind != LiteralKind::Float);
+  
   TypeChecker &tc = cs.getTypeChecker();
   
   // Check the destination type to see if it is compatible with literals,
@@ -2110,7 +2112,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
   // "chaining", and an implicit conversion through that type).
   Expr *intermediate;
   BuiltinIntegerType *BIT;
-  BuiltinFloatType *BFT;
   if (kind == LiteralKind::Int &&
       (BIT = argType->getAs<BuiltinIntegerType>())) {
     // If this is a direct use of the builtin integer type, use the integer size
@@ -2141,34 +2142,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
     // Give the integer literal the builtin integer type.
     literal->setType(argType);
     intermediate = literal;
-  }
-  else if (kind == LiteralKind::Float &&
-           (BFT = argType->getAs<BuiltinFloatType>())) {
-    // If this is a direct use of a builtin floating point type, use the
-    // floating point type to do the syntax verification.
-    llvm::APFloat Val(BFT->getAPFloatSemantics());
-    switch (Val.convertFromString(cast<FloatLiteralExpr>(literal)->getText(),
-                                  llvm::APFloat::rmNearestTiesToEven)) {
-      case llvm::APFloat::opOverflow: {
-        llvm::SmallString<20> Buffer;
-        llvm::APFloat::getLargest(Val.getSemantics()).toString(Buffer);
-        tc.diagnose(literal->getLoc(), diag::float_literal_overflow, Buffer);
-        break;
-      }
-      case llvm::APFloat::opUnderflow: {
-        // Denormals are ok, but reported as underflow by APFloat.
-        if (!Val.isZero()) break;
-        llvm::SmallString<20> Buffer;
-        llvm::APFloat::getSmallest(Val.getSemantics()).toString(Buffer);
-        tc.diagnose(literal->getLoc(), diag::float_literal_underflow, Buffer);
-        break;
-      }
-      default:
-        break;
-    }
-
-    literal->setType(argType);
-    intermediate = literal;
   } else if (isStringLiteralKind(kind) && argType->is<BuiltinRawPointerType>()){
     // Nothing to do.
     literal->setType(argType);
@@ -2194,9 +2167,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
 
     if (kind == LiteralKind::Int &&
         chainedArgType->is<BuiltinIntegerType>()) {
-      // ok.
-    } else if (kind == LiteralKind::Float &&
-               chainedArgType->is<BuiltinFloatType>()) {
       // ok.
     } else if (kind == LiteralKind::Char &&
                chainedArgType->is<BuiltinIntegerType>() &&
