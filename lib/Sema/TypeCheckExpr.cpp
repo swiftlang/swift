@@ -562,52 +562,6 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
   return *type;
 }
 
-Type TypeChecker::getDefaultLiteralType(LiteralExpr *E) {
-  if (isa<IntegerLiteralExpr>(E)) {
-    if (!IntLiteralType) {
-      IntLiteralType = getDefaultLiteralType(LiteralKind::Int);
-      if (!IntLiteralType) {
-        diagnose(E->getLoc(), diag::no_IntegerLiteralType_found);
-        IntLiteralType = BuiltinIntegerType::get(32, Context);
-      }
-    }
-    return IntLiteralType;
-  }
-  
-  if (isa<FloatLiteralExpr>(E)) {
-    if (!FloatLiteralType) {
-      FloatLiteralType = getDefaultLiteralType(LiteralKind::Float);
-      if (!FloatLiteralType) {
-        diagnose(E->getLoc(), diag::no_FloatLiteralType_found);
-        FloatLiteralType = Context.TheIEEE64Type;
-      }
-    }
-    return FloatLiteralType;
-  }
-  
-  if (isa<CharacterLiteralExpr>(E)) {
-    if (!CharacterLiteralType) {
-      CharacterLiteralType = getDefaultLiteralType(LiteralKind::Char);
-      if (!CharacterLiteralType) {
-        diagnose(E->getLoc(), diag::no_CharacterLiteralType_found);
-        CharacterLiteralType = BuiltinIntegerType::get(32, Context);
-      }
-    }
-    return CharacterLiteralType;
-  }
-  
-  assert((isa<StringLiteralExpr>(E) || isa<InterpolatedStringLiteralExpr>(E)) &&
-         "Unknown literal type");
-  if (!StringLiteralType) {
-    StringLiteralType = getDefaultLiteralType(LiteralKind::UTFString);
-    if (!StringLiteralType) {
-      diagnose(E->getLoc(), diag::no_StringLiteralType_found);
-      StringLiteralType = Context.TheRawPointerType;
-    }
-  }
-  return StringLiteralType;
-}
-
 Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");

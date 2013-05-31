@@ -311,10 +311,6 @@ public:
   /// \brief Retrieve the default literal type for the given literal kind.
   Type getDefaultLiteralType(LiteralKind kind);
 
-  /// \brief Retrieve the default literal type for the given literal
-  /// expression.
-  Type getDefaultLiteralType(LiteralExpr *E);
-    
   /// \brief Convert the given expression to the given type.
   ///
   /// \param expr The expression, which will be updated in place.
