@@ -199,13 +199,8 @@ namespace {
       // The type of the expression must conform to the
       // StringInterpolationConvertible protocol.
       auto tv = CS.createTypeVariable(expr);
-      CS.addConstraint(ConstraintKind::Conversion, tv,
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType());
-
-      // The interpolated string type must also be a string literal type.
-      // FIXME: This could come from the protocol definition itself.
-      CS.addLiteralConstraint(tv, LiteralKind::UTFString,
-                              CS.getConstraintLocator(expr, { }));
 
       // Each of the segments needs to be convertible to a constructor argument
       // for the underlying string type.

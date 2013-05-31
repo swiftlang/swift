@@ -566,6 +566,18 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
   if (protocol == getProtocol(KnownProtocolKind::FloatLiteralConvertible))
     return getDefaultLiteralType(LiteralKind::Float);
 
+  // StringInterpolationConvertible -> StringLiteralType
+  if (protocol==getProtocol(KnownProtocolKind::StringInterpolationConvertible))
+    return getDefaultLiteralType(LiteralKind::UTFString);
+
+  // ArrayLiteralConvertible -> Slice;
+  if (protocol == getProtocol(KnownProtocolKind::ArrayLiteralConvertible))
+    return getDefaultLiteralType(LiteralKind::Array);
+
+  // DictionaryLiteralConvertible -> Dictionary;
+  if (protocol == getProtocol(KnownProtocolKind::DictionaryLiteralConvertible))
+    return getDefaultLiteralType(LiteralKind::Dictionary);
+
   return nullptr;
 }
 
