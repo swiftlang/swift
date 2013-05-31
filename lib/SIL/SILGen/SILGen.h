@@ -603,6 +603,7 @@ public:
 
   ManagedValue emitClosureForCapturingExpr(SILLocation loc,
                                            SILConstant function,
+                                           ArrayRef<Substitution> forwardSubs,
                                            CapturingExpr *body);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
@@ -719,6 +720,10 @@ public:
   /// parameter list.
   ArrayRef<Substitution>
   buildForwardingSubstitutions(GenericParamList *gp);
+  
+  /// Return forwarding substitutions for the archetypes in the current
+  /// function.
+  ArrayRef<Substitution> getForwardingSubstitutions();
 };
   
 } // end namespace Lowering

@@ -222,6 +222,11 @@ public:
     return getLoweredType(TupleType::getEmpty(Context));
   }
   
+  /// Get a function type curried with its capture context.
+  Type getFunctionTypeWithCaptures(AnyFunctionType *funcType,
+                                   ArrayRef<ValueDecl*> captures,
+                                   DeclContext *parentContext);
+  
   /// Returns the type of the "this" parameter to methods of a type.
   Type getMethodThisType(Type thisType) const;
   

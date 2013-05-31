@@ -51,7 +51,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
   switch (c.kind) {
   //   entity ::= declaration                     // other declaration
   case SILConstant::Kind::Func:
-    if (!c.hasDecl()) {
+    if (!c.hasDecl() || c.getDecl()->getDeclContext()->isLocalContext()) {
       // FIXME: Generate a more descriptive name for closures.
       buffer << "closure" << anonymousFunctionCounter++;
       return;
