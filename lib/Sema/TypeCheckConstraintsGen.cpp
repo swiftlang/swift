@@ -159,11 +159,8 @@ namespace {
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Float,
-                              CS.getConstraintLocator(expr, { }));
-
       // Require conformance to the FloatLiteralConvertible protocol.
+      auto tv = CS.createTypeVariable(expr);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
 

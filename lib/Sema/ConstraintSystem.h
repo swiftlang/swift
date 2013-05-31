@@ -1176,6 +1176,10 @@ struct TypeVariableConstraints {
   /// \brief The set of constraints "below" the type variable.
   SmallVector<std::pair<Constraint *, Type>, 4> Below;
 
+  /// \brief The set of protocol conformance constraints directly applicable
+  /// to the type variable.
+  SmallVector<Constraint *, 4> ConformsToConstraints;
+  
   /// \brief The set of archetype and literal constraints directly
   /// applicable to the type variable T.
   SmallVector<Constraint *, 4> KindConstraints;

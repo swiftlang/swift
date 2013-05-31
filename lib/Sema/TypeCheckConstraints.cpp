@@ -2084,6 +2084,8 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
                                             ConstraintLocator *locator) {
+  assert(kind != LiteralKind::Float);
+  
   if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
     auto fixed = getFixedType(tv);
     if (!fixed)
@@ -2096,11 +2098,7 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
   // Collection and floating-point literals are handled via separate protocol
   // requirements, so let this constraint be satisfied when we've picked a
   // concrete type.
-  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary ||
-      kind == LiteralKind::Float) {
-    if (kind == LiteralKind::Float && type->is<ArchetypeType>())
-      return SolutionKind::TriviallySolved;
-    
+  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary) {
     return (type->is<NominalType>() || type->is<BoundGenericType>())
              ? SolutionKind::TriviallySolved
              : SolutionKind::Unsolved;
@@ -2441,10 +2439,11 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
                                                            Type type) {
   tv = getRepresentative(tv);
 
-  // FIXME:
+  // FIXME: this is hideously inefficient.
   for (auto constraint : Constraints) {
-    // We only care about literal constraints...
-    if (constraint->getClassification() != ConstraintClassification::Literal)
+    // We only care about literal constraints and conformance constrants;
+    if (constraint->getClassification() != ConstraintClassification::Literal &&
+        constraint->getKind() != ConstraintKind::ConformsTo)
       continue;
 
     // on type variables...
@@ -2460,9 +2459,15 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
     // If the type we were given matches the default literal type for this
     // constraint, we found what we're looking for.
     // FIXME: isEqual() isn't right for Slice<T>.
-    auto defaultLiteralType
-      = TC.getDefaultLiteralType(constraint->getLiteralKind());
-    if (defaultLiteralType && type->isEqual(defaultLiteralType))
+    Type defaultType;
+    if (constraint->getKind() == ConstraintKind::Literal)
+      defaultType = TC.getDefaultLiteralType(constraint->getLiteralKind());
+    else if (constraint->getProtocol()
+               == TC.getProtocol(KnownProtocolKind::FloatLiteralConvertible)) {
+      defaultType = TC.getDefaultLiteralType(LiteralKind::Float);
+    }
+
+    if (defaultType && type->isEqual(defaultType))
       return true;
   }
 
