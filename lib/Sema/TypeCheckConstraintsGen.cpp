@@ -163,7 +163,9 @@ namespace {
       CS.addLiteralConstraint(tv, LiteralKind::Float,
                               CS.getConstraintLocator(expr, { }));
 
-      // FIXME: Require conformance to the FloatLiteralConvertible protocol.
+      // Require conformance to the FloatLiteralConvertible protocol.
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                       protocol->getDeclaredType());
 
       return tv;
     }

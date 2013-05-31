@@ -157,6 +157,12 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     auto first = simplifyType(constraint->getFirstType());
     switch (constraint->getClassification()) {
     case ConstraintClassification::Relational:
+      // Just ignore conformance constraints.
+      // FIXME: These could actually be useful.
+      if (constraint->getKind() == ConstraintKind::ConformsTo) {
+        continue;
+      }
+
       // Handle this interesting case below.
       break;
 

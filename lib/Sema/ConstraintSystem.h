@@ -269,6 +269,9 @@ enum class ConstraintKind : char {
   /// used as an argument to a constructor for the second (non-reference)
   /// type.
   Construction,
+  /// \brief The first type must conform to the second type (which is a
+  /// protocol type).
+  ConformsTo,
   /// \brief The first type is the type of a literal. There is no second
   /// type.
   Literal,
@@ -909,6 +912,7 @@ public:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::Construction:
+    case ConstraintKind::ConformsTo:
       assert(Member.empty() && "Relational constraint cannot have a member");
       break;
 
@@ -946,6 +950,7 @@ public:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::Construction:
+    case ConstraintKind::ConformsTo:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::Literal:
@@ -973,6 +978,12 @@ public:
   /// \brief Determine whether this constraint kind has a second type.
   static bool hasSecondType(ConstraintKind kind) {
     return kind != ConstraintKind::Literal;
+  }
+
+  /// \brief Retrieve the protocol in a conformance constraint.
+  ProtocolDecl *getProtocol() const {
+    assert(Kind==ConstraintKind::ConformsTo && "Not a conformance constraint");
+    return Second->castTo<ProtocolType>()->getDecl();
   }
 
   /// \brief Retrieve the name of the member for a member constraint.
@@ -1165,8 +1176,8 @@ struct TypeVariableConstraints {
   /// \brief The set of constraints "below" the type variable.
   SmallVector<std::pair<Constraint *, Type>, 4> Below;
 
-  /// \brief The set of archetype and literal constraints directly applicable
-  /// to the type variable T.
+  /// \brief The set of archetype and literal constraints directly
+  /// applicable to the type variable T.
   SmallVector<Constraint *, 4> KindConstraints;
 };
 
@@ -1984,6 +1995,14 @@ private:
   SolutionKind simplifyConstructionConstraint(Type valueType, Type argType,
                                               unsigned flags,
                                               ConstraintLocator *locator);
+
+  /// \brief Attempt to simplify the given conformance constraint.
+  ///
+  /// \param type The type being testing.
+  /// \param protocol The protocol to which the type should conform.
+  /// \param locator Locator describing where this constraint occurred.
+  SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
+                                            ConstraintLocator *locator);
 
   /// \brief Attempt to simplify the given literal constraint.
   SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind,

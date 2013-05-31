@@ -210,6 +210,7 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
   case ConstraintKind::Construction: Out << " <C "; break;
+  case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::Literal:
     Out << " is ";
     switch (getLiteralKind()) {
@@ -2061,6 +2062,26 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyConformsToConstraint(Type type,
+                                               ProtocolDecl *protocol,
+                                               ConstraintLocator *locator) {
+  // If the type still contains a type variable, we can't solve this constraint
+  // now.
+  // FIXME: Eventually, we'll be able to check if an arbitrary nominal type
+  // conforms to the protocol. However, we can't do so yet.
+  type = simplifyType(type);
+  if (type->hasTypeVariable())
+    return SolutionKind::Unsolved;
+
+  if (TC.conformsToProtocol(type, protocol))
+    return SolutionKind::TriviallySolved;
+
+  recordFailure(locator, Failure::DoesNotConformToProtocol, type,
+                protocol->getDeclaredType());
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
                                             ConstraintLocator *locator) {
   if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
@@ -2072,25 +2093,14 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
     type = fixed;
   }
 
-  // For floating-point literals, check for conformance against the
-  // FloatLiteralConvertible protocol.
-  if (kind == LiteralKind::Float) {
-    if (type->hasTypeVariable())
-      return SolutionKind::Unsolved;
-
-    auto protocol = TC.getProtocol(KnownProtocolKind::FloatLiteralConvertible);
-    if (TC.conformsToProtocol(type, protocol))
-      return SolutionKind::TriviallySolved;
-
-    // Record this failure.
-    recordFailure(locator, Failure::IsNotLiteralType, type, kind);
-    return SolutionKind::Error;
-  }
-
-  // Collection literals are handled via separate protocol
+  // Collection and floating-point literals are handled via separate protocol
   // requirements, so let this constraint be satisfied when we've picked a
   // concrete type.
-  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary) {
+  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary ||
+      kind == LiteralKind::Float) {
+    if (kind == LiteralKind::Float && type->is<ArchetypeType>())
+      return SolutionKind::TriviallySolved;
+    
     return (type->is<NominalType>() || type->is<BoundGenericType>())
              ? SolutionKind::TriviallySolved
              : SolutionKind::Unsolved;
@@ -2342,6 +2352,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Construction:
     llvm_unreachable("Construction constraints don't involve type matches");
 
+  case ConstraintKind::ConformsTo:
+    llvm_unreachable("Conformance constraints don't involve type matches");
+
   case ConstraintKind::Literal:
     llvm_unreachable("Literals don't involve type matches");
 
@@ -2375,6 +2388,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           constraint.getFirstType(),
                                           TMF_None,
                                           constraint.getLocator());
+
+  case ConstraintKind::ConformsTo:
+    return simplifyConformsToConstraint(constraint.getFirstType(),
+                                        constraint.getProtocol(),
+                                        constraint.getLocator());
 
   case ConstraintKind::Literal:
     return simplifyLiteralConstraint(constraint.getFirstType(),
