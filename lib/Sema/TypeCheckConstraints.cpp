@@ -429,17 +429,10 @@ Type ConstraintSystem::openType(
       if (!conformsTo.empty()) {
         // FIXME: Can we do this more efficiently, since we know that the
         // protocol list has already been minimized?
-        SmallVector<Type, 4> conformsToTypes;
-        conformsToTypes.reserve(conformsTo.size());
-        std::transform(conformsTo.begin(), conformsTo.end(),
-                       std::back_inserter(conformsToTypes),
-                       [](ProtocolDecl *proto) {
-                         return proto->getDeclaredType();
-                       });
-
-        auto composition = ProtocolCompositionType::get(CS.TC.Context,
-                                                        conformsToTypes);
-        CS.addConstraint(ConstraintKind::Conversion, tv, composition);
+        for (auto protocol : conformsTo) {
+          CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                           protocol->getDeclaredType());
+        }
       }
 
       // Record the type variable that corresponds to this archetype.
@@ -2069,7 +2062,7 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
   // now.
   // FIXME: Eventually, we'll be able to check if an arbitrary nominal type
   // conforms to the protocol. However, we can't do so yet.
-  type = simplifyType(type);
+  type = simplifyType(type)->getRValueType();
   if (type->hasTypeVariable())
     return SolutionKind::Unsolved;
 
@@ -3308,7 +3301,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr) {
     return true;
   }
 
-  cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+  cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
                    logicValueProto->getDeclaredType(),
                    cs.getConstraintLocator(expr, { }));
 
@@ -3435,7 +3428,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
     return true;
   }
 
-  cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+  cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
                    arrayBoundProto->getDeclaredType(),
                    cs.getConstraintLocator(expr, { }));
 

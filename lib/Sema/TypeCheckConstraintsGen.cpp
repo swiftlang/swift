@@ -880,6 +880,7 @@ namespace {
     }
     
     Type visitCoerceExpr(CoerceExpr *expr) {
+      // FIXME: Could split the system here.
       Type ty = expr->getTypeLoc().getType();
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), ty,
