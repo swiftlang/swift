@@ -993,30 +993,13 @@ RValue SILGenFunction::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
 }
 
 ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
-                                             SILConstant constant,
-                                             ArrayRef<Substitution> forwardSubs,
-                                             CapturingExpr *body) {
+                                                         SILConstant constant,
+                                                         CapturingExpr *body) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
   assert(((constant.uncurryLevel == 1 && !body->getCaptures().empty())
           || (constant.uncurryLevel == 0 && body->getCaptures().empty()))
          && "curried local functions not yet supported");
-  
-  SILValue functionRef = emitGlobalFunctionRef(loc, constant);
-  
-  // Forward substitutions from the outer scope.
-  if (!forwardSubs.empty()) {
-    auto *pft = SGM.getConstantType(constant).castTo<PolymorphicFunctionType>();
-    FunctionType *specialized = FunctionType::get(pft->getInput(),
-                                                  pft->getResult(),
-                                                  /*autoClosure*/ false,
-                                                  /*isBlock*/ false,
-                                                  /*isThin*/ true,
-                                                  pft->getAbstractCC(),
-                                                  F.getASTContext());
-    functionRef = B.createSpecialize(loc, functionRef, forwardSubs,
-                                     getLoweredLoadableType(specialized));
-  }
 
   auto captures = body->getCaptures();
   if (!captures.empty()) {    
@@ -1067,12 +1050,14 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
       }
     }
     
+    SILValue functionRef = emitGlobalFunctionRef(loc, constant);
     SILType closureTy = getLoweredLoadableType(body->getType());
     return emitManagedRValueWithCleanup(
                     B.createPartialApply(loc, functionRef, capturedArgs,
                                          closureTy));
   } else {
-    return ManagedValue(functionRef, ManagedValue::Unmanaged);
+    return ManagedValue(emitGlobalFunctionRef(loc, constant),
+                        ManagedValue::Unmanaged);
   }
 }
 
@@ -1081,9 +1066,7 @@ RValue SILGenFunction::visitFuncExpr(FuncExpr *e, SGFContext C) {
   SGM.emitFunction(e, e);
 
   // Generate the closure (if any) for the function reference.
-  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e),
-                                                   getForwardingSubstitutions(),
-                                                   e));
+  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e), e));
 }
 
 RValue SILGenFunction::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
@@ -1092,9 +1075,7 @@ RValue SILGenFunction::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e),
-                                                   getForwardingSubstitutions(),
-                                                   e));
+  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e), e));
 }
 
 RValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
@@ -1103,9 +1084,7 @@ RValue SILGenFunction::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e),
-                                                   getForwardingSubstitutions(),
-                                                   e));
+  return RValue(*this, emitClosureForCapturingExpr(e, SILConstant(e), e));
 }
 
 void SILGenFunction::emitFunction(FuncExpr *fe) {

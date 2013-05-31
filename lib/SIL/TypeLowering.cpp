@@ -549,9 +549,9 @@ static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
   return FunctionType::get(classType, C.TheObjectPointerType, C);
 }
 
-Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
-                                                ArrayRef<ValueDecl*> captures,
-                                                DeclContext *parentContext) {
+static Type getFunctionTypeWithCaptures(TypeConverter &types,
+                                        AnyFunctionType *funcType,
+                                        ArrayRef<ValueDecl*> captures) {
   assert(!funcType->isThin());
   if (captures.empty())
     return funcType;
@@ -575,21 +575,21 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
         = capture->getType()->getRValueType();
       LValueType *lvType = LValueType::get(objectType,
                                            LValueType::Qual::DefaultForType,
-                                           Context);
+                                           types.Context);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy = getPropertyType(SILConstant::Kind::Setter,
-                                      capture->getType());
+      Type setterTy = types.getPropertyType(SILConstant::Kind::Setter,
+                                            capture->getType());
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy = getPropertyType(SILConstant::Kind::Getter,
-                                      capture->getType());
+      Type getterTy = types.getPropertyType(SILConstant::Kind::Getter,
+                                            capture->getType());
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
@@ -597,25 +597,22 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       // Capture the owning ObjectPointer and the address of the value.
       assert(capture->getTypeOfReference()->is<LValueType>() &&
              "lvalue capture not an lvalue?!");
-      inputFields.push_back(Context.TheObjectPointerType);
+      inputFields.push_back(types.Context.TheObjectPointerType);
       LValueType *lvType = LValueType::get(capture->getType(),
                                            LValueType::Qual::DefaultForType,
-                                           Context);
+                                           types.Context);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
     }
   }
   
-  Type capturedInputs = TupleType::get(inputFields, Context);
-  
-  // Capture generic parameters from the enclosing context.
-  GenericParamList *genericParams = parentContext->getGenericParamsOfContext();
-  if (genericParams)
-    return PolymorphicFunctionType::get(capturedInputs, funcType,
-                                        genericParams,
-                                        Context);
-  
-  return FunctionType::get(capturedInputs, funcType, Context);
+  Type capturedInputs = TupleType::get(inputFields, types.Context);
+
+  // FIXME: If there are generic captures, the archetypes from the context
+  // need to become generic parameters of the closure.
+  return FunctionType::get(capturedInputs,
+                           funcType,
+                           types.Context);
 }
 
 Type TypeConverter::makeConstantType(SILConstant c) {
@@ -625,14 +622,12 @@ Type TypeConverter::makeConstantType(SILConstant c) {
   case SILConstant::Kind::Func:
     if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
       auto *funcTy = e->getType()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(funcTy, e->getCaptures(),
-                                         e->getParent());
+      return getFunctionTypeWithCaptures(*this, funcTy, e->getCaptures());
     } else {
       FuncDecl *func = cast<FuncDecl>(vd);
       auto *funcTy = func->getTypeOfReference()->castTo<AnyFunctionType>();
-      return getFunctionTypeWithCaptures(funcTy,
-                                         func->getCaptures(),
-                                         func->getDeclContext());
+      return getFunctionTypeWithCaptures(*this, funcTy,
+                                         func->getCaptures());
     }
 
   case SILConstant::Kind::Getter:
@@ -667,9 +662,8 @@ Type TypeConverter::makeConstantType(SILConstant c) {
           ? var->getGetter()
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
-        return getFunctionTypeWithCaptures(propTy,
-                                           property->getCaptures(),
-                                           var->getDeclContext());
+        return getFunctionTypeWithCaptures(*this, propTy,
+                                           property->getCaptures());
       }
     }
     return propertyMethodType;

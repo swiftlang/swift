@@ -109,13 +109,6 @@ namespace {
   };
 }
 
-ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
-  if (auto *outerPFT = F.getLoweredType().getAs<PolymorphicFunctionType>()) {
-    return buildForwardingSubstitutions(&outerPFT->getGenericParams());
-  }
-  return {};
-}
-
 void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
   // Generate the local function body.
   SGM.emitFunction(fd, fd->getBody());
@@ -124,8 +117,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
   // store it as a local constant.
   if (!fd->getCaptures().empty()) {
     SILValue closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
-                                                   getForwardingSubstitutions(),
-                                                   fd->getBody())
+                                                fd->getBody())
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
     LocalConstants[SILConstant(fd)] = closure;
