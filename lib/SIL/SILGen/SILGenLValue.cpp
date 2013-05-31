@@ -86,6 +86,17 @@ WritebackScope::WritebackScope(SILGenFunction &gen)
   gen.InWritebackScope = true;
 }
 
+ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
+  if (address.getType().isAddressOnly(gen.SGM.M)) {
+    // We can use the temporary as an address-only rvalue directly.
+    return ManagedValue(address, valueCleanup);
+  }
+
+  if (valueCleanup.isValid())
+    gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
+  return gen.emitLoad(loc, address, SGFContext(), /*isTake*/ true);
+}
+
 WritebackScope::~WritebackScope() {
   if (!gen)
     return;
@@ -95,10 +106,7 @@ WritebackScope::~WritebackScope() {
        deepest = gen->
   WritebackStack.begin() + savedDepth;
   while (i-- > deepest) {
-    if (i->temp.valueCleanup.isValid())
-      gen->Cleanups.setCleanupState(i->temp.valueCleanup, CleanupState::Dead);
-    ManagedValue mv
-      = gen->emitLoad(i->loc, i->temp.address, SGFContext(), /*isTake*/ true);
+    ManagedValue mv = i->temp.claim(*gen, i->loc);
     i->component->set(*gen, i->loc, RValue(*gen, mv), i->base);
   }
   

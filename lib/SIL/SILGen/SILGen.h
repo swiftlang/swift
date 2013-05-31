@@ -182,6 +182,10 @@ struct Materialize {
   /// The cleanup to dispose of the value before deallocating the buffer.
   /// This cleanup can be killed by calling the consume method.
   CleanupsDepth valueCleanup;
+  
+  /// Load and claim ownership of the value in the buffer. Does not deallocate
+  /// the buffer.
+  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
 };
   
 /// SGFContext - Internal context information for the SILGenFunction visitor.
