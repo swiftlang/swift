@@ -288,12 +288,8 @@ void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   
   // FIXME: Curry thunks for generic functions don't work right yet, so skip
   // emitting thunks for generic functions for now.
-  for (AnyFunctionType *ft = fe->getType()->getAs<AnyFunctionType>();
-       ft;
-       ft = ft->getResult()->getAs<AnyFunctionType>()) {
-    if (ft->is<PolymorphicFunctionType>())
-      return;
-  }
+  if (f->getLoweredType().is<PolymorphicFunctionType>())
+    return;
   
   // Generate the curry thunks.
   unsigned level = constant.uncurryLevel;
