@@ -83,6 +83,8 @@ public:
   /// type checker.
   std::vector<FuncExprLike> implicitlyDefinedFunctions;
 
+  DeclContext *CurDC = nullptr;
+  
 private:
   /// \brief The number of known protocols.
   static const unsigned numKnownProtocols
@@ -117,7 +119,8 @@ public:
   }
 
   Type getArraySliceType(SourceLoc loc, Type elementType);
-  Expr *buildArrayInjectionFnRef(ArraySliceType *sliceType,
+  Expr *buildArrayInjectionFnRef(DeclContext *dc,
+                                 ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
   bool validateType(TypeLoc &Loc);
@@ -259,7 +262,8 @@ public:
   /// or null if the expression is standalone.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpression(Expr *&expr, Type convertType = Type());
+  bool typeCheckExpression(Expr *&expr, DeclContext *dc,
+                           Type convertType = Type());
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.
@@ -271,7 +275,8 @@ public:
   /// or null if the expression is standalone.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, Type convertType = Type());
+  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
+                                  Type convertType = Type());
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -280,14 +285,14 @@ public:
   /// to return a logic value (builtin i1).
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool typeCheckCondition(Expr *&expr);
+  bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.
   ///
   /// \param expr The expression to type-check, which will be modified in
   /// place to return a builtin integral value (e.g., builtin i64).
-  bool typeCheckArrayBound(Expr *&expr, bool requireConstant);
+  bool typeCheckArrayBound(Expr *&expr, bool requireConstant, DeclContext *dc);
 
   /// \brief Type check an assignment expression using the constraint-based
   /// type checker.
@@ -300,10 +305,12 @@ public:
   /// if the assignment failed to type-check.
   std::pair<Expr *, Expr *> typeCheckAssignment(Expr *dest,
                                                 SourceLoc equalLoc,
-                                                Expr *src);
+                                                Expr *src,
+                                                DeclContext *dc);
 
-  bool typeCheckPattern(Pattern *P, bool isFirstPass, bool allowUnknownTypes);
-  bool coerceToType(Pattern *P, Type Ty);
+  bool typeCheckPattern(Pattern *P, DeclContext *dc,
+                        bool isFirstPass, bool allowUnknownTypes);
+  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);
   
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
@@ -327,7 +334,7 @@ public:
   /// \param type The type to convert to.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type);
+  bool convertToType(Expr *&expr, Type type, DeclContext *dc);
 
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
@@ -371,7 +378,8 @@ public:
   /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
   ///
   /// \returns a fully type-checked call, or null if the protocol was broken.
-  Expr *callWitness(Expr *base, ProtocolDecl *protocol,
+  Expr *callWitness(Expr *base, DeclContext *dc,
+                    ProtocolDecl *protocol,
                     ProtocolConformance *conformance,
                     Identifier name,
                     MutableArrayRef<Expr *> arguments,

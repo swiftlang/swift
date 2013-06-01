@@ -90,7 +90,8 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 /// Is the given expression a valid thing to use as the injection
 /// function from the data for a newly-allocated array into the
 /// given slice type?
-Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
+Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
+                                            ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
   // Build the expression "Slice<T>".
   Expr *sliceTypeRef =
@@ -102,7 +103,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
                                       sliceTypeRef, Loc,
                                       Context.getIdentifier("convertFromHeapArray"),
                                       Loc);
-  if (typeCheckExpressionShallow(injectionFn))
+  if (typeCheckExpressionShallow(injectionFn, dc))
     return nullptr;
 
   // The input is a tuple type:
@@ -128,7 +129,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(ArraySliceType *sliceType,
   FunctionType *fnTy = FunctionType::get(input, result, Context);
 
   // FIXME: this produces terrible diagnostics.
-  if (convertToType(injectionFn, fnTy))
+  if (convertToType(injectionFn, fnTy, dc))
     return nullptr;
 
   return injectionFn;
@@ -595,6 +596,7 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr) {
 }
 
 static bool semaFuncParamPatterns(TypeChecker *checker,
+                                  DeclContext *dc,
                                   ArrayRef<Pattern*> paramPatterns,
                                   bool isFirstPass,
                                   bool allowUnknownTypes) {
@@ -602,7 +604,7 @@ static bool semaFuncParamPatterns(TypeChecker *checker,
   for (Pattern *P : paramPatterns) {
     if (P->hasType())
       continue;
-    if (checker->typeCheckPattern(P, isFirstPass, allowUnknownTypes)) {
+    if (checker->typeCheckPattern(P, dc, isFirstPass, allowUnknownTypes)) {
       badType = true;
       continue;
     }
@@ -623,9 +625,9 @@ void TypeChecker::semaFuncExpr(FuncExpr *FE, bool isFirstPass,
     }
   }
   
-  badType = badType || semaFuncParamPatterns(this, FE->getArgParamPatterns(),
+  badType = badType || semaFuncParamPatterns(this, FE, FE->getArgParamPatterns(),
                                              isFirstPass, allowUnknownTypes);
-  badType = badType || semaFuncParamPatterns(this, FE->getBodyParamPatterns(),
+  badType = badType || semaFuncParamPatterns(this, FE, FE->getBodyParamPatterns(),
                                              isFirstPass, allowUnknownTypes);
 
   if (badType) {

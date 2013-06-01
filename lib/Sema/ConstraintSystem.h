@@ -1321,7 +1321,10 @@ public:
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
+public:
   TypeChecker &TC;
+  DeclContext *DC;
+private:
   Constraint *failedConstraint = nullptr;
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1463,7 +1466,7 @@ public:
     ~SolverScope();
   };
 
-  ConstraintSystem(TypeChecker &tc);
+  ConstraintSystem(TypeChecker &tc, DeclContext *dc);
   ~ConstraintSystem();
 
   /// \brief Retrieve the type checker associated with this constraint system.

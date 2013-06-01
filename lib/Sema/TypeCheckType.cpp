@@ -367,7 +367,8 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       if (EltInit == 0) continue;
 
       Expr *initExpr = EltInit->getExpr();
-      if (typeCheckExpression(initExpr, EltTy)) {
+      // FIXME: Should pass the DeclContext in which the tuple type appears.
+      if (typeCheckExpression(initExpr, &TU, EltTy)) {
         diagnose(initExpr->getLoc(), diag::while_converting_default_tuple_value,
                  EltTy);
         IsInvalid = true;

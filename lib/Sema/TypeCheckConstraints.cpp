@@ -288,8 +288,8 @@ OverloadSet *OverloadSet::getNew(ConstraintSystem &CS,
                                  choices);
 }
 
-ConstraintSystem::ConstraintSystem(TypeChecker &tc)
-  : TC(tc), Arena(tc.Context, Allocator)
+ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
+  : TC(tc), DC(dc), Arena(tc.Context, Allocator)
 {
 }
 
@@ -2722,9 +2722,10 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
 namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
+    DeclContext *DC;
 
   public:
-    PreCheckExpression(TypeChecker &tc) : TC(tc) { }
+    PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For FuncExprs, we just want to type-check the patterns as written,
@@ -2740,7 +2741,7 @@ namespace {
       // we've determine the complete function type.
       if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
         // Validate the parameters.
-        if (TC.typeCheckPattern(closure->getParams(), true, true)) {
+        if (TC.typeCheckPattern(closure->getParams(), DC, true, true)) {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
         }
@@ -2779,13 +2780,13 @@ namespace {
             continue;
 
           // All inner bounds must be constant.
-          if (TC.typeCheckArrayBound(bound.Value, /*requireConstant=*/true))
+          if (TC.typeCheckArrayBound(bound.Value, /*requireConstant=*/true, DC))
             return nullptr;
         }
 
         // The outermost bound does not need to be constant.
         if (TC.typeCheckArrayBound(newArray->getBounds()[0].Value,
-                                   /*requireConstant=*/false))
+                                   /*requireConstant=*/false, DC))
           return nullptr;
 
         return expr;
@@ -2906,17 +2907,18 @@ namespace {
 }
 
 #pragma mark High-level entry points
-bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
+bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
+                                      Type convertType){
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this));
+  expr = expr->walk(PreCheckExpression(*this, dc));
   if (!expr)
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   expr = cs.generateConstraints(expr);
   if (!expr) {
@@ -3006,9 +3008,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, Type convertType){
   return false;
 }
 
-bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, Type convertType) {
+bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
+                                             Type convertType) {
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   expr = cs.generateConstraintsShallow(expr);
   if (!expr) {
@@ -3149,24 +3152,25 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
 
 std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
                                                            SourceLoc equalLoc,
-                                                           Expr *src) {
+                                                           Expr *src,
+                                                           DeclContext *dc) {
   // First, pre-check the destination and source, validating any types that
   // occur in the expression and folding sequence expressions.
 
   // Pre-check the destination.
-  dest = dest->walk(PreCheckExpression(*this));
+  dest = dest->walk(PreCheckExpression(*this, dc));
   if (!dest)
     return std::make_pair(nullptr, nullptr);
 
   // Pre-check the source.
-  src = src->walk(PreCheckExpression(*this));
+  src = src->walk(PreCheckExpression(*this, dc));
   if (!src)
     return { nullptr, nullptr };
 
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from the destination and source.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanupSrc(cs, src);
   CleanupIllFormedExpressionRAII cleanupDest(cs, dest);
   dest = cs.generateConstraints(dest);
@@ -3278,17 +3282,17 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
   return { dest, src };
 }
 
-bool TypeChecker::typeCheckCondition(Expr *&expr) {
+bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this));
+  expr = expr->walk(PreCheckExpression(*this, dc));
   if (!expr)
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   expr = cs.generateConstraints(expr);
   if (!expr)
@@ -3379,7 +3383,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr) {
   return false;
 }
 
-bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
+bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
+                                      DeclContext *dc) {
   // If it's an integer literal expression, just convert the type directly.
   if (auto lit = dyn_cast<IntegerLiteralExpr>(
                    expr->getSemanticsProvidingExpr())) {
@@ -3408,14 +3413,14 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this));
+  expr = expr->walk(PreCheckExpression(*this, dc));
   if (!expr)
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   expr = cs.generateConstraints(expr);
   if (!expr)
@@ -3507,7 +3512,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired) {
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, bool &isTrivial) {
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, nullptr);
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
@@ -3576,11 +3581,11 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   return expr;
 }
 
-bool TypeChecker::convertToType(Expr *&expr, Type type) {
+bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   llvm::raw_ostream &log = llvm::errs();
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
 
   // If there is a type that we're expected to convert to, add the conversion

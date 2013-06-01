@@ -767,7 +767,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         if (TT->hasCanonicalTypeComputed()) {
           // If we already examined a tuple in the first pass, we didn't
           // get a chance to type-check it; do that now.
-          if (!TC.typeCheckExpression(initExpr, Elt.getType()))
+          // FIXME: Bogus DeclContext
+          if (!TC.typeCheckExpression(initExpr, TU, Elt.getType()))
             init->setExpr(initExpr);
         }
       }
@@ -794,7 +795,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
           if (field.getInit() && field.getPattern()->hasType()) {
             Expr *e = field.getInit()->getExpr();
             e = PrePass.doWalk(e, DC);
-            TC.typeCheckExpression(e, field.getPattern()->getType());
+            TC.typeCheckExpression(e, DC, field.getPattern()->getType());
             field.getInit()->setExpr(e);
           }
         }
@@ -983,7 +984,7 @@ bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
       || isa<ErrorExpr>(parsedExpr)
       || (parsedExpr->getType() && parsedExpr->getType()->is<ErrorType>()))
     return false;
-  TC.typeCheckExpression(parsedExpr);
+  TC.typeCheckExpression(parsedExpr, TU);
   TU->ASTStage = TranslationUnit::TypeChecked;
   
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)

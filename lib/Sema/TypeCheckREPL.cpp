@@ -96,13 +96,13 @@ getArgRefExpr(TypeChecker &TC,
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
-      TC.typeCheckExpressionShallow(ArgRef);
+      TC.typeCheckExpressionShallow(ArgRef, Arg->getDeclContext());
       continue;
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
-      TC.typeCheckExpressionShallow(ArgRef);
+      TC.typeCheckExpressionShallow(ArgRef, Arg->getDeclContext());
       continue;
     }
     TupleType *TT = cast<TupleType>(CurT);
@@ -138,20 +138,20 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
                                                     Loc,
                                                     MetaT);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc);
-    if (TC.typeCheckExpressionShallow(Res))
+    if (TC.typeCheckExpressionShallow(Res, Arg->getDeclContext()))
       return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    if (TC.typeCheckExpressionShallow(CE))
+    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
       goto dynamicTypeFailed;
     Res = CE;
 
     Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
     CE = new (Context) CallExpr(PrintStrFn, Res);
-    if (TC.typeCheckExpressionShallow(CE))
+    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
       goto dynamicTypeFailed;
     Res = CE;
 
@@ -312,14 +312,14 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                    EndLoc);
-    if (TC.typeCheckExpressionShallow(Res))
+    if (TC.typeCheckExpressionShallow(Res, Arg->getDeclContext()))
       return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    if (TC.typeCheckExpressionShallow(CE))
+    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
       return;
     Res = CE;
     BodyContent.push_back(Res);
@@ -463,7 +463,9 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(C, SourceLoc(), elt, SourceLoc());
   }
-  TC->typeCheckPattern(ParamPat, /*isFirstPass*/false,
+  TC->typeCheckPattern(ParamPat,
+                       Arg->getDeclContext(),
+                       /*isFirstPass*/false,
                        /*allowUnknownTypes*/false);
   FuncExpr *FE = FuncExpr::create(C, Loc, ParamPat, ParamPat, TypeLoc(),
                                   0, &TC->TU);
@@ -500,7 +502,7 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   TC->typeCheckFunctionBody(FE);
   
   Expr *TheCall = new (C) CallExpr(FE, E);
-  if (TC->typeCheckExpressionShallow(TheCall))
+  if (TC->typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
   
   // Inject the call into the top level stream by wrapping it with a TLCD.

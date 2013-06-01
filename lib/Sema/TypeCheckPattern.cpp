@@ -24,14 +24,15 @@ using namespace swift;
 /// false, the type of the pattern will have been set.  If allowUnknownTypes is
 /// true, then this accepts "any" and "named" patterns, setting their type to
 /// UnresolvedType.
-bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
+bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
+                                   bool isFirstPass,
                                    bool allowUnknownTypes) {
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren: {
     Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, isFirstPass, allowUnknownTypes)) {
+    if (typeCheckPattern(SP, dc, isFirstPass, allowUnknownTypes)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -50,7 +51,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
     } else {
       TP->setType(TP->getTypeLoc().getType());
     }
-    hadError |= coerceToType(TP->getSubPattern(), P->getType());
+    hadError |= coerceToType(TP->getSubPattern(), dc, P->getType());
     return hadError;
   }
 
@@ -79,7 +80,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
       Type type;
       ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, isFirstPass, allowUnknownTypes)) {
+      if (typeCheckPattern(pattern, dc, isFirstPass, allowUnknownTypes)) {
         hadError = true;
       } else {
         type = pattern->getType();
@@ -87,7 +88,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
 
       if (init && !isFirstPass) {
         Expr *e = init->getExpr();
-        typeCheckExpression(e, type);
+        typeCheckExpression(e, dc, type);
         init->setExpr(e);
       }
 
@@ -107,12 +108,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, bool isFirstPass,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *P, Type type) {
+bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
   switch (P->getKind()) {
   // For parens, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
     P->setType(type);
-    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), type);
+    return coerceToType(cast<ParenPattern>(P)->getSubPattern(), dc, type);
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -132,7 +133,7 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
       }
     }
 
-    hadError |= coerceToType(TP->getSubPattern(), TP->getType());
+    hadError |= coerceToType(TP->getSubPattern(), dc, TP->getType());
     return hadError;
   }
 
@@ -187,12 +188,12 @@ bool TypeChecker::coerceToType(Pattern *P, Type type) {
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      hadError |= coerceToType(pattern, CoercionType);
+      hadError |= coerceToType(pattern, dc, CoercionType);
 
       // Type-check the initialization expression.
       if (ExprHandle *initHandle = elt.getInit()) {
         Expr *init = initHandle->getExpr();
-        if (typeCheckExpression(init, CoercionType)) {
+        if (typeCheckExpression(init, dc, CoercionType)) {
           initHandle->setExpr(nullptr);
         } else {
           initHandle->setExpr(init);

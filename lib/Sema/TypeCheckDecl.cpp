@@ -247,7 +247,7 @@ public:
       if (PBD->getInit() && PBD->getPattern()->hasType()) {
         Expr *Init = PBD->getInit();
         Type DestTy = PBD->getPattern()->getType();
-        if (TC.typeCheckExpression(Init, DestTy)) {
+        if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy)) {
           if (DestTy)
             TC.diagnose(PBD, diag::while_converting_var_init,
                         DestTy);
@@ -264,7 +264,9 @@ public:
         isa<TypedPattern>(PBD->getPattern()) &&
         !PBD->getDeclContext()->isTypeContext()) {
       // Type-check the pattern.
-      if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false,
+      if (TC.typeCheckPattern(PBD->getPattern(),
+                              PBD->getDeclContext(),
+                              /*isFirstPass*/false,
                               /*allowUnknownTypes*/false))
         return;
 
@@ -277,7 +279,7 @@ public:
         TC.diagnose(PBD, diag::decl_no_default_init, ty);
         PBD->setInvalid();
       } else {
-        if (TC.typeCheckExpression(initializer, ty)) {
+        if (TC.typeCheckExpression(initializer, PBD->getDeclContext(), ty)) {
           TC.diagnose(PBD, diag::while_converting_var_init, ty);
           return;
         }
@@ -287,13 +289,15 @@ public:
     } else if (PBD->getInit() && !IsFirstPass) {
       Type DestTy;
       if (isa<TypedPattern>(PBD->getPattern())) {
-        if (TC.typeCheckPattern(PBD->getPattern(), /*isFirstPass*/false,
+        if (TC.typeCheckPattern(PBD->getPattern(),
+                                PBD->getDeclContext(),
+                                /*isFirstPass*/false,
                                 /*allowUnknownTypes*/false))
           return;
         DestTy = PBD->getPattern()->getType();
       }
       Expr *Init = PBD->getInit();
-      if (TC.typeCheckExpression(Init, DestTy)) {
+      if (TC.typeCheckExpression(Init, PBD->getDeclContext(), DestTy)) {
         if (DestTy)
           TC.diagnose(PBD, diag::while_converting_var_init,
                       DestTy);
@@ -305,11 +309,15 @@ public:
       }
       PBD->setInit(Init);
       if (!DestTy) {
-        if (TC.coerceToType(PBD->getPattern(), Init->getType()))
+        if (TC.coerceToType(PBD->getPattern(),
+                            PBD->getDeclContext(),
+                            Init->getType()))
           return;
       }
     } else if (!IsFirstPass || !DelayCheckingPattern) {
-      if (TC.typeCheckPattern(PBD->getPattern(), IsFirstPass,
+      if (TC.typeCheckPattern(PBD->getPattern(),
+                              PBD->getDeclContext(),
+                              IsFirstPass,
                               /*allowUnknownTypes*/false))
         return;
     }
@@ -326,7 +334,9 @@ public:
            && "Decl parsing must prevent subscripts outside of types!");
 
     bool isInvalid = TC.validateType(SD->getElementTypeLoc());
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(), IsFirstPass,
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(),
+                                     SD->getDeclContext(),
+                                     IsFirstPass,
                                      /*allowUnknownTypes*/false);
 
     if (isInvalid) {
@@ -640,7 +650,9 @@ public:
       checkGenericParams(gp);
     }
 
-    if (TC.typeCheckPattern(CD->getArguments(), IsFirstPass,
+    if (TC.typeCheckPattern(CD->getArguments(),
+                            CD,
+                            IsFirstPass,
                             /*allowUnknownTypes*/false)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {

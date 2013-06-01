@@ -850,7 +850,7 @@ namespace {
       // the ternary.
       Expr *condExpr = expr->getCondExpr();
       // FIXME: Mark expression as an error if this fails.
-      CS.getTypeChecker().typeCheckCondition(condExpr);
+      CS.getTypeChecker().typeCheckCondition(condExpr, CS.DC);
       expr->setCondExpr(condExpr);
 
       // The branches must be convertible to a common type.

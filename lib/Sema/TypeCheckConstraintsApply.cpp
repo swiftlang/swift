@@ -1201,9 +1201,9 @@ namespace {
       // Coerce the FuncExpr's pattern, in case we resolved something.
       Type input = expr->getType()->castTo<FunctionType>()->getInput();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getArgParamPatterns()[0], input))
+      if (tc.coerceToType(expr->getArgParamPatterns()[0], cs.DC, input))
         return nullptr;
-      if (tc.coerceToType(expr->getBodyParamPatterns()[0], input))
+      if (tc.coerceToType(expr->getBodyParamPatterns()[0], cs.DC, input))
         return nullptr;
 
       return expr;
@@ -1215,7 +1215,7 @@ namespace {
       // Coerce the pattern, in case we resolved something.
       auto fnType = expr->getType()->castTo<FunctionType>();
       auto &tc = cs.getTypeChecker();
-      if (tc.coerceToType(expr->getParams(), fnType->getInput()))
+      if (tc.coerceToType(expr->getParams(), cs.DC, fnType->getInput()))
         return nullptr;
 
       // If this is a single-expression closure, convert the expression
@@ -1287,7 +1287,7 @@ namespace {
       expr->setType(resultType);
 
       // Find the appropriate injection function.
-      Expr* injectionFn = tc.buildArrayInjectionFnRef(sliceType,
+      Expr* injectionFn = tc.buildArrayInjectionFnRef(cs.DC, sliceType,
                             expr->getBounds()[0].Value->getType(),
                             expr->getNewLoc());
       if (!injectionFn)
@@ -1379,7 +1379,7 @@ namespace {
 
       // Type-check the subexpression in isolation.
       Expr *sub = expr->getSubExpr();
-      if (tc.typeCheckExpression(sub)) {
+      if (tc.typeCheckExpression(sub, cs.DC)) {
         // FIXME: Mark as error.
         return nullptr;
       }
@@ -1435,7 +1435,7 @@ namespace {
         }
 
         // Coerce to the supertype of the archetype.
-        if (tc.convertToType(sub, toSuperType))
+        if (tc.convertToType(sub, toSuperType, cs.DC))
           return nullptr;
         
         // The source type must be equivalent to or a supertype of the supertype
@@ -1655,7 +1655,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       = cast<ArraySliceType>(
           toTuple->getFields().back().getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
+    injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
+                                              sliceType, boundType,
                                               expr->getStartLoc());
     if (!injectionFn)
       return nullptr;
@@ -1710,7 +1711,8 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     ArraySliceType *sliceType
     = cast<ArraySliceType>(lastField.getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, tc.Context);
-    injectionFn = tc.buildArrayInjectionFnRef(sliceType, boundType,
+    injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
+                                              sliceType, boundType,
                                               expr->getStartLoc());
     if (!injectionFn)
       return nullptr;
@@ -2242,7 +2244,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
                                                MetaTypeType::get(type,
                                                                  tc.Context));
-    Expr *result = tc.callWitness(base, builtinProtocol, builtinConformance,
+    Expr *result = tc.callWitness(base, cs.DC,
+                                  builtinProtocol, builtinConformance,
                                   builtinLiteralFuncName,
                                   literal,
                                   brokenBuiltinProtocolDiag);
@@ -2279,7 +2282,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
                                              MetaTypeType::get(type,
                                                                tc.Context));
-  literal = tc.callWitness(base, protocol, conformance, literalFuncName,
+  literal = tc.callWitness(base, cs.DC,
+                           protocol, conformance, literalFuncName,
                            literal, brokenProtocolDiag);
   if (literal)
     literal->setType(type);
@@ -2384,7 +2388,7 @@ void substForBaseConversion(TypeChecker &tc, ValueDecl *member,
                             TypeSubstitutionMap &substitutions,
                             ConformanceMap &conformances,
                             GenericParamList *&genericParams) {
-  ConstraintSystem cs(tc);
+  ConstraintSystem cs(tc, nullptr);
 
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
@@ -2534,13 +2538,14 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
   return rewriter.coerceToType(expr, toType, locator);
 }
 
-Expr *TypeChecker::callWitness(Expr *base, ProtocolDecl *protocol,
+Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
+                               ProtocolDecl *protocol,
                                ProtocolConformance *conformance,
                                Identifier name,
                                MutableArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
-  ConstraintSystem cs(*this);
+  ConstraintSystem cs(*this, dc);
   Solution solution(cs);
   ExprRewriter rewriter(cs, solution);
 

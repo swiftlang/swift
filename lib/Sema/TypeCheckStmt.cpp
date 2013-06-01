@@ -88,7 +88,7 @@ public:
   //===--------------------------------------------------------------------===//
   
   bool typeCheckExpr(Expr *&E, Type DestTy = Type()) {
-    return TC.typeCheckExpression(E, DestTy);
+    return TC.typeCheckExpression(E, DC, DestTy);
   }
 
   template<typename StmtTy>
@@ -117,7 +117,8 @@ public:
   Stmt *visitAssignStmt(AssignStmt *S) {
     Expr *Dest = S->getDest();
     Expr *Src = S->getSrc();
-    llvm::tie(Dest, Src) = TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src);
+    llvm::tie(Dest, Src) = TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src,
+                                                  DC);
     if (!Dest || !Src)
       return nullptr;
 
@@ -170,7 +171,7 @@ public:
   
   Stmt *visitIfStmt(IfStmt *IS) {
     Expr *E = IS->getCond();
-    if (TC.typeCheckCondition(E)) return 0;
+    if (TC.typeCheckCondition(E, DC)) return 0;
     IS->setCond(E);
 
     Stmt *S = IS->getThenStmt();
@@ -187,7 +188,7 @@ public:
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
     Expr *E = WS->getCond();
-    if (TC.typeCheckCondition(E)) return 0;
+    if (TC.typeCheckCondition(E, DC)) return 0;
     WS->setCond(E);
 
     AddLoopNest loopNest(*this);
@@ -206,7 +207,7 @@ public:
     }
     
     Expr *E = WS->getCond();
-    if (TC.typeCheckCondition(E)) return 0;
+    if (TC.typeCheckCondition(E, DC)) return 0;
     WS->setCond(E);
     return WS;
   }
@@ -222,7 +223,7 @@ public:
     // Type check the condition if present.
     if (FS->getCond().isNonNull()) {
       Expr *E = FS->getCond().get();
-      if (TC.typeCheckCondition(E)) return 0;
+      if (TC.typeCheckCondition(E, DC)) return 0;
       FS->setCond(E);
     }
     
@@ -241,7 +242,7 @@ public:
   Stmt *visitForEachStmt(ForEachStmt *S) {
     // Type-check the container and convert it to an rvalue.
     Expr *Container = S->getContainer();
-    if (TC.typeCheckExpression(Container)) return nullptr;
+    if (TC.typeCheckExpression(Container, DC)) return nullptr;
     S->setContainer(Container);
 
     // Retrieve the 'Enumerable' protocol.
@@ -296,7 +297,7 @@ public:
       }
 
       Expr *GetElements
-        = TC.callWitness(Container, EnumerableProto, Conformance,
+        = TC.callWitness(Container, DC, EnumerableProto, Conformance,
                          TC.Context.getIdentifier("getEnumeratorType"),
                          { },
                          diag::enumerable_protocol_broken);
@@ -361,12 +362,12 @@ public:
       = TC.callWitness(new (TC.Context) DeclRefExpr(
                                           Range, S->getInLoc(),
                                           Range->getTypeOfReference()),
-                       EnumeratorProto, Conformance,
+                       DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("isEmpty"),
                        { },
                        diag::range_protocol_broken);
     if (!Empty) return nullptr;
-    if (TC.typeCheckCondition(Empty)) return nullptr;
+    if (TC.typeCheckCondition(Empty, DC)) return nullptr;
     S->setRangeEmpty(Empty);
     
     // Compute the expression that extracts a value from the range.
@@ -374,7 +375,7 @@ public:
       = TC.callWitness(new (TC.Context) DeclRefExpr(
                                           Range, S->getInLoc(),
                                           Range->getTypeOfReference()),
-                       EnumeratorProto, Conformance,
+                       DC, EnumeratorProto, Conformance,
                        TC.Context.getIdentifier("next"),
                        { },
                        diag::range_protocol_broken);
@@ -387,7 +388,7 @@ public:
 
     // Coerce the pattern to the element type, now that we know the element
     // type.
-    if (TC.coerceToType(S->getPattern(), ElementTy))
+    if (TC.coerceToType(S->getPattern(), DC, ElementTy))
       return nullptr;
     
     // Type-check the body of the loop.
@@ -494,7 +495,7 @@ public:
           condition = nextCondition;
       }
       
-      if (TC.typeCheckCondition(condition))
+      if (TC.typeCheckCondition(condition, DC))
         return true;
       Case->setConditionExpr(condition);
     }
@@ -597,9 +598,9 @@ void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   // the arguments, mark the argument types as error type.
   if (FE->getType()->isUnresolvedType()) {
     for (auto P : FE->getArgParamPatterns())
-      coerceToType(P, ErrorType::get(Context));
+      coerceToType(P, FE, ErrorType::get(Context));
     for (auto P : FE->getBodyParamPatterns())
-      coerceToType(P, ErrorType::get(Context));
+      coerceToType(P, FE, ErrorType::get(Context));
   }
   
   BraceStmt *BS = FE->getBody();
@@ -669,7 +670,7 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
 
 void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   if (auto allocThis = ctor->getAllocThisExpr()) {
-    if (!typeCheckExpression(allocThis))
+    if (!typeCheckExpression(allocThis, ctor))
       ctor->setAllocThisExpr(allocThis);
   }
 
@@ -751,7 +752,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                              patternBind->getPattern())) {
             initializer = new (Context) DefaultValueExpr(initializer);
             llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
-                                                               initializer);
+                                                               initializer,
+                                                               ctor);
             defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
                                                             initializer));
             continue;
@@ -797,7 +799,8 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                 var->getName(),
                 SourceLoc());
           llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
-                                                             initializer);
+                                                             initializer,
+                                                             ctor);
           defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
                                                           initializer));
         }
