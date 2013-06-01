@@ -36,6 +36,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/Support/ConvertUTF.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -323,11 +324,19 @@ void swift::RunImmediately(irgen::Options &Options,
     return;
   }
 
+  DEBUG(llvm::dbgs() << "Module to be executed:\n";
+        Module.dump());
+  
   // Run the generated program.
-  for (auto InitFn : InitFns)
+  for (auto InitFn : InitFns) {
+    DEBUG(llvm::dbgs() << "Running initialization function "
+            << InitFn->getName() << '\n');
     EE->runFunctionAsMain(InitFn, CmdLine, 0);
+  }
 
+  DEBUG(llvm::dbgs() << "Running static constructors\n");
   EE->runStaticConstructorsDestructors(false);
+  DEBUG(llvm::dbgs() << "Running main\n");
   llvm::Function *EntryFn = Module.getFunction("main");
   EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
