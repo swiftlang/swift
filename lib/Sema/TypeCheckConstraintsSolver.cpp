@@ -525,7 +525,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
           if (anySolved)
             break;
         }
-        type = cs.openType(type);
+        type = cs.openBindingType(type);
       }
 
       // FIXME: Use a 'bind' constraint here.

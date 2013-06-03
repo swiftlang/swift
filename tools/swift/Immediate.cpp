@@ -139,6 +139,7 @@ static void convertFromUTF8(llvm::StringRef utf8,
                                       &wide_begin, out.data() + reserve,
                                       lenientConversion);
   assert(res == conversionOK && "utf8-to-wide conversion failed!");
+  (void)res;
   out.set_size(wide_begin - out.begin());
 }
   
@@ -152,6 +153,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
                                     &utf8_begin, out.data() + reserve,
                                     lenientConversion);
   assert(res == conversionOK && "wide-to-utf8 conversion failed!");
+  (void)res;
   out.set_size(utf8_begin - out.begin());
 }
 
@@ -1270,6 +1272,7 @@ void swift::REPLRunLoop(ASTContext &Context, const ProcessCmdLine &CmdLine) {
                                           kCFRunLoopDefaultMode,
                                           &response);
       assert(res == kCFMessagePortSuccess && "failed to send repl message");
+      (void)res;
       assert(CFDataGetLength(response) >= 1 && "expected one-byte response");
       UInt8 cont = CFDataGetBytePtr(response)[0];
       CFRelease(lineData);

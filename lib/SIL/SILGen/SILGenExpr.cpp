@@ -694,6 +694,7 @@ RValue SILGenFunction::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
          "archetype must be an address or metatype");
   // FIXME: curried archetype
   // FIXME: archetype properties
+  (void)archetype;
   llvm_unreachable("unapplied archetype method not implemented");
 }
 
@@ -736,6 +737,7 @@ RValue SILGenFunction::visitExistentialMemberRefExpr(
   //SILValue method = emitProtocolMethod(E, existential);
   // FIXME: curried existential
   // FIXME: existential properties
+  (void)existential;
   llvm_unreachable("unapplied protocol method not implemented");
 }
 
