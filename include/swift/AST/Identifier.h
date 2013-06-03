@@ -82,6 +82,7 @@ public:
     ConversionResult res = llvm::convertUTF8Sequence(&s, end, &codePoint,
                                                      strictConversion);
     assert(res == conversionOK && "invalid UTF-8 in identifier?!");
+    (void)res;
     return !empty() && isOperatorStartCodePoint(codePoint);
   }
   
