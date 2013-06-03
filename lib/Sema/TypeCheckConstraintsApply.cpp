@@ -388,6 +388,9 @@ namespace {
     Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind,
                          Type openedType);
 
+    /// \brief Describes either a type or the name of a type to be resolved.
+    typedef llvm::PointerUnion<Identifier, Type> TypeOrName;
+
     /// \brief Convert the given literal expression via a protocol pair.
     ///
     /// This routine handles the two-step literal conversion process used
@@ -403,9 +406,9 @@ namespace {
     ///
     /// \param protocol The protocol that describes the literal requirement.
     ///
-    /// \param literalTypeName The name of the associated type in \c protocol
-    /// that describes the argument type of the conversion function
-    /// (\c literalFuncName).
+    /// \param literalType Either the name of the associated type in
+    /// \c protocol that describes the argument type of the conversion function
+    /// (\c literalFuncName) or the argument type itself.
     ///
     /// \param literalFuncName The name of the conversion function requirement
     /// in \c protocol.
@@ -415,10 +418,10 @@ namespace {
     /// by standard library types. If \c type does not conform to this
     /// protocol, it's literal type will.
     ///
-    /// \param builtinLiteralTypeName The name of the associated type in
-    /// \c builtinProtocol
-    /// that describes the argument type of the builtin conversion function
-    /// (\c builtinLiteralFuncName).
+    /// \param builtinLiteralType Either the name of the associated type in
+    /// \c builtinProtocol that describes the argument type of the builtin
+    /// conversion function (\c builtinLiteralFuncName) or the argument type
+    /// itself.
     ///
     /// \param builtinLiteralFuncName The name of the conversion function
     /// requirement in \c builtinProtocol.
@@ -437,10 +440,10 @@ namespace {
                          Type type,
                          Type openedType,
                          ProtocolDecl *protocol,
-                         Identifier literalTypeName,
+                         TypeOrName literalType,
                          Identifier literalFuncName,
                          ProtocolDecl *builtinProtocol,
-                         Identifier builtinLiteralTypeName,
+                         TypeOrName builtinLiteralType,
                          Identifier builtinLiteralFuncName,
                          bool (*isBuiltinArgType)(Type),
                          Diag<> brokenProtocolDiag,
@@ -716,8 +719,38 @@ namespace {
     }
 
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
-      return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Char, expr->getType());
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *protocol
+        = tc.getProtocol(KnownProtocolKind::CharacterLiteralConvertible);
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(KnownProtocolKind::BuiltinCharacterLiteralConvertible);
+
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      auto type = simplifyType(expr->getType());
+      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Char)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
+      }
+
+      return convertLiteral(
+               expr,
+               type,
+               expr->getType(),
+               protocol,
+               tc.Context.getIdentifier("CharacterLiteralType"),
+               tc.Context.getIdentifier("convertFromCharacterLiteral"),
+               builtinProtocol,
+               Type(BuiltinIntegerType::get(32, tc.Context)),
+               tc.Context.getIdentifier("_convertFromBuiltinCharacterLiteral"),
+               [] (Type type) -> bool {
+                 if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
+                   return builtinInt->getBitWidth() == 32;
+                 }
+                 return false;
+               },
+               diag::character_literal_broken_proto,
+               diag::builtin_character_literal_broken_proto);
     }
 
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
@@ -2152,12 +2185,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
     // Nothing to do.
     literal->setType(argType);
     intermediate = literal;
-  } else if (kind == LiteralKind::Char &&
-             argType->is<BuiltinIntegerType>() &&
-             argType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
-    // Nothing to do.
-    literal->setType(argType);
-    intermediate = literal;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
     // conversion from a Builtin type.
@@ -2170,11 +2197,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
     if (kind == LiteralKind::Int &&
         chainedArgType->is<BuiltinIntegerType>()) {
       // ok.
-    } else if (kind == LiteralKind::Char &&
-               chainedArgType->is<BuiltinIntegerType>() &&
-               chainedArgType->getAs<BuiltinIntegerType>()->getBitWidth() == 32) {
-      // ok.
-
     } else if (isStringLiteralKind(kind) &&
                chainedArgType->is<BuiltinRawPointerType>()) {
       // ok.
@@ -2210,10 +2232,10 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                                    Type type,
                                    Type openedType,
                                    ProtocolDecl *protocol,
-                                   Identifier literalTypeName,
+                                   TypeOrName literalType,
                                    Identifier literalFuncName,
                                    ProtocolDecl *builtinProtocol,
-                                   Identifier builtinLiteralTypeName,
+                                   TypeOrName builtinLiteralType,
                                    Identifier builtinLiteralFuncName,
                                    bool (*isBuiltinArgType)(Type),
                                    Diag<> brokenProtocolDiag,
@@ -2224,10 +2246,14 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   ProtocolConformance *builtinConformance = nullptr;
   if (tc.conformsToProtocol(type, builtinProtocol, &builtinConformance)) {
     // Find the builtin argument type we'll use.
-    auto argType = tc.getWitnessType(type, builtinProtocol,
-                                     builtinConformance,
-                                     builtinLiteralTypeName,
-                                     brokenBuiltinProtocolDiag);
+    Type argType;
+    if (builtinLiteralType.is<Type>())
+      argType = builtinLiteralType.get<Type>();
+    else
+     argType = tc.getWitnessType(type, builtinProtocol,
+                                 builtinConformance,
+                                 builtinLiteralType.get<Identifier>(),
+                                 brokenBuiltinProtocolDiag);
     if (!argType)
       return nullptr;
 
@@ -2262,8 +2288,13 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   (void)conforms;
 
   // Figure out the (non-builtin) argument type.
-  auto argType = tc.getWitnessType(type, protocol, conformance, literalTypeName,
-                                   brokenProtocolDiag);
+  Type argType;
+  if (literalType.is<Type>())
+    argType = literalType.get<Type>();
+  else
+    argType = tc.getWitnessType(type, protocol, conformance,
+                                literalType.get<Identifier>(),
+                                brokenProtocolDiag);
   if (!argType)
     return nullptr;
 
@@ -2272,7 +2303,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   // FIXME: Do we need an opened type here?
   literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
                            Identifier(), builtinProtocol,
-                           builtinLiteralTypeName, builtinLiteralFuncName,
+                           builtinLiteralType, builtinLiteralFuncName,
                            isBuiltinArgType, brokenProtocolDiag,
                            brokenBuiltinProtocolDiag);
   if (!literal)

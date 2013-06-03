@@ -420,7 +420,8 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   const char *AltMethodName = 0;
   switch (LitTy) {
   case LiteralKind::Int:    MethodName = "convertFromIntegerLiteral"; break;
-  case LiteralKind::Char:   MethodName = "convertFromCharacterLiteral"; break;
+  case LiteralKind::Char:
+    llvm_unreachable("Cannot handle character literals here");
   case LiteralKind::UTFString: MethodName = "convertFromStringLiteral"; break;
   case LiteralKind::ASCIIString:
     MethodName = "convertFromASCIIStringLiteral";
@@ -496,9 +497,6 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   // FIXME: This duplicated code will be unnecessary when we switch
   // literals over to formal protocols.
   if (!((LitTy == LiteralKind::Int && ArgType->is<BuiltinIntegerType>()) ||
-        (LitTy == LiteralKind::Char &&
-         (ArgType->is<BuiltinIntegerType>() &&
-          ArgType->castTo<BuiltinIntegerType>()->getBitWidth() == 32)) ||
         ((LitTy == LiteralKind::ASCIIString ||
           LitTy == LiteralKind::UTFString) &&
          isStringLiteralArg(ArgType))) &&
@@ -563,6 +561,10 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
+  // CharacterLiteralConvertible -> CharacterLiteralType
+  if (protocol == getProtocol(KnownProtocolKind::CharacterLiteralConvertible))
+    return getDefaultLiteralType(LiteralKind::Char);
+
   // FloatLiteralConvertible -> FloatLiteralType
   if (protocol == getProtocol(KnownProtocolKind::FloatLiteralConvertible))
     return getDefaultLiteralType(LiteralKind::Float);

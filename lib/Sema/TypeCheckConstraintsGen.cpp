@@ -168,9 +168,16 @@ namespace {
     }
 
     Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
+      auto protocol
+        = CS.getTypeChecker().getProtocol(
+            KnownProtocolKind::CharacterLiteralConvertible);
+      if (!protocol) {
+        return nullptr;
+      }
+      
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Char,
-                              CS.getConstraintLocator(expr, { }));
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                       protocol->getDeclaredType());
       return tv;
     }
 

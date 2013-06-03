@@ -87,10 +87,18 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
     name = Context.getIdentifier("ArrayLiteralConvertible");
     break;
 
+  case KnownProtocolKind::BuiltinCharacterLiteralConvertible:
+    name = Context.getIdentifier("BuiltinCharacterLiteralConvertible");
+    break;
+
   case KnownProtocolKind::BuiltinFloatLiteralConvertible:
     name = Context.getIdentifier("BuiltinFloatLiteralConvertible");
     break;
-      
+
+  case KnownProtocolKind::CharacterLiteralConvertible:
+    name = Context.getIdentifier("CharacterLiteralConvertible");
+    break;
+
   case KnownProtocolKind::DictionaryLiteralConvertible:
     name = Context.getIdentifier("DictionaryLiteralConvertible");
     break;

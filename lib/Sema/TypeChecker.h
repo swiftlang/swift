@@ -47,9 +47,17 @@ enum class KnownProtocolKind : unsigned {
   /// \brief The 'ArrayLiteralConvertible' protocol, used for array literals.
   ArrayLiteralConvertible,
 
+  /// \brief The 'BuiltinCharacterLiteralConvertible' protocol, used for
+  /// character literals.
+  BuiltinCharacterLiteralConvertible,
+
   /// \brief The 'BuiltinFloatLiteralConvertible' protocol, used for floating
   /// point literals.
   BuiltinFloatLiteralConvertible,
+
+  /// \brief The 'CharacterLiteralConvertible' protocol, used for character
+  /// literals.
+  CharacterLiteralConvertible,
 
   /// \brief The 'DictionaryLiteralConvertible' protocol, used for dictionary
   /// literals.

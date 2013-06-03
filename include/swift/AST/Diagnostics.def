@@ -661,6 +661,11 @@ ERROR(builtin_float_literal_broken_proto,sema_tce,none,
 ERROR(float_literal_broken_proto,sema_tce,none,
       "protocol 'FloatLiteralConvertible' is broken", ())
 
+ERROR(builtin_character_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinCharacterLiteralConvertible' is broken", ())
+ERROR(character_literal_broken_proto,sema_tce,none,
+      "protocol 'CharacterLiteralConvertible' is broken", ())
+
 // Array literal expressions
 ERROR(expected_expr_array,expr_parsing,none,
       "expected subexpression in container literal", ())

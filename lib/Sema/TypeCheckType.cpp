@@ -491,7 +491,9 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
     }
 
     // Check protocol conformance.
-    if (!IsInvalid && !BGT->hasSubstitutions()) {
+    // FIXME: Should be able to check even when there are type variables
+    // present?
+    if (!IsInvalid && !BGT->hasSubstitutions() && !BGT->hasTypeVariable()) {
       // FIXME: Record that we're checking substitutions, so we can't end up
       // with infinite recursion.
       TypeSubstitutionMap Substitutions;
