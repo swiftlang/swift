@@ -1564,19 +1564,22 @@ namespace {
 
       // Check the form of the getter.
       FuncDecl *getterThunk = nullptr;
+      Pattern *getterIndices = nullptr;
       auto &context = Impl.SwiftContext;
+
+      // Find the getter indices and make sure they match.
       {
         auto tuple = dyn_cast<TuplePattern>(
                        getter->getBody()->getArgParamPatterns()[1]);
         if (tuple && tuple->getFields().size() != 1)
           return nullptr;
 
-        auto indices = tuple->getFields()[0].getPattern();
-        getterThunk = buildGetterThunk(getter, dc, indices);
+        getterIndices = tuple->getFields()[0].getPattern();
       }
 
       // Check the form of the setter.
       FuncDecl *setterThunk = nullptr;
+      Pattern *setterIndices = nullptr;
       if (setter) {
         auto tuple = dyn_cast<TuplePattern>(
                        setter->getBody()->getBodyParamPatterns()[1]);
@@ -1593,9 +1596,13 @@ namespace {
         if (!elementTy->isEqual(setterElementTy))
           return nullptr;
 
-        auto indices = tuple->getFields()[1].getPattern();
-        setterThunk = buildSetterThunk(setter, dc, indices);
+        setterIndices = tuple->getFields()[1].getPattern();
       }
+
+      if (getter && getterIndices)
+        getterThunk = buildGetterThunk(getter, dc, getterIndices);
+      if (setter && setterIndices)
+        setterThunk = buildSetterThunk(setter, dc, setterIndices);
 
       // Build the subscript declaration.
       auto loc = decl->getLoc();

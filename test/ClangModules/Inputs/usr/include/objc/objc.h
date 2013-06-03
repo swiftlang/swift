@@ -108,3 +108,8 @@ typedef signed char BOOL;
 @end
 
 typedef struct objc_selector    *SEL;
+
+@interface AlmostSubscriptable
+- (A*) objectForKeyedSubscript:(id)key;
+- (void)setObject:(id)object forKeyedSubscript:(id)key;
+@end

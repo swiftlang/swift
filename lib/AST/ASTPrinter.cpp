@@ -452,7 +452,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     OS << "func ";
     printAttributes(decl->getAttrs());
     recordDeclLoc(decl);
-    OS << decl->getName().str();
+    if (decl->getName().empty())
+      OS << "<anonymous>";
+    else
+      OS << decl->getName().str();
     if (decl->isGeneric()) {
       printGenericParams(decl->getGenericParams());
     }
