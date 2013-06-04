@@ -25,14 +25,14 @@ ifeq ($(ARCH),x86)
 endif
 SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
 		 Object.swift CTypes.swift Misc.swift GenericIVar.swift \
-		 Range.swift UnsafePointer.swift \
+		 Range.swift Indexable.swift UnsafePointer.swift \
 		 Slice.swift StringByte.swift String.swift Char.swift \
 		 Optional.swift Dictionary.swift Vector.swift \
 		 Algorithm.swift \
 		 Demangle.swift InputStream.swift OutputStream.swift \
-		 CString.swift \
+		 CString.swift REPL.swift \
 		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
-		 REPL.swift Environment.swift \
+		 Environment.swift \
 	   Generator.swift Zip.swift CodePoints.swift
 ifeq ($(DISABLE_ASSERTIONS),1)
   SWIFT_SOURCES += Assert.swift
