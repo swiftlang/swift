@@ -1,0 +1,19 @@
+#!/bin/sh
+# Runs swift (found on the path) with -use-malloc and GuardMalloc enabled.
+# Command-line arguments are forwarded to the Swift compiler untouched.
+# This script can be used to run the test suite with memory debugging enabled
+# by setting the SWIFT environment variable to point to the script, as in:
+#
+#   SWIFT=/path/to/guard-malloc-swift llvm-lit -sv test
+
+export MallocScribble=1
+export MallocPreScribble=1
+export MallocGuardEdges=1
+export MallocCheckHeapStart=100
+export MallocCheckHeapEach=100
+export MallocCheckHeapAbort=1
+export MallocErrorAbort=1
+
+export DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib
+
+swift -use-malloc "$@"

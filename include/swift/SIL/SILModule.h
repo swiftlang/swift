@@ -143,6 +143,9 @@ public:
   
   /// Allocate memory using Function's internal allocator.
   void *allocate(unsigned Size, unsigned Align) const {
+    if (TheASTContext.LangOpts.UseMalloc)
+      return AlignedAlloc(Size, Align);
+    
     return BPA.Allocate(Size, Align);
   }
 };

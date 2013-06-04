@@ -20,6 +20,7 @@
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Malloc.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -209,6 +210,9 @@ public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
                  AllocationArena arena = AllocationArena::Permanent) {
+    if (LangOpts.UseMalloc)
+      return AlignedAlloc(bytes, alignment);
+    
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
