@@ -31,7 +31,7 @@ class TypeChecker;
 
 /// \brief Describes the kind of a literal.
 enum class LiteralKind : char {
-  Int, Float, Char, UTFString, ASCIIString, Array, Dictionary
+  Int, Float, Char, String, Array, Dictionary
 };
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -54,6 +54,10 @@ enum class KnownProtocolKind : unsigned {
   /// \brief The 'BuiltinFloatLiteralConvertible' protocol, used for floating
   /// point literals.
   BuiltinFloatLiteralConvertible,
+
+  /// \brief The 'BuiltinStringLiteralConvertible' protocol, used for string
+  /// literals.
+  BuiltinStringLiteralConvertible,
 
   /// \brief The 'CharacterLiteralConvertible' protocol, used for character
   /// literals.
@@ -79,7 +83,10 @@ enum class KnownProtocolKind : unsigned {
 
   /// \brief The 'StringInterpolationConvertible ' protocol, used for string
   /// interpolation literals.
-  StringInterpolationConvertible
+  StringInterpolationConvertible,
+
+  /// \brief The 'StringLiteralConvertible' protocol, used for string literals.
+  StringLiteralConvertible
 };
 
 class TypeChecker : public ASTMutationListener {
@@ -97,7 +104,7 @@ private:
   /// \brief The number of known protocols.
   static const unsigned numKnownProtocols
     = 1 + static_cast<unsigned>(
-            KnownProtocolKind::StringInterpolationConvertible);
+            KnownProtocolKind::StringLiteralConvertible);
 
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *knownProtocols[numKnownProtocols] = { };

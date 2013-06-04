@@ -72,7 +72,7 @@ void TypeChecker::addedExternalType(Type type) {
 ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
   // Check whether we've already looked for and cached this protocol.
   unsigned index = (unsigned)kind;
-  assert(index < numKnownProtocols && "Number of known protocol is wrong");
+  assert(index < numKnownProtocols && "Number of known protocols is wrong");
   if (knownProtocols[index])
     return knownProtocols[index];
 
@@ -93,6 +93,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
 
   case KnownProtocolKind::BuiltinFloatLiteralConvertible:
     name = Context.getIdentifier("BuiltinFloatLiteralConvertible");
+    break;
+
+  case KnownProtocolKind::BuiltinStringLiteralConvertible:
+    name = Context.getIdentifier("BuiltinStringLiteralConvertible");
     break;
 
   case KnownProtocolKind::CharacterLiteralConvertible:
@@ -121,6 +125,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
 
   case KnownProtocolKind::StringInterpolationConvertible:
     name = Context.getIdentifier("StringInterpolationConvertible");
+    break;
+
+  case KnownProtocolKind::StringLiteralConvertible:
+    name = Context.getIdentifier("StringLiteralConvertible");
     break;
   }
 

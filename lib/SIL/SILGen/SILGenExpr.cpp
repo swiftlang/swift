@@ -245,7 +245,7 @@ RValue SILGenFunction::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
             ManagedValue(B.createIntegerLiteral(E), ManagedValue::Unmanaged));
 }
 RValue SILGenFunction::visitStringLiteralExpr(StringLiteralExpr *E,
-                                                    SGFContext C) {
+                                              SGFContext C) {
   SILType ty = getLoweredLoadableType(E->getType());
   SILValue string = B.createStringLiteral(E, ty);
   return RValue(*this, ManagedValue(string, ManagedValue::Unmanaged));

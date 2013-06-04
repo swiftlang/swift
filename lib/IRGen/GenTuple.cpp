@@ -247,10 +247,18 @@ OwnedAddress irgen::projectTupleElementAddress(IRGenFunction &IGF,
 // FIXME: Why is this here?
 void swift::irgen::emitStringLiteral(IRGenFunction &IGF,
                                      StringRef string,
-                                     bool includeSize,
                                      Explosion &out) {
   auto ptr = IGF.IGM.getAddrOfGlobalString(string);
   out.add(ptr);
-  if (includeSize)
-    out.add(IGF.Builder.getInt64(string.size()));
+  out.add(IGF.Builder.getInt64(string.size()));
+
+  // Determine whether this is an ASCII string.
+  bool isASCII = true;
+  for (unsigned char c : string) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
+  out.add(IGF.Builder.getInt1(isASCII));
 }

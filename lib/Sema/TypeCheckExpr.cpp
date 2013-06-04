@@ -422,11 +422,8 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   case LiteralKind::Int:    MethodName = "convertFromIntegerLiteral"; break;
   case LiteralKind::Char:
     llvm_unreachable("Cannot handle character literals here");
-  case LiteralKind::UTFString: MethodName = "convertFromStringLiteral"; break;
-  case LiteralKind::ASCIIString:
-    MethodName = "convertFromASCIIStringLiteral";
-    AltMethodName = "convertFromStringLiteral";
-    break;
+  case LiteralKind::String:
+    llvm_unreachable("Cannot handle string literals here");
   case LiteralKind::Float:
     llvm_unreachable("Cannot handle float literals here");
   case LiteralKind::Array:
@@ -497,8 +494,7 @@ TypeChecker::isLiteralCompatibleType(Type Ty, SourceLoc Loc, LiteralKind LitTy,
   // FIXME: This duplicated code will be unnecessary when we switch
   // literals over to formal protocols.
   if (!((LitTy == LiteralKind::Int && ArgType->is<BuiltinIntegerType>()) ||
-        ((LitTy == LiteralKind::ASCIIString ||
-          LitTy == LiteralKind::UTFString) &&
+        (LitTy == LiteralKind::String &&
          isStringLiteralArg(ArgType))) &&
       (RequiresBuiltinArg ||
        !isLiteralCompatibleType(ArgType, Loc, LitTy, Complain, true).first)) {
@@ -518,8 +514,7 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
     name = "CharacterLiteralType";
     break;
 
-  case LiteralKind::ASCIIString:
-  case LiteralKind::UTFString:
+  case LiteralKind::String:
     type = &StringLiteralType;
     name = "StringLiteralType";
       break;
@@ -565,13 +560,15 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
   if (protocol == getProtocol(KnownProtocolKind::CharacterLiteralConvertible))
     return getDefaultLiteralType(LiteralKind::Char);
 
+  // StringLiteralConvertible -> StringLiteralType
+  // StringInterpolationConvertible -> StringLiteralType
+  if (protocol == getProtocol(KnownProtocolKind::StringLiteralConvertible)||
+      protocol==getProtocol(KnownProtocolKind::StringInterpolationConvertible))
+    return getDefaultLiteralType(LiteralKind::String);
+
   // FloatLiteralConvertible -> FloatLiteralType
   if (protocol == getProtocol(KnownProtocolKind::FloatLiteralConvertible))
     return getDefaultLiteralType(LiteralKind::Float);
-
-  // StringInterpolationConvertible -> StringLiteralType
-  if (protocol==getProtocol(KnownProtocolKind::StringInterpolationConvertible))
-    return getDefaultLiteralType(LiteralKind::UTFString);
 
   // ArrayLiteralConvertible -> Slice;
   if (protocol == getProtocol(KnownProtocolKind::ArrayLiteralConvertible))

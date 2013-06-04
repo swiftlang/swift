@@ -214,10 +214,6 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
   case ConstraintKind::Literal:
     Out << " is ";
     switch (getLiteralKind()) {
-    case LiteralKind::ASCIIString:
-      Out << "an ASCII string";
-      break;
-
     case LiteralKind::Char:
       Out << "a character";
       break;
@@ -230,8 +226,8 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
       Out << "an integer";
       break;
 
-    case LiteralKind::UTFString:
-      Out << "a UTF-8 string";
+    case LiteralKind::String:
+      Out << "a string";
       break;
 
     case LiteralKind::Array:

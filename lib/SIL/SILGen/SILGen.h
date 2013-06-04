@@ -561,9 +561,8 @@ public:
   RValue visitFuncExpr(FuncExpr *E, SGFContext C);
   RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
   RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
-  RValue visitInterpolatedStringLiteralExpr(
-                                              InterpolatedStringLiteralExpr *E,
-                                              SGFContext C);
+  RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
+                                            SGFContext C);
   RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
   RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
                                                 SGFContext C);

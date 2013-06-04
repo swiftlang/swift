@@ -44,7 +44,6 @@ namespace irgen {
   /// Emit a string literal rvalue.
   void emitStringLiteral(IRGenFunction &IGF,
                          llvm::StringRef string,
-                         bool includeSize,
                          Explosion &out);
   
 } // end namespace irgen

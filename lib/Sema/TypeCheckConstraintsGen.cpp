@@ -182,13 +182,16 @@ namespace {
     }
 
     Type visitStringLiteralExpr(StringLiteralExpr *expr) {
+      auto protocol
+        = CS.getTypeChecker().getProtocol(
+            KnownProtocolKind::StringLiteralConvertible);
+      if (!protocol) {
+        return nullptr;
+      }
+
       auto tv = CS.createTypeVariable(expr);
-      LiteralKind kind = LiteralKind::ASCIIString;
-      if (std::find_if(expr->getValue().begin(), expr->getValue().end(),
-                       [](char c) { return c > 127; })
-            != expr->getValue().end())
-        kind = LiteralKind::UTFString;
-      CS.addLiteralConstraint(tv, kind, CS.getConstraintLocator(expr, { }));
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                       protocol->getDeclaredType());
       return tv;
     }
 

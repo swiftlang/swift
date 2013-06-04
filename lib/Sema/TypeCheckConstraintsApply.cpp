@@ -754,17 +754,39 @@ namespace {
     }
 
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
-      // FIXME: Already did this when generating constraints.
-      auto kind = LiteralKind::ASCIIString;
-      for (unsigned char c : expr->getValue()) {
-        if (c > 127) {
-          kind = LiteralKind::UTFString;
-          break;
-        }
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *protocol
+        = tc.getProtocol(KnownProtocolKind::StringLiteralConvertible);
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(KnownProtocolKind::BuiltinStringLiteralConvertible);
+
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      auto type = simplifyType(expr->getType());
+      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::String)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
       }
 
-      return convertLiteral(expr, simplifyType(expr->getType()), kind,
-                            expr->getType());
+      // FIXME: 32-bit platforms should use 32-bit size here?
+      TupleTypeElt elements[3] = {
+        TupleTypeElt(tc.Context.TheRawPointerType),
+        TupleTypeElt(BuiltinIntegerType::get(64, tc.Context)),
+        TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
+      };
+      return convertLiteral(
+               expr,
+               type,
+               expr->getType(),
+               protocol,
+               tc.Context.getIdentifier("StringLiteralType"),
+               tc.Context.getIdentifier("convertFromStringLiteral"),
+               builtinProtocol,
+               TupleType::get(elements, tc.Context),
+               tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
+               nullptr,
+               diag::string_literal_broken_proto,
+               diag::builtin_string_literal_broken_proto);
     }
 
     Expr *
@@ -2089,30 +2111,6 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   return new (tc.Context) MaterializeExpr(expr, destType);
 }
 
-/// \brief Determine if this literal kind is a string literal.
-static bool isStringLiteralKind(LiteralKind kind) {
-  return kind == LiteralKind::UTFString ||
-         kind == LiteralKind::ASCIIString;
-}
-
-// Check for (Builtin.RawPointer, Builtin.Int64).
-static bool isRawPtrAndInt64(Type ty) {
-  TupleType *tt = ty->getAs<TupleType>();
-  if (!tt)
-    return false;
-  if (tt->getFields().size() != 2)
-    return false;
-  if (!tt->getElementType(0)->is<BuiltinRawPointerType>())
-    return false;
-  BuiltinIntegerType *intTy
-    = tt->getElementType(1)->getAs<BuiltinIntegerType>();
-  if (!intTy)
-    return false;
-  if (intTy->getBitWidth() != 64)
-    return false;
-  return true;
-}
-
 Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
                                    Type openedType) {
   assert(kind != LiteralKind::Float);
@@ -2177,14 +2175,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
     // Give the integer literal the builtin integer type.
     literal->setType(argType);
     intermediate = literal;
-  } else if (isStringLiteralKind(kind) && argType->is<BuiltinRawPointerType>()){
-    // Nothing to do.
-    literal->setType(argType);
-    intermediate = literal;
-  } else if (isStringLiteralKind(kind) && isRawPtrAndInt64(argType)) {
-    // Nothing to do.
-    literal->setType(argType);
-    intermediate = literal;
   } else {
     // Check to see if this is the chaining case, where ArgType itself has a
     // conversion from a Builtin type.
@@ -2196,11 +2186,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
 
     if (kind == LiteralKind::Int &&
         chainedArgType->is<BuiltinIntegerType>()) {
-      // ok.
-    } else if (isStringLiteralKind(kind) &&
-               chainedArgType->is<BuiltinRawPointerType>()) {
-      // ok.
-    } else if (isStringLiteralKind(kind) && isRawPtrAndInt64(chainedArgType)) {
       // ok.
     } else {
       llvm_unreachable("Literal conversion defined improperly");
@@ -2250,15 +2235,15 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     if (builtinLiteralType.is<Type>())
       argType = builtinLiteralType.get<Type>();
     else
-     argType = tc.getWitnessType(type, builtinProtocol,
-                                 builtinConformance,
-                                 builtinLiteralType.get<Identifier>(),
-                                 brokenBuiltinProtocolDiag);
+      argType = tc.getWitnessType(type, builtinProtocol,
+                                  builtinConformance,
+                                  builtinLiteralType.get<Identifier>(),
+                                  brokenBuiltinProtocolDiag);
     if (!argType)
       return nullptr;
 
     // Make sure it's of an appropriate builtin type.
-    if (!isBuiltinArgType(argType)) {
+    if (isBuiltinArgType && !isBuiltinArgType(argType)) {
       tc.diagnose(builtinProtocol->getLoc(), brokenBuiltinProtocolDiag);
       return nullptr;
     }

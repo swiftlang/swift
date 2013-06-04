@@ -882,9 +882,7 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
   Explosion e(CurExplosionLevel);
-  TupleType *resultTy = i->getType().getAs<TupleType>();
-  bool includeSize = resultTy && resultTy->getFields().size() >= 2;
-  emitStringLiteral(*this, i->getValue(), includeSize, e);
+  emitStringLiteral(*this, i->getValue(), e);
   newLoweredExplosion(SILValue(i, 0), e);
 }
 
