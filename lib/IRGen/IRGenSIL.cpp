@@ -791,6 +791,41 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   newLoweredExplosion(SILValue(i, 0), result);
 }
 
+static std::pair<llvm::Function*, ArrayRef<Substitution>>
+getPartialApplicationFunction(IRGenSILFunction &IGF,
+                              const LoweredValue &lv) {
+  switch (lv.kind) {
+  case LoweredValue::Kind::Address:
+    llvm_unreachable("can't partially apply an address");
+
+  case LoweredValue::Kind::StaticFunction:
+    switch (lv.getStaticFunction().getAbstractCC()) {
+    case AbstractCC::C:
+    case AbstractCC::ObjCMethod:
+      assert(false && "partial_apply of foreign functions not implemented");
+      break;
+      
+    case AbstractCC::Freestanding:
+    case AbstractCC::Method:
+      break;
+    }
+      
+    return {lv.getStaticFunction().getFunction(), {}};
+  case LoweredValue::Kind::SpecializedValue: {
+    const SpecializedValue &specialized = lv.getSpecializedValue();
+    const LoweredValue &unspecialized
+      = IGF.getLoweredValue(specialized.getUnspecializedValue());
+    return {getPartialApplicationFunction(IGF, unspecialized).first,
+            specialized.getSubstitutions()};
+  }
+  case LoweredValue::Kind::Explosion:
+  case LoweredValue::Kind::ObjCMethod:
+  case LoweredValue::Kind::MetatypeValue:
+  case LoweredValue::Kind::BuiltinValue:
+    llvm_unreachable("partial application not yet supported");
+  }
+}
+
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   SILValue v(i, 0);
 
@@ -799,26 +834,15 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // too, by including the function pointer and context data into the new
   // closure context.
   LoweredValue &lv = getLoweredValue(i->getCallee());
-  assert(lv.kind == LoweredValue::Kind::StaticFunction &&
-         "partial application of non-static functions not yet implemented");
+  llvm::Function *calleeFn = nullptr;
+  ArrayRef<Substitution> substitutions;
 
-  auto *calleeFn = lv.getStaticFunction().getFunction();
-  
-  switch (lv.getStaticFunction().getAbstractCC()) {
-  case AbstractCC::C:
-  case AbstractCC::ObjCMethod:
-    assert(false && "partial_apply of foreign functions not implemented");
-    break;
-
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-    break;
-  }
+  std::tie(calleeFn, substitutions) = getPartialApplicationFunction(*this, lv);
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
 
-  // FIXME: We may need to close over fat function values to be able to curry
+  // FIXME: We need to close over fat function values to be able to curry
   // specialized 
   assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
          "can't closure a function that already has context");
@@ -834,7 +858,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   // Create the thunk and function value.
   Explosion function(CurExplosionLevel);
-  emitFunctionPartialApplication(*this, calleeFn, llArgs, argTypes,
+  emitFunctionPartialApplication(*this, calleeFn, llArgs,
+                                 argTypes, substitutions,
                                  i->getType(), function);
   newLoweredExplosion(v, function);
 }

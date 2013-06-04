@@ -1706,6 +1706,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            llvm::Function *fnPtr,
                                            Explosion &args,
                                            ArrayRef<SILType> argTypes,
+                                           ArrayRef<Substitution> subs,
                                            SILType outType,
                                            Explosion &out) {
   // Collect the type infos for the context types.

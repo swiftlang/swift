@@ -49,6 +49,7 @@ namespace irgen {
                                       llvm::Function *fnPtr,
                                       Explosion &args,
                                       ArrayRef<SILType> argTypes,
+                                      ArrayRef<Substitution> subs,
                                       SILType outType,
                                       Explosion &out);
   

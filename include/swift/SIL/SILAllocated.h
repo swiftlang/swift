@@ -23,21 +23,19 @@ namespace swift {
 template <typename DERIVED>
 class SILAllocated {
 public:
-  /// Forward to ordinary 'new'.
-  void *operator new(size_t Bytes, size_t Alignment = alignof(DERIVED)) {
-    return ::operator new(Bytes);
-  }
+  /// Disable non-placement new.
+  void *operator new(size_t) = delete;
+  void *operator new[](size_t) = delete;
 
-  /// Forward to ordinary 'delete'.
-  void operator delete(void *Ptr, size_t) {
-    ::operator delete(Ptr);
-  }
+  /// Disable non-placement delete.
+  void operator delete(void *) = delete;
+  void operator delete[](void *) = delete;
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with
   /// precise alignment knowledge.  This is templated on the allocator type so
   /// that this doesn't require including SILModule.h.
-  template <typename SizeTy>
-  void *operator new(size_t Bytes, const SizeTy &C,
+  template <typename ContextTy>
+  void *operator new(size_t Bytes, const ContextTy &C,
                      size_t Alignment = alignof(DERIVED)) {
     return C.allocate(Bytes, Alignment);
   }
