@@ -174,7 +174,7 @@ namespace llvm {
     static inline swift::Identifier getFromVoidPointer(void *P) {
       return swift::Identifier::getFromOpaquePointer(P);
     }
-    enum { NumLowBitsAvailable = 3 };
+    enum { NumLowBitsAvailable = 2 };
   };
   
 } // end namespace llvm
