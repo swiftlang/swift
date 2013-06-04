@@ -17,6 +17,10 @@
 
 #include "swift/Basic/LLVM.h"
 
+namespace llvm {
+  class MemoryBuffer;
+}
+
 namespace swift {
   class ASTContext;
   class TranslationUnit;
@@ -32,6 +36,7 @@ namespace swift {
 
   bool appendToREPLTranslationUnit(TranslationUnit *TU,
                                    REPLContext &RC,
+                                   llvm::MemoryBuffer *Buffer,
                                    unsigned &BufferOffset,
                                    unsigned BufferEndOffset);
 }

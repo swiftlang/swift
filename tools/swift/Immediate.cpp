@@ -866,14 +866,9 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
-  // FIXME: We should do something a bit more elaborate than
-  // "allocate a 1MB buffer and hope it's enough".
-  static const size_t BUFFER_SIZE = 1 << 20;
-
   ASTContext &Context;
   bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
-  llvm::MemoryBuffer *Buffer;
   Component *Comp;
   TranslationUnit *TU;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
@@ -890,20 +885,14 @@ class REPLEnvironment {
   REPLInput Input;
   REPLContext RC;
 
-  char *getBufferStart() {
-    return const_cast<char*>(Buffer->getBufferStart());
-  }
-  
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
-    assert(Line.size() < BUFFER_SIZE &&
-           "line too big for our stupid fixed-size repl buffer");
-    memcpy(getBufferStart(), Line.data(), Line.size());
-    getBufferStart()[Line.size()] = '\0';
-    
+    llvm::MemoryBuffer *input
+      = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
+
     // Parse the current line(s).
     unsigned BufferOffset = 0;
     bool ShouldRun =
-      swift::appendToREPLTranslationUnit(TU, RC,
+      swift::appendToREPLTranslationUnit(TU, RC, input,
                                          BufferOffset, Line.size());
     
     if (Context.hadError()) {
@@ -988,7 +977,6 @@ public:
     : Context(Context),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
-      Buffer(llvm::MemoryBuffer::getNewMemBuffer(BUFFER_SIZE, "<REPL Buffer>")),
       Comp(new (Context.Allocate<Component>(1)) Component()),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
                                        Comp, Context,
@@ -999,7 +987,7 @@ public:
       DumpModule("REPL", LLVMContext),
       Input(*this),
       RC{
-        /*BufferID*/ Context.SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc()),
+        /*BufferID*/ ~0U,
         /*CurTUElem*/ 0,
         /*CurIRGenElem*/ 0
       }
@@ -1024,11 +1012,14 @@ public:
     // Force swift.swift to be parsed/type-checked immediately.  This forces
     // any errors to appear upfront, and helps eliminate some nasty lag after
     // the first statement is typed into the REPL.
-    const char importstmt[] = "import swift\n";
-    strcpy(getBufferStart(), importstmt);
-    
+    static const char importstmt[] = "import swift\n";
+
+    llvm::MemoryBuffer *buffer
+      = llvm::MemoryBuffer::getMemBufferCopy(importstmt,
+                                             "<REPL Initialization>");
     unsigned BufferOffset = 0;
-    swift::appendToREPLTranslationUnit(TU, RC,
+    
+    swift::appendToREPLTranslationUnit(TU, RC, buffer,
                                        /*startOffset*/ BufferOffset,
                                        /*endOffset*/ strlen(importstmt));
     if (Context.hadError())

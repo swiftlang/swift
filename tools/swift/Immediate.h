@@ -37,7 +37,7 @@ namespace swift {
   class REPLContext {
   public:
     /// The SourceMgr buffer ID of the REPL input.
-    unsigned BufferID;
+    unsigned CurBufferID;
     
     /// The index into the TranslationUnit's Decls at which to start
     /// typechecking the next REPL input.

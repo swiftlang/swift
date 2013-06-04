@@ -102,14 +102,18 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
 
 bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
                                         REPLContext &RC,
+                                        llvm::MemoryBuffer *Buffer,
                                         unsigned &BufferOffset,
                                         unsigned BufferEndOffset) {
   assert(TU->Kind == TranslationUnit::Repl && "Can't append to a non-REPL TU");
   
+  RC.CurBufferID
+    = TU->getASTContext().SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
+  
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;
   do {
-    FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.BufferID,
+    FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.CurBufferID,
                                                     &BufferOffset,
                                                     BufferEndOffset);
     performNameBinding(TU, CurTUElem);
