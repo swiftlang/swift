@@ -145,15 +145,24 @@ namespace {
     }
 
     Type visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+      auto protocol
+        = CS.getTypeChecker().getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::IntegerLiteralConvertible);
+      if (!protocol) {
+        return nullptr;
+      }
+
       auto tv = CS.createTypeVariable(expr);
-      CS.addLiteralConstraint(tv, LiteralKind::Int,
-                              CS.getConstraintLocator(expr, { }));
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
+                       protocol->getDeclaredType());
       return tv;
     }
 
     Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
       auto protocol
         = CS.getTypeChecker().getProtocol(
+            expr->getLoc(),
             KnownProtocolKind::FloatLiteralConvertible);
       if (!protocol) {
         return nullptr;
@@ -170,6 +179,7 @@ namespace {
     Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       auto protocol
         = CS.getTypeChecker().getProtocol(
+            expr->getLoc(),
             KnownProtocolKind::CharacterLiteralConvertible);
       if (!protocol) {
         return nullptr;
@@ -184,6 +194,7 @@ namespace {
     Type visitStringLiteralExpr(StringLiteralExpr *expr) {
       auto protocol
         = CS.getTypeChecker().getProtocol(
+            expr->getLoc(),
             KnownProtocolKind::StringLiteralConvertible);
       if (!protocol) {
         return nullptr;
@@ -200,7 +211,8 @@ namespace {
       // Dig out the StringInterpolationConvertible protocol.
       auto &tc = CS.getTypeChecker();
       auto interpolationProto
-        = tc.getProtocol(KnownProtocolKind::StringInterpolationConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::StringInterpolationConvertible);
       if (!interpolationProto) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
@@ -463,9 +475,9 @@ namespace {
       // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
       ProtocolDecl *arrayProto
-        = tc.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::ArrayLiteralConvertible);
       if (!arrayProto) {
-        tc.diagnose(expr->getStartLoc(), diag::array_expr_missing_proto);
         return Type();
       }
 
@@ -520,9 +532,9 @@ namespace {
       // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
       ProtocolDecl *dictionaryProto
-        = tc.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::DictionaryLiteralConvertible);
       if (!dictionaryProto) {
-        tc.diagnose(expr->getStartLoc(), diag::dictionary_expr_missing_proto);
         return Type();
       }
 

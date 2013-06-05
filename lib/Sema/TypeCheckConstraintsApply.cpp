@@ -383,11 +383,6 @@ namespace {
       return result;
     }
 
-    /// \brief Convert the given literal expression to a specific type with
-    /// a known literal kind.
-    Expr *convertLiteral(Expr *literal, Type type, LiteralKind kind,
-                         Type openedType);
-
     /// \brief Describes either a type or the name of a type to be resolved.
     typedef llvm::PointerUnion<Identifier, Type> TypeOrName;
 
@@ -682,16 +677,52 @@ namespace {
     }
 
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
-      return convertLiteral(expr, simplifyType(expr->getType()),
-                            LiteralKind::Int, expr->getType());
+      auto &tc = cs.getTypeChecker();
+      ProtocolDecl *protocol
+      = tc.getProtocol(expr->getLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+      ProtocolDecl *builtinProtocol
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BuiltinIntegerLiteralConvertible);
+
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      auto type = simplifyType(expr->getType());
+      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Int)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
+      }
+      if (auto defaultFloatType = tc.getDefaultLiteralType(LiteralKind::Float)){
+        if (defaultFloatType->isEqual(type))
+          type = defaultFloatType;
+      }
+
+      return convertLiteral(
+               expr,
+               type,
+               expr->getType(),
+               protocol,
+               tc.Context.getIdentifier("IntegerLiteralType"),
+               tc.Context.getIdentifier("convertFromIntegerLiteral"),
+               builtinProtocol,
+               tc.Context.getIdentifier("BuiltinIntegerLiteralType"),
+               tc.Context.getIdentifier(
+                                        "_convertFromBuiltinIntegerLiteral"),
+               [] (Type type) -> bool {
+                 return type->is<BuiltinIntegerType>();
+               },
+               diag::integer_literal_broken_proto,
+               diag::builtin_integer_literal_broken_proto);
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-        = tc.getProtocol(KnownProtocolKind::FloatLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::FloatLiteralConvertible);
       ProtocolDecl *builtinProtocol
-        = tc.getProtocol(KnownProtocolKind::BuiltinFloatLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BuiltinFloatLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -721,9 +752,11 @@ namespace {
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-        = tc.getProtocol(KnownProtocolKind::CharacterLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::CharacterLiteralConvertible);
       ProtocolDecl *builtinProtocol
-        = tc.getProtocol(KnownProtocolKind::BuiltinCharacterLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BuiltinCharacterLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -756,9 +789,11 @@ namespace {
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-        = tc.getProtocol(KnownProtocolKind::StringLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::StringLiteralConvertible);
       ProtocolDecl *builtinProtocol
-        = tc.getProtocol(KnownProtocolKind::BuiltinStringLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BuiltinStringLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -799,7 +834,8 @@ namespace {
       // Find the string interpolation protocol we need.
       auto &tc = cs.getTypeChecker();
       auto interpolationProto
-        = tc.getProtocol(KnownProtocolKind::StringInterpolationConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::StringInterpolationConvertible);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       // FIXME: Cache name,
@@ -1112,7 +1148,8 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *arrayProto
-        = tc.getProtocol(KnownProtocolKind::ArrayLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::ArrayLiteralConvertible);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
        // Use a value member constraint to find the appropriate
@@ -1158,7 +1195,8 @@ namespace {
       auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *dictionaryProto
-        = tc.getProtocol(KnownProtocolKind::DictionaryLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::DictionaryLiteralConvertible);
 
       // Use a value member constraint to find the appropriate
       // convertFromDictionaryLiteral call.
@@ -2110,108 +2148,6 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   return new (tc.Context) MaterializeExpr(expr, destType);
 }
 
-Expr *ExprRewriter::convertLiteral(Expr *literal, Type type, LiteralKind kind,
-                                   Type openedType) {
-  assert(kind != LiteralKind::Float);
-  
-  TypeChecker &tc = cs.getTypeChecker();
-  
-  // Check the destination type to see if it is compatible with literals,
-  // diagnosing the failure if not.
-  // FIXME: The Complain and Location arguments are pointless for us.
-  FuncDecl *method;
-  Type argType;
-  std::tie(method, argType)
-    = tc.isLiteralCompatibleType(type, SourceLoc(), kind, /*Complain=*/false);
-  assert(method && "Literal type is not compatible?");
-
-  // If the destination type is equivalent to the default literal type, use
-  // the default literal type as the sugared type of the literal.
-  Type defaultLiteralTy = tc.getDefaultLiteralType(kind);
-  if (defaultLiteralTy && type->isEqual(defaultLiteralTy))
-    type = defaultLiteralTy;
-  // Additionally, if an integer literal gets used as the default floating-point
-  // type, use the default floating-point literal type as the sugared type.
-  else if (kind == LiteralKind::Int) {
-    Type defaultFloatLiteralTy = tc.getDefaultLiteralType(LiteralKind::Float);
-    if (defaultFloatLiteralTy && type->isEqual(defaultFloatLiteralTy))
-      type = defaultFloatLiteralTy;
-  }
-  
-  // The argument type must either be a Builtin:: type (in which case
-  // this is a type in the standard library) or some other type that itself has
-  // a conversion function from a builtin type (in which case we have
-  // "chaining", and an implicit conversion through that type).
-  Expr *intermediate;
-  BuiltinIntegerType *BIT;
-  if (kind == LiteralKind::Int &&
-      (BIT = argType->getAs<BuiltinIntegerType>())) {
-    // If this is a direct use of the builtin integer type, use the integer size
-    // to diagnose excess precision issues.
-    llvm::APInt Value(1, 0);
-    StringRef IntText = cast<IntegerLiteralExpr>(literal)->getText();
-    unsigned Radix;
-    if (IntText.startswith("0x")) {
-      IntText = IntText.substr(2);
-      Radix = 16;
-    } else if (IntText.startswith("0o")) {
-      IntText = IntText.substr(2);
-      Radix = 8;
-    } else if (IntText.startswith("0b")) {
-      IntText = IntText.substr(2);
-      Radix = 2;
-    } else {
-      Radix = 10;
-    }
-    bool Failure = IntText.getAsInteger(Radix, Value);
-    assert(!Failure && "Lexer should have verified a reasonable type!");
-    (void)Failure;
-
-    if (Value.getActiveBits() > BIT->getBitWidth())
-      tc.diagnose(literal->getLoc(), diag::int_literal_too_large,
-                  Value.getBitWidth(), type);
-
-    // Give the integer literal the builtin integer type.
-    literal->setType(argType);
-    intermediate = literal;
-  } else {
-    // Check to see if this is the chaining case, where ArgType itself has a
-    // conversion from a Builtin type.
-    FuncDecl *chainedMethod;
-    Type chainedArgType;
-    std::tie(chainedMethod, chainedArgType)
-      = tc.isLiteralCompatibleType(argType, SourceLoc(), kind, false);
-    assert(chainedMethod && "Literal type is not compatible?");
-
-    if (kind == LiteralKind::Int &&
-        chainedArgType->is<BuiltinIntegerType>()) {
-      // ok.
-    } else {
-      llvm_unreachable("Literal conversion defined improperly");
-    }
-
-    // If this a 'chaining' case, recursively convert the literal to the
-    // intermediate type, then use our conversion function to finish the
-    // translation.
-    intermediate = convertLiteral(literal, argType, kind, argType);
-
-    // Okay, now Intermediate is known to have type 'argType' so we can use a
-    // call to our conversion function to finish things off.
-  }
-
-  Expr *result = new (tc.Context) MetatypeExpr(nullptr,
-                                               intermediate->getStartLoc(),
-                                               method->computeThisType());
-  result = buildMemberRef(result, SourceLoc(), method,
-                          intermediate->getStartLoc(),
-                          openedType,
-                          cs.getConstraintLocator(literal, { }));
-
-  // Return a new call of the conversion function, passing in the (possibly
-  // converted) argument.
-  return new (tc.Context) CallExpr(result, intermediate, type);
-}
-
 Expr *ExprRewriter::convertLiteral(Expr *literal,
                                    Type type,
                                    Type openedType,
@@ -2716,7 +2652,8 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
   // FIXME: Cache names.
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
-                  tc.getProtocol(KnownProtocolKind::LogicValue),
+                  tc.getProtocol(expr->getLoc(),
+                                 KnownProtocolKind::LogicValue),
                   tc.Context.getIdentifier("getLogicValue"),
                   tc.Context.getIdentifier("_getBuiltinLogicValue"),
                   diag::condition_broken_proto,
@@ -2735,7 +2672,8 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,
-                  tc.getProtocol(KnownProtocolKind::ArrayBound),
+                  tc.getProtocol(expr->getLoc(),
+                                 KnownProtocolKind::ArrayBound),
                   tc.Context.getIdentifier("getArrayBoundValue"),
                   tc.Context.getIdentifier("_getBuiltinArrayBoundValue"),
                   diag::broken_array_bound_proto,

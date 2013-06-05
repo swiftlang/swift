@@ -1344,11 +1344,6 @@ private:
   llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
     MemberLookups;
 
-  /// \brief Cached literal checks.  The key is a canonical type + literal
-  /// kind.  The value is a tristate of 0 -> uncomputed, 1 -> computed
-  /// false, 2 -> computed true.
-  llvm::DenseMap<std::pair<CanType, unsigned>, unsigned> LiteralChecks;
-
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
   llvm::FoldingSet<ConstraintLocator> ConstraintLocators;

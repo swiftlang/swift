@@ -2084,34 +2084,10 @@ ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
     type = fixed;
   }
 
-  // Collection and floating-point literals are handled via separate protocol
-  // requirements, so let this constraint be satisfied when we've picked a
-  // concrete type.
-  if (kind == LiteralKind::Array || kind == LiteralKind::Dictionary) {
-    return (type->is<NominalType>() || type->is<BoundGenericType>())
-             ? SolutionKind::TriviallySolved
-             : SolutionKind::Unsolved;
-  }
-
-
-  // Look up the entry for this type/literalkind pair in LiteralChecks.
-  unsigned &known = LiteralChecks[{type->getCanonicalType(), (unsigned)kind}];
-
-  // If we haven't already checked whether this type is literal compatible, do
-  // it now.
-  if (known == 0) {
-    // FIXME: We should do this caching in the translation unit.
-    known = 1+(TC.isLiteralCompatibleType(type, SourceLoc(), kind,
-                                          /*Complain=*/false).first != nullptr);
-  }
-
-  if (known == 2) {
-    return SolutionKind::TriviallySolved;
-  }
-
-  // Record this failure.
-  recordFailure(locator, Failure::IsNotLiteralType, type, kind);
-  return SolutionKind::Error;
+  assert(kind == LiteralKind::Array || kind == LiteralKind::Dictionary);
+  return (type->is<NominalType>() || type->is<BoundGenericType>())
+           ? SolutionKind::TriviallySolved
+           : SolutionKind::Unsolved;
 }
 
 /// \brief Determine whether the given protocol member's signature involves
@@ -3295,9 +3271,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return true;
 
   // The result must be a LogicValue.
-  auto logicValueProto = getProtocol(KnownProtocolKind::LogicValue);
+  auto logicValueProto = getProtocol(expr->getLoc(),
+                                     KnownProtocolKind::LogicValue);
   if (!logicValueProto) {
-    diagnose(expr->getLoc(), diag::condition_missing_proto);
     return true;
   }
 
@@ -3423,9 +3399,9 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
     return true;
 
   // The result must be an ArrayBound.
-  auto arrayBoundProto = getProtocol(KnownProtocolKind::ArrayBound);
+  auto arrayBoundProto = getProtocol(expr->getLoc(),
+                                     KnownProtocolKind::ArrayBound);
   if (!arrayBoundProto) {
-    diagnose(expr->getLoc(), diag::array_bound_missing_proto);
     return true;
   }
 

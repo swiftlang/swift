@@ -656,6 +656,14 @@ ERROR(expected_rparen_expr_list,expr_parsing,none,
 ERROR(expected_rsquare_expr_list,expr_parsing,none,
       "expected ']' in expression list", ())
 
+ERROR(missing_protocol,sema_tce,none,
+      "missing protocol %0", (Identifier))
+      
+ERROR(builtin_integer_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinIntegerLiteralConvertible' is broken", ())
+ERROR(integer_literal_broken_proto,sema_tce,none,
+      "protocol 'IntegerLiteralConvertible' is broken", ())
+
 ERROR(builtin_float_literal_broken_proto,sema_tce,none,
       "protocol 'BuiltinFloatLiteralConvertible' is broken", ())
 ERROR(float_literal_broken_proto,sema_tce,none,
@@ -727,15 +735,6 @@ ERROR(literal_conversion_wrong_return_type,literal_parsing,none,
 ERROR(type_literal_conversion_defined_wrong,literal_parsing,none,
       "conversion method in %0 not defined in terms of standard library type",
        (Type))
-
-WARNING(int_literal_too_large,literal_parsing,none,
-        "integer constant too large (%0 bits) for %1",
-        (unsigned, Type))
-      
-WARNING(float_literal_overflow,literal_parsing,none,
-        "floating point constant overflowed to %0", (StringRef))
-WARNING(float_literal_underflow,literal_parsing,none,
-        "floating point constant underflowed to %0", (StringRef))
 
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
@@ -1234,8 +1233,6 @@ NOTE(subscript_decl_here,sema_tca,none,
 ERROR(condition_convert_limit_reached,sema_tce,none,
       "getLogicValue() for type %0 used in a conditional does not return "
       "a bool", (Type))
-ERROR(condition_missing_proto,sema_tce,none,
-      "condition requires the missing protocol 'LogicValue' to be defined", ())
 ERROR(condition_broken_proto,sema_tce,none,
       "protocol 'LogicValue' is broken", ())
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
@@ -1245,8 +1242,6 @@ ERROR(new_array_bound_zero,sema_tce,none,
 ERROR(array_bound_convert_limit_reached,sema_tce,none,
       "getArrayBoundValue() for type %0 used as an array size does not return "
       "an integer type", (Type))
-ERROR(array_bound_missing_proto,sema_tce,none,
-      "array bound requires the missing protocol 'ArrayBound' to be defined", ())
 ERROR(broken_array_bound_proto,sema_tce,none,
       "protocol 'ArrayBound' is broken", ())
 ERROR(broken_builtin_array_bound,sema_tce,none,
@@ -1270,14 +1265,10 @@ ERROR(interpolation_broken_proto,sema_tce,none,
 
 
 // Array literals
-ERROR(array_expr_missing_proto,sema_tce,none,
-      "array literal expression requires the 'ArrayLiteralConvertible' protocol to be defined", ())
 ERROR(array_protocol_broken,sema_tce,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
 
 // Dictionary literals
-ERROR(dictionary_expr_missing_proto,sema_tce,none,
-      "dictionary literal expression requires the 'DictionaryLiteralConvertible' protocol to be defined", ())
 ERROR(dictionary_protocol_broken,sema_tce,none,
       "DictionaryLiteralConvertible protocol definition is broken", ())
       
@@ -1313,12 +1304,8 @@ ERROR(byref_not_settable,sema_tcs,none,
       "cannot pass by reference a property or subscript without a 'set' method", ())
 
 // ForEach Stmt
-ERROR(foreach_missing_enumerable,sema_tcs,none,
-      "for-each loop requires the 'Enumerable' protocol to be defined", ())
 ERROR(enumerable_protocol_broken,sema_tcs,none,
       "Enumerable protocol definition is broken", ())
-ERROR(foreach_missing_range,sema_tcs,none,
-      "for-each loop requires the 'Enumerator' protocol to be defined", ())
 ERROR(range_protocol_broken,sema_tcs,none,
       "Enumerator protocol definition is broken", ())
 

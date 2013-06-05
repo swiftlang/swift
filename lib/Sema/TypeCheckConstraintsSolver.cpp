@@ -564,16 +564,17 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
         if (handledLiteralConstraints)
           continue;
 
-        for (auto constraint : tvc.KindConstraints) {
-          if (constraint->getKind() != ConstraintKind::Literal)
-            continue;
-
-          // FIXME: Total hack. integer literal -> default floating
-          // literal kind.
-          if (constraint->getLiteralKind() == LiteralKind::Int) {
+        // FIXME: Total hack. If there is an IntegerLiteralConvertible
+        // constraint, also try the default float literal type.
+        auto integerLiteralConvertible
+          = tc.getProtocol(SourceLoc(),
+                           KnownProtocolKind::IntegerLiteralConvertible);
+        for (auto constraint : tvc.ConformsToConstraints) {
+          if (constraint->getProtocol() == integerLiteralConvertible) {
             auto newType = tc.getDefaultLiteralType(LiteralKind::Float);
             if (newType && exploredTypes.insert(newType->getCanonicalType()))
               newBindings.push_back({newType, false});
+            break;
           }
         }
 

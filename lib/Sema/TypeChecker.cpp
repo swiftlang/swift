@@ -69,7 +69,7 @@ void TypeChecker::addedExternalType(Type type) {
   Context.ExternalTypes.push_back(type);
 }
 
-ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
+ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   // Check whether we've already looked for and cached this protocol.
   unsigned index = (unsigned)kind;
   assert(index < numKnownProtocols && "Number of known protocols is wrong");
@@ -93,6 +93,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
 
   case KnownProtocolKind::BuiltinFloatLiteralConvertible:
     name = Context.getIdentifier("BuiltinFloatLiteralConvertible");
+    break;
+
+  case KnownProtocolKind::BuiltinIntegerLiteralConvertible:
+    name = Context.getIdentifier("BuiltinIntegerLiteralConvertible");
     break;
 
   case KnownProtocolKind::BuiltinStringLiteralConvertible:
@@ -119,6 +123,10 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
     name = Context.getIdentifier("FloatLiteralConvertible");
     break;
 
+  case KnownProtocolKind::IntegerLiteralConvertible:
+    name = Context.getIdentifier("IntegerLiteralConvertible");
+    break;
+
   case KnownProtocolKind::LogicValue:
     name = Context.getIdentifier("LogicValue");
     break;
@@ -135,6 +143,12 @@ ProtocolDecl *TypeChecker::getProtocol(KnownProtocolKind kind) {
   UnqualifiedLookup global(name, &TU);
   knownProtocols[index]
     = dyn_cast_or_null<ProtocolDecl>(global.getSingleTypeResult());
+
+  // Complain if the protocol is completely missing.
+  if (!knownProtocols[index]) {
+    diagnose(loc, diag::missing_protocol, name);
+  }
+
   return knownProtocols[index];
 }
 

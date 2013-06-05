@@ -247,17 +247,15 @@ public:
 
     // Retrieve the 'Enumerable' protocol.
     ProtocolDecl *EnumerableProto
-      = TC.getProtocol(KnownProtocolKind::Enumerable);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Enumerable);
     if (!EnumerableProto) {
-      TC.diagnose(S->getForLoc(), diag::foreach_missing_enumerable);
       return nullptr;
     }
 
     // Retrieve the 'Enumerator' protocol.
     ProtocolDecl *EnumeratorProto
-      = TC.getProtocol(KnownProtocolKind::Enumerator);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Enumerator);
     if (!EnumeratorProto) {
-      TC.diagnose(S->getForLoc(), diag::foreach_missing_range);
       return nullptr;
     }
     

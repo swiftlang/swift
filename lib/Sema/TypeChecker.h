@@ -55,6 +55,10 @@ enum class KnownProtocolKind : unsigned {
   /// point literals.
   BuiltinFloatLiteralConvertible,
 
+  /// \brief The 'BuiltinIntegerLiteralConvertible' protocol, used for integer
+  /// literals.
+  BuiltinIntegerLiteralConvertible,
+
   /// \brief The 'BuiltinStringLiteralConvertible' protocol, used for string
   /// literals.
   BuiltinStringLiteralConvertible,
@@ -76,6 +80,10 @@ enum class KnownProtocolKind : unsigned {
   /// \brief The 'FloatLiteralConvertible' protocol, used for floating
   /// point literals.
   FloatLiteralConvertible,
+
+  /// \brief The 'IntegerLiteralConvertible' protocol, used for integer
+  /// literals.
+  IntegerLiteralConvertible,
 
   /// \brief The 'LogicValue' protocol, used for places where a value is
   /// considered to be a logic value, such as in an 'if' statement.
@@ -426,17 +434,6 @@ public:
                           SourceLoc ComplainLoc,
                           TypeSubstitutionMap *RecordSubstitutions = nullptr);
 
-  /// \brief Determine whether the given type is compatible with an integer
-  /// or floating-point literal and what function would perform the conversion.
-  ///
-  /// \returns The function that will perform the conversion, along with the
-  /// type of the argument of this function.
-  std::pair<FuncDecl*, Type> isLiteralCompatibleType(
-                               Type Ty, SourceLoc Loc,
-                               LiteralKind LitTy,
-                               bool Complain,
-                               bool RequiresBuiltinArg = false);
-
   /// \brief Lookup a member in the given type.
   ///
   /// \param type The type in which we will look for a member.
@@ -518,9 +515,12 @@ public:
 
   /// \brief Retrieve a specific, known protocol.
   ///
+  /// \param loc The location at which we need to look for the protocol.
+  /// \param kind The known protocol we're looking for.
+  ///
   /// \returns null if the protocol is not available. This represents a
   /// problem with the Standard Library.
-  ProtocolDecl *getProtocol(KnownProtocolKind kind);
+  ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
 
   /// \name AST Mutation Listener Implementation
   /// @{
