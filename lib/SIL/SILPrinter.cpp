@@ -573,13 +573,13 @@ public:
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    OS << "index_addr " << getID(IAI->getBase()) << ", "
-       << getID(IAI->getIndex());
+    OS << "index_addr " << getIDAndType(IAI->getBase()) << ", "
+       << getIDAndType(IAI->getIndex());
   }
 
   void visitIndexRawPointerInst(IndexRawPointerInst *IAI) {
-    OS << "index_raw_pointer " << getID(IAI->getBase()) << ", "
-    << getID(IAI->getIndex());
+    OS << "index_raw_pointer " << getIDAndType(IAI->getBase()) << ", "
+    << getIDAndType(IAI->getIndex());
   }
   
   void visitUnreachableInst(UnreachableInst *UI) {
