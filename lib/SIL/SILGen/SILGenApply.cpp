@@ -1140,7 +1140,21 @@ namespace {
     SILValue metaTy = gen.emitMetatypeOfValue(loc, args[0].getValue());
     return ManagedValue(metaTy, ManagedValue::Unmanaged);
   }
-  
+
+  /// Specialized emitter for Builtin.gep.
+  static ManagedValue emitBuiltinGep(SILGenFunction &gen,
+                                     SILLocation loc,
+                                     ArrayRef<Substitution> substitutions,
+                                     ArrayRef<ManagedValue> args,
+                                     SGFContext C) {
+    assert(args.size() == 2 && "gep should be given two arguments");
+    
+    SILValue offsetPtr = gen.B.createIndexRawPointer(loc,
+                                                   args[0].getUnmanagedValue(),
+                                                   args[1].getUnmanagedValue());
+    return ManagedValue(offsetPtr, ManagedValue::Unmanaged);
+  }
+
   Callee::SpecializedEmitter
   Callee::getSpecializedEmitterForSILBuiltin(SILConstant function) {
     // Filter out non-function members and non-builtin modules.

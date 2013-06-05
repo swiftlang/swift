@@ -126,8 +126,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(SuperToArchetypeInst, SILInstruction)
   INST(IsaInst, SILInstruction)
 
-  // SIL-only instructions that don't have an AST analog.
-  INST(IndexAddrInst, SILInstruction)
+  // Array indexing instructions.
+  ABSTRACT_VALUE(IndexingInst, SILInstruction)
+    INST(IndexAddrInst, IndexingInst)
+    INST(IndexRawPointerInst, IndexingInst)
+    VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
   // Terminators.
   ABSTRACT_VALUE(TermInst, SILInstruction)

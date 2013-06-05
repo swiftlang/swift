@@ -148,6 +148,9 @@ BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 /// Returns the runtime type of a value.
 BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
 
+/// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
+BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
@@ -156,9 +159,6 @@ BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
 #define BUILTIN_MISC_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
 #endif
                        
-/// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
-BUILTIN_MISC_OPERATION(Gep, "gep", Integer)
-
 /// Sizeof has type (metatype<T>) -> Int64
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", Special)
 

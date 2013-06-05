@@ -533,6 +533,7 @@ public:
   void visitIsaInst(IsaInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
+  void visitIndexRawPointerInst(IndexRawPointerInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
   void visitBranchInst(BranchInst *i);

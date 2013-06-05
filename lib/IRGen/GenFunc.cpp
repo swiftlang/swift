@@ -892,16 +892,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return out->add(v);
   }
   
-  if (BuiltinName == "gep") {
-    llvm::Value *lhs = args.claimNext();
-    llvm::Value *rhs = args.claimNext();
-    assert(args.empty() && "wrong operands to gep operation");
-    
-    // We don't expose a non-inbounds GEP operation.
-    llvm::Value *gep = IGF.Builder.CreateInBoundsGEP(lhs, rhs);
-    return out->add(gep);
-  }
-
   if (BuiltinName == "allocRaw") {
     auto size = args.claimNext();
     auto align = args.claimNext();

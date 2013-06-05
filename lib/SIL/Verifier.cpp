@@ -440,6 +440,15 @@ public:
             "index_addr index must be of a builtin integer type");
   }
   
+  void checkIndexRawPointerInst(IndexRawPointerInst *IAI) {
+    require(IAI->getType().is<BuiltinRawPointerType>(),
+            "index_raw_pointer must produce a RawPointer");
+    require(IAI->getBase().getType().is<BuiltinRawPointerType>(),
+            "index_raw_pointer base must be a RawPointer");
+    require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
+            "index_raw_pointer index must be of a builtin integer type");
+  }
+  
   void checkTupleExtractInst(TupleExtractInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     require(!operandTy.isAddress(),

@@ -523,7 +523,7 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
-  // SIL-only instructions that don't have an AST analog
+  // Array indexing instructions
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation loc,
@@ -531,6 +531,11 @@ public:
     return insert(new (F.getModule()) IndexAddrInst(loc, Operand, Index));
   }
 
+  IndexRawPointerInst *createIndexRawPointer(SILLocation loc,
+                                             SILValue Operand, SILValue Index) {
+    return insert(new (F.getModule()) IndexRawPointerInst(loc, Operand, Index));
+  }
+  
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//

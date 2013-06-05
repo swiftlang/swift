@@ -577,6 +577,11 @@ public:
        << getID(IAI->getIndex());
   }
 
+  void visitIndexRawPointerInst(IndexRawPointerInst *IAI) {
+    OS << "index_raw_pointer " << getID(IAI->getBase()) << ", "
+    << getID(IAI->getIndex());
+  }
+  
   void visitUnreachableInst(UnreachableInst *UI) {
     OS << "unreachable";
   }

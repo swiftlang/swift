@@ -1362,6 +1362,21 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   newLoweredAddress(SILValue(i, 0), Address(destValue, base.getAlignment()));
 }
 
+void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
+  Explosion baseValues = getLoweredExplosion(i->getBase());
+  llvm::Value *base = baseValues.claimNext();
+  
+  Explosion indexValues = getLoweredExplosion(i->getIndex());
+  llvm::Value *index = indexValues.claimNext();
+  
+  // We don't expose a non-inbounds GEP operation.
+  llvm::Value *destValue = Builder.CreateInBoundsGEP(base, index);
+  
+  Explosion result(CurExplosionLevel);
+  result.add(destValue);
+  newLoweredExplosion(SILValue(i, 0), result);
+}
+
 void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand().getType();

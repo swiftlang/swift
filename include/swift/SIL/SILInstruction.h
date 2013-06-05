@@ -1326,19 +1326,17 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// SIL-only instructions that don't have an AST analog
+// Pointer/address indexing instructions
 //===----------------------------------------------------------------------===//
 
-
-/// IndexAddrInst - "%2 = index_addr %0 : $*T, %1 : $Builtin.Int64"
-/// This takes an address and indexes it, striding by the pointed-
-/// to type.  This is used to index into arrays of uniform elements.
-class IndexAddrInst : public SILInstruction {
+/// Abstract base class for indexing instructions.
+class IndexingInst : public SILInstruction {
   enum { Base, Index };
   FixedOperandList<2> Operands;
 public:
-  IndexAddrInst(SILLocation Loc, SILValue Operand, SILValue Index)
-    : SILInstruction(ValueKind::IndexAddrInst, Loc, Operand.getType()),
+  IndexingInst(ValueKind Kind,
+               SILLocation Loc, SILValue Operand, SILValue Index)
+    : SILInstruction(Kind, Loc, Operand.getType()),
       Operands{this, Operand, Index}
   {}
   
@@ -1350,9 +1348,43 @@ public:
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_IndexingInst
+        && V->getKind() <= ValueKind::Last_IndexingInst;
+  }
+};
+  
+/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Int64"
+/// This takes an address and indexes it, striding by the pointed-
+/// to type.  This is used to index into arrays of uniform elements.
+class IndexAddrInst : public IndexingInst {
+  enum { Base, Index };
+public:
+  IndexAddrInst(SILLocation Loc, SILValue Operand, SILValue Index)
+    : IndexingInst(ValueKind::IndexAddrInst, Loc, Operand, Index)
+  {}
+  
+  static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IndexAddrInst;
   }
 };
+
+/// IndexRawPointerInst
+/// %2 : $Builtin.RawPointer \
+///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int64
+/// This takes an address and indexes it, striding by the pointed-
+/// to type.  This is used to index into arrays of uniform elements.
+class IndexRawPointerInst : public IndexingInst {
+  enum { Base, Index };
+public:
+  IndexRawPointerInst(SILLocation Loc, SILValue Operand, SILValue Index)
+    : IndexingInst(ValueKind::IndexRawPointerInst, Loc, Operand, Index)
+  {}
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::IndexRawPointerInst;
+  }
+};
+
 
 //===----------------------------------------------------------------------===//
 // Instructions representing terminators
