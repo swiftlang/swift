@@ -1128,6 +1128,10 @@ ERROR(no_CharacterLiteralType_found,sema_tce,none,
       "standard library error: CharacterLiteralType not defined", ())
 ERROR(no_StringLiteralType_found,sema_tce,none,
       "standard library error: StringLiteralType not defined", ())
+ERROR(no_MaxBuiltinIntegerType_found,sema_tce,none,
+   "standard library error: MaxBuiltinIntegerType is not properly defined", ())
+ERROR(no_MaxBuiltinFloatType_found,sema_tce,none,
+   "standard library error: MaxBuiltinFloatType is not properly defined", ())
 
 ERROR(ambiguous_expression_unresolved,sema_tce,none,
       "ambiguous expression was not resolved to a concrete type", ())

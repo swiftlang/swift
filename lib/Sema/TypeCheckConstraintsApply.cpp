@@ -697,6 +697,19 @@ namespace {
           type = defaultFloatType;
       }
 
+      // Find the maximum-sized builtin integer type.
+      // FIXME: Cache name lookup.
+      auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinIntegerType");
+      UnqualifiedLookup lookup(maxTypeName, &tc.TU);
+      auto maxTypeDecl
+        = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+      if (!maxTypeDecl ||
+          !maxTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
+        tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
+        return nullptr;
+      }
+      auto maxType = maxTypeDecl->getUnderlyingType();
+
       return convertLiteral(
                expr,
                type,
@@ -705,12 +718,9 @@ namespace {
                tc.Context.getIdentifier("IntegerLiteralType"),
                tc.Context.getIdentifier("convertFromIntegerLiteral"),
                builtinProtocol,
-               tc.Context.getIdentifier("BuiltinIntegerLiteralType"),
-               tc.Context.getIdentifier(
-                                        "_convertFromBuiltinIntegerLiteral"),
-               [] (Type type) -> bool {
-                 return type->is<BuiltinIntegerType>();
-               },
+               maxType,
+               tc.Context.getIdentifier("_convertFromBuiltinIntegerLiteral"),
+               nullptr,
                diag::integer_literal_broken_proto,
                diag::builtin_integer_literal_broken_proto);
     }
@@ -732,21 +742,32 @@ namespace {
           type = defaultType;
       }
 
-      return convertLiteral(expr,
-                            type,
-                            expr->getType(),
-                            protocol,
-                            tc.Context.getIdentifier("FloatLiteralType"),
-                            tc.Context.getIdentifier("convertFromFloatLiteral"),
-                            builtinProtocol,
-                            tc.Context.getIdentifier("BuiltinFloatLiteralType"),
-                            tc.Context.getIdentifier(
-                              "_convertFromBuiltinFloatLiteral"),
-                            [] (Type type) -> bool {
-                              return type->is<BuiltinFloatType>();
-                            },
-                            diag::float_literal_broken_proto,
-                            diag::builtin_float_literal_broken_proto);
+      // Find the maximum-sized builtin float type.
+      // FIXME: Cache name lookup.
+      auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinFloatType");
+      UnqualifiedLookup lookup(maxTypeName, &tc.TU);
+      auto maxTypeDecl
+      = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+      if (!maxTypeDecl ||
+          !maxTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
+        tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
+        return nullptr;
+      }
+      auto maxType = maxTypeDecl->getUnderlyingType();
+
+      return convertLiteral(
+               expr,
+               type,
+               expr->getType(),
+               protocol,
+               tc.Context.getIdentifier("FloatLiteralType"),
+               tc.Context.getIdentifier("convertFromFloatLiteral"),
+               builtinProtocol,
+               maxType,
+               tc.Context.getIdentifier("_convertFromBuiltinFloatLiteral"),
+               nullptr,
+               diag::float_literal_broken_proto,
+               diag::builtin_float_literal_broken_proto);
     }
 
     Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
@@ -2510,11 +2531,10 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (!witness)
     return nullptr;
 
-  // FIXME: Could be smarter here w.r.t. generics, e.g., by opening up the
-  // type appropriately and 
-  auto openedType
-    = witness->getType()->castTo<AnyFunctionType>()->getResult();
-
+  // Form a reference to the witness itself.
+  auto openedType = cs.getTypeOfMemberReference(base->getType(),
+                                                witness,
+                                                /*isTypeReference=*/false);
   auto locator = cs.getConstraintLocator(base, { });
   auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
                                            witness, base->getEndLoc(),
