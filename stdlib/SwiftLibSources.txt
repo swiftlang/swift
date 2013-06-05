@@ -1,0 +1,42 @@
+#
+# This file lists the sources for the swift standard library in a
+# common place that can be used by both CMake and Make.  It should 
+# always begin with a comment.  Filenames should not contain spaces
+# and should be listed one-per-line.  Comments, which are ignored, 
+# begin with "#" and extend to the end of the line.
+#
+Policy.swift
+Bool.swift
+Word.swift   # Replaced by build system with Word32.swift or Word64.swift
+FixedPoint.swift
+Float32.swift
+Float64.swift
+Object.swift
+CTypes.swift
+Misc.swift
+GenericIVar.swift
+Range.swift
+Indexable.swift
+UnsafePointer.swift
+Slice.swift
+StringByte.swift
+String.swift
+Char.swift
+Optional.swift
+Dictionary.swift
+Vector.swift
+Algorithm.swift
+Demangle.swift
+InputStream.swift
+OutputStream.swift
+CString.swift
+REPL.swift
+POSIX/Descriptor.swift
+POSIX/File.swift
+POSIX/Misc.swift
+Environment.swift
+Generator.swift
+Zip.swift
+CodePoints.swift
+Assert.swift     # May be replaced by build system with AssertDebug.swift
+Float80.swift

@@ -16,35 +16,38 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swift_stdlib
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := Policy.swift Bool.swift
+
+#
+# Determine SWIFT_SOURCES, the list of source files in the swift library.
+#
+# sed is used here to strip comments.  
+SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/SwiftLibSources.txt" )
+
+# Replace Word.swift with Word64.swift or Word32.swift, according to
+# the target architecture
 ifeq ($(ARCH),x86_64)
-  SWIFT_SOURCES += Word64.swift
+  WORD_SIZE := 64
 endif
 ifeq ($(ARCH),x86)
-  SWIFT_SOURCES += Word32.swift
+  WORD_SIZE := 32
 endif
-SWIFT_SOURCES += FixedPoint.swift Float32.swift Float64.swift \
-		 Object.swift CTypes.swift Misc.swift GenericIVar.swift \
-		 Range.swift Indexable.swift UnsafePointer.swift \
-		 Slice.swift StringByte.swift String.swift Char.swift \
-		 Optional.swift Dictionary.swift Vector.swift \
-		 Algorithm.swift \
-		 Demangle.swift InputStream.swift OutputStream.swift \
-		 CString.swift REPL.swift \
-		 POSIX/Descriptor.swift POSIX/File.swift POSIX/Misc.swift \
-		 Environment.swift \
-	   Generator.swift Zip.swift CodePoints.swift
-ifeq ($(DISABLE_ASSERTIONS),1)
-  SWIFT_SOURCES += Assert.swift
-else
-  SWIFT_SOURCES += AssertDebug.swift
+SWIFT_SOURCES := $(subst Word.swift,Word$(WORD_SIZE).swift,$(SWIFT_SOURCES))
+
+# Replace Assert.swift with AssertDebug.swift if assertions are enabled
+ifneq ($(DISABLE_ASSERTIONS),1)
+  SWIFT_SOURCES := $(subst Assert.swift,AssertDebug.swift,$(SWIFT_SOURCES))
 endif
-ifeq ($(ARCH),x86_64)
-  SWIFT_SOURCES += Float80.swift
+
+# Remove Float80.swift on non-x86 architectures
+ifneq ($(ARCH),x86_64)
+	ifneq ($(ARCH),x86)
+	  SWIFT_SOURCES := $(filter-out Float80.swift,$(SWIFT_SOURCES))
+	endif
 endif
-ifeq ($(ARCH),x86)
-  SWIFT_SOURCES += Float80.swift
-endif
+#
+# Done with SWIFT_SOURCES
+#
+
 SOURCES := swift.swift
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
