@@ -791,9 +791,11 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   newLoweredExplosion(SILValue(i, 0), result);
 }
 
-static std::pair<llvm::Function*, ArrayRef<Substitution>>
+static std::tuple<llvm::Function*, SILType, ArrayRef<Substitution>>
 getPartialApplicationFunction(IRGenSILFunction &IGF,
-                              const LoweredValue &lv) {
+                              SILValue v) {
+  LoweredValue &lv = IGF.getLoweredValue(v);
+
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
     llvm_unreachable("can't partially apply an address");
@@ -809,13 +811,15 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     case AbstractCC::Method:
       break;
     }
-      
-    return {lv.getStaticFunction().getFunction(), {}};
+    return {lv.getStaticFunction().getFunction(),
+            v.getType(),
+            ArrayRef<Substitution>{}};
   case LoweredValue::Kind::SpecializedValue: {
     const SpecializedValue &specialized = lv.getSpecializedValue();
-    const LoweredValue &unspecialized
-      = IGF.getLoweredValue(specialized.getUnspecializedValue());
-    return {getPartialApplicationFunction(IGF, unspecialized).first,
+    SILValue unspecialized = specialized.getUnspecializedValue();
+    auto res = getPartialApplicationFunction(IGF, unspecialized);
+    return {std::get<0>(res),
+            std::get<1>(res),
             specialized.getSubstitutions()};
   }
   case LoweredValue::Kind::Explosion:
@@ -833,11 +837,12 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // FIXME: We'll need to be able to close over runtime function values
   // too, by including the function pointer and context data into the new
   // closure context.
-  LoweredValue &lv = getLoweredValue(i->getCallee());
   llvm::Function *calleeFn = nullptr;
+  SILType calleeTy;
   ArrayRef<Substitution> substitutions;
 
-  std::tie(calleeFn, substitutions) = getPartialApplicationFunction(*this, lv);
+  std::tie(calleeFn, calleeTy, substitutions)
+    = getPartialApplicationFunction(*this, i->getCallee());
   
   // Apply the closure up to the next-to-last uncurry level to gather the
   // context arguments.
@@ -860,7 +865,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Explosion function(CurExplosionLevel);
   emitFunctionPartialApplication(*this, calleeFn, llArgs,
                                  argTypes, substitutions,
-                                 i->getType(), function);
+                                 calleeTy, i->getType(), function);
   newLoweredExplosion(v, function);
 }
 
@@ -1511,7 +1516,8 @@ void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
   // If the specialization is used as a value and not just called, we need to
   // emit the thunk.
   for (auto *use : i->getUses())
-    if (!isa<ApplyInst>(use->getUser())) {
+    if (!isa<ApplyInst>(use->getUser())
+        && !isa<PartialApplyInst>(use->getUser())) {
       assert(operand.kind == LoweredValue::Kind::StaticFunction &&
          "specialization thunks for dynamic function values not yet supported");
       

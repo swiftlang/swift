@@ -1707,6 +1707,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            Explosion &args,
                                            ArrayRef<SILType> argTypes,
                                            ArrayRef<Substitution> subs,
+                                           SILType inType,
                                            SILType outType,
                                            Explosion &out) {
   // Collect the type infos for the context types.
@@ -1716,6 +1717,32 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argTypeInfos.push_back(&IGF.getFragileTypeInfo(argType.getSwiftType()));
   }
   
+  // Collect the polymorphic arguments.
+  Explosion polymorphicArgs(IGF.CurExplosionLevel);
+  
+  if (PolymorphicFunctionType *pft = inType.getAs<PolymorphicFunctionType>()) {
+    assert(!subs.empty() && "no substitutions for polymorphic argument?!");
+    emitPolymorphicArguments(IGF, pft,
+                         CanType(outType.castTo<AnyFunctionType>()->getInput()),
+                         subs,
+                         polymorphicArgs);
+
+    const TypeInfo &metatypeTI = IGF.IGM.getTypeMetadataPtrTypeInfo(),
+                   &witnessTI = IGF.IGM.getWitnessTablePtrTypeInfo();
+    for (llvm::Value *arg : polymorphicArgs.getAll()) {
+      if (arg->getType() == IGF.IGM.TypeMetadataPtrTy)
+        argTypeInfos.push_back(&metatypeTI);
+      else if (arg->getType() == IGF.IGM.WitnessTablePtrTy)
+        argTypeInfos.push_back(&witnessTI);
+      else
+        llvm_unreachable("unexpected polymorphic argument");
+    }
+    
+    args.add(polymorphicArgs.claimAll());
+  } else {
+    assert(subs.empty() && "substitutions for non-polymorphic function?!");
+  }
+
   // Store the context arguments on the heap.
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argTypeInfos);
   llvm::Value *data;

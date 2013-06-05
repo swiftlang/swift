@@ -50,6 +50,7 @@ namespace irgen {
                                       Explosion &args,
                                       ArrayRef<SILType> argTypes,
                                       ArrayRef<Substitution> subs,
+                                      SILType inType,
                                       SILType outType,
                                       Explosion &out);
   
