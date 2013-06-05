@@ -384,7 +384,7 @@ public:
       visit(member);
     
     if (!IsFirstPass)
-      checkExplicitConformance(OOD, OOD->getDeclaredType(),
+      checkExplicitConformance(OOD, OOD->getDeclaredTypeInContext(),
                                OOD->getInherited());
   }
 
@@ -417,7 +417,7 @@ public:
     }
 
     if (!IsFirstPass)
-      checkExplicitConformance(SD, SD->getDeclaredType(),
+      checkExplicitConformance(SD, SD->getDeclaredTypeInContext(),
                                SD->getInherited());
   }
 
@@ -454,7 +454,7 @@ public:
       visit(Member);
     
     if (!IsFirstPass)
-      checkExplicitConformance(CD, CD->getDeclaredType(),
+      checkExplicitConformance(CD, CD->getDeclaredTypeInContext(),
                                CD->getInherited());
   }
 
