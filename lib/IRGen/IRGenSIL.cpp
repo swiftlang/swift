@@ -838,10 +838,10 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   // too, by including the function pointer and context data into the new
   // closure context.
   llvm::Function *calleeFn = nullptr;
-  SILType calleeTy;
+  SILType origCalleeTy;
   ArrayRef<Substitution> substitutions;
 
-  std::tie(calleeFn, calleeTy, substitutions)
+  std::tie(calleeFn, origCalleeTy, substitutions)
     = getPartialApplicationFunction(*this, i->getCallee());
   
   // Apply the closure up to the next-to-last uncurry level to gather the
@@ -865,7 +865,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Explosion function(CurExplosionLevel);
   emitFunctionPartialApplication(*this, calleeFn, llArgs,
                                  argTypes, substitutions,
-                                 calleeTy, i->getType(), function);
+                                 origCalleeTy, i->getCallee().getType(),
+                                 i->getType(), function);
   newLoweredExplosion(v, function);
 }
 

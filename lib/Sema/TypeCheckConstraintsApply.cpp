@@ -1917,8 +1917,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, toFunc->getResult(),
                           locator.withPathElement(ConstraintLocator::Load));
 
-      // FIXME: Bogus declaration context.
-      auto ice = new (tc.Context) ImplicitClosureExpr(expr, &tc.TU, toType);
+      auto ice = new (tc.Context) ImplicitClosureExpr(expr, cs.DC, toType);
       Pattern *pattern = TuplePattern::create(tc.Context, expr->getLoc(),
                                               ArrayRef<TuplePatternElt>(),
                                               expr->getLoc());

@@ -1707,7 +1707,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            Explosion &args,
                                            ArrayRef<SILType> argTypes,
                                            ArrayRef<Substitution> subs,
-                                           SILType inType,
+                                           SILType origType,
+                                           SILType substType,
                                            SILType outType,
                                            Explosion &out) {
   // Collect the type infos for the context types.
@@ -1720,10 +1721,10 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Collect the polymorphic arguments.
   Explosion polymorphicArgs(IGF.CurExplosionLevel);
   
-  if (PolymorphicFunctionType *pft = inType.getAs<PolymorphicFunctionType>()) {
+  if (PolymorphicFunctionType *pft = origType.getAs<PolymorphicFunctionType>()) {
     assert(!subs.empty() && "no substitutions for polymorphic argument?!");
     emitPolymorphicArguments(IGF, pft,
-                         CanType(outType.castTo<AnyFunctionType>()->getInput()),
+                         CanType(substType.castTo<FunctionType>()->getInput()),
                          subs,
                          polymorphicArgs);
 
