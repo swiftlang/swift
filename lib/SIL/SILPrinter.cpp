@@ -573,7 +573,8 @@ public:
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
-    OS << "index_addr " << getID(IAI->getOperand()) << ", " <<IAI->getIndex();
+    OS << "index_addr " << getID(IAI->getBase()) << ", "
+       << getID(IAI->getIndex());
   }
 
   void visitUnreachableInst(UnreachableInst *UI) {

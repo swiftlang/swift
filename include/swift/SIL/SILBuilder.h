@@ -526,10 +526,9 @@ public:
   // SIL-only instructions that don't have an AST analog
   //===--------------------------------------------------------------------===//
 
-  IndexAddrInst *createIndexAddr(SILLocation loc, SILValue Operand,
-                                 unsigned Index) {
-    return insert(new (F.getModule())
-                    IndexAddrInst(loc, Operand, Index));
+  IndexAddrInst *createIndexAddr(SILLocation loc,
+                                 SILValue Operand, SILValue Index) {
+    return insert(new (F.getModule()) IndexAddrInst(loc, Operand, Index));
   }
 
   //===--------------------------------------------------------------------===//

@@ -433,9 +433,11 @@ public:
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {
-    require(IAI->getType().isAddress() &&
-            IAI->getType() == IAI->getOperand().getType(),
-            "invalid IndexAddrInst");
+    require(IAI->getType().isAddress(), "index_addr must produce an address");
+    require(IAI->getType() == IAI->getBase().getType(),
+            "index_addr must produce an address of the same type as its base");
+    require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
+            "index_addr index must be of a builtin integer type");
   }
   
   void checkTupleExtractInst(TupleExtractInst *EI) {

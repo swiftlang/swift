@@ -1330,16 +1330,28 @@ public:
 //===----------------------------------------------------------------------===//
 
 
-/// IndexAddrInst - "%1 = index_addr %0, 42"
-/// This takes an lvalue and indexes over the pointer, striding by the type of
-/// the lvalue.  This is used to index into arrays of uniform elements.
-class IndexAddrInst : public UnaryInstructionBase<ValueKind::IndexAddrInst> {
-  unsigned Index;
+/// IndexAddrInst - "%2 = index_addr %0 : $*T, %1 : $Builtin.Int64"
+/// This takes an address and indexes it, striding by the pointed-
+/// to type.  This is used to index into arrays of uniform elements.
+class IndexAddrInst : public SILInstruction {
+  enum { Base, Index };
+  FixedOperandList<2> Operands;
 public:
-  IndexAddrInst(SILLocation Loc, SILValue Operand, unsigned Index)
-    : UnaryInstructionBase(Loc, Operand, Operand.getType()), Index(Index) {}
+  IndexAddrInst(SILLocation Loc, SILValue Operand, SILValue Index)
+    : SILInstruction(ValueKind::IndexAddrInst, Loc, Operand.getType()),
+      Operands{this, Operand, Index}
+  {}
   
-  unsigned getIndex() const { return Index; }
+  SILValue getBase() const { return Operands[Base].get(); }
+  SILValue getIndex() const { return Operands[Index].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::IndexAddrInst;
+  }
 };
 
 //===----------------------------------------------------------------------===//

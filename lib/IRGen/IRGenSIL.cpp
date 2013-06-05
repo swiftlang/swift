@@ -1351,10 +1351,14 @@ void IRGenSILFunction::visitDowncastInst(swift::DowncastInst *i) {
 }
 
 void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
-  Address base = getLoweredAddress(i->getOperand());
-  llvm::Value *index = Builder.getInt64(i->getIndex());
-  llvm::Value *destValue = Builder.CreateGEP(base.getAddress(),
-                                             index);
+  Address base = getLoweredAddress(i->getBase());
+  Explosion indexValues = getLoweredExplosion(i->getIndex());
+  llvm::Value *index = indexValues.claimNext();
+  
+  // We don't expose a non-inbounds GEP operation.
+  llvm::Value *destValue = Builder.CreateInBoundsGEP(base.getAddress(),
+                                                     index);
+  
   newLoweredAddress(SILValue(i, 0), Address(destValue, base.getAlignment()));
 }
 

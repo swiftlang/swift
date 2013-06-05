@@ -517,9 +517,12 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   SILValue basePtr(allocArray, 1);
 
   for (size_t i = 0, size = elements.size(); i < size; ++i) {
-    SILValue eltPtr = i == 0
-      ? basePtr
-      : gen.B.createIndexAddr(loc, basePtr, i);
+    SILValue eltPtr = basePtr;
+    if (i != 0) {
+      SILValue index = gen.B.createIntegerLiteral(loc,
+                  SILType::getBuiltinIntegerType(64, gen.F.getASTContext()), i);
+      eltPtr = gen.B.createIndexAddr(loc, basePtr, index);
+    }
     ManagedValue v = elements[i];
     v.forwardInto(gen, loc, eltPtr);
   }
