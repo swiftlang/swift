@@ -482,38 +482,31 @@ public:
   }
 };
   
-/// UnresolvedIfExpr - This represents a '?' within an unresolved SequenceExpr.
-/// It will be matched to an UnresolvedElseExpr and transformed to an IfExpr
+/// This represents the '? ... :' middle operand of a
+/// ternary expression within an unresolved SequenceExpr.
+/// It will be matched to left and right operands and transformed into an IfExpr
 /// during precedence parsing in NameBinding.
-class UnresolvedIfExpr : public Expr {
-  SourceLoc Loc;
+class UnresolvedTernaryExpr : public Expr {
+  SourceLoc QuestionLoc, ColonLoc;
+  Expr *MiddleExpr;
 public:
-  UnresolvedIfExpr(SourceLoc Loc)
-    : Expr(ExprKind::UnresolvedIf), Loc(Loc) {}
+  UnresolvedTernaryExpr(SourceLoc QuestionLoc,
+                        Expr *MiddleExpr,
+                        SourceLoc ColonLoc)
+    : Expr(ExprKind::UnresolvedTernary),
+      QuestionLoc(QuestionLoc), ColonLoc(ColonLoc), MiddleExpr(MiddleExpr)
+  {}
   
-  SourceLoc getLoc() const { return Loc; }
-  SourceRange getSourceRange() const { return Loc; }
+  SourceLoc getLoc() const { return QuestionLoc; }
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+  SourceLoc getColonLoc() const { return ColonLoc; }
+  SourceRange getSourceRange() const { return {QuestionLoc, ColonLoc}; }
+  
+  Expr *getMiddleExpr() const { return MiddleExpr; }
+  void setMiddleExpr(Expr *e) { MiddleExpr = e; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedIf;
-  }
-};
-  
-/// UnresolvedElseExpr - This represents a ':' within an unresolved
-/// SequenceExpr.
-/// It will be matched to an UnresolvedElseExpr and transformed to an IfExpr
-/// during precedence parsing in NameBinding.
-class UnresolvedElseExpr : public Expr {
-  SourceLoc Loc;
-public:
-  UnresolvedElseExpr(SourceLoc Loc)
-    : Expr(ExprKind::UnresolvedElse), Loc(Loc) {}
-  
-  SourceLoc getLoc() const { return Loc; }
-  SourceRange getSourceRange() const { return Loc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedElse;
+    return E->getKind() == ExprKind::UnresolvedTernary;
   }
 };
   

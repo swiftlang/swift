@@ -94,8 +94,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::Sequence:
   case ExprKind::IsSubtype:
   case ExprKind::UncheckedDowncast:
-  case ExprKind::UnresolvedIf:
-  case ExprKind::UnresolvedElse:
+  case ExprKind::UnresolvedTernary:
     return false;
 
   // Postfix expressions.
@@ -308,13 +307,13 @@ static bool startsWithPipe(Token tok) {
 /// match.
 NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
-  SmallVector<UnresolvedIfExpr*, 2> UnmatchedIfs;
+  SourceLoc startLoc = Tok.getLoc();
 
   while (true) {
     // Parse a unary expression.
     auto Primary = parseExprUnary(Message);
     if (Primary.isNull())
-      return 0;
+      return nullptr;
     SequencedExprs.push_back(Primary.get());
 
     switch (Tok.getKind()) {
@@ -335,26 +334,29 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
     
     case tok::question: {
       // Save the '?'.
-      auto *unresolvedIf = new (Context) UnresolvedIfExpr(consumeToken());
+      SourceLoc questionLoc = consumeToken();
+      
+      // Parse the middle expression of the ternary.
+      NullablePtr<Expr> middle
+        = parseExprSequence(diag::expected_expr_after_if_question);
+      if (middle.isNull())
+        return nullptr;
+      
+      // Make sure there's a matching ':' after the middle expr.
+      if (!Tok.is(tok::colon)) {
+        diagnose(questionLoc, diag::expected_colon_after_if_question);
+
+        return new (Context) ErrorExpr({startLoc,
+                                        middle.get()->getSourceRange().End});
+      }
+      
+      SourceLoc colonLoc = consumeToken();
+      
+      auto *unresolvedIf
+        = new (Context) UnresolvedTernaryExpr(questionLoc,
+                                              middle.get(),
+                                              colonLoc);
       SequencedExprs.push_back(unresolvedIf);
-      UnmatchedIfs.push_back(unresolvedIf);
-      
-      Message = diag::expected_expr_after_if_question;
-      break;
-    }
-
-    case tok::colon: {
-      // If there's no preceding '?', this isn't a ternary colon. We're done.
-      if (UnmatchedIfs.empty())
-        goto done;
-      UnmatchedIfs.pop_back();
-
-      // Save the ':'.
-      auto *unresolvedElse = new (Context) UnresolvedElseExpr(consumeToken());
-      SequencedExprs.push_back(unresolvedElse);
-
-      
-      Message = diag::expected_expr_after_if_colon;
       break;
     }
         
@@ -367,15 +369,6 @@ done:
   
   // If we had semantic errors, just fail here.
   assert(!SequencedExprs.empty());
-
-  // If we found invalid ternaries, return an error expr.
-  if (!UnmatchedIfs.empty()) {
-    for (auto *unmatchedIf : UnmatchedIfs) {
-      diagnose(unmatchedIf->getLoc(), diag::expected_colon_after_if_question);
-    }
-    return new (Context) ErrorExpr({SequencedExprs.front()->getStartLoc(),
-                                    SequencedExprs.back()->getEndLoc()});
-  }
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1)

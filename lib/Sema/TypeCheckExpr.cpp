@@ -138,9 +138,7 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
-  assert(!isa<UnresolvedElseExpr>(E) &&
-         "should fold ':' as part of ternary folding");
-  if (isa<UnresolvedIfExpr>(E)) {
+  if (isa<UnresolvedTernaryExpr>(E)) {
     // Ternary has fixed precedence.
     return InfixData(100, Associativity::Right);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -231,28 +229,16 @@ static Expr *foldSequence(TypeChecker &TC,
   /// Get the next binary or ternary operator, if appropriate to this pass.
   auto getNextOperator = [&]() -> Op {
     Expr *op = S[0];
-    // If this is a ternary ':', stop here.
-    // The outer parse will match it to a '?'.
-    if (isa<UnresolvedElseExpr>(op)) {
-      return {};
-    }
-    
+
     // If the operator's precedence is lower than the minimum, stop here.
     InfixData opInfo = getInfixData(TC, op);
     if (opInfo.getPrecedence() < MinPrecedence) return {};
-    // If this is a ternary '?', do a maximal-munch parse of the middle operand
-    // up to the matching ':'.
-    if (isa<UnresolvedIfExpr>(op)) {
-      Expr *MHS = S[1];
-      assert(S.size() >= 4 &&
-             "SequenceExpr doesn't have enough elts to complete ternary");
-      S = S.slice(2);
-      MHS = foldSequence(TC, MHS, S, 0);
-      assert(S.size() >= 2 &&
-             "folding MHS of ternary did not leave enough elts to complete ternary");
-      assert(isa<UnresolvedElseExpr>(S[0]) &&
-             "folding MHS of ternary did not end at ':'");
-      return Op(op->getLoc(), MHS, S[0]->getLoc(), opInfo);
+    // If this is a ternary '?', pick out the middle expr.
+    if (auto *ternary = dyn_cast<UnresolvedTernaryExpr>(op)) {
+      return Op(ternary->getQuestionLoc(),
+                ternary->getMiddleExpr(),
+                ternary->getColonLoc(),
+                opInfo);
     }
     return Op(op, opInfo);
   };
@@ -291,8 +277,6 @@ static Expr *foldSequence(TypeChecker &TC,
 
     // Pull out the next binary operator.
     Expr *Op2 = S[0];
-    // If this is a ternary ':', break out of the loop.
-    if (isa<UnresolvedElseExpr>(Op2)) break;
   
     InfixData Op2Info = getInfixData(TC, Op2);
     // If the second operator's precedence is lower than the min

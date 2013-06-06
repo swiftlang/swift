@@ -538,11 +538,10 @@ public:
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
   }
-  void visitUnresolvedIfExpr(UnresolvedIfExpr *E) {
-    printCommon(E, "unresolved_if_expr") << ')';
-  }
-  void visitUnresolvedElseExpr(UnresolvedElseExpr *E) {
-    printCommon(E, "unresolved_else_expr") << ')';
+  void visitUnresolvedTernaryExpr(UnresolvedTernaryExpr *E) {
+    printCommon(E, "unresolved_ternary_expr") << '\n';
+    printRec(E->getMiddleExpr());
+    OS << ')';
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';
