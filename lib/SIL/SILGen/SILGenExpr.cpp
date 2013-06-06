@@ -1960,3 +1960,36 @@ void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {
   return RValue(CanType(TupleType::getEmpty(F.getASTContext())));
 }
+
+/// Destructure (potentially) recursive assignments into tuple expressions
+/// down to their scalar stores.
+static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src, Expr *Dest,
+                                    SILGenFunction &Gen) {
+  // If the destination is a tuple, recursively destructure.
+  if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
+    SmallVector<RValue, 4> elements;
+    std::move(Src).extractElements(elements);
+    unsigned EltNo = 0;
+    for (Expr *DestElem : TE->getElements()) {
+      emitAssignExprRecursive(S,
+                              std::move(elements[EltNo++]),
+                              DestElem, Gen);
+    }
+    return;
+  }
+  
+  // Otherwise, emit the scalar assignment.
+  LValue DstLV = Gen.emitLValue(Dest);
+  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
+}
+
+
+RValue SILGenFunction::visitAssignExpr(AssignExpr *E, SGFContext C) {
+  FullExpr scope(Cleanups);
+
+  // Handle tuple destinations by destructuring them if present.
+  emitAssignExprRecursive(E, visit(E->getSrc()), E->getDest(), *this);
+  
+  return emitEmptyTupleRValue(E);
+}
+

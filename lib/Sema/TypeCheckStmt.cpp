@@ -99,34 +99,10 @@ public:
     return false;
   }
   
-  bool typeCheck(PointerUnion<Expr*, AssignStmt*> &Val) {
-    if (Expr *E = Val.dyn_cast<Expr*>()) {
-      if (typeCheckExpr(E)) return true;
-      Val = E;
-    } else if (AssignStmt *S = Val.dyn_cast<AssignStmt*>()) {
-      if (typeCheckStmt(S)) return true;
-      Val = S;
-    }
-    return false;
-  }
- 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
 
-  Stmt *visitAssignStmt(AssignStmt *S) {
-    Expr *Dest = S->getDest();
-    Expr *Src = S->getSrc();
-    llvm::tie(Dest, Src) = TC.typeCheckAssignment(Dest, S->getEqualLoc(), Src,
-                                                  DC);
-    if (!Dest || !Src)
-      return nullptr;
-
-    S->setDest(Dest);
-    S->setSrc(Src);
-    return S;
-  }
-  
   Stmt *visitBraceStmt(BraceStmt *BS);
   
   Type returnTypeOfFunc() {
@@ -216,9 +192,11 @@ public:
     for (auto D : FS->getInitializerVarDecls())
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
-    PointerUnion<Expr*, AssignStmt*> Tmp = FS->getInitializer();
-    if (typeCheck(Tmp)) return 0;
-    FS->setInitializer(Tmp);
+    Expr *Tmp = FS->getInitializer();
+    if (Tmp) {
+      if (typeCheckExpr(Tmp)) return 0;
+      FS->setInitializer(Tmp);
+    }
     
     // Type check the condition if present.
     if (FS->getCond().isNonNull()) {
@@ -228,8 +206,10 @@ public:
     }
     
     Tmp = FS->getIncrement();
-    if (typeCheck(Tmp)) return 0;
-    FS->setIncrement(Tmp);
+    if (Tmp) {
+      if (typeCheckExpr(Tmp)) return 0;
+      FS->setIncrement(Tmp);
+    }
 
     AddLoopNest loopNest(*this);
     Stmt *S = FS->getBody();
@@ -685,11 +665,11 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                          ->getNominalOrBoundGenericNominal();
     llvm::SmallPtrSet<VarDecl *, 4> initializedMembers;
     for (auto elt : body->getElements()) {
-      auto stmt = elt.dyn_cast<Stmt *>();
-      if (!stmt)
+      auto expr = elt.dyn_cast<Expr *>();
+      if (!expr)
         continue;
 
-      auto assign = dyn_cast<AssignStmt>(stmt);
+      auto assign = dyn_cast<AssignExpr>(expr);
       if (!assign)
         continue;
 
@@ -752,7 +732,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
             llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
                                                                initializer,
                                                                ctor);
-            defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
+            defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),
                                                             initializer));
             continue;
           }
@@ -799,7 +779,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
           llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
                                                              initializer,
                                                              ctor);
-          defaultInits.push_back(new (Context) AssignStmt(dest, SourceLoc(),
+          defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),
                                                           initializer));
         }
       }

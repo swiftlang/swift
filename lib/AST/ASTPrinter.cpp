@@ -599,12 +599,6 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   OS << "operator postfix " << decl->getName() << " {\n}";
 }
 
-void PrintAST::visitAssignStmt(AssignStmt *stmt) {
-  // FIXME: lhs
-  OS << " = ";
-  // FIXME: rhs
-}
-
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   OS << "{";
   printBraceStmtElements(stmt);
@@ -648,25 +642,13 @@ void PrintAST::visitDoWhileStmt(DoWhileStmt *stmt) {
 
 void PrintAST::visitForStmt(ForStmt *stmt) {
   OS << "for (";
-  if (!stmt->getInitializer().isNull()) {
-    if (auto assign = stmt->getInitializer().dyn_cast<AssignStmt *>())
-      visit(assign);
-    else {
-      // FIXME: print expr
-    }
-  }
+  // FIXME: print initializer
   OS << "; ";
   if (stmt->getCond().isNonNull()) {
     // FIXME: print cond
   }
   OS << "; ";
-  if (!stmt->getIncrement().isNull()) {
-    if (auto assign = stmt->getIncrement().dyn_cast<AssignStmt *>())
-      visit(assign);
-    else {
-      // FIXME: print expr
-    }
-  }
+  // FIXME: print increment
   OS << ") ";
   visit(stmt->getBody());
 }

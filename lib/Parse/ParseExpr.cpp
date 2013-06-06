@@ -95,6 +95,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::IsSubtype:
   case ExprKind::UncheckedDowncast:
   case ExprKind::UnresolvedTernary:
+  case ExprKind::Assign:
     return false;
 
   // Postfix expressions.
@@ -1088,8 +1089,12 @@ Expr *Parser::parseExprClosure() {
 
   // If the body consists of a single expression, turn it into a return
   // statement.
+  // FIXME: Single-AssignExpr bodies should be considered single expression, but
+  // require some type-checker modification to be able to take part in closure
+  // type inference.
   bool hasSingleExpressionBody = false;
-  if (bodyElements.size() == 1 && bodyElements[0].is<Expr *>()) {
+  if (bodyElements.size() == 1 && bodyElements[0].is<Expr *>()
+      && !isa<AssignExpr>(bodyElements[0].get<Expr*>())) {
     hasSingleExpressionBody = true;
     bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
                                                bodyElements[0].get<Expr*>());

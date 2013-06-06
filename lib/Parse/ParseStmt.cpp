@@ -102,6 +102,8 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
 /// \param usesExprBasic If true, parse expr-or-stmt-assign-basic rather than
 /// expr-or-stmt-assign.
 bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result, bool usesExprBasic) {
+  // FIXME: This should move into sequence expr parsing.
+
   NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr, usesExprBasic);
   if (ResultExpr.isNull())
     return true;
@@ -118,7 +120,8 @@ bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result, bool usesExprBasic) {
                                         usesExprBasic);
   if (RHSExpr.isNull())
     return true;
-  Result = new (Context) AssignStmt(ResultExpr.get(),
+
+  Result = new (Context) AssignExpr(ResultExpr.get(),
                                     EqualLoc, RHSExpr.get());
   return false;
 }
@@ -515,20 +518,16 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if ((Body = parseBraceItemList(diag::expected_lbrace_after_for)).isNull())
     return 0;
 
-  PointerUnion<Expr*, AssignStmt*> Initializer, Increment;
+  Expr *Initializer, *Increment;
   if (First.isNull())
-    ;
-  else if (First.is<Expr*>())
-    Initializer = First.get<Expr*>();
+    Initializer = nullptr;
   else
-    Initializer = cast<AssignStmt>(First.get<Stmt*>());
+    Initializer = First.get<Expr*>();
 
   if (Third.isNull())
-    ;
-  else if (Third.is<Expr*>())
-    Increment = Third.get<Expr*>();
+    Increment = nullptr;
   else
-    Increment = cast<AssignStmt>(Third.get<Stmt*>());
+    Increment = Third.get<Expr*>();
 
   ArrayRef<Decl*> FirstDeclsContext;
   if (!FirstDecls.empty())

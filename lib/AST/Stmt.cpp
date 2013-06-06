@@ -76,15 +76,7 @@ bool Stmt::isImplicit() const {
       return true;
   }
 
-  if (auto assign = dyn_cast<AssignStmt>(this)) {
-    return assign->getEqualLoc().isInvalid();
-  }
-
   return false;
-}
-
-SourceRange AssignStmt::getSourceRange() const {
-  return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
 }
 
 BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ExprStmtOrDecl> elts,
@@ -197,14 +189,6 @@ public:
   void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Expr *E) { E->print(OS, Indent+2); }
 
-  void visitAssignStmt(AssignStmt *S) {
-    OS.indent(Indent) << "(assign_stmt\n";
-    printRec(S->getDest());
-    OS << '\n';
-    printRec(S->getSrc());
-    OS << ')';
-  }
-
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
     for (auto Elt : S->getElements()) {
@@ -261,14 +245,11 @@ public:
         printRec(D);
         OS << '\n';
       }
-    } else if (S->getInitializer().isNull())
-      OS.indent(Indent+2) << "<null initializer>\n";
-    else if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
-      printRec(E);
+    } else if (S->getInitializer()) {
+      printRec(S->getInitializer());
       OS << '\n';
     } else {
-      printRec(S->getInitializer().get<AssignStmt*>());
-      OS << '\n';
+      OS.indent(Indent+2) << "<null initializer>\n";
     }
 
     if (S->getCond().isNull())
@@ -277,12 +258,11 @@ public:
       printRec(S->getCond().get());
     OS << '\n';
 
-    if (S->getIncrement().isNull())
+    if (S->getIncrement()) {
+      printRec(S->getIncrement());
+    } else {
       OS.indent(Indent+2) << "<null increment>";
-    else if (Expr *E = S->getIncrement().dyn_cast<Expr*>())
-      printRec(E);
-    else
-      printRec(S->getIncrement().get<AssignStmt*>());
+    }
     OS << '\n';
     printRec(S->getBody());
     OS << ')';

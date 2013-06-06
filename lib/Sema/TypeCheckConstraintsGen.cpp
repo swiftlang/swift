@@ -920,7 +920,11 @@ namespace {
       
       return tyDecl->getDeclaredType();
     }
-
+    
+    Type visitAssignExpr(AssignExpr *expr) {
+      expr->setType(TupleType::getEmpty(CS.getASTContext()));
+      return expr->getType();
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -934,9 +938,11 @@ namespace {
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Don't recurse into array-new or default-value expressions.
+      // Don't recur into array-new or default-value expressions.
       return {
-        !isa<NewArrayExpr>(expr) && !isa<DefaultValueExpr>(expr),
+        !isa<NewArrayExpr>(expr)
+          && !isa<DefaultValueExpr>(expr)
+          && !isa<AssignExpr>(expr),
         expr
       };
     }
@@ -1031,6 +1037,11 @@ namespace {
       // We don't visit default value expressions; they've already been
       // type-checked.
       if (isa<DefaultValueExpr>(expr)) {
+        return { false, expr };
+      }
+      
+      // Assign expressions should be type-checked in PreCheckExpression.
+      if (isa<AssignExpr>(expr)) {
         return { false, expr };
       }
 

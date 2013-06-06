@@ -2364,6 +2364,30 @@ public:
   }
 };
 
+/// AssignExpr - A value assignment, like "x = y".
+class AssignExpr : public Expr {
+  Expr *Dest;
+  Expr *Src;
+  SourceLoc EqualLoc;
+
+public:  
+  AssignExpr(Expr *Dest, SourceLoc EqualLoc, Expr *Src)
+    : Expr(ExprKind::Assign), Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}
+
+  Expr *getDest() const { return Dest; }
+  void setDest(Expr *e) { Dest = e; }
+  Expr *getSrc() const { return Src; }
+  void setSrc(Expr *e) { Src = e; }
+  
+  SourceLoc getEqualLoc() const { return EqualLoc; }
+  
+  SourceRange getSourceRange() const;
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Assign;
+  }
+};
+  
 /// \brief An expression that produces a zero value for types that
 /// default-initialize to zero, including builtin types and classes.
 ///

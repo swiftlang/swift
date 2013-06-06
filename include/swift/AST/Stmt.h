@@ -82,29 +82,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
 };
 
-/// AssignStmt - A value assignment, like "x = y".
-class AssignStmt : public Stmt {
-  Expr *Dest;
-  Expr *Src;
-  SourceLoc EqualLoc;
-
-public:  
-  AssignStmt(Expr *Dest, SourceLoc EqualLoc, Expr *Src)
-    : Stmt(StmtKind::Assign), Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}
-
-  Expr *getDest() const { return Dest; }
-  void setDest(Expr *e) { Dest = e; }
-  Expr *getSrc() const { return Src; }
-  void setSrc(Expr *e) { Src = e; }
-  
-  SourceLoc getEqualLoc() const { return EqualLoc; }
-  
-  SourceRange getSourceRange() const;
-  
-  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Assign; }
-};
-
-
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
 /// { var x = 10; println(10) }.
 class BraceStmt : public Stmt {
@@ -255,18 +232,18 @@ public:
 /// optional.
 class ForStmt : public Stmt {
   SourceLoc ForLoc, Semi1Loc, Semi2Loc;
-  PointerUnion<Expr*, AssignStmt*> Initializer;
+  Expr *Initializer;
   ArrayRef<Decl*> InitializerVarDecls;
   NullablePtr<Expr> Cond;
-  PointerUnion<Expr*, AssignStmt*> Increment;
+  Expr *Increment;
   Stmt *Body;
   
 public:
   ForStmt(SourceLoc ForLoc,
-          PointerUnion<Expr*, AssignStmt*> Initializer,
+          Expr *Initializer,
           ArrayRef<Decl*> InitializerVarDecls,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
-          PointerUnion<Expr*, AssignStmt*> Increment,
+          Expr *Increment,
           Stmt *Body)
   : Stmt(StmtKind::For), ForLoc(ForLoc), Semi1Loc(Semi1Loc),
     Semi2Loc(Semi2Loc), Initializer(Initializer), 
@@ -278,16 +255,16 @@ public:
     return SourceRange(ForLoc, Body->getEndLoc());
   }
   
-  PointerUnion<Expr*, AssignStmt*> getInitializer() const { return Initializer;}
-  void setInitializer(PointerUnion<Expr*, AssignStmt*> V) { Initializer = V; }
+  Expr *getInitializer() const { return Initializer;}
+  void setInitializer(Expr *V) { Initializer = V; }
   
   ArrayRef<Decl*> getInitializerVarDecls() const { return InitializerVarDecls; }
   void setInitializerVarDecls(ArrayRef<Decl*> D) { InitializerVarDecls = D; }
   
   NullablePtr<Expr> getCond() const { return Cond; }
   void setCond(NullablePtr<Expr> C) { Cond = C; }
-  PointerUnion<Expr*, AssignStmt*> getIncrement() const { return Increment; }
-  void setIncrement(PointerUnion<Expr*, AssignStmt*> V) { Increment = V; }
+  Expr *getIncrement() const { return Increment; }
+  void setIncrement(Expr *V) { Increment = V; }
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
   

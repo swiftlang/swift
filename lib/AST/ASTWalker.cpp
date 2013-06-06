@@ -401,6 +401,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
   
+  Expr *visitAssignExpr(AssignExpr *AE) {
+    if (Expr *E = doIt(AE->getDest()))
+      AE->setDest(E);
+    else
+      return nullptr;
+
+    if (Expr *E = doIt(AE->getSrc()))
+      AE->setSrc(E);
+    else
+      return nullptr;
+    return AE;
+  }
+  
+  
   Expr *visitIfExpr(IfExpr *E) {
     Expr *Cond = doIt(E->getCondExpr());
     if (!Cond) return nullptr;
@@ -435,19 +449,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
   Stmt *visitFallthroughStmt(FallthroughStmt *CS) {
     return CS;
-  }
-  
-  Stmt *visitAssignStmt(AssignStmt *AS) {
-    if (Expr *E = doIt(AS->getDest()))
-      AS->setDest(E);
-    else
-      return nullptr;
-
-    if (Expr *E = doIt(AS->getSrc()))
-      AS->setSrc(E);
-    else
-      return nullptr;
-    return AS;
   }
   
   Stmt *visitBraceStmt(BraceStmt *BS) {
@@ -538,14 +539,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
       if (doIt(D))
         return nullptr;
     
-    if (Expr *E = FS->getInitializer().dyn_cast<Expr*>()) {
-      if ((E = doIt(E)))
+    if (FS->getInitializer()) {
+      if (Expr *E = doIt(FS->getInitializer()))
         FS->setInitializer(E);
-      else
-        return nullptr;
-    } else if (AssignStmt *S = FS->getInitializer().dyn_cast<AssignStmt*>()) {
-      if ((S = cast_or_null<AssignStmt>(doIt(S))))
-        FS->setInitializer(S);
       else
         return nullptr;
     }
@@ -557,15 +553,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
         return nullptr;
 
     }
-    
-    if (Expr *E = FS->getIncrement().dyn_cast<Expr*>()) {
-      if ((E = doIt(E)))
+
+    if (FS->getIncrement()) {
+      if (Expr *E = doIt(FS->getIncrement()))
         FS->setIncrement(E);
-      else
-        return nullptr;
-    } else if (AssignStmt *S = FS->getIncrement().dyn_cast<AssignStmt*>()) {
-      if ((S = cast_or_null<AssignStmt>(doIt(S))))
-        FS->setIncrement(S);
       else
         return nullptr;
     }

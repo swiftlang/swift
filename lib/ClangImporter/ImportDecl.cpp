@@ -239,7 +239,7 @@ namespace {
                                              param->getTypeOfReference());
 
         // Add assignment.
-        stmts.push_back(new (context) AssignStmt(lhs, SourceLoc(), rhs));
+        stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs));
       }
 
       // Create the function body.
@@ -1187,7 +1187,7 @@ namespace {
       auto refThis
         = new (Impl.SwiftContext) DeclRefExpr(thisVar, loc,
                                               thisVar->getTypeOfReference());
-      auto assign = new (Impl.SwiftContext) AssignStmt(refThis, loc, initExpr);
+      auto assign = new (Impl.SwiftContext) AssignExpr(refThis, loc, initExpr);
 
       // Set the body of the constructor.
       result->setBody(BraceStmt::create(Impl.SwiftContext, loc,

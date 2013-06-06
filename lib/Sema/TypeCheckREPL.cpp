@@ -231,8 +231,10 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
                                                firstVar->getTypeOfReference());
     Expr *falseRef = new (context) DeclRefExpr(falseDecl, Loc,
                                                falseDecl->getTypeOfReference());
-    Stmt *setFirstToFalse
-      = new (context) AssignStmt(firstRef, Loc, falseRef);
+    Expr *setFirstToFalse
+      = new (context) AssignExpr(firstRef, Loc, falseRef);
+    Stmt *thenStmt = BraceStmt::create(context, Loc,
+                               BraceStmt::ExprStmtOrDecl(setFirstToFalse), Loc);
 
     // else branch: print a comma.
     SmallVector<BraceStmt::ExprStmtOrDecl, 4> elseBodyContents;
@@ -243,7 +245,7 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
     firstRef = new (context) DeclRefExpr(firstVar, Loc,
                                          firstVar->getTypeOfReference());
     loopBodyContents.push_back(new (context) IfStmt(Loc, firstRef,
-                                                    setFirstToFalse,
+                                                    thenStmt,
                                                     Loc, elseStmt));
   } else {
     PrintLiteralString(", ", TC, Loc, PrintDecls, loopBodyContents);

@@ -112,9 +112,11 @@ namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
+  public:
     ConstraintSystem &cs;
     const Solution &solution;
 
+  private:
     /// \brief Coerce the given tuple to another tuple type.
     ///
     /// \param expr The expression we're converting.
@@ -1601,6 +1603,10 @@ namespace {
 
       return expr;
     }
+    
+    Expr *visitAssignExpr(AssignExpr *expr) {
+      return expr;
+    }
   };
 }
 
@@ -2443,6 +2449,11 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, Rewriter.visitUncheckedDowncastExpr(unchecked) };
       }
 
+      // Assignments should already be type-checked.
+      if (isa<AssignExpr>(expr)) {
+        return { false, expr };
+      }
+      
       // For a default-value expression, do nothing.
       if (isa<DefaultValueExpr>(expr)) {
         return { false, expr };

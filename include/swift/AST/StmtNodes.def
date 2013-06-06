@@ -29,7 +29,6 @@
 #define ABSTRACT_STMT(Id, Parent)
 #endif
 
-STMT(Assign, Stmt)
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
 STMT(If, Stmt)

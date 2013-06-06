@@ -2640,6 +2640,26 @@ namespace {
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // For AssignExprs, do assignment type-checking and stop.
+      if (auto *assign = dyn_cast<AssignExpr>(expr)) {
+        Expr *Dest = assign->getDest();
+        Expr *Src = assign->getSrc();
+        
+        std::tie(Dest, Src) = TC.typeCheckAssignment(Dest,
+                                                     assign->getEqualLoc(),
+                                                     Src,
+                                                     DC);
+        if (!Dest || !Src) {
+          return { false, nullptr };
+        }
+        
+        assign->setDest(Dest);
+        assign->setSrc(Src);
+        
+        expr->setType(TupleType::getEmpty(TC.Context));
+        return { false, expr };
+      }
+      
       // For FuncExprs, we just want to type-check the patterns as written,
       // but not walk into the body. The body will by type-checked separately.
       if (auto func = dyn_cast<FuncExpr>(expr)) {

@@ -23,8 +23,6 @@ using namespace swift;
 using namespace Lowering;
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
-/// Used to visit the left-hand sides of AssignStmts and [byref] arguments of
-/// ApplyExprs.
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
   : public ExprVisitor<SILGenLValue, LValue>
 {

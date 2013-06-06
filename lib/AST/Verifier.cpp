@@ -276,7 +276,7 @@ namespace {
       return checkLValue(Dest->getType(), "LHS of assignment");
     }
 
-    void verifyChecked(AssignStmt *S) {
+    void verifyChecked(AssignExpr *S) {
       Type lhsTy = checkAssignDest(S->getDest());
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
     }

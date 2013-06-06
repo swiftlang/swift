@@ -475,8 +475,6 @@ public:
   
   void visitBraceStmt(BraceStmt *S, SGFContext C);
   
-  void visitAssignStmt(AssignStmt *S, SGFContext C);
-
   void visitReturnStmt(ReturnStmt *S, SGFContext C);
   
   void visitIfStmt(IfStmt *S, SGFContext C);
@@ -570,6 +568,8 @@ public:
   RValue visitIfExpr(IfExpr *E, SGFContext C);
   RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
   RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
+  
+  RValue visitAssignExpr(AssignExpr *E, SGFContext C);
 
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,

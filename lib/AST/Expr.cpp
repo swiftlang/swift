@@ -136,7 +136,10 @@ bool Expr::isImplicit() const {
   }
 
   if (isa<ZeroValueExpr>(this) || isa<DefaultValueExpr>(this))
-    return true;  
+    return true;
+  
+  if (auto assign = dyn_cast<AssignExpr>(this))
+    return assign->getEqualLoc().isInvalid();
 
   return false;
 }
@@ -426,6 +429,10 @@ Type PipeClosureExpr::getResultType() const {
 void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
   cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
     ->setResult(newBody);
+}
+
+SourceRange AssignExpr::getSourceRange() const {
+  return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
 }
 
 //===----------------------------------------------------------------------===//
@@ -901,6 +908,13 @@ public:
   void visitDefaultValueExpr(DefaultValueExpr *E) {
     printCommon(E, "default_value_expr") << ' ';
     printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitAssignExpr(AssignExpr *E) {
+    OS.indent(Indent) << "(assign_expr\n";
+    printRec(E->getDest());
+    OS << '\n';
+    printRec(E->getSrc());
     OS << ')';
   }
 };

@@ -104,36 +104,6 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
   }
 }
 
-/// emitAssignStmtRecursive - Used to destructure (potentially) recursive
-/// assignments into tuple expressions down to their scalar stores.
-static void emitAssignStmtRecursive(AssignStmt *S, RValue &&Src, Expr *Dest,
-                                    SILGenFunction &Gen) {
-  // If the destination is a tuple, recursively destructure.
-  if (TupleExpr *TE = dyn_cast<TupleExpr>(Dest)) {
-    SmallVector<RValue, 4> elements;
-    std::move(Src).extractElements(elements);
-    unsigned EltNo = 0;
-    for (Expr *DestElem : TE->getElements()) {
-      emitAssignStmtRecursive(S,
-                              std::move(elements[EltNo++]),
-                              DestElem, Gen);
-    }
-    return;
-  }
-  
-  // Otherwise, emit the scalar assignment.
-  LValue DstLV = Gen.emitLValue(Dest);
-  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
-}
-
-
-void SILGenFunction::visitAssignStmt(AssignStmt *S, SGFContext C) {
-  FullExpr scope(Cleanups);
-
-  // Handle tuple destinations by destructuring them if present.
-  return emitAssignStmtRecursive(S, visit(S->getSrc()), S->getDest(), *this);
-}
-
 namespace {
 
 /// IndirectReturnInitialization - represents initializing an indirect return
@@ -271,11 +241,9 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   for (auto D : S->getInitializerVarDecls())
     visit(D);
   
-  if (Expr *E = S->getInitializer().dyn_cast<Expr*>()) {
+  if (S->getInitializer()) {
     FullExpr Scope(Cleanups);
-    visit(E);
-  } else if (Stmt *AS = S->getInitializer().dyn_cast<AssignStmt*>()) {
-    visit(AS);
+    visit(S->getInitializer());
   }
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -305,13 +273,9 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
     
     emitOrDeleteBlock(B, IncBB);
     
-    if (B.hasValidInsertionPoint() && !S->getIncrement().isNull()) {
-      if (Expr *E = S->getIncrement().dyn_cast<Expr*>()) {
-        FullExpr Scope(Cleanups);
-        visit(E);
-      } else if (Stmt *AS = S->getIncrement().dyn_cast<AssignStmt*>()) {
-        visit(AS);
-      }
+    if (B.hasValidInsertionPoint() && S->getIncrement()) {
+      FullExpr Scope(Cleanups);
+      visit(S->getIncrement());
     }
     
     if (B.hasValidInsertionPoint())
