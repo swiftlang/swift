@@ -342,7 +342,8 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   DiagnosticInfo Info;
   Info.Ranges = ActiveDiagnostic->getRanges();
   Info.FixIts = ActiveDiagnostic->getFixIts();
-  Consumer.handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
+  for (auto &Consumer : Consumers)
+    Consumer->handleDiagnostic(SourceMgr, loc, StoredInfo.Kind, Text, Info);
   
   // Reset the active diagnostic.
   ActiveDiagnostic.reset();

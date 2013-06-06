@@ -269,10 +269,10 @@ namespace swift {
     /// display diagnostics.
     llvm::SourceMgr &SourceMgr;
 
-    /// \brief The diagnostic consumer that will be responsible for actually
+    /// \brief The diagnostic consumer(s) that will be responsible for actually
     /// emitting diagnostics.
-    DiagnosticConsumer &Consumer;
-    
+    SmallVector<DiagnosticConsumer *, 2> Consumers;
+
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
@@ -296,8 +296,10 @@ namespace swift {
   public:
     explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr, 
                               DiagnosticConsumer &Consumer)
-      : SourceMgr(SourceMgr), Consumer(Consumer), HadAnyError(false), 
-        ActiveDiagnostic() { }
+      : SourceMgr(SourceMgr), HadAnyError(false),
+        ActiveDiagnostic() {
+      Consumers.push_back(&Consumer);
+    }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const {
@@ -306,6 +308,11 @@ namespace swift {
 
     void resetHadAnyError() {
       HadAnyError = false;
+    }
+
+    /// \brief Add an additional DiagnosticConsumer to receive diagnostics.
+    void addConsumer(DiagnosticConsumer &Consumer) {
+      Consumers.push_back(&Consumer);
     }
 
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
