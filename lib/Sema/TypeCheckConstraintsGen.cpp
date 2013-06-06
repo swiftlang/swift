@@ -527,17 +527,16 @@ namespace {
       auto dictionaryTy = CS.createTypeVariable(expr);
 
       // The array must be a dictionary literal type.
-      CS.addLiteralConstraint(dictionaryTy, LiteralKind::Dictionary);
+      CS.addConstraint(ConstraintKind::ConformsTo, dictionaryTy,
+                       dictionaryProto->getDeclaredType(),
+                       CS.getConstraintLocator(expr, { }));
 
-      // FIXME: Constraint checker appears to be unable to solve a system in
-      // which the same type variable is a subtype of multiple types.
-      // The protocol conformance checker also has an issue with checking
-      // conformances of generic types <rdar://problem/13153805>
-      //Type dictionaryProtoTy = dictionaryProto->getDeclaredType();
-      //CS.addConstraint(ConstraintKind::Subtype,
-      //                 dictionaryTy, dictionaryProtoTy);
-      
-      // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
+
+      // Its subexpression should be convertible to a tuple
+      // ((T.Key,T.Value)...).
+      //
+      // FIXME: We should be getting Key/Value through the witnesses, not
+      // directly from the type.
       auto dictionaryKeyTy = CS.createTypeVariable(expr);
       CS.addTypeMemberConstraint(dictionaryTy,
                                  C.getIdentifier("Key"),
@@ -564,16 +563,6 @@ namespace {
                          expr,
                          ConstraintLocator::ApplyArgument));
 
-      // FIXME: Use the protocol constraint instead of this value constraint.
-      Type converterFuncTy = FunctionType::get(dictionaryEltsTupleTy,
-                                               dictionaryTy, C);
-      auto dictionaryMetaTy = MetaTypeType::get(dictionaryTy, C);
-      CS.addValueMemberConstraint(
-        dictionaryMetaTy,
-        C.getIdentifier("convertFromDictionaryLiteral"),
-        converterFuncTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
-      
       return dictionaryTy;
     }
 

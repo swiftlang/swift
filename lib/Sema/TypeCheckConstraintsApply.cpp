@@ -1208,41 +1208,31 @@ namespace {
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::DictionaryLiteralConvertible);
 
-      // Use a value member constraint to find the appropriate
-      // convertFromDictionaryLiteral call.
-      // FIXME: Switch to protocol conformance.
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::MemberRefBase));
-      auto choice = selected.first;
-      auto converterDecl = cast<FuncDecl>(choice.getDecl());
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
+                                            &conformance);
+      (void)conforms;
+      assert(conforms && "Type does not conform to protocol?");
 
-      // Construct the semantic expr as a convertFromDictionaryLiteral
-      // application.
-      ASTContext &C = cs.getASTContext();
-      Expr *typeRef = new (C) MetatypeExpr(nullptr,
-                                           expr->getLoc(),
-                                           MetaTypeType::get(dictionaryTy, C));
-
-      // FIXME: Location information is suspect.
-      Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
-                                       converterDecl,
-                                       expr->getLoc(),
-                                       selected.second,
-                                       cs.getConstraintLocator(expr, { }));
-
-      ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType,
-                                        ConstraintLocatorBuilder(
-                                          cs.getConstraintLocator(expr, { }))));
-      if (!expr->getSemanticExpr()) {
-        // FIXME: Should never happen.
-        cs.getTypeChecker().diagnose(dictionaryProto->getLoc(),
-                                     diag::dictionary_protocol_broken);
+      // Call the witness that builds the dictionary literal.
+      // FIXME: callWitness() may end up re-doing some work we already did
+      // to convert the dictionary literal elements to the (key, value) tuple.
+      // It would be nicer to re-use them.
+      // FIXME: Cache the name.
+      Expr *typeRef = new (tc.Context) MetatypeExpr(
+                                         nullptr,
+                                         expr->getLoc(),
+                                         MetaTypeType::get(dictionaryTy,
+                                                           tc.Context));
+      auto name = tc.Context.getIdentifier("convertFromDictionaryLiteral");
+      auto arg = expr->getSubExpr();
+      Expr *result = tc.callWitness(typeRef, cs.DC, dictionaryProto,
+                                    conformance, name, arg,
+                                    diag::dictionary_protocol_broken);
+      if (!result)
         return nullptr;
-      }
 
+      expr->setSemanticExpr(result);
       expr->setType(dictionaryTy);
       return expr;
     }
