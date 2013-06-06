@@ -3,6 +3,7 @@ add_swift_executable(swift
   Frontend.cpp
   Immediate.cpp
   PrintingDiagnosticConsumer.cpp
+  SerializedDiagnosticConsumer.cpp
   swift.cpp
   DEPENDS swiftIRGen swiftParse swiftSema swiftClangImporter swiftAST swiftSIL
           swiftSILGen swiftSerialization
