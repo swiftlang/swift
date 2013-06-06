@@ -679,8 +679,8 @@ namespace {
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-      = tc.getProtocol(expr->getLoc(),
-                       KnownProtocolKind::IntegerLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::IntegerLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::BuiltinIntegerLiteralConvertible);
@@ -688,13 +688,17 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Int)) {
+      if (auto defaultType = tc.getDefaultType(protocol)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-      if (auto defaultFloatType = tc.getDefaultLiteralType(LiteralKind::Float)){
-        if (defaultFloatType->isEqual(type))
-          type = defaultFloatType;
+      if (auto floatProtocol
+            = tc.getProtocol(expr->getLoc(),
+                             KnownProtocolKind::FloatLiteralConvertible)) {
+        if (auto defaultFloatType = tc.getDefaultType(floatProtocol)) {
+          if (defaultFloatType->isEqual(type))
+            type = defaultFloatType;
+        }
       }
 
       // Find the maximum-sized builtin integer type.
@@ -737,7 +741,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Float)) {
+      if (auto defaultType = tc.getDefaultType(protocol)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -782,7 +786,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::Char)) {
+      if (auto defaultType = tc.getDefaultType(protocol)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
@@ -819,7 +823,7 @@ namespace {
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultLiteralType(LiteralKind::String)) {
+      if (auto defaultType = tc.getDefaultType(protocol)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }

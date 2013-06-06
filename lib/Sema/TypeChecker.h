@@ -29,11 +29,6 @@ namespace swift {
 class MemberLookup;
 class TypeChecker;
 
-/// \brief Describes the kind of a literal.
-enum class LiteralKind : char {
-  Int, Float, Char, String, Array, Dictionary
-};
-
 /// \brief A mapping from substitutable types to the protocol-conformance
 /// mappings for those types.
 typedef llvm::DenseMap<SubstitutableType *,
@@ -337,9 +332,6 @@ public:
   
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
-
-  /// \brief Retrieve the default literal type for the given literal kind.
-  Type getDefaultLiteralType(LiteralKind kind);
 
   /// \brief Retrieve the default type for the given protocol.
   ///

@@ -556,10 +556,14 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
                            KnownProtocolKind::IntegerLiteralConvertible);
         for (auto constraint : tvc.ConformsToConstraints) {
           if (constraint->getProtocol() == integerLiteralConvertible) {
-            auto newType = tc.getDefaultLiteralType(LiteralKind::Float);
-            if (newType && exploredTypes.insert(newType->getCanonicalType()))
-              newBindings.push_back({newType, false});
-            break;
+            if (auto floatLiteralConvertible
+                  = tc.getProtocol(SourceLoc(),
+                                   KnownProtocolKind::FloatLiteralConvertible)){
+              auto newType = tc.getDefaultType(floatLiteralConvertible);
+              if (newType && exploredTypes.insert(newType->getCanonicalType()))
+                newBindings.push_back({newType, false});
+              break;
+            }
           }
         }
 

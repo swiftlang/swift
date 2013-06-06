@@ -382,41 +382,57 @@ static Type lookupGlobalType(TypeChecker &TC, StringRef name) {
   return TD->getDeclaredType();
 }
 
-/// \brief Retrieve the default literal type for the given literal kind.
-Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
-  Type *type;
-  const char *name;
-  switch (kind) {
-  case LiteralKind::Char:
+
+Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
+  Type *type = nullptr;
+  const char *name = nullptr;
+
+  // CharacterLiteralConvertible -> CharacterLiteralType
+  if (protocol == getProtocol(SourceLoc(),
+                              KnownProtocolKind::CharacterLiteralConvertible)) {
     type = &CharacterLiteralType;
     name = "CharacterLiteralType";
-    break;
-
-  case LiteralKind::String:
+  }
+  // StringLiteralConvertible -> StringLiteralType
+  // StringInterpolationConvertible -> StringLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::StringLiteralConvertible) ||
+           protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::StringInterpolationConvertible)) {
     type = &StringLiteralType;
     name = "StringLiteralType";
-      break;
-
-  case LiteralKind::Float:
-    type = &FloatLiteralType;
-    name = "FloatLiteralType";
-    break;
-
-  case LiteralKind::Int:
+  }
+  // IntegerLiteralConvertible -> IntegerLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::IntegerLiteralConvertible)) {
     type = &IntLiteralType;
     name = "IntegerLiteralType";
-    break;
-
-  case LiteralKind::Array:
+  }
+  // FloatLiteralConvertible -> FloatLiteralType
+  else if (protocol == getProtocol(SourceLoc(),
+                                   KnownProtocolKind::FloatLiteralConvertible)){
+    type = &FloatLiteralType;
+    name = "FloatLiteralType";
+  }
+  // ArrayLiteralConvertible -> Slice
+  else if (protocol == getProtocol(SourceLoc(),
+                                   KnownProtocolKind::ArrayLiteralConvertible)){
     type = &ArrayLiteralType;
     name = "Slice";
-    break;
-
-  case LiteralKind::Dictionary:
+  }
+  // DictionaryLiteralConvertible -> Dictionary
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::DictionaryLiteralConvertible)) {
     type = &DictionaryLiteralType;
     name = "Dictionary";
-    break;
   }
+
+  if (!type)
+    return nullptr;
 
   // If we haven't found the type yet, look for it now.
   if (!*type) {
@@ -431,43 +447,6 @@ Type TypeChecker::getDefaultLiteralType(LiteralKind kind) {
   }
 
   return *type;
-}
-
-Type TypeChecker::getDefaultType(ProtocolDecl *protocol) {
-  // CharacterLiteralConvertible -> CharacterLiteralType
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::CharacterLiteralConvertible))
-    return getDefaultLiteralType(LiteralKind::Char);
-
-  // StringLiteralConvertible -> StringLiteralType
-  // StringInterpolationConvertible -> StringLiteralType
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::StringLiteralConvertible)||
-      protocol==getProtocol(SourceLoc(),
-                            KnownProtocolKind::StringInterpolationConvertible))
-    return getDefaultLiteralType(LiteralKind::String);
-
-  // IntegerLiteralConvertible -> IntegerLiteralType
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::IntegerLiteralConvertible))
-    return getDefaultLiteralType(LiteralKind::Int);
-
-  // FloatLiteralConvertible -> FloatLiteralType
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::FloatLiteralConvertible))
-    return getDefaultLiteralType(LiteralKind::Float);
-
-  // ArrayLiteralConvertible -> Slice
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::ArrayLiteralConvertible))
-    return getDefaultLiteralType(LiteralKind::Array);
-
-  // DictionaryLiteralConvertible -> Dictionary
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::DictionaryLiteralConvertible))
-    return getDefaultLiteralType(LiteralKind::Dictionary);
-
-  return nullptr;
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr) {

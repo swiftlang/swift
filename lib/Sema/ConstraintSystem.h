@@ -31,7 +31,6 @@
 namespace swift {
 
 class Expr;
-enum class LiteralKind : char;
 
 namespace constraints {
 
@@ -687,9 +686,7 @@ public:
     /// \brief The first type does not have a member with the given name.
     DoesNotHaveMember,
     /// \brief The type is not an archetype.
-    IsNotArchetype,
-    /// \brief The type is not a literal type.
-    IsNotLiteralType,
+    IsNotArchetype
   };
 
 private:
@@ -706,11 +703,10 @@ private:
   Type first;
 
   /// \brief The second value, which may be one of several things (type,
-  /// member name, literal kind, etc.).
+  /// member name, etc.).
   union {
     TypeBase *type;
     void *name;
-    LiteralKind literal;
   } second;
 
 public:
@@ -733,11 +729,6 @@ public:
   /// \brief Retrieve the name.
   Identifier getName() const {
     return Identifier::getFromOpaquePointer(second.name);
-  }
-
-  /// \brief Retrieve the literal kind.
-  LiteralKind getLiteralKind() const {
-    return second.literal;
   }
 
   /// \brief Retrieve the value.
@@ -766,9 +757,6 @@ public:
 
     case IsNotArchetype:
       return Profile(id, locator, kind, getFirstType());
-
-    case IsNotLiteralType:
-      return Profile(id, locator, kind, getFirstType(), getLiteralKind());
     }
   }
 
@@ -796,14 +784,6 @@ private:
   : kind(kind), value(0), locator(locator), first(type)
   {
     second.name = name.getAsOpaquePointer();
-  }
-
-  /// \brief Construct a failure involving a type and a literal kind.
-  Failure(ConstraintLocator *locator, FailureKind kind, Type type,
-          LiteralKind literal)
-  : kind(kind), value(0), locator(locator), first(type)
-  {
-    second.literal = literal;
   }
 
   /// \brief Profile a failure involving one type.
@@ -841,15 +821,6 @@ private:
     id.AddInteger(kind);
     id.AddPointer(type.getPointer());
     id.AddPointer(name.getAsOpaquePointer());
-  }
-
-  /// \brief Profile a failure involving a type and a literal kind.
-  static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
-                      FailureKind kind, Type type, LiteralKind literal) {
-    id.AddPointer(locator);
-    id.AddInteger(kind);
-    id.AddPointer(type.getPointer());
-    id.AddInteger(static_cast<unsigned>(literal));
   }
 
   /// \brief Create a new Failure object with the given arguments, allocated
@@ -1553,11 +1524,6 @@ private:
 
   /// \brief Simplifies an argument to the failure (a no-op).
   unsigned simplifyFailureArg(unsigned arg) {
-    return arg;
-  }
-
-  /// \brief Simplifies an argument to the failure (a no-op).
-  LiteralKind simplifyFailureArg(LiteralKind arg) {
     return arg;
   }
 
