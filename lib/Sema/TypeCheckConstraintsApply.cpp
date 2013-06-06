@@ -1173,39 +1173,28 @@ namespace {
                          KnownProtocolKind::ArrayLiteralConvertible);
       assert(arrayProto && "type-checked array literal w/o protocol?!");
 
-       // Use a value member constraint to find the appropriate
-       // convertFromArrayLiteral call.
-       // FIXME: Switch to protocol conformance.
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(
-                          expr,
-                          ConstraintLocator::MemberRefBase));
-      auto choice = selected.first;
-      auto converterDecl = cast<FuncDecl>(choice.getDecl());
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(arrayTy, arrayProto, &conformance);
+      (void)conforms;
+      assert(conforms && "Type does not conform to protocol?");
 
-      // Construct the semantic expr as a convertFromArrayLiteral application.
-      ASTContext &C = cs.getASTContext();
-      Expr *typeRef = new (C) MetatypeExpr(nullptr,
-                                           expr->getLoc(),
-                                           MetaTypeType::get(arrayTy, C));
-      // FIXME: Location information is suspect.
-      Expr *memberRef = buildMemberRef(typeRef, expr->getLoc(),
-                                       converterDecl,
-                                       expr->getLoc(),
-                                       selected.second,
-                                       cs.getConstraintLocator(expr, { }));
-
-      ApplyExpr *apply = new (C) CallExpr(memberRef, expr->getSubExpr());
-      expr->setSemanticExpr(finishApply(apply, openedType,
-                                        ConstraintLocatorBuilder(
-                                          cs.getConstraintLocator(expr, { }))));
-      if (!expr->getSemanticExpr()) {
-        // FIXME: Should never happen.
-        cs.getTypeChecker().diagnose(arrayProto->getLoc(),
-                                     diag::array_protocol_broken);
+      // Call the witness that builds the array literal.
+      // FIXME: callWitness() may end up re-doing some work we already did
+      // to convert the array literal elements to the element type. It would
+      // be nicer to re-use them.
+      // FIXME: Cache the name.
+      Expr *typeRef = new (tc.Context) MetatypeExpr(nullptr,
+                                         expr->getLoc(),
+                                         MetaTypeType::get(arrayTy,
+                                                           tc.Context));
+      auto name = tc.Context.getIdentifier("convertFromArrayLiteral");
+      auto arg = expr->getSubExpr();
+      Expr *result = tc.callWitness(typeRef, cs.DC, arrayProto, conformance,
+                                    name, arg, diag::array_protocol_broken);
+      if (!result)
         return nullptr;
-      }
 
+      expr->setSemanticExpr(result);
       expr->setType(arrayTy);
       return expr;
     }
@@ -2518,8 +2507,6 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc);
-  Solution solution(cs);
-  ExprRewriter rewriter(cs, solution);
 
   // Find the witness we need to use.
   auto type = base->getType();
@@ -2536,11 +2523,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                                 witness,
                                                 /*isTypeReference=*/false);
   auto locator = cs.getConstraintLocator(base, { });
-  auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
-                                           witness, base->getEndLoc(),
-                                           openedType, locator);
 
-  // Call the witness.
+  // Form the call argument.
   Expr *arg;
   if (arguments.size() == 1)
     arg = arguments[0];
@@ -2556,9 +2540,30 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                   /*hasTrailingClosure=*/false,
                                   TupleType::get(elementTypes, Context));
   }
-  
+
+  // Add the conversion from the argument to the function parameter type.
+  cs.addConstraint(ConstraintKind::Conversion, arg->getType(),
+                   openedType->castTo<FunctionType>()->getInput(),
+                   cs.getConstraintLocator(arg,
+                                           ConstraintLocator::ApplyArgument));
+
+  // Solve the system.
+  SmallVector<Solution, 1> solutions;
+  bool failed = cs.solve(solutions);
+  (void)failed;
+  assert(!failed && "Unable to solve for call to witness?");
+
+  Solution &solution = solutions.front();
+  ExprRewriter rewriter(cs, solution);
+
+  auto memberRef = rewriter.buildMemberRef(base, base->getStartLoc(),
+                                           witness, base->getEndLoc(),
+                                           openedType, locator);
+
+  // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg);
-  return rewriter.finishApply(apply, openedType, locator);
+  return rewriter.finishApply(apply, openedType,
+                              cs.getConstraintLocator(arg, { }));
 }
 
 /// \brief Convert an expression via a builtin protocol.

@@ -472,7 +472,6 @@ namespace {
       ASTContext &C = CS.getASTContext();
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
-      // FIXME: This isn't actually used for anything at the moment.
       auto &tc = CS.getTypeChecker();
       ProtocolDecl *arrayProto
         = tc.getProtocol(expr->getLoc(),
@@ -484,17 +483,13 @@ namespace {
       auto arrayTy = CS.createTypeVariable(expr);
 
       // The array must be an array literal type.
-      CS.addLiteralConstraint(arrayTy, LiteralKind::Array);
-
-      // FIXME: Constraint checker appears to be unable to solve a system in
-      // which the same type variable is a subtype of multiple types.
-      // The protocol conformance checker also has an issue with checking
-      // conformances of generic types <rdar://problem/13153805>
-      //Type arrayProtoTy = arrayProto->getDeclaredType();
-      //CS.addConstraint(ConstraintKind::Subtype,
-      //                 arrayTy, arrayProtoTy);
+      CS.addConstraint(ConstraintKind::ConformsTo, arrayTy,
+                       arrayProto->getDeclaredType(),
+                       CS.getConstraintLocator(expr, { }));
       
       // Its subexpression should be convertible to a tuple (T.Element...).
+      // FIXME: We should really go through the conformance above to extract
+      // the element type, rather than just looking for the element type.
       auto arrayElementTy = CS.createTypeVariable(expr);
       CS.addTypeMemberConstraint(arrayTy,
                                  C.getIdentifier("Element"),
@@ -512,15 +507,6 @@ namespace {
                        CS.getConstraintLocator(
                          expr,
                          ConstraintLocator::ApplyArgument));
-
-      // FIXME: Use the protocol constraint instead of this value constraint.
-      Type converterFuncTy = FunctionType::get(arrayEltsTupleTy,
-                                               arrayTy, C);
-      auto arrayMetaTy = MetaTypeType::get(arrayTy, C);
-      CS.addValueMemberConstraint(arrayMetaTy,
-        C.getIdentifier("convertFromArrayLiteral"),
-        converterFuncTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
 
       return arrayTy;
     }

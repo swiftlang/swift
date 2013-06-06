@@ -2062,6 +2062,12 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
   if (type->hasTypeVariable())
     return SolutionKind::Unsolved;
 
+  TypeLoc typeLoc = TypeLoc::withoutLoc(type);
+  if (TC.validateType(typeLoc)) {
+    // FIXME: record failure.
+    return SolutionKind::Error;
+  }
+
   if (TC.conformsToProtocol(type, protocol))
     return SolutionKind::TriviallySolved;
 
