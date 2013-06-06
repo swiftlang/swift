@@ -22,7 +22,7 @@
 
 namespace swift {
 
-/// \brief Diagnostic consumer that displays diagnostics to standard error.
+/// \brief Diagnostic consumer that serializes diagnostics to a file.
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
 public:
   virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
