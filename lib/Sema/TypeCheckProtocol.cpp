@@ -116,7 +116,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     MemberLookup Lookup(metaT, AssociatedType->getName(), TC.TU);
     if (Lookup.isSuccess()) {
-      SmallVector<TypeDecl *, 2> Viable;
+      SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
       SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
 
       for (auto Candidate : Lookup.Results) {
@@ -127,10 +127,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             // Check this type against the protocol requirements.
             bool SatisfiesRequirements = true;
 
-            Type T = TypeD->getDeclaredType();
-
-            // FIXME: When this is a meta-archetype member (i.e., an associated
-            // type), map down to the archetype it models.
+            Type WitnessTy
+              = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
 
             for (auto Req : AssociatedType->getInherited()) {
               SmallVector<ProtocolDecl *, 4> ReqProtos;
@@ -138,7 +136,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                 return nullptr;
 
               for (auto ReqProto : ReqProtos) {
-                if (!TC.conformsToProtocol(T, ReqProto)) {
+                if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
                   SatisfiesRequirements = false;
 
                   NonViable.push_back({TypeD, ReqProto});
@@ -151,7 +149,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             }
 
             if (SatisfiesRequirements)
-              Viable.push_back(TypeD);
+              Viable.push_back({TypeD, WitnessTy});
           }
           break;
 
@@ -167,7 +165,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       
       if (Viable.size() == 1) {
         TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-          = Viable.front()->getDeclaredType();
+          = Viable.front().second;
         continue;
       }
       
@@ -186,7 +184,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     AssociatedType->getName());
         
         for (auto Candidate : Viable)
-          TC.diagnose(Candidate, diag::protocol_witness_type);
+          TC.diagnose(Candidate.first, diag::protocol_witness_type);
         
         TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
           = ErrorType::get(TC.Context);
@@ -347,12 +345,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::MetaArchetypeMember:
         case MemberLookupResult::MemberProperty:
         case MemberLookupResult::MemberFunction:
-        case MemberLookupResult::ExistentialMember:
-          // FIXME: Handle substitution for meta-archetype members.
-          if (valueMemberMatches(Candidate.D, Requirement, RequiredTy,
-                                 TC.Context))
+        case MemberLookupResult::ExistentialMember: {
+          if (Candidate.D->getKind() != Requirement->getKind())
+            break;
+
+          Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
+          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, Candidate.D,T);
+          if (RequiredTy->isEqual(CandidateTy))
             Viable.push_back(Candidate.D);
           break;
+        }
 
         case MemberLookupResult::ArchetypeMember: {
           if (Candidate.D->getKind() != Requirement->getKind())
