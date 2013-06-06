@@ -54,7 +54,10 @@ static bool valueMemberMatches(ValueDecl *Candidate, ValueDecl *Requirement,
   if (!RequiredTy->isEqual(getInstanceUsageType(Candidate, Context)))
     return false;
   if (FuncDecl *FD = dyn_cast<FuncDecl>(Candidate)) {
-    if (FD->isStatic() != cast<FuncDecl>(Requirement)->isStatic())
+    FuncDecl *ReqFD = cast<FuncDecl>(Requirement);
+    if (FD->isStatic() != ReqFD->isStatic() ||
+        FD->getAttrs().isPrefix() != ReqFD->getAttrs().isPrefix() ||
+        FD->getAttrs().isPostfix() != ReqFD->getAttrs().isPostfix())
       return false;
   }
   return true;
