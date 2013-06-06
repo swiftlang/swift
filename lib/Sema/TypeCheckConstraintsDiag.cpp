@@ -92,11 +92,92 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
   return cs.getConstraintLocator(anchor, path);
 }
 
+/// \brief Emit a diagnostic for the given failure.
+///
+/// \param cs The constraint system in which the diagnostic was generated.
+/// \param failure The failure to emit.
+///
+/// \returns true if the diagnostic was emitted successfully.
+static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
+  // If there's no anchor, we have no location information to use when emitting
+  // the diagnostic.
+  if (!failure.getLocator() || !failure.getLocator()->getAnchor())
+    return false;
+
+  SourceRange range1, range2;
+
+  auto locator = simplifyLocator(cs, failure.getLocator(), range1, range2);
+  auto &tc = cs.getTypeChecker();
+
+  auto anchor = locator->getAnchor();
+  auto loc = anchor->getLoc();
+  switch (failure.getKind()) {
+  case Failure::TupleSizeMismatch: {
+    auto tuple1 = failure.getFirstType()->castTo<TupleType>();
+    auto tuple2 = failure.getSecondType()->castTo<TupleType>();
+    tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
+                tuple1->getFields().size(),
+                tuple2->getFields().size())
+      .highlight(range1).highlight(range2);
+    break;
+  }
+
+  case Failure::TupleUnused:
+    tc.diagnose(loc, diag::invalid_tuple_element_unused,
+                failure.getFirstType(),
+                failure.getSecondType())
+      .highlight(range1).highlight(range2);
+    break;
+
+  case Failure::TypesNotEqual:
+  case Failure::TypesNotTrivialSubtypes:
+  case Failure::TypesNotSubtypes:
+  case Failure::TypesNotConvertible:
+  case Failure::TypesNotConstructible:
+    tc.diagnose(loc, diag::invalid_relation,
+                failure.getKind() - Failure::TypesNotEqual,
+                failure.getFirstType(),
+                failure.getSecondType())
+      .highlight(range1).highlight(range2);
+    break;
+
+  case Failure::DoesNotHaveMember:
+    tc.diagnose(loc, diag::does_not_have_member,
+                failure.getFirstType(),
+                failure.getName())
+      .highlight(range1).highlight(range2);
+    break;
+
+  case Failure::DoesNotConformToProtocol:
+    tc.diagnose(loc, diag::type_does_not_conform,
+                failure.getFirstType(),
+                failure.getSecondType())
+      .highlight(range1).highlight(range2);
+    break;
+
+  default:
+    // FIXME: Handle all failure kinds
+    return false;
+  }
+
+  return true;
+}
+
 bool ConstraintSystem::diagnose() {
-  // If there were no unavoidable failures, attempt to solve again, capturing
+  // If there were any unavoidable failures, emit the first one we can.
+  if (!unavoidableFailures.empty()) {
+    for (auto failure : unavoidableFailures) {
+      if (diagnoseFailure(*this, *failure))
+        return true;
+    }
+    
+    return false;
+  }
+
+  // There were no unavoidable failures, so attempt to solve again, capturing
   // any failures that come from our attempts to select overloads or bind
   // type variables.
-  if (unavoidableFailures.empty()) {
+  {
     SmallVector<Solution, 4> solutions;
     
     // Set up solver state.
@@ -116,69 +197,10 @@ bool ConstraintSystem::diagnose() {
     // Fall through to produce diagnostics.
   }
 
-  if (unavoidableFailures.size() + failures.size() == 1) {
+  if (failures.size() == 1) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
-    if (failure.getLocator() && failure.getLocator()->getAnchor()) {
-      SourceRange range1, range2;
-
-      auto locator = simplifyLocator(*this, failure.getLocator(), range1,
-                                     range2);
-      auto &tc = getTypeChecker();
-
-      auto anchor = locator->getAnchor();
-      auto loc = anchor->getLoc();
-      switch (failure.getKind()) {
-      case Failure::TupleSizeMismatch: {
-        auto tuple1 = failure.getFirstType()->castTo<TupleType>();
-        auto tuple2 = failure.getSecondType()->castTo<TupleType>();
-        tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
-                    tuple1->getFields().size(),
-                    tuple2->getFields().size())
-          .highlight(range1).highlight(range2);
-        break;
-      }
-
-      case Failure::TupleUnused:
-        tc.diagnose(loc, diag::invalid_tuple_element_unused,
-                    failure.getFirstType(),
-                    failure.getSecondType())
-          .highlight(range1).highlight(range2);
-        break;
-
-      case Failure::TypesNotEqual:
-      case Failure::TypesNotTrivialSubtypes:
-      case Failure::TypesNotSubtypes:
-      case Failure::TypesNotConvertible:
-      case Failure::TypesNotConstructible:
-        tc.diagnose(loc, diag::invalid_relation,
-                    failure.getKind() - Failure::TypesNotEqual,
-                    failure.getFirstType(),
-                    failure.getSecondType())
-          .highlight(range1).highlight(range2);
-        break;
-
-      case Failure::DoesNotHaveMember:
-        tc.diagnose(loc, diag::does_not_have_member,
-                    failure.getFirstType(),
-                    failure.getName())
-          .highlight(range1).highlight(range2);
-        break;
-
-      case Failure::DoesNotConformToProtocol:
-        tc.diagnose(loc, diag::type_does_not_conform,
-                    failure.getFirstType(),
-                    failure.getSecondType())
-          .highlight(range1).highlight(range2);
-        break;
-
-      default:
-        // FIXME: Handle all failure kinds
-        return false;
-      }
-
-      return true;
-    }
+    return diagnoseFailure(*this, failure);
   }
 
   return false;
