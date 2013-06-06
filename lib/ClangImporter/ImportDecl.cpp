@@ -612,6 +612,12 @@ namespace {
     }
 
     Decl *VisitFunctionDecl(clang::FunctionDecl *decl) {
+      decl = decl->getMostRecentDecl();
+      if (!decl->hasPrototype()) {
+        // We can't import a function without a prototype.
+        return nullptr;
+      }
+
       // FIXME: We can't IRgen inline functions, so don't import them.
       if (decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>()) {
         return nullptr;
@@ -625,15 +631,12 @@ namespace {
       // get into the resulting function type.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      Type type;
-      if (decl->param_size())
-        type = Impl.importFunctionType(
-                 decl->getType()->getAs<clang::FunctionType>()->getResultType(),
-                 { decl->param_begin(), decl->param_size() },
-                 decl->isVariadic(), argPatterns, bodyPatterns);
-      else
-        type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
-
+      Type type = Impl.importFunctionType(
+                                          decl->getResultType(),
+                                          { decl->param_begin(),
+                                            decl->param_size() },
+                                          decl->isVariadic(),
+                                          argPatterns, bodyPatterns);
       if (!type)
         return nullptr;
 
