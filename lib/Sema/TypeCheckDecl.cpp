@@ -515,7 +515,10 @@ public:
     // Before anything else, set up the 'this' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
-      TC.validateTypeSimple(thisType);
+      // FIXME: this can actually fail when the context is an extension
+      // of a type that can't be resolved. We need a better fix for this.
+      TypeLoc tl = TypeLoc::withoutLoc(thisType);
+      TC.validateType(tl);
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getArgParamPatterns()[0]);
       if (thisPattern->hasType()) {
@@ -599,8 +602,9 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    bool IsInvalid = false;
     if (!IsSecondPass) {
-      TC.validateType(ED->getExtendedTypeLoc());
+      IsInvalid = TC.validateType(ED->getExtendedTypeLoc());
 
       Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
       if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&

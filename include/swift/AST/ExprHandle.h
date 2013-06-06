@@ -18,6 +18,7 @@
 #define SWIFT_EXPRHANDLE_H
 
 #include "llvm/Support/DataTypes.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
   class ASTContext;
@@ -26,9 +27,11 @@ namespace swift {
 /// ExprHandle - Provides an indirection for expressions, so both a type and a
 /// pattern can point at the same expression during type-checking.
 class ExprHandle {
-  Expr *E;
+  /// \brief The expression along with a bit saying whether this expression
+  /// was already type-checked (or not).
+  llvm::PointerIntPair<Expr *, 1, bool> EAndChecked;
 private:
-  ExprHandle(Expr *E) : E(E) {}
+  ExprHandle(Expr *E) : EAndChecked(E, false) {}
 
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
@@ -37,11 +40,17 @@ private:
                      unsigned Alignment = 8);
 public:
   Expr *getExpr() {
-    return E;
+    return EAndChecked.getPointer();
   }
 
-  void setExpr(Expr *newE) {
-    E = newE;
+  /// \brief Determine whether the referenced expression has already been
+  /// type-checked.
+  bool alreadyChecked() const { return EAndChecked.getInt(); }
+
+  /// \brief Set the expression after it has been type-checked.
+  void setExpr(Expr *newE, bool checked) {
+    EAndChecked.setPointer(newE);
+    EAndChecked.setInt(checked);
   }
 
   static ExprHandle *get(ASTContext &Context, Expr *E);

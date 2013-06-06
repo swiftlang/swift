@@ -83,7 +83,11 @@ class alignas(8) TypeBase {
     unsigned HasTypeVariable : 1;
 
     /// \brief Whether this type has been validated.
-    unsigned Validated : 1;
+    ///
+    /// 0 -> not validated
+    /// 1 -> invalid
+    /// 2 -> valid
+    unsigned Validated : 2;
   };
   static const unsigned NumTypeBaseBits = 4;
   
@@ -101,7 +105,7 @@ protected:
     
     setUnresolved(Unresolved);
     setHasTypeVariable(HasTypeVariable);
-    TypeBits.TypeBase.Validated = false;
+    TypeBits.TypeBase.Validated = 0;
   }
 
   /// \brief Mark this type as unresolved.
@@ -223,10 +227,16 @@ public:
   bool isUnspecializedGeneric();
 
   /// \brief Whether this type has been validated yet.
-  bool getValidated() const { return TypeBits.TypeBase.Validated; }
+  bool wasValidated() const { return TypeBits.TypeBase.Validated != 0; }
+
+  /// \brief Whether this type is valid.
+  bool isValid() const {
+    assert(wasValidated() && "Type not yet validated");
+    return TypeBits.TypeBase.Validated == 2;
+  }
 
   /// \brief Mark this type as having been validated already.
-  void setValidated() { TypeBits.TypeBase.Validated = true; }
+  void setValidated(bool valid) { TypeBits.TypeBase.Validated = 1 + valid; }
 
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.

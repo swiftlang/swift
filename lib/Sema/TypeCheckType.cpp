@@ -122,25 +122,27 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
-  if (T->getValidated()) return false;
+  if (T->wasValidated()) return !T->isValid();
 
+  bool IsInvalid = false;
+  
   // \brief RAII object that sets the validation pass on the type when it
   // goes out of scope.
   class SetValidation {
     Type T;
+    bool &IsInvalid;
 
   public:
-    SetValidation(Type T) : T(T) { }
+    SetValidation(Type T, bool &IsInvalid) : T(T), IsInvalid(IsInvalid) { }
     ~SetValidation() {
-      T->setValidated();
+      T->setValidated(!IsInvalid);
     }
-  } setValidation(T);
+  } setValidation(T, IsInvalid);
 
-  bool IsInvalid = false;
   switch (T->getKind()) {
   case TypeKind::Error:
     // Error already diagnosed.
-    return true;
+    return IsInvalid = true;
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinRawPointer:
@@ -154,7 +156,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   case TypeKind::Archetype:
   case TypeKind::UnboundGeneric:
     // These types are already canonical anyway.
-    return false;
+    return IsInvalid = false;
       
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -166,7 +168,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   case TypeKind::Substituted: {
     TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
                Loc.getSourceRange());
-    return validateType(TL);
+    return IsInvalid = validateType(TL);
   }
 
   case TypeKind::NameAlias: {
@@ -215,14 +217,14 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
             else
               diagnose(Loc, diag::found_candidate);
           }
-          return true;
+          return IsInvalid = true;
         }
 
         if (Globals.Results.empty()) {
           diagnose(Loc, Components.size() == 1 ? 
                    diag::use_undeclared_type : diag::unknown_name_in_type, Name)
             .highlight(SourceRange(Loc, Components.back().Loc));
-          return true;
+          return IsInvalid = true;
         }
 
         switch (Globals.Results[0].Kind) {
@@ -278,7 +280,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       } else {
         diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
           .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-        return true;
+        return IsInvalid = true;
       }
 
       if (TD) {
@@ -316,7 +318,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
           // FIXME: Refactor this to avoid fake TypeLoc
           TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
           if (validateType(TempLoc)) {
-            return true;
+            return IsInvalid = true;
           }
 
           if (BaseTy)
@@ -334,7 +336,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
         else
           diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
             .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-        return true;
+        return IsInvalid = true;
       }
 
       LastOne = C;
@@ -345,7 +347,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ cast<ParenType>(T)->getUnderlyingType(),
                      Loc.getSourceRange() };
-    return validateType(TempLoc);
+    return IsInvalid = validateType(TempLoc);
   }
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
@@ -364,7 +366,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       }
 
       ExprHandle *EltInit = TT->getFields()[i].getInit();
-      if (EltInit == 0) continue;
+      if (EltInit == 0 || EltInit->alreadyChecked()) continue;
 
       Expr *initExpr = EltInit->getExpr();
       // FIXME: Should pass the DeclContext in which the tuple type appears.
@@ -400,7 +402,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       assert(EltTy.isNull() || EltTy->isEqual(initExpr->getType()));
       EltTy = initExpr->getType();
 
-      EltInit->setExpr(initExpr);
+      EltInit->setExpr(initExpr, true);
       TT->updateInitializedElementType(i, EltTy);
     }
     break;

@@ -86,10 +86,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
         type = pattern->getType();
       }
 
-      if (init && !isFirstPass) {
+      if (init && !isFirstPass && !init->alreadyChecked()) {
         Expr *e = init->getExpr();
         typeCheckExpression(e, dc, type);
-        init->setExpr(e);
+        init->setExpr(e, true);
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init,
@@ -193,10 +193,12 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
       // Type-check the initialization expression.
       if (ExprHandle *initHandle = elt.getInit()) {
         Expr *init = initHandle->getExpr();
-        if (typeCheckExpression(init, dc, CoercionType)) {
-          initHandle->setExpr(nullptr);
+        if (initHandle->alreadyChecked()) {
+          // Nothing to do
+        } else if (typeCheckExpression(init, dc, CoercionType)) {
+          initHandle->setExpr(nullptr, true);
         } else {
-          initHandle->setExpr(init);
+          initHandle->setExpr(init, true);
         }
       }
     }

@@ -791,15 +791,18 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         // default value; conceptually, we should be appending to the list
         // in source order.
         ExprHandle *init = Elt.getInit();
+        if (init->alreadyChecked())
+          continue;
+
         Expr *initExpr = prePass.doWalk(init->getExpr(), TypeAndContext.second);
-        init->setExpr(initExpr);
+        init->setExpr(initExpr, false);
 
         if (TT->hasCanonicalTypeComputed()) {
           // If we already examined a tuple in the first pass, we didn't
           // get a chance to type-check it; do that now.
           // FIXME: Bogus DeclContext
           if (!TC.typeCheckExpression(initExpr, TU, Elt.getType()))
-            init->setExpr(initExpr);
+            init->setExpr(initExpr, true);
         }
       }
     }
@@ -822,11 +825,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       switch (P->getKind()) {
       case PatternKind::Tuple:
         for (auto &field : cast<TuplePattern>(P)->getFields()) {
-          if (field.getInit() && field.getPattern()->hasType()) {
+          if (field.getInit() && field.getPattern()->hasType() &&
+              !field.getInit()->alreadyChecked()) {
             Expr *e = field.getInit()->getExpr();
             e = PrePass.doWalk(e, DC);
             TC.typeCheckExpression(e, DC, field.getPattern()->getType());
-            field.getInit()->setExpr(e);
+            field.getInit()->setExpr(e, true);
           }
         }
         return;
