@@ -171,7 +171,6 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       break;
 
     case ConstraintClassification::Archetype:
-    case ConstraintClassification::Literal:
       if (auto firstTV = dyn_cast<TypeVariableType>(first.getPointer())) {
         // Record this constraint on the type variable.
         getTVC(firstTV).KindConstraints.push_back(constraint);
@@ -427,53 +426,39 @@ getPotentialBindings(ConstraintSystem &cs,
       bindings.push_back({type, false});
   }
 
-  // Add the default literal types.
-  auto addDefaultLiteralType = [&](Type type) {
-    // For non-generic literal types, just check for exact types.
-    if (!type->isUnspecializedGeneric()) {
-      if (exactTypes.insert(type->getCanonicalType())) {
-        hasLiteralBindings = true;
-        bindings.push_back({type, true});
-      }
-      return;
-    }
-
-    // For generic literal types, check whether we already have a
-    // specialization of this generic within our list.
-    auto nominal = type->getAnyNominal();
-    bool matched = false;
-    for (auto exactType : exactTypes) {
-      if (auto exactNominal = exactType->getAnyNominal()) {
-        // FIXME: Check parents?
-        if (nominal == exactNominal) {
-          matched = true;
-          break;
-        }
-      }
-    }
-
-    if (!matched) {
-      hasLiteralBindings = true;
-      exactTypes.insert(type->getCanonicalType());
-      bindings.push_back({type, true});
-    }
-  };
-
-  auto &tc = cs.getTypeChecker();
-  for (auto constraint : tvc.KindConstraints) {
-    if (constraint->getKind() != ConstraintKind::Literal)
-      continue;
-
-    if (auto type = tc.getDefaultLiteralType(constraint->getLiteralKind())) {
-      addDefaultLiteralType(type);
-    }
-  }
-
   // When we see conformance to a known protocol, add the default type for
   // that protocol.
+  auto &tc = cs.getTypeChecker();
   for (auto constraint : tvc.ConformsToConstraints) {
     if (auto type = tc.getDefaultType(constraint->getProtocol())) {
-      addDefaultLiteralType(type);
+      // For non-generic literal types, just check for exact types.
+      if (!type->isUnspecializedGeneric()) {
+        if (exactTypes.insert(type->getCanonicalType())) {
+          hasLiteralBindings = true;
+          bindings.push_back({type, true});
+        }
+        continue;
+      }
+
+      // For generic literal types, check whether we already have a
+      // specialization of this generic within our list.
+      auto nominal = type->getAnyNominal();
+      bool matched = false;
+      for (auto exactType : exactTypes) {
+        if (auto exactNominal = exactType->getAnyNominal()) {
+          // FIXME: Check parents?
+          if (nominal == exactNominal) {
+            matched = true;
+            break;
+          }
+        }
+      }
+
+      if (!matched) {
+        hasLiteralBindings = true;
+        exactTypes.insert(type->getCanonicalType());
+        bindings.push_back({type, true});
+      }
     }
   }
 

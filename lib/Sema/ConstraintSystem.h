@@ -272,9 +272,6 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
-  /// \brief The first type is the type of a literal. There is no second
-  /// type.
-  Literal,
   /// \brief The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
@@ -289,10 +286,6 @@ enum class ConstraintKind : char {
 enum class ConstraintClassification : char {
   /// \brief A relational constraint, which relates two types.
   Relational,
-
-  /// \brief A literal constraint, which specifies that a type must be
-  /// able to be created from a particular kind of literal.
-  Literal,
 
   /// \brief A member constraint, which names a member of a type and assigns
   /// it a reference type.
@@ -876,10 +869,6 @@ class Constraint {
   /// \brief The kind of constraint.
   ConstraintKind Kind : 8;
 
-  /// \brief For a literal-type constraint, the kind of literal we're
-  /// expecting.
-  LiteralKind Literal : 8;
-
   /// \brief The first type.
   Type First;
 
@@ -916,10 +905,6 @@ public:
       assert(Member.empty() && "Relational constraint cannot have a member");
       break;
 
-    case ConstraintKind::Literal:
-      llvm_unreachable("Wrong constructor for literal constraint");
-      break;
-
     case ConstraintKind::TypeMember:
     case ConstraintKind::ValueMember:
       assert(!Member.empty() && "Member constraint has no member");
@@ -931,10 +916,6 @@ public:
       break;
     }
   }
-
-  Constraint(Type type, LiteralKind literal, ConstraintLocator *locator)
-    : Kind(ConstraintKind::Literal), Literal(literal), First(type),
-      Locator(locator) { }
 
   /// \brief Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -953,9 +934,6 @@ public:
     case ConstraintKind::ConformsTo:
       return ConstraintClassification::Relational;
 
-    case ConstraintKind::Literal:
-      return ConstraintClassification::Literal;
-
     case ConstraintKind::ValueMember:
     case ConstraintKind::TypeMember:
       return ConstraintClassification::Member;
@@ -970,14 +948,7 @@ public:
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    assert(Kind != ConstraintKind::Literal &&
-           "No second type for literal constraints");
     return Second;
-  }
-
-  /// \brief Determine whether this constraint kind has a second type.
-  static bool hasSecondType(ConstraintKind kind) {
-    return kind != ConstraintKind::Literal;
   }
 
   /// \brief Retrieve the protocol in a conformance constraint.
@@ -997,12 +968,6 @@ public:
   static bool hasMember(ConstraintKind kind) {
     return kind == ConstraintKind::ValueMember
         || kind == ConstraintKind::TypeMember;
-  }
-
-  /// \brief Determine the kind of literal for a literal constraint.
-  LiteralKind getLiteralKind() const {
-    assert(Kind == ConstraintKind::Literal && "Not a literal constraint!");
-    return Literal;
   }
 
   /// \brief Retrieve the locator for this constraint.
@@ -1180,7 +1145,7 @@ struct TypeVariableConstraints {
   /// to the type variable.
   SmallVector<Constraint *, 4> ConformsToConstraints;
   
-  /// \brief The set of archetype and literal constraints directly
+  /// \brief The set of archetype constraints directly
   /// applicable to the type variable T.
   SmallVector<Constraint *, 4> KindConstraints;
 };
@@ -1650,13 +1615,6 @@ public:
                                          locator));
   }
 
-  ///\ brief Add a literal constraint to the constraint system.
-  void addLiteralConstraint(Type type, LiteralKind kind,
-                            ConstraintLocator *locator = nullptr) {
-    assert(type && "missing type for literal constraint");
-    addConstraint(new (*this) Constraint(type, kind, locator));
-  }
-
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy,
                                 ConstraintLocator *locator = nullptr) {
@@ -2005,10 +1963,6 @@ private:
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
                                             ConstraintLocator *locator);
-
-  /// \brief Attempt to simplify the given literal constraint.
-  SolutionKind simplifyLiteralConstraint(Type type, LiteralKind kind,
-                                         ConstraintLocator *locator);
 
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);

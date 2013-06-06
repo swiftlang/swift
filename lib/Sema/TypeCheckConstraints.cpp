@@ -211,37 +211,6 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
   case ConstraintKind::Conversion: Out << " <c "; break;
   case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
-  case ConstraintKind::Literal:
-    Out << " is ";
-    switch (getLiteralKind()) {
-    case LiteralKind::Char:
-      Out << "a character";
-      break;
-
-    case LiteralKind::Float:
-      Out << "a floating-point";
-      break;
-
-    case LiteralKind::Int:
-      Out << "an integer";
-      break;
-
-    case LiteralKind::String:
-      Out << "a string";
-      break;
-
-    case LiteralKind::Array:
-      Out << "an array";
-      break;
-
-    case LiteralKind::Dictionary:
-      Out << "a dictionary";
-      break;
-    }
-    Out << " literal";
-    skipSecond = true;
-    break;
-
   case ConstraintKind::ValueMember:
     Out << "[." << Member.str() << ": value] == ";
     break;
@@ -2076,26 +2045,6 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
   return SolutionKind::Error;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyLiteralConstraint(Type type, LiteralKind kind,
-                                            ConstraintLocator *locator) {
-  assert(kind != LiteralKind::Float);
-  
-  if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-    auto fixed = getFixedType(tv);
-    if (!fixed)
-      return SolutionKind::Unsolved;
-
-    // Continue with the fixed type.
-    type = fixed;
-  }
-
-  assert(kind == LiteralKind::Array || kind == LiteralKind::Dictionary);
-  return (type->is<NominalType>() || type->is<BoundGenericType>())
-           ? SolutionKind::TriviallySolved
-           : SolutionKind::Unsolved;
-}
-
 /// \brief Determine whether the given protocol member's signature involves
 /// any associated types.
 ///
@@ -2324,9 +2273,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::ConformsTo:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
-  case ConstraintKind::Literal:
-    llvm_unreachable("Literals don't involve type matches");
-
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
     llvm_unreachable("Member constraints don't involve type matches");
@@ -2362,11 +2308,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyConformsToConstraint(constraint.getFirstType(),
                                         constraint.getProtocol(),
                                         constraint.getLocator());
-
-  case ConstraintKind::Literal:
-    return simplifyLiteralConstraint(constraint.getFirstType(),
-                                     constraint.getLiteralKind(),
-                                     constraint.getLocator());
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::TypeMember:
@@ -2412,9 +2353,8 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
 
   // FIXME: this is hideously inefficient.
   for (auto constraint : Constraints) {
-    // We only care about literal constraints and conformance constrants;
-    if (constraint->getClassification() != ConstraintClassification::Literal &&
-        constraint->getKind() != ConstraintKind::ConformsTo)
+    // We only care about conformance constrants.
+    if (constraint->getKind() != ConstraintKind::ConformsTo)
       continue;
 
     // on type variables...
@@ -2430,13 +2370,7 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
     // If the type we were given matches the default literal type for this
     // constraint, we found what we're looking for.
     // FIXME: isEqual() isn't right for Slice<T>.
-    Type defaultType;
-    if (constraint->getKind() == ConstraintKind::Literal) {
-      defaultType = TC.getDefaultLiteralType(constraint->getLiteralKind());
-    } else {
-      defaultType = TC.getDefaultType(constraint->getProtocol());
-    }
-    
+    Type defaultType = TC.getDefaultType(constraint->getProtocol());
     if (defaultType && type->isEqual(defaultType))
       return true;
   }
@@ -2587,8 +2521,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
           continue;
         }
         
-        // If the type variable was bound by a literal constraint, and the
-        // type it is bound to happens to match the default literal
+        // If the type variable was bound by a literal protocol constraint, and
+        // the type it is bound to happens to match the default literal
         // constraint in one system but not the other, we prefer the one
         // that matches the default.
         // Note that the constraint will be available in the parent of
