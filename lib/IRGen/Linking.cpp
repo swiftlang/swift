@@ -183,7 +183,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
         if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-          buffer << asmLabel->getLabel();
+          buffer << '\01' << asmLabel->getLabel();
         } else {
           buffer << namedClangDecl->getName();
         }

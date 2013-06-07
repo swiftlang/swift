@@ -72,7 +72,7 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
     if (auto clangDecl = c.getDecl()->getClangDecl()) {
       if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
         if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
-          buffer << asmLabel->getLabel();
+          buffer << '\01' << asmLabel->getLabel();
         } else {
           buffer << namedClangDecl->getName();
         }
