@@ -15,13 +15,35 @@
 //===----------------------------------------------------------------------===//
 
 #include "SerializedDiagnosticConsumer.h"
+#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/OwningPtr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
+
+namespace {
+/// \brief Diagnostic consumer that serializes diagnostics to a stream.
+class SerializedDiagnosticConsumer : public DiagnosticConsumer {
+  llvm::OwningPtr<raw_ostream> OS;
+public:
+  SerializedDiagnosticConsumer(raw_ostream *OS) : OS(OS) {}
+
+  virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+                                DiagnosticKind Kind, llvm::StringRef Text,
+                                const DiagnosticInfo &Info);
+};
+}
+
+namespace swift { namespace serialized_diagnostics {
+  DiagnosticConsumer *createConsumer(llvm::raw_ostream *OS) {
+    return new SerializedDiagnosticConsumer(OS);
+  }
+}}
 
 void
 SerializedDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM,

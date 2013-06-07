@@ -1392,6 +1392,15 @@ ERROR(irgen_unimplemented,irgen,none,
       "unimplemented IR generation feature %0", (StringRef))
 ERROR(irgen_failure,irgen,none, "IR generation failure: %0", (StringRef))
 
+
+//==============================================================================
+// Frontend Diagnostics.
+//==============================================================================
+
+ERROR(cannot_open_serialized_file,frontend,none,
+  "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
+
+
 #if defined(DIAG)
 #  undef DIAG
 #endif

@@ -18,17 +18,24 @@
 #ifndef SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 #define SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 
-#include "swift/Basic/DiagnosticConsumer.h"
+namespace llvm {
+  class raw_ostream;
+}
 
 namespace swift {
 
-/// \brief Diagnostic consumer that serializes diagnostics to a file.
-class SerializedDiagnosticConsumer : public DiagnosticConsumer {
-public:
-  virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, llvm::StringRef Text,
-                                const DiagnosticInfo &Info);
-};
+  class DiagnosticConsumer;
+
+  namespace serialized_diagnostics {
+    /// \brief Create a DiagnostcConsumer that serializes diagnostics to a
+    ///        stream.
+    ///
+    /// \param OS the stream to emit the diagnostics.  The consumer takes
+    ///        ownership of the stream.
+    ///
+    /// \returns A new diagnostic consumer that serializes diagnostics.
+    DiagnosticConsumer *createConsumer(llvm::raw_ostream *OS);
+  }
 }
 
 #endif
