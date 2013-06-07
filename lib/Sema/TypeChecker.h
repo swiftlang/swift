@@ -312,20 +312,6 @@ public:
   /// place to return a builtin integral value (e.g., builtin i64).
   bool typeCheckArrayBound(Expr *&expr, bool requireConstant, DeclContext *dc);
 
-  /// \brief Type check an assignment expression using the constraint-based
-  /// type checker.
-  ///
-  /// \param dest The destination expression.
-  /// \param equalLoc The location of the '='.
-  /// \param src The source expression.
-  ///
-  /// \returns a converted (dest, src) expression pair, or (nullptr, nullptr)
-  /// if the assignment failed to type-check.
-  std::pair<Expr *, Expr *> typeCheckAssignment(Expr *dest,
-                                                SourceLoc equalLoc,
-                                                Expr *src,
-                                                DeclContext *dc);
-
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);

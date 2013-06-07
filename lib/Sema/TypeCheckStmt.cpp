@@ -729,14 +729,12 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                              ctor->getImplicitThisDecl(),
                              patternBind->getPattern())) {
             initializer = new (Context) DefaultValueExpr(initializer);
-            std::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
-                                                               initializer,
-                                                               ctor);
-            defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),
-                                                            initializer));
+            Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
+                                                    initializer);
+            typeCheckExpression(assign, ctor);
+            defaultInits.push_back(assign);
             continue;
           }
-
 
           diagnose(body->getLBraceLoc(), diag::decl_no_default_init_ivar_hole);
           diagnose(patternBind->getLoc(), diag::decl_init_here);
@@ -776,11 +774,10 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                 SourceLoc(), 
                 var->getName(),
                 SourceLoc());
-          std::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
-                                                             initializer,
-                                                             ctor);
-          defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),
-                                                          initializer));
+          Expr *assign = new (Context) AssignExpr(dest, SourceLoc(),
+                                                  initializer);
+          typeCheckExpression(assign, ctor);
+          defaultInits.push_back(assign);
         }
       }
     }
