@@ -93,7 +93,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'P' protocol-list '_'             // protocol
   type ::= 'Q' index                         // archetype with depth=0
   type ::= 'Qd' index index                  // archetype with depth=M+1
-  type ::= 'R' type                          // l-value
+  type ::= 'R' type                          // byref
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
   type ::= 'U' generics '_' type             // generic type
