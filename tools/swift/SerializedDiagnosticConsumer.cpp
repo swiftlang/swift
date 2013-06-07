@@ -123,16 +123,51 @@ class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// \brief State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
 public:
-  SerializedDiagnosticConsumer(raw_ostream *OS) : State(new SharedState(OS)) {}
+  SerializedDiagnosticConsumer(raw_ostream *OS) : State(new SharedState(OS)) {
+    emitPreamble();
+  }
+
+  ~SerializedDiagnosticConsumer() {
+    // FIXME: we may not wish to put this in a destructor.
+    // That's not what clang does.
+
+    // NOTE: clang also does check for shared instances.  We don't
+    // have these yet in Swift, but if we do we need to add an extra
+    // check here.
+
+    // Finish off any diagnostic we were in the process of emitting.
+    if (State->EmittedAnyDiagBlocks)
+      exitDiagBlock();
+
+    // Write the generated bitstream to "Out".
+    State->OS->write((char *)&State->Buffer.front(), State->Buffer.size());
+    State->OS->flush();
+    State->OS.reset(0);
+  }
 
   virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, llvm::StringRef Text,
                                 const DiagnosticInfo &Info);
+
+  /// \brief The version of the diagnostics file.
+  enum { Version = 1 };
+
 private:
+  /// \brief Emit bitcode for the preamble.
+  void emitPreamble();
+
+  /// \brief Emit bitcode for the BlockInfoBlock (part of the preamble).
+  void emitBlockInfoBlock();
+
+  /// \brief Emit bitcode for metadata block (part of preamble).
+  void emitMetaBlock();
+
+  /// \brief Emit bitcode to enter a block for a diagnostic.
   void enterDiagBlock() {
     State->Stream.EnterSubblock(BLOCK_DIAG, 4);
   }
 
+  /// \brief Emit bitcode to exit a block for a diagnostic.
   void exitDiagBlock() {
     State->Stream.ExitBlock();
   }
@@ -239,6 +274,167 @@ static unsigned getDiagnosticLevel(DiagnosticKind Kind) {
     case DiagnosticKind::Warning:
       return 2;
   }
+}
+
+void SerializedDiagnosticConsumer::emitPreamble() {
+  State->Stream.Emit((unsigned)'D', 8);
+  State->Stream.Emit((unsigned)'I', 8);
+  State->Stream.Emit((unsigned)'A', 8);
+  State->Stream.Emit((unsigned)'G', 8);
+  emitBlockInfoBlock();
+  emitMetaBlock();
+}
+
+
+void SerializedDiagnosticConsumer::emitMetaBlock() {
+  llvm::BitstreamWriter &Stream = State->Stream;
+  RecordData &Record = State->Record;
+  AbbreviationMap &Abbrevs = State->Abbrevs;
+
+  Stream.EnterSubblock(BLOCK_META, 3);
+  Record.clear();
+  Record.push_back(RECORD_VERSION);
+  Record.push_back(Version);
+  Stream.EmitRecordWithAbbrev(Abbrevs.get(RECORD_VERSION), Record);
+  Stream.ExitBlock();
+}
+
+
+/// \brief Emits a block ID in the BLOCKINFO block.
+static void emitBlockID(unsigned ID, const char *Name,
+                        llvm::BitstreamWriter &Stream,
+                        RecordDataImpl &Record) {
+  Record.clear();
+  Record.push_back(ID);
+  Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, Record);
+
+  // Emit the block name if present.
+  if (Name == 0 || Name[0] == 0)
+    return;
+
+  Record.clear();
+
+  while (*Name)
+    Record.push_back(*Name++);
+
+  Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, Record);
+}
+
+/// \brief Emits a record ID in the BLOCKINFO block.
+static void emitRecordID(unsigned ID, const char *Name,
+                         llvm::BitstreamWriter &Stream,
+                         RecordDataImpl &Record){
+  Record.clear();
+  Record.push_back(ID);
+
+  while (*Name)
+    Record.push_back(*Name++);
+
+  Stream.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, Record);
+}
+
+/// \brief Emit bitcode for abbreviation for source locations.
+static void addSourceLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
+  using namespace llvm;
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // File ID.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Line.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Column.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Offset;
+}
+
+/// \brief Emit bitcode for abbreviation for source ranges.
+static void addRangeLocationAbbrev(llvm::BitCodeAbbrev *Abbrev) {
+  addSourceLocationAbbrev(Abbrev);
+  addSourceLocationAbbrev(Abbrev);
+}
+
+void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
+  State->Stream.EnterBlockInfoBlock(3);
+
+  using namespace llvm;
+  llvm::BitstreamWriter &Stream = State->Stream;
+  RecordData &Record = State->Record;
+  AbbreviationMap &Abbrevs = State->Abbrevs;
+
+  // ==---------------------------------------------------------------------==//
+  // The subsequent records and Abbrevs are for the "Meta" block.
+  // ==---------------------------------------------------------------------==//
+
+  emitBlockID(BLOCK_META, "Meta", Stream, Record);
+  emitRecordID(RECORD_VERSION, "Version", Stream, Record);
+  BitCodeAbbrev *Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_VERSION));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32));
+  Abbrevs.set(RECORD_VERSION, Stream.EmitBlockInfoAbbrev(BLOCK_META, Abbrev));
+
+  // ==---------------------------------------------------------------------==//
+  // The subsequent records and Abbrevs are for the "Diagnostic" block.
+  // ==---------------------------------------------------------------------==//
+
+  emitBlockID(BLOCK_DIAG, "Diag", Stream, Record);
+  emitRecordID(RECORD_DIAG, "DiagInfo", Stream, Record);
+  emitRecordID(RECORD_SOURCE_RANGE, "SrcRange", Stream, Record);
+  emitRecordID(RECORD_CATEGORY, "CatName", Stream, Record);
+  emitRecordID(RECORD_DIAG_FLAG, "DiagFlag", Stream, Record);
+  emitRecordID(RECORD_FILENAME, "FileName", Stream, Record);
+  emitRecordID(RECORD_FIXIT, "FixIt", Stream, Record);
+
+  // Emit abbreviation for RECORD_DIAG.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_DIAG));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 3));  // Diag level.
+  addSourceLocationAbbrev(Abbrev);
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Category.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped Diag ID.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Diagnostc text.
+  Abbrevs.set(RECORD_DIAG, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
+
+  // Emit abbrevation for RECORD_CATEGORY.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_CATEGORY));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Category ID.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 8));  // Text size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));      // Category text.
+  Abbrevs.set(RECORD_CATEGORY, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
+
+  // Emit abbrevation for RECORD_SOURCE_RANGE.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_SOURCE_RANGE));
+  addRangeLocationAbbrev(Abbrev);
+  Abbrevs.set(RECORD_SOURCE_RANGE,
+              Stream.EmitBlockInfoAbbrev(BLOCK_DIAG, Abbrev));
+
+  // Emit the abbreviation for RECORD_DIAG_FLAG.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_DIAG_FLAG));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped Diag ID.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // Flag name text.
+  Abbrevs.set(RECORD_DIAG_FLAG, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG,
+                                                           Abbrev));
+
+  // Emit the abbreviation for RECORD_FILENAME.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_FILENAME));
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 10)); // Mapped file ID.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 32)); // Modifcation time.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob)); // File name text.
+  Abbrevs.set(RECORD_FILENAME, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG,
+                                                          Abbrev));
+
+  // Emit the abbreviation for RECORD_FIXIT.
+  Abbrev = new BitCodeAbbrev();
+  Abbrev->Add(BitCodeAbbrevOp(RECORD_FIXIT));
+  addRangeLocationAbbrev(Abbrev);
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 16)); // Text size.
+  Abbrev->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));      // FixIt text.
+  Abbrevs.set(RECORD_FIXIT, Stream.EmitBlockInfoAbbrev(BLOCK_DIAG,
+                                                       Abbrev));
+
+  Stream.ExitBlock();
 }
 
 void SerializedDiagnosticConsumer::
