@@ -170,18 +170,13 @@ static bool isExprPostfix(Expr *expr) {
 ///
 ///   expr:
 ///     expr-basic
-///     expr-trailing-closure expr-cast?
+///     expr-trailing-closure
 ///
 ///   expr-basic:
 ///     expr-sequence
-///     expr-sequence expr-cast?
 ///
 ///   expr-trailing-closure:
 ///     expr-postfix expr-closure+
-///
-///   expr-cast:
-///     expr-is
-///     expr-as
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
@@ -244,34 +239,27 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  if (Tok.is(tok::kw_is)) {
-    return parseExprIs(expr.get());
-  }
-  if (Tok.is(tok::kw_as)) {
-    return parseExprAs(expr.get());
-  }
-  
   return expr;
 }
 
 /// parseExprIs
 ///   expr-is:
 ///     'is' type
-NullablePtr<Expr> Parser::parseExprIs(Expr *sub) {
+NullablePtr<Expr> Parser::parseExprIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   
   TypeLoc type;
   if (parseType(type, diag::expected_type_after_is))
     return nullptr;
   
-  return new (Context) IsSubtypeExpr(sub, isLoc, type);
+  return new (Context) IsSubtypeExpr(isLoc, type);
 }
 
 /// parseExprAs
 ///   expr-as:
 ///     'as' type
 ///     'as' '!' type
-NullablePtr<Expr> Parser::parseExprAs(Expr *sub) {
+NullablePtr<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
   SourceLoc bangLoc;
   
@@ -284,8 +272,8 @@ NullablePtr<Expr> Parser::parseExprAs(Expr *sub) {
     return nullptr;
   
   return bangLoc.isValid()
-    ? (Expr*) new (Context) UncheckedDowncastExpr(sub, asLoc, bangLoc, type)
-    : (Expr*) new (Context) CoerceExpr(sub, asLoc, type);
+    ? (Expr*) new (Context) UncheckedDowncastExpr(asLoc, bangLoc, type)
+    : (Expr*) new (Context) CoerceExpr(asLoc, type);
 }
 
 /// \brief Determine whether the given token starts with a pipe ('|').
@@ -296,11 +284,14 @@ static bool startsWithPipe(Token tok) {
 /// parseExprSequence
 ///
 ///   expr-sequence:
-///     expr-unary expr-binary*
+///     expr-unary expr-binary* expr-cast?
 ///   expr-binary:
 ///     operator-binary expr-unary
 ///     '?' expr-sequence ':' expr-unary
 ///     '=' expr-unary
+///   expr-cast:
+///     expr-is
+///     expr-as
 ///
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
@@ -308,6 +299,8 @@ static bool startsWithPipe(Token tok) {
 NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
+  
+  Expr *suffix = nullptr;
 
   while (true) {
     // Parse a unary expression.
@@ -376,6 +369,25 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
     }
   }
 done:
+  
+  // Check for a cast suffix.
+  if (Tok.is(tok::kw_is)) {
+    NullablePtr<Expr> is = parseExprIs();
+    if (is.isNull()) return nullptr;
+    suffix = is.get();
+  }
+  else if (Tok.is(tok::kw_as)) {
+    NullablePtr<Expr> as = parseExprAs();
+    if (as.isNull()) return nullptr;
+    suffix = as.get();
+  }
+  
+  // If present, push the cast suffix onto the sequence with a placeholder
+  // RHS. (The real RHS is the type parameter encoded in the node itself.)
+  if (suffix) {
+    SequencedExprs.push_back(suffix);
+    SequencedExprs.push_back(suffix);
+  }
   
   // If we had semantic errors, just fail here.
   assert(!SequencedExprs.empty());

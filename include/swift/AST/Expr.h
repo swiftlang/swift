@@ -2147,11 +2147,12 @@ public:
 /// the type.
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
+  SourceLoc AsLoc;
   TypeLoc Type;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *sub, TypeLoc type)
-    : Expr(kind, type.getType()), SubExpr(sub), Type(type)
+  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc type)
+    : Expr(kind, type.getType()), SubExpr(sub), AsLoc(AsLoc), Type(type)
   {}
 
 public:
@@ -2161,12 +2162,16 @@ public:
 
   void setSubExpr(Expr *E) { SubExpr = E; }
 
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-  SourceLoc getEndLoc() const { return Type.getSourceRange().End; }
+  SourceLoc getLoc() const { return AsLoc; }
 
   SourceRange getSourceRange() const {
-    return {getStartLoc(), getEndLoc()};
+    return SubExpr
+      ? SourceRange{SubExpr->getStartLoc(), Type.getSourceRange().End}
+      : SourceRange{AsLoc, Type.getSourceRange().End};
   }
+  
+  /// True if the node has been processed by SequenceExpr folding.
+  bool isFolded() const { return SubExpr; }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ExplicitCastExpr &&
@@ -2181,15 +2186,14 @@ public:
 /// a type. It does not perform any casting not captured by implicit
 /// conversions.
 class CoerceExpr : public ExplicitCastExpr {
-  SourceLoc AsLoc;
-  
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, type),
-      AsLoc(asLoc) { }
+    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type) { }
   
-  SourceLoc getLoc() const { return AsLoc; }
-
+  CoerceExpr(SourceLoc asLoc, TypeLoc type)
+    : CoerceExpr(nullptr, asLoc, type)
+  {}
+  
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Coerce;
   }
@@ -2202,18 +2206,20 @@ public:
 /// FIXME: At present, only class downcasting is supported.
 /// FIXME: All downcasts are currently unchecked, which is horrible.
 class UncheckedDowncastExpr : public ExplicitCastExpr {
-  SourceLoc AsLoc;
   SourceLoc BangLoc;
   
 public:
   UncheckedDowncastExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
                         TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedDowncast, sub, type),
-      AsLoc(asLoc), BangLoc(bangLoc) { }
-
-  SourceLoc getLoc() const { return AsLoc; }
-  SourceLoc getBangLoc() const { return BangLoc; }
+    : ExplicitCastExpr(ExprKind::UncheckedDowncast, sub, asLoc, type),
+      BangLoc(bangLoc) { }
   
+  UncheckedDowncastExpr(SourceLoc asLoc, SourceLoc bangLoc, TypeLoc type)
+    : UncheckedDowncastExpr(nullptr, asLoc, bangLoc, type)
+  {}
+
+  SourceLoc getBangLoc() const { return BangLoc; }
+    
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UncheckedDowncast;
   }
@@ -2226,16 +2232,14 @@ public:
 /// FIXME: At present, only class downcasting is supported.
 /// FIXME: All downcasts are currently unchecked, which is horrible.
 class UncheckedSuperToArchetypeExpr : public ExplicitCastExpr {
-  SourceLoc AsLoc;
   SourceLoc BangLoc;
   
 public:
   UncheckedSuperToArchetypeExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
                                 TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedSuperToArchetype, sub, type),
-      AsLoc(asLoc), BangLoc(bangLoc) { }
+    : ExplicitCastExpr(ExprKind::UncheckedSuperToArchetype, sub, asLoc, type),
+      BangLoc(bangLoc) { }
   
-  SourceLoc getLoc() const { return AsLoc; }
   SourceLoc getBangLoc() const { return BangLoc; }
 
   static bool classof(const Expr *E) {
@@ -2256,6 +2260,10 @@ public:
     : Expr(ExprKind::IsSubtype), SubExpr(sub), Type(type), IsLoc(isLoc)
   {}
   
+  IsSubtypeExpr(SourceLoc isLoc, TypeLoc type)
+    : IsSubtypeExpr(nullptr, isLoc, type)
+  {}
+  
   Expr *getSubExpr() const { return SubExpr; }
   TypeLoc &getTypeLoc() { return Type; }
   TypeLoc getTypeLoc() const { return Type; }
@@ -2264,8 +2272,13 @@ public:
   
   SourceLoc getLoc() const { return IsLoc; }
   SourceRange getSourceRange() const {
-    return {SubExpr->getStartLoc(), Type.getSourceRange().End};
+    return SubExpr
+      ? SourceRange{SubExpr->getStartLoc(), Type.getSourceRange().End}
+      : SourceRange{IsLoc, Type.getSourceRange().End};
   }
+  
+  /// True if the node has been processed by SequenceExpr folding.
+  bool isFolded() const { return SubExpr; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IsSubtype;

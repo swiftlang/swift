@@ -434,8 +434,8 @@ public:
   NullablePtr<Expr> parseExprBasic(Diag<> ID) {
     return parseExpr(ID, /*isExprBasic=*/true);
   }
-  NullablePtr<Expr> parseExprIs(Expr *sub);
-  NullablePtr<Expr> parseExprAs(Expr *sub);
+  NullablePtr<Expr> parseExprIs();
+  NullablePtr<Expr> parseExprAs();
   NullablePtr<Expr> parseExprSequence(Diag<> ID);
   NullablePtr<Expr> parseExprPostfix(Diag<> ID);
   NullablePtr<Expr> parseExprUnary(Diag<> ID);
