@@ -482,52 +482,6 @@ public:
   }
 };
   
-/// This represents the '? ... :' middle operand of a
-/// ternary expression within an unresolved SequenceExpr.
-/// It will be matched to left and right operands and transformed into an IfExpr
-/// during precedence parsing in NameBinding.
-class UnsequencedTernaryExpr : public Expr {
-  SourceLoc QuestionLoc, ColonLoc;
-  Expr *MiddleExpr;
-public:
-  UnsequencedTernaryExpr(SourceLoc QuestionLoc,
-                        Expr *MiddleExpr,
-                        SourceLoc ColonLoc)
-    : Expr(ExprKind::UnsequencedTernary),
-      QuestionLoc(QuestionLoc), ColonLoc(ColonLoc), MiddleExpr(MiddleExpr)
-  {}
-  
-  SourceLoc getLoc() const { return QuestionLoc; }
-  SourceLoc getQuestionLoc() const { return QuestionLoc; }
-  SourceLoc getColonLoc() const { return ColonLoc; }
-  SourceRange getSourceRange() const { return {QuestionLoc, ColonLoc}; }
-  
-  Expr *getMiddleExpr() const { return MiddleExpr; }
-  void setMiddleExpr(Expr *e) { MiddleExpr = e; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnsequencedTernary;
-  }
-};
-  
-/// This represents a '=' assignment token within an unresolved SequenceExpr.
-/// It will be matched to left and right operands and transformed into an
-/// AssignExpr during precedence parsing.
-class UnsequencedAssignExpr : public Expr {
-  SourceLoc EqualsLoc;
-public:
-  UnsequencedAssignExpr(SourceLoc EqualsLoc)
-    : Expr(ExprKind::UnsequencedAssign), EqualsLoc(EqualsLoc)
-  {}
-  
-  SourceLoc getLoc() const { return EqualsLoc; }
-  SourceRange getSourceRange() const { return EqualsLoc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnsequencedAssign;
-  }
-};
-  
 /// MemberRefExpr - This represents 'a.b' where we are referring to a member
 /// of a type, such as a property or variable.
 ///
@@ -2361,9 +2315,15 @@ public:
       QuestionLoc(QuestionLoc), ColonLoc(ColonLoc)
   {}
   
+  IfExpr(SourceLoc QuestionLoc, Expr *ThenExpr, SourceLoc ColonLoc)
+    : IfExpr(nullptr, QuestionLoc, ThenExpr, ColonLoc, nullptr)
+  {}
+  
   SourceLoc getLoc() const { return QuestionLoc; }
   SourceRange getSourceRange() const {
-    return {CondExpr->getStartLoc(), ElseExpr->getEndLoc()};
+    if (isFolded())
+      return {CondExpr->getStartLoc(), ElseExpr->getEndLoc()};
+    return {QuestionLoc, ColonLoc};
   }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
   SourceLoc getColonLoc() const { return ColonLoc; }
@@ -2376,6 +2336,9 @@ public:
   
   Expr *getElseExpr() const { return ElseExpr; }
   void setElseExpr(Expr *E) { ElseExpr = E; }
+  
+  /// True if the node has been processed by binary expression folding.
+  bool isFolded() const { return CondExpr && ElseExpr; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::If;
@@ -2391,6 +2354,10 @@ class AssignExpr : public Expr {
 public:  
   AssignExpr(Expr *Dest, SourceLoc EqualLoc, Expr *Src)
     : Expr(ExprKind::Assign), Dest(Dest), Src(Src), EqualLoc(EqualLoc) {}
+  
+  AssignExpr(SourceLoc EqualLoc)
+    : AssignExpr(nullptr, EqualLoc, nullptr)
+  {}
 
   Expr *getDest() const { return Dest; }
   void setDest(Expr *e) { Dest = e; }
@@ -2400,6 +2367,9 @@ public:
   SourceLoc getEqualLoc() const { return EqualLoc; }
   
   SourceRange getSourceRange() const;
+  
+  /// True if the node has been processed by binary expression folding.
+  bool isFolded() const { return Dest && Src; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Assign;

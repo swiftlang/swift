@@ -1449,12 +1449,6 @@ namespace {
       return expr;
     }
     
-    Expr *visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
-      llvm_unreachable("this node should be eliminated by name binding");
-    }
-    Expr *visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
-      llvm_unreachable("this node should be eliminated by name binding");
-    }
     Expr *visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

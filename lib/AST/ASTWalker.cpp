@@ -89,18 +89,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
-  Expr *visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
-    if (Expr *Middle = doIt(E->getMiddleExpr())) {
-      E->setMiddleExpr(Middle);
-      return E;
-    }
-    return nullptr;
-  }
-  
-  Expr *visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
-    return E;
-  }
-  
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
   Expr *visitZeroValueExpr(ZeroValueExpr *E) { return E; }
@@ -406,31 +394,38 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   
   Expr *visitAssignExpr(AssignExpr *AE) {
-    if (Expr *E = doIt(AE->getDest()))
-      AE->setDest(E);
-    else
-      return nullptr;
+    if (Expr *Dest = AE->getDest()) {
+      if (!(Dest = doIt(Dest)))
+        return nullptr;
+      AE->setDest(Dest);
+    }
 
-    if (Expr *E = doIt(AE->getSrc()))
-      AE->setSrc(E);
-    else
-      return nullptr;
+    if (Expr *Src = AE->getSrc()) {
+      if (!(Src = doIt(AE->getSrc())))
+        return nullptr;
+      AE->setSrc(Src);
+    }
+    
     return AE;
   }
   
   
   Expr *visitIfExpr(IfExpr *E) {
-    Expr *Cond = doIt(E->getCondExpr());
-    if (!Cond) return nullptr;
-    E->setCondExpr(Cond);
+    if (Expr *Cond = E->getCondExpr()) {
+      Cond = doIt(Cond);
+      if (!Cond) return nullptr;
+      E->setCondExpr(Cond);
+    }
     
     Expr *Then = doIt(E->getThenExpr());
     if (!Then) return nullptr;
     E->setThenExpr(Then);
     
-    Expr *Else = doIt(E->getElseExpr());
-    if (!Else) return nullptr;
-    E->setElseExpr(Else);
+    if (Expr *Else = E->getElseExpr()) {
+      Else = doIt(Else);
+      if (!Else) return nullptr;
+      E->setElseExpr(Else);
+    }
     
     return E;
   }

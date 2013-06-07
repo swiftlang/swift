@@ -94,8 +94,6 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::Sequence:
   case ExprKind::IsSubtype:
   case ExprKind::UncheckedDowncast:
-  case ExprKind::UnsequencedTernary:
-  case ExprKind::UnsequencedAssign:
   case ExprKind::Assign:
     return false;
 
@@ -355,9 +353,9 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
-        = new (Context) UnsequencedTernaryExpr(questionLoc,
-                                              middle.get(),
-                                              colonLoc);
+        = new (Context) IfExpr(questionLoc,
+                               middle.get(),
+                               colonLoc);
       SequencedExprs.push_back(unresolvedIf);
       Message = diag::expected_expr_after_if_colon;
       break;
@@ -366,7 +364,7 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
     case tok::equal: {
       SourceLoc equalsLoc = consumeToken();
       
-      auto *assign = new (Context) UnsequencedAssignExpr(equalsLoc);
+      auto *assign = new (Context) AssignExpr(equalsLoc);
       SequencedExprs.push_back(assign);
       Message = diag::expected_expr_assignment;
       break;

@@ -138,11 +138,13 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
-  if (isa<UnsequencedTernaryExpr>(E)) {
+  if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
+    assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     return InfixData(100, Associativity::Right);
-  } else if (isa<UnsequencedAssignExpr>(E)) {
+  } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
+    assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     return InfixData(90, Associativity::Right);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (Optional<InfixOperatorDecl*> maybeOp
@@ -171,10 +173,21 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
 static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   if (!LHS || !RHS)
     return nullptr;
+  
+  if (auto *ifExpr = dyn_cast<IfExpr>(Op)) {
+    // Resolve the ternary expression.
+    assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    ifExpr->setCondExpr(LHS);
+    ifExpr->setElseExpr(RHS);
+    return ifExpr;
+  }
 
-  if (auto *assign = dyn_cast<UnsequencedAssignExpr>(Op)) {
-    // Build an assignment expression.
-    return new (TC.Context) AssignExpr(LHS, assign->getLoc(), RHS);
+  if (auto *assign = dyn_cast<AssignExpr>(Op)) {
+    // Resolve the assignment expression.
+    assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    assign->setDest(LHS);
+    assign->setSrc(RHS);
+    return assign;
   }
   
   // Build the argument to the operation.
@@ -199,76 +212,23 @@ static Expr *foldSequence(TypeChecker &TC,
   assert(!S.empty());
   assert((S.size() & 1) == 0);
   
-  // An "operator" for our purposes can be either a binary op, or the MHS of a
-  // ternary.
   struct Op {
-    enum { Null, Binary, Ternary } kind;
-    union {
-      Expr *binary;
-      struct {
-        SourceLoc question;
-        swift::Expr *mhs;
-        SourceLoc colon;
-      } ternary;
-    };
+    Expr *op;
     InfixData infixData;
     
-    Op() : kind(Null) {}
-    
-    Op(Expr *binary, InfixData data)
-      : kind(Binary), binary(binary), infixData(data) {}
-    Op(SourceLoc question, swift::Expr *mhs, SourceLoc colon, InfixData data)
-      : kind(Ternary), ternary{question, mhs, colon}, infixData(data) {}
-    
-    SourceLoc getLoc() const {
-      switch (kind) {
-      case Null:
-        llvm_unreachable("null op");
-      case Binary:
-        return binary->getLoc();
-      case Ternary:
-        return ternary.question;
-      }
-    }
-    
-    explicit operator bool() const { return kind != Null; }
+    explicit operator bool() const { return op; }
   };
   
-  /// Get the next binary or ternary operator, if appropriate to this pass.
+  /// Get the operator, if appropriate to this pass.
   auto getNextOperator = [&]() -> Op {
     Expr *op = S[0];
 
     // If the operator's precedence is lower than the minimum, stop here.
     InfixData opInfo = getInfixData(TC, op);
-    if (opInfo.getPrecedence() < MinPrecedence) return {};
-    // If this is a ternary '?', pick out the middle expr.
-    if (auto *ternary = dyn_cast<UnsequencedTernaryExpr>(op)) {
-      return Op(ternary->getQuestionLoc(),
-                ternary->getMiddleExpr(),
-                ternary->getColonLoc(),
-                opInfo);
-    }
-    return Op(op, opInfo);
+    if (opInfo.getPrecedence() < MinPrecedence) return {nullptr, {}};
+    return {op, opInfo};
   };
-  
-  /// Finalize an operator expression.
-  auto makeOperatorExpr = [&](Expr *LHS, Op Operator, Expr *RHS) -> Expr* {
-    switch (Operator.kind) {
-    case Op::Null:
-      llvm_unreachable("should have break'ed on null Op");
-        
-    case Op::Binary:
-      return makeBinOp(TC, Operator.binary, LHS, RHS);
-    
-    case Op::Ternary:
-      return new (TC.Context) IfExpr(LHS,
-                                     Operator.ternary.question,
-                                     Operator.ternary.mhs,
-                                     Operator.ternary.colon,
-                                     RHS);
-    }
-  };
-  
+
   // Extract out the first operator.
   Op Op1 = getNextOperator();
   if (!Op1) return LHS;
@@ -296,7 +256,7 @@ static Expr *foldSequence(TypeChecker &TC,
     // both left-associative, fold LHS and RHS immediately.
     if (Op1.infixData.getPrecedence() > Op2Info.getPrecedence() ||
         (Op1.infixData == Op2Info && Op1.infixData.isLeftAssociative())) {
-      LHS = makeOperatorExpr(LHS, Op1, RHS);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS);
       Op1 = getNextOperator();
       assert(Op1 && "should get a valid operator here");
       RHS = S[1];
@@ -319,7 +279,7 @@ static Expr *foldSequence(TypeChecker &TC,
     // immediately fold LHS and RHS.
     if (Op1.infixData == Op2Info && Op1.infixData.isRightAssociative()) {
       RHS = foldSequence(TC, RHS, S, Op1.infixData.getPrecedence());
-      LHS = makeOperatorExpr(LHS, Op1, RHS);
+      LHS = makeBinOp(TC, Op1.op, LHS, RHS);
 
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
@@ -336,21 +296,20 @@ static Expr *foldSequence(TypeChecker &TC,
 
     if (Op1.infixData.isNonAssociative()) {
       // FIXME: QoI ranges
-      TC.diagnose(Op1.getLoc(), diag::non_assoc_adjacent);
+      TC.diagnose(Op1.op->getLoc(), diag::non_assoc_adjacent);
     } else if (Op2Info.isNonAssociative()) {
       TC.diagnose(Op2->getLoc(), diag::non_assoc_adjacent);
     } else {
-      TC.diagnose(Op1.getLoc(), diag::incompatible_assoc);
+      TC.diagnose(Op1.op->getLoc(), diag::incompatible_assoc);
     }
     
     // Recover by arbitrarily binding the first two.
-    LHS = makeOperatorExpr(LHS, Op1, RHS);
+    LHS = makeBinOp(TC, Op1.op, LHS, RHS);
     return foldSequence(TC, LHS, S, MinPrecedence);
   }
 
-  // Fold LHS (and MHS, if ternary) and RHS together and declare completion.
-
-  return makeOperatorExpr(LHS, Op1, RHS);
+  // Fold LHS and RHS together and declare completion.
+  return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {

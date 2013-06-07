@@ -432,7 +432,9 @@ void PipeClosureExpr::setSingleExpressionBody(Expr *newBody) {
 }
 
 SourceRange AssignExpr::getSourceRange() const {
-  return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
+  if (isFolded())
+    return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
+  return EqualLoc;
 }
 
 //===----------------------------------------------------------------------===//
@@ -544,14 +546,6 @@ public:
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
-  }
-  void visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
-    printCommon(E, "unresolved_ternary_expr") << '\n';
-    printRec(E->getMiddleExpr());
-    OS << ')';
-  }
-  void visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
-    printCommon(E, "unsequenced_assign_expr") << ')';
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';
