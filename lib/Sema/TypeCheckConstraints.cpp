@@ -2436,6 +2436,71 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
            });
 }
 
+/// \brief Compare two overload choices for equality.
+static bool sameOverloadChoice(const OverloadChoice &x,
+                               const OverloadChoice &y) {
+  if (x.getKind() != y.getKind())
+    return false;
+
+  switch (x.getKind()) {
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::FunctionReturningBaseType:
+  case OverloadChoiceKind::IdentityFunction:
+    // FIXME: Compare base types after substitution?
+    return true;
+
+  case OverloadChoiceKind::Decl:
+    return x.getDecl() == y.getDecl();
+
+  case OverloadChoiceKind::TupleIndex:
+    return x.getTupleIndex() == y.getTupleIndex();
+  }
+}
+
+/// \brief Determine whether the first declaration is as "specialized" as
+/// the second declaration.
+///
+/// "Specialized" is essentially a form of subtyping, defined below.
+static bool isDeclAsSpecializedAs(ConstraintSystem &cs,
+                                  Decl *decl1, Decl *decl2) {
+  // If the kinds are different, there's nothing we can do.
+  if (decl1->getKind() != decl2->getKind())
+    return false;
+
+  // Only permit as-specialized-as checks for function declarations.
+  if (!isa<FuncDecl>(decl1))
+    return false;
+
+  auto func1 = cast<FuncDecl>(decl1);
+  auto func2 = cast<FuncDecl>(decl2);
+
+  // Skip the 'this' parameter.
+  // FIXME: Might not actually be what we want to do. Think about this more.
+  auto type1 = func1->getType();
+  auto type2 = func2->getType();
+  if (func1->getDeclContext()->isTypeContext() &&
+      func2->getDeclContext()->isTypeContext()) {
+    type1 = type1->castTo<AnyFunctionType>()->getResult();
+    type2 = type2->castTo<AnyFunctionType>()->getResult();
+  }
+
+  // If one is polymorphic and the other is not, prefer the monomorphic result.
+  // FIXME: Isn't this a special case of the subtype check below.
+  bool poly1 = type1->is<PolymorphicFunctionType>();
+  bool poly2 = type2->is<PolymorphicFunctionType>();
+  if (poly1 != poly2) {
+    return poly2;
+  }
+
+  // FIXME: Should be able to compare polymorphic types here.
+  if (poly1 || poly2) {
+    return false;
+  }
+
+  // The first is more specialized if it is a subtype of the second.
+  return cs.getTypeChecker().isSubtypeOf(type1, type2);
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
                         ConstraintSystem &cs,
                         ArrayRef<Solution> solutions,
@@ -2531,31 +2596,73 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     bool defaultLit2
       = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type2);
     if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
-      break;;
+      break;
 
     // Prefer concrete types to existentials.
     bool isExistential1 = type1->isExistentialType();
     bool isExistential2 = type2->isExistentialType();
     if (updateSolutionCompareResult(result, isExistential1, isExistential2))
-      break;;
+      break;
   }
   
   // FIXME: There might be variables bound in the second type system but not
   // the first, but for now we don't really care.
 
-  // FIXME: Compare overload sets.
-
-  switch (result) {
-  case SolutionCompareResult::Incomparable:
-  case SolutionCompareResult::Better:
-  case SolutionCompareResult::Worse:
+  if (result == SolutionCompareResult::Incomparable)
     return result;
+  
+  // Compare overload sets.
+  for (auto &overload : diff.overloads) {
+    auto choice1 = overload.choices[idx1];
+    auto choice2 = overload.choices[idx2];
 
-  case SolutionCompareResult::Identical:
-    // FIXME: We haven't checked enough to conclude that two solutions are
-    // identical. But it's convenient to call them identical.
-    return SolutionCompareResult::Identical;
+    // If the systems made the same choice, there's nothing interesting here.
+    if (sameOverloadChoice(choice1, choice2))
+      continue;
+
+    // If the kinds of overload choice don't match...
+    if (choice1.getKind() != choice2.getKind()) {
+      // The identity function beats any declaration.
+      if (choice1.getKind() == OverloadChoiceKind::IdentityFunction &&
+          choice2.getKind() == OverloadChoiceKind::Decl) {
+        if (updateSolutionCompareResult(result, true, false))
+          break;
+      } else if (choice1.getKind() == OverloadChoiceKind::Decl &&
+                 choice2.getKind() == OverloadChoiceKind::IdentityFunction) {
+        if (updateSolutionCompareResult(result, false, true))
+          break;
+      } else {
+        // FIXME: Incomparable?
+      }
+      continue;
+    }
+
+    // The kinds of overload choice match, but the contents don't.
+    switch (choice1.getKind()) {
+    case OverloadChoiceKind::TupleIndex:
+      // The system is incomparable if we selected different tuple indices.
+      return SolutionCompareResult::Incomparable;
+
+    case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::FunctionReturningBaseType:
+    case OverloadChoiceKind::IdentityFunction:
+      llvm_unreachable("Never considered different");
+
+    case OverloadChoiceKind::Decl:
+      // Declaration case handled below.
+      if (updateSolutionCompareResult(result,
+                                      isDeclAsSpecializedAs(cs,
+                                                            choice1.getDecl(),
+                                                            choice2.getDecl()),
+                                      isDeclAsSpecializedAs(cs,
+                                                            choice2.getDecl(),
+                                                            choice1.getDecl())))
+        return result;
+      break;
+    }
   }
+
+  return result;
 }
 
 Solution *
@@ -2607,27 +2714,6 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
   // solutions.
 
   return &viable[bestIdx];
-}
-
-/// \brief Compare two overload choices for equality.
-static bool sameOverloadChoice(const OverloadChoice &x,
-                               const OverloadChoice &y) {
-  if (x.getKind() != y.getKind())
-    return false;
-
-  switch (x.getKind()) {
-  case OverloadChoiceKind::BaseType:
-  case OverloadChoiceKind::FunctionReturningBaseType:
-  case OverloadChoiceKind::IdentityFunction:
-    // FIXME: Compare base types after substitution?
-    return true;
-
-  case OverloadChoiceKind::Decl:
-    return x.getDecl() == y.getDecl();
-
-  case OverloadChoiceKind::TupleIndex:
-    return x.getTupleIndex() == y.getTupleIndex();
-  }
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
@@ -2723,8 +2809,9 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
         this->overloads.push_back(
           SolutionDiff::OverloadDiff{
             overloadChoice.first,
-            std::move(overloadChoice.second)
+            overloadChoice.second
           });
+        
       }
     }
   }
