@@ -266,13 +266,8 @@ bool SILParser::parseSILType(SILType &Result) {
       return true;
   }
 
-  // FIXME: Stop using TypeConverter when SILType for functions doesn't contain
-  // SILTypes itself.
-  Result = SILMod.Types.getLoweredType(Ty.getType(), 0);
-
-  // If this is an address type, apply the modifier.
-  if (isAddress)
-    Result = Result.getAddressType();
+  Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
+                                     isAddress);
   return false;
 }
 
@@ -510,8 +505,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                diag::expected_tok_in_sil_instr,")");
       
       auto Ty = TupleType::get(TypeElts, P.Context);
-      // FIXME: Stop using TypeConverter
-      auto Ty2 = SILMod.Types.getLoweredType(Ty, 0);
+      auto Ty2 = SILType::getPrimitiveType(Ty->getCanonicalType(), false);
       ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
       break;
     }

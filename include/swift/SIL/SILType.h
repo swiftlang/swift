@@ -41,11 +41,6 @@ namespace swift {
 /// reference any Swift type (but cannot take the address of an address). *T
 /// is the type of an address pointing at T.
 ///
-/// SIL also has the notion of "loadable" vs "address-only" types: loadable
-/// types have a fixed size and compile-time binary representation and thus
-/// can be loaded from memory and represented as rvalues, whereas address-only
-/// types do not have a known size or layout and must always be handled
-/// indirectly in memory.
 class SILType {
 public:
   // The bool value of the PointerIntPair is the "isAddress" bit.
