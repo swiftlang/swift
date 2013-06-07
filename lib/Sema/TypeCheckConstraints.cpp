@@ -2640,26 +2640,6 @@ namespace {
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For AssignExprs, do assignment type-checking and stop.
-      if (auto *assign = dyn_cast<AssignExpr>(expr)) {
-        Expr *Dest = assign->getDest();
-        Expr *Src = assign->getSrc();
-        
-        std::tie(Dest, Src) = TC.typeCheckAssignment(Dest,
-                                                     assign->getEqualLoc(),
-                                                     Src,
-                                                     DC);
-        if (!Dest || !Src) {
-          return { false, nullptr };
-        }
-        
-        assign->setDest(Dest);
-        assign->setSrc(Src);
-        
-        expr->setType(TupleType::getEmpty(TC.Context));
-        return { false, expr };
-      }
-      
       // For FuncExprs, we just want to type-check the patterns as written,
       // but not walk into the body. The body will by type-checked separately.
       if (auto func = dyn_cast<FuncExpr>(expr)) {
@@ -3036,14 +3016,13 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 
 /// \brief Compute the rvalue type of the given expression, which is the
 /// destination of an assignment statement.
-static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
-                                  SourceLoc equalLoc) {
+Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   if (TupleExpr *TE = dyn_cast<TupleExpr>(dest)) {
-    auto &ctx = cs.getASTContext();
+    auto &ctx = getASTContext();
     SmallVector<TupleTypeElt, 4> destTupleTypes;
     for (unsigned i = 0; i != TE->getNumElements(); ++i) {
       Expr *subExpr = TE->getElement(i);
-      Type elemTy = computeAssignDestType(cs, subExpr, equalLoc);
+      Type elemTy = computeAssignDestType(subExpr, equalLoc);
       if (!elemTy)
         return Type();
       destTupleTypes.push_back(TupleTypeElt(elemTy, TE->getElementName(i)));
@@ -3052,11 +3031,11 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
     return TupleType::get(destTupleTypes, ctx);
   }
 
-  Type destTy = cs.simplifyType(dest->getType());
+  Type destTy = simplifyType(dest->getType());
   if (LValueType *destLV = destTy->getAs<LValueType>()) {
     // If the destination is a settable lvalue, we're good; get its object type.
     if (!destLV->isSettable()) {
-      cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
+      getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
         .highlight(dest->getSourceRange());
     }
     destTy = destLV->getObjectType();
@@ -3065,15 +3044,15 @@ static Type computeAssignDestType(ConstraintSystem &cs, Expr *dest,
     // lvalue type, which we enforce via a subtyping relationship with
     // [byref(implicit, settable)] T, where T is a fresh type variable that
     // will be the object type of this particular expression type.
-    auto objectTv = cs.createTypeVariable(dest);
+    auto objectTv = createTypeVariable(dest);
     auto refTv = LValueType::get(objectTv,
                                  LValueType::Qual::Implicit,
-                                 cs.getASTContext());
-    cs.addConstraint(ConstraintKind::Subtype, typeVar, refTv);
+                                 getASTContext());
+    addConstraint(ConstraintKind::Subtype, typeVar, refTv);
     destTy = objectTv;
   } else {
     if (!destTy->is<ErrorType>())
-      cs.getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
+      getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
         .highlight(dest->getSourceRange());
 
     return Type();
@@ -3117,7 +3096,7 @@ std::pair<Expr *, Expr *> TypeChecker::typeCheckAssignment(Expr *dest,
 
   // Compute the type to which the source must be converted to allow assignment
   // to the destination.
-  auto destTy = computeAssignDestType(cs, dest, equalLoc);
+  auto destTy = cs.computeAssignDestType(dest, equalLoc);
   if (!destTy)
     return { nullptr, nullptr };
 

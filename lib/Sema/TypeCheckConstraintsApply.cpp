@@ -1605,6 +1605,26 @@ namespace {
     }
     
     Expr *visitAssignExpr(AssignExpr *expr) {
+      // Compute the type to which the source must be converted to allow
+      // assignment to the destination.
+      //
+      // FIXME: This is also computed when the constraint system is set up.
+      auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
+      if (!destTy)
+        return nullptr;
+
+      auto assignLocator = cs.getConstraintLocator(expr->getSrc(),
+                                               ConstraintLocator::AssignSource);
+
+      // Convert the source to the simplified destination type.
+      Expr *src = solution.coerceToType(expr->getSrc(),
+                                        destTy,
+                                        assignLocator);
+      if (!src)
+        return nullptr;
+      
+      expr->setSrc(src);
+      
       return expr;
     }
   };
@@ -2449,11 +2469,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, Rewriter.visitUncheckedDowncastExpr(unchecked) };
       }
 
-      // Assignments should already be type-checked.
-      if (isa<AssignExpr>(expr)) {
-        return { false, expr };
-      }
-      
       // For a default-value expression, do nothing.
       if (isa<DefaultValueExpr>(expr)) {
         return { false, expr };

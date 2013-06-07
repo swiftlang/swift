@@ -729,7 +729,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                              ctor->getImplicitThisDecl(),
                              patternBind->getPattern())) {
             initializer = new (Context) DefaultValueExpr(initializer);
-            llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
+            std::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
                                                                initializer,
                                                                ctor);
             defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),
@@ -776,7 +776,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                 SourceLoc(), 
                 var->getName(),
                 SourceLoc());
-          llvm::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
+          std::tie(dest, initializer) = typeCheckAssignment(dest, SourceLoc(),
                                                              initializer,
                                                              ctor);
           defaultInits.push_back(new (Context) AssignExpr(dest, SourceLoc(),

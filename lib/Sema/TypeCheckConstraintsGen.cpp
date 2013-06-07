@@ -922,6 +922,19 @@ namespace {
     }
     
     Type visitAssignExpr(AssignExpr *expr) {
+      // Compute the type to which the source must be converted to allow
+      // assignment to the destination.
+      auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
+      if (!destTy)
+        return Type();
+      
+      // The source must be convertible to the destination.
+      auto assignLocator = CS.getConstraintLocator(expr->getSrc(),
+                                               ConstraintLocator::AssignSource);
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSrc()->getType(), destTy,
+                       assignLocator);
+      
       expr->setType(TupleType::getEmpty(CS.getASTContext()));
       return expr->getType();
     }
@@ -941,8 +954,7 @@ namespace {
       // Don't recur into array-new or default-value expressions.
       return {
         !isa<NewArrayExpr>(expr)
-          && !isa<DefaultValueExpr>(expr)
-          && !isa<AssignExpr>(expr),
+          && !isa<DefaultValueExpr>(expr),
         expr
       };
     }
@@ -1040,11 +1052,6 @@ namespace {
         return { false, expr };
       }
       
-      // Assign expressions should be type-checked in PreCheckExpression.
-      if (isa<AssignExpr>(expr)) {
-        return { false, expr };
-      }
-
       return { true, expr };
     }
 

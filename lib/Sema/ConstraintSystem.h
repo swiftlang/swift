@@ -1784,6 +1784,10 @@ public:
   /// such that there is no type U where T < U and U < S.
   SmallVector<Type, 4> enumerateDirectSupertypes(Type type);
 
+  /// \brief Compute the rvalue type of the given expression, which is the
+  /// destination of an assignment statement.
+  Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
+
 private:
   /// \brief Flags that direct type matching.
   enum TypeMatchFlags {
