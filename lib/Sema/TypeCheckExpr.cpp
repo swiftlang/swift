@@ -138,9 +138,12 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, Expr *E) {
-  if (isa<UnresolvedTernaryExpr>(E)) {
+  if (isa<UnsequencedTernaryExpr>(E)) {
     // Ternary has fixed precedence.
     return InfixData(100, Associativity::Right);
+  } else if (isa<UnsequencedAssignExpr>(E)) {
+    // Assignment has fixed precedence.
+    return InfixData(90, Associativity::Right);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (Optional<InfixOperatorDecl*> maybeOp
       = TC.TU.lookupInfixOperator(DRE->getDecl()->getName(), E->getLoc())) {
@@ -169,6 +172,11 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   if (!LHS || !RHS)
     return nullptr;
 
+  if (auto *assign = dyn_cast<UnsequencedAssignExpr>(Op)) {
+    // Build an assignment expression.
+    return new (TC.Context) AssignExpr(LHS, assign->getLoc(), RHS);
+  }
+  
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
@@ -234,7 +242,7 @@ static Expr *foldSequence(TypeChecker &TC,
     InfixData opInfo = getInfixData(TC, op);
     if (opInfo.getPrecedence() < MinPrecedence) return {};
     // If this is a ternary '?', pick out the middle expr.
-    if (auto *ternary = dyn_cast<UnresolvedTernaryExpr>(op)) {
+    if (auto *ternary = dyn_cast<UnsequencedTernaryExpr>(op)) {
       return Op(ternary->getQuestionLoc(),
                 ternary->getMiddleExpr(),
                 ternary->getColonLoc(),

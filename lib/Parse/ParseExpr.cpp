@@ -94,7 +94,8 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::Sequence:
   case ExprKind::IsSubtype:
   case ExprKind::UncheckedDowncast:
-  case ExprKind::UnresolvedTernary:
+  case ExprKind::UnsequencedTernary:
+  case ExprKind::UnsequencedAssign:
   case ExprKind::Assign:
     return false;
 
@@ -300,8 +301,8 @@ static bool startsWithPipe(Token tok) {
 ///     expr-unary expr-binary*
 ///   expr-binary:
 ///     operator-binary expr-unary
-///     '?' expr-unary
-///     ':' expr-unary
+///     '?' expr-sequence ':' expr-unary
+///     '=' expr-unary
 ///
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
@@ -354,10 +355,20 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
       SourceLoc colonLoc = consumeToken();
       
       auto *unresolvedIf
-        = new (Context) UnresolvedTernaryExpr(questionLoc,
+        = new (Context) UnsequencedTernaryExpr(questionLoc,
                                               middle.get(),
                                               colonLoc);
       SequencedExprs.push_back(unresolvedIf);
+      Message = diag::expected_expr_after_if_colon;
+      break;
+    }
+        
+    case tok::equal: {
+      SourceLoc equalsLoc = consumeToken();
+      
+      auto *assign = new (Context) UnsequencedAssignExpr(equalsLoc);
+      SequencedExprs.push_back(assign);
+      Message = diag::expected_expr_assignment;
       break;
     }
         

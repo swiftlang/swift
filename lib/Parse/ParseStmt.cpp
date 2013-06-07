@@ -87,45 +87,6 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   }
 }
 
-/// parseExprOrStmtAssign
-///   expr-or-stmt-assign:
-///     expr
-///     stmt-assign
-///
-///   expr-or-stmt-assign-basic:
-///     expr-basic
-///     stmt-assign-basic
-///
-///   stmt-assign-basic:
-///     expr-basic '=' expr-basic
-///
-/// \param usesExprBasic If true, parse expr-or-stmt-assign-basic rather than
-/// expr-or-stmt-assign.
-bool Parser::parseExprOrStmtAssign(ExprStmtOrDecl &Result, bool usesExprBasic) {
-  // FIXME: This should move into sequence expr parsing.
-
-  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr, usesExprBasic);
-  if (ResultExpr.isNull())
-    return true;
-
-  Result = ResultExpr.get();
-  
-  // Check for assignment.  If we don't have it, then we just have a
-  // simple expression.
-  if (Tok.isNot(tok::equal))
-    return false;
-
-  SourceLoc EqualLoc = consumeToken();
-  NullablePtr<Expr> RHSExpr = parseExpr(diag::expected_expr_assignment,
-                                        usesExprBasic);
-  if (RHSExpr.isNull())
-    return true;
-
-  Result = new (Context) AssignExpr(ResultExpr.get(),
-                                    EqualLoc, RHSExpr.get());
-  return false;
-}
-
 bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok.getLoc(), diag::illegal_semi_stmt)
@@ -140,7 +101,13 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
     return false;
   }
 
-  return parseExprOrStmtAssign(Result);
+  NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr,
+                                           /*usesExprBasic*/ false);
+  if (ResultExpr.isNull())
+    return true;
+  
+  Result = ResultExpr.get();
+  return false;
 }
 
 static bool isTerminatorForBraceItemListKind(const Token &Tok,
@@ -470,7 +437,17 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // Otherwise, this is some sort of c-style for loop.
   return parseStmtForCStyle(ForLoc);
 }
-      
+
+static bool parseExprForCStyle(Parser &P, Parser::ExprStmtOrDecl &Result,
+                               bool usesExprBasic = false) {
+  NullablePtr<Expr> ResultExpr = P.parseExpr(diag::expected_expr, usesExprBasic);
+  if (ResultExpr.isNull())
+    return true;
+  
+  Result = ResultExpr.get();
+  return false;
+}
+
 ///   stmt-for-c-style:
 ///     'for' stmt-for-c-style-init? ';' expr? ';' expr-or-stmt-assign-basic?
 ///           stmt-brace
@@ -498,7 +475,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   // Parse the first part, either a var, expr, or stmt-assign.
   if (Tok.is(tok::kw_var)) {
     if (parseDeclVar(false, FirstDecls)) return 0;
-  } else if ((Tok.isNot(tok::semi) && parseExprOrStmtAssign(First)))
+  } else if ((Tok.isNot(tok::semi) && parseExprForCStyle(*this, First)))
     return 0;
 
   // Parse the rest of the statement.
@@ -508,7 +485,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if ((Tok.isNot(tok::semi) && Tok.isNot(tok::l_brace) &&
         (Second = parseExpr(diag::expected_cond_for_stmt)).isNull()) ||
       parseToken(tok::semi, Semi2Loc, diag::expected_semi_for_stmt) ||
-      (Tok.isNot(tok::l_brace) && parseExprOrStmtAssign(Third, true)))
+      (Tok.isNot(tok::l_brace) && parseExprForCStyle(*this, Third, true)))
     return 0;
 
   if (LPLocConsumed && parseMatchingToken(tok::r_paren, RPLoc,

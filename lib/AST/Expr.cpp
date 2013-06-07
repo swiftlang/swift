@@ -545,10 +545,13 @@ public:
     printCommon(E, "unresolved_decl_ref_expr")
       << " name=" << E->getName() << ')';
   }
-  void visitUnresolvedTernaryExpr(UnresolvedTernaryExpr *E) {
+  void visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
     printCommon(E, "unresolved_ternary_expr") << '\n';
     printRec(E->getMiddleExpr());
     OS << ')';
+  }
+  void visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
+    printCommon(E, "unsequenced_assign_expr") << ')';
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';

@@ -865,7 +865,10 @@ namespace {
       return resultTy;
     }
     
-    Type visitUnresolvedTernaryExpr(UnresolvedTernaryExpr *E) {
+    Type visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
+    Type visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
       llvm_unreachable("this node should be eliminated by name binding");
     }
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {

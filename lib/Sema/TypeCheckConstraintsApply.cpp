@@ -1449,7 +1449,10 @@ namespace {
       return expr;
     }
     
-    Expr *visitUnresolvedTernaryExpr(UnresolvedTernaryExpr *E) {
+    Expr *visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
+      llvm_unreachable("this node should be eliminated by name binding");
+    }
+    Expr *visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
       llvm_unreachable("this node should be eliminated by name binding");
     }
     Expr *visitImplicitConversionExpr(ImplicitConversionExpr *expr) {

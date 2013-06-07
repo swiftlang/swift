@@ -89,12 +89,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
-  Expr *visitUnresolvedTernaryExpr(UnresolvedTernaryExpr *E) {
+  Expr *visitUnsequencedTernaryExpr(UnsequencedTernaryExpr *E) {
     if (Expr *Middle = doIt(E->getMiddleExpr())) {
       E->setMiddleExpr(Middle);
       return E;
     }
     return nullptr;
+  }
+  
+  Expr *visitUnsequencedAssignExpr(UnsequencedAssignExpr *E) {
+    return E;
   }
   
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { return E; }

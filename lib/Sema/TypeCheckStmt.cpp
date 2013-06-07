@@ -655,6 +655,9 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
   BraceStmt *body = ctor->getBody();
 
   if (body) {
+    // Type-check the body.
+    StmtChecker(*this, ctor).typeCheckStmt(body);
+
     // Figure out which members already have initializers. We don't
     // default-initialize those members.
     // FIXME: This traversal is quite simplistic and quite stupid. It should
@@ -791,8 +794,6 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                                body->getRBraceLoc());
     }
 
-    // Type-check the body.
-    StmtChecker(*this, ctor).typeCheckStmt(body);
     ctor->setBody(body);
   }
 }

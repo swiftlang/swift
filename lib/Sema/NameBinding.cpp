@@ -278,6 +278,9 @@ bool NameBinder::resolveIdentifierTypeImpl(IdentifierType *DNT) {
   }
 
   // Finally, sanity check that the last value is a type.
+  if (Components.back().Value.dyn_cast<Type>())
+    return false;
+  
   if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>()) {
     auto GenericArgs = Components.back().GenericArgs;
     if (!GenericArgs.empty()) {

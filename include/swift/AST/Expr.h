@@ -486,14 +486,14 @@ public:
 /// ternary expression within an unresolved SequenceExpr.
 /// It will be matched to left and right operands and transformed into an IfExpr
 /// during precedence parsing in NameBinding.
-class UnresolvedTernaryExpr : public Expr {
+class UnsequencedTernaryExpr : public Expr {
   SourceLoc QuestionLoc, ColonLoc;
   Expr *MiddleExpr;
 public:
-  UnresolvedTernaryExpr(SourceLoc QuestionLoc,
+  UnsequencedTernaryExpr(SourceLoc QuestionLoc,
                         Expr *MiddleExpr,
                         SourceLoc ColonLoc)
-    : Expr(ExprKind::UnresolvedTernary),
+    : Expr(ExprKind::UnsequencedTernary),
       QuestionLoc(QuestionLoc), ColonLoc(ColonLoc), MiddleExpr(MiddleExpr)
   {}
   
@@ -506,7 +506,25 @@ public:
   void setMiddleExpr(Expr *e) { MiddleExpr = e; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedTernary;
+    return E->getKind() == ExprKind::UnsequencedTernary;
+  }
+};
+  
+/// This represents a '=' assignment token within an unresolved SequenceExpr.
+/// It will be matched to left and right operands and transformed into an
+/// AssignExpr during precedence parsing.
+class UnsequencedAssignExpr : public Expr {
+  SourceLoc EqualsLoc;
+public:
+  UnsequencedAssignExpr(SourceLoc EqualsLoc)
+    : Expr(ExprKind::UnsequencedAssign), EqualsLoc(EqualsLoc)
+  {}
+  
+  SourceLoc getLoc() const { return EqualsLoc; }
+  SourceRange getSourceRange() const { return EqualsLoc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnsequencedAssign;
   }
 };
   
