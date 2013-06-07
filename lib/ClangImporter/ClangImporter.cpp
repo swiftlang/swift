@@ -413,7 +413,7 @@ void ClangImporter::lookupValue(Module *module,
   for (auto decl : lookupResult) {
     if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
       if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
-      results.push_back(valueDecl);
+        results.push_back(valueDecl);
   }
 }
 
