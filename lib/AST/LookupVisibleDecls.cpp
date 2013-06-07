@@ -89,8 +89,8 @@ static void lookupVisibleMemberDecls(Type BaseTy,
                  Visited);
 }
 
-/// doIt - Lookup a member 'Name' in 'BaseTy' within the context
-/// of a given module 'M'.  This operation corresponds to a standard "dot" 
+/// \brief Lookup a member 'Name' in 'BaseTy' within the context
+/// of a given module 'M'.  This operation corresponds to a standard "dot"
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
 ///
