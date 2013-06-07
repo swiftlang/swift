@@ -18,6 +18,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/Mangle.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -181,7 +182,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     // FIXME: When we can import C++, use Clang's mangler.
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
-        buffer << namedClangDecl->getName();
+        if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
+          buffer << asmLabel->getLabel();
+        } else {
+          buffer << namedClangDecl->getName();
+        }
         return;
       }
     }

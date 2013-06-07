@@ -21,3 +21,6 @@ typedef struct {
 FILE *fopen(const char *, const char *);
 
 inline int createSomething(void);
+
+int renamed(int) __asm("_something_else");
+
