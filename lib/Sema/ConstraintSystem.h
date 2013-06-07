@@ -1253,6 +1253,42 @@ public:
   void dump(llvm::SourceMgr *sm) const LLVM_ATTRIBUTE_USED;
 };
 
+/// \brief Describes the differences between several solutions to the same
+/// constraint system.
+class SolutionDiff {
+public:
+  /// \brief A difference between two overloads.
+  struct OverloadDiff {
+    /// \brief The locator that describes where the overload comes from.
+    ConstraintLocator *locator;
+
+    /// \brief The choices that each solution made.
+    SmallVector<OverloadChoice, 2> choices;
+  };
+
+  /// \brief A difference between two type variable bindings.
+  struct TypeBindingDiff {
+    /// \brief The type variable.
+    TypeVariableType *typeVar;
+
+    /// \brief The bindings that each solution made.
+    SmallVector<Type, 2> bindings;
+  };
+
+  /// \brief The differences between the overload choices between the
+  /// solutions.
+  SmallVector<OverloadDiff, 4> overloads;
+
+  /// \brief The differences between the type variable bindings of the
+  /// solutions.
+  SmallVector<TypeBindingDiff, 4> typeBindings;
+
+  /// \brief Compute the differences between the given set of solutions.
+  ///
+  /// \param solutions The set of solutions.
+  explicit SolutionDiff(ArrayRef<Solution> solutions);
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1981,9 +2017,17 @@ private:
                                            Type type);
 
   // \brief Compare two solutions to the same set of constraints.
+  ///
+  /// \param cs The constraint system.
+  /// \param solutions All of the solutions to the system.
+  /// \param diff The differences among the solutions.
+  /// \param idx1 The index of the first solution.
+  /// \param idx2 The index of the second solution.
   static SolutionCompareResult compareSolutions(ConstraintSystem &cs,
-                                                const Solution &sol1,
-                                                const Solution &sol2);
+                                                ArrayRef<Solution> solutions,
+                                                const SolutionDiff &diff,
+                                                unsigned idx1,
+                                                unsigned idx2);
 
 public:
   /// \brief Given a set of viable solutions, find the best

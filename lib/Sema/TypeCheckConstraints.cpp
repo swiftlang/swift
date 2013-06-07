@@ -2436,121 +2436,109 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
            });
 }
 
-SolutionCompareResult ConstraintSystem::compareSolutions(ConstraintSystem &cs,
-                                                         const Solution &sol1,
-                                                         const Solution &sol2) {
-  // Compare the sets of bound type variables in the two systems.
-  auto compareTypeVariables =
-    [&](const Solution &sol1, const Solution &sol2) -> SolutionCompareResult {
-      SolutionCompareResult result = SolutionCompareResult::Identical;
-      
-      for (auto fixedTV1 : sol1.typeBindings) {
-        auto boundTV1 = fixedTV1.first;
-
-        // Find the fixed type in the second constraint system.
-        auto known2 = sol2.typeBindings.find(boundTV1);
-        if (known2 == sol2.typeBindings.end())
-          continue;
-
-        Type type2 = known2->second;
-
-        auto type1 = fixedTV1.second;
-
-        // Strip any initializers from tuples in the type; they aren't
-        // to be compared.
-        type1 = stripInitializers(cs.getTypeChecker(), type1);
-        type2 = stripInitializers(cs.getTypeChecker(), type2);
-
-        // If the types are equivalent, there's nothing more to do.
-        if (type1->isEqual(type2))
-          continue;
-
-        // If either of the types still contains type variables, we can't
-        // compare them.
-        // FIXME: This is really unfortunate. More type variable sharing
-        // (when it's sane) would help us do much better here.
-        if (type1->hasTypeVariable() || type2->hasTypeVariable())
-          return SolutionCompareResult::Incomparable;
-
-        // If one type is a subtype of the other, but not vice-verse,
-        // we prefer the system with the more-constrained type.
-        // FIXME: Collapse this check into the second check.
-        bool type1Trivial = false;
-        bool type1Better = cs.matchTypes(type1, type2,
-                                         TypeMatchKind::Subtype,
-                                         TMF_None,
-                                         ConstraintLocatorBuilder(nullptr),
-                                         type1Trivial)
-                             == SolutionKind::TriviallySolved;
-        bool type2Trivial = false;
-        bool type2Better = cs.matchTypes(type2, type1,
-                                         TypeMatchKind::Subtype,
-                                         TMF_None,
-                                         ConstraintLocatorBuilder(nullptr),
-                                         type2Trivial)
-                             == SolutionKind::TriviallySolved;
-        if (type1Better && type2Better) {
-          if (updateSolutionCompareResult(result, type1Trivial, type2Trivial))
-            return result;
-        } else {
-          if (updateSolutionCompareResult(result, type1Better, type2Better))
-            return result;
-        }
-        if (type1Better || type2Better) {
-          continue;
-        }
-
-        // If one type is convertible to of the other, but not vice-versa.
-        type1Trivial = false;
-        type1Better = cs.matchTypes(type1, type2,
-                                    TypeMatchKind::Conversion,
-                                    TMF_None,
-                                    ConstraintLocatorBuilder(nullptr),
-                                    type1Trivial)
-                        == SolutionKind::TriviallySolved;
-        type2Trivial = false;
-        type2Better = cs.matchTypes(type2, type1,
-                                    TypeMatchKind::Conversion,
-                                    TMF_None,
-                                    ConstraintLocatorBuilder(nullptr),
-                                    type2Trivial)
-                        == SolutionKind::TriviallySolved;
-        if (updateSolutionCompareResult(result, type1Better, type2Better))
-          return result;
-        if (type1Better || type2Better) {
-          continue;
-        }
-        
-        // If the type variable was bound by a literal protocol constraint, and
-        // the type it is bound to happens to match the default literal
-        // constraint in one system but not the other, we prefer the one
-        // that matches the default.
-        // Note that the constraint will be available in the parent of
-        // the constraint system that assumed a value for the type variable
-        // (or, of course, in the original system, since these constraints
-        // are generated directly from the expression).
-        // FIXME: Make it efficient to find these constraints. This is
-        // silly.
-        bool defaultLit1
-          = cs.typeMatchesDefaultLiteralConstraint(boundTV1, type1);
-        bool defaultLit2
-          = cs.typeMatchesDefaultLiteralConstraint(boundTV1, type2);
-        if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
-          return result;
-
-        // Prefer concrete types to existentials.
-        bool isExistential1 = type1->isExistentialType();
-        bool isExistential2 = type2->isExistentialType();
-        if (updateSolutionCompareResult(result, isExistential1, isExistential2))
-          return result;
-      }
-
-      return result;
-    };
-
+SolutionCompareResult ConstraintSystem::compareSolutions(
+                        ConstraintSystem &cs,
+                        ArrayRef<Solution> solutions,
+                        const SolutionDiff &diff,
+                        unsigned idx1,
+                        unsigned idx2) {
   // Compare the type variables bound in the first system to the type variables
   // bound in the second type system.
-  SolutionCompareResult result = compareTypeVariables(sol1, sol2);
+  SolutionCompareResult result = SolutionCompareResult::Identical;
+  for (auto &binding : diff.typeBindings) {
+    auto type1 = binding.bindings[idx1];
+    auto type2 = binding.bindings[idx2];
+
+    // Strip any initializers from tuples in the type; they aren't
+    // to be compared.
+    type1 = stripInitializers(cs.getTypeChecker(), type1);
+    type2 = stripInitializers(cs.getTypeChecker(), type2);
+
+    // If the types are equivalent, there's nothing more to do.
+    if (type1->isEqual(type2))
+      continue;
+
+    // If either of the types still contains type variables, we can't
+    // compare them.
+    // FIXME: This is really unfortunate. More type variable sharing
+    // (when it's sane) would help us do much better here.
+    if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
+      result = SolutionCompareResult::Incomparable;
+      break;
+    }
+
+    // If one type is a subtype of the other, but not vice-verse,
+    // we prefer the system with the more-constrained type.
+    // FIXME: Collapse this check into the second check.
+    bool type1Trivial = false;
+    bool type1Better = cs.matchTypes(type1, type2,
+                                     TypeMatchKind::Subtype,
+                                     TMF_None,
+                                     ConstraintLocatorBuilder(nullptr),
+                                     type1Trivial)
+                                       == SolutionKind::TriviallySolved;
+    bool type2Trivial = false;
+    bool type2Better = cs.matchTypes(type2, type1,
+                                     TypeMatchKind::Subtype,
+                                     TMF_None,
+                                     ConstraintLocatorBuilder(nullptr),
+                                     type2Trivial)
+                                       == SolutionKind::TriviallySolved;
+    if (type1Better && type2Better) {
+      if (updateSolutionCompareResult(result, type1Trivial, type2Trivial))
+        break;
+    } else {
+      if (updateSolutionCompareResult(result, type1Better, type2Better))
+        break;
+    }
+    if (type1Better || type2Better) {
+      continue;
+    }
+
+    // If one type is convertible to of the other, but not vice-versa.
+    type1Trivial = false;
+    type1Better = cs.matchTypes(type1, type2,
+                                TypeMatchKind::Conversion,
+                                TMF_None,
+                                ConstraintLocatorBuilder(nullptr),
+                                type1Trivial)
+                                  == SolutionKind::TriviallySolved;
+    type2Trivial = false;
+    type2Better = cs.matchTypes(type2, type1,
+                                TypeMatchKind::Conversion,
+                                TMF_None,
+                                ConstraintLocatorBuilder(nullptr),
+                                type2Trivial)
+                                  == SolutionKind::TriviallySolved;
+    if (updateSolutionCompareResult(result, type1Better, type2Better))
+      break;
+    if (type1Better || type2Better) {
+      continue;
+    }
+
+    // If the type variable was bound by a literal protocol constraint, and
+    // the type it is bound to happens to match the default literal
+    // constraint in one system but not the other, we prefer the one
+    // that matches the default.
+    // Note that the constraint will be available in the parent of
+    // the constraint system that assumed a value for the type variable
+    // (or, of course, in the original system, since these constraints
+    // are generated directly from the expression).
+    // FIXME: Make it efficient to find these constraints. This is
+    // silly.
+    bool defaultLit1
+      = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type1);
+    bool defaultLit2
+      = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type2);
+    if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
+      break;;
+
+    // Prefer concrete types to existentials.
+    bool isExistential1 = type1->isExistentialType();
+    bool isExistential2 = type2->isExistentialType();
+    if (updateSolutionCompareResult(result, isExistential1, isExistential2))
+      break;;
+  }
   
   // FIXME: There might be variables bound in the second type system but not
   // the first, but for now we don't really care.
@@ -2577,16 +2565,12 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
   if (viable.size() == 1)
     return &viable[0];
 
-  // Find a potential best. 
-  Solution *best = nullptr;
-  for (auto &solution : viable) {
-    if (!best) {
-      // Found the first solved system.
-      best = &solution;
-      continue;
-    }
+  SolutionDiff diff(viable);
 
-    switch (compareSolutions(*this, solution, *best)) {
+  // Find a potential best.
+  unsigned bestIdx = 0;
+  for (unsigned i = 1, n = viable.size(); i != n; ++i) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -2595,20 +2579,17 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
       break;
 
     case SolutionCompareResult::Better:
-      best = &solution;
+      bestIdx = i;
       break;
     }
   }
 
-  if (!best)
-    return nullptr;
-
   // Make sure that our current best is better than all of the solved systems.
-  for (auto &solution : viable) {
-    if (best == &solution)
+  for (unsigned i = 0, n = viable.size(); i != n; ++i) {
+    if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, *best, solution)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -2625,7 +2606,128 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable){
   // FIXME: If we lost our best, we should minimize the set of viable
   // solutions.
 
-  return best;
+  return &viable[bestIdx];
+}
+
+/// \brief Compare two overload choices for equality.
+static bool sameOverloadChoice(const OverloadChoice &x,
+                               const OverloadChoice &y) {
+  if (x.getKind() != y.getKind())
+    return false;
+
+  switch (x.getKind()) {
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::FunctionReturningBaseType:
+  case OverloadChoiceKind::IdentityFunction:
+    // FIXME: Compare base types after substitution?
+    return true;
+
+  case OverloadChoiceKind::Decl:
+    return x.getDecl() == y.getDecl();
+
+  case OverloadChoiceKind::TupleIndex:
+    return x.getTupleIndex() == y.getTupleIndex();
+  }
+}
+
+SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions)  {
+  if (solutions.size() <= 1)
+    return;
+
+  // Populate the type bindings with the first solution.
+  llvm::DenseMap<TypeVariableType *, SmallVector<Type, 2>> typeBindings;
+  for (auto binding : solutions[0].typeBindings) {
+    typeBindings[binding.first].push_back(binding.second);
+  }
+
+  // Populate the overload choices with the first solution.
+  llvm::DenseMap<ConstraintLocator *, SmallVector<OverloadChoice, 2>>
+    overloadChoices;
+  for (auto choice : solutions[0].overloadChoices) {
+    overloadChoices[choice.first].push_back(choice.second.first);
+  }
+
+  // Find the type variables and overload locators common to all of the
+  // solutions.
+  for (auto &solution : solutions.slice(1)) {
+    // For each type variable bound in all of the previous solutions, check
+    // whether we have a binding for this type variable in this solution.
+    SmallVector<TypeVariableType *, 4> removeTypeBindings;
+    for (auto &binding : typeBindings) {
+      auto known = solution.typeBindings.find(binding.first);
+      if (known == solution.typeBindings.end()) {
+        removeTypeBindings.push_back(binding.first);
+        continue;
+      }
+
+      // Add this solution's binding to the results.
+      binding.second.push_back(known->second);
+    }
+
+    // Remove those type variables for which this solution did not have a
+    // binding.
+    for (auto typeVar : removeTypeBindings) {
+      typeBindings.erase(typeVar);
+    }
+    removeTypeBindings.clear();
+
+    // For each overload locator for which we have an overload choice in
+    // all of the previous solutions. Check whether we have an overload choice
+    // in this solution.
+    SmallVector<ConstraintLocator *, 4> removeOverloadChoices;
+    for (auto &overloadChoice : overloadChoices) {
+      auto known = solution.overloadChoices.find(overloadChoice.first);
+      if (known == solution.overloadChoices.end()) {
+        removeOverloadChoices.push_back(overloadChoice.first);
+        continue;
+      }
+
+      // Add this solution's overload choice to the results.
+      overloadChoice.second.push_back(known->second.first);
+    }
+
+    // Remove those overload locators for which this solution did not have
+    // an overload choice.
+    for (auto overloadChoice : removeOverloadChoices) {
+      overloadChoices.erase(overloadChoice);
+    }
+  }
+
+  // Look through the type variables that have bindings in all of the
+  // solutions, and add those that have differences to the diff.
+  for (auto &binding : typeBindings) {
+    Type singleType;
+    for (auto type : binding.second) {
+      if (!singleType)
+        singleType = type;
+      else if (!singleType->isEqual(type)) {
+        // We have a difference. Add this binding to the diff.
+        this->typeBindings.push_back(
+          SolutionDiff::TypeBindingDiff{
+            binding.first,
+            std::move(binding.second)
+          });
+
+        break;
+      }
+    }
+  }
+
+  // Look through the overload locators that have overload choices in all of
+  // the solutions, and add those that have differences to the diff.
+  for (auto &overloadChoice : overloadChoices) {
+    OverloadChoice singleChoice = overloadChoice.second[0];
+    for (auto choice : overloadChoice.second) {
+      if (!sameOverloadChoice(singleChoice, choice)) {
+        // We have a difference. Add this set of overload choices to the diff.
+        this->overloads.push_back(
+          SolutionDiff::OverloadDiff{
+            overloadChoice.first,
+            std::move(overloadChoice.second)
+          });
+      }
+    }
+  }
 }
 
 //===--------------------------------------------------------------------===//
