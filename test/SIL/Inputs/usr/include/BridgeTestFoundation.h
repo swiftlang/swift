@@ -25,6 +25,6 @@
 
 @end
 
-NSString *bar(int);
+NSString *bar(void);
 void setBar(NSString *s);
 
