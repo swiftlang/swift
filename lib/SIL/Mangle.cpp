@@ -523,7 +523,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // Protocol type manglings have a variable number of protocol names
     // follow the 'P' sigil, so a trailing underscore is needed after the
     // type name, unlike protocols as contexts.
-    mangleNominalType(cast<ProtocolType>(base)->getDecl(), explosion);
+    Buffer << 'P';
+    mangleProtocolList(type);
     Buffer << '_';
     return;
 
