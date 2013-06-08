@@ -176,11 +176,15 @@ private:
   unsigned getEmitFile(StringRef Filename);
 
   /// \brief Add a source location to a record.
-  void addLocToRecord(SourceLoc Loc,
+  void addLocToRecord(llvm::SMLoc Loc,
                       llvm::SourceMgr &SM,
                       StringRef Filename,
                       RecordDataImpl &Record);
 
+  void addRangeToRecord(llvm::SMRange Range, llvm::SourceMgr &SM,
+                        StringRef Filename, RecordDataImpl &Record);
+
+  /// \brief Emit the message payload of a diagnostic to bitcode.
   void emitDiagnosticMessage(llvm::SourceMgr &SM, SourceLoc Loc,
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
@@ -240,12 +244,12 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(StringRef Filename) {
   return entry;
 }
 
-void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
+void SerializedDiagnosticConsumer::addLocToRecord(llvm::SMLoc Loc,
                                                   llvm::SourceMgr &SM,
                                                   StringRef Filename,
                                                   RecordDataImpl &Record)
 {
-  if (Loc.isInvalid()) {
+  if (!Loc.isValid()) {
     // Emit a "sentinel" location.
     Record.push_back((unsigned)0); // File.
     Record.push_back((unsigned)0); // Line.
@@ -255,12 +259,20 @@ void SerializedDiagnosticConsumer::addLocToRecord(SourceLoc Loc,
   }
 
   unsigned line, col;
-  std::tie(line, col) = SM.getLineAndColumn(Loc.Value);
+  std::tie(line, col) = SM.getLineAndColumn(Loc);
 
   Record.push_back(getEmitFile(Filename));
   Record.push_back(line);
   Record.push_back(col);
   Record.push_back(0);
+}
+
+void SerializedDiagnosticConsumer::addRangeToRecord(llvm::SMRange Range,
+                                                    llvm::SourceMgr &SM,
+                                                    StringRef Filename,
+                                                    RecordDataImpl &Record) {
+  addLocToRecord(Range.Start, SM, Filename, Record);
+  addLocToRecord(Range.End, SM, Filename, Record);
 }
 
 /// \brief Map a Swift DiagosticKind to the diagnostic level expected
@@ -458,19 +470,10 @@ emitDiagnosticMessage(llvm::SourceMgr &SM,
       break;
   }
 
-  // Translate ranges.
-  SmallVector<llvm::SMRange, 2> Ranges;
-  for (DiagnosticInfo::Range R : Info.Ranges)
-    Ranges.push_back(getRawRange(SM, R));
-
-  // Translate fix-its.
-  SmallVector<llvm::SMFixIt, 2> FixIts;
-  for (DiagnosticInfo::FixIt F : Info.FixIts)
-    FixIts.push_back(getRawFixIt(SM, F));
-
   // Construct the diagnostic.
   const llvm::SMDiagnostic &D =
-    SM.GetMessage(Loc.Value, SMKind, Text, Ranges, FixIts);
+    SM.GetMessage(Loc.Value, SMKind, Text,
+                  ArrayRef<llvm::SMRange>(), ArrayRef<llvm::SMFixIt>());
 
   // Emit the diagnostic to bitcode.
   llvm::BitstreamWriter &Stream = State->Stream;
@@ -481,7 +484,7 @@ emitDiagnosticMessage(llvm::SourceMgr &SM,
   Record.clear();
   Record.push_back(RECORD_DIAG);
   Record.push_back(getDiagnosticLevel(Kind));
-  addLocToRecord(Loc, SM, D.getFilename(), Record);
+  addLocToRecord(Loc.Value, SM, D.getFilename(), Record);
 
   // FIXME: Swift diagnostics currently have no category.
   Record.push_back(0);
@@ -492,6 +495,36 @@ emitDiagnosticMessage(llvm::SourceMgr &SM,
   Record.push_back(D.getMessage().size());
   Stream.EmitRecordWithBlob(Abbrevs.get(RECORD_DIAG), Record,
                             D.getMessage());
+
+  // If the location is invalid, do not emit source ranges or fixits.
+  if (Loc.isInvalid())
+    return;
+
+  // Emit source ranges.
+  //
+  // SourceMgr::GetMessage() creates ranges that lose some fidelity
+  // of the original range.  Use Swift's ranges.
+  auto RangeAbbrev = State->Abbrevs.get(RECORD_SOURCE_RANGE);
+  for (const auto &R : Info.Ranges) {
+    State->Record.clear();
+    State->Record.push_back(RECORD_SOURCE_RANGE);
+    auto RawRange = getRawRange(SM, R);
+    addRangeToRecord(RawRange, SM, D.getFilename(), State->Record);
+    State->Stream.EmitRecordWithAbbrev(RangeAbbrev, State->Record);
+  }
+
+  // Emit FixIts.
+  auto FixItAbbrev = State->Abbrevs.get(RECORD_FIXIT);
+  for (const auto &F : Info.FixIts) {
+    auto RawFixIt = getRawFixIt(SM, F);
+    if (RawFixIt.getRange().isValid()) {
+      State->Record.clear();
+      State->Record.push_back(RECORD_FIXIT);
+      addRangeToRecord(RawFixIt.getRange(), SM, D.getFilename(), State->Record);
+      State->Record.push_back(RawFixIt.getText().size());
+      Stream.EmitRecordWithBlob(FixItAbbrev, Record, RawFixIt.getText());
+    }
+  }
 }
 
 void
@@ -513,7 +546,7 @@ SerializedDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM,
 
   // Special-case diagnostics with no location.
   // Make sure we bracket all notes as "sub-diagnostics".
-  bool bracketDiagnostic = Loc.isInvalid() && Kind == DiagnosticKind::Note;
+  bool bracketDiagnostic = (Kind == DiagnosticKind::Note);
 
   if (bracketDiagnostic)
     enterDiagBlock();
