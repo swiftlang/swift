@@ -69,10 +69,10 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
 
-  if (declOrOffset.isPointer())
-    return declOrOffset.getPointer();
+  if (declOrOffset.is<Decl *>())
+    return declOrOffset.get<Decl *>();
 
-  DeclTypeCursor.JumpToBit(declOrOffset.getInt());
+  DeclTypeCursor.JumpToBit(declOrOffset.get<BitOffset>());
   auto entry = DeclTypeCursor.advance();
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -130,7 +130,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     return nullptr;
   }
 
-  return declOrOffset.getPointer();
+  return declOrOffset.get<Decl *>();
 }
 
 Type ModuleFile::getType(TypeID TID) {
@@ -140,10 +140,10 @@ Type ModuleFile::getType(TypeID TID) {
   assert(TID <= Types.size() && "invalid decl ID");
   auto &typeOrOffset = Types[TID-1];
 
-  if (typeOrOffset.isPointer())
-    return typeOrOffset.getPointer();
+  if (typeOrOffset.is<Type>())
+    return typeOrOffset.get<Type>();
 
-  DeclTypeCursor.JumpToBit(typeOrOffset.getInt());
+  DeclTypeCursor.JumpToBit(typeOrOffset.get<BitOffset>());
   auto entry = DeclTypeCursor.advance();
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -192,7 +192,7 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
   
-  return typeOrOffset.getPointer();
+  return typeOrOffset.get<Type>();
 }
 
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)

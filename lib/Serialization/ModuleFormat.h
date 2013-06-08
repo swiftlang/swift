@@ -45,15 +45,17 @@ enum class DeclOrType {
   IsType
 };
 
+// The serialized format uses 32 bits for potential alignment benefits, even
+// though bitcode is generally unaligned.
+using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<32>;
-using DeclID = DeclIDField::value_type;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
-using TypeIDField = DeclIDField;
 using TypeID = DeclID;
+using TypeIDField = DeclIDField;
 
+using BitOffset = Fixnum<31>;
 using BitOffsetField = BCFixed<32>;
-using BitOffset = BitOffsetField::value_type;
 
 
 /// The various types of blocks that can occur within a serialized Swift

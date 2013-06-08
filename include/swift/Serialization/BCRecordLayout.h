@@ -35,6 +35,7 @@
 #ifndef SWIFT_SERIALIZATION_BCRECORDLAYOUT_H
 #define SWIFT_SERIALIZATION_BCRECORDLAYOUT_H
 
+#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -109,10 +110,7 @@ public:
            "data value does not fit in the given bit width");
   }
 
-  using value_type = typename std::conditional<(Width <= 8), uint8_t,
-                     typename std::conditional<(Width <= 16), uint16_t,
-                     typename std::conditional<(Width <= 32), uint32_t,
-                     uint64_t>::type>::type>::type;
+  using value_type = Fixnum<Width>;
 
   template<typename T>
   static value_type convert(T rawValue) {

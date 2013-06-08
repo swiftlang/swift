@@ -16,7 +16,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/PointerIntUnion.h"
+#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -71,10 +71,10 @@ class ModuleFile {
   SmallVector<StringRef, 4> SourcePaths;
 
   /// Decls referenced by this module.
-  std::vector<PointerIntUnion<Decl*, serialization::BitOffset, uint64_t>> Decls;
+  std::vector<PointerUnion<Decl*, serialization::BitOffset>> Decls;
 
   /// Types referenced by this module.
-  std::vector<PointerIntUnion<Type, serialization::BitOffset, uint64_t>> Types;
+  std::vector<PointerUnion<Type, serialization::BitOffset>> Types;
 
   /// All top-level decls in this module.
   // FIXME: A single identifier may refer to multiple decls.
