@@ -62,6 +62,25 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+StringRef readIdentifier(llvm::BitstreamCursor &Cursor) {
+  // Deserialize the name.
+  // FIXME: Move this to an identifier table instead of a trailing record.
+  auto entry = Cursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return {};
+
+  StringRef blobData;
+  SmallVector<uint64_t, 0> empty;
+  unsigned recordID = Cursor.readRecord(entry.ID, empty, &blobData);
+  if (recordID != decls_block::NAME_HACK)
+    return {};
+
+  assert(empty.empty() && "no data in NAME_HACK records");
+  assert(!blobData.empty() && "missing name in NAME_HACK record");
+
+  return blobData;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID) {
   if (DID == 0)
     return nullptr;
@@ -81,6 +100,8 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     return nullptr;
   }
 
+  ASTContext &ctx = ModuleContext->Ctx;
+
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
@@ -99,28 +120,39 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
     // Deserialize the name.
     // FIXME: Move this to an identifier table instead of a trailing record.
-    entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
+    StringRef name = readIdentifier(DeclTypeCursor);
+    if (name.empty()) {
       error();
       return nullptr;
     }
-    SmallVector<uint64_t, 0> empty;
-    recordID = DeclTypeCursor.readRecord(entry.ID, empty, &blobData);
-    if (recordID != decls_block::NAME_HACK) {
-      error();
-      return nullptr;
-    }
-    assert(empty.empty() && "no data in NAME_HACK records");
-    assert(!blobData.empty() && "missing name in NAME_HACK record");
 
-    ASTContext &ctx = ModuleContext->Ctx;
     TypeLoc underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
     declOrOffset = new (ctx) TypeAliasDecl(SourceLoc(),
-                                           ctx.getIdentifier(blobData),
+                                           ctx.getIdentifier(name),
                                            SourceLoc(),
                                            underlyingType,
                                            ModuleContext,
-                                           {});
+                                           /*inherited=*/{});
+    break;
+  }
+
+  case decls_block::STRUCT_DECL: {
+    bool isImplicit;
+    ArrayRef<uint64_t> inheritedIDs;
+
+    decls_block::StructLayout::readRecord(scratch, isImplicit, inheritedIDs);
+    assert(inheritedIDs.empty() && "can't handle inherited IDs yet");
+
+    StringRef name = readIdentifier(DeclTypeCursor);
+    if (name.empty()) {
+      error();
+      return nullptr;
+    }
+
+    declOrOffset = new (ctx) StructDecl(SourceLoc(), ctx.getIdentifier(name),
+                                        SourceLoc(), /*inherited=*/{},
+                                        /*generic params=*/nullptr,
+                                        ModuleContext);
     break;
   }
     

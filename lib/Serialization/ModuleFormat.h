@@ -137,13 +137,14 @@ namespace input_block {
 namespace decls_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
-  enum {
+  enum : uint8_t {
     BUILTIN_TYPE = 1,
     NAME_ALIAS_TYPE,
 
     TYPE_ALIAS_DECL = 100,
+    STRUCT_DECL,
 
-    NAME_HACK = 200
+    NAME_HACK = 255
   };
 
   using BuiltinTypeLayout = BCRecordLayout<
@@ -160,6 +161,12 @@ namespace decls_block {
     TYPE_ALIAS_DECL,
     TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
+    BCFixed<1>,  // implicit flag
+    BCArray<TypeIDField> // inherited types
+  >;
+
+  using StructLayout = BCRecordLayout<
+    STRUCT_DECL,
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
   >;

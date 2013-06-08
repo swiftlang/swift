@@ -253,6 +253,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, BUILTIN_TYPE);
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, TYPE_ALIAS_DECL);
+  RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, NAME_HACK);
 
   BLOCK(INDEX_BLOCK);
@@ -357,8 +358,33 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
+  case DeclKind::Struct: {
+    auto theStruct = cast<StructDecl>(D);
+    
+    // FIXME: Handle attributes.
+    if (!theStruct->getAttrs().empty())
+      return false;
+
+    // FIXME: Handle generics.
+    if (theStruct->getGenericParams())
+      return false;
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : theStruct->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
+    StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                             theStruct->isImplicit(),
+                             inherited);
+
+    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
+    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                               theStruct->getName().str());
+    return true;
+  }
+
   case DeclKind::OneOf:
-  case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
     return false;
@@ -465,11 +491,12 @@ bool Serializer::writeType(Type ty) {
 }
 
 void Serializer::writeAllDeclsAndTypes() {
-  BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 3);
+  BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
 
   registerDeclTypeAbbr<decls_block::BuiltinTypeLayout>();
   registerDeclTypeAbbr<decls_block::NameAliasTypeLayout>();
   registerDeclTypeAbbr<decls_block::TypeAliasLayout>();
+  registerDeclTypeAbbr<decls_block::StructLayout>();
   registerDeclTypeAbbr<decls_block::NameHackLayout>();
 
   while (!DeclsAndTypesToWrite.empty()) {
