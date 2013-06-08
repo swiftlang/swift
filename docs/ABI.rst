@@ -105,7 +105,7 @@ types where the metadata itself has unknown layout.)
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // oneof
   nominal-type-kind ::= 'V'                  // struct
-  protocol-context ::= 'P' declaration-name
+  protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
 <type> never begins or ends with a number.
