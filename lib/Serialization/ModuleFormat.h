@@ -45,17 +45,15 @@ enum class DeclOrType {
   IsType
 };
 
-// The serialized format uses 32 bits for potential alignment benefits, even
-// though bitcode is generally unaligned.
 using DeclID = Fixnum<31>;
-using DeclIDField = BCFixed<32>;
+using DeclIDField = BCFixed<31>;
 
 // TypeID must be the same as DeclID because it is stored in the same way.
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using BitOffset = Fixnum<31>;
-using BitOffsetField = BCFixed<32>;
+using BitOffsetField = BCFixed<31>;
 
 
 /// The various types of blocks that can occur within a serialized Swift
@@ -140,10 +138,12 @@ namespace decls_block {
   enum : uint8_t {
     BUILTIN_TYPE = 1,
     NAME_ALIAS_TYPE,
+    STRUCT_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
     CONSTRUCTOR_DECL,
+    VAR_DECL,
 
     DECL_CONTEXT = 254,
     NAME_HACK = 255
@@ -159,8 +159,15 @@ namespace decls_block {
     DeclIDField // typealias decl
   >;
 
+  using StructTypeLayout = BCRecordLayout<
+    STRUCT_TYPE,
+    DeclIDField, // struct decl
+    TypeIDField  // parent
+  >;
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
+    DeclIDField, // context decl
     TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
     BCFixed<1>,  // implicit flag
@@ -169,14 +176,27 @@ namespace decls_block {
 
   using StructLayout = BCRecordLayout<
     STRUCT_DECL,
+    DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
   >;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
-    BCFixed<1>, // implicit flag
-    DeclIDField // implicit this decl
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    DeclIDField  // implicit this decl
+  >;
+
+  using VarLayout = BCRecordLayout<
+    VAR_DECL,
+    DeclIDField,  // context decl
+    BCFixed<1>,   // implicit flag
+    BCFixed<1>,   // never lvalue flag
+    TypeIDField,  // type
+    DeclIDField,  // getter
+    DeclIDField,  // setter
+    DeclIDField   // overridden decl
   >;
 
   using DeclContextLayout = BCRecordLayout<

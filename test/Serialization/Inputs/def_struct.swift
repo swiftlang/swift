@@ -1,0 +1,3 @@
+import Builtin
+
+struct Empty {}

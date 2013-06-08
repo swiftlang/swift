@@ -298,6 +298,12 @@ namespace impl {
       out.EmitRecordWithAbbrev(abbrCode, buffer);
     }
 
+    template <typename BufferTy>
+    static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
+                     unsigned abbrCode, Nothing_t) {
+      out.EmitRecordWithAbbrev(abbrCode, buffer);
+    }
+
     template <typename ElementTy>
     static void read(ArrayRef<ElementTy> buffer, ArrayRef<ElementTy> &rawData) {
       rawData = buffer;

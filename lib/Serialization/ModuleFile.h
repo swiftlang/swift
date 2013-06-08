@@ -31,6 +31,7 @@ namespace llvm {
 
 namespace swift {
 class Decl;
+class DeclContext;
 class Module;
 class ValueDecl;
 
@@ -95,6 +96,9 @@ class ModuleFile {
            issue != ModuleStatus::FallBackToTranslationUnit);
     Status = issue;
   }
+
+  /// Returns the decl context with the given ID, deserializing it if needed.
+  DeclContext *getDeclContext(serialization::DeclID DID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
   Decl *getDecl(serialization::DeclID DID);

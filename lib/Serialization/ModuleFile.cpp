@@ -81,6 +81,26 @@ StringRef readIdentifier(llvm::BitstreamCursor &Cursor) {
   return blobData;
 }
 
+DeclContext *ModuleFile::getDeclContext(DeclID DID) {
+  if (DID == 0)
+    return ModuleContext;
+
+  Decl *D = getDecl(DID);
+
+  if (auto ND = dyn_cast<NominalTypeDecl>(D))
+    return ND;
+  if (auto ED = dyn_cast<ExtensionDecl>(D))
+    return ED;
+  if (auto CD = dyn_cast<ConstructorDecl>(D))
+    return CD;
+  if (auto DD = dyn_cast<DestructorDecl>(D))
+    return DD;
+  if (auto FD = dyn_cast<FuncDecl>(D))
+    return FD->getBody();
+
+  llvm_unreachable("unknown DeclContext kind");
+}
+
 Decl *ModuleFile::getDecl(DeclID DID) {
   if (DID == 0)
     return nullptr;
@@ -108,15 +128,16 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
+    DeclID contextID;
     TypeID underlyingTypeID;
     bool isGeneric;
     bool isImplicit;
     ArrayRef<uint64_t> inheritedIDs;
 
-    decls_block::TypeAliasLayout::readRecord(scratch, underlyingTypeID,
+    decls_block::TypeAliasLayout::readRecord(scratch, contextID,
+                                             underlyingTypeID,
                                              isGeneric, isImplicit,
                                              inheritedIDs);
-    assert(inheritedIDs.empty() && "can't handle inherited IDs yet");
 
     // Deserialize the name.
     // FIXME: Move this to an identifier table instead of a trailing record.
@@ -126,27 +147,56 @@ Decl *ModuleFile::getDecl(DeclID DID) {
       return nullptr;
     }
 
+    auto inherited =
+      MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
+                               inheritedIDs.size());
+
+    TypeLoc *nextInheritedType = inherited.data();
+    for (TypeID TID : inheritedIDs) {
+      auto type = getType(TID);
+      new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
+      ++nextInheritedType;
+    }
+
     TypeLoc underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-    declOrOffset = new (ctx) TypeAliasDecl(SourceLoc(),
-                                           ctx.getIdentifier(name),
-                                           SourceLoc(),
-                                           underlyingType,
-                                           ModuleContext,
-                                           /*inherited=*/{});
+    auto alias = new (ctx) TypeAliasDecl(SourceLoc(),
+                                         ctx.getIdentifier(name),
+                                         SourceLoc(),
+                                         underlyingType,
+                                         getDeclContext(contextID),
+                                         inherited);
+    declOrOffset = alias;
+
+    if (isImplicit)
+      alias->setImplicit();
+    if (isGeneric)
+      alias->setGenericParameter();
     break;
   }
 
   case decls_block::STRUCT_DECL: {
+    DeclID contextID;
     bool isImplicit;
     ArrayRef<uint64_t> inheritedIDs;
 
-    decls_block::StructLayout::readRecord(scratch, isImplicit, inheritedIDs);
-    assert(inheritedIDs.empty() && "can't handle inherited IDs yet");
+    decls_block::StructLayout::readRecord(scratch, contextID, isImplicit,
+                                          inheritedIDs);
 
     StringRef name = readIdentifier(DeclTypeCursor);
     if (name.empty()) {
       error();
       return nullptr;
+    }
+
+    auto inherited =
+      MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
+                               inheritedIDs.size());
+
+    TypeLoc *nextInheritedType = inherited.data();
+    for (TypeID TID : inheritedIDs) {
+      auto type = getType(TID);
+      new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
+      ++nextInheritedType;
     }
 
     ArrayRef<uint64_t> memberIDs;
@@ -166,10 +216,13 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     decls_block::DeclContextLayout::readRecord(memberIDBuffer, memberIDs);
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), ctx.getIdentifier(name),
-                                          SourceLoc(), /*inherited=*/{},
+                                          SourceLoc(), inherited,
                                           /*generic params=*/nullptr,
-                                          ModuleContext);
+                                          getDeclContext(contextID));
     declOrOffset = theStruct;
+
+    if (isImplicit)
+      theStruct->setImplicit();
 
     if (!memberIDs.empty()) {
       MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(memberIDs.size()),
@@ -186,19 +239,72 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   }
 
   case decls_block::CONSTRUCTOR_DECL: {
+    DeclID parentID;
     bool isImplicit;
     DeclID implicitThisID;
 
-    decls_block::ConstructorLayout::readRecord(scratch, isImplicit,
+    decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                implicitThisID);
     auto thisDecl = cast<VarDecl>(getDecl(implicitThisID));
-    auto parent = thisDecl->getType()->getAnyNominal();
+    auto parent = cast<NominalTypeDecl>(getDeclContext(parentID));
 
     auto emptyArgs = TuplePattern::create(ctx, SourceLoc(), {}, SourceLoc());
-    declOrOffset = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
-                                             SourceLoc(), emptyArgs, thisDecl,
-                                             /*generic params=*/nullptr,
-                                             parent);
+    auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
+                                          SourceLoc(), emptyArgs, thisDecl,
+                                          /*generic params=*/nullptr,
+                                          parent);
+    declOrOffset = ctor;
+
+    // FIXME: Actually serialize the type instead of reconstructing it here.
+    ctor->setType(FunctionType::get(MetaTypeType::get(thisDecl->getType(),
+                                                      ctx),
+                                    FunctionType::get(ctx.TheEmptyTupleType,
+                                                      thisDecl->getType(),
+                                                      ctx),
+                                    ctx));
+
+    if (isImplicit)
+      ctor->setImplicit();
+    break;
+  }
+
+  case decls_block::VAR_DECL: {
+    DeclID contextID;
+    bool isImplicit, isNeverLValue;
+    TypeID typeID;
+    DeclID getterID, setterID;
+    DeclID overriddenID;
+
+    decls_block::VarLayout::readRecord(scratch, contextID, isImplicit,
+                                       isNeverLValue, typeID, getterID,
+                                       setterID, overriddenID);
+
+    StringRef name = readIdentifier(DeclTypeCursor);
+    if (name.empty()) {
+      error();
+      return nullptr;
+    }
+
+    auto var = new (ctx) VarDecl(SourceLoc(), ctx.getIdentifier(name),
+                                 getType(typeID), nullptr);
+    declOrOffset = var;
+
+    // Explicitly set the DeclContext /after/ creating the VarDecl.
+    // Sometimes the context has to reference this decl.
+    var->setDeclContext(getDeclContext(contextID));
+
+    var->setNeverUsedAsLValue(isNeverLValue);
+    if (isImplicit)
+      var->setImplicit();
+
+    if (getterID || setterID) {
+      var->setProperty(ctx, SourceLoc(),
+                       cast_or_null<FuncDecl>(getDecl(getterID)),
+                       cast_or_null<FuncDecl>(getDecl(setterID)),
+                       SourceLoc());
+    }
+
+    var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
   }
 
@@ -261,6 +367,15 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     typeOrOffset = alias->getDeclaredType();
+    break;
+  }
+
+  case decls_block::STRUCT_TYPE: {
+    DeclID structID;
+    TypeID parentID;
+    decls_block::StructTypeLayout::readRecord(scratch, structID, parentID);
+    typeOrOffset = StructType::get(cast<StructDecl>(getDecl(structID)),
+                                   getType(parentID), ModuleContext->Ctx);
     break;
   }
 

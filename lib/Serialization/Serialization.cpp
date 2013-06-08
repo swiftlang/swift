@@ -183,6 +183,38 @@ namespace llvm {
   };
 }
 
+static const Decl *getDeclForContext(const DeclContext *DC) {
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TranslationUnit:
+    // Use a null decl to represent the translation unit.
+    // FIXME: multiple TUs within a module?
+    return nullptr;
+  case DeclContextKind::BuiltinModule:
+    llvm_unreachable("builtins should be handled explicitly");
+  case DeclContextKind::SerializedModule:
+  case DeclContextKind::ClangModule:
+    llvm_unreachable("shouldn't serialize decls from an imported module");
+  case DeclContextKind::TopLevelCodeDecl:
+    llvm_unreachable("shouldn't serialize the main module");
+  case DeclContextKind::CapturingExpr: {
+    // FIXME: What about default functions?
+    assert(isa<FuncExpr>(DC) &&
+           "shouldn't serialize decls from anonymous closures");
+    auto FD = cast<FuncExpr>(DC)->getDecl();
+    assert(FD && "shouldn't serialize decls from anonymous closures");
+    return FD;
+  }
+  case DeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(DC);
+  case DeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(DC);
+  case DeclContextKind::ConstructorDecl:
+    return cast<ConstructorDecl>(DC);
+  case DeclContextKind::DestructorDecl:
+    return cast<DestructorDecl>(DC);
+  }
+}
+
 DeclID Serializer::addDeclRef(const Decl *D) {
   if (!D)
     return 0;
@@ -252,9 +284,11 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, BUILTIN_TYPE);
   RECORD(decls_block, NAME_ALIAS_TYPE);
+  RECORD(decls_block, STRUCT_TYPE);
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
+  RECORD(decls_block, VAR_DECL);
   RECORD(decls_block, DECL_CONTEXT);
   RECORD(decls_block, NAME_HACK);
 
@@ -339,6 +373,8 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!typeAlias->getAttrs().empty())
       return false;
 
+    const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
+
     Type underlying;
     if (typeAlias->hasUnderlyingType())
       underlying = typeAlias->getUnderlyingType();
@@ -349,6 +385,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addDeclRef(DC),
                                 addTypeRef(underlying),
                                 typeAlias->isGenericParameter(),
                                 typeAlias->isImplicit(),
@@ -371,12 +408,15 @@ bool Serializer::writeDecl(const Decl *D) {
     if (theStruct->getGenericParams())
       return false;
 
+    const Decl *DC = getDeclForContext(theStruct->getDeclContext());
+
     SmallVector<TypeID, 4> inherited;
     for (auto parent : theStruct->getInherited())
       inherited.push_back(addTypeRef(parent.getType()));
 
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                             addDeclRef(DC),
                              theStruct->isImplicit(),
                              inherited);
 
@@ -398,8 +438,30 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Protocol:
     return false;
 
-  case DeclKind::Var:
-    return false;    
+  case DeclKind::Var: {
+    auto var = cast<VarDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!var->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(var->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
+    VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                          addDeclRef(DC), var->isImplicit(),
+                          var->isNeverUsedAsLValue(),
+                          addTypeRef(var->getType()),
+                          addDeclRef(var->getGetter()),
+                          addDeclRef(var->getSetter()),
+                          addDeclRef(var->getOverriddenDecl()));
+
+    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
+    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                               var->getName().str());
+
+    return true;
+  }
 
   case DeclKind::Func:
   case DeclKind::OneOfElement:
@@ -428,10 +490,12 @@ bool Serializer::writeDecl(const Decl *D) {
     if (ctor->getAllocThisExpr())
       return false;
 
+    const DeclContext *DC = ctor->getDeclContext();
     auto implicitThis = ctor->getImplicitThisDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  addDeclRef(cast<NominalTypeDecl>(DC)),
                                   ctor->isImplicit(), addDeclRef(implicitThis));
 
     return true;
@@ -476,7 +540,7 @@ bool Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(nameAlias->getDecl()));
+                                    addDeclRef(typeAlias));
     return true;
   }
 
@@ -491,8 +555,17 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Tuple:
     return false;
 
+  case TypeKind::Struct: {
+    auto structTy = cast<StructType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[StructTypeLayout::Code];
+    StructTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addDeclRef(structTy->getDecl()),
+                                 addTypeRef(structTy->getParent()));
+    return true;
+  }
+
   case TypeKind::OneOf:
-  case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Protocol:
     return false;
@@ -538,9 +611,11 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<decls_block::BuiltinTypeLayout>();
   registerDeclTypeAbbr<decls_block::NameAliasTypeLayout>();
+  registerDeclTypeAbbr<decls_block::StructTypeLayout>();
   registerDeclTypeAbbr<decls_block::TypeAliasLayout>();
   registerDeclTypeAbbr<decls_block::StructLayout>();
   registerDeclTypeAbbr<decls_block::ConstructorLayout>();
+  registerDeclTypeAbbr<decls_block::VarLayout>();
   registerDeclTypeAbbr<decls_block::DeclContextLayout>();
   registerDeclTypeAbbr<decls_block::NameHackLayout>();
 
