@@ -81,7 +81,8 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual Module *loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path);
+                             ArrayRef<std::pair<Identifier, SourceLoc>> path)
+                                                                      override;
 
   /// \brief Look for declarations associated with the given name.
   ///
@@ -99,7 +100,7 @@ public:
   virtual void lookupValue(Module *module,
                            Module::AccessPathTy accessPath, Identifier name,
                            NLKind lookupKind,
-                           SmallVectorImpl<ValueDecl*> &result);
+                           SmallVectorImpl<ValueDecl*> &result) override;
   
   /// \brief Look for visible declarations in the Clang translation unit.
   ///
@@ -115,7 +116,7 @@ public:
   /// contains extensions loaded from any generation up to and including this
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
-                              unsigned previousGeneration);
+                              unsigned previousGeneration) override;
 };
 
 }
