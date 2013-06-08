@@ -520,7 +520,12 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return mangleNominalType(cast<OneOfType>(base)->getDecl(), explosion);
 
   case TypeKind::Protocol:
-    return mangleNominalType(cast<ProtocolType>(base)->getDecl(), explosion);
+    // Protocol type manglings have a variable number of protocol names
+    // follow the 'P' sigil, so a trailing underscore is needed after the
+    // type name, unlike protocols as contexts.
+    mangleNominalType(cast<ProtocolType>(base)->getDecl(), explosion);
+    Buffer << '_';
+    return;
 
   case TypeKind::Struct:
     return mangleNominalType(cast<StructType>(base)->getDecl(), explosion);

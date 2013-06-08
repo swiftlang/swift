@@ -44,7 +44,7 @@ All Swift-mangled names begin with this prefix.
   declaration-name ::= context identifier
   local-marker ::= 'L'
 
-Entity manglings all start with a nominal-type-kind ([COV]), an
+Entity manglings all start with a nominal-type-kind ([COPV]), an
 identifier ([0-9oX]), or a substitution ([S]).  Global manglings start
 with any of those or [MTWw].
 
@@ -73,6 +73,7 @@ types where the metadata itself has unknown layout.)
   context ::= module
   context ::= function
   context ::= nominal-type
+  context ::= protocol-context
   module ::= substitution                    // other substitution
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
@@ -91,7 +92,7 @@ types where the metadata itself has unknown layout.)
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
   type ::= 'M' type                          // metatype
-  type ::= 'P' protocol-list '_'             // protocol
+  type ::= 'P' protocol-list '_'             // protocol type
   type ::= 'Q' index                         // archetype with depth=0
   type ::= 'Qd' index index                  // archetype with depth=M+1
   type ::= 'R' type                          // byref
@@ -100,14 +101,20 @@ types where the metadata itself has unknown layout.)
   type ::= 'U' generics '_' type             // generic type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
-  nominal-type ::= nominal-type-kind context identifier
+  nominal-type ::= nominal-type-kind declaration-name
   nominal-type-kind ::= 'C'                  // class
   nominal-type-kind ::= 'O'                  // oneof
   nominal-type-kind ::= 'V'                  // struct
+  protocol-context ::= 'P' declaration-name
   tuple-element ::= identifier? type
 
 <type> never begins or ends with a number.
 <type> never begins with an underscore.
+
+Note that protocols mangle differently as types and as contexts. A protocol
+context always consists of a single protocol name and so mangles without a
+trailing underscore. A protocol type can have zero, one, or many protocol bounds
+which are juxtaposed and terminated with a trailing underscore.
 
 ::
 
