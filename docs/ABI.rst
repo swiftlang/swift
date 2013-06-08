@@ -40,7 +40,8 @@ All Swift-mangled names begin with this prefix.
   entity ::= declaration 's'                 // setter
   entity ::= declaration 'a'                 // addressor
   entity ::= declaration                     // other declaration
-  declaration ::= context identifier type
+  declaration ::= declaration-name type
+  declaration-name ::= context identifier
   local-marker ::= 'L'
 
 Entity manglings all start with a nominal-type-kind ([COV]), an
@@ -114,10 +115,10 @@ types where the metadata itself has unknown layout.)
   generic-parameter ::= protocol-list '_'
   protocol-list ::= protocol*
   protocol ::= substitution
-  protocol ::= entity
+  protocol ::= declaration-name
 
 <protocol-list> is unambiguous because protocols are always top-level,
-and so the structure is quite simple.
+so the structure is quite simple.
 
 ::
 
