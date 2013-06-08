@@ -149,13 +149,59 @@ Decl *ModuleFile::getDecl(DeclID DID) {
       return nullptr;
     }
 
-    declOrOffset = new (ctx) StructDecl(SourceLoc(), ctx.getIdentifier(name),
-                                        SourceLoc(), /*inherited=*/{},
-                                        /*generic params=*/nullptr,
-                                        ModuleContext);
+    ArrayRef<uint64_t> memberIDs;
+
+    auto entry = DeclTypeCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      return {};
+
+    StringRef blobData;
+    SmallVector<uint64_t, 16> memberIDBuffer;
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer,
+                                                  &blobData);
+    if (recordID != decls_block::DECL_CONTEXT) {
+      error();
+      return nullptr;
+    }
+    decls_block::DeclContextLayout::readRecord(memberIDBuffer, memberIDs);
+
+    auto theStruct = new (ctx) StructDecl(SourceLoc(), ctx.getIdentifier(name),
+                                          SourceLoc(), /*inherited=*/{},
+                                          /*generic params=*/nullptr,
+                                          ModuleContext);
+    declOrOffset = theStruct;
+
+    if (!memberIDs.empty()) {
+      MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(memberIDs.size()),
+                                      memberIDs.size());
+      auto nextMember = members.begin();
+      for (auto rawID : memberIDBuffer) {
+        *nextMember = getDecl(rawID);
+        ++nextMember;
+      }
+
+      theStruct->setMembers(members, SourceRange());
+    }
     break;
   }
-    
+
+  case decls_block::CONSTRUCTOR_DECL: {
+    bool isImplicit;
+    DeclID implicitThisID;
+
+    decls_block::ConstructorLayout::readRecord(scratch, isImplicit,
+                                               implicitThisID);
+    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID));
+    auto parent = thisDecl->getType()->getAnyNominal();
+
+    auto emptyArgs = TuplePattern::create(ctx, SourceLoc(), {}, SourceLoc());
+    declOrOffset = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
+                                             SourceLoc(), emptyArgs, thisDecl,
+                                             /*generic params=*/nullptr,
+                                             parent);
+    break;
+  }
+
   default:
     // We don't know how to deserialize this kind of decl.
     error();

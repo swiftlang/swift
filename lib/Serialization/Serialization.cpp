@@ -254,6 +254,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
+  RECORD(decls_block, CONSTRUCTOR_DECL);
+  RECORD(decls_block, DECL_CONTEXT);
   RECORD(decls_block, NAME_HACK);
 
   BLOCK(INDEX_BLOCK);
@@ -381,6 +383,13 @@ bool Serializer::writeDecl(const Decl *D) {
     abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
     NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                theStruct->getName().str());
+
+    abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
+    SmallVector<DeclID, 16> memberIDs;
+    for (auto member : theStruct->getMembers())
+      memberIDs.push_back(addDeclRef(member));
+    DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
+
     return true;
   }
 
@@ -390,10 +399,44 @@ bool Serializer::writeDecl(const Decl *D) {
     return false;
 
   case DeclKind::Var:
+    return false;    
+
   case DeclKind::Func:
   case DeclKind::OneOfElement:
   case DeclKind::Subscript:
-  case DeclKind::Constructor:
+    return false;
+
+  case DeclKind::Constructor: {
+    auto ctor = cast<ConstructorDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!ctor->getAttrs().empty())
+      return false;
+
+    // FIXME: Handle generics.
+    if (ctor->isGeneric())
+      return false;
+
+    // FIXME: Handle arguments.
+    if (ctor->getArgumentType()->getCanonicalType() !=
+        D->getASTContext().TheEmptyTupleType->getCanonicalType())
+      return false;
+
+    // FIXME: Handle allocating constructors.
+    // FIXME: Does this ever occur in Swift modules? If it's only used by the
+    // importer, perhaps we don't need to worry about it here.
+    if (ctor->getAllocThisExpr())
+      return false;
+
+    auto implicitThis = ctor->getImplicitThisDecl();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
+    ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  ctor->isImplicit(), addDeclRef(implicitThis));
+
+    return true;
+  }
+
   case DeclKind::Destructor:
     return false;
   }
@@ -497,6 +540,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<decls_block::NameAliasTypeLayout>();
   registerDeclTypeAbbr<decls_block::TypeAliasLayout>();
   registerDeclTypeAbbr<decls_block::StructLayout>();
+  registerDeclTypeAbbr<decls_block::ConstructorLayout>();
+  registerDeclTypeAbbr<decls_block::DeclContextLayout>();
   registerDeclTypeAbbr<decls_block::NameHackLayout>();
 
   while (!DeclsAndTypesToWrite.empty()) {

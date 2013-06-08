@@ -143,7 +143,9 @@ namespace decls_block {
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
+    CONSTRUCTOR_DECL,
 
+    DECL_CONTEXT = 254,
     NAME_HACK = 255
   };
 
@@ -169,6 +171,17 @@ namespace decls_block {
     STRUCT_DECL,
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
+  >;
+
+  using ConstructorLayout = BCRecordLayout<
+    CONSTRUCTOR_DECL,
+    BCFixed<1>, // implicit flag
+    DeclIDField // implicit this decl
+  >;
+
+  using DeclContextLayout = BCRecordLayout<
+    DECL_CONTEXT,
+    BCArray<DeclIDField>
   >;
 
   /// Names will eventually be uniqued in an identifier table, but for now we
