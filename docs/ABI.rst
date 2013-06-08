@@ -25,6 +25,7 @@ All Swift-mangled names begin with this prefix.
   global ::= 'M' directness type             // type metadata
   global ::= 'MP' directness type            // type metadata pattern
   global ::= 'Mm' type                       // class metaclass
+  global ::= 'nk_' entity                    // protocol witness
   global ::= 'w' value-witness-kind type     // value witness
   global ::= 'WV' type                       // value witness table
   global ::= 'Wo' entity                     // witness table offset
