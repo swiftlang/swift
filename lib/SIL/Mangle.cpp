@@ -61,8 +61,6 @@ static bool isSwiftModule(Module *module) {
 }
 
 namespace {
-  
-
   /// A helpful little wrapper for a value that should be mangled
   /// in a particular, compressed value.
   class Index {
@@ -282,6 +280,7 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
   // emit the outer parameters because they should have been emitted as part of
   // the outer context.
   const GenericParamList *parent = genericParams;
+  ArchetypesDepth = 0;
   do {
     ++ArchetypesDepth;
   } while ((parent = parent->getOuterParameters()));
