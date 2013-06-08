@@ -75,9 +75,9 @@ void BuiltinModuleCache::lookupValue(Identifier Name, NLKind LookupKind,
 
   if (Entry == 0)
     Entry = getBuiltinValue(M.Ctx, Name);
-      
-  if (ValueDecl *VD = dyn_cast_or_null<ValueDecl>(Entry))
-    Result.push_back(VD);
+
+  if (Entry)
+    Result.push_back(Entry);
 }
                        
 //===----------------------------------------------------------------------===//
