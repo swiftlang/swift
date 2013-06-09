@@ -1046,6 +1046,9 @@ ERROR(nonprotocol_inherit,sema_tcd,none,
       "cannot inherit non-protocol type %0", (Type))
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+ERROR(non_class_does_not_conform_to_class_protocol,sema_tcd,none,
+      "non-class type %0 does not conform to class-bound protocol %1",
+      (Type, Type))
 NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,sema_tcd,none,

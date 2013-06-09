@@ -94,9 +94,18 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
   }
   
+  // If the protocol is class-bound, non-classes are a non-starter.
+  if (Proto->getAttrs().isClassProtocol()
+      && !T->getClassOrBoundGenericClass()) {
+    TC.diagnose(ComplainLoc,
+                diag::non_class_does_not_conform_to_class_protocol,
+                T, Proto->getDeclaredType());
+    return nullptr;
+  }
+
   bool Complained = false;
   auto metaT = MetaTypeType::get(T, TC.Context);
-
+  
   // First, resolve any associated type members. They'll be used for checking
   // other members.
   

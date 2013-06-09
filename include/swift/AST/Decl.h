@@ -1167,6 +1167,7 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
+  Optional<bool> ClassBound;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -1198,6 +1199,9 @@ public:
   /// \brief Retrieve the associated type 'This'.
   TypeAliasDecl *getThis() const;
 
+  /// True if this protocol can only be conformed to by class types.
+  bool isClassBound();
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
