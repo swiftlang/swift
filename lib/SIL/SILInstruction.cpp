@@ -426,6 +426,14 @@ ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
                    SILType::getOpaquePointerType(F.getASTContext()))
 {}
 
+ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
+                                                     SILValue Operand,
+                                                     SILFunction &F)
+  : UnaryInstructionBase(Loc, Operand,
+                         SILType::getObjCPointerType(F.getASTContext()))
+{}
+
+
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
                                  SILValue SrcExistential,
                                  SILValue DestExistential,

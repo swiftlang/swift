@@ -197,6 +197,11 @@ SILType SILType::getObjectPointerType(ASTContext &C) {
                  /*isAddress=*/ false);
 }
 
+SILType SILType::getObjCPointerType(ASTContext &C) {
+  return SILType(CanType(C.TheObjCPointerType),
+                 /*isAddress=*/ false);
+}
+
 SILType SILType::getRawPointerType(ASTContext &C) {
   return SILType(CanType(C.TheRawPointerType),
                  /*isAddress=*/false);

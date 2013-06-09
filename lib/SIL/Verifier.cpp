@@ -366,10 +366,8 @@ public:
   void checkArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "archetype_metatype instruction must be of metatype type");
-    require(MI->getOperand().getType().isAddress(),
-            "archetype_metatype operand must be an address");
     require(MI->getOperand().getType().getSwiftRValueType()->is<ArchetypeType>(),
-            "archetype_metatype operand must be address of archetype type");
+            "archetype_metatype operand must be of archetype type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "archetype_metatype result must be metatype of operand type");
@@ -377,10 +375,8 @@ public:
   void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
     require(MI->getType().is<MetaTypeType>(),
             "protocol_metatype instruction must be of metatype type");
-    require(MI->getOperand().getType().isAddress(),
-            "protocol_metatype operand must be an address");
     require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
-            "protocol_metatype operand must be address of protocol type");
+            "protocol_metatype operand must be of protocol type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
             CanType(MI->getType().castTo<MetaTypeType>()->getInstanceType()),
             "protocol_metatype result must be metatype of operand type");
@@ -572,14 +568,13 @@ public:
                             MetaTypeType::get(operandType.getSwiftRValueType(),
                                               operandType.getASTContext())),
             "result must be method of operand type");
-    if (operandType.isAddress()) {
-      require(operandType.is<ArchetypeType>(),
-              "archetype_method must apply to an archetype address");
-    } else if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
+    if (MetaTypeType *mt = operandType.getAs<MetaTypeType>()) {
       require(mt->getInstanceType()->is<ArchetypeType>(),
               "archetype_method must apply to an archetype metatype");
-    } else
-      llvm_unreachable("method must apply to an address or metatype");
+    } else {
+      require(operandType.is<ArchetypeType>(),
+              "archetype_method must apply to an archetype or archetype metatype");
+    }
   }
   
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
@@ -594,8 +589,6 @@ public:
       require(getMethodThisType(methodType)->isEqual(
                             operandType.getASTContext().TheOpaquePointerType),
               "result must be a method of opaque pointer");
-      require(operandType.isAddress(),
-              "instance protocol_method must apply to an existential address");
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
     } else {
@@ -652,6 +645,17 @@ public:
             "project_existential must be applied to address");
     require(operandType.isExistentialType(),
             "project_existential must be applied to address of existential");
+    require(PEI->getType() == SILType::getOpaquePointerType(F.getASTContext()),
+            "project_existential_ref result must be an OpaquePointer");
+  }
+  
+  void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
+    require(!PEI->getOperand().getType().isAddress(),
+            "project_existential_ref operand must not be address");
+    require(PEI->getOperand().getType().isClassBoundExistentialType(),
+            "project_existential_ref operand must be class-bound existential");
+    require(PEI->getType() == SILType::getObjCPointerType(F.getASTContext()),
+            "project_existential_ref result must be an ObjCPointer");
   }
   
   void checkInitExistentialInst(InitExistentialInst *AEI) {
@@ -660,22 +664,45 @@ public:
             "init_existential must be applied to an address");
     require(exType.isExistentialType(),
             "init_existential must be applied to address of existential");
+    require(!exType.isClassBoundExistentialType(),
+            "init_existential must be applied to non-class-bound existential");
     require(!AEI->getConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
             "an existential container");
   }
   
+  void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
+    SILType concreteType = IEI->getOperand().getType();
+    require(concreteType.getSwiftType()->getClassOrBoundGenericClass(),
+            "init_existential_ref operand must be a class instance");
+    require(IEI->getType().isClassBoundExistentialType(),
+            "init_existential_ref result must be a class-bound existential type");
+    require(!IEI->getType().isAddress(),
+            "init_existential_ref result must not be an address");
+  }
+  
   void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
     SILType srcType = UEI->getSrcExistential().getType();
     SILType destType = UEI->getDestExistential().getType();
-    require(srcType.isAddress(),
-            "upcast_existential source must be an address");
     require(srcType.isExistentialType(),
-            "upcast_existential source must be address of existential");
+            "upcast_existential source must be existential");
     require(destType.isAddress(),
             "upcast_existential dest must be an address");
     require(destType.isExistentialType(),
             "upcast_existential dest must be address of existential");
+    require(!destType.isClassBoundExistentialType(),
+            "upcast_existential dest must be non-class-bound existential");
+  }
+  
+  void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
+    require(!UEI->getOperand().getType().isAddress(),
+            "upcast_existential_ref operand must not be an address");
+    require(UEI->getOperand().getType().isClassBoundExistentialType(),
+            "upcast_existential_ref operand must be class-bound existential");
+    require(!UEI->getType().isAddress(),
+            "upcast_existential_ref result must not be an address");
+    require(UEI->getType().isClassBoundExistentialType(),
+            "upcast_existential_ref result must be class-bound existential");
   }
   
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
@@ -684,15 +711,41 @@ public:
             "deinit_existential must be applied to an address");
     require(exType.isExistentialType(),
             "deinit_existential must be applied to address of existential");
+    require(!exType.isClassBoundExistentialType(),
+            "deinit_existential must be applied to non-class-bound existential");
   }
   
   void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
-    require(ASI->getOperand().getType().isAddressOnly(F.getModule()),
+    require(ASI->getOperand().getType().isAddress(),
             "archetype_to_super operand must be an address");
-    require(ASI->getOperand().getType().is<ArchetypeType>(),
-            "archetype_to_super operand must be archetype");
-    require(ASI->getType().hasReferenceSemantics(),
-            "archetype_to_super must convert to a reference type");
+    ArchetypeType *archetype
+      = ASI->getOperand().getType().getAs<ArchetypeType>();
+    require(archetype, "archetype_to_super operand must be archetype");
+    require(!archetype->isClassBound(),
+            "archetype_to_super operand must not be class-bound archetype");
+    require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+            "archetype_to_super must convert to a class type");
+  }
+
+  void checkArchetypeRefToSuperInst(ArchetypeRefToSuperInst *ASI) {
+    ArchetypeType *archetype
+      = ASI->getOperand().getType().getAs<ArchetypeType>();
+    require(archetype, "archetype_ref_to_super operand must be archetype");
+    require(archetype->isClassBound(),
+            "archetype_ref_to_super operand must be class-bound archetype");
+    require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+            "archetype_ref_to_super must convert to a class type");
+  }
+  
+  void checkSuperToArchetypeRefInst(SuperToArchetypeRefInst *SAI) {
+    require(SAI->getOperand().getType()
+              .getSwiftType()->getClassOrBoundGenericClass(),
+            "super_to_archetype_ref operand must be a class instance");
+    ArchetypeType *archetype
+      = SAI->getType().getAs<ArchetypeType>();
+    require(archetype, "super_to_archetype_ref must convert to archetype type");
+    require(archetype->isClassBound(),
+            "super_to_archetype_ref must convert to class-bound archetypet type");
   }
   
   void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {

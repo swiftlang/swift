@@ -306,6 +306,20 @@ public:
                     ArchetypeToSuperInst(Loc, Archetype, BaseTy));
   }
   
+  ArchetypeRefToSuperInst *createArchetypeRefToSuper(SILLocation Loc,
+                                                     SILValue Archetype,
+                                                     SILType BaseTy) {
+    return insert(new (F.getModule())
+                    ArchetypeRefToSuperInst(Loc, Archetype, BaseTy));
+  }
+  
+  SuperToArchetypeRefInst *createSuperToArchetypeRef(SILLocation Loc,
+                                                     SILValue Archetype,
+                                                     SILType BaseTy) {
+    return insert(new (F.getModule())
+                    SuperToArchetypeRefInst(Loc, Archetype, BaseTy));
+  }
+  
   SuperToArchetypeInst *createSuperToArchetype(SILLocation Loc,
                                                SILValue SrcBase,
                                                SILValue DestArchetypeAddr) {
@@ -412,6 +426,12 @@ public:
                     ProjectExistentialInst(Loc, Operand, F));
   }
   
+  ProjectExistentialRefInst *createProjectExistentialRefInst(SILLocation Loc,
+                                                             SILValue Operand) {
+    return insert(new (F.getModule())
+                    ProjectExistentialRefInst(Loc, Operand, F));
+  }
+  
   InitExistentialInst *createInitExistential(SILLocation Loc,
                                  SILValue Existential,
                                  SILType ConcreteType,
@@ -421,6 +441,17 @@ public:
                                           Existential,
                                           ConcreteType,
                                           Conformances));
+  }
+  
+  InitExistentialRefInst *createInitExistentialRef(SILLocation Loc,
+                                 SILType ExistentialType,
+                                 SILValue Concrete,
+                                 ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(new (F.getModule())
+                    InitExistentialRefInst(Loc,
+                                           ExistentialType,
+                                           Concrete,
+                                           Conformances));
   }
   
   UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
@@ -434,6 +465,14 @@ public:
                                             DestExistential,
                                             isTakeOfSrc,
                                             Conformances));
+  }
+  
+  UpcastExistentialRefInst *createUpcastExistentialRef(SILLocation Loc,
+                                 SILValue Operand,
+                                 SILType Ty,
+                                 ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(new (F.getModule())
+                    UpcastExistentialRefInst(Loc, Operand, Ty, Conformances));
   }
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,

@@ -203,6 +203,10 @@ public:
   /// some set of protocols. Protocol and protocol-conformance types are
   /// existential types.
   bool isExistentialType();
+  
+  /// Determines whether this type is an existential type with a class protocol
+  /// bound.
+  bool isClassBoundExistentialType();
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -1822,6 +1826,15 @@ inline bool TypeBase::isExistentialType() {
   CanType T = getCanonicalType();
   return T->getKind() == TypeKind::Protocol
          || T->getKind() == TypeKind::ProtocolComposition;
+}
+  
+inline bool TypeBase::isClassBoundExistentialType() {
+  CanType T = getCanonicalType();
+  if (auto *pt = dyn_cast<ProtocolType>(T))
+    return pt->isClassBound();
+  if (auto *pct = dyn_cast<ProtocolCompositionType>(T))
+    return pct->isClassBound();
+  return false;
 }
 
 inline Type TypeBase::getRValueType() {

@@ -412,6 +412,12 @@ public:
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
     printConversionInst(CI, CI->getOperand(), "archetype_to_super");
   }
+  void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "archetype_ref_to_super");
+  }
+  void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "supert_to_archetype_ref");
+  }
 
   void visitSuperToArchetypeInst(SuperToArchetypeInst *I) {
     OS << "super_to_archetype " << getID(I->getSrcBase()) << " to "
@@ -514,11 +520,18 @@ public:
     printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
-    OS << "project_existential " << getID(PI->getOperand());
+    OS << "project_existential " << getIDAndType(PI->getOperand());
+  }
+  void visitProjectExistentialRefInst(ProjectExistentialRefInst *PI) {
+    OS << "project_existential_ref " << getIDAndType(PI->getOperand());
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
     OS << "init_existential " << getID(AEI->getOperand()) << ", $";
     AEI->getConcreteType().print(OS);
+  }
+  void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
+    OS << "init_existential_ref " << getIDAndType(AEI->getOperand()) << ", $";
+    AEI->getType().print(OS);
   }
   void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {
     OS << "upcast_existential ";
@@ -526,6 +539,9 @@ public:
       OS << "[take] ";
     OS << getID(UEI->getSrcExistential())
        << " to " << getID(UEI->getDestExistential());
+  }
+  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "upcast_existential_ref");
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getID(DEI->getOperand());

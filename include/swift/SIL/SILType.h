@@ -165,6 +165,10 @@ public:
   bool isExistentialType() const {
     return getSwiftRValueType()->isExistentialType();
   }
+  /// Returns true if the referenced type is a class-bound existential type.
+  bool isClassBoundExistentialType() const {
+    return getSwiftRValueType()->isClassBoundExistentialType();
+  }
   
   /// Returns the ASTContext for the referenced Swift type.
   ASTContext &getASTContext() const {
@@ -177,6 +181,8 @@ public:
   
   /// Get the ObjectPointer type as a SILType.
   static SILType getObjectPointerType(ASTContext &C);
+  /// Get the ObjCPointer type as a SILType.
+  static SILType getObjCPointerType(ASTContext &C);
   /// Get the RawPointer type as a SILType.
   static SILType getRawPointerType(ASTContext &C);
   /// Get the OpaquePointer type as a SILType.

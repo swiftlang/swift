@@ -811,7 +811,21 @@ public:
   ArchetypeToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
+/// ArchetypeRefToSuperInst - Given a class-bound archetype value with a base
+/// class constraint, returns a reference to the base class instance.
+///
+/// FIXME: All archetypes with base class constraints are class-bound, so
+/// ArchetypeToSuper should go away when class-bound archetypes are fully
+/// implemented.
+class ArchetypeRefToSuperInst
+  : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst, ConversionInst>
+{
+public:
+  ArchetypeRefToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// SuperToArchetypeInst - Given a value of a class type, initializes an
 /// archetype with a base class constraint to contain a reference to the value.
 class SuperToArchetypeInst : public SILInstruction {
@@ -837,6 +851,22 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SuperToArchetypeInst;
   }
+};
+  
+/// SuperToArchetypeRefInst - Given a value of a class type, initializes a
+/// class-bound archetype with a base class constraint to contain a reference to
+/// the value.
+///
+/// FIXME: All archetypes with base class constraints are class-bound, so
+/// ArchetypeToSuper should go away when class-bound archetypes are fully
+/// implemented.
+class SuperToArchetypeRefInst
+  : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,
+                                ConversionInst>
+{
+public:
+  SuperToArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
 /// IsaInst - Perform a runtime check of a class instance's type.
@@ -1175,6 +1205,15 @@ public:
   ProjectExistentialInst(SILLocation Loc, SILValue Operand, SILFunction &F);
 };
   
+/// ProjectExistentialRefInst - Given a class-bound existential, returns an
+/// ObjCPointer referencing the contained class instance.
+class ProjectExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::ProjectExistentialRefInst>
+{
+public:
+  ProjectExistentialRefInst(SILLocation Loc, SILValue Operand, SILFunction &F);
+};
+  
 /// InitExistentialInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
@@ -1198,6 +1237,27 @@ public:
 
   SILType getConcreteType() const {
     return getType();
+  }
+};
+  
+/// InitExistentialRefInst - Given a class instance reference and a set of
+/// conformances, creates a class-bound existential value referencing the
+/// class instance.
+class InitExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::InitExistentialRefInst>
+{
+  ArrayRef<ProtocolConformance*> Conformances;
+public:
+  InitExistentialRefInst(SILLocation Loc,
+                         SILType ExistentialType,
+                         SILValue Instance,
+                         ArrayRef<ProtocolConformance*> Conformances)
+    : UnaryInstructionBase(Loc, Instance, ExistentialType),
+      Conformances(Conformances)
+  {}
+  
+  ArrayRef<ProtocolConformance*> getConformances() const {
+    return Conformances;
   }
 };
 
@@ -1250,6 +1310,23 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UpcastExistentialInst;
   }
+};
+  
+/// UpcastExistentialRefInst - Converts a value of class-bound existential
+/// container to another, more general class-bound existential container type.
+class UpcastExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::UpcastExistentialRefInst,
+                                ConversionInst>
+{
+  ArrayRef<ProtocolConformance*> Conformances;
+public:
+  UpcastExistentialRefInst(SILLocation Loc,
+                           SILValue Operand,
+                           SILType DestTy,
+                           ArrayRef<ProtocolConformance*> Conformances)
+    : UnaryInstructionBase(Loc, Operand, DestTy),
+      Conformances(Conformances)
+  {}
 };
   
 /// RetainInst - Increase the retain count of a value.
