@@ -235,7 +235,17 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     }
     return false;
   }
+   
+  case AttrName::class_protocol: {
+    if (Attributes.isClassProtocol())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
     
+    consumeToken(tok::identifier);
+    
+    Attributes.ClassProtocol = true;
+    return false;
+  }
+
   // 'objc_block' attribute.
   // FIXME: only permit this in type contexts.
   case AttrName::objc_block: {

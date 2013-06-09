@@ -163,6 +163,10 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "ibaction";
   }
+  if (attrs.isClassProtocol()) {
+    comma();
+    OS << "class_protocol";
+  }
   OS << "] ";
 }
 

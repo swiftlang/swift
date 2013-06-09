@@ -152,6 +152,7 @@ public:
   bool ExplicitInfix = false;
   bool IBOutlet = false;
   bool IBAction = false;
+  bool ClassProtocol = false;
   Optional<AbstractCC> cc = Nothing;
   
   DeclAttributes() {}
@@ -172,6 +173,7 @@ public:
   bool isObjCBlock() const { return ObjCBlock; }
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
+  bool isClassProtocol() const { return ClassProtocol; }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
 
@@ -180,7 +182,7 @@ public:
            !isAutoClosure() && !isThin() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !hasCC();
+           !isClassProtocol() && !hasCC();
   }
 };
   

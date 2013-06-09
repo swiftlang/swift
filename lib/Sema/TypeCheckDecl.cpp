@@ -1305,6 +1305,12 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     VD->getMutableAttrs().ObjCBlock = false;
   }
 
+  // Only protocols can have the [class_protocol] attribute.
+  if (Attrs.isClassProtocol() && !isa<ProtocolDecl>(VD)) {
+    TC.diagnose(VD->getStartLoc(), diag::class_protocol_not_protocol);
+    VD->getMutableAttrs().ClassProtocol = false;
+  }
+  
   if (Attrs.hasCC()) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "cc");
     VD->getMutableAttrs().cc = {};

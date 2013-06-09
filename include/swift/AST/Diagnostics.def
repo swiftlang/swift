@@ -1029,6 +1029,8 @@ ERROR(invalid_ibaction_decl,sema_tcd,none,
       "only methods can be declared 'ibaction'", ())
 ERROR(invalid_ibaction_result,sema_tcd,none,
       "methods declared 'ibaction' must return 'Void' (not %0)", (Type))
+ERROR(class_protocol_not_protocol,sema_tcd,none,
+      "'class_protocol' attribute can only be applied to protocols", ())
       
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute '%0' cannot be applied to declaration", (StringRef))
