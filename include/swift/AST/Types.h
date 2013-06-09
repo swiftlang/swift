@@ -1321,6 +1321,9 @@ public:
   
   void print(raw_ostream &OS) const;
   
+  /// True if the protocol is class-bound.
+  bool isClassBound() const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Protocol;
@@ -1365,6 +1368,9 @@ public:
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
+  /// True if one or more of the protocols is class-bound.
+  bool isClassBound() const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
@@ -1578,6 +1584,10 @@ public:
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
+  
+  /// isClassBound - True if the type conforms to one or more class-bound
+  /// protocols.
+  bool isClassBound() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }

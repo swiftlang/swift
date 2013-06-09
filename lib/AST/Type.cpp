@@ -90,19 +90,23 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::Tuple:
   case TypeKind::OneOf:
   case TypeKind::Struct:
-  case TypeKind::Protocol:
   case TypeKind::MetaType:
   case TypeKind::Module:
-  case TypeKind::Archetype:
   case TypeKind::DeducibleGenericParam:
   case TypeKind::Array:
-  case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct:
     return false;
 
+  case TypeKind::Archetype:
+    return cast<ArchetypeType>(canonical)->isClassBound();
+  case TypeKind::Protocol:
+    return cast<ProtocolType>(canonical)->isClassBound();
+  case TypeKind::ProtocolComposition:
+    return cast<ProtocolCompositionType>(canonical)->isClassBound();
+      
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
@@ -111,7 +115,7 @@ bool TypeBase::hasReferenceSemantics() {
     return true;
 
   case TypeKind::UnboundGeneric:
-    return isa<ClassDecl>(canonical->castTo<UnboundGenericType>()->getDecl());
+    return isa<ClassDecl>(cast<UnboundGenericType>(canonical)->getDecl());
   }
 
   llvm_unreachable("Unhandled type kind!");
@@ -1134,6 +1138,13 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
   Elt = TupleTypeElt(NewTy, Elt.getName(), Elt.getInit());
 }
 
+bool SubstitutableType::isClassBound() const {
+  for (ProtocolDecl *conformed : getConformsTo())
+    if (conformed->isClassBound())
+      return true;
+  return false;
+}
+
 ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
                                      Type Superclass,
@@ -1255,6 +1266,21 @@ void BoundGenericType::setSubstitutions(ArrayRef<Substitution> Subs){
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
   ASTContext &ctx = canon->getASTContext();
   ctx.setSubstitutions(canon, Subs);
+}
+
+bool ProtocolType::isClassBound() const {
+  return getDecl()->isClassBound();
+}
+
+bool ProtocolCompositionType::isClassBound() const {
+  for (Type t : getProtocols()) {
+    SmallVector<ProtocolDecl*, 2> protocols;
+    if (t->isExistentialType(protocols))
+      for (auto *proto : protocols)
+        if (proto->isClassBound())
+          return true;
+  }
+  return false;
 }
 
 Type
