@@ -2071,16 +2071,136 @@ ill-formed if the type does not conform to the protocol.</p>
     <a href="#expr-cast">cast operator</a>.
 
   <!-- ===================================================================== -->
-  <h3 id="expr-cast">Cast Operators</h3>
+  <h3 id="expr-binary">Binary Operators</h3>
   <!-- ===================================================================== -->
 
+  <div class="commentary">
+    Should this use the expr-identifier production to allow qualified
+    identifiers?  This would allow "foo swift.+ bar".  Is ADL or something
+    like it enough?<br><br>
+  </div>
+  
   <pre class="grammar">
+    expr-binary ::= op-binary-or-ternary <a href="#expr-unary">expr-unary</a> expr-cast?
+    
+    op-binary-or-ternary ::= <a href="#operator">operator-binary</a>
+    op-binary-or-ternary ::= '='
+    op-binary-or-ternary ::= '?' <a href="#expr">expr-sequence</a> ':'
+
     expr-cast ::= 'is' <a href="#type">type</a>
     expr-cast ::= 'as' <a href="#type">type</a>
     expr-cast ::= 'as' '!' <a href="#type">type</a>
   </pre>
 
-  Cast expressions influence the types of their subexpressions.
+  <p>Infix binary expressions are not formed during parsing.  Instead,
+  they are formed after name resolution by building a tree from an
+  operator-delimited sequence of unary expressions.  Precedence and
+  associativity are determined by the <a href="#attribute-infix">infix</a>
+  attribute on the resolved names, which must fully agree.</p>
+
+  <p>If an operator is used as a binary operator, but name resolution
+  does not find at least one function of binary operator type, the
+  expression is ill-formed.</p>
+
+  <p>A simple example is:</p>
+  
+  <pre class="example">
+    4 + 5 * 123
+  </pre>
+
+  <!-- ===================================================================== -->
+  <h3 id="expr-binary-builtin">Builtin Binary Operators</h3>
+  <!-- ===================================================================== -->
+
+  <p>In addition to user-defined operators, a handful of builtin operators are
+  defined that parse inside binary expressions with predefined precedence and
+  associativity.
+
+  <h4 id="expr-assign">Assignment operator</h4>
+
+  <p>The assignment operator <tt>a = b</tt> updates the value of <tt>a</tt> with
+  the value of <tt>b</tt>. Its precedence is hardcoded as if declared as
+  follows:</p>
+
+  <pre class="example">
+    // Not valid Swift code
+    operator infix = {
+      precedence 90
+      associativity right
+    }
+  </pre>
+
+  The left-hand operand must be an lvalue, or a tuple of lvalues. Assigning to
+  a tuple of lvalues performs destructuring reassignment.
+
+  <pre class="example">
+    var (a, b) = (1, 2)
+
+    // Swap two values.
+    (a, b) = (b, a)
+
+    // Reassign two values.
+    (a, b) = (11, 22)
+
+    // Reassign two values by destructuring a tuple.
+    var tuple = (111, 222)
+    (a, b) = tuple
+  </pre>
+
+  <h4 id="expr-ternary">Ternary operator</h4>
+
+  <p>The ternary operator <tt>a ? b : c</tt> conditionally evaluates its middle
+  or right operand based on the value of its left operand. Its precedence is
+  hardcoded as if the middle <tt>? b :</tt> subexpression were a binary operator
+  declared as follows:</p>
+
+  <pre class="example">
+    // Not valid Swift code
+    operator infix ?...: {
+      precedence 100
+      associativity right
+    }
+  </pre>
+
+  <p>The subexpression to the left of the
+  '?' is evaluated, and is converted to 'Bool' using the result's
+  'getLogicValue' method if it is not already 'Bool'. If the condition is
+  true, the subexpression to the right of '?' is evaluated, and its result
+  becomes the result of the expression. If the
+  condition is false, the subexpression to the right of ':' is evaluated, and
+  its result becomes the result of the expression. Only one of the
+  '?' or ':' subexpressions will be evaluated. The results of the
+  '?' and ':' subexpressions must be implicitly convertible to a common type,
+  which becomes the type of the ternary expression.
+
+  <pre class="example">
+    x += b ? y : z
+    x += a ? b ? y : z : w
+
+    for i in 1..101 {
+      println(i % 15      ? "fizzbuzz"
+            : i %  3 == 0 ? "fizz"
+            : i %  5 == 0 ? "buzz"
+            : "\(i)")
+    }
+  </pre>
+  
+  <h4 id="expr-cast">Cast Operators</h4>
+
+  <p>Cast expressions influence the types of their subexpressions. They can appear
+  at the end of a binary operator sequence; their left operand is parsed as if
+  the cast operator has a fixed precedence of 95 (above assignment, but below
+  the ternary) and no associativity, as if declared:</p>
+
+  <pre class="example">
+    // Not valid Swift code
+    operator infix as {
+      precedence 95
+      associativity none
+    }
+  </pre>
+  
+  <p>The right operand of all operators is parsed as a type.</p>
 
   <ul>
   <li><tt>x as T</tt> will coerce the expression <tt>x</tt> to the type T.
@@ -2132,71 +2252,6 @@ ill-formed if the type does not conform to the protocol.</p>
     (b as! D).derivedMethod()
     ((D as B) as! D2)
     (b is D) ? (b as! D) : new D
-  </pre>
-  
-  <!-- ===================================================================== -->
-  <h3 id="expr-binary">Binary Operators</h3>
-  <!-- ===================================================================== -->
-
-  <div class="commentary">
-    Should this use the expr-identifier production to allow qualified
-    identifiers?  This would allow "foo swift.+ bar".  Is ADL or something
-    like it enough?<br><br>
-  </div>
-  
-  <pre class="grammar">
-    expr-binary ::= operator-binary-or-ternary <a href="#expr-unary">expr-unary</a>
-    
-    op-binary-or-ternary ::= <a href="#operator">operator-binary</a>
-    op-binary-or-ternary ::= '?' <a href="#expr">expr-sequence</a> ':'
-  </pre>
-
-  <p>Infix binary expressions are not formed during parsing.  Instead,
-  they are formed after name resolution by building a tree from an
-  operator-delimited sequence of unary expressions.  Precedence and
-  associativity are determined by the <a href="#attribute-infix">infix</a>
-  attribute on the resolved names, which must fully agree.</p>
-
-  <p>If an operator is used as a binary operator, but name resolution
-  does not find at least one function of binary operator type, the
-  expression is ill-formed.</p>
-
-  <p>A simple example is:</p>
-  
-  <pre class="example">
-    4 + 5 * 123
-  </pre>
-
-  <h4 id="expr-ternary">Ternary operator</h4>
-
-  <p>The ternary operator <tt>a ? b : c</tt> is hardcoded as a conditional
-  operator.  The subexpression to the left of the
-  '?' is evaluated, and is converted to 'Bool' using the result's
-  'getLogicValue' method if it is not already 'Bool'. If the condition is
-  true, the subexpression to the right of '?' is evaluated, and its result
-  becomes the result of the expression. If the
-  condition is false, the subexpression to the right of ':' is evaluated, and
-  its result becomes the result of the expression. Only one of the
-  '?' or ':' subexpressions will be evaluated. The results of the
-  '?' and ':' subexpressions must be implicitly convertible to a common type,
-  which becomes the type of the ternary expression.
-
-  <p>Ternary parsing is handled as part of sequence expression folding. The
-  middle arm of the ternary is parsed maximal-munch as a sequence
-  expression from the '?' up to the matching ':'. The <tt>? ... :</tt> sequence
-  then participates in binary operator folding as if it were a single binary
-  operator with fixed precedence of 100 and right associativity.</p>
-
-  <pre class="example">
-    x += b ? y : z
-    x += a ? b ? y : z : w
-
-    for i in 1..101 {
-      println(i % 15      ? "fizzbuzz"
-            : i %  3 == 0 ? "fizz"
-            : i %  5 == 0 ? "buzz"
-            : "\(i)")
-    }
   </pre>
   
   <!-- ===================================================================== -->
@@ -2816,7 +2871,6 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="grammar">
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
-    stmt ::= <a href="#stmt-assign">stmt-assign</a>
     stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
@@ -2855,34 +2909,6 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <p>The semicolon statement has no effect.</p>
   
-  <!-- ===================================================================== -->
-  <h3 id="stmt-assign">Assignment Statement</h3>
-  <!-- ===================================================================== -->
-  
-  <div class="commentary">
-    The requirement that '=' can only be used as a statement means that the
-    following is inherently illegal:
-    
-    <pre>  if (x = 1)</pre>
-    
-    It also implies that nested assignments are also illegal:
-    
-    <pre>  x = y = z</pre>
-    
-  </div>
-  
-  <pre class="grammar">
-    stmt-assign ::= <a href="#expr">expr</a> '=' <a href="#expr">expr</a>
-    stmt-assign-basic ::= <a href="#expr">expr-basic</a> '=' <a href="#expr">expr-basic</a>
-  </pre>
-  
-  <p>The assignment statement evaluates its left hand side as some sort of
-     lvalue, then evaluates the right hand side, the assigns one to the other.
-  FIXME: The requirements for lvalues should be described, and tied into a
-  description of lvalue types.
-  </p>
-  
-
   <!-- ===================================================================== -->
   <h3 id="stmt-return">'return' Statement</h3>
   <!-- ===================================================================== -->
@@ -3008,10 +3034,9 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-or-stmt-assign-basic? <a href="#brace-item-list">brace-item-list</a>
-    expr-or-stmt-assign-basic ::= <a href="#expr">expr-basic</a> | <a href="#stmt-assign">stmt-assign-basic</a>
+    stmt-for-c-style    ::= 'for' stmt-for-c-style-init? ';' <a href="#expr">expr</a>? ';' expr-basic? <a href="#brace-item-list">brace-item-list</a>
     stmt-for-c-style-init ::= <a href="#decl-var">decl-var</a>
-    stmt-for-c-style-init ::= expr-or-stmt-assign
+    stmt-for-c-style-init ::= expr
   </pre>
   
   <p>C-Style 'for' statements provide simple loop construct which evaluates the
