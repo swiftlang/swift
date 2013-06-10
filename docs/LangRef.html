@@ -216,27 +216,11 @@
   </div>
 
   <pre class="grammar">
-    lparen-following  ::= '('  // immediately (no white space) preceded by an
-                               // identifier, or an identfier-like keyword, or
-                               // a literal, or ')', or ']', or '}'
-    lparen-starting   ::= '('  // any '(' that is not lparen-following
-    lparen-any        ::= lparen-following
-    lparen-any        ::= lparen-starting
-
-    lsquare-following ::= '['  // immediately (no white space) preceded by an
-                               // identifier, or an identfier-like keyword, or
-                               // a literal, or ')', or ']', or '}'
-    lsquare-starting  ::= '['  // any '[' that is not lsquare-following
-    lsquare-any       ::= lsquare-following
-    lsquare-any       ::= lsquare-starting
-
-    punctuation ::= lparen-following
-    punctuation ::= lparen-starting
+    punctuation ::= '('
     punctuation ::= ')'
     punctuation ::= '{'
     punctuation ::= '}'
-    punctuation ::= lsquare-following
-    punctuation ::= lsquare-starting
+    punctuation ::= ']'
     punctuation ::= ']'
     punctuation ::= '.'
     punctuation ::= ','
@@ -1355,8 +1339,8 @@ if vec[3] {
 
   <pre class="grammar">
     attribute-list ::= /*empty*/
-    attribute-list ::= lsquare-starting ']'
-    attribute-list ::= lsquare-starting attribute (',' attribute)* ']'
+    attribute-list ::= '[' ']'
+    attribute-list ::= '[' attribute (',' attribute)* ']'
     
     attribute      ::= attribute-infix
     attribute      ::= attribute-resilience
@@ -1586,7 +1570,7 @@ if vec[3] {
   </div>
 
   <pre class="grammar">
-    type-tuple ::= lparen-any type-tuple-body? ')'
+    type-tuple ::= '(' type-tuple-body? ')'
     type-tuple-body ::= type-tuple-element (',' type-tuple-element)* '...'?
     type-tuple-element ::= identifier <a href="#value-specifier">value-specifier</a>
     type-tuple-element ::= <a href="#type">type-annotation</a>
@@ -1753,8 +1737,8 @@ if vec[3] {
   
   <pre class="grammar">
     type-array ::= <a href="#type">type-simple</a>
-    type-array ::= <a href="#type">type-array</a> lsquare-following ']'
-    type-array ::= <a href="#type">type-array</a> lsquare-following <a href="#expr">expr</a> ']'
+    type-array ::= <a href="#type">type-array</a> '[' ']'
+    type-array ::= <a href="#type">type-array</a> '[' <a href="#expr">expr</a> ']'
   </pre>
   
   <p>Array types include a base type and an optional size.  Array types indicate
@@ -2550,8 +2534,8 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    expr-paren      ::= lparen-any ')'
-    expr-paren      ::= lparen-any expr-paren-element (',' expr-paren-element)* ')'
+    expr-paren      ::= '(' ')'
+    expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
     expr-paren-element ::= (<a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
   </pre>
 
@@ -2568,9 +2552,6 @@ ill-formed if the type does not conform to the protocol.</p>
      any named elements, those elements become names for the tuple type.  A
      parenthesis expression with no value has a type of the empty tuple.
   </p>
-
-  <p>Note that some enclosing productions restrict the <tt>lparen-any</tt> to a
-  <tt>lparen-following</tt>.</p>
 
   <p>Some examples:</p>
   
@@ -2687,15 +2668,12 @@ ill-formed if the type does not conform to the protocol.</p>
     subscripting semantics is implemented via subscript declarations
     in the library.
 
-    <br/<br/>We require an unspaced '[' because we want to avoid
-    ambiguities with expressions or statements starting with '['. We
-    don't have any of those right now, but it's inevitable that we'll
-    want something like an array literal, list comprehension, or
-    statement attribute.
+    <br/>We require that the '[' not be the first token on a line, so that
+    a statement can begin with an array expression.
   </div>
 
   <pre class="grammar">
-    expr-subscript ::= <a href="#expr">expr-postfix</a> lsquare-following <a href="#expr">expr</a> ']'
+    expr-subscript ::= <a href="#expr">expr-postfix</a> '[' <a href="#expr">expr</a> ']'
   </pre>
 
  <p>A subscript expression invokes a <a
@@ -2739,8 +2717,8 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-call ::= <a href="#expr">expr-postfix</a> <a href="#expr-paren">expr-paren</a>
   </pre>
 
-  <p>The leading <tt>'('</tt> of the <tt>expr-paren</tt> must be
-  a <tt>lparen-following</tt>.  This greatly reduces the likelihood of
+  <p>The leading <tt>'('</tt> of the <tt>expr-paren</tt> must not be
+  the first token on a line.  This greatly reduces the likelihood of
   confusion from semicolon elision, without requiring feedback from
   the typechecker or more aggressive whitespace sensitivity.</p>
 
