@@ -2147,6 +2147,18 @@ ill-formed if the type does not conform to the protocol.</p>
     (a, b) = tuple
   </pre>
 
+  <p>An assignment expression evaluates to void. Unlike C, productions such as
+  these are invalid:</p>
+
+  <pre class="example">
+    // Error: x = y doesn't return Bool
+    if x = y { }
+
+    // Error: (y = z) doesn't return Int
+    var x, y, z : Int
+    x = y = z
+  </pre>
+
   <h4 id="expr-ternary">Ternary operator</h4>
 
   <p>The ternary operator <tt>a ? b : c</tt> conditionally evaluates its middle
