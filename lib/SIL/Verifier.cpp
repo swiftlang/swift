@@ -586,11 +586,18 @@ public:
     SILType operandType = EMI->getOperand().getType();
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
-      require(getMethodThisType(methodType)->isEqual(
-                            operandType.getASTContext().TheOpaquePointerType),
-              "result must be a method of opaque pointer");
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
+      if (operandType.isClassBoundExistentialType()) {
+        require(getMethodThisType(methodType)->isEqual(
+                               operandType.getASTContext().TheObjCPointerType),
+                "result must be a method of objc pointer");
+        
+      } else {
+        require(getMethodThisType(methodType)->isEqual(
+                               operandType.getASTContext().TheOpaquePointerType),
+                "result must be a method of opaque pointer");
+      }
     } else {
       require(!operandType.isAddress(),
               "static protocol_method cannot apply to an address");

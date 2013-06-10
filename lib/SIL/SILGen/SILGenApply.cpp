@@ -136,11 +136,17 @@ private:
                                        SILConstant methodName,
                                        Type memberType) {
     // 'this' for instance methods is projected out of the existential container
-    // as an OpaquePointer.
+    // as an OpaquePointer or ObjCPointer.
     // 'this' for existential metatypes is the metatype itself.
-    Type thisTy = methodName.getDecl()->isInstanceMember()
-      ? memberType->getASTContext().TheOpaquePointerType
-      : proto.getType().getSwiftType();
+    Type thisTy;
+    if (methodName.getDecl()->isInstanceMember()) {
+      if (proto.getType().isClassBoundExistentialType())
+        thisTy = memberType->getASTContext().TheObjCPointerType;
+      else
+        thisTy = memberType->getASTContext().TheOpaquePointerType;
+    } else {
+      thisTy = proto.getType().getSwiftType();
+    }
     
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
@@ -506,14 +512,15 @@ public:
     ManagedValue existential = gen.visit(e->getBase()).getAsSingleValue(gen);
     
     if (e->getDecl()->isInstanceMember()) {
-      assert(existential.getType().isAddress() && "loadable existential?!");
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
-      ManagedValue projection
-        = ManagedValue(gen.B.createProjectExistential(e, existential.getValue()),
-                       existential.getCleanup());
-      
-      setThisParam(RValue(gen, projection), e);
+      SILValue proj;
+      if (existential.getType().isClassBoundExistentialType())
+        proj = gen.B.createProjectExistentialRef(e, existential.getValue());
+      else
+        proj = gen.B.createProjectExistential(e, existential.getValue());
+
+      setThisParam(RValue(gen, ManagedValue(proj,existential.getCleanup())), e);
     } else {
       assert(existential.getType().is<MetaTypeType>() &&
              "non-existential-metatype for existential static method?!");

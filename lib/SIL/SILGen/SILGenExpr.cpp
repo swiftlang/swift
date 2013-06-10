@@ -763,9 +763,6 @@ RValue SILGenFunction::visitExistentialMemberRefExpr(
                                                  ExistentialMemberRefExpr *E,
                                                  SGFContext C) {
   SILValue existential = visit(E->getBase()).getUnmanagedSingleValue(*this);
-  assert((existential.getType().isAddress() ||
-          existential.getType().is<MetaTypeType>()) &&
-         "existential must be an address");
   //SILValue projection = B.createProjectExistential(E, existential);
   //SILValue method = emitProtocolMethod(E, existential);
   // FIXME: curried existential
