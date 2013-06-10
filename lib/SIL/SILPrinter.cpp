@@ -526,11 +526,11 @@ public:
     OS << "project_existential_ref " << getIDAndType(PI->getOperand());
   }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
-    OS << "init_existential " << getID(AEI->getOperand()) << ", $";
+    OS << "init_existential " << getID(AEI->getOperand()) << ", ";
     AEI->getConcreteType().print(OS);
   }
   void visitInitExistentialRefInst(InitExistentialRefInst *AEI) {
-    OS << "init_existential_ref " << getIDAndType(AEI->getOperand()) << ", $";
+    OS << "init_existential_ref " << getIDAndType(AEI->getOperand()) << ", ";
     AEI->getType().print(OS);
   }
   void visitUpcastExistentialInst(UpcastExistentialInst *UEI) {

@@ -218,12 +218,11 @@ public:
   }
 };
 
-/// AllocBoxInst - This represents the allocation of a heap box for a Swift
-/// value of some type, and whose element memory is left uninitialized.  This
-/// returns two values.  The first return element is the object pointer (pointer
-/// to the object header) with Builtin.ObjectPointer type.  The second element
-/// returned is an lvalue to the element.
-///
+/// This represents the allocation of a heap box for a Swift value of some type.  This
+/// The instruction returns two values.  The first return value is the object
+/// pointer with Builtin.ObjectPointer type.  The second return value
+/// is an address pointing to the contained element. The contained
+/// element is uninitialized.
 class AllocBoxInst : public SILInstruction {
 public:
   AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F);

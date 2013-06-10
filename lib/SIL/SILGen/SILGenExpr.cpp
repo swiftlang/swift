@@ -427,39 +427,69 @@ namespace {
   };
 }
 
-RValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
+static RValue emitClassBoundErasure(SILGenFunction &gen, ErasureExpr *E) {
+  ManagedValue sub = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
+  SILType resultTy = gen.getLoweredLoadableType(E->getType());
+  
+  SILValue v;
+  
+  if (E->getSubExpr()->getType()->isExistentialType())
+    // If the source value is already of protocol type, we can use
+    // upcast_existential_ref to steal the already-initialized witness tables
+    // and concrete value.
+    v = gen.B.createUpcastExistentialRef(E, sub.getValue(),
+                                         resultTy, E->getConformances());
+  else
+    // Otherwise, create a new existential container value around the class
+    // instance.
+    v = gen.B.createInitExistentialRef(E, resultTy,
+                                       sub.getValue(), E->getConformances());
+
+  return RValue(gen, ManagedValue(v, sub.getCleanup()));
+}
+
+static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
+                                     SGFContext C) {
   // FIXME: Need to stage cleanups here. If code fails between
   // InitExistential and initializing the value, clean up using
   // DeinitExistential.
   
   // Allocate the existential.
-  SILValue existential = getBufferForExprResult(E, getLoweredType(E->getType()),
-                                                C);
+  SILValue existential = gen.getBufferForExprResult(E,
+                                              gen.getLoweredType(E->getType()),
+                                              C);
   
   if (E->getSubExpr()->getType()->isExistentialType()) {
     // If the source value is already of a protocol type, we can use
     // upcast_existential to steal its already-initialized witness tables and
     // concrete value.
-    ManagedValue subExistential = visit(E->getSubExpr()).getAsSingleValue(*this);
+    ManagedValue subExistential
+      = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
 
-    B.createUpcastExistential(E, subExistential.getValue(), existential,
-                              /*isTake=*/subExistential.hasCleanup(),
-                              E->getConformances());
+    gen.B.createUpcastExistential(E, subExistential.getValue(), existential,
+                                  /*isTake=*/subExistential.hasCleanup(),
+                                  E->getConformances());
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.
     
     // Allocate the concrete value inside the container.
-    SILValue valueAddr = B.createInitExistential(E, existential,
-                                      getLoweredType(E->getSubExpr()->getType()),
-                                      E->getConformances());
+    SILValue valueAddr = gen.B.createInitExistential(E, existential,
+                                gen.getLoweredType(E->getSubExpr()->getType()),
+                                E->getConformances());
     // Initialize the concrete value in-place.
     InitializationPtr init(new ExistentialValueInitialization(valueAddr));
-    emitExprInto(E->getSubExpr(), init.get());    
-    init->finishInitialization(*this);
+    gen.emitExprInto(E->getSubExpr(), init.get());
+    init->finishInitialization(gen);
   }
   
-  return RValue(*this, emitManagedRValueWithCleanup(existential));
+  return RValue(gen, gen.emitManagedRValueWithCleanup(existential));
+}
+
+RValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
+  if (E->getType()->isClassBoundExistentialType())
+    return emitClassBoundErasure(*this, E);
+  return emitAddressOnlyErasure(*this, E, C);
 }
 
 RValue SILGenFunction::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
