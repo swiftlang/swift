@@ -29,7 +29,7 @@ namespace irgen {
 /// which consists solely of something reference-counted.
 ///
 /// Subclasses should implement the following method, returning true
-/// if it's known to be okay to use Swift reference-counting on values
+/// if it's known to be OK to use Swift reference-counting on values
 /// of this type:
 ///   bool hasSwiftRefcount() const;
 template <class Impl>

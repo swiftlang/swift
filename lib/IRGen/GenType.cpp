@@ -581,7 +581,10 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
 /// indirectly at the given level.
 llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
                                                       ExplosionKind kind) {
-  if (isa<ArchetypeType>(type)) return OpaquePtrTy;
+  if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+    if (!archetype->isClassBounded())
+      return OpaquePtrTy;
+  }
 
   ExplosionSchema schema(kind);
   getSchema(type, schema);

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILType.h"
@@ -206,6 +207,15 @@ namespace {
     bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
       // Archetypes vary by what we're considering this for.
 
+      if (origTy->isClassBounded()) {
+        // Class-bounded archetypes are represented as an ObjC class
+        // pointer type. We differ unless the target type is ObjCPointer or
+        // another class-bounded archetype.
+        if (auto *substArchetype = dyn_cast<ArchetypeType>(substTy))
+          return !substArchetype->isClassBounded();
+        return substTy != CanType(IGM.Context.TheObjCPointerType);
+      }
+      
       // Archetypes are laid out in memory in the same way as a
       // concrete type would be.
       if (DiffKind == AbstractionDifference::Memory) return false;
@@ -384,6 +394,17 @@ namespace {
     }
 
     void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+      // For class-bounded protocols, bitcast to the archetype class pointer
+      // representation.
+      if (origTy->isClassBounded()) {
+        llvm::Value *inValue = In.claimNext();
+        auto addr = IGF.Builder.CreateBitCast(inValue,
+                                              IGF.IGM.ObjCPtrTy,
+                                              "substitution.class_bound");
+        Out.add(addr);
+        return;
+      }
+      
       // Handle the not-unlikely case that the input is a single
       // indirect value.
       if (IGF.IGM.isSingleIndirectValue(substTy, In.getKind())) {

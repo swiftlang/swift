@@ -1193,6 +1193,9 @@ void CallEmission::emitToExplosion(Explosion &out) {
   // Figure out how the substituted result differs from the original.
   CanType substType = getCallee().getSubstResultType()->getCanonicalType();
   auto resultDiff = computeResultDifference(IGF.IGM, CurOrigType, substType);
+  const TypeInfo &substResultTI =
+    IGF.getFragileTypeInfo(getCallee().getSubstResultType());
+
   switch (resultDiff) {
   // If they don't differ at all, we're good. 
   case ResultDifference::Identical:
@@ -1206,8 +1209,6 @@ void CallEmission::emitToExplosion(Explosion &out) {
       Explosion temp(getCallee().getExplosionLevel());
       emitToUnmappedExplosion(temp);
 
-      const TypeInfo &substResultTI =
-        IGF.getFragileTypeInfo(getCallee().getSubstResultType());
       substResultTI.reexplode(IGF, temp, out);
     }
     return;
@@ -1226,6 +1227,21 @@ void CallEmission::emitToExplosion(Explosion &out) {
       emitToUnmappedExplosion(temp);
       temp.claimAll();
       return;
+    }
+      
+    if (auto *origArchetype = dyn_cast<ArchetypeType>(CurOrigType)) {
+      if (origArchetype->isClassBounded()) {
+        // Remap a class-bounded archetype to an instance.
+        assert(substType->getClassOrBoundGenericClass() &&
+               "remapping class-bounded archetype to non-class?!");
+        Explosion temp(getCallee().getExplosionLevel());
+        emitToUnmappedExplosion(temp);
+        llvm::Value *pointer = temp.claimNext();
+        pointer = IGF.Builder.CreateBitCast(pointer,
+                                            substResultTI.getStorageType());
+        out.add(pointer);
+        return;
+      }
     }
       
     // There's a related FIXME in the Builtin.load/move code.

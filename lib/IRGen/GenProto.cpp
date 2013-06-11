@@ -47,6 +47,7 @@
 #include "GenOpaque.h"
 #include "GenPoly.h"
 #include "GenType.h"
+#include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -558,68 +559,75 @@ namespace {
     }
   };
 
-  /// A type implementation for an ArchetypeType, otherwise known as a
-  /// type variable: for example, This in a protocol declaration, or T
-  /// in a generic declaration like foo<T>(x : T) -> T.  The critical
-  /// thing here is that performing an operation involving archetypes
-  /// is dependent on the witness binding we can see.
-  class ArchetypeTypeInfo :
-      public IndirectTypeInfo<ArchetypeTypeInfo,
-                              WitnessSizedTypeInfo<ArchetypeTypeInfo> > {
-
+  /// Common type implementation details for all archetypes.
+  class ArchetypeTypeInfoBase {
+  protected:
     ArchetypeType *TheArchetype;
-
-    ProtocolEntry *getProtocolsBuffer() {
-      return reinterpret_cast<ProtocolEntry*>(this + 1);
-    }
-    const ProtocolEntry *getProtocolsBuffer() const {
-      return reinterpret_cast<const ProtocolEntry*>(this + 1);
-    }
-
-    ArchetypeTypeInfo(ArchetypeType *archetype, llvm::Type *type,
-                      ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(type, Alignment(1), IsNotPOD),
-        TheArchetype(archetype) {
+    ProtocolEntry *ProtocolsBuffer;
+    
+    ArchetypeTypeInfoBase(ArchetypeType *archetype,
+                          void *protocolsBuffer,
+                          ArrayRef<ProtocolEntry> protocols)
+      : TheArchetype(archetype),
+        ProtocolsBuffer(reinterpret_cast<ProtocolEntry*>(protocolsBuffer))
+    {
       assert(protocols.size() == archetype->getConformsTo().size());
       for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-        new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
+        ::new (&ProtocolsBuffer[i]) ProtocolEntry(protocols[i]);
       }
     }
-
+    
   public:
-    static const ArchetypeTypeInfo *create(ArchetypeType *archetype,
-                                           llvm::Type *type,
-                                           ArrayRef<ProtocolEntry> protocols) {
-      void *buffer =
-        operator new(sizeof(ArchetypeTypeInfo) +
-                     protocols.size() * sizeof(ProtocolEntry));
-      return new (buffer) ArchetypeTypeInfo(archetype, type, protocols);
-    }
-
     unsigned getNumProtocols() const {
       return TheArchetype->getConformsTo().size();
     }
-
+    
     ArrayRef<ProtocolEntry> getProtocols() const {
-      return llvm::makeArrayRef(getProtocolsBuffer(), getNumProtocols());
+      return llvm::makeArrayRef(ProtocolsBuffer, getNumProtocols());
     }
-
+    
     llvm::Value *getMetadataRef(IRGenFunction &IGF) const {
       return IGF.getLocalTypeData(CanType(TheArchetype),
                                   LocalTypeData::Metatype);
     }
-
+    
     /// Return the witness table that's been set for this type.
     llvm::Value *getWitnessTable(IRGenFunction &IGF, unsigned which) const {
       assert(which < getNumProtocols());
       return IGF.getLocalTypeData(CanType(TheArchetype),
                                   LocalTypeData(which));
     }
-
+    
     llvm::Value *getValueWitnessTable(IRGenFunction &IGF) const {
       // This can be called in any of the cases.
       return IGF.getLocalTypeData(CanType(TheArchetype),
                                   LocalTypeData(0));
+    }
+  };
+  
+  /// A type implementation for an ArchetypeType, otherwise known as a
+  /// type variable: for example, This in a protocol declaration, or T
+  /// in a generic declaration like foo<T>(x : T) -> T.  The critical
+  /// thing here is that performing an operation involving archetypes
+  /// is dependent on the witness binding we can see.
+  class OpaqueArchetypeTypeInfo
+    : public IndirectTypeInfo<OpaqueArchetypeTypeInfo,
+                              WitnessSizedTypeInfo<OpaqueArchetypeTypeInfo>>,
+      public ArchetypeTypeInfoBase
+  {
+    OpaqueArchetypeTypeInfo(ArchetypeType *archetype, llvm::Type *type,
+                      ArrayRef<ProtocolEntry> protocols)
+      : IndirectTypeInfo(type, Alignment(1), IsNotPOD),
+        ArchetypeTypeInfoBase(archetype, this + 1, protocols)
+    {}
+
+  public:
+    static const OpaqueArchetypeTypeInfo *create(ArchetypeType *archetype,
+                                           llvm::Type *type,
+                                           ArrayRef<ProtocolEntry> protocols) {
+      void *buffer = operator new(sizeof(OpaqueArchetypeTypeInfo)
+                                  + protocols.size() * sizeof(ProtocolEntry));
+      return ::new (buffer) OpaqueArchetypeTypeInfo(archetype, type, protocols);
     }
 
     /// Create an uninitialized archetype object.
@@ -708,7 +716,7 @@ namespace {
     llvm::Constant *getStaticAlignment(IRGenModule &IGM) const { return nullptr; }
     llvm::Constant *getStaticStride(IRGenModule &IGM) const { return nullptr; }
   };
-
+  
   /// Ways in which an object can fit into a fixed-size buffer.
   enum class FixedPacking {
     /// It fits at offset zero.
@@ -720,6 +728,52 @@ namespace {
     /// It needs to be checked dynamically.
     Dynamic
   };
+
+  /// A type implementation for a class-bounded archetype, that is, an archetype
+  /// bounded by a class-bounded protocol constraint. These archetypes can be
+  /// represented by a refcounted pointer instead of an opaque value buffer.
+  /// We use an ObjC-refcounted pointer in order to allow ObjC or Swift classes
+  /// to conform to the type variable.
+  class ClassBoundedArchetypeTypeInfo
+    : public HeapTypeInfo<ClassBoundedArchetypeTypeInfo>,
+      public ArchetypeTypeInfoBase
+  {
+    ClassBoundedArchetypeTypeInfo(ArchetypeType *archetype,
+                                  llvm::PointerType *storageType,
+                                  Size size, Alignment align,
+                                  ArrayRef<ProtocolEntry> protocols)
+      : HeapTypeInfo(storageType, size, align),
+        ArchetypeTypeInfoBase(archetype, this + 1, protocols)
+    {}
+    
+  public:
+    static const ClassBoundedArchetypeTypeInfo *create(ArchetypeType *archetype,
+                                           llvm::PointerType *storageType,
+                                           Size size, Alignment align,
+                                           ArrayRef<ProtocolEntry> protocols) {
+      void *buffer = operator new(sizeof(ClassBoundedArchetypeTypeInfo)
+                                    + protocols.size() * sizeof(ProtocolEntry));
+      return ::new (buffer)
+        ClassBoundedArchetypeTypeInfo(archetype,
+                                      storageType, size, align,
+                                      protocols);
+    }
+    
+    bool hasSwiftRefcount() const {
+      // Can't assume that a generic class value has Swift refcount.
+      return false;
+    }
+  };
+  
+  /// Return the ArchetypeTypeInfoBase information from the TypeInfo for any
+  /// archetype.
+  static const ArchetypeTypeInfoBase &
+  getArchetypeInfo(IRGenFunction &IGF, ArchetypeType *t) {
+    const TypeInfo &ti = IGF.getFragileTypeInfo(t);
+    if (t->isClassBounded())
+      return ti.as<ClassBoundedArchetypeTypeInfo>();
+    return ti.as<OpaqueArchetypeTypeInfo>();
+  }
 }
 
 static void setMetadataRef(IRGenFunction &IGF,
@@ -2428,10 +2482,18 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
     protocols.push_back(ProtocolEntry(protocol, impl));
   }
+
+  // If the archetype is class-bounded, use the class-bounded representation.
+  if (archetype->isClassBounded())
+    return ClassBoundedArchetypeTypeInfo::create(archetype,
+                                                 IGM.ObjCPtrTy,
+                                                 IGM.getPointerSize(),
+                                                 IGM.getPointerAlignment(),
+                                                 protocols);
   
-  // For now, just always use the same type.
+  // Otherwise, for now, always use an opaque indirect type.
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return ArchetypeTypeInfo::create(archetype, storageType, protocols);
+  return OpaqueArchetypeTypeInfo::create(archetype, storageType, protocols);
 }
 
 /// Inform IRGenFunction that the given archetype has the given value
@@ -2881,11 +2943,10 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
   // Look at the replacement type.
   CanType replType = sub.Replacement->getCanonicalType();
-  auto &replTI = IGF.getFragileTypeInfo(replType);
 
   // If it's an archetype, we'll need to grab from the local context.
-  if (isa<ArchetypeType>(replType)) {
-    auto &archTI = replTI.as<ArchetypeTypeInfo>();
+  if (auto *archetype = dyn_cast<ArchetypeType>(replType)) {
+    auto &archTI = getArchetypeInfo(IGF, archetype);
 
     for (auto proto : archetypeProtos) {
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
@@ -2898,6 +2959,8 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 
   // Otherwise, we can construct the witnesses from the protocol
   // conformances.
+  auto &replTI = IGF.getFragileTypeInfo(replType);
+
   assert(archetypeProtos.size() == sub.Conformance.size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
     auto proto = archetypeProtos[j];
@@ -2993,8 +3056,8 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
         continue;
 
       // If the target is an archetype, go to the type info.
-      if (isa<ArchetypeType>(argType)) {
-        auto &archTI = argTI.as<ArchetypeTypeInfo>();
+      if (auto *archetype = dyn_cast<ArchetypeType>(argType)) {
+        auto &archTI = getArchetypeInfo(IGF, archetype);
 
         ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
         auto wtable = archTI.getWitnessTable(IGF, path.getOriginIndex());
@@ -3078,9 +3141,9 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
   // Compute basic layout information about the type.  If we have a
   // concrete type, we need to know how it packs into a fixed-size
   // buffer.  If we don't, we need an value-witness table.
-  if (srcType.is<ArchetypeType>()) { // FIXME: tuples of archetypes?
+  if (auto *archetype = srcType.getAs<ArchetypeType>()) { // FIXME: tuples of archetypes?
     packing = (FixedPacking) -1;
-    wtable = srcTI.as<ArchetypeTypeInfo>().getValueWitnessTable(IGF);
+    wtable = getArchetypeInfo(IGF, archetype).getValueWitnessTable(IGF);
   } else {
     packing = computePacking(IGF.IGM, srcTI);
     wtable = nullptr;
@@ -3094,8 +3157,8 @@ static void emitProtocolWitnessTables(IRGenFunction &IGF,
     llvm::Value *ptable;
     
     // If the source type is an archetype, look at what's bound.
-    if (srcType.is<ArchetypeType>()) {
-      auto &archTI = srcTI.as<ArchetypeTypeInfo>();
+    if (auto *archetype = srcType.getAs<ArchetypeType>()) {
+      auto &archTI = getArchetypeInfo(IGF, archetype);
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
       ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
       ptable = path.apply(IGF, ptable);
@@ -3276,7 +3339,7 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
   // Find the witness table.
-  auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+  auto &archetypeTI = getArchetypeInfo(IGF, archetype);
   ProtocolPath path(IGF.IGM, archetypeTI.getProtocols(), fnProto);
   llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
   llvm::Value *wtable = path.apply(IGF, origin);
@@ -3293,7 +3356,7 @@ irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
                                        Address addr,
                                        SILType type) {
   ArchetypeType *archetype = type.castTo<ArchetypeType>();
-  auto &archetypeTI = IGF.getFragileTypeInfo(archetype).as<ArchetypeTypeInfo>();
+  auto &archetypeTI = getArchetypeInfo(IGF, archetype);
   
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
