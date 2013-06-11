@@ -1957,10 +1957,13 @@ namespace {
       // Find the This archetype.
       auto thisTy = SignatureTy;
       thisTy = stripLabel(CanType(cast<AnyFunctionType>(thisTy)->getInput()));
-      if (auto lvalueTy = dyn_cast<LValueType>(thisTy)) {
+      if (auto *lvalueTy = dyn_cast<LValueType>(thisTy)) {
         thisTy = CanType(lvalueTy->getObjectType());
+      } else if (auto *metaTy = dyn_cast<MetaTypeType>(thisTy)) {
+        thisTy = CanType(metaTy->getInstanceType());
       } else {
-        thisTy = CanType(cast<MetaTypeType>(thisTy)->getInstanceType());
+        assert(thisTy->hasReferenceSemantics() &&
+               "non-class-bounded archetype This passed by value?");
       }
       auto archetype = cast<ArchetypeType>(thisTy);
 
