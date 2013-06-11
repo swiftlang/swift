@@ -140,7 +140,7 @@ private:
     // 'this' for existential metatypes is the metatype itself.
     Type thisTy;
     if (methodName.getDecl()->isInstanceMember()) {
-      if (proto.getType().isClassBoundExistentialType())
+      if (proto.getType().isClassBoundedExistentialType())
         thisTy = memberType->getASTContext().TheObjCPointerType;
       else
         thisTy = memberType->getASTContext().TheOpaquePointerType;
@@ -515,7 +515,7 @@ public:
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
       SILValue proj;
-      if (existential.getType().isClassBoundExistentialType())
+      if (existential.getType().isClassBoundedExistentialType())
         proj = gen.B.createProjectExistentialRef(e, existential.getValue());
       else
         proj = gen.B.createProjectExistential(e, existential.getValue());

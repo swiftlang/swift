@@ -588,7 +588,7 @@ public:
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
-      if (operandType.isClassBoundExistentialType()) {
+      if (operandType.isClassBoundedExistentialType()) {
         require(getMethodThisType(methodType)->isEqual(
                                operandType.getASTContext().TheObjCPointerType),
                 "result must be a method of objc pointer");
@@ -659,8 +659,8 @@ public:
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
     require(!PEI->getOperand().getType().isAddress(),
             "project_existential_ref operand must not be address");
-    require(PEI->getOperand().getType().isClassBoundExistentialType(),
-            "project_existential_ref operand must be class-bound existential");
+    require(PEI->getOperand().getType().isClassBoundedExistentialType(),
+            "project_existential_ref operand must be class-bounded existential");
     require(PEI->getType() == SILType::getObjCPointerType(F.getASTContext()),
             "project_existential_ref result must be an ObjCPointer");
   }
@@ -671,8 +671,8 @@ public:
             "init_existential must be applied to an address");
     require(exType.isExistentialType(),
             "init_existential must be applied to address of existential");
-    require(!exType.isClassBoundExistentialType(),
-            "init_existential must be applied to non-class-bound existential");
+    require(!exType.isClassBoundedExistentialType(),
+            "init_existential must be applied to non-class-bounded existential");
     require(!AEI->getConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
             "an existential container");
@@ -682,8 +682,8 @@ public:
     SILType concreteType = IEI->getOperand().getType();
     require(concreteType.getSwiftType()->getClassOrBoundGenericClass(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().isClassBoundExistentialType(),
-            "init_existential_ref result must be a class-bound existential type");
+    require(IEI->getType().isClassBoundedExistentialType(),
+            "init_existential_ref result must be a class-bounded existential type");
     require(!IEI->getType().isAddress(),
             "init_existential_ref result must not be an address");
   }
@@ -697,19 +697,19 @@ public:
             "upcast_existential dest must be an address");
     require(destType.isExistentialType(),
             "upcast_existential dest must be address of existential");
-    require(!destType.isClassBoundExistentialType(),
-            "upcast_existential dest must be non-class-bound existential");
+    require(!destType.isClassBoundedExistentialType(),
+            "upcast_existential dest must be non-class-bounded existential");
   }
   
   void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
     require(!UEI->getOperand().getType().isAddress(),
             "upcast_existential_ref operand must not be an address");
-    require(UEI->getOperand().getType().isClassBoundExistentialType(),
-            "upcast_existential_ref operand must be class-bound existential");
+    require(UEI->getOperand().getType().isClassBoundedExistentialType(),
+            "upcast_existential_ref operand must be class-bounded existential");
     require(!UEI->getType().isAddress(),
             "upcast_existential_ref result must not be an address");
-    require(UEI->getType().isClassBoundExistentialType(),
-            "upcast_existential_ref result must be class-bound existential");
+    require(UEI->getType().isClassBoundedExistentialType(),
+            "upcast_existential_ref result must be class-bounded existential");
   }
   
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
@@ -718,8 +718,8 @@ public:
             "deinit_existential must be applied to an address");
     require(exType.isExistentialType(),
             "deinit_existential must be applied to address of existential");
-    require(!exType.isClassBoundExistentialType(),
-            "deinit_existential must be applied to non-class-bound existential");
+    require(!exType.isClassBoundedExistentialType(),
+            "deinit_existential must be applied to non-class-bounded existential");
   }
   
   void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
@@ -728,8 +728,8 @@ public:
     ArchetypeType *archetype
       = ASI->getOperand().getType().getAs<ArchetypeType>();
     require(archetype, "archetype_to_super operand must be archetype");
-    require(!archetype->isClassBound(),
-            "archetype_to_super operand must not be class-bound archetype");
+    require(!archetype->isClassBounded(),
+            "archetype_to_super operand must not be class-bounded archetype");
     require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
             "archetype_to_super must convert to a class type");
   }
@@ -738,8 +738,8 @@ public:
     ArchetypeType *archetype
       = ASI->getOperand().getType().getAs<ArchetypeType>();
     require(archetype, "archetype_ref_to_super operand must be archetype");
-    require(archetype->isClassBound(),
-            "archetype_ref_to_super operand must be class-bound archetype");
+    require(archetype->isClassBounded(),
+            "archetype_ref_to_super operand must be class-bounded archetype");
     require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
             "archetype_ref_to_super must convert to a class type");
   }
@@ -751,8 +751,8 @@ public:
     ArchetypeType *archetype
       = SAI->getType().getAs<ArchetypeType>();
     require(archetype, "super_to_archetype_ref must convert to archetype type");
-    require(archetype->isClassBound(),
-            "super_to_archetype_ref must convert to class-bound archetypet type");
+    require(archetype->isClassBounded(),
+            "super_to_archetype_ref must convert to class-bounded archetypet type");
   }
   
   void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {

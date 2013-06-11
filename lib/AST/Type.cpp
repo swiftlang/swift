@@ -101,11 +101,11 @@ bool TypeBase::hasReferenceSemantics() {
     return false;
 
   case TypeKind::Archetype:
-    return cast<ArchetypeType>(canonical)->isClassBound();
+    return cast<ArchetypeType>(canonical)->isClassBounded();
   case TypeKind::Protocol:
-    return cast<ProtocolType>(canonical)->isClassBound();
+    return cast<ProtocolType>(canonical)->isClassBounded();
   case TypeKind::ProtocolComposition:
-    return cast<ProtocolCompositionType>(canonical)->isClassBound();
+    return cast<ProtocolCompositionType>(canonical)->isClassBounded();
       
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::Class:
@@ -1138,9 +1138,9 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
   Elt = TupleTypeElt(NewTy, Elt.getName(), Elt.getInit());
 }
 
-bool SubstitutableType::isClassBound() const {
+bool SubstitutableType::isClassBounded() const {
   for (ProtocolDecl *conformed : getConformsTo())
-    if (conformed->isClassBound())
+    if (conformed->isClassBounded())
       return true;
   return false;
 }
@@ -1268,16 +1268,16 @@ void BoundGenericType::setSubstitutions(ArrayRef<Substitution> Subs){
   ctx.setSubstitutions(canon, Subs);
 }
 
-bool ProtocolType::isClassBound() const {
-  return getDecl()->isClassBound();
+bool ProtocolType::isClassBounded() const {
+  return getDecl()->isClassBounded();
 }
 
-bool ProtocolCompositionType::isClassBound() const {
+bool ProtocolCompositionType::isClassBounded() const {
   for (Type t : getProtocols()) {
     SmallVector<ProtocolDecl*, 2> protocols;
     if (t->isExistentialType(protocols))
       for (auto *proto : protocols)
-        if (proto->isClassBound())
+        if (proto->isClassBounded())
           return true;
   }
   return false;

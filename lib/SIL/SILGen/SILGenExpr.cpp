@@ -487,7 +487,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 }
 
 RValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
-  if (E->getType()->isClassBoundExistentialType())
+  if (E->getType()->isClassBoundedExistentialType())
     return emitClassBoundErasure(*this, E);
   return emitAddressOnlyErasure(*this, E, C);
 }

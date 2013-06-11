@@ -649,18 +649,18 @@ void ProtocolDecl::collectInherited(
   }
 }
 
-bool ProtocolDecl::isClassBound() {
-  return ClassBound.cache([&] {
-    // If we have the [class_protocol] attribute, we're trivially class-bound.
+bool ProtocolDecl::isClassBounded() {
+  return ClassBounded.cache([&] {
+    // If we have the [class_protocol] attribute, we're trivially class-bounded.
     if (getAttrs().isClassProtocol())
       return true;
     
-    // Check inherited protocols for class-bound-ness.
+    // Check inherited protocols for class-bounded-ness.
     for (TypeLoc inherited : getInherited()) {
       SmallVector<ProtocolDecl*, 2> inheritedProtos;
       if (inherited.getType()->isExistentialType(inheritedProtos))
         for (auto *proto : inheritedProtos)
-          if (proto->isClassBound())
+          if (proto->isClassBounded())
             return true;
     }
     

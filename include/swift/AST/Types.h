@@ -206,7 +206,7 @@ public:
   
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
-  bool isClassBoundExistentialType();
+  bool isClassBoundedExistentialType();
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -1325,8 +1325,8 @@ public:
   
   void print(raw_ostream &OS) const;
   
-  /// True if the protocol is class-bound.
-  bool isClassBound() const;
+  /// True if the protocol is class-bounded.
+  bool isClassBounded() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1372,8 +1372,8 @@ public:
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
-  /// True if one or more of the protocols is class-bound.
-  bool isClassBound() const;
+  /// True if one or more of the protocols is class-bounded.
+  bool isClassBounded() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1589,9 +1589,9 @@ public:
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
   
-  /// isClassBound - True if the type conforms to one or more class-bound
+  /// isClassBounded - True if the type conforms to one or more class-bounded
   /// protocols.
-  bool isClassBound() const;
+  bool isClassBounded() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }
@@ -1828,12 +1828,12 @@ inline bool TypeBase::isExistentialType() {
          || T->getKind() == TypeKind::ProtocolComposition;
 }
   
-inline bool TypeBase::isClassBoundExistentialType() {
+inline bool TypeBase::isClassBoundedExistentialType() {
   CanType T = getCanonicalType();
   if (auto *pt = dyn_cast<ProtocolType>(T))
-    return pt->isClassBound();
+    return pt->isClassBounded();
   if (auto *pct = dyn_cast<ProtocolCompositionType>(T))
-    return pct->isClassBound();
+    return pct->isClassBounded();
   return false;
 }
 
