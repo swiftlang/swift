@@ -110,6 +110,8 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     //   getter type (T)(Index)() -> U and
     //   setter type (T)(Index)(U) -> ()
     naturalUncurryLevel = 2;
+  } else {
+    llvm_unreachable("Unhandled ValueDecl for SILConstant");
   }
   
   assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
