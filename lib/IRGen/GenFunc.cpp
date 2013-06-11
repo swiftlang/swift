@@ -794,9 +794,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
   assert(((out != nullptr) ^ indirectOut.isValid()) &&
          "cannot emit builtin to both explosion and memory");
   
-  // True if the builtin returns void.
-  bool voidResult = false;
-  
   // Decompose the function's name into a builtin name and type list.
   SmallVector<Type, 4> Types;
   StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
@@ -854,9 +851,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
       IRArgs.push_back(args.claimNext());
     llvm::Value *TheCall = IGF.Builder.CreateCall(F, IRArgs);
 
-    if (TheCall->getType()->isVoidTy())
-      voidResult = true;
-    else
+    if (!TheCall->getType()->isVoidTy())
       extractScalarResults(IGF, TheCall, *out);
 
     return;
@@ -906,8 +901,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     auto pointer = args.claimNext();
     auto size = args.claimNext();
     IGF.emitDeallocRawCall(pointer, size);
-    
-    voidResult = true;
     return;
   }
 
@@ -926,7 +919,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     
     IGF.Builder.CreateFence(ordering,
                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
-    voidResult = true;
     return;
   }
 
