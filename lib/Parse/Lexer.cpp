@@ -1089,7 +1089,7 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
     
     // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
     // just ignore them here.
-    unsigned CharValue; // Unicode character value for \x, \u, \U.
+    unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
     default:
       continue;   // Invalid escape, ignore it.
