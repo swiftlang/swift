@@ -2088,16 +2088,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     StringRef nameStr = name.str();
     int fieldIdx = -1;
-    bool isNamed;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
     if (!nameStr.getAsInteger(10, Value) &&
         Value < baseTuple->getFields().size()) {
       fieldIdx = Value;
-      isNamed = false;
     } else {
       fieldIdx = baseTuple->getNamedElementId(name);
-      isNamed = true;
     }
 
     if (fieldIdx == -1) {
