@@ -560,12 +560,10 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
   ExtraData extraData;
-  AbstractCC cc;
   
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
-    cc = lv.getStaticFunction().getAbstractCC();
     calleeData = nullptr;
     extraData = ExtraData::None;
     break;
@@ -588,7 +586,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       calleeData = calleeValues.claimNext();
     else
       calleeData = nullptr;
-    cc = AbstractCC::Freestanding;
 
     // Guess the "ExtraData" kind from the type of CalleeData.
     // FIXME: Should these be typed differently by SIL?
