@@ -2197,12 +2197,11 @@ ill-formed if the type does not conform to the protocol.</p>
     }
   </pre>
   
-  <h4 id="expr-cast">Cast Operators</h4>
+  <h4 id="expr-cast">Cast operators</h4>
 
   <p>Cast expressions influence the types of their subexpressions. They can appear
   at the end of a binary operator sequence; their left operand is parsed as if
-  the cast operator has a fixed precedence of 95 (above assignment, but below
-  the ternary) and no associativity, as if declared:</p>
+  the cast operators were declared as follows:</p>
 
   <pre class="example">
     // Not valid Swift code
@@ -2256,9 +2255,9 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   </ul>
 
-  <p><tt>as</tt>, <tt>as!</tt>, and <tt>is</tt> all have lower precedence than
-  all binary operators. They must be parenthesized if used in larger expressions,
-  including within nested cast expressions.
+  <p><tt>as</tt>, <tt>as!</tt>, and <tt>is</tt> all parse a type for their
+  right-hand argument. They must be parenthesized if followed by subsequent
+  operators:
 
   <pre class="example">
     (b as! D).derivedMethod()
