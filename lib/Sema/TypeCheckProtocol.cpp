@@ -98,7 +98,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   if (Proto->getAttrs().isClassProtocol()
       && !T->getClassOrBoundGenericClass()) {
     TC.diagnose(ComplainLoc,
-                diag::non_class_does_not_conform_to_class_protocol,
+                diag::non_class_cannot_conform_to_class_protocol,
                 T, Proto->getDeclaredType());
     return nullptr;
   }
