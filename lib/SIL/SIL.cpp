@@ -52,7 +52,9 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
   : loc(vd), kind(kind), isObjC(isObjC)
 {
   unsigned naturalUncurryLevel;
-  
+
+  // FIXME: restructure to use a "switch".
+
   if (auto *func = dyn_cast<FuncDecl>(vd)) {
     assert(!func->isGetterOrSetter() &&
            "cannot create a Func SILConstant for a property accessor");
