@@ -2375,44 +2375,6 @@ bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
   return false;
 }
 
-/// \brief Updates a solution comparison result based on whether a given metric
-/// considers one solution set to be "at least as good as" the other.
-///
-/// \returns true if the caller should return the result immediately, because no
-/// additional information would change it.
-static bool updateSolutionCompareResult(SolutionCompareResult &result,
-                                        bool firstAsGoodAsSecond,
-                                        bool secondAsGoodAsFirst) {
-  if (firstAsGoodAsSecond && secondAsGoodAsFirst) {
-    result = SolutionCompareResult::Incomparable;
-    return true;
-  }
-
-  if (firstAsGoodAsSecond != secondAsGoodAsFirst) {
-    switch (result) {
-    case SolutionCompareResult::Incomparable:
-      return false;
-
-    case SolutionCompareResult::Identical:
-      result = firstAsGoodAsSecond? SolutionCompareResult::Better
-                                  : SolutionCompareResult::Worse;
-      break;
-
-    case SolutionCompareResult::Better:
-      if (secondAsGoodAsFirst)
-        result = SolutionCompareResult::Incomparable;
-      break;
-
-    case SolutionCompareResult::Worse:
-      if (firstAsGoodAsSecond)
-        result =  SolutionCompareResult::Incomparable;
-      break;
-    }
-  }
-
-  return false;
-}
-
 /// \brief Remove the initializers from any tuple types within the
 /// given type.
 static Type stripInitializers(TypeChecker &tc, Type origType) {
@@ -2433,6 +2395,27 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
            });
 }
 
+///\ brief Compare two declarations for equality when they are used.
+///
+//
+static bool sameDecl(Decl *decl1, Decl *decl2) {
+  if (decl1 == decl2)
+    return true;
+
+  // All types considered identical.
+  // FIXME: This is a hack. What we really want is to have substituted the
+  // base type into the declaration reference, so that we can compare the
+  // actual types to which two type declarations resolve. If those types are
+  // equivalent, then it doesn't matter which declaration is chosen.
+  if (isa<TypeDecl>(decl1) && isa<TypeDecl>(decl2))
+    return true;
+  
+  if (decl1->getKind() != decl2->getKind())
+    return false;
+
+  return false;
+}
+
 /// \brief Compare two overload choices for equality.
 static bool sameOverloadChoice(const OverloadChoice &x,
                                const OverloadChoice &y) {
@@ -2447,7 +2430,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
     return true;
 
   case OverloadChoiceKind::Decl:
-    return x.getDecl() == y.getDecl();
+    return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
@@ -2461,10 +2444,12 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 static bool isDeclAsSpecializedAs(ConstraintSystem &cs,
                                   Decl *decl1, Decl *decl2) {
   // If the kinds are different, there's nothing we can do.
+  // FIXME: This is wrong for type declarations.
   if (decl1->getKind() != decl2->getKind())
     return false;
 
-  // Only permit as-specialized-as checks for function declarations.
+  // Only consider function declarations from here on.
+  // FIXME: Subscripts and VarDecls should work as well.
   if (!isa<FuncDecl>(decl1))
     return false;
 
@@ -2494,8 +2479,16 @@ static bool isDeclAsSpecializedAs(ConstraintSystem &cs,
     return false;
   }
 
-  // The first is more specialized if it is a subtype of the second.
-  return cs.getTypeChecker().isSubtypeOf(type1, type2);
+  // Check whether both the input and result types of the first are
+  // subtypes of the second.
+  auto funcTy1 = type1->castTo<FunctionType>();
+  auto funcTy2 = type2->castTo<FunctionType>();
+  auto &tc = cs.getTypeChecker();
+  auto &context = tc.Context;
+  return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput()) ||
+        (funcTy1->getInput()->getUnlabeledType(context)->isEqual(
+           funcTy2->getInput()->getUnlabeledType(context)) &&
+          tc.isSubtypeOf(funcTy1->getResult(), funcTy2->getResult()));
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -2504,9 +2497,62 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                         const SolutionDiff &diff,
                         unsigned idx1,
                         unsigned idx2) {
-  // Compare the type variables bound in the first system to the type variables
-  // bound in the second type system.
-  SolutionCompareResult result = SolutionCompareResult::Identical;
+  // Whether the solutions are identical.
+  bool identical = true;
+
+  // Compare overload sets.
+  // Use a scoring mechanism where having an overload "at least as good as"
+  // the other 
+  int score = 0;
+  for (auto &overload : diff.overloads) {
+    auto choice1 = overload.choices[idx1];
+    auto choice2 = overload.choices[idx2];
+
+    // If the systems made the same choice, there's nothing interesting here.
+    if (sameOverloadChoice(choice1, choice2))
+      continue;
+
+    // The two systems are not identical.
+    identical = false;
+    
+    // If the kinds of overload choice don't match...
+    if (choice1.getKind() != choice2.getKind()) {
+      // The identity function beats any declaration.
+      if (choice1.getKind() == OverloadChoiceKind::IdentityFunction &&
+          choice2.getKind() == OverloadChoiceKind::Decl) {
+        --score;
+        continue;
+      }
+      if (choice1.getKind() == OverloadChoiceKind::Decl &&
+          choice2.getKind() == OverloadChoiceKind::IdentityFunction) {
+        ++score;
+        continue;
+      }
+
+      continue;
+    }
+
+    // The kinds of overload choice match, but the contents don't.
+    switch (choice1.getKind()) {
+    case OverloadChoiceKind::TupleIndex:
+      break;
+
+    case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::FunctionReturningBaseType:
+    case OverloadChoiceKind::IdentityFunction:
+      llvm_unreachable("Never considered different");
+
+    case OverloadChoiceKind::Decl:
+      // Determine whether one declaration is more specialized than the other.
+      if (isDeclAsSpecializedAs(cs, choice1.getDecl(), choice2.getDecl()))
+        --score;
+      if (isDeclAsSpecializedAs(cs, choice2.getDecl(), choice1.getDecl()))
+        ++score;
+      break;
+    }
+  }
+
+  // Compare the type variable bindings.
   for (auto &binding : diff.typeBindings) {
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
@@ -2520,13 +2566,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     if (type1->isEqual(type2))
       continue;
 
+    // The two systems are not identical.
+    identical = false;
+
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
     // (when it's sane) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
-      result = SolutionCompareResult::Incomparable;
-      break;
+      continue;
     }
 
     // If one type is a subtype of the other, but not vice-verse,
@@ -2546,14 +2594,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                                      ConstraintLocatorBuilder(nullptr),
                                      type2Trivial)
                                        == SolutionKind::TriviallySolved;
-    if (type1Better && type2Better) {
-      if (updateSolutionCompareResult(result, type1Trivial, type2Trivial))
-        break;
-    } else {
-      if (updateSolutionCompareResult(result, type1Better, type2Better))
-        break;
-    }
     if (type1Better || type2Better) {
+      if (type1Better)
+        --score;
+      if (type2Better)
+        ++score;
       continue;
     }
 
@@ -2572,9 +2617,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                                 ConstraintLocatorBuilder(nullptr),
                                 type2Trivial)
                                   == SolutionKind::TriviallySolved;
-    if (updateSolutionCompareResult(result, type1Better, type2Better))
-      break;
     if (type1Better || type2Better) {
+      if (type1Better)
+        --score;
+      if (type2Better)
+        ++score;
       continue;
     }
 
@@ -2592,74 +2639,35 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type1);
     bool defaultLit2
       = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type2);
-    if (updateSolutionCompareResult(result, defaultLit1, defaultLit2))
-      break;
+    if (defaultLit1 || defaultLit2) {
+      if (defaultLit1)
+        --score;
+      if (defaultLit2)
+        ++score;
+      continue;
+    }
 
     // Prefer concrete types to existentials.
-    bool isExistential1 = type1->isExistentialType();
-    bool isExistential2 = type2->isExistentialType();
-    if (updateSolutionCompareResult(result, isExistential1, isExistential2))
-      break;
-  }
-  
-  // FIXME: There might be variables bound in the second type system but not
-  // the first, but for now we don't really care.
-
-  if (result == SolutionCompareResult::Incomparable)
-    return result;
-  
-  // Compare overload sets.
-  for (auto &overload : diff.overloads) {
-    auto choice1 = overload.choices[idx1];
-    auto choice2 = overload.choices[idx2];
-
-    // If the systems made the same choice, there's nothing interesting here.
-    if (sameOverloadChoice(choice1, choice2))
-      continue;
-
-    // If the kinds of overload choice don't match...
-    if (choice1.getKind() != choice2.getKind()) {
-      // The identity function beats any declaration.
-      if (choice1.getKind() == OverloadChoiceKind::IdentityFunction &&
-          choice2.getKind() == OverloadChoiceKind::Decl) {
-        if (updateSolutionCompareResult(result, true, false))
-          break;
-      } else if (choice1.getKind() == OverloadChoiceKind::Decl &&
-                 choice2.getKind() == OverloadChoiceKind::IdentityFunction) {
-        if (updateSolutionCompareResult(result, false, true))
-          break;
-      } else {
-        // FIXME: Incomparable?
-      }
-      continue;
-    }
-
-    // The kinds of overload choice match, but the contents don't.
-    switch (choice1.getKind()) {
-    case OverloadChoiceKind::TupleIndex:
-      // The system is incomparable if we selected different tuple indices.
-      return SolutionCompareResult::Incomparable;
-
-    case OverloadChoiceKind::BaseType:
-    case OverloadChoiceKind::FunctionReturningBaseType:
-    case OverloadChoiceKind::IdentityFunction:
-      llvm_unreachable("Never considered different");
-
-    case OverloadChoiceKind::Decl:
-      // Declaration case handled below.
-      if (updateSolutionCompareResult(result,
-                                      isDeclAsSpecializedAs(cs,
-                                                            choice1.getDecl(),
-                                                            choice2.getDecl()),
-                                      isDeclAsSpecializedAs(cs,
-                                                            choice2.getDecl(),
-                                                            choice1.getDecl())))
-        return result;
-      break;
-    }
+    if (type1->isExistentialType())
+      --score;
+    if (type2->isExistentialType())
+      ++score;
   }
 
-  return result;
+  // FIXME: There are type variables and overloads not common to both solutions
+  // that haven't been considered. They make the systems different, but don't
+  // affect ranking. We need to handle this.
+
+  // If the score is non-zero, one of the solutions is better.
+  if (score) {
+    assert(!identical && "Identical systems with non-zero score");
+    return score < 0? SolutionCompareResult::Better
+                    : SolutionCompareResult::Worse;
+  }
+
+  // Neither system wins; report whether they were identical or not.
+  return identical? SolutionCompareResult::Identical
+                  : SolutionCompareResult::Incomparable;
 }
 
 Solution *
