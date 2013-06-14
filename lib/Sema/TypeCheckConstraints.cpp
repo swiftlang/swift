@@ -2500,10 +2500,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Whether the solutions are identical.
   bool identical = true;
 
+  // Solution comparison uses a scoring system to determine whether one
+  // solution is better than the other.
+  int score1 = 0;
+  int score2 = 0;
+
   // Compare overload sets.
-  // Use a scoring mechanism where having an overload "at least as good as"
-  // the other 
-  int score = 0;
   for (auto &overload : diff.overloads) {
     auto choice1 = overload.choices[idx1];
     auto choice2 = overload.choices[idx2];
@@ -2520,12 +2522,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       // The identity function beats any declaration.
       if (choice1.getKind() == OverloadChoiceKind::IdentityFunction &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
-        --score;
+        ++score1;
         continue;
       }
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
           choice2.getKind() == OverloadChoiceKind::IdentityFunction) {
-        ++score;
+        ++score2;
         continue;
       }
 
@@ -2545,9 +2547,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(cs, choice1.getDecl(), choice2.getDecl()))
-        --score;
+        ++score1;
       if (isDeclAsSpecializedAs(cs, choice2.getDecl(), choice1.getDecl()))
-        ++score;
+        ++score2;
       break;
     }
   }
@@ -2596,9 +2598,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                                        == SolutionKind::TriviallySolved;
     if (type1Better || type2Better) {
       if (type1Better)
-        --score;
+        ++score1;
       if (type2Better)
-        ++score;
+        ++score2;
       continue;
     }
 
@@ -2619,9 +2621,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                                   == SolutionKind::TriviallySolved;
     if (type1Better || type2Better) {
       if (type1Better)
-        --score;
+        ++score1;
       if (type2Better)
-        ++score;
+        ++score2;
       continue;
     }
 
@@ -2641,28 +2643,22 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type2);
     if (defaultLit1 || defaultLit2) {
       if (defaultLit1)
-        --score;
+        ++score1;
       if (defaultLit2)
-        ++score;
+        ++score2;
       continue;
     }
-
-    // Prefer concrete types to existentials.
-    if (type1->isExistentialType())
-      --score;
-    if (type2->isExistentialType())
-      ++score;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
   // that haven't been considered. They make the systems different, but don't
   // affect ranking. We need to handle this.
 
-  // If the score is non-zero, one of the solutions is better.
-  if (score) {
+  // If the scores are different, we have a winner.
+  if (score1 != score2) {
     assert(!identical && "Identical systems with non-zero score");
-    return score < 0? SolutionCompareResult::Better
-                    : SolutionCompareResult::Worse;
+    return score1 > score2? SolutionCompareResult::Better
+                          : SolutionCompareResult::Worse;
   }
 
   // Neither system wins; report whether they were identical or not.
