@@ -502,8 +502,11 @@ public:
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   
   void visitProjectExistentialInst(ProjectExistentialInst *i);
+  void visitProjectExistentialRefInst(ProjectExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
+  void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitUpcastExistentialInst(UpcastExistentialInst *i);
+  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
   //void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
   void visitRetainInst(RetainInst *i);

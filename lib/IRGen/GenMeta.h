@@ -114,6 +114,11 @@ namespace irgen {
                                     VarDecl *field,
                                     llvm::Value *metadata);
 
+  /// Given an opaque class instance pointer, produce the type metadata reference
+  /// as a %type*.
+  llvm::Value *emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
+                                                      llvm::Value *object);
+
   /// Given a heap-object instance, with some heap-object type,
   /// produce a reference to its type metadata.
   llvm::Value *emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,

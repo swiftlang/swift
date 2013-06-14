@@ -528,10 +528,16 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
 
 void IRGenSILFunction::visitProtocolMetatypeInst(
                                                swift::ProtocolMetatypeInst *i) {
-  Address existential = getLoweredAddress(i->getOperand());
-
-  llvm::Value *metatype = emitTypeMetadataRefForExistential(*this, existential,
-                                                    i->getOperand().getType());
+  llvm::Value *metatype;
+  if (i->getOperand().getType().isClassBoundedExistentialType()) {
+    Explosion existential = getLoweredExplosion(i->getOperand());
+    metatype = emitTypeMetadataRefForClassBoundedExistential(*this, existential,
+                                                     i->getOperand().getType());
+  } else {
+    Address existential = getLoweredAddress(i->getOperand());
+    metatype = emitTypeMetadataRefForOpaqueExistential(*this, existential,
+                                                 i->getOperand().getType());
+  }
   Explosion result(CurExplosionLevel);
   result.add(metatype);
   newLoweredExplosion(SILValue(i, 0), result);
@@ -1378,41 +1384,74 @@ void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand().getType();
   SILType srcType = i->getConcreteType();
-  Address buffer = emitExistentialContainerInit(*this,
+  Address buffer = emitOpaqueExistentialContainerInit(*this,
                                                 container,
                                                 destType, srcType,
                                                 i->getConformances());
   newLoweredAddress(SILValue(i, 0), buffer);
 }
 
+void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
+  Explosion instance = getLoweredExplosion(i->getOperand());
+  Explosion result(CurExplosionLevel);
+  emitClassBoundedExistentialContainer(*this,
+                               result, i->getType(),
+                               instance.claimNext(), i->getOperand().getType(),
+                               i->getConformances());
+  newLoweredExplosion(SILValue(i, 0), result);
+}
+
 void IRGenSILFunction::visitUpcastExistentialInst(
                                               swift::UpcastExistentialInst *i) {
+  /// FIXME: Handle source existential being class-bounded.
   Address src = getLoweredAddress(i->getSrcExistential());
   Address dest = getLoweredAddress(i->getDestExistential());
   SILType srcType = i->getSrcExistential().getType();
   SILType destType = i->getDestExistential().getType();
-  emitExistentialContainerUpcast(*this, dest, destType, src, srcType,
-                                 i->isTakeOfSrc(),
-                                 i->getConformances());
+  emitOpaqueExistentialContainerUpcast(*this, dest, destType, src, srcType,
+                                       i->isTakeOfSrc(),
+                                       i->getConformances());
+}
+
+void IRGenSILFunction::visitUpcastExistentialRefInst(
+                                           swift::UpcastExistentialRefInst *i) {
+  llvm_unreachable("not yet implemented");
 }
 
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
-  Address object = emitExistentialProjection(*this, base, baseTy);
+  Address object = emitOpaqueExistentialProjection(*this, base, baseTy);
   Explosion lowered(CurExplosionLevel);
   lowered.add(object.getAddress());
   newLoweredExplosion(SILValue(i, 0), lowered);
 }
 
+void IRGenSILFunction::visitProjectExistentialRefInst(
+                                          swift::ProjectExistentialRefInst *i) {
+  SILType baseTy = i->getOperand().getType();
+  Explosion base = getLoweredExplosion(i->getOperand());
+  
+  Explosion result(CurExplosionLevel);
+  llvm::Value *instance
+    = emitClassBoundedExistentialProjection(*this, base, baseTy);
+  result.add(instance);
+  newLoweredExplosion(SILValue(i, 0), result);
+}
+
 void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
-  Address base = getLoweredAddress(i->getOperand());
   SILType baseTy = i->getOperand().getType();
   SILConstant member = i->getMember();
   
   Explosion lowered(CurExplosionLevel);
-  emitProtocolMethodValue(*this, base, baseTy, member, lowered);
+  if (baseTy.isClassBoundedExistentialType()) {
+    Explosion base = getLoweredExplosion(i->getOperand());
+    emitClassBoundedProtocolMethodValue(*this, base, baseTy, member, lowered);
+  } else {
+    Address base = getLoweredAddress(i->getOperand());
+    emitOpaqueProtocolMethodValue(*this, base, baseTy, member, lowered);
+  }
   
   newLoweredExplosion(SILValue(i, 0), lowered);
 }

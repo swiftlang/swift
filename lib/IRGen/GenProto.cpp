@@ -65,7 +65,7 @@ using namespace irgen;
 namespace {
   /// The layout of an existential buffer.  This is intended to be a
   /// small, easily-computed type that can be passed around by value.
-  class ExistentialLayout {
+  class OpaqueExistentialLayout {
   private:
     unsigned NumTables;
     // If you add anything to the layout computation, you might need
@@ -74,7 +74,8 @@ namespace {
     // for different layout kinds.
 
   public:
-    explicit ExistentialLayout(unsigned numTables) : NumTables(numTables) {}
+    explicit OpaqueExistentialLayout(unsigned numTables)
+      : NumTables(numTables) {}
 
     unsigned getNumTables() const { return NumTables; }
 
@@ -94,7 +95,7 @@ namespace {
       return IGF.Builder.CreateStructGEP(addr, getNumTables() + 1,
                                          getBufferOffset(IGF.IGM));
     }
-
+    
     /// Given the address of an existential object, drill down to the
     /// witness-table field.
     Address projectWitnessTable(IRGenFunction &IGF, Address addr,
@@ -111,12 +112,13 @@ namespace {
                                     "witness-table");
     }
     
+    /// Given the address of an existential object, extract the value witness
+    /// table.
     llvm::Value *loadValueWitnessTable(IRGenFunction &IGF, Address addr,
                                        llvm::Value *metadata) {
       if (getNumTables() > 0)
         return loadWitnessTable(IGF, addr, 0);
-      else
-        return IGF.emitValueWitnessTableRefForMetadata(metadata);
+      return IGF.emitValueWitnessTableRefForMetadata(metadata);
     }
 
     /// Given the address of an existential object, drill down to the
@@ -132,7 +134,7 @@ namespace {
                                addr.getAddress()->getName() + ".metadata");
     }
   };
-
+  
   /// A concrete witness table, together with its known layout.
   class WitnessTable {
     llvm::Value *Table;
@@ -146,12 +148,9 @@ namespace {
   };
 }
 
-
-
-
 /// Given the address of an existential object, destroy it.
 static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
-                                   ExistentialLayout layout) {
+                                   OpaqueExistentialLayout layout) {
   llvm::Value *metadata = layout.loadMetadataRef(IGF, addr);
 
   // We need a value witness table.  Use one from the existential if
@@ -165,7 +164,7 @@ static void emitDestroyExistential(IRGenFunction &IGF, Address addr,
 
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
                                                      llvm::Type *objectPtrTy,
-                                                     ExistentialLayout layout);
+                                                     OpaqueExistentialLayout layout);
 
 namespace {
 
@@ -444,8 +443,8 @@ namespace {
     ProtocolDecl *getProtocol() const { return Protocol; }
     const ProtocolInfo &getInfo() const { return Impl; }
   };
-
-  /// A TypeInfo implementation for existential types, i.e. types like:
+  
+  /// A TypeInfo implementation for existential types, i.e., types like:
   ///   Printable
   ///   protocol<Printable, Serializable>
   /// with the semantic translation:
@@ -453,8 +452,8 @@ namespace {
   /// t here is an ArchetypeType.
   ///
   /// This is used for both ProtocolTypes and ProtocolCompositionTypes.
-  class ExistentialTypeInfo :
-      public IndirectTypeInfo<ExistentialTypeInfo, FixedTypeInfo> {
+  class OpaqueExistentialTypeInfo :
+      public IndirectTypeInfo<OpaqueExistentialTypeInfo, FixedTypeInfo> {
     unsigned NumProtocols;
 
     ProtocolEntry *getProtocolsBuffer() {
@@ -464,7 +463,7 @@ namespace {
       return reinterpret_cast<const ProtocolEntry *>(this + 1);
     }
 
-    ExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
+    OpaqueExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
                         ArrayRef<ProtocolEntry> protocols)
       : IndirectTypeInfo(ty, size, align, IsNotPOD), NumProtocols(protocols.size()) {
 
@@ -474,16 +473,16 @@ namespace {
     }
 
   public:
-    ExistentialLayout getLayout() const {
-      return ExistentialLayout(NumProtocols);
+    OpaqueExistentialLayout getLayout() const {
+      return OpaqueExistentialLayout(NumProtocols);
     }
 
-    static const ExistentialTypeInfo *create(llvm::Type *ty, Size size,
+    static const OpaqueExistentialTypeInfo *create(llvm::Type *ty, Size size,
                                           Alignment align,
                                           ArrayRef<ProtocolEntry> protocols) {
-      void *buffer = operator new(sizeof(ExistentialTypeInfo) +
+      void *buffer = operator new(sizeof(OpaqueExistentialTypeInfo) +
                                   protocols.size() * sizeof(ProtocolEntry));
-      return new(buffer) ExistentialTypeInfo(ty, size, align, protocols);
+      return new(buffer) OpaqueExistentialTypeInfo(ty, size, align, protocols);
     }
 
     /// Returns the protocols that values of this type are known to
@@ -556,6 +555,200 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address addr) const {
       emitDestroyExistential(IGF, addr, getLayout());
+    }
+  };
+  
+  /// A type info implementation for class-bounded existential types, that is,
+  /// an existential type known to conform to one or more class protocols.
+  /// Class-bounded existentials can be represented directly as an aggregation
+  /// of a refcounted pointer plus witness tables instead of using an indirect
+  /// buffer.
+  class ClassBoundedExistentialTypeInfo
+    : public ScalarTypeInfo<ClassBoundedExistentialTypeInfo, FixedTypeInfo>
+  {
+    unsigned NumProtocols;
+    
+    ProtocolEntry *getProtocolsBuffer() {
+      return reinterpret_cast<ProtocolEntry *>(this + 1);
+    }
+    const ProtocolEntry *getProtocolsBuffer() const {
+      return reinterpret_cast<const ProtocolEntry *>(this + 1);
+    }
+    
+    ClassBoundedExistentialTypeInfo(llvm::Type *ty,
+                                    Size size,
+                                    Alignment align,
+                                    ArrayRef<ProtocolEntry> protocols)
+      : ScalarTypeInfo(ty, size, align, IsNotPOD),
+        NumProtocols(protocols.size())
+    {
+      for (unsigned i = 0; i != NumProtocols; ++i) {
+        new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);
+      }
+    }
+    
+  public:    
+    static const ClassBoundedExistentialTypeInfo *
+    create(llvm::Type *ty, Size size, Alignment align,
+           ArrayRef<ProtocolEntry> protocols)
+    {
+      void *buffer = operator new(sizeof(ClassBoundedExistentialTypeInfo) +
+                                  protocols.size() * sizeof(ProtocolEntry));
+      return new (buffer) ClassBoundedExistentialTypeInfo(ty, size, align,
+                                                          protocols);
+    }
+
+    /// Returns the protocols that values of this type are known to
+    /// implement.  This can be empty, meaning that values of this
+    /// type are not know to implement any protocols, although we do
+    /// still know how to manipulate them.
+    ArrayRef<ProtocolEntry> getProtocols() const {
+      return ArrayRef<ProtocolEntry>(getProtocolsBuffer(), NumProtocols);
+    }
+    
+    /// The storage type of a class-bounded existential is a struct containing
+    /// witness table pointers for each conformed-to protocol followed by a
+    /// refcounted pointer to the class instance value. Unlike for opaque
+    /// existentials, a class-bounded existential does not need to store type
+    /// metadata as an additional element, since it can be derived from the
+    /// class instance.
+    llvm::StructType *getStorageType() const {
+      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
+
+    unsigned getExplosionSize(ExplosionKind kind) const override {
+      return 1 + NumProtocols;
+    }
+    
+    void getSchema(ExplosionSchema &schema) const override {
+      llvm::StructType *ty = getStorageType();
+      for (unsigned i = 0; i < 1 + NumProtocols; ++i)
+        schema.add(ExplosionSchema::Element::forScalar(ty->getElementType(i)));
+    }
+    
+    /// Given the address of a class-bounded existential container, returns
+    /// the address of a witness table pointer.
+    Address projectWitnessTable(IRGenFunction &IGF, Address address,
+                                unsigned n) const {
+      assert(n < NumProtocols && "witness table index out of bounds");
+      return IGF.Builder.CreateStructGEP(address, n, Size(0));
+    }
+    
+    /// Given the address of a class-bounded existential container, returns
+    /// the address of its instance pointer.
+    Address projectValue(IRGenFunction &IGF, Address address) const {
+      return IGF.Builder.CreateStructGEP(address, NumProtocols, Size(0));
+    }
+    
+    /// Given a class-bounded existential container, returns a witness table
+    /// pointer out of the container, and the type metadata pointer for the
+    /// value.
+    std::pair<llvm::Value*, llvm::Value*>
+    getWitnessTableAndMetadata(IRGenFunction &IGF, Explosion &container,
+                               unsigned which) const {
+      assert(which < NumProtocols && "witness table index out of bounds");
+      ArrayRef<llvm::Value *> values = container.claimAll();
+      llvm::Value *witness = values[which];
+      llvm::Value *metadata
+        = emitTypeMetadataRefForOpaqueHeapObject(IGF, values.back());
+      return {witness, metadata};
+    }
+    
+    /// Given an existential object, find the witness table
+    /// corresponding to the given protocol.
+    std::pair<llvm::Value*, llvm::Value*>
+    findWitnessTableAndMetadata(IRGenFunction &IGF,
+                                Explosion &container,
+                                ProtocolDecl *protocol) const {
+      assert(NumProtocols != 0 &&
+             "finding a witness table in a trivial existential");
+      
+      ProtocolPath path(IGF.IGM, getProtocols(), protocol);
+      llvm::Value *witness, *metadata;
+      
+      std::tie(witness, metadata)
+        = getWitnessTableAndMetadata(IGF, container, path.getOriginIndex());
+      witness = path.apply(IGF, witness);
+      
+      return {witness, metadata};
+    }
+    
+    /// Given a class-bounded existential containe, returns the instance
+    /// pointer value.
+    llvm::Value *getValue(IRGenFunction &IGF, Explosion &container) const {
+      container.claim(NumProtocols);
+      return container.claimNext();
+    }
+
+    void load(IRGenFunction &IGF, Address address, Explosion &e) const override{
+      // Load the witness table pointers.
+      for (unsigned i = 0; i < NumProtocols; ++i)
+        e.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
+      // Load the instance pointer, which is ObjC-refcounted.
+      llvm::Value *instance
+        = IGF.Builder.CreateLoad(projectValue(IGF, address));
+      IGF.emitObjCRetainCall(instance);
+      e.add(instance);
+    }
+
+    void loadAsTake(IRGenFunction &IGF, Address address,
+                    Explosion &e) const override {
+      // Load the witness table pointers.
+      for (unsigned i = 0; i < NumProtocols; ++i)
+        e.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
+      // Load the instance pointer.
+      e.add(IGF.Builder.CreateLoad(projectValue(IGF, address)));
+    }
+    
+    void assign(IRGenFunction &IGF, Explosion &e, Address address)
+    const override {
+      // Store the witness table pointers.
+      for (unsigned i = 0; i < NumProtocols; ++i) {
+        IGF.Builder.CreateStore(e.claimNext(),
+                                projectWitnessTable(IGF, address, i));
+      }
+      // Reassign the instance pointer, which is ObjC-refcounted.
+      Address instanceAddr = projectValue(IGF, address);
+      llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
+      IGF.Builder.CreateStore(e.claimNext(), instanceAddr);
+      IGF.emitObjCRelease(old);
+    }
+    
+    void initialize(IRGenFunction &IGF, Explosion &e, Address address)
+    const override {
+      // Store the witness table pointers.
+      for (unsigned i = 0; i < NumProtocols; ++i) {
+        IGF.Builder.CreateStore(e.claimNext(),
+                                projectWitnessTable(IGF, address, i));
+      }
+      // Store the instance pointer.
+      IGF.Builder.CreateStore(e.claimNext(),
+                              projectValue(IGF, address));
+    }
+    
+    void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
+    const override {
+      // Transfer the witness table pointers.
+      src.transferInto(dest, NumProtocols);
+      // Copy the instance pointer, which is ObjC-refcounted.
+      IGF.emitObjCRetain(src.claimNext(), dest);
+    }
+
+    void retain(IRGenFunction &IGF, Explosion &e) const override {
+      e.claim(NumProtocols);
+      // The instance is treated as ObjC-refcounted.
+      IGF.emitObjCRetainCall(e.claimNext());
+    }
+    
+    void release(IRGenFunction &IGF, Explosion &e) const override {
+      e.claim(NumProtocols);
+      // The instance is treated as ObjC-refcounted.
+      IGF.emitObjCRelease(e.claimNext());
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr) const override {
+      // The instance is treated as ObjC-refcounted.
+      IGF.emitObjCRelease(IGF.Builder.CreateLoad(projectValue(IGF, addr)));
     }
   };
 
@@ -1346,9 +1539,18 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     assert(concreteType->isExistentialType() &&
            "non-existentials should have a known typeof witness");
     Address obj = getArgAs(IGF, argv, type, "obj");
-    llvm::Value *result
-      = emitTypeMetadataRefForExistential(IGF, obj, concreteType);
-    IGF.Builder.CreateRet(result);
+    if (concreteType->isClassBoundedExistentialType()) {
+      Explosion existential(IGF.CurExplosionLevel);
+      type.loadAsTake(IGF, obj, existential);
+      llvm::Value *result
+        = emitTypeMetadataRefForClassBoundedExistential(IGF, existential,
+                                                        concreteType);
+      IGF.Builder.CreateRet(result);
+    } else {
+      llvm::Value *result
+        = emitTypeMetadataRefForOpaqueExistential(IGF, obj, concreteType);
+      IGF.Builder.CreateRet(result);
+    }
     return;
   }
 
@@ -1385,7 +1587,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
 /// function to the appropriate object-pointer type.
 static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
                                                      llvm::Type *objectPtrTy,
-                                                     ExistentialLayout layout) {
+                                                     OpaqueExistentialLayout layout) {
   llvm::Type *argTys[] = { objectPtrTy, objectPtrTy };
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(IGM.VoidTy, argTys, false);
@@ -2434,6 +2636,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // The first field is the metadata reference.
   fields.push_back(IGM.TypeMetadataPtrTy);
 
+  bool isClassBounded = false;
+  
   for (auto protocol : protocols) {
     // Find the protocol layout.
     const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
@@ -2441,9 +2645,28 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
 
     // Each protocol gets a witness table.
     fields.push_back(IGM.WitnessTablePtrTy);
+    
+    // The existential container is class-bounded if any of its protocol bounds
+    // are.
+    isClassBounded |= protocol->isClassBounded();
+  }
+  
+  // If the existential is class-bounded, lower it to a class-bounded
+  // existential representation.
+  if (isClassBounded) {
+    // Add the class instance pointer to the fields.
+    fields.push_back(IGM.ObjCPtrTy);
+    // Drop the type metadata pointer. We can get it from the class instance.
+    type->setBody(llvm::makeArrayRef(fields).slice(1));
+    
+    Alignment align = IGM.getPointerAlignment();
+    Size size = fields.size() * IGM.getPointerSize();
+    
+    return ClassBoundedExistentialTypeInfo::create(type, size, align,
+                                                   entries);
   }
 
-  ExistentialLayout layout(entries.size());
+  OpaqueExistentialLayout layout(entries.size());
 
   // Add the value buffer to the fields.
   fields.push_back(IGM.getFixedBufferTy());
@@ -2456,7 +2679,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   assert(size.roundUpToAlignment(align) == size);
   size += getFixedBufferSize(IGM);
 
-  return ExistentialTypeInfo::create(type, size, align, entries);
+  return OpaqueExistentialTypeInfo::create(type, size, align, entries);
 }
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
@@ -3125,76 +3348,65 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
   ExpandPolymorphicSignature(IGM, polyFn).expand(out);
 }
 
-static void emitProtocolWitnessTables(IRGenFunction &IGF,
-                                  Address dest,
-                                  ExistentialTypeInfo const &destTI,
-                                  SILType srcType,
-                                  ArrayRef<ProtocolConformance*> conformances,
-                                  llvm::Value* &metadata,
-                                  FixedPacking &packing,
-                                  llvm::Value* &wtable) {
-  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
-  ExistentialLayout destLayout = destTI.getLayout();
-  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
-
-  // First, write out the metadata.
-  metadata = IGF.emitTypeMetadataRef(srcType);
-  IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
+/// Emit protocol witness table pointers for the given protocol conformances,
+/// passing each emitted witness table index into the given function body.
+static void forEachProtocolWitnessTable(IRGenFunction &IGF,
+                          SILType srcType,
+                          ArrayRef<ProtocolEntry> protocols,
+                          ArrayRef<ProtocolConformance*> conformances,
+                          std::function<void (unsigned, llvm::Value*)> body) {
+  assert(protocols.size() == conformances.size() &&
+         "mismatched protocol conformances");
   
-  // Compute basic layout information about the type.  If we have a
-  // concrete type, we need to know how it packs into a fixed-size
-  // buffer.  If we don't, we need an value-witness table.
-  if (auto *archetype = srcType.getAs<ArchetypeType>()) { // FIXME: tuples of archetypes?
-    packing = (FixedPacking) -1;
-    wtable = getArchetypeInfo(IGF, archetype).getValueWitnessTable(IGF);
-  } else {
-    packing = computePacking(IGF.IGM, srcTI);
-    wtable = nullptr;
-  }
-  
-  // Next, write the protocol witness tables.
-  for (unsigned i = 0, e = destTI.getProtocols().size(); i != e; ++i) {
-    ProtocolDecl *proto = destEntries[i].getProtocol();
-    auto &protoI = destEntries[i].getInfo();
+  // If the source type is an archetype, look at what's locally bound.
+  if (auto *archetype = srcType.getAs<ArchetypeType>()) {
+    auto &archTI = getArchetypeInfo(IGF, archetype);
     
-    llvm::Value *ptable;
-    
-    // If the source type is an archetype, look at what's bound.
-    if (auto *archetype = srcType.getAs<ArchetypeType>()) {
-      auto &archTI = getArchetypeInfo(IGF, archetype);
+    for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
+      ProtocolDecl *proto = protocols[i].getProtocol();
+      
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
-      ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
+      
+      llvm::Value *ptable = archTI.getWitnessTable(IGF, path.getOriginIndex());
       ptable = path.apply(IGF, ptable);
       
-      // All other source types should be concrete enough that we have
-      // conformance information for them.
-    } else {
-      auto astConformance = conformances[i];
-      assert(astConformance);
-      
-      // Compute the conformance information.
-      const ConformanceInfo &conformance =
-      protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(), srcTI, proto,
-                            *astConformance);
-      ptable = conformance.getTable(IGF);
+      body(i, ptable);
     }
     
-    // Now store the protocol witness table into the destination.
-    Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
-    IGF.Builder.CreateStore(ptable, ptableSlot);
+    return;
   }
+  
+  // All other source types should be concrete enough that we have conformance
+  // info for them.
+  auto &srcTI = IGF.getFragileTypeInfo(srcType);
 
+  for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
+    ProtocolDecl *proto = protocols[i].getProtocol();
+    auto &protoI = protocols[i].getInfo();
+    auto astConformance = conformances[i];
+    assert(astConformance);
+    
+    // Compute the conformance information.
+    const ConformanceInfo &conformance =
+      protoI.getConformance(IGF.IGM, srcType.getSwiftRValueType(), srcTI, proto,
+                            *astConformance);
+    body(i, conformance.getTable(IGF));
+  }
 }
 
 /// Emit an existential container initialization by copying the value and
 /// witness tables from an existential container of a more specific type.
-void irgen::emitExistentialContainerUpcast(IRGenFunction &IGF,
+void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
                                  Address dest, SILType destType,
                                  Address src,  SILType srcType,
                                  bool isTakeOfSrc,
                                  ArrayRef<ProtocolConformance*> conformances) {
-  auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
-  auto &srcTI = IGF.getFragileTypeInfo(srcType).as<ExistentialTypeInfo>();
+  assert(destType.isExistentialType());
+  assert(!destType.isClassBoundedExistentialType());
+  assert(srcType.isExistentialType());
+  assert(!srcType.isClassBoundedExistentialType());
+  auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
+  auto &srcTI = IGF.getFragileTypeInfo(srcType).as<OpaqueExistentialTypeInfo>();
 
   auto destLayout = destTI.getLayout();
   auto srcLayout = srcTI.getLayout();
@@ -3249,35 +3461,75 @@ void irgen::emitExistentialContainerUpcast(IRGenFunction &IGF,
   }
 }
 
+/// Emit a class-bounded existential container from a class instance value
+/// as an explosion.
+void irgen::emitClassBoundedExistentialContainer(IRGenFunction &IGF,
+                               Explosion &out,
+                               SILType outType,
+                               llvm::Value *instance,
+                               SILType instanceType,
+                               ArrayRef<ProtocolConformance*> conformances) {
+  assert(outType.isClassBoundedExistentialType() &&
+         "creating a non-class-bounded existential type");
+  
+  auto &destTI = IGF.getFragileTypeInfo(outType)
+    .as<ClassBoundedExistentialTypeInfo>();
+  
+  // Emit the witness table pointers.
+  forEachProtocolWitnessTable(IGF, instanceType,
+                              destTI.getProtocols(),
+                              conformances,
+                              [&](unsigned i, llvm::Value *ptable) {
+    out.add(ptable);
+  });
+  
+  // Cast the instance pointer to an opaque refcounted pointer.
+  llvm::Value *opaqueInstance
+    = IGF.Builder.CreateBitCast(instance, IGF.IGM.ObjCPtrTy);
+  out.add(opaqueInstance);
+}
+
 /// Emit an existential container initialization operation for a concrete type.
 /// Returns the address of the uninitialized buffer for the concrete value.
-Address irgen::emitExistentialContainerInit(IRGenFunction &IGF,
+Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   Address dest,
                                   SILType destType,
                                   SILType srcType,
                                   ArrayRef<ProtocolConformance*> conformances) {
-  auto &destTI = IGF.getFragileTypeInfo(destType).as<ExistentialTypeInfo>();
-  const TypeInfo &srcTI = IGF.getFragileTypeInfo(srcType);
-  ExistentialLayout destLayout = destTI.getLayout();
+  assert(!destType.isClassBoundedExistentialType() &&
+         "initializing a class-bounded existential container as opaque");
+  auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
+  auto &srcTI = IGF.getFragileTypeInfo(srcType);
+  OpaqueExistentialLayout destLayout = destTI.getLayout();
   assert(destTI.getProtocols().size() == conformances.size());
   
   assert(!srcType.isExistentialType() &&
          "existential-to-existential erasure should be done with "
          "upcast_existential");
   
-  // First, write out the metadata and witness tables.
+  // First, write out the metadata.
+  llvm::Value *metadata = IGF.emitTypeMetadataRef(srcType);
+  IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
   
-  llvm::Value *metadata = nullptr;
-  FixedPacking packing = (FixedPacking) -1;
-  llvm::Value *wtable = nullptr;
-  emitProtocolWitnessTables(IGF,
-                            dest,
-                            destTI,
-                            srcType,
-                            conformances,
-                            metadata,
-                            packing,
-                            wtable);
+  // Compute basic layout information about the type.  If we have a
+  // concrete type, we need to know how it packs into a fixed-size
+  // buffer.  If we don't, we need an value-witness table.
+  FixedPacking packing;
+  llvm::Value *wtable;
+  if (auto *archetype = srcType.getAs<ArchetypeType>()) { // FIXME: tuples of archetypes?
+    packing = (FixedPacking) -1;
+    wtable = getArchetypeInfo(IGF, archetype).getValueWitnessTable(IGF);
+  } else {
+    packing = computePacking(IGF.IGM, srcTI);
+    wtable = nullptr;
+  }
+  
+  // Next, write the protocol witness tables.
+  forEachProtocolWitnessTable(IGF, srcType, destTI.getProtocols(), conformances,
+                              [&](unsigned i, llvm::Value *ptable) {
+    Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
+    IGF.Builder.CreateStore(ptable, ptableSlot);
+  });
   
   // Finally, evaluate into the buffer.
   
@@ -3374,15 +3626,17 @@ irgen::emitTypeMetadataRefForArchetype(IRGenFunction &IGF,
 /// Extract the method pointer and metadata from a protocol witness table
 /// as a function value.
 void
-irgen::emitProtocolMethodValue(IRGenFunction &IGF,
-                               Address existAddr,
-                               SILType baseTy,
-                               SILConstant member,
-                               Explosion &out) {
+irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
+                                     Address existAddr,
+                                     SILType baseTy,
+                                     SILConstant member,
+                                     Explosion &out) {
+  assert(baseTy.isExistentialType());
+  assert(!baseTy.isClassBoundedExistentialType() &&
+         "emitting class-bounded existential as opaque existential");
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
-  assert(baseTy.getSwiftRValueType()->isExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -3403,19 +3657,57 @@ irgen::emitProtocolMethodValue(IRGenFunction &IGF,
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
+/// Extract the method pointer and metadata from a class-bounded existential
+/// container's protocol witness table as a function value.
+void irgen::emitClassBoundedProtocolMethodValue(IRGenFunction &IGF,
+                                                Explosion &in,
+                                                SILType baseTy,
+                                                SILConstant member,
+                                                Explosion &out) {
+  assert(baseTy.isClassBoundedExistentialType());
+
+  // The protocol we're calling on.
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy)
+    .as<ClassBoundedExistentialTypeInfo>();
+  
+  // The function we're going to call.
+  // FIXME: Support getters and setters (and curried entry points?)
+  assert(member.kind == SILConstant::Kind::Func
+         && "getters and setters not yet supported");
+  ValueDecl *vd = member.getDecl();
+  FuncDecl *fn = cast<FuncDecl>(vd);
+  ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
+  
+  // Load the witness table and metadata.
+  llvm::Value *wtable, *metadata;
+  std::tie(wtable, metadata)
+    = baseTI.findWitnessTableAndMetadata(IGF, in, fnProto);
+  
+  // Build the value.
+  getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
+}
+
 llvm::Value *
-irgen::emitTypeMetadataRefForExistential(IRGenFunction &IGF, Address addr,
-                                         SILType type) {
-  return emitTypeMetadataRefForExistential(IGF, addr,
+irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
+                                               SILType type) {
+  return emitTypeMetadataRefForOpaqueExistential(IGF, addr,
                                            type.getSwiftRValueType());
 }
 
 llvm::Value *
-irgen::emitTypeMetadataRefForExistential(IRGenFunction &IGF,
-                                         Address addr,
-                                         CanType type) {
+irgen::emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+                                                     Explosion &value,
+                                                     SILType type) {
+  return emitTypeMetadataRefForClassBoundedExistential(IGF, value,
+                                                 type.getSwiftRValueType());
+}
+
+llvm::Value *
+irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
+                                               CanType type) {
   assert(type->isExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(type).as<ExistentialTypeInfo>();
+  assert(!type->isClassBoundedExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
   auto existLayout = baseTI.getLayout();
@@ -3430,26 +3722,28 @@ irgen::emitTypeMetadataRefForExistential(IRGenFunction &IGF,
   return emitTypeofCall(IGF, vwtable, metadata, object);
 }
 
-/// Determine the natural limits on how we can call the given protocol
-/// member function.
-AbstractCallee irgen::getAbstractProtocolCallee(IRGenFunction &IGF,
-                                                FuncDecl *fn) {
-  // TODO: consider adding non-minimal or curried entrypoints.
-  if (fn->isStatic())
-    return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
-                          0, 0, ExtraData::Metatype);
-  return AbstractCallee(AbstractCC::Method, ExplosionKind::Minimal,
-                        1, 1, ExtraData::Metatype);
+llvm::Value *
+irgen::emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+                                                     Explosion &value,
+                                                     CanType type) {
+  assert(type->isClassBoundedExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(type)
+    .as<ClassBoundedExistentialTypeInfo>();
+  
+  // Extract the class instance pointer.
+  llvm::Value *instance = baseTI.getValue(IGF, value);
+  // Get the type metadata.
+  return emitTypeMetadataRefForOpaqueHeapObject(IGF, instance);
 }
-
 
 /// Emit a projection from an existential container to its concrete value
 /// buffer.
-Address irgen::emitExistentialProjection(IRGenFunction &IGF,
-                                         Address base,
-                                         SILType baseTy) {
+Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
+                                               Address base,
+                                               SILType baseTy) {
   assert(baseTy.isExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<ExistentialTypeInfo>();
+  assert(!baseTy.isClassBoundedExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 
   llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
@@ -3457,4 +3751,15 @@ Address irgen::emitExistentialProjection(IRGenFunction &IGF,
   Address buffer = layout.projectExistentialBuffer(IGF, base);
   llvm::Value *object = emitProjectBufferCall(IGF, wtable, metadata, buffer);
   return Address(object, Alignment(1));
+}
+
+/// Extract the instance pointer from a class-bounded existential value.
+llvm::Value *irgen::emitClassBoundedExistentialProjection(IRGenFunction &IGF,
+                                                          Explosion &base,
+                                                          SILType baseTy) {
+  assert(baseTy.isClassBoundedExistentialType());
+  auto &baseTI = IGF.getFragileTypeInfo(baseTy)
+    .as<ClassBoundedExistentialTypeInfo>();
+  
+  return baseTI.getValue(IGF, base);
 }

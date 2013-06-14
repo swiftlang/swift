@@ -1575,6 +1575,21 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                           suppressCast);
 }
 
+/// Given an opaque class instance pointer, produce the type metadata reference
+/// as a %type*.
+llvm::Value *irgen::emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
+                                                           llvm::Value *object)
+{
+  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
+  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
+                                         object,
+                                         object->getName() + ".metatype");
+  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setDoesNotThrow();
+  metadata->setDoesNotAccessMemory();
+  return metadata;
+}
+
 /// Given an object of class type, produce the type metadata reference
 /// as a %type*.
 llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
@@ -1590,14 +1605,7 @@ llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
 
   // Okay, ask the runtime for the type metadata of this
   // potentially-ObjC object.
-  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
-  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
-                                         object,
-                                         object->getName() + ".metatype");
-  metadata->setCallingConv(IGF.IGM.RuntimeCC);
-  metadata->setDoesNotThrow();
-  metadata->setDoesNotAccessMemory();
-  return metadata;
+  return emitTypeMetadataRefForOpaqueHeapObject(IGF, object);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

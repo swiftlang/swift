@@ -166,8 +166,12 @@ static llvm::Constant *getCastOfRetainFn(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(fn, fnTy->getPointerTo(0));
 }
 
+void IRGenFunction::emitObjCRetain(llvm::Value *v, Explosion &explosion) {
+  explosion.add(emitObjCRetainCall(v));
+}
+
 llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
-  // Get an appropriately-casted function pointer.
+  // Get an appropriately cast function pointer.
   auto fn = IGM.getObjCRetainFn();
   fn = getCastOfRetainFn(IGM, fn, value->getType());
 

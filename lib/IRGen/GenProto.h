@@ -45,16 +45,25 @@ namespace irgen {
   class TypeInfo;
 
   /// Emit the metadata and witness table initialization for an allocated
-  /// existential container.
-  Address emitExistentialContainerInit(IRGenFunction &IGF,
+  /// opaque existential container.
+  Address emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                    Address dest,
                                    SILType destType,
                                    SILType srcType,
                                    ArrayRef<ProtocolConformance*> conformances);
+  
+  /// Emit a class-bounded existential container from a class instance value
+  /// as an explosion.
+  void emitClassBoundedExistentialContainer(IRGenFunction &IGF,
+                                 Explosion &out,
+                                 SILType outType,
+                                 llvm::Value *instance,
+                                 SILType instanceType,
+                                 ArrayRef<ProtocolConformance*> conformances);
 
-  /// Initialize an existential container using the value and metadata from
-  /// an existing, more specific existential container.
-  void emitExistentialContainerUpcast(IRGenFunction &IGF,
+  /// Initialize an opaque existential container using the value and metadata
+  /// from an existing, more specific opaque existential container.
+  void emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
                                   Address dest,
                                   SILType destType,
                                   Address src,
@@ -64,9 +73,14 @@ namespace irgen {
   
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
-  Address emitExistentialProjection(IRGenFunction &IGF,
-                                    Address base,
-                                    SILType baseTy);
+  Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
+                                          Address base,
+                                          SILType baseTy);
+  
+  /// Extract the instance pointer from a class-bounded existential value.
+  llvm::Value *emitClassBoundedExistentialProjection(IRGenFunction &IGF,
+                                                     Explosion &base,
+                                                     SILType baseTy);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
@@ -75,17 +89,22 @@ namespace irgen {
                                 SILConstant member,
                                 Explosion &out);
   
-  /// Extract the method pointer and metadata from a protocol witness table
-  /// as a function value.
-  void emitProtocolMethodValue(IRGenFunction &IGF,
-                               Address existAddr,
-                               SILType baseTy,
-                               SILConstant member,
-                               Explosion &out);
-  /// Determine the natural limits on how we can call the given
-  /// protocol member function.
-  AbstractCallee getAbstractProtocolCallee(IRGenFunction &IGF, FuncDecl *fn);
-
+  /// Extract the method pointer and metadata from an opaque existential
+  /// container's protocol witness table as a function value.
+  void emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
+                                     Address existAddr,
+                                     SILType baseTy,
+                                     SILConstant member,
+                                     Explosion &out);
+  
+  /// Extract the method pointer and metadata from a class-bounded existential
+  /// container's protocol witness table as a function value.
+  void emitClassBoundedProtocolMethodValue(IRGenFunction &IGF,
+                                           Explosion &in,
+                                           SILType baseTy,
+                                           SILConstant member,
+                                           Explosion &out);
+  
   /// Add the witness arguments necessary for calling a function with
   /// the given generics clause.
   void expandPolymorphicSignature(IRGenModule &IGM,
@@ -121,14 +140,24 @@ namespace irgen {
                                                SILType archetypeType);
   
   /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForExistential(IRGenFunction &IGF,
+  llvm::Value *emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF,
                                                  Address addr,
                                                  SILType type);
   
   /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForExistential(IRGenFunction &IGF,
+  llvm::Value *emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF,
                                                  Address addr,
                                                  CanType type);
+  
+  /// Emit a dynamic metatype lookup for the given class-bounded existential.
+  llvm::Value *emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+                                                             Explosion &value,
+                                                             SILType type);
+  
+  /// Emit a dynamic metatype lookup for the given existential.
+  llvm::Value *emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+                                                             Explosion &value,
+                                                             CanType type);
 } // end namespace irgen
 } // end namespace swift
 
