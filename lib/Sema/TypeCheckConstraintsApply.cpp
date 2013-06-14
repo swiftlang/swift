@@ -2729,6 +2729,8 @@ int Solution::getFixedScore() const {
     return *fixedScore;
 
   int score = 0;
+
+  // Consider overload choices.
   for (auto overload : overloadChoices) {
     auto choice = overload.second.first;
     if (choice.getKind() != OverloadChoiceKind::Decl)
@@ -2737,6 +2739,33 @@ int Solution::getFixedScore() const {
     // -2 penalty for each user-defined conversion.
     if (choice.getDecl()->getAttrs().isConversion())
       score -= 2;
+  }
+
+  // Consider type bindings.
+  auto &tc = getConstraintSystem().getTypeChecker();
+  for (auto binding : typeBindings) {
+    // Look for type variables corresponding directly to an expression.
+    auto typeVar = binding.first;
+    auto locator = typeVar->getImpl().getLocator();
+    if (!locator || !locator->getAnchor() || !locator->getPath().empty())
+      continue;
+
+    // Check whether there is a literal protocol corresponding to the
+    // anchor expression.
+    auto literalProtocol
+      = tc.getLiteralProtocol(locator->getAnchor());
+    if (!literalProtocol)
+      continue;
+
+    // Retrieve the default type for this literal protocol, if there is one.
+    auto defaultType = tc.getDefaultType(literalProtocol);
+    if (!defaultType)
+      continue;
+
+    // +1 if the bound type matches the default type for this literal protocol.
+    // FIXME: Doesn't work properly for Slice<T> et al.
+    if (defaultType->isEqual(binding.second))
+      ++score;
   }
 
   // Save the fixed score.

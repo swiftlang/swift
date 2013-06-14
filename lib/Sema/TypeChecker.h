@@ -500,6 +500,12 @@ public:
   /// problem with the Standard Library.
   ProtocolDecl *getProtocol(SourceLoc loc, KnownProtocolKind kind);
 
+  /// \brief Retrieve the literal protocol for the given expression.
+  ///
+  /// \returns the literal protocol, if known and available, or null if the
+  /// expression does not have an associated literal protocol.
+  ProtocolDecl *getLiteralProtocol(Expr *expr);
+
   /// \name AST Mutation Listener Implementation
   /// @{
   void handleExternalDecl(Decl *decl);

@@ -152,6 +152,41 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   return knownProtocols[index];
 }
 
+ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
+  if (isa<ArrayExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::ArrayLiteralConvertible);
+  }
+  if (isa<DictionaryExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::DictionaryLiteralConvertible);
+  }
+  if (!isa<LiteralExpr>(expr))
+    return nullptr;
+  if (isa<IntegerLiteralExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::IntegerLiteralConvertible);
+  }
+  if (isa<FloatLiteralExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::FloatLiteralConvertible);
+  }
+  if (isa<CharacterLiteralExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::CharacterLiteralConvertible);
+  }
+  if (isa<StringLiteralExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::StringLiteralConvertible);
+  }
+  if (isa<InterpolatedStringLiteralExpr>(expr)) {
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::StringInterpolationConvertible);
+  }
+  
+  llvm_unreachable("Unhandled literal kind");
+}
+
 /// \brief Check for circular inheritance of protocols.
 ///
 /// \param Path The circular path through the protocol inheritance hierarchy,

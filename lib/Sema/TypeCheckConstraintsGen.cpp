@@ -153,58 +153,8 @@ namespace {
       return nullptr;
     }
 
-    Type visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
-      auto protocol
-        = CS.getTypeChecker().getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::IntegerLiteralConvertible);
-      if (!protocol) {
-        return nullptr;
-      }
-
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
-      CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                       protocol->getDeclaredType());
-      return tv;
-    }
-
-    Type visitFloatLiteralExpr(FloatLiteralExpr *expr) {
-      auto protocol
-        = CS.getTypeChecker().getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::FloatLiteralConvertible);
-      if (!protocol) {
-        return nullptr;
-      }
-
-      // Require conformance to the FloatLiteralConvertible protocol.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
-      CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                       protocol->getDeclaredType());
-
-      return tv;
-    }
-
-    Type visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
-      auto protocol
-        = CS.getTypeChecker().getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::CharacterLiteralConvertible);
-      if (!protocol) {
-        return nullptr;
-      }
-      
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
-      CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                       protocol->getDeclaredType());
-      return tv;
-    }
-
-    Type visitStringLiteralExpr(StringLiteralExpr *expr) {
-      auto protocol
-        = CS.getTypeChecker().getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::StringLiteralConvertible);
+    Type visitLiteralExpr(LiteralExpr *expr) {
+      auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
       if (!protocol) {
         return nullptr;
       }
@@ -479,6 +429,7 @@ namespace {
     
     Type visitArrayExpr(ArrayExpr *expr) {
       ASTContext &C = CS.getASTContext();
+      
       // An array expression can be of a type T that conforms to the
       // ArrayLiteralConvertible protocol.
       auto &tc = CS.getTypeChecker();

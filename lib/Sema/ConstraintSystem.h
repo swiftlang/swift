@@ -2080,11 +2080,6 @@ public:
   bool solve(SmallVectorImpl<Solution> &solutions);
 
 private:
-  /// \brief Determine whether the given \p type matches the default literal
-  /// type for a literal constraint placed on the type variable \p tv.
-  bool typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
-                                           Type type);
-
   // \brief Compare two solutions to the same set of constraints.
   ///
   /// \param cs The constraint system.

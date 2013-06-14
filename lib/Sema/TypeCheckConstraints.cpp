@@ -2375,37 +2375,6 @@ Type Solution::simplifyType(TypeChecker &tc, Type type) const {
 //===--------------------------------------------------------------------===//
 #pragma mark Ranking solutions
 
-bool ConstraintSystem::typeMatchesDefaultLiteralConstraint(TypeVariableType *tv,
-                                                           Type type) {
-  tv = getRepresentative(tv);
-
-  // FIXME: this is hideously inefficient.
-  for (auto constraint : Constraints) {
-    // We only care about conformance constrants.
-    if (constraint->getKind() != ConstraintKind::ConformsTo)
-      continue;
-
-    // on type variables...
-    auto constraintTV
-      = dyn_cast<TypeVariableType>(constraint->getFirstType().getPointer());
-    if (!constraintTV)
-      continue;
-
-    // that have the same representative as the type we care about.
-    if (getRepresentative(constraintTV) != tv)
-      continue;
-
-    // If the type we were given matches the default literal type for this
-    // constraint, we found what we're looking for.
-    // FIXME: isEqual() isn't right for Slice<T>.
-    Type defaultType = TC.getDefaultType(constraint->getProtocol());
-    if (defaultType && type->isEqual(defaultType))
-      return true;
-  }
-
-  return false;
-}
-
 /// \brief Remove the initializers from any tuple types within the
 /// given type.
 static Type stripInitializers(TypeChecker &tc, Type origType) {
@@ -2655,28 +2624,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (type1Better)
         ++score1;
       if (type2Better)
-        ++score2;
-      continue;
-    }
-
-    // If the type variable was bound by a literal protocol constraint, and
-    // the type it is bound to happens to match the default literal
-    // constraint in one system but not the other, we prefer the one
-    // that matches the default.
-    // Note that the constraint will be available in the parent of
-    // the constraint system that assumed a value for the type variable
-    // (or, of course, in the original system, since these constraints
-    // are generated directly from the expression).
-    // FIXME: Make it efficient to find these constraints. This is
-    // silly.
-    bool defaultLit1
-      = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type1);
-    bool defaultLit2
-      = cs.typeMatchesDefaultLiteralConstraint(binding.typeVar, type2);
-    if (defaultLit1 || defaultLit2) {
-      if (defaultLit1)
-        ++score1;
-      if (defaultLit2)
         ++score2;
       continue;
     }
