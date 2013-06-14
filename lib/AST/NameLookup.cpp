@@ -766,7 +766,8 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
                 CurModuleResults);
   searchedClangModule = isa<ClangModule>(&M);
   for (ValueDecl *VD : CurModuleResults)
-    Results.push_back(Result::getModuleMember(VD));
+    if (!IsTypeLookup || isa<TypeDecl>(VD))
+      Results.push_back(Result::getModuleMember(VD));
 
   // The builtin module has no imports.
   if (isa<BuiltinModule>(M)) return;
@@ -802,7 +803,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,
                                  ImportedModuleResults);
     for (ValueDecl *VD : ImportedModuleResults) {
-      if (IsTypeLookup || isa<TypeDecl>(VD) ||
+      if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
           !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
         Results.push_back(Result::getModuleMember(VD));
       }

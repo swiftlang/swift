@@ -401,19 +401,31 @@ void ClangImporter::lookupValue(Module *module,
   // FIXME: Map source locations over.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    lookupNameKind);
-  if (!sema.LookupName(lookupResult, /*Scope=*/0) &&
-      lookupNameKind == clang::Sema::LookupOrdinaryName) {
-    // If we didn't find an ordinary name, fall back to a tag name.
+  bool FoundType = false;
+  if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+    // FIXME: Filter based on access path? C++ access control?
+    for (auto decl : lookupResult) {
+      if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
+        if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
+          results.push_back(valueDecl);
+          FoundType = FoundType || isa<TypeDecl>(valueDecl);
+        }
+    }
+  }
+
+  if (lookupNameKind == clang::Sema::LookupOrdinaryName && !FoundType) {
+    // Look up a tag name if we did not find a type with this name already.
+    // We don't want to introduce multiple types with same name.
     lookupResult.clear(clang::Sema::LookupTagName);
     if (!sema.LookupName(lookupResult, /*Scope=*/0))
       return;
-  }
 
-  // FIXME: Filter based on access path? C++ access control?
-  for (auto decl : lookupResult) {
-    if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
-      if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
-        results.push_back(valueDecl);
+    // FIXME: Filter based on access path? C++ access control?
+    for (auto decl : lookupResult) {
+      if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
+        if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
+          results.push_back(valueDecl);
+    }
   }
 }
 

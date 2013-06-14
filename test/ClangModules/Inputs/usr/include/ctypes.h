@@ -50,3 +50,8 @@ typedef CGRect NSRect;
 
 typedef void MyVoid;
 MyVoid returnsMyVoid(void);
+
+// Function and struct with same name.
+void funcOrStruct(void);
+struct funcOrStruct { int i; };
+
