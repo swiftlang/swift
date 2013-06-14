@@ -27,4 +27,5 @@ target_link_libraries(swiftClangImporter
   clangRewriteFrontend
   clangLex
   clangAST
-  clangBasic)
+  clangBasic
+  LLVMOption)
