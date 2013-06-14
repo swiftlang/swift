@@ -1898,4 +1898,21 @@ inline unsigned SubstitutableType::getPrimaryIndex() const {
 
 } // end namespace swift
 
+namespace llvm {
+  // ArchetypeType* is always at least eight-byte aligned; make the three tag
+  // bits available through PointerLikeTypeTraits.
+  template<>
+  class PointerLikeTypeTraits<swift::ArchetypeType*> {
+  public:
+    static inline void *getAsVoidPointer(swift::ArchetypeType *I) {
+      return (void*)I;
+    }
+    static inline swift::ArchetypeType *getFromVoidPointer(void *P) {
+      return (swift::ArchetypeType*)P;
+    }
+    enum { NumLowBitsAvailable = 3 };
+  };
+
+} // end namespace llvm
+
 #endif

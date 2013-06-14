@@ -79,7 +79,9 @@ namespace {
       // that member through the base returns a value convertible to the type
       // of this expression.
       auto baseTy = base->getType();
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(
+                  CS.getConstraintLocator(expr, ConstraintLocator::Member));
+      // FIXME: Constraint below should be a ::Member constraint?
       CS.addValueMemberConstraint(baseTy, name, tv,
         CS.getConstraintLocator(expr, ConstraintLocator::MemberRefBase));
       return tv;
@@ -88,7 +90,8 @@ namespace {
     /// \brief Add constraints for a reference to a specific member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(
+                  CS.getConstraintLocator(expr, ConstraintLocator::Member));
       OverloadChoice choice(base->getType(), decl);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, { &choice, 1 }));
@@ -99,19 +102,25 @@ namespace {
     Type addSubscriptConstraints(Expr *expr, Expr *base, Expr *index) {
       ASTContext &Context = CS.getASTContext();
 
+      // Locators used in this expression.
+      auto indexLocator
+        = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex);
+      auto resultLocator
+        = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
       // The base type must have a subscript declaration with type
       // I -> [byref] O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
       // itself has type [byref] O, where O may or may not be settable.
-      auto inputTv = CS.createTypeVariable(expr);
-      auto outputTv = CS.createTypeVariable(expr);
+      auto inputTv = CS.createTypeVariable(indexLocator);
+      auto outputTv = CS.createTypeVariable(resultLocator);
 
-      auto outputSuperTv = CS.createTypeVariable(expr);
-      auto outputSuperTy = LValueType::get(outputSuperTv,
-                                           LValueType::Qual::DefaultForMemberAccess|
-                                           LValueType::Qual::Implicit|
-                                           LValueType::Qual::NonSettable,
-                                           Context);
+      auto outputSuperTv = CS.createTypeVariable(nullptr);
+      auto outputSuperTy
+        = LValueType::get(outputSuperTv,
+                          LValueType::Qual::DefaultForMemberAccess|
+                          LValueType::Qual::Implicit|
+                          LValueType::Qual::NonSettable,
+                          Context);
 
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
@@ -125,12 +134,12 @@ namespace {
       // Add the subtype constraint that the output type must be some lvalue
       // subtype.
       CS.addConstraint(ConstraintKind::Subtype, outputTv, outputSuperTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult));
+                       resultLocator);
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
       CS.addConstraint(ConstraintKind::Conversion, index->getType(), inputTv,
-        CS.getConstraintLocator(expr, ConstraintLocator::SubscriptIndex));
+                       indexLocator);
       return outputTv;
     }
 
@@ -153,7 +162,7 @@ namespace {
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
       return tv;
@@ -169,7 +178,7 @@ namespace {
       }
 
       // Require conformance to the FloatLiteralConvertible protocol.
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
 
@@ -185,7 +194,7 @@ namespace {
         return nullptr;
       }
       
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
       return tv;
@@ -200,7 +209,7 @@ namespace {
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
       return tv;
@@ -220,7 +229,7 @@ namespace {
 
       // The type of the expression must conform to the
       // StringInterpolationConvertible protocol.
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType());
 
@@ -270,23 +279,23 @@ namespace {
       return E->getType();
     }
     
-    Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *E) {
+    Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       ASTContext &C = CS.getASTContext();
       
       // Open a member constraint for constructors on the subexpr type.
-      auto baseTy = E->getSubExpr()->getType()->getRValueType();
-      auto argsTy = CS.createTypeVariable(E);
+      auto baseTy = expr->getSubExpr()->getType()->getRValueType();
+      auto argsTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       auto methodTy = FunctionType::get(argsTy, baseTy, C);
       CS.addValueMemberConstraint(baseTy, C.getIdentifier("constructor"),
         methodTy,
-        CS.getConstraintLocator(E, ConstraintLocator::ConstructorMember));
+        CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
       
       // The result of the expression is the partial application of the
       // constructor to 'this'.
       return methodTy;
     }
     
-    Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E) {
+    Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -294,7 +303,8 @@ namespace {
       // For a reference to an overloaded declaration, we create a type variable
       // that will be equal to different types depending on which overload
       // is selected.
-      auto tv = CS.createTypeVariable(expr);
+      auto locator = CS.getConstraintLocator(expr, { });
+      auto tv = CS.createTypeVariable(locator);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
@@ -302,9 +312,7 @@ namespace {
       }
 
       // Record this overload set.
-      CS.addOverloadSet(OverloadSet::getNew(CS, tv,
-                                            CS.getConstraintLocator(expr, { }),
-                                            choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, choices));
       return tv;
     }
 
@@ -312,7 +320,7 @@ namespace {
       // For a reference to an overloaded declaration, we create a type variable
       // that will be bound to different types depending on which overload
       // is selected.
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
       auto baseTy = expr->getBase()->getType();
@@ -330,7 +338,7 @@ namespace {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
       // FIXME: Do we need to note that we're doing some kind of recovery?
-      return CS.createTypeVariable(expr);
+      return CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
     }
     
     Type visitMemberRefExpr(MemberRefExpr *expr) {
@@ -350,8 +358,13 @@ namespace {
     }
 
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      auto oneofTy = CS.createTypeVariable(expr);
-      auto memberTy = CS.createTypeVariable(expr);
+      auto oneofLocator = CS.getConstraintLocator(
+                            expr,
+                            ConstraintLocator::MemberRefBase);
+      auto memberLocator = CS.getConstraintLocator(expr,
+                                                   ConstraintLocator::Member);
+      auto oneofTy = CS.createTypeVariable(oneofLocator);
+      auto memberTy = CS.createTypeVariable(memberLocator);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
@@ -368,18 +381,14 @@ namespace {
       // overload set with two entries: one for T0 and one for T2 -> T0.
       auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
       CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy,
-                                  CS.getConstraintLocator(
-                                    expr,
-                                    ConstraintLocator::Member));
+                                  memberLocator);
 
       OverloadChoice choices[2] = {
         OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
         OverloadChoice(oneofTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
-      auto locator = CS.getConstraintLocator(
-                         expr,
-                         ConstraintLocator::MemberRefBase);
-      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, locator, choices));
+      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, oneofLocator,
+                                            choices));
       return memberTy;
     }
 
@@ -480,17 +489,21 @@ namespace {
         return Type();
       }
 
-      auto arrayTy = CS.createTypeVariable(expr);
+      auto locator = CS.getConstraintLocator(expr, { });
+      auto arrayTy = CS.createTypeVariable(locator);
 
       // The array must be an array literal type.
       CS.addConstraint(ConstraintKind::ConformsTo, arrayTy,
                        arrayProto->getDeclaredType(),
-                       CS.getConstraintLocator(expr, { }));
+                       locator);
       
       // Its subexpression should be convertible to a tuple (T.Element...).
       // FIXME: We should really go through the conformance above to extract
       // the element type, rather than just looking for the element type.
-      auto arrayElementTy = CS.createTypeVariable(expr);
+      // FIXME: Member constraint is still weird here.
+      auto arrayElementTy
+        = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::Member));
       CS.addTypeMemberConstraint(arrayTy,
                                  C.getIdentifier("Element"),
                                  arrayElementTy);
@@ -524,12 +537,13 @@ namespace {
         return Type();
       }
 
-      auto dictionaryTy = CS.createTypeVariable(expr);
+      auto locator = CS.getConstraintLocator(expr, { });
+      auto dictionaryTy = CS.createTypeVariable(locator);
 
       // The array must be a dictionary literal type.
       CS.addConstraint(ConstraintKind::ConformsTo, dictionaryTy,
                        dictionaryProto->getDeclaredType(),
-                       CS.getConstraintLocator(expr, { }));
+                       locator);
 
 
       // Its subexpression should be convertible to a tuple
@@ -537,12 +551,15 @@ namespace {
       //
       // FIXME: We should be getting Key/Value through the witnesses, not
       // directly from the type.
-      auto dictionaryKeyTy = CS.createTypeVariable(expr);
+      // FIXME: Member locator here is weird.
+      auto memberLocator = CS.getConstraintLocator(expr,
+                                                   ConstraintLocator::Member);
+      auto dictionaryKeyTy = CS.createTypeVariable(memberLocator);
       CS.addTypeMemberConstraint(dictionaryTy,
                                  C.getIdentifier("Key"),
                                  dictionaryKeyTy);
 
-      auto dictionaryValueTy = CS.createTypeVariable(expr);
+      auto dictionaryValueTy = CS.createTypeVariable(memberLocator);
       CS.addTypeMemberConstraint(dictionaryTy,
                                  C.getIdentifier("Value"),
                                  dictionaryValueTy);
@@ -591,21 +608,22 @@ namespace {
     /// \param pattern The pattern.
     /// \param expr The expression that 'anchors' the pattern, which is used
     /// to create fresh type variables.
-    Type getTypeForPattern(Pattern *pattern, Expr *expr) {
+    Type getTypeForPattern(Pattern *pattern, Expr *expr,
+                           ConstraintLocatorBuilder locator) {
       switch (pattern->getKind()) {
       case PatternKind::Paren:
         // Parentheses don't affect the type.
         return getTypeForPattern(cast<ParenPattern>(pattern)->getSubPattern(),
-                                 expr);
+                                 expr, locator);
 
       case PatternKind::Any:
         // For a pattern of unknown type, create a new type variable.
-        return CS.createTypeVariable(expr);
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
 
       case PatternKind::Named: {
         // For a named pattern without a type, create a new type variable
         // and use it as the type of the variable.
-        auto tv = CS.createTypeVariable(expr);
+        auto tv = CS.createTypeVariable(CS.getConstraintLocator(locator));
         cast<NamedPattern>(pattern)->getDecl()->setType(tv);
         return tv;
       }
@@ -619,8 +637,12 @@ namespace {
         auto tuplePat = cast<TuplePattern>(pattern);
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
         tupleTypeElts.reserve(tuplePat->getNumFields());
+        unsigned index = 0;
         for (auto tupleElt : tuplePat->getFields()) {
-          Type eltTy = getTypeForPattern(tupleElt.getPattern(), expr);
+          Type eltTy = getTypeForPattern(tupleElt.getPattern(), expr,
+                                         locator.withPathElement(
+                                           LocatorPathElt::getTupleElement(
+                                             index++)));
           auto name = findPatternName(tupleElt.getPattern());
           Type varArgBaseTy;
           if (tupleElt.isVararg()) {
@@ -646,7 +668,9 @@ namespace {
       if (!funcTy) {
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(expr);
+        funcTy = CS.createTypeVariable(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::ClosureResult));
       }
 
       // Walk through the patterns in the func expression, backwards,
@@ -654,8 +678,11 @@ namespace {
       // variables where parameter types where no provided) and building the
       // eventual function type.
       auto patterns = expr->getArgParamPatterns();
+      ConstraintLocatorBuilder locator(CS.getConstraintLocator(expr, { }));
       for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
-        Type paramTy = getTypeForPattern(patterns[e - i - 1], expr);
+        Type paramTy = getTypeForPattern(patterns[e - i - 1], expr,
+                                         locator.withPathElement(
+                                           LocatorPathElt::getTupleElement(i)));
         funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
       }
 
@@ -673,14 +700,20 @@ namespace {
       } else {
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(expr);
+        funcTy = CS.createTypeVariable(
+                   CS.getConstraintLocator(expr,
+                                           ConstraintLocator::ClosureResult));
       }
 
       // Walk through the patterns in the func expression, backwards,
       // computing the type of each pattern (which may involve fresh type
       // variables where parameter types where no provided) and building the
       // eventual function type.
-      auto paramTy = getTypeForPattern(expr->getParams(), expr);
+      auto paramTy = getTypeForPattern(
+                       expr->getParams(), expr,
+                       CS.getConstraintLocator(
+                         expr,
+                         LocatorPathElt::getTupleElement(0)));
       funcTy = FunctionType::get(paramTy, funcTy, CS.getASTContext());
 
       return funcTy;
@@ -703,7 +736,7 @@ namespace {
       //     S < [byref(implicit, settable)] T
       //
       // where T is a fresh type variable.
-      auto tv = CS.createTypeVariable(expr);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       auto bound = LValueType::get(tv,
                                    LValueType::Qual::DefaultForType|
                                    LValueType::Qual::Implicit,
@@ -748,7 +781,7 @@ namespace {
       // If this is an artificial MetatypeExpr, it's fully type-checked.
       if (!base) return expr->getType();
 
-      auto tv = CS.createTypeVariable();
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::EqualRvalue, tv, base->getType(),
         CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
@@ -791,8 +824,12 @@ namespace {
 
       // The function subexpression has some rvalue type T1 -> T2 for fresh
       // variables T1 and T2.
-      auto inputTy = CS.createTypeVariable(expr);
-      auto outputTy = CS.createTypeVariable(expr);
+      auto argumentLocator
+        = CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument);
+      auto inputTy = CS.createTypeVariable(argumentLocator);
+      auto outputTy
+        = CS.createTypeVariable(
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
       auto funcTy = FunctionType::get(inputTy, outputTy, Context);
       CS.addConstraint(ConstraintKind::EqualRvalue, funcTy,
         expr->getFn()->getType(),
@@ -800,8 +837,7 @@ namespace {
 
       // The argument type must be convertible to the input type.
       CS.addConstraint(ConstraintKind::Conversion, expr->getArg()->getType(),
-        inputTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+                       inputTy, argumentLocator);
 
       return outputTy;
     }
@@ -851,9 +887,7 @@ namespace {
       expr->setCondExpr(condExpr);
 
       // The branches must be convertible to a common type.
-      ConstraintLocatorBuilder locatorBuilder(CS.getConstraintLocator(expr,
-                                                                      { }));
-      auto resultTy = CS.createTypeVariable(expr);
+      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getThenExpr()->getType(), resultTy,
                        CS.getConstraintLocator(expr,
@@ -892,7 +926,7 @@ namespace {
       ASTContext &C = CS.getASTContext();
 
       // The subexpression must be castable to the destination type.
-      auto tv = CS.createTypeVariable();
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
       CS.addConstraint(ConstraintKind::EqualRvalue, tv,
            expr->getSubExpr()->getType(),
            CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));

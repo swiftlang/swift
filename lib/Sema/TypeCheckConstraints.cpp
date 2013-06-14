@@ -63,6 +63,16 @@ void SavedTypeVariableBinding::restore() {
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
+ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
+  // Check whether we have a path that terminates at an archetype locator.
+  if (!locator || locator->getPath().empty() ||
+      locator->getPath().back().getKind() != ConstraintLocator::Archetype)
+    return nullptr;
+
+  // Retrieve the archetype.
+  return locator->getPath().back().getArchetype();
+}
+
 //===--------------------------------------------------------------------===//
 // Constraints
 //===--------------------------------------------------------------------===//
@@ -90,12 +100,20 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
       out << "array element";
       break;
 
+    case Archetype:
+      out << "archetype '" << elt.getArchetype()->getString() << "'";
+      break;
+        
     case ApplyArgument:
       out << "apply argument";
       break;
 
     case ApplyFunction:
       out << "apply function";
+      break;
+
+    case AssignDest:
+      out << "assignment destination";
       break;
 
     case AssignSource:
@@ -379,7 +397,10 @@ Type ConstraintSystem::openType(
         return known->second;
 
       // Create a new type variable to replace this archetype.
-      auto tv = CS.createTypeVariable(archetype);
+      // FIXME: Path to this declaration being opened, then to the archetype.
+      auto tv = CS.createTypeVariable(
+                  CS.getConstraintLocator((Expr *)nullptr,
+                                          LocatorPathElt(archetype)));
 
       // If there is a superclass for the archetype, add the appropriate
       // trivial subtype requirement on the type variable.
@@ -1745,16 +1766,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     auto name = context.getIdentifier("__conversion");
     MemberLookup &lookup = lookupMember(type1, name);
     if (lookup.isSuccess()) {
-      auto inputTV = createTypeVariable();
-      auto outputTV = createTypeVariable();
+      auto memberLocator = getConstraintLocator(
+                              locator.withPathElement(
+                                ConstraintLocator::ConversionMember));
+      auto inputTV = createTypeVariable(
+                       getConstraintLocator(
+                          memberLocator,
+                          ConstraintLocator::FunctionArgument));
+      auto outputTV = createTypeVariable(
+                        getConstraintLocator(
+                           memberLocator,
+                           ConstraintLocator::FunctionResult));
 
       // The conversion function will have function type TI -> TO, for fresh
       // type variables TI and TO.
       addValueMemberConstraint(type1, name,
                                FunctionType::get(inputTV, outputTV, context),
-                               getConstraintLocator(
-                                  locator.withPathElement(
-                                    ConstraintLocator::ConversionMember)));
+                               memberLocator);
 
       // A conversion function must accept an empty parameter list ().
       // Note: This should never fail, because the declaration checker
@@ -1847,7 +1875,10 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
     break;
 
   case OverloadChoiceKind::FunctionReturningBaseType:
-    refType = FunctionType::get(createTypeVariable(),
+    refType = FunctionType::get(createTypeVariable(
+                                  getConstraintLocator(
+                                    ovl->getLocator(),
+                                    ConstraintLocator::FunctionResult)),
                                 choice.getBaseType(),
                                 getASTContext());
     break;
@@ -1999,7 +2030,9 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   auto &context = getASTContext();
   // FIXME: lame name
   auto name = context.getIdentifier("constructor");
-  auto tv = createTypeVariable();
+  auto applyLocator = getConstraintLocator(locator,
+                                           ConstraintLocator::ApplyArgument);
+  auto tv = createTypeVariable(applyLocator);
   
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. Note that these constraints specifically require a
@@ -2012,9 +2045,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
                              ConstraintLocator::ConstructorMember));
   
   // The first type must be convertible to the constructor's argument type.
-  addConstraint(ConstraintKind::Conversion, argType, tv,
-                getConstraintLocator(locator,
-                                     ConstraintLocator::ApplyArgument));
+  addConstraint(ConstraintKind::Conversion, argType, tv, applyLocator);
 
   return SolutionKind::Solved;
 }
@@ -3235,7 +3266,9 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     // lvalue type, which we enforce via a subtyping relationship with
     // [byref(implicit, settable)] T, where T is a fresh type variable that
     // will be the object type of this particular expression type.
-    auto objectTv = createTypeVariable(dest);
+    auto objectTv = createTypeVariable(
+                      getConstraintLocator(dest,
+                                           ConstraintLocator::AssignDest));
     auto refTv = LValueType::get(objectTv,
                                  LValueType::Qual::Implicit,
                                  getASTContext());

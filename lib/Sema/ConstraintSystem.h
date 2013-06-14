@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 
 #include "TypeChecker.h"
+#include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/NameLookup.h"
@@ -66,7 +67,9 @@ public:
 
 /// \brief A set of saved type variable bindings.
 typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
-  
+
+class ConstraintLocator;
+
 } // end namespace constraints
 
 /// \brief The implementation object for a type variable used within the
@@ -80,8 +83,8 @@ class TypeVariableType::Implementation {
   /// \brief The unique number assigned to this type variable.
   unsigned ID;
 
-  /// \brief The archetype that this type variable describes.
-  ArchetypeType *Archetype;
+  /// \brief The locator that describes where this type variable was generated.
+  constraints::ConstraintLocator *locator;
 
   /// \brief Either the parent of this type variable within an equivalence
   /// class of type variables, or the fixed type to which this type variable
@@ -91,23 +94,11 @@ class TypeVariableType::Implementation {
   friend class constraints::SavedTypeVariableBinding;
 
 public:
-  explicit Implementation(unsigned ID)
-    : ID(ID), Archetype(nullptr),
-      ParentOrFixed(getTypeVariable()) { }
-
-  explicit Implementation(unsigned ID, Expr *TheExpr)
-    : ID(ID), Archetype(nullptr),
-      ParentOrFixed(getTypeVariable()) { }
-
-  explicit Implementation(unsigned ID, ArchetypeType *Archetype)
-    : ID(ID), Archetype(Archetype),
-      ParentOrFixed(getTypeVariable()) { }
+  explicit Implementation(unsigned ID, constraints::ConstraintLocator *locator)
+    : ID(ID), locator(locator), ParentOrFixed(getTypeVariable()) { }
 
   /// \brief Retrieve the unique ID corresponding to this type variable.
   unsigned getID() const { return ID; }
-
-  /// \brief Retrieve the archetype that this type variable replaced.
-  ArchetypeType *getArchetype() const { return Archetype; }
 
   /// \brief Retrieve the type variable associated with this implementation.
   TypeVariableType *getTypeVariable() {
@@ -118,6 +109,15 @@ public:
   void recordBinding(constraints::SavedTypeVariableBindings &record) {
     record.push_back(constraints::SavedTypeVariableBinding(getTypeVariable()));
   }
+
+  /// \brief Retrieve the locator describing where this type variable was
+  /// created.
+  constraints::ConstraintLocator *getLocator() const {
+    return locator;
+  }
+
+  /// \brief Retrieve the archetype opened by this type variable.
+  ArchetypeType *getArchetype() const;
 
   /// \brief Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
@@ -314,6 +314,10 @@ public:
     ApplyArgument,
     /// \brief The function being applied.
     ApplyFunction,
+    /// \brief An archetype being opened.
+    ///
+    /// Also contains the archetype itself.
+    Archetype,
     /// \brief The argument type of a function.
     FunctionArgument,
     /// \brief The result type of a function.
@@ -344,7 +348,7 @@ public:
     AddressOf,
     /// \brief Rvalue adjustment.
     RvalueAdjustment,
-    /// \brief The result of an explicit closure expression.
+    /// \brief The result of a closure.
     ClosureResult,
     /// \brief The parent of a nested type.
     ParentType,
@@ -367,15 +371,18 @@ public:
     /// \brief The 'else' branch of a ternary expression.
     IfElse,
     /// \brief The source of an assignment.
-    AssignSource
+    AssignSource,
+    /// \brief The destination of an assignment
+    AssignDest
   };
 
   /// \brief Determine whether the given path element kind has an associated
   /// value.
-  static bool pathElementHasValue(PathElementKind kind) {
+  static bool pathElementHasNumericValue(PathElementKind kind) {
     switch (kind) {
     case ApplyArgument:
     case ApplyFunction:
+    case Archetype:
     case FunctionArgument:
     case FunctionResult:
     case Member:
@@ -398,6 +405,7 @@ public:
     case IfThen:
     case IfElse:
     case AssignSource:
+    case AssignDest:
       return false;
 
     case GenericArgument:
@@ -408,25 +416,59 @@ public:
     }
   }
 
+  template<unsigned N> struct incomplete;
+  
   /// \brief One element in the path of a locator, which can include both
   /// a kind (PathElementKind) and a value used to describe specific
   /// kinds further (e.g., the position of a tuple element).
   class PathElement {
-    /// \brief The kind of path element.
-    PathElementKind kind : 8;
+    /// \brief Describes the kind of data stored here.
+    enum StoredKind : unsigned char {
+      StoredArchetype,
+      StoredKindAndValue
+    };
 
-    ///\ brief The value of the path element, if applicable.
-    unsigned value : 24;
+    /// \brief The type of storage used for a kind and numeric value.
+    typedef Fixnum<29> KindAndValueStorage;
+
+    /// \brief The actual storage for the path element, which involves both a
+    /// kind and (potentially) a value.
+    ///
+    /// The current storage involves a two-bit "storage kind", which selects
+    /// amount the possible value stores. The value stores can either be an
+    /// archetype (for archetype path elements) or an unsigned value that
+    /// stores both the specific kind and the (optional) numeric value of that
+    /// kind. Use \c encodeStorage and \c decodeStorage to work with this value.
+    llvm::PointerIntPair<llvm::PointerUnion<ArchetypeType *,
+                                            KindAndValueStorage>,
+                         2, StoredKind> storage;
+
+    /// \brief Encode a path element kind and a value into the storage format.
+    static KindAndValueStorage encodeStorage(PathElementKind kind, unsigned value) {
+      unsigned result = (value << 8) | (unsigned)kind;
+      return result;
+    }
+
+    /// \brief Decode a storage value into path element kind and value.
+    static std::pair<PathElementKind, unsigned>
+    decodeStorage(KindAndValueStorage storage) {
+      return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
+    }
 
     PathElement(PathElementKind kind, unsigned value)
-      : kind(kind), value(value) { }
+      : storage(encodeStorage(kind, value), StoredKindAndValue) { }
 
     friend class ConstraintLocator;
     
   public:
-    PathElement(PathElementKind kind) : kind(kind), value(0) {
-      assert(!pathElementHasValue(kind) && "Path element requires value");
+    PathElement(PathElementKind kind)
+      : storage(encodeStorage(kind, 0), StoredKindAndValue)
+    {
+      assert(!pathElementHasNumericValue(kind) &&"Path element requires value");
     }
+
+    PathElement(ArchetypeType *archetype)
+      : storage(archetype, StoredArchetype) { }
 
     /// \brief Retrieve a path element for a tuple element referred to by
     /// its position.
@@ -453,13 +495,30 @@ public:
     }
 
     /// \brief Retrieve the kind of path element.
-    PathElementKind getKind() const { return kind; }
+    PathElementKind getKind() const {
+      switch (storage.getInt()) {
+      case StoredArchetype:
+        return Archetype;
+
+      case StoredKindAndValue:
+        return decodeStorage(storage.getPointer().get<KindAndValueStorage>())
+                 .first;
+      }
+    }
 
     /// \brief Retrieve the value associated with this path element,
     /// if it has one.
     unsigned getValue() const {
-      assert(pathElementHasValue(kind) && "No value in path element!");
-      return value;
+      assert(pathElementHasNumericValue(getKind()) &&
+             "No value in path element!");
+      return decodeStorage(storage.getPointer().get<KindAndValueStorage>())
+               .second;
+    }
+
+    /// \brief Retrieve the actual archetype for an archetype path element.
+    ArchetypeType *getArchetype() const {
+      assert(getKind() == Archetype && "Not an archetype path element");
+      return storage.getPointer().get<ArchetypeType *>();
     }
   };
 
@@ -503,8 +562,10 @@ public:
       case IfThen:
       case IfElse:
       case AssignSource:
+      case AssignDest:
         continue;
 
+      case Archetype:
       case GenericArgument:
       case InterpolationArgument:
       case NamedTupleElement:
@@ -523,8 +584,10 @@ public:
     id.AddInteger(path.size());
     for (auto elt : path) {
       id.AddInteger(elt.getKind());
-      if (pathElementHasValue(elt.getKind()))
+      if (pathElementHasNumericValue(elt.getKind()))
         id.AddInteger(elt.getValue());
+      else if (elt.getKind() == ConstraintLocator::Archetype)
+        id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
     }
   }
   
@@ -1493,10 +1556,9 @@ public:
   }
 
   /// \brief Create a new type variable.
-  template<typename ...Args>
-  TypeVariableType *createTypeVariable(Args &&...args) {
+  TypeVariableType *createTypeVariable(ConstraintLocator *locator) {
     auto tv = TypeVariableType::getNew(TC.Context, assignTypeVariableID(),
-                                       std::forward<Args>(args)...);
+                                       locator);
     TypeVariables.push_back(tv);
     return tv;
   }
