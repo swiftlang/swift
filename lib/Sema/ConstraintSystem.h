@@ -1167,6 +1167,9 @@ class Solution {
   /// \brief The constraint system this solution solves.
   ConstraintSystem *constraintSystem;
 
+  /// \brief The fixed score for this solution.
+  mutable Optional<int> fixedScore;
+
 public:
   /// \brief Create a solution for the given constraint system.
   Solution(ConstraintSystem &cs) : constraintSystem(&cs) {}
@@ -1248,6 +1251,10 @@ public:
   /// \returns the expression converted to an array bound (Builtin integral
   /// type).
   Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
+
+  /// \brief Retrieve the fixed score of this solution, which considers
+  /// the number of user-defined conversions.
+  int getFixedScore() const;
 
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) const LLVM_ATTRIBUTE_USED;

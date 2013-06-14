@@ -2501,9 +2501,10 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   bool identical = true;
 
   // Solution comparison uses a scoring system to determine whether one
-  // solution is better than the other.
-  int score1 = 0;
-  int score2 = 0;
+  // solution is better than the other. Retrieve the fixed scores for each of
+  // the solutions, which we'll modify with relative scoring.
+  int score1 = solutions[idx1].getFixedScore();
+  int score2 = solutions[idx2].getFixedScore();
 
   // Compare overload sets.
   for (auto &overload : diff.overloads) {
@@ -3635,7 +3636,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
 void Solution::dump(llvm::SourceMgr *sm) const {
   llvm::raw_ostream &out = llvm::errs();
-
+  out << "Fixed score: " << getFixedScore() << "\n\n";
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
     out.indent(2);

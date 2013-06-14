@@ -2724,3 +2724,22 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
   return result;
 }
 
+int Solution::getFixedScore() const {
+  if (fixedScore)
+    return *fixedScore;
+
+  int score = 0;
+  for (auto overload : overloadChoices) {
+    auto choice = overload.second.first;
+    if (choice.getKind() != OverloadChoiceKind::Decl)
+      continue;
+
+    // -2 penalty for each user-defined conversion.
+    if (choice.getDecl()->getAttrs().isConversion())
+      score -= 2;
+  }
+
+  // Save the fixed score.
+  fixedScore = score;
+  return score;
+}
