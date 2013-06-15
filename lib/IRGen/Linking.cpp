@@ -41,8 +41,8 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   // direct purpose, but it's neat.
   switch (witness) {
   case ValueWitness::AllocateBuffer: return "al";
-  case ValueWitness::AssignWithCopy: return "ac";
-  case ValueWitness::AssignWithTake: return "at";
+  case ValueWitness::AssignWithCopy: return "ca";
+  case ValueWitness::AssignWithTake: return "ta";
   case ValueWitness::DeallocateBuffer: return "de";
   case ValueWitness::Destroy: return "xx";
   case ValueWitness::DestroyBuffer: return "XX";

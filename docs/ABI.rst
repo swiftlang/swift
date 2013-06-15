@@ -131,8 +131,8 @@ so the structure is quite simple.
 ::
 
   value-witness-kind ::= 'al'                // allocateBuffer
-  value-witness-kind ::= 'ac'                // assignWithCopy
-  value-witness-kind ::= 'at'                // assignWithTake
+  value-witness-kind ::= 'ca'                // assignWithCopy
+  value-witness-kind ::= 'ta'                // assignWithTake
   value-witness-kind ::= 'de'                // deallocateBuffer
   value-witness-kind ::= 'xx'                // destroy
   value-witness-kind ::= 'XX'                // destroyBuffer
