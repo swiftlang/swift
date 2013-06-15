@@ -335,10 +335,7 @@ public:
                            constant,
                            gen.getLoweredType(genericMethod.origType, level));
       mv = ManagedValue(method, ManagedValue::Unmanaged);
-      
-      // FIXME: We currently assume all archetype methods have native ownership
-      // semantics.
-      ownership = OwnershipConventions::getDefault(gen, method.getType());
+      ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
     case Kind::ProtocolMethod: {
@@ -353,10 +350,7 @@ public:
                             constant,
                             gen.getLoweredType(genericMethod.origType, level));
       mv = ManagedValue(method, ManagedValue::Unmanaged);
-      
-      // FIXME: We currently assume all protocol methods have native ownership
-      // semantics.
-      ownership = OwnershipConventions::getDefault(gen, method.getType());
+      ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
     }
     }
@@ -540,21 +534,29 @@ public:
              "non-existential-metatype for existential static method?!");
       setThisParam(RValue(gen, existential), e);
     }
-    
+
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
     
+    // Method calls through ObjC protocols require ObjC dispatch.
+    bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
+    
     setCallee(Callee::forProtocol(gen, existential.getValue(),
-                                  SILConstant(fd), e->getType()));
+                                  SILConstant(fd).asObjC(isObjC),
+                                  e->getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     setThisParam(gen.visit(e->getBase()), e);
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
+
+    // Method calls through ObjC protocols require ObjC dispatch.
+    bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
     
     setCallee(Callee::forArchetype(gen, thisParam.peekScalarValue(),
-                                   SILConstant(fd), e->getType()));
+                                   SILConstant(fd).asObjC(isObjC),
+                                   e->getType()));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
     visit(e->getSubExpr());

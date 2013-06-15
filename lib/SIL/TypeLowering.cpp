@@ -429,19 +429,20 @@ TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   return *existing->second;
 }
 
-static bool isClassMethod(ValueDecl *vd) {
+static bool isClassOrProtocolMethod(ValueDecl *vd) {
   if (!vd->getDeclContext())
     return false;
-  if (!vd->getDeclContext()->getDeclaredTypeInContext())
+  Type contextType = vd->getDeclContext()->getDeclaredTypeInContext();
+  if (!contextType)
     return false;
-  return vd->getDeclContext()->getDeclaredTypeInContext()
-    ->getClassOrBoundGenericClass();
+  return contextType->getClassOrBoundGenericClass()
+    || contextType->isClassBoundedExistentialType();
 }
 
 static AbstractCC getAbstractCC(SILConstant c) {
   // If this is an ObjC thunk, it always has ObjC calling convention.
   if (c.isObjC)
-    return c.hasDecl() && isClassMethod(c.getDecl())
+    return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
       ? AbstractCC::ObjCMethod
       : AbstractCC::C;
   
