@@ -1546,6 +1546,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
         = emitTypeMetadataRefForClassBoundedExistential(IGF, existential,
                                                         concreteType);
       IGF.Builder.CreateRet(result);
+      
     } else {
       llvm::Value *result
         = emitTypeMetadataRefForOpaqueExistential(IGF, obj, concreteType);

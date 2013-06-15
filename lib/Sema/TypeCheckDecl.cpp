@@ -461,6 +461,20 @@ public:
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (IsSecondPass)
       return;
+    
+    // The protocol requires ObjC interop if the protocol or any of the
+    // protocols it refines are [objc].
+    if (PD->getAttrs().isObjC())
+      PD->setIsObjC(true);
+    else {
+      PD->setIsObjC(false);
+      for (auto *parent : PD->getProtocols()) {
+        if (parent->isObjC()) {
+          PD->setIsObjC(true);
+          break;
+        }
+      }
+    }
 
     // Fix the 'This' associated type.
     TypeAliasDecl *thisDecl = nullptr;
@@ -1116,17 +1130,25 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
   };
   
   if (Attrs.isObjC()) {
-    // Only classes, instance properties, and methods can be ObjC.
-    bool isLegal = false;
+    // Only classes, class protocols, instance properties, and methods can be
+    // ObjC.
+    Optional<Diag<>> error;
     if (isa<ClassDecl>(VD)) {
-      isLegal = true;
+      /* ok */
     } else if (isa<FuncDecl>(VD) && isInClassContext(VD)) {
-      isLegal = !isOperator;
+      if (isOperator)
+        error = diag::invalid_objc_decl;
     } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
-      isLegal = true;
+      /* ok */
+    } else if (auto *protocol = dyn_cast<ProtocolDecl>(VD)) {
+      if (!protocol->isClassBounded())
+        error = diag::objc_protocol_not_class_protocol;
+    } else {
+      error = diag::invalid_objc_decl;
     }
-    if (!isLegal) {
-      TC.diagnose(VD->getStartLoc(), diag::invalid_objc_decl);
+    
+    if (error) {
+      TC.diagnose(VD->getStartLoc(), *error);
       VD->getMutableAttrs().ObjC = false;
       return;
     }
