@@ -113,6 +113,13 @@ private:
   
   static const enum class ForArchetype_t {} ForArchetype{};
   static const enum class ForProtocol_t {} ForProtocol{};
+
+  static ArchetypeType *getArchetypeType(SILType t) {
+    if (auto *metatype = t.getAs<MetaTypeType>())
+      return metatype->getInstanceType()->castTo<ArchetypeType>();
+    else
+      return t.castTo<ArchetypeType>();
+  }
   
   Callee(ForArchetype_t,
          SILGenFunction &gen,
@@ -124,8 +131,7 @@ private:
                                       /*isAutoClosure*/ false,
                                       /*isBlock*/ false,
                                       /*isThin*/
-                                        archetype.getType()
-                                          .castTo<ArchetypeType>()
+                                        getArchetypeType(archetype.getType())
                                           ->isClassBounded(),
                                       gen.SGM.getConstantCC(methodName),
                                       memberType->getASTContext())
