@@ -661,9 +661,6 @@ public:
   // Helpers for emitting ApplyExpr chains.
   //
   
-  SILValue emitArchetypeMethod(ArchetypeMemberRefExpr *e, SILValue archetype);
-  SILValue emitProtocolMethod(ExistentialMemberRefExpr *e, SILValue existential);
-  
   RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
   ManagedValue emitApply(SILLocation Loc, ManagedValue Fn,

@@ -693,37 +693,6 @@ RValue SILGenFunction::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
   return emitLValueAsRValue(E);
 }
 
-SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
-                                             SILValue archetype) {
-  if (isa<FuncDecl>(e->getDecl())) {
-    SILConstant c(e->getDecl());
-    
-    // The representation for class-bounded methods can be thin.
-    bool isThin = archetype.getType().castTo<ArchetypeType>()
-      ->isClassBoundedExistentialType();
-
-    // This is a method reference. Extract the method implementation from the
-    // archetype and apply the "this" argument.
-    Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
-                                        e->getType(),
-                                        /*isAutoClosure*/ false,
-                                        /*isBlock*/ false,
-                                        isThin,
-                                        SGM.getConstantCC(c),
-                                        F.getASTContext());
-    
-    CanType archetypeType = archetype.getType().getSwiftType();
-    if (auto *metaType = dyn_cast<MetaTypeType>(archetypeType))
-      archetypeType = CanType(metaType->getInstanceType());
-    
-    return B.createArchetypeMethod(e, getLoweredType(archetypeType), c,
-                                   getLoweredLoadableType(methodType,
-                                                          c.uncurryLevel));
-  } else {
-    llvm_unreachable("archetype properties not yet implemented");
-  }
-}
-
 RValue SILGenFunction::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
                                                    SGFContext C) {
   SILValue archetype = visit(E->getBase()).getUnmanagedSingleValue(*this);
@@ -734,37 +703,6 @@ RValue SILGenFunction::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
   // FIXME: archetype properties
   (void)archetype;
   llvm_unreachable("unapplied archetype method not implemented");
-}
-
-SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
-                                            SILValue existential) {
-  if (isa<FuncDecl>(e->getDecl())) {
-    // 'this' for instance methods is projected out of the existential container
-    // as an OpaquePointer.
-    // 'this' for existential metatypes is the metatype itself.
-    Type thisTy = e->getDecl()->isInstanceMember()
-      ? F.getASTContext().TheOpaquePointerType
-      : e->getBase()->getType();
-    
-    // The representation for class-bounded methods can be thin.
-    bool isThin = existential.getType().isClassBoundedExistentialType();
-    
-    // This is a method reference. Extract the method implementation from the
-    // archetype and apply the "this" argument.
-    SILConstant c(e->getDecl());
-    Type methodType = FunctionType::get(thisTy,
-                                        e->getType(),
-                                        /*isAutoClosure*/ false,
-                                        /*isBlock*/ false,
-                                        isThin,
-                                        SGM.getConstantCC(c),
-                                        F.getASTContext());
-    return B.createProtocolMethod(e, existential, c,
-                                  getLoweredLoadableType(methodType,
-                                                         c.uncurryLevel));
-  } else {
-    llvm_unreachable("existential properties not yet implemented");
-  }
 }
 
 RValue SILGenFunction::visitExistentialMemberRefExpr(
