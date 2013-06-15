@@ -1441,6 +1441,13 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
 }
 
 void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
+  // For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  if (i->getMember().isObjC) {
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember());
+    return;
+  }
+
   SILType baseTy = i->getOperand().getType();
   SILConstant member = i->getMember();
   
@@ -1457,6 +1464,13 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
 }
 
 void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
+  // For Objective-C classes we need to arrange for a msgSend
+  // to happen when the method is called.
+  if (i->getMember().isObjC) {
+    newLoweredObjCMethod(SILValue(i, 0), i->getMember());
+    return;
+  }
+
   SILType baseTy = i->getLookupArchetype();
   SILConstant member = i->getMember();
 
@@ -1513,30 +1527,16 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
   addrTI.destroy(*this, base);
 }
 
-static bool silMethodIsObjC(SILConstant t) {
-  if (t.kind == SILConstant::Kind::Initializer)
-    return cast<ConstructorDecl>(t.getDecl())->getDeclContext()
-      ->getDeclaredTypeInContext()->getClassOrBoundGenericClass()->isObjC();
-
-  return t.hasDecl() && t.getDecl()->isObjC();
-}
-
 void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
-  // For Objective-C classes we need to arrange for a msgSendSuper2
-  // to happen when the method is called.
-  if (silMethodIsObjC(i->getMember())) {
-    newLoweredObjCMethod(SILValue(i, 0), i->getMember(),
-                         i->getOperand().getType());
-    return;
-  }
-
-  llvm_unreachable("super_method to non-objc callee");
+  assert(i->getMember().isObjC && "super_method to non_objc callee");
+  newLoweredObjCMethod(SILValue(i, 0), i->getMember(),
+                       i->getOperand().getType());
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
-  if (silMethodIsObjC(i->getMember())) {
+  if (i->getMember().isObjC) {
     newLoweredObjCMethod(SILValue(i, 0), i->getMember());
     return;
   }
