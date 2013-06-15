@@ -2652,16 +2652,21 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   bool isClassBounded = false;
   
   for (auto protocol : protocols) {
+    // The existential container is class-bounded if any of its protocol bounds
+    // are.
+    isClassBounded |= protocol->isClassBounded();
+    
+    // ObjC protocols need no layout or witness table info. All dispatch is done
+    // through objc_msgSend.
+    if (protocol->isObjC())
+      continue;
+    
     // Find the protocol layout.
     const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
     entries.push_back(ProtocolEntry(protocol, impl));
 
     // Each protocol gets a witness table.
     fields.push_back(IGM.WitnessTablePtrTy);
-    
-    // The existential container is class-bounded if any of its protocol bounds
-    // are.
-    isClassBounded |= protocol->isClassBounded();
   }
   
   // If the existential is class-bounded, lower it to a class-bounded
