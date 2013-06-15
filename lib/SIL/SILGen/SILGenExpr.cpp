@@ -697,13 +697,18 @@ SILValue SILGenFunction::emitArchetypeMethod(ArchetypeMemberRefExpr *e,
                                              SILValue archetype) {
   if (isa<FuncDecl>(e->getDecl())) {
     SILConstant c(e->getDecl());
+    
+    // The representation for class-bounded methods can be thin.
+    bool isThin = archetype.getType().castTo<ArchetypeType>()
+      ->isClassBoundedExistentialType();
+
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     Type methodType = FunctionType::get(archetype.getType().getSwiftType(),
                                         e->getType(),
                                         /*isAutoClosure*/ false,
                                         /*isBlock*/ false,
-                                        /*isThin*/ false,
+                                        isThin,
                                         SGM.getConstantCC(c),
                                         F.getASTContext());
     
@@ -741,6 +746,9 @@ SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
       ? F.getASTContext().TheOpaquePointerType
       : e->getBase()->getType();
     
+    // The representation for class-bounded methods can be thin.
+    bool isThin = existential.getType().isClassBoundedExistentialType();
+    
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
     SILConstant c(e->getDecl());
@@ -748,7 +756,7 @@ SILValue SILGenFunction::emitProtocolMethod(ExistentialMemberRefExpr *e,
                                         e->getType(),
                                         /*isAutoClosure*/ false,
                                         /*isBlock*/ false,
-                                        /*isThin*/ false,
+                                        isThin,
                                         SGM.getConstantCC(c),
                                         F.getASTContext());
     return B.createProtocolMethod(e, existential, c,

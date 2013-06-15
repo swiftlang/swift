@@ -643,34 +643,26 @@ namespace {
     /// Given a class-bounded existential container, returns a witness table
     /// pointer out of the container, and the type metadata pointer for the
     /// value.
-    std::pair<llvm::Value*, llvm::Value*>
-    getWitnessTableAndMetadata(IRGenFunction &IGF, Explosion &container,
-                               unsigned which) const {
+    llvm::Value *
+    getWitnessTable(IRGenFunction &IGF, Explosion &container,
+                    unsigned which) const {
       assert(which < NumProtocols && "witness table index out of bounds");
       ArrayRef<llvm::Value *> values = container.claimAll();
-      llvm::Value *witness = values[which];
-      llvm::Value *metadata
-        = emitTypeMetadataRefForOpaqueHeapObject(IGF, values.back());
-      return {witness, metadata};
+      return values[which];
     }
     
     /// Given an existential object, find the witness table
     /// corresponding to the given protocol.
-    std::pair<llvm::Value*, llvm::Value*>
-    findWitnessTableAndMetadata(IRGenFunction &IGF,
-                                Explosion &container,
-                                ProtocolDecl *protocol) const {
+    llvm::Value *findWitnessTable(IRGenFunction &IGF,
+                                  Explosion &container,
+                                  ProtocolDecl *protocol) const {
       assert(NumProtocols != 0 &&
              "finding a witness table in a trivial existential");
       
       ProtocolPath path(IGF.IGM, getProtocols(), protocol);
-      llvm::Value *witness, *metadata;
-      
-      std::tie(witness, metadata)
-        = getWitnessTableAndMetadata(IGF, container, path.getOriginIndex());
-      witness = path.apply(IGF, witness);
-      
-      return {witness, metadata};
+      llvm::Value *witness
+        = getWitnessTable(IGF, container, path.getOriginIndex());
+      return path.apply(IGF, witness);
     }
     
     /// Given a class-bounded existential containe, returns the instance
@@ -2043,6 +2035,9 @@ namespace {
 
     /// The function involves any difference in abstraction.
     bool HasAbstraction;
+    
+    /// The witness needs an extra metatype argument.
+    bool NeedsExtraMetatype;
 
   public:
     WitnessBuilder(IRGenModule &IGM, llvm::Constant *impl,
@@ -2081,6 +2076,17 @@ namespace {
         isa<PolymorphicFunctionType>(implFnTy) || // HACK
         differsByAbstractionAsFunction(IGM, sigFnTy, implFnTy,
                                        explosionLevel, uncurryLevel);
+          
+      // We can derive the type metadata from class-bounded archetypes; for
+      // fully opaque archetypes, we need to pass in the metatype for the
+      // archetype as an extra argument.
+      if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
+        assert(archetype->isClassBounded() &&
+               "non-lvalue this argument for non-class-bounded This?!");
+        NeedsExtraMetatype = false;
+      } else {
+        NeedsExtraMetatype = true;
+      }
     }
 
     llvm::Constant *get() {
@@ -2088,7 +2094,7 @@ namespace {
       if (!HasAbstraction)
         return asOpaquePtr(IGM, ImplPtr);
 
-      // Okay, mangle a name.
+      // OK, mangle a name.
       llvm::SmallString<128> name;
       mangleThunk(name);
 
@@ -2097,11 +2103,14 @@ namespace {
       llvm::Function *fn = IGM.Module.getFunction(name);
       if (fn) return asOpaquePtr(IGM, fn);
 
+      ExtraData extraData
+        = NeedsExtraMetatype ? ExtraData::Metatype : ExtraData::None;
+      
       // Create the function.
       llvm::AttributeSet attrs;
       auto fnTy = IGM.getFunctionType(AbstractCC::Freestanding,
                                       SignatureTy, ExplosionKind::Minimal,
-                                      UncurryLevel, ExtraData::Metatype,
+                                      UncurryLevel, extraData,
                                       attrs);
       fn = llvm::Function::Create(fnTy, llvm::Function::InternalLinkage,
                                   name.str(), &IGM.Module);
@@ -2185,9 +2194,12 @@ namespace {
       // Collect the parameters.
       Explosion sigParams = IGF.collectParameters();
 
-      // The data parameter is a metatype; bind it as the This archetype.
-      llvm::Value *metatype = sigParams.takeLast();
-      bindThisArchetype(IGF, metatype);
+      // For opaque archetypes, the data parameter is a metatype; bind it as
+      // the This archetype.
+      if (NeedsExtraMetatype) {
+        llvm::Value *metatype = sigParams.takeLast();
+        bindThisArchetype(IGF, metatype);
+      }
 
       // Peel off the result address if necessary.
       auto &sigResultTI =
@@ -3572,7 +3584,8 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
   
   // Build the value.
   out.add(witness);
-  out.add(metadata);
+  if (metadata)
+    out.add(metadata);
 }
 
 void
@@ -3600,8 +3613,10 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
   llvm::Value *origin = archetypeTI.getWitnessTable(IGF, path.getOriginIndex());
   llvm::Value *wtable = path.apply(IGF, origin);
   
-  // Acquire the archetype metadata.
-  llvm::Value *metadata = archetypeTI.getMetadataRef(IGF);
+  // Acquire the archetype metadata for fully opaque archetype methods.
+  llvm::Value *metadata = nullptr;
+  if (!archetype->isClassBounded())
+    metadata = archetypeTI.getMetadataRef(IGF);
   
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
@@ -3679,13 +3694,11 @@ void irgen::emitClassBoundedProtocolMethodValue(IRGenFunction &IGF,
   FuncDecl *fn = cast<FuncDecl>(vd);
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
-  // Load the witness table and metadata.
-  llvm::Value *wtable, *metadata;
-  std::tie(wtable, metadata)
-    = baseTI.findWitnessTableAndMetadata(IGF, in, fnProto);
+  // Load the witness table.
+  llvm::Value *wtable = baseTI.findWitnessTable(IGF, in, fnProto);
   
   // Build the value.
-  getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
+  getWitnessMethodValue(IGF, fn, fnProto, wtable, /*metadata*/nullptr, out);
 }
 
 llvm::Value *

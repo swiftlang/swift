@@ -123,7 +123,10 @@ private:
                                       memberType,
                                       /*isAutoClosure*/ false,
                                       /*isBlock*/ false,
-                                      /*isThin*/ false,
+                                      /*isThin*/
+                                        archetype.getType()
+                                          .castTo<ArchetypeType>()
+                                          ->isClassBounded(),
                                       gen.SGM.getConstantCC(methodName),
                                       memberType->getASTContext())
                       ->getCanonicalType()},
@@ -139,13 +142,18 @@ private:
     // as an OpaquePointer or ObjCPointer.
     // 'this' for existential metatypes is the metatype itself.
     Type thisTy;
+    bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
-      if (proto.getType().isClassBoundedExistentialType())
+      if (proto.getType().isClassBoundedExistentialType()) {
         thisTy = memberType->getASTContext().TheObjCPointerType;
-      else
+        isThin = true;
+      } else {
         thisTy = memberType->getASTContext().TheOpaquePointerType;
+        isThin = false;
+      }
     } else {
       thisTy = proto.getType().getSwiftType();
+      isThin = false;
     }
     
     // This is a method reference. Extract the method implementation from the
@@ -154,7 +162,7 @@ private:
                              memberType,
                              /*isAutoClosure*/ false,
                              /*isBlock*/ false,
-                             /*isThin*/ false,
+                             /*isThin*/ isThin,
                              gen.SGM.getConstantCC(methodName),
                              memberType->getASTContext())
       ->getCanonicalType();

@@ -553,8 +553,11 @@ public:
           llvm::dbgs() << "\n");
     require(methodType,
             "result method must be of a concrete function type");
-    require(!methodType->isThin(),
-            "result method must not be of a thin function type");
+    require(methodType->isThin()
+              == AMI->getLookupArchetype().castTo<ArchetypeType>()
+                  ->isClassBounded(),
+            "result method must not be thin function type if class-bounded, "
+            "thick if not class-bounded");
     SILType operandType = AMI->getLookupArchetype();
     DEBUG(llvm::dbgs() << "operand type ";
           operandType.print(llvm::dbgs());
@@ -581,9 +584,11 @@ public:
     FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
     require(methodType,
             "result method must be of a concrete function type");
-    require(!methodType->isThin(),
-            "result method must not be of a thin function type");
     SILType operandType = EMI->getOperand().getType();
+    require(methodType->isThin()
+              == operandType.isClassBoundedExistentialType(),
+            "result method must be thin function type if class-bounded, or "
+            "thick if not class-bounded");
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
