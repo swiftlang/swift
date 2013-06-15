@@ -2057,6 +2057,17 @@ namespace {
       AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
       AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
 
+      // We can derive the type metadata from class-bounded archetypes; for
+      // fully opaque archetypes, we need to pass in the metatype for the
+      // archetype as an extra argument.
+      if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
+        assert(archetype->isClassBounded() &&
+               "non-lvalue this argument for non-class-bounded This?!");
+        NeedsExtraMetatype = false;
+      } else {
+        NeedsExtraMetatype = true;
+      }
+      
       // The first argument isn't necessarily a simple substitution.
       // If so, we don't need to compute difference by abstraction.
       if (isa<LValueType>(CanType(sigFnTy->getInput())) &&
@@ -2076,17 +2087,6 @@ namespace {
         isa<PolymorphicFunctionType>(implFnTy) || // HACK
         differsByAbstractionAsFunction(IGM, sigFnTy, implFnTy,
                                        explosionLevel, uncurryLevel);
-          
-      // We can derive the type metadata from class-bounded archetypes; for
-      // fully opaque archetypes, we need to pass in the metatype for the
-      // archetype as an extra argument.
-      if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
-        assert(archetype->isClassBounded() &&
-               "non-lvalue this argument for non-class-bounded This?!");
-        NeedsExtraMetatype = false;
-      } else {
-        NeedsExtraMetatype = true;
-      }
     }
 
     llvm::Constant *get() {
