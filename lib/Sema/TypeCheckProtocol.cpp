@@ -361,6 +361,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         case MemberLookupResult::ExistentialMember: {
           if (Candidate.D->getKind() != Requirement->getKind())
             break;
+          
+          if (Candidate.D->isInstanceMember() != Requirement->isInstanceMember())
+            break ;
 
           Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
           CandidateTy = TC.substMemberTypeWithBase(CandidateTy, Candidate.D,T);
