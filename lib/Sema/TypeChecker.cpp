@@ -1008,8 +1008,8 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
         TC.typeCheckFunctionBody(FE);
         continue;
       }
-       if (isa<StructDecl>(decl)) {
-         // StructDecls should already be typed by the ClangImporter and don't
+       if (isa<StructDecl>(decl) || isa<ProtocolDecl>(decl)) {
+         // Type decls should already be typed by the ClangImporter and don't
          // need additional typechecking.
          continue;
       }

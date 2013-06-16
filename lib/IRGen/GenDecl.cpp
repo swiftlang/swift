@@ -816,32 +816,36 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
 void IRGenModule::emitExternalDefinition(Decl *D) {
   switch (D->getKind()) {
-    case DeclKind::Extension:
-    case DeclKind::Protocol:
-    case DeclKind::PatternBinding:
-    case DeclKind::OneOfElement:
-    case DeclKind::OneOf:
-    case DeclKind::Class:
-    case DeclKind::TopLevelCode:
-    case DeclKind::TypeAlias:
-    case DeclKind::Var:
-    case DeclKind::Import:
-    case DeclKind::Subscript:
-    case DeclKind::Destructor:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      llvm_unreachable("Not a valid external definition for IRgen");
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::OneOfElement:
+  case DeclKind::OneOf:
+  case DeclKind::Class:
+  case DeclKind::TopLevelCode:
+  case DeclKind::TypeAlias:
+  case DeclKind::Var:
+  case DeclKind::Import:
+  case DeclKind::Subscript:
+  case DeclKind::Destructor:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    llvm_unreachable("Not a valid external definition for IRgen");
 
-    case DeclKind::Func:
-      return emitLocalDecls(cast<FuncDecl>(D));
-    case DeclKind::Constructor:
-      return emitLocalDecls(cast<ConstructorDecl>(D));
-      
-    case DeclKind::Struct:
-      // Emit Swift metadata for the external struct.
-      emitStructMetadata(*this, cast<StructDecl>(D));
-      break;
+  case DeclKind::Func:
+    return emitLocalDecls(cast<FuncDecl>(D));
+  case DeclKind::Constructor:
+    return emitLocalDecls(cast<ConstructorDecl>(D));
+    
+  case DeclKind::Struct:
+    // Emit Swift metadata for the external struct.
+    emitStructMetadata(*this, cast<StructDecl>(D));
+    break;
+    
+  case DeclKind::Protocol:
+    // Emit Swift metadata for the protocol type.
+    emitProtocolDecl(cast<ProtocolDecl>(D));
+    break;
   }
 }
 

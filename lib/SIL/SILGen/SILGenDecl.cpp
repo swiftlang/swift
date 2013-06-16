@@ -846,13 +846,13 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     emitConstructor(cast<ConstructorDecl>(d));
     break;
   }
-  case DeclKind::Struct: {
-    // Nothing to do in SILGen for external structs.
+  case DeclKind::Struct:
+  case DeclKind::Protocol: {
+    // Nothing to do in SILGen for external types.
     break;
   }
       
   case DeclKind::Extension:
-  case DeclKind::Protocol:
   case DeclKind::PatternBinding:
   case DeclKind::OneOfElement:
   case DeclKind::OneOf:
