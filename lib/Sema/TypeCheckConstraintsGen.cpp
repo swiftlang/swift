@@ -869,10 +869,26 @@ namespace {
     }
 
     Type visitUncheckedSuperToArchetypeExpr(
-                                          UncheckedSuperToArchetypeExpr *expr) {
+            UncheckedSuperToArchetypeExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-    
+    Type visitUncheckedArchetypeToArchetypeExpr(
+            UncheckedArchetypeToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitUncheckedArchetypeToConcreteExpr(
+            UncheckedArchetypeToConcreteExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitUncheckedExistentialToArchetypeExpr(
+            UncheckedExistentialToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitUncheckedExistentialToConcreteExpr(
+            UncheckedExistentialToConcreteExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Type visitIsSubtypeExpr(IsSubtypeExpr *expr) {
       ASTContext &C = CS.getASTContext();
 

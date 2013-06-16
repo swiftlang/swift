@@ -157,6 +157,10 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::TupleElement:
   case ExprKind::TupleShuffle:
   case ExprKind::UncheckedSuperToArchetype:
+  case ExprKind::UncheckedArchetypeToArchetype:
+  case ExprKind::UncheckedArchetypeToConcrete:
+  case ExprKind::UncheckedExistentialToArchetype:
+  case ExprKind::UncheckedExistentialToConcrete:
   case ExprKind::ZeroValue:
     llvm_unreachable("Not a parsed expression");
 

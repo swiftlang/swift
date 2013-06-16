@@ -353,7 +353,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;      
   }
 
-  Expr *visitCoerceExpr(CoerceExpr *E) {
+  Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {
     if (Expr *Sub = E->getSubExpr()) {
       Sub = doIt(Sub);
       if (!Sub) return nullptr;
@@ -363,26 +363,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
     return E;
   }
 
-  Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
-    if (Expr *Sub = E->getSubExpr()) {
-      Sub = doIt(Sub);
-      if (!Sub) return nullptr;
-      E->setSubExpr(Sub);
-    }
-    
-    return E;
-  }
-
-  Expr *visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
-    if (Expr *Sub = E->getSubExpr()) {
-      Sub = doIt(Sub);
-      if (!Sub) return nullptr;
-      E->setSubExpr(Sub);
-    }
-    
-    return E;
-  }
-  
   Expr *visitIsSubtypeExpr(IsSubtypeExpr *E) {
     if (Expr *Sub = E->getSubExpr()) {
       Sub = doIt(Sub);

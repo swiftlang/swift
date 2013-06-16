@@ -2148,17 +2148,17 @@ public:
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
   SourceLoc AsLoc;
-  TypeLoc Type;
+  TypeLoc Ty;
 
 protected:
   ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc type)
-    : Expr(kind, type.getType()), SubExpr(sub), AsLoc(AsLoc), Type(type)
+    : Expr(kind, type.getType()), SubExpr(sub), AsLoc(AsLoc), Ty(type)
   {}
 
 public:
   Expr *getSubExpr() const { return SubExpr; }
-  TypeLoc &getTypeLoc() { return Type; }
-  TypeLoc getTypeLoc() const { return Type; }
+  TypeLoc &getTypeLoc() { return Ty; }
+  TypeLoc getTypeLoc() const { return Ty; }
 
   void setSubExpr(Expr *E) { SubExpr = E; }
 
@@ -2166,8 +2166,8 @@ public:
 
   SourceRange getSourceRange() const {
     return SubExpr
-      ? SourceRange{SubExpr->getStartLoc(), Type.getSourceRange().End}
-      : SourceRange{AsLoc, Type.getSourceRange().End};
+      ? SourceRange{SubExpr->getStartLoc(), Ty.getSourceRange().End}
+      : SourceRange{AsLoc, Ty.getSourceRange().End};
   }
   
   /// True if the node has been processed by SequenceExpr folding.
@@ -2229,7 +2229,6 @@ public:
 /// superclass of an archetype to the archetype iself or crashing if the cast
 /// is not possible, spelled 'a as! T' for an archetype type T.
 ///
-/// FIXME: At present, only class downcasting is supported.
 /// FIXME: All downcasts are currently unchecked, which is horrible.
 class UncheckedSuperToArchetypeExpr : public ExplicitCastExpr {
   SourceLoc BangLoc;
@@ -2244,6 +2243,86 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UncheckedSuperToArchetype;
+  }
+};
+
+// \brief Represents an explicit unchecked cast from an archetype value to a
+// different archetype, spelled 't as! U' for an archetype value t and archetype
+// type U.
+class UncheckedArchetypeToArchetypeExpr : public ExplicitCastExpr {
+  SourceLoc BangLoc;
+  
+public:
+  UncheckedArchetypeToArchetypeExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
+                                    TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedArchetypeToArchetype, sub, asLoc, type),
+      BangLoc(bangLoc) { }
+  
+  SourceLoc getBangLoc() const { return BangLoc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedArchetypeToArchetype;
+  }
+};
+  
+// \brief Represents an explicit unchecked cast from an archetype value to a
+// concrete type, spelled 't as! A' for an archetype value t
+// and concrete type 'A'.
+class UncheckedArchetypeToConcreteExpr : public ExplicitCastExpr {
+  SourceLoc BangLoc;
+
+public:
+  UncheckedArchetypeToConcreteExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
+                                   TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedArchetypeToConcrete, sub, asLoc, type),
+      BangLoc(bangLoc) { }
+  
+  SourceLoc getBangLoc() const { return BangLoc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedArchetypeToConcrete;
+  }
+};
+
+// \brief Represents an explicit unchecked cast from an existential type value
+// to an archetype, spelled 'p as! T' for a protocol value p
+// and archetype type 'T'.
+class UncheckedExistentialToArchetypeExpr : public ExplicitCastExpr {
+  SourceLoc BangLoc;
+
+public:
+  UncheckedExistentialToArchetypeExpr(Expr *sub, SourceLoc asLoc,
+                                      SourceLoc bangLoc,
+                                      TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedExistentialToArchetype,
+                       sub, asLoc, type),
+      BangLoc(bangLoc) { }
+  
+  SourceLoc getBangLoc() const { return BangLoc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedExistentialToArchetype;
+  }
+};
+  
+// \brief Represents an explicit unchecked cast from an existential type value
+// to a concrete type, spelled 'p as! A' for a protocol value p
+// and conforming type 'A'.
+class UncheckedExistentialToConcreteExpr : public ExplicitCastExpr {
+  SourceLoc BangLoc;
+
+public:
+  UncheckedExistentialToConcreteExpr(Expr *sub, SourceLoc asLoc,
+                                     SourceLoc bangLoc,
+                                     TypeLoc type)
+    : ExplicitCastExpr(ExprKind::UncheckedExistentialToConcrete,
+                       sub, asLoc, type),
+      BangLoc(bangLoc) { }
+  
+  SourceLoc getBangLoc() const { return BangLoc; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UncheckedExistentialToConcrete;
   }
 };
   

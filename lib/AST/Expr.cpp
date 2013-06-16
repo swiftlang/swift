@@ -860,26 +860,35 @@ public:
     printRec(E->getRHS());
     OS << ')';
   }
-  void visitCoerceExpr(CoerceExpr *E) {
-    printCommon(E, "coerce_expr") << ' ';
+  
+  void printExplicitCastExpr(ExplicitCastExpr *E, const char *name) {
+    printCommon(E, name) << ' ';
     E->getTypeLoc().getType()->print(OS);
     OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
+  }
+  
+  void visitCoerceExpr(CoerceExpr *E) {
+    printExplicitCastExpr(E, "coerce_expr");
   }
   void visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
-    printCommon(E, "unchecked_downcast_expr") << ' ';
-    E->getTypeLoc().getType()->print(OS);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
+    printExplicitCastExpr(E, "unchecked_downcast_expr");
   }
   void visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
-    printCommon(E, "unchecked_super_to_archetype_expr") << ' ';
-    E->getTypeLoc().getType()->print(OS);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
+    printExplicitCastExpr(E, "unchecked_super_to_archetype_expr");
+  }
+  void visitUncheckedArchetypeToArchetypeExpr(UncheckedArchetypeToArchetypeExpr *E) {
+    printExplicitCastExpr(E, "unchecked_archetype_to_archetype_expr");
+  }
+  void visitUncheckedArchetypeToConcreteExpr(UncheckedArchetypeToConcreteExpr *E) {
+    printExplicitCastExpr(E, "unchecked_archetype_to_concrete_expr");
+  }
+  void visitUncheckedExistentialToArchetypeExpr(UncheckedExistentialToArchetypeExpr *E) {
+    printExplicitCastExpr(E, "unchecked_existential_to_archetype_expr");
+  }
+  void visitUncheckedExistentialToConcreteExpr(UncheckedExistentialToConcreteExpr *E) {
+    printExplicitCastExpr(E, "unchecked_existential_to_concrete_expr");
   }
   void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
     printCommon(E, "rebind_this_in_constructor_expr") << '\n';

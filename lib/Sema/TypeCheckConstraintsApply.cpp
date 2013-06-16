@@ -1482,75 +1482,13 @@ namespace {
       }
       expr->setSubExpr(sub);
 
-      // A downcast is okay when:
       Type fromType = sub->getType();
       Type origFromType = fromType;
       bool toArchetype = toType->is<ArchetypeType>();
       bool fromArchetype = fromType->is<ArchetypeType>();
-
-      // A downcast can:
-      //   - convert an archetype to a (different) archetype type.
-      if (fromArchetype && toArchetype) {
-        // FIXME: We don't support this yet.
-        tc.diagnose(expr->getLoc(), diag::downcast_archetype,
-                    fromType, toType);
-        return nullptr;
-      }
-
-      //   - convert an archetype to a subclass of its superclass type.
-      if (fromArchetype) {
-        // Introduce the archetype-to-super conversion.
-        auto fromSuperType = fromType->castTo<ArchetypeType>()->getSuperclass();
-        if (!fromSuperType) {
-          // FIXME: We should be able to do this without the to-super
-          // conversion. Specifically, we should be able to cast to any
-          // concrete type that meets the requirements of the archetype.
-          tc.diagnose(expr->getLoc(), diag::downcast_archetype_without_super,
-                      fromType, toType);
-          return nullptr;
-        }
-
-        sub = new (C) ArchetypeToSuperExpr(sub, fromSuperType);
-        expr->setSubExpr(sub);
-        fromArchetype = false;
-        fromType = fromSuperType;
-      }
-
-      //   - convert from a superclass to an archetype.
-      if (toArchetype) {
-        auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
-        if (!toSuperType) {
-          // FIXME: We should be able to do this.
-          tc.diagnose(expr->getLoc(), diag::downcast_archetype_without_super,
-                      origFromType, toType);
-          return nullptr;
-        }
-
-        // Coerce to the supertype of the archetype.
-        if (tc.convertToType(sub, toSuperType, cs.DC))
-          return nullptr;
-        
-        // The source type must be equivalent to or a supertype of the supertype
-        // of the destination archetype.
-        if (!tc.isSubtypeOf(toSuperType, fromType)) {
-          // FIXME: Still too strong?
-          tc.diagnose(expr->getLoc(), diag::downcast_not_class_cast,
-                      origFromType, toType);
-          return nullptr;
-        }
-
-        // Construct the supertype-to-archetype cast.
-        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(sub,
-                                                           expr->getLoc(),
-                                                           expr->getBangLoc(),
-                                                           expr->getTypeLoc());
-        stoa->setType(expr->getType());
-        return stoa;
-      }
-
-      assert(!fromArchetype && "archetypes should have been handled above");
-      assert(!toArchetype && "archetypes should have been handled above");
-
+      bool toExistential = toType->isExistentialType();
+      bool fromExistential = fromType->isExistentialType();
+      
       // If the from/to types are equivalent, this should have been a
       // coercion expression (b as A) rather than a cast (a as! B). Complain.
       if (fromType->isEqual(toType) || tc.isSubtypeOf(fromType, toType)) {
@@ -1561,16 +1499,88 @@ namespace {
         if (!expr->isImplicit()) {
           tc.diagnose(expr->getLoc(), diag::downcast_to_supertype,
                       origFromType, toType)
-            .highlight(sub->getSourceRange())
-            .highlight(expr->getTypeLoc().getSourceRange())
-            .fixItRemove(SourceRange(expr->getBangLoc()));
+          .highlight(sub->getSourceRange())
+          .highlight(expr->getTypeLoc().getSourceRange())
+          .fixItRemove(SourceRange(expr->getBangLoc()));
         }
-
+        
         Expr *coerce = new (C) CoerceExpr(sub, expr->getLoc(),
                                           expr->getTypeLoc());
         coerce->setType(expr->getType());
         return coerce;
       }
+      
+      // We can't downcast to an existential.
+      if (toExistential) {
+        tc.diagnose(expr->getLoc(), diag::downcast_to_existential,
+                    origFromType, toType)
+        .highlight(sub->getSourceRange())
+        .highlight(expr->getTypeLoc().getSourceRange());
+        return nullptr;
+      }
+      
+      // A downcast can:
+      //   - convert an archetype to a (different) archetype type.
+      if (fromArchetype && toArchetype) {
+        auto *atoa = new (C) UncheckedArchetypeToArchetypeExpr(sub,
+                                                               expr->getLoc(),
+                                                               expr->getBangLoc(),
+                                                               expr->getTypeLoc());
+        atoa->setType(expr->getType());
+        return atoa;
+      }
+
+      //   - convert from an existential to an archetype or conforming concrete type.
+      if (fromExistential) {
+        Expr *etox;
+        if (toArchetype)
+          etox = new (C) UncheckedExistentialToArchetypeExpr(sub,
+                                                             expr->getLoc(),
+                                                             expr->getBangLoc(),
+                                                             expr->getTypeLoc());
+        else {
+          etox = new (C) UncheckedExistentialToConcreteExpr(sub,
+                                                            expr->getLoc(),
+                                                            expr->getBangLoc(),
+                                                            expr->getTypeLoc());
+        }
+        etox->setType(expr->getType());
+        return etox;
+      }
+      
+      //   - convert an archetype to a concrete type fulfilling its constraints.
+      if (fromArchetype) {
+        auto *atoc = new (C) UncheckedArchetypeToConcreteExpr(sub,
+                                                              expr->getLoc(),
+                                                              expr->getBangLoc(),
+                                                              expr->getTypeLoc());
+        atoc->setType(expr->getType());
+        return atoc;
+      }
+      
+      //   - convert from a superclass to an archetype.
+      if (toArchetype) {
+        auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
+
+        // Coerce to the supertype of the archetype.
+        if (tc.convertToType(sub, toSuperType, cs.DC))
+          return nullptr;
+        
+        // Construct the supertype-to-archetype cast.
+        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(sub,
+                                                           expr->getLoc(),
+                                                           expr->getBangLoc(),
+                                                           expr->getTypeLoc());
+        stoa->setType(expr->getType());
+        return stoa;
+      }
+      
+      
+
+      assert(!fromArchetype && "archetypes should have been handled above");
+      assert(!toArchetype && "archetypes should have been handled above");
+      assert(!fromExistential && "existentials should have been handled above");
+      assert(!toExistential && "existentials should have been handled above");
 
       // The destination type must be a subtype of the source type.
       if (!tc.isSubtypeOf(toType, fromType)) {
@@ -1587,6 +1597,22 @@ namespace {
     
     Expr *visitUncheckedSuperToArchetypeExpr(
             UncheckedSuperToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Expr *visitUncheckedArchetypeToArchetypeExpr(
+            UncheckedArchetypeToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Expr *visitUncheckedArchetypeToConcreteExpr(
+            UncheckedArchetypeToConcreteExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Expr *visitUncheckedExistentialToArchetypeExpr(
+            UncheckedExistentialToArchetypeExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Expr *visitUncheckedExistentialToConcreteExpr(
+            UncheckedExistentialToConcreteExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     

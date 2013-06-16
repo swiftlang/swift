@@ -516,6 +516,23 @@ RValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
   return RValue(*this, emitManagedRValueWithCleanup(archetype));
 }
 
+RValue SILGenFunction::visitUncheckedArchetypeToArchetypeExpr(
+                                  UncheckedArchetypeToArchetypeExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+RValue SILGenFunction::visitUncheckedArchetypeToConcreteExpr(
+                                   UncheckedArchetypeToConcreteExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+RValue SILGenFunction::visitUncheckedExistentialToArchetypeExpr(
+                                   UncheckedExistentialToArchetypeExpr *E, SGFContext C){
+  llvm_unreachable("not implemented");
+}
+RValue SILGenFunction::visitUncheckedExistentialToConcreteExpr(
+                                   UncheckedExistentialToConcreteExpr *E, SGFContext C){
+  llvm_unreachable("not implemented");
+}
+
 RValue SILGenFunction::visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C)
 {
   ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
