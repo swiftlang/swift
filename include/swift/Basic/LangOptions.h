@@ -32,6 +32,9 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
+    
+    /// \brief Import qualified ObjC object types as protocol types.
+    bool ImportObjCProtocolTypes = false;
   };
 }
 

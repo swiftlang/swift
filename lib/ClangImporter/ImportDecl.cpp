@@ -1893,14 +1893,16 @@ namespace {
                                    Impl.importSourceLoc(decl->getLocation()),
                                    name,
                                    { });
+      
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
 
       // Import protocols this protocol conforms to.
       result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
 
-      // Note that this is an Objective-C protocol.
+      // Note that this is an Objective-C and class-bounded protocol.
       result->getMutableAttrs().ObjC = true;
+      result->getMutableAttrs().ClassProtocol = true;
       result->setIsObjC(true);
 
       // Add the implicit 'This' associated type.

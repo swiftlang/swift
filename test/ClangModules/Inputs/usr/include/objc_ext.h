@@ -15,3 +15,11 @@
 @interface RefedSub : SuperRefsSub
 - overridden;
 @end
+
+@protocol NSRuncing
+- (void)runce;
+@end
+
+@interface NSMince
+- (void)eatWith:(id <NSRuncing>)runcer;
+@end
