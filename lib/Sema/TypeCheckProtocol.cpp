@@ -97,9 +97,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // If the protocol is class-bounded, non-classes are a non-starter.
   if (Proto->getAttrs().isClassProtocol()
       && !T->getClassOrBoundGenericClass()) {
-    TC.diagnose(ComplainLoc,
-                diag::non_class_cannot_conform_to_class_protocol,
-                T, Proto->getDeclaredType());
+    if (ComplainLoc.isValid())
+      TC.diagnose(ComplainLoc,
+                  diag::non_class_cannot_conform_to_class_protocol,
+                  T, Proto->getDeclaredType());
     return nullptr;
   }
 
