@@ -46,3 +46,16 @@ typedef long NSInteger;
 struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);
+
+@protocol NSRuncing
+- (void)runce;
+@end
+
+@protocol NSFunging
+- (void)funge;
+@end
+
+@interface NSSpoon <NSRuncing, NSFunging>
+- (void)runce;
+- (void)funge;
+@end

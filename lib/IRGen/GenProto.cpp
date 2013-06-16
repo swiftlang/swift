@@ -3369,12 +3369,26 @@ void irgen::expandPolymorphicSignature(IRGenModule &IGM,
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
 static void forEachProtocolWitnessTable(IRGenFunction &IGF,
-                          SILType srcType,
+                          SILType srcType, SILType destType,
                           ArrayRef<ProtocolEntry> protocols,
                           ArrayRef<ProtocolConformance*> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
-  assert(protocols.size() == conformances.size() &&
+  // Collect the conformances that need witness tables.
+  SmallVector<ProtocolDecl*, 2> destProtocols;
+  bool isExistential
+    = destType.getSwiftRValueType()->isExistentialType(destProtocols);
+  
+  assert(isExistential);
+  SmallVector<ProtocolConformance*, 2> witnessConformances;
+  assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
+  for (unsigned i = 0; i < destProtocols.size(); ++i)
+    if (!destProtocols[i]->isObjC())
+      witnessConformances.push_back(conformances[i]);
+
+  assert(protocols.size() == witnessConformances.size() &&
+         "mismatched protocol conformances");
+  
   
   // If the source type is an archetype, look at what's locally bound.
   if (auto *archetype = srcType.getAs<ArchetypeType>()) {
@@ -3401,7 +3415,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
     ProtocolDecl *proto = protocols[i].getProtocol();
     auto &protoI = protocols[i].getInfo();
-    auto astConformance = conformances[i];
+    auto astConformance = witnessConformances[i];
     assert(astConformance);
     
     // Compute the conformance information.
@@ -3494,7 +3508,7 @@ void irgen::emitClassBoundedExistentialContainer(IRGenFunction &IGF,
     .as<ClassBoundedExistentialTypeInfo>();
   
   // Emit the witness table pointers.
-  forEachProtocolWitnessTable(IGF, instanceType,
+  forEachProtocolWitnessTable(IGF, instanceType, outType,
                               destTI.getProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {
@@ -3543,7 +3557,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   }
   
   // Next, write the protocol witness tables.
-  forEachProtocolWitnessTable(IGF, srcType, destTI.getProtocols(), conformances,
+  forEachProtocolWitnessTable(IGF, srcType, destType,
+                              destTI.getProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);
     IGF.Builder.CreateStore(ptable, ptableSlot);
