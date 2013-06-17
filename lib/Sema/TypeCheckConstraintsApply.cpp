@@ -1097,8 +1097,8 @@ namespace {
 
       // Find the selected member.
       auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
+                        cs.getConstraintLocator(
+                          expr, ConstraintLocator::UnresolvedMember));
       auto member = selected.first.getDecl();
 
       // The base expression is simply the metatype of a oneof type.

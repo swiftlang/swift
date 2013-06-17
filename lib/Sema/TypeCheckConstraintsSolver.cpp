@@ -133,6 +133,47 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
   return result;
 }
 
+/// \brief Determine whether the given overload set fully binds its type
+/// variables.
+///
+/// An overload set fully binds its type when all of the the overload choices
+/// declarations, tuple indices, or identity functions. In these cases, the
+/// selection of the overload itself is enough to determine the type variables
+/// in the bound type. Otherwise, contextual information is still required even
+/// after the overload choice has been made.
+static bool overloadSetFullyBindsType(OverloadSet *ovl) {
+  for (const auto &choice : ovl->getChoices()) {
+    switch (choice.getKind()) {
+    case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::FunctionReturningBaseType:
+      continue;
+
+    case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::IdentityFunction:
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// \brief Determine whether the given member constraint fully binds it's
+/// right-hand type variables.
+///
+/// The only member constraints that don't fully bind their right-hand
+/// type variables are unresolved member constraints, which require type
+/// information to flow through the member constraint to determine the member
+/// itself.
+static bool memberConstraintFullyBindsType(const Constraint *constraint) {
+  assert(constraint->getKind() == ConstraintKind::TypeMember ||
+         constraint->getKind() == ConstraintKind::ValueMember);
+  auto locator = constraint->getLocator();
+  return !locator || locator->getPath().empty() ||
+         locator->getPath().back().getKind()
+           != ConstraintLocator::UnresolvedMember;
+}
+
 void ConstraintSystem::collectConstraintsForTypeVariables(
        SmallVectorImpl<TypeVariableConstraints> &typeVarConstraints) {
   typeVarConstraints.clear();
@@ -180,23 +221,32 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
       }
       continue;
 
-    case ConstraintClassification::Member:
+    case ConstraintClassification::Member: {
       // Mark the referenced type variables for the left-hand side, unless
       // it is simply a type variable or a metatype of a type variable, in
       // which case it's not going to open up any more opportunities.
-      // FIXME: Enable this for old solver?
-      bool skipFirst = solverState;
-      if (skipFirst) {
-        if (auto metaFirst = first->getAs<MetaTypeType>())
-          skipFirst = metaFirst->getInstanceType()->is<TypeVariableType>();
-        else
-          skipFirst = first->is<TypeVariableType>();
-      }
+      bool skipFirst;
+      if (auto metaFirst = first->getAs<MetaTypeType>())
+        skipFirst = metaFirst->getInstanceType()->is<TypeVariableType>();
+      else
+        skipFirst = first->is<TypeVariableType>();
       if (skipFirst)
         first->getTypeVariables(referencedTypeVars);
-      simplifyType(constraint->getSecondType())
-        ->getTypeVariables(referencedTypeVars);
+
+      if (memberConstraintFullyBindsType(constraint)) {
+        // Variables on the right-hand side are fully bound by the member
+        // constraint.
+        SmallVector<TypeVariableType *, 4> rhsTypeVars;
+        simplifyType(constraint->getSecondType())->getTypeVariables(rhsTypeVars);
+        for (auto typeVar : rhsTypeVars)
+          getTVC(typeVar).FullyBound = true;
+      } else {
+        // Reference all of the variables on the right-hand side.
+        simplifyType(constraint->getSecondType())
+          ->getTypeVariables(referencedTypeVars);
+      }
       continue;
+    }
     }
 
     auto second = simplifyType(constraint->getSecondType());
@@ -226,10 +276,17 @@ void ConstraintSystem::collectConstraintsForTypeVariables(
     }
   }
 
-  // Mark any type variables that specify the result of an unresolved overload
-  // set as having non-concrete constraints.
+  // Mark any type variables within the result of an overload set as either
+  // fully bound or as having non-concrete constraints, as appropriate.
   for (auto ovl : UnresolvedOverloadSets) {
-    ovl->getBoundType()->getTypeVariables(referencedTypeVars);
+    if (overloadSetFullyBindsType(ovl)) {
+      SmallVector<TypeVariableType *, 4> boundTypeVars;
+      simplifyType(ovl->getBoundType())->getTypeVariables(boundTypeVars);
+      for (auto typeVar : boundTypeVars)
+        getTVC(typeVar).FullyBound = true;
+    } else {
+      simplifyType(ovl->getBoundType())->getTypeVariables(referencedTypeVars);
+    }
   }
 
   // Mark any referenced type variables as having non-concrete constraints.
@@ -385,6 +442,10 @@ getPotentialBindings(ConstraintSystem &cs,
 
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   SmallVector<std::pair<Type, bool>, 4> bindings;
+
+  // If this type variable is fully bound, return an empty set.
+  if (tvc.FullyBound)
+    return bindings;
 
   // Add the types below this type variable.
   for (auto arg : tvc.Below) {

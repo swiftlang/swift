@@ -184,6 +184,10 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
       out << "named tuple element #" << llvm::utostr(elt.getValue());
       break;
 
+    case UnresolvedMember:
+      out << "unresolved member";
+      break;
+        
     case ParentType:
       out << "parent type";
       break;

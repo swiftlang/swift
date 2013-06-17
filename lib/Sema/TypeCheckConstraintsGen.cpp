@@ -311,8 +311,8 @@ namespace {
       auto oneofLocator = CS.getConstraintLocator(
                             expr,
                             ConstraintLocator::MemberRefBase);
-      auto memberLocator = CS.getConstraintLocator(expr,
-                                                   ConstraintLocator::Member);
+      auto memberLocator
+        = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
       auto oneofTy = CS.createTypeVariable(oneofLocator);
       auto memberTy = CS.createTypeVariable(memberLocator);
 

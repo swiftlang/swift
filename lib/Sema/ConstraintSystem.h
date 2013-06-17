@@ -333,6 +333,8 @@ public:
     /// \brief A member.
     /// FIXME: Do we need the actual member name here?
     Member,
+    /// \brief An unresolved member.
+    UnresolvedMember,
     /// \brief The base of a member expression.
     MemberRefBase,
     /// \brief The lookup for a subscript member.
@@ -388,6 +390,7 @@ public:
     case FunctionResult:
     case Member:
     case MemberRefBase:
+    case UnresolvedMember:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
@@ -554,6 +557,7 @@ public:
       case LvalueObjectType:
       case Member:
       case MemberRefBase:
+      case UnresolvedMember:
       case ParentType:
       case RvalueAdjustment:
       case ScalarToTuple:
@@ -1163,12 +1167,15 @@ public:
 /// \brief A representative type variable with the list of constraints
 /// that apply to it.
 struct TypeVariableConstraints {
-  TypeVariableConstraints(TypeVariableType *typeVar)
-    : HasNonConcreteConstraints(false), TypeVar(typeVar) {}
+  TypeVariableConstraints(TypeVariableType *typeVar) : TypeVar(typeVar) {}
 
   /// \brief Whether there are any non-concrete constraints placed on this
   /// type variable that aren't represented by the stored constraints.
-  bool HasNonConcreteConstraints;
+  bool HasNonConcreteConstraints = false;
+
+  /// \brief Whether this type variable is either fully bound by either an
+  /// overload set or a member constraint.
+  bool FullyBound = false;
 
   /// \brief The representative type variable.
   TypeVariableType *TypeVar;
