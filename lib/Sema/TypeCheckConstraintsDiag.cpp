@@ -17,6 +17,80 @@
 using namespace swift;
 using namespace constraints;
 
+void Failure::dump(llvm::SourceMgr *sm) {
+
+  llvm::raw_ostream &out = llvm::errs();
+  out << "(";
+  if (locator) {
+    out << "@";
+    locator->dump(sm);
+    out << ": ";
+  }
+
+  switch (getKind()) {
+  case DoesNotConformToProtocol:
+    out << getFirstType().getString() << " does not conform to "
+        << getSecondType().getString();
+    break;
+
+  case DoesNotHaveMember:
+    out << getFirstType().getString() << " does not have a member named '"
+        << getName().str() << "'";
+    break;
+
+  case FunctionAutoclosureMismatch:
+    out << "autoclosure mismatch " << getFirstType().getString() << " vs. "
+        << getSecondType().getString();
+    break;
+
+  case IsNotArchetype:
+    out << getFirstType().getString() << " is not an archetype";
+    break;
+
+  case LValueQualifiers:
+    out << "lvalue qualifier mismatch between " << getFirstType().getString()
+        << " and " << getSecondType().getString();
+    break;
+
+  case TupleNameMismatch:
+  case TupleNamePositionMismatch:
+  case TupleSizeMismatch:
+  case TupleVariadicMismatch:
+  case TupleUnused:
+    out << "mismatched tuple types " << getFirstType().getString() << " and "
+        << getSecondType().getString();
+    break;
+
+  case TypesNotConstructible:
+    out << getFirstType().getString() << " is not a constructible argument for "
+        << getSecondType().getString();
+    break;
+
+  case TypesNotConvertible:
+    out << getFirstType().getString() << " is not convertible to "
+        << getSecondType().getString();
+    break;
+
+  case TypesNotSubtypes:
+    out << getFirstType().getString() << " is not a subtype of "
+        << getSecondType().getString();
+    break;
+
+  case TypesNotTrivialSubtypes:
+    out << getFirstType().getString() << " is not a trivial subtype of "
+        << getSecondType().getString();
+    break;
+
+  case TypesNotEqual:
+    out << getFirstType().getString() << " is not equal to "
+        << getSecondType().getString();
+    break;
+  }
+
+  out << ")\n";
+}
+
+
 /// \brief Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
 ///

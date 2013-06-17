@@ -27,6 +27,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 
 namespace swift {
@@ -823,6 +824,9 @@ public:
     }
   }
 
+  /// \brief Dump a debug representation of this failure.
+  void dump(llvm::SourceMgr *sm) LLVM_ATTRIBUTE_USED;
+
 private:
   friend class ConstraintSystem;
 
@@ -1597,22 +1601,37 @@ private:
                                Args &&...args) {
     // If there is no solver state, this failure is unavoidable.
     if (!solverState) {
-      unavoidableFailures.push_back(
-        Failure::create(getAllocator(), locator, kind,
-                        std::forward<Args>(args)...));
+      auto failure = Failure::create(getAllocator(), locator, kind,
+                                     std::forward<Args>(args)...);
+
+      // Debug output.
+      if (TC.Context.LangOpts.DebugConstraintSolver) {
+        llvm::errs().indent(2);
+        failure->dump(&TC.Context.SourceMgr);
+      }
+
+      unavoidableFailures.push_back(failure);
       return;
     }
 
-    // Check whether we've recorded this failure already. If so, we're done.
+    // Check whether we've recorded this failure already.
     llvm::FoldingSetNodeID id;
     Failure::Profile(id, locator, kind, args...);
     void *insertPos = nullptr;
-    if (failures.FindNodeOrInsertPos(id, insertPos))
-      return;
+    auto failure = failures.FindNodeOrInsertPos(id, insertPos);
+    if (!failure) {
+      // Allocate a new failure and record it.
+      failure = Failure::create(getAllocator(), locator, kind, args...);
+      failures.InsertNode(failure, insertPos);
+    }
 
-    // Allocate a new failure and record it.
-    auto failure = Failure::create(getAllocator(), locator, kind, args...);
-    failures.InsertNode(failure, insertPos);
+    // Debug output.
+    if (TC.Context.LangOpts.DebugConstraintSolver) {
+      llvm::errs().indent(solverState->depth * 2 + 2);
+      failure->dump(&TC.Context.SourceMgr);
+    }
+
+    return;
   }
 
   /// \brief Simplifies an argument to the failure by simplifying the type.
@@ -1640,7 +1659,8 @@ private:
 public:
   /// \brief Whether we should be recording failures.
   bool shouldRecordFailures() {
-    return !solverState || solverState->recordFailures;
+    return !solverState || solverState->recordFailures ||
+           TC.Context.LangOpts.DebugConstraintSolver;
   }
 
   /// \brief Record a failure at the given location with the given kind,
