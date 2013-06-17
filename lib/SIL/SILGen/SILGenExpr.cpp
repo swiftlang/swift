@@ -509,28 +509,81 @@ RValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
                                               SGFContext C) {
   ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
   // Allocate an archetype to hold the downcast value.
-  SILValue archetype = getBufferForExprResult(E, getLoweredType(E->getType()), C);
+  SILValue archetype = getBufferForExprResult(E,
+                                              getLoweredType(E->getType()), C);
   // Initialize it with a SuperToArchetypeInst.
   B.createSuperToArchetype(E, base.forward(*this), archetype);
   
   return RValue(*this, emitManagedRValueWithCleanup(archetype));
 }
 
+static RValue emitArchetypeDowncast(SILGenFunction &gen,
+                                    ExplicitCastExpr *E, SGFContext C) {
+  ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
+  
+  // Cast to the concrete type and replace the cleanup with a new one on the
+  // concrete value, which should be more specific and more efficient than the
+  // one on the original archetype.
+  SILValue cast;
+  if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->isClassBounded()) {
+    cast = gen.B.createDowncastArchetypeRef(E, base.forward(gen),
+                                    gen.getLoweredLoadableType(E->getType()));
+  } else {
+    SILType castTy = gen.getLoweredType(E->getType());
+    cast = gen.B.createDowncastArchetypeAddr(E, base.forward(gen),
+                                             castTy.getAddressType());
+    if (castTy.isLoadable(gen.F.getModule()))
+      cast = gen.B.createLoad(E, cast);
+  }
+  return RValue(gen, gen.emitManagedRValueWithCleanup(cast));
+}
+
 RValue SILGenFunction::visitUncheckedArchetypeToArchetypeExpr(
-                                  UncheckedArchetypeToArchetypeExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
+                                  UncheckedArchetypeToArchetypeExpr *E,
+                                  SGFContext C) {
+  return emitArchetypeDowncast(*this, E, C);
 }
+
 RValue SILGenFunction::visitUncheckedArchetypeToConcreteExpr(
-                                   UncheckedArchetypeToConcreteExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
+                                   UncheckedArchetypeToConcreteExpr *E,
+                                   SGFContext C) {
+  return emitArchetypeDowncast(*this, E, C);
 }
+
+static RValue emitExistentialDowncast(SILGenFunction &gen,
+                                      ExplicitCastExpr *E, SGFContext C) {
+  ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
+  
+  SILValue cast;
+  if (E->getSubExpr()->getType()->isClassBoundedExistentialType()) {
+    // Cast to the concrete type and replace the cleanup with a new one on the
+    // archetype, which may be more specific.
+    cast = gen.B.createDowncastExistentialRef(E, base.forward(gen),
+                                     gen.getLoweredLoadableType(E->getType()));
+  } else {
+    // Project the concrete value address out of the container.
+    SILType castTy = gen.getLoweredType(E->getType());
+    cast = gen.B.createProjectDowncastExistentialAddr(E, base.forward(gen),
+                                                      castTy.getAddressType());
+    if (castTy.isLoadable(gen.F.getModule()))
+      cast = gen.B.createLoad(E, cast);
+    
+    // FIXME: The buffer in the existential container needs to be deallocated
+    // regardless of whether the concrete value is consumed.
+  }
+  return RValue(gen, gen.emitManagedRValueWithCleanup(cast));
+}
+
 RValue SILGenFunction::visitUncheckedExistentialToArchetypeExpr(
-                                   UncheckedExistentialToArchetypeExpr *E, SGFContext C){
-  llvm_unreachable("not implemented");
+                                   UncheckedExistentialToArchetypeExpr *E,
+                                   SGFContext C) {
+  return emitExistentialDowncast(*this, E, C);
 }
+
 RValue SILGenFunction::visitUncheckedExistentialToConcreteExpr(
-                                   UncheckedExistentialToConcreteExpr *E, SGFContext C){
-  llvm_unreachable("not implemented");
+                                   UncheckedExistentialToConcreteExpr *E,
+                                   SGFContext C) {
+  return emitExistentialDowncast(*this, E, C);
 }
 
 RValue SILGenFunction::visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C)

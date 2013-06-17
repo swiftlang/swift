@@ -526,6 +526,8 @@ public:
       if (existential.getType().isClassBoundedExistentialType())
         proj = gen.B.createProjectExistentialRef(e, existential.getValue());
       else
+        // FIXME: We need to arrange for the buffer in the existential container
+        // to be deallocated if "this" is consumed by the call.
         proj = gen.B.createProjectExistential(e, existential.getValue());
 
       setThisParam(RValue(gen, ManagedValue(proj,existential.getCleanup())), e);
