@@ -522,15 +522,17 @@ public:
     if (e->getDecl()->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
-      SILValue proj;
-      if (existential.getType().isClassBoundedExistentialType())
-        proj = gen.B.createProjectExistentialRef(e, existential.getValue());
-      else
-        // FIXME: We need to arrange for the buffer in the existential container
-        // to be deallocated if "this" is consumed by the call.
-        proj = gen.B.createProjectExistential(e, existential.getValue());
+      ManagedValue proj;
+      if (existential.getType().isClassBoundedExistentialType()) {
+        SILValue val = gen.B.createProjectExistentialRef(e,
+                                                         existential.getValue());
+        proj = ManagedValue(val, existential.getCleanup());
+      } else {
+        SILValue val = gen.B.createProjectExistential(e, existential.getValue());
+        proj = ManagedValue(val, ManagedValue::Unmanaged);
+      }
 
-      setThisParam(RValue(gen, ManagedValue(proj,existential.getCleanup())), e);
+      setThisParam(RValue(gen, proj), e);
     } else {
       assert(existential.getType().is<MetaTypeType>() &&
              "non-existential-metatype for existential static method?!");
