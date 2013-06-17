@@ -87,15 +87,29 @@ public:
     }
   }
 
-  void checkExplicitConformance(Decl *D, Type T,
-                                MutableArrayRef<TypeLoc> Inherited) {
-    for (auto InheritedTy : Inherited) {
-      // FIXME: Poor location info.
-      SmallVector<ProtocolDecl *, 4> InheritedProtos;
-      if (InheritedTy.getType()->isExistentialType(InheritedProtos))
-        for (auto Proto : InheritedProtos)
-          TC.conformsToProtocol(T, Proto, nullptr, D->getStartLoc());
+  void gatherExplicitConformances(Decl *D, Type T,
+                          ArrayRef<ProtocolDecl *> Protocols,
+                          SmallVectorImpl<ProtocolConformance *> &Conformances) {
+    
+    for (auto Proto : Protocols) {
+      ProtocolConformance *Conformance = nullptr;
+      TC.conformsToProtocol(T, Proto, &Conformance, D->getStartLoc());
+      Conformances.push_back(Conformance);
     }
+  }
+  
+  void checkExplicitConformance(TypeDecl *D, Type T) {
+    SmallVector<ProtocolConformance *, 2> Conformances;
+    gatherExplicitConformances(D, T, D->getProtocols(),
+                               Conformances);
+    D->setConformances(D->getASTContext().AllocateCopy(Conformances));
+  }
+  
+  void checkExplicitConformance(ExtensionDecl *D, Type T) {
+    SmallVector<ProtocolConformance *, 2> Conformances;
+    gatherExplicitConformances(D, T, D->getProtocols(),
+                               Conformances);
+    D->setConformances(D->getASTContext().AllocateCopy(Conformances));
   }
 
   void checkGenericParams(GenericParamList *GenericParams) {
@@ -357,8 +371,7 @@ public:
     }
 
     if (!IsFirstPass)
-      checkExplicitConformance(TAD, TAD->getDeclaredType(),
-                               TAD->getInherited());
+      checkExplicitConformance(TAD, TAD->getDeclaredType());
   }
 
   void visitOneOfDecl(OneOfDecl *OOD) {
@@ -384,8 +397,7 @@ public:
       visit(member);
     
     if (!IsFirstPass)
-      checkExplicitConformance(OOD, OOD->getDeclaredTypeInContext(),
-                               OOD->getInherited());
+      checkExplicitConformance(OOD, OOD->getDeclaredTypeInContext());
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -417,8 +429,7 @@ public:
     }
 
     if (!IsFirstPass)
-      checkExplicitConformance(SD, SD->getDeclaredTypeInContext(),
-                               SD->getInherited());
+      checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
   }
 
   void visitClassDecl(ClassDecl *CD) {
@@ -454,8 +465,7 @@ public:
       visit(Member);
     
     if (!IsFirstPass)
-      checkExplicitConformance(CD, CD->getDeclaredTypeInContext(),
-                               CD->getInherited());
+      checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -642,8 +652,7 @@ public:
       visit(Member);
 
     if (!IsFirstPass)
-      checkExplicitConformance(ED, ED->getExtendedType(),
-                               ED->getInherited());
+      checkExplicitConformance(ED, ED->getExtendedType());
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

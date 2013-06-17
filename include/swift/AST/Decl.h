@@ -627,6 +627,10 @@ class ExtensionDecl : public Decl, public DeclContext {
 
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
+  
+  /// \brief The set of protocol conformance mappings. The element order
+  /// corresponds to the order of Protocols.
+  ArrayRef<ProtocolConformance *> Conformances;
 
   /// \brief The next extension in the linked list of extensions.
   ExtensionDecl *NextExtension = nullptr;
@@ -662,6 +666,17 @@ public:
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> getProtocols();
+  
+  /// \brief Retrieve the set of protocol conformance mappings for this type.
+  ///
+  /// Calculated during type-checking.
+  ArrayRef<ProtocolConformance *> getConformances() const {
+    return Conformances;
+  }
+  
+  void setConformances(ArrayRef<ProtocolConformance *> c) {
+    Conformances = c;
+  }
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B) {
@@ -906,6 +921,10 @@ class TypeDecl : public ValueDecl {
 
   /// \brief The set of protocols to which this type conforms.
   ArrayRef<ProtocolDecl *> Protocols;
+  
+  /// \brief The set of protocol conformance mappings. The element order
+  /// corresponds to the order of Protocols.
+  ArrayRef<ProtocolConformance *> Conformances;
 
 public:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name,
@@ -924,6 +943,17 @@ public:
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
   ArrayRef<ProtocolDecl *> getProtocols();
+  
+  /// \brief Retrieve the set of protocol conformance mappings for this type.
+  ///
+  /// Calculated during type-checking.
+  ArrayRef<ProtocolConformance *> getConformances() const {
+    return Conformances;
+  }
+  
+  void setConformances(ArrayRef<ProtocolConformance *> c) {
+    Conformances = c;
+  }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
