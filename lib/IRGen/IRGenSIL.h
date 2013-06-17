@@ -533,7 +533,11 @@ public:
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
   void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
+  void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *i);
+  void visitDowncastExistentialRefInst(DowncastExistentialRefInst *i);
+  
   void visitIsaInst(IsaInst *i);
+  
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);

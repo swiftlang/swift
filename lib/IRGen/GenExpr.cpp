@@ -46,15 +46,28 @@ llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
     from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
   
   // Emit a reference to the metadata.
-  llvm::Value *metadataRef
-    = IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(), false, false);
+  bool isClass = toType.getClassOrBoundGenericClass();
+  llvm::Value *metadataRef;
+  llvm::Constant *castFn;
+  if (isClass) {
+    // If the dest type is a concrete class, get the class metadata
+    // and call dynamicCastClass directly.
+    metadataRef
+      = IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(), false, false);
+    castFn = IGM.getDynamicCastClassUnconditionalFn();
+  } else {
+    // Otherwise, get the type metadata, which may be local, and go through
+    // the more general dynamicCast entry point.
+    metadataRef = emitTypeMetadataRef(toType);
+    castFn = IGM.getDynamicCastUnconditionalFn();
+  }
+  
   if (metadataRef->getType() != IGM.Int8PtrTy)
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
   
   // Call the (unconditional) dynamic cast.
   auto call
-    = Builder.CreateCall2(IGM.getDynamicCastClassUnconditionalFn(),
-                              from, metadataRef);
+    = Builder.CreateCall2(castFn, from, metadataRef);
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
   
@@ -62,7 +75,6 @@ llvm::Value *IRGenFunction::emitUnconditionalDowncast(llvm::Value *from,
   return Builder.CreateBitCast(call, subTy);
   
 }
-
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type, Explosion &explosion) {
   ExplosionSchema schema(explosion.getKind());

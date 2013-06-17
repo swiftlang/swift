@@ -1300,6 +1300,29 @@ void IRGenSILFunction::visitSuperToArchetypeInst(swift::SuperToArchetypeInst *i)
                                  archetype);
 }
 
+void IRGenSILFunction::visitDowncastArchetypeRefInst(
+                                           swift::DowncastArchetypeRefInst *i) {
+  Explosion archetype = getLoweredExplosion(i->getOperand());
+  llvm::Value *fromValue = archetype.claimNext();
+  llvm::Value *toValue = emitUnconditionalDowncast(fromValue, i->getType());
+  Explosion to(archetype.getKind());
+  to.add(toValue);
+  newLoweredExplosion(SILValue(i,0), to);
+}
+
+void IRGenSILFunction::visitDowncastExistentialRefInst(
+                                         swift::DowncastExistentialRefInst *i) {
+  Explosion existential = getLoweredExplosion(i->getOperand());
+  llvm::Value *instance
+    = emitClassBoundedExistentialProjection(*this, existential,
+                                            i->getOperand().getType());
+
+  llvm::Value *toValue = emitUnconditionalDowncast(instance, i->getType());
+  Explosion to(existential.getKind());
+  to.add(toValue);
+  newLoweredExplosion(SILValue(i,0), to);
+}
+
 void IRGenSILFunction::visitIsaInst(swift::IsaInst *i) {
   // Emit the value we're testing.
   Explosion from = getLoweredExplosion(i->getOperand());
