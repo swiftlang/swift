@@ -1139,6 +1139,8 @@ void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
 }
 
 bool SubstitutableType::isClassBounded() const {
+  if (Superclass)
+    return true;
   for (ProtocolDecl *conformed : getConformsTo())
     if (conformed->isClassBounded())
       return true;

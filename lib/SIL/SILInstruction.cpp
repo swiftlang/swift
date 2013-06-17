@@ -382,13 +382,6 @@ SpecializeInst::SpecializeInst(SILLocation Loc, SILValue Operand,
          Substitutions.size() * sizeof(Substitution));
 }
 
-SuperToArchetypeInst::SuperToArchetypeInst(SILLocation Loc,
-                                           SILValue SrcBase,
-                                           SILValue DestArchetypeAddress)
-  : SILInstruction(ValueKind::SuperToArchetypeInst, Loc),
-    Operands(this, SrcBase, DestArchetypeAddress) {
-}
-
 StructInst *StructInst::createImpl(SILLocation Loc, SILType Ty,
                                  ArrayRef<SILValue> Elements, SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(StructInst) +

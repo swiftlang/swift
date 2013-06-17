@@ -1590,7 +1590,7 @@ public:
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
   
   /// isClassBounded - True if the type conforms to one or more class-bounded
-  /// protocols.
+  /// protocols or has a superclass constraint.
   bool isClassBounded() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.

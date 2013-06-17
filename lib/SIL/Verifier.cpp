@@ -727,18 +727,6 @@ public:
             "deinit_existential must be applied to non-class-bounded existential");
   }
   
-  void checkArchetypeToSuperInst(ArchetypeToSuperInst *ASI) {
-    require(ASI->getOperand().getType().isAddress(),
-            "archetype_to_super operand must be an address");
-    ArchetypeType *archetype
-      = ASI->getOperand().getType().getAs<ArchetypeType>();
-    require(archetype, "archetype_to_super operand must be archetype");
-    require(!archetype->isClassBounded(),
-            "archetype_to_super operand must not be class-bounded archetype");
-    require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
-            "archetype_to_super must convert to a class type");
-  }
-
   void checkArchetypeRefToSuperInst(ArchetypeRefToSuperInst *ASI) {
     ArchetypeType *archetype
       = ASI->getOperand().getType().getAs<ArchetypeType>();
@@ -875,13 +863,6 @@ public:
     }    
   }
   
-  void checkSuperToArchetypeInst(SuperToArchetypeInst *SAI) {
-    require(SAI->getSrcBase().getType().hasReferenceSemantics(),
-            "super_to_archetype source must be a reference type");
-    require(SAI->getDestArchetypeAddress().getType().is<ArchetypeType>(),
-            "super_to_archetype dest must be an archetype address");
-  }
-
   void checkUpcastInst(UpcastInst *UI) {
     if (UI->getType().is<MetaTypeType>()) {
       CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());

@@ -299,13 +299,6 @@ public:
                     BridgeToBlockInst(Loc, Op, Ty));
   }
 
-  ArchetypeToSuperInst *createArchetypeToSuper(SILLocation Loc,
-                                               SILValue Archetype,
-                                               SILType BaseTy) {
-    return insert(new (F.getModule())
-                    ArchetypeToSuperInst(Loc, Archetype, BaseTy));
-  }
-  
   ArchetypeRefToSuperInst *createArchetypeRefToSuper(SILLocation Loc,
                                                      SILValue Archetype,
                                                      SILType BaseTy) {
@@ -318,13 +311,6 @@ public:
                                                      SILType BaseTy) {
     return insert(new (F.getModule())
                     SuperToArchetypeRefInst(Loc, Archetype, BaseTy));
-  }
-  
-  SuperToArchetypeInst *createSuperToArchetype(SILLocation Loc,
-                                               SILValue SrcBase,
-                                               SILValue DestArchetypeAddr) {
-    return insert(new (F.getModule())
-                    SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
   }
   
   DowncastArchetypeAddrInst *createDowncastArchetypeAddr(SILLocation Loc,

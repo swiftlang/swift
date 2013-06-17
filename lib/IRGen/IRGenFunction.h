@@ -180,8 +180,8 @@ public:
 
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
-  void emitSupertoArchetypeConversion(Explosion &input,
-                                    SILType destType, Address outputArchetype);
+  llvm::Value *emitSuperToClassBoundedArchetypeConversion(llvm::Value *super,
+                                                          SILType destType);
 
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.

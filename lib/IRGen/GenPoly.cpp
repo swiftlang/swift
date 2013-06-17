@@ -678,30 +678,32 @@ void irgen::reemitAsSubstituted(IRGenFunction &IGF,
   ReemitAsSubstituted(IGF, subs, in, out).visit(origTy, substTy);
 }
 
-
-void IRGenFunction::emitSupertoArchetypeConversion(Explosion &input,
-                                                   SILType destType,
-                                                   Address outputArchetype) {
+llvm::Value *
+IRGenFunction::emitSuperToClassBoundedArchetypeConversion(llvm::Value *super,
+                                                          SILType destType) {
   assert(destType.is<ArchetypeType>() && "expected archetype type");
-  
-  llvm::Value *superObject = input.claimNext();
-  superObject = Builder.CreateBitCast(superObject, IGM.Int8PtrTy);
-  
+  assert(destType.castTo<ArchetypeType>()->isClassBounded()
+         && "expected class-bounded archetype type");
+
+  // Cast the super pointer to i8* for the runtime call.
+  super = Builder.CreateBitCast(super, IGM.Int8PtrTy);
+
   // Retrieve the metadata.
   llvm::Value *metadataRef = emitTypeMetadataRef(destType);
   if (metadataRef->getType() != IGM.Int8PtrTy)
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
-  
+
   // Call the (unconditional) dynamic cast.
   auto call
     = Builder.CreateCall2(IGM.getDynamicCastUnconditionalFn(),
-                          superObject, metadataRef);
-
+                          super, metadataRef);
+  
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
   
-  // Store the result into the archetype.
-  llvm::Value *addr = Builder.CreateBitCast(outputArchetype.getAddress(),
-                                            IGM.Int8PtrPtrTy);
-  Builder.CreateStore(call, addr, outputArchetype.getAlignment());  
+  // Bitcast the result to the archetype's representation type.
+  auto &destTI = getFragileTypeInfo(destType);
+  llvm::Value *cast = Builder.CreateBitCast(call, destTI.StorageType);
+
+  return cast;
 }

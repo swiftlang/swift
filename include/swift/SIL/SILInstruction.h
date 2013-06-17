@@ -801,22 +801,8 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// ArchetypeToSuperInst - Given the address of an archetype value with a base
-/// class constraint, returns a reference to the base class instance.
-class ArchetypeToSuperInst
-  : public UnaryInstructionBase<ValueKind::ArchetypeToSuperInst, ConversionInst>
-{
-public:
-  ArchetypeToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
 /// ArchetypeRefToSuperInst - Given a class-bounded archetype value with a base
 /// class constraint, returns a reference to the base class instance.
-///
-/// FIXME: All archetypes with base class constraints are class-bounded, so
-/// ArchetypeToSuper should go away when class-bounded archetypes are fully
-/// implemented.
 class ArchetypeRefToSuperInst
   : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst, ConversionInst>
 {
@@ -825,40 +811,9 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// SuperToArchetypeInst - Given a value of a class type, initializes an
-/// archetype with a base class constraint to contain a reference to the value.
-class SuperToArchetypeInst : public SILInstruction {
-  enum {
-    /// The value of class type.
-    SrcBase,
-    /// The address to store to.
-    DestArchetypeAddress
-  };
-  FixedOperandList<2> Operands;
-public:
-  SuperToArchetypeInst(SILLocation Loc,
-                       SILValue SrcBase,
-                       SILValue DestArchetypeAddress);
-  
-  SILValue getSrcBase() const { return Operands[SrcBase].get(); }
-  SILValue getDestArchetypeAddress() const {
-    return Operands[DestArchetypeAddress].get();
-  }
-
-  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SuperToArchetypeInst;
-  }
-};
-  
 /// SuperToArchetypeRefInst - Given a value of a class type, initializes a
 /// class-bounded archetype with a base class constraint to contain a reference to
 /// the value.
-///
-/// FIXME: All archetypes with base class constraints are class-bounded, so
-/// ArchetypeToSuper should go away when class-bounded archetypes are fully
-/// implemented.
 class SuperToArchetypeRefInst
   : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,
                                 ConversionInst>

@@ -531,8 +531,8 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
-  void visitArchetypeToSuperInst(ArchetypeToSuperInst *i);
-  void visitSuperToArchetypeInst(SuperToArchetypeInst *i);
+  void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
+  void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *i);
   void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *i);
   void visitDowncastExistentialRefInst(DowncastExistentialRefInst *i);
   

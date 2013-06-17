@@ -368,19 +368,11 @@ RValue SILGenFunction::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 RValue SILGenFunction::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                  SGFContext C) {
   ManagedValue archetype = visit(E->getSubExpr()).getAsSingleValue(*this);
-  SILValue base = B.createArchetypeToSuper(E,
-                                        archetype.getValue(),
+  // Replace the cleanup with a new one on the base class value so we always use
+  // concrete retain/release operations.
+  SILValue base = B.createArchetypeRefToSuper(E,
+                                        archetype.forward(*this),
                                         getLoweredLoadableType(E->getType()));
-  if (archetype.hasCleanup()) {
-    // If an archetype has a base class, then it must have been of some
-    // reference type, so releasing the resulting class-type value is equivalent
-    // to destroying the archetype. We can thus "take" the archetype and disable
-    // its destructor cleanup if it was a temporary.
-    Cleanups.setCleanupState(archetype.getCleanup(), CleanupState::Dead);
-  } else {
-    // The archetype isn't a temporary, so we need our own retain.
-    emitRetainRValue(E, base);
-  }
   return RValue(*this, emitManagedRValueWithCleanup(base));
 }
 
@@ -508,13 +500,11 @@ RValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
                                               UncheckedSuperToArchetypeExpr *E,
                                               SGFContext C) {
   ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
-  // Allocate an archetype to hold the downcast value.
-  SILValue archetype = getBufferForExprResult(E,
-                                              getLoweredType(E->getType()), C);
   // Initialize it with a SuperToArchetypeInst.
-  B.createSuperToArchetype(E, base.forward(*this), archetype);
-  
-  return RValue(*this, emitManagedRValueWithCleanup(archetype));
+  SILValue archetype = B.createSuperToArchetypeRef(E, base.getValue(),
+                                         getLoweredLoadableType(E->getType()));
+  // Keep the base-class-typed cleanup so we use a concrete release.
+  return RValue(*this, ManagedValue(archetype, base.getCleanup()));
 }
 
 static RValue emitArchetypeDowncast(SILGenFunction &gen,

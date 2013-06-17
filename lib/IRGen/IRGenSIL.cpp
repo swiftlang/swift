@@ -1271,33 +1271,29 @@ void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   newLoweredExplosion(SILValue(i, 0), to);
 }
 
-void IRGenSILFunction::visitArchetypeToSuperInst(swift::ArchetypeToSuperInst *i)
-{
-  // Get the archetype address.
-  Address archetype = getLoweredAddress(i->getOperand());
+void IRGenSILFunction::visitArchetypeRefToSuperInst(
+                                              swift::ArchetypeRefToSuperInst *i) {
+  // Get the archetype value.
+  Explosion archetype = getLoweredExplosion(i->getOperand());
+  llvm::Value *in = archetype.claimNext();
   
-  // The data associated with the archetype is simply a pointer; grab it
-  // and cast it to the superclass type.
   Explosion out(CurExplosionLevel);
-  
   const TypeInfo &baseTypeInfo = getFragileTypeInfo(i->getType());
   llvm::Type *baseTy = baseTypeInfo.StorageType;
-  llvm::Type *basePtrTy = baseTy->getPointerTo();
-  llvm::Value *castPtrVal = Builder.CreateBitCast(archetype.getAddress(),
-                                                  basePtrTy);
-  llvm::Value *castVal
-    = Builder.CreateLoad(castPtrVal, IGM.getPointerAlignment());
-
-  out.add(castVal);
+  llvm::Value *cast = Builder.CreateBitCast(in, baseTy);
+  out.add(cast);
   newLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitSuperToArchetypeInst(swift::SuperToArchetypeInst *i)
-{
-  Address archetype = getLoweredAddress(i->getDestArchetypeAddress());
-  Explosion super = getLoweredExplosion(i->getSrcBase());
-  emitSupertoArchetypeConversion(super, i->getDestArchetypeAddress().getType(),
-                                 archetype);
+void IRGenSILFunction::visitSuperToArchetypeRefInst(
+                                             swift::SuperToArchetypeRefInst *i) {
+  Explosion super = getLoweredExplosion(i->getOperand());
+  llvm::Value *in = super.claimNext();
+  Explosion out(CurExplosionLevel);
+  llvm::Value *cast
+    = emitSuperToClassBoundedArchetypeConversion(in, i->getType());
+  out.add(cast);
+  newLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitDowncastArchetypeRefInst(

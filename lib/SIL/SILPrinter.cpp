@@ -409,9 +409,6 @@ public:
   void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
     printConversionInst(CI, CI->getOperand(), "bridge_to_block");
   }
-  void visitArchetypeToSuperInst(ArchetypeToSuperInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "archetype_to_super");
-  }
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *CI) {
     printConversionInst(CI, CI->getOperand(), "archetype_ref_to_super");
   }
@@ -431,11 +428,6 @@ public:
     printConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
   }
 
-  void visitSuperToArchetypeInst(SuperToArchetypeInst *I) {
-    OS << "super_to_archetype " << getID(I->getSrcBase()) << " to "
-       << getID(I->getDestArchetypeAddress());
-  }
-  
   void visitIsaInst(IsaInst *I) {
     OS << "isa " << getID(I->getOperand()) << ", " << I->getTestType();
   }
