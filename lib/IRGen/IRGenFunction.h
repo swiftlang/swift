@@ -161,11 +161,18 @@ public:
   void emitInitializeRetained(llvm::Value *value, Address addr);
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRetainCall(llvm::Value *value);
-  llvm::Value *emitBestRetainCall(llvm::Value *value, ClassDecl *theClass);
   void emitRelease(llvm::Value *value);
   void emitObjCRetain(llvm::Value *value, Explosion &explosion);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
   void emitObjCRelease(llvm::Value *value);
+  
+  /// Emit a retain of a class instance with unknown retain semantics.
+  void emitUnknownRetain(llvm::Value *value, Explosion &explosion);
+  /// Emit a retain of a class instance with unknown retain semantics, and
+  /// return the retained value.
+  llvm::Value *emitUnknownRetainCall(llvm::Value *value);
+  /// Emit a release of a class instance with unknown retain semantics.
+  void emitUnknownRelease(llvm::Value *value);
 
 //--- Expression emission ------------------------------------------------------
 public:

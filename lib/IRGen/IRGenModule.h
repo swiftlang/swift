@@ -137,7 +137,10 @@ public:
   llvm::PointerType *TypeMetadataPatternPtrTy;/// %swift.type_pattern*
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
-  llvm::PointerType *ObjCPtrTy;        /// %objc_object*
+  union {
+    llvm::PointerType *ObjCPtrTy;        /// %objc_object*
+    llvm::PointerType *UnknownRefCountedPtrTy;
+  };
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*

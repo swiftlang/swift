@@ -650,4 +650,14 @@ void IRGenFunction::emitRelease(llvm::Value *value) {
   return emitReleaseCall(*this, value);
 }
 
+void IRGenFunction::emitUnknownRetain(llvm::Value *value, Explosion &e) {
+  return emitObjCRetain(value, e);
+}
 
+llvm::Value *IRGenFunction::emitUnknownRetainCall(llvm::Value *value) {
+  return emitObjCRetainCall(value);
+}
+
+void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
+  return emitObjCRelease(value);
+}

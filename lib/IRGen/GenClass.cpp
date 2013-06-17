@@ -62,17 +62,6 @@ static bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
   return hasKnownSwiftImplementation(IGM, theClass);
 }
 
-/// Emit a retain of a class pointer, using the best known retain
-/// semantics for the value.
-llvm::Value *IRGenFunction::emitBestRetainCall(llvm::Value *value,
-                                               ClassDecl *theClass) {
-  if (hasSwiftRefcount(IGM, theClass)) {
-    emitRetainCall(value);
-    return value;
-  }
-  return emitObjCRetainCall(value);
-}
-
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.

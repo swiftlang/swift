@@ -676,10 +676,10 @@ namespace {
       // Load the witness table pointers.
       for (unsigned i = 0; i < NumProtocols; ++i)
         e.add(IGF.Builder.CreateLoad(projectWitnessTable(IGF, address, i)));
-      // Load the instance pointer, which is ObjC-refcounted.
+      // Load the instance pointer, which is unknown-refcounted.
       llvm::Value *instance
         = IGF.Builder.CreateLoad(projectValue(IGF, address));
-      IGF.emitObjCRetainCall(instance);
+      IGF.emitUnknownRetainCall(instance);
       e.add(instance);
     }
 
@@ -699,11 +699,11 @@ namespace {
         IGF.Builder.CreateStore(e.claimNext(),
                                 projectWitnessTable(IGF, address, i));
       }
-      // Reassign the instance pointer, which is ObjC-refcounted.
+      // Reassign the instance pointer, which is unknown-refcounted.
       Address instanceAddr = projectValue(IGF, address);
       llvm::Value *old = IGF.Builder.CreateLoad(instanceAddr);
       IGF.Builder.CreateStore(e.claimNext(), instanceAddr);
-      IGF.emitObjCRelease(old);
+      IGF.emitUnknownRelease(old);
     }
     
     void initialize(IRGenFunction &IGF, Explosion &e, Address address)
@@ -722,25 +722,25 @@ namespace {
     const override {
       // Transfer the witness table pointers.
       src.transferInto(dest, NumProtocols);
-      // Copy the instance pointer, which is ObjC-refcounted.
-      IGF.emitObjCRetain(src.claimNext(), dest);
+      // Copy the instance pointer, which is unknown-refcounted.
+      IGF.emitUnknownRetain(src.claimNext(), dest);
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const override {
       e.claim(NumProtocols);
-      // The instance is treated as ObjC-refcounted.
-      IGF.emitObjCRetainCall(e.claimNext());
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownRetainCall(e.claimNext());
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const override {
       e.claim(NumProtocols);
-      // The instance is treated as ObjC-refcounted.
-      IGF.emitObjCRelease(e.claimNext());
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownRelease(e.claimNext());
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const override {
-      // The instance is treated as ObjC-refcounted.
-      IGF.emitObjCRelease(IGF.Builder.CreateLoad(projectValue(IGF, addr)));
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownRelease(IGF.Builder.CreateLoad(projectValue(IGF, addr)));
     }
   };
 
@@ -917,8 +917,8 @@ namespace {
   /// A type implementation for a class-bounded archetype, that is, an archetype
   /// bounded by a class-bounded protocol constraint. These archetypes can be
   /// represented by a refcounted pointer instead of an opaque value buffer.
-  /// We use an ObjC-refcounted pointer in order to allow ObjC or Swift classes
-  /// to conform to the type variable.
+  /// We use an unknown-refcounted pointer in order to allow ObjC or Swift
+  /// classes to conform to the type variable.
   class ClassBoundedArchetypeTypeInfo
     : public HeapTypeInfo<ClassBoundedArchetypeTypeInfo>,
       public ArchetypeTypeInfoBase
@@ -2673,7 +2673,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // existential representation.
   if (isClassBounded) {
     // Add the class instance pointer to the fields.
-    fields.push_back(IGM.ObjCPtrTy);
+    fields.push_back(IGM.UnknownRefCountedPtrTy);
     // Drop the type metadata pointer. We can get it from the class instance.
     type->setBody(llvm::makeArrayRef(fields).slice(1));
     
@@ -2730,7 +2730,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is class-bounded, use the class-bounded representation.
   if (archetype->isClassBounded())
     return ClassBoundedArchetypeTypeInfo::create(archetype,
-                                                 IGM.ObjCPtrTy,
+                                                 IGM.UnknownRefCountedPtrTy,
                                                  IGM.getPointerSize(),
                                                  IGM.getPointerAlignment(),
                                                  protocols);
@@ -3517,7 +3517,7 @@ void irgen::emitClassBoundedExistentialContainer(IRGenFunction &IGF,
   
   // Cast the instance pointer to an opaque refcounted pointer.
   llvm::Value *opaqueInstance
-    = IGF.Builder.CreateBitCast(instance, IGF.IGM.ObjCPtrTy);
+    = IGF.Builder.CreateBitCast(instance, IGF.IGM.UnknownRefCountedPtrTy);
   out.add(opaqueInstance);
 }
 
