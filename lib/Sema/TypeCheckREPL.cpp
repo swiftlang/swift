@@ -169,9 +169,9 @@ dynamicTypeFailed:
   PrintLiteralString(" instance>", TC, Loc, PrintDecls, BodyContent);
 }
 
-/// \brief Print a slice.
+/// \brief Print a collection.
 static void
-PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
+PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
            SourceLoc Loc, SourceLoc EndLoc,
            SmallVectorImpl<unsigned> &MemberIndexes,
            SmallVectorImpl<BraceStmt::ExprStmtOrDecl> &BodyContent,
@@ -213,13 +213,47 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
   // Add opening bracket '['.
   PrintLiteralString("[", TC, Loc, PrintDecls, BodyContent);
 
-  // Create the pattern for a variable "elt".
-  auto elementVar = new (context) VarDecl(Loc, context.getIdentifier("elt"),
-                                          ElementTy, DC);
-  Pattern *pattern = new (context) NamedPattern(elementVar);
-  pattern->setType(ElementTy);
-  pattern = new (context) TypedPattern(pattern, TypeLoc::withoutLoc(ElementTy));
-  pattern->setType(ElementTy);
+  // Create the "value" variable and its pattern.
+  auto valueId = context.getIdentifier("value");
+  VarDecl *valueVar = new (context) VarDecl(Loc, valueId, ValueTy, DC);
+  Pattern *valuePattern = new (context) NamedPattern(valueVar);
+  valuePattern->setType(ValueTy);
+  valuePattern = new (context) TypedPattern(valuePattern,
+                                            TypeLoc::withoutLoc(ValueTy));
+  valuePattern->setType(ValueTy);
+
+  // Create the pattern. For a dictionary 
+  Pattern *pattern = nullptr;
+  VarDecl *keyVar = nullptr;
+  if (KeyTy) {
+    // We have a key type, so the pattern is '(key, value)'.
+
+    // Form the key variable and its pattern.
+    auto keyId = context.getIdentifier("key");
+    keyVar = new (context) VarDecl(Loc, keyId, KeyTy, DC);
+    Pattern *keyPattern = new (context) NamedPattern(keyVar);
+    keyPattern->setType(KeyTy);
+    keyPattern = new (context) TypedPattern(keyPattern,
+                                            TypeLoc::withoutLoc(KeyTy));
+
+    // Form the tuple pattern.
+    TuplePatternElt patternElts[2] = {
+      TuplePatternElt(keyPattern), TuplePatternElt(valuePattern)
+    };
+    pattern = TuplePattern::create(context,SourceLoc(),patternElts,SourceLoc());
+
+    // Provide a type for the pattern.
+    TupleTypeElt elts[2] = {
+      TupleTypeElt(KeyTy, keyId),
+      TupleTypeElt(ValueTy, valueId)
+    };
+    pattern->setType(TupleType::get(elts, context));
+
+  } else {
+    // We don't have a key type, so the pattern is just 'value'.
+    pattern = valuePattern;
+  }
+
 
   // Construct the loop body.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> loopBodyContents;
@@ -251,8 +285,16 @@ PrintSlice(TypeChecker &TC, VarDecl *Arg, Type ElementTy,
     PrintLiteralString(", ", TC, Loc, PrintDecls, loopBodyContents);
   }
 
+  // If there is a key, print it and the ':'.
+  if (keyVar) {
+    PrintReplExpr(TC, keyVar, KeyTy, KeyTy->getCanonicalType(), Loc,
+                  EndLoc, MemberIndexes, loopBodyContents, PrintDecls, DC);
+
+    PrintLiteralString(" : ", TC, Loc, PrintDecls, loopBodyContents);
+  }
+
   // Print the value
-  PrintReplExpr(TC, elementVar, ElementTy, ElementTy->getCanonicalType(), Loc,
+  PrintReplExpr(TC, valueVar, ValueTy, ValueTy->getCanonicalType(), Loc,
                 EndLoc, MemberIndexes, loopBodyContents, PrintDecls, DC);
 
   auto loopBody = BraceStmt::create(context, Loc, loopBodyContents, EndLoc);
@@ -341,8 +383,8 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     // constrained to being replPrintable.  We need replPrint to be more
     // dynamically reflective in its implementation.
     if (!BGST->getParent() && BGST->getDecl()->getName().str() == "Slice") {
-      PrintSlice(TC, Arg, BGST->getGenericArgs()[0], Loc, EndLoc, MemberIndexes,
-                 BodyContent, PrintDecls, DC);
+      PrintCollection(TC, Arg, Type(), BGST->getGenericArgs()[0], Loc, EndLoc,
+                      MemberIndexes, BodyContent, PrintDecls, DC);
       return;
     }
 
@@ -357,7 +399,23 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     return;
   }
 
-  
+  if (BoundGenericClassType *BGCT = dyn_cast<BoundGenericClassType>(T)) {
+    // FIXME: We have to hack Slice into here, because replPrint on Dictionary
+    // isn't implementable yet.  We don't want the T argument of the dictionary
+    // to be constrained to being replPrintable.  We need replPrint to be more
+    // dynamically reflective in its implementation.
+    if (!BGCT->getParent() && BGCT->getDecl()->getName().str() == "Dictionary"){
+      PrintCollection(TC, Arg, BGCT->getGenericArgs()[0],
+                      BGCT->getGenericArgs()[1], Loc, EndLoc,
+                      MemberIndexes, BodyContent, PrintDecls, DC);
+      return;
+    }
+
+    PrintClass(TC, Arg, SugarT, BGCT->getDecl(), Loc, EndLoc,
+               MemberIndexes, BodyContent, PrintDecls);
+    return;
+  }
+
   // FIXME: We should handle OneOfTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
 
