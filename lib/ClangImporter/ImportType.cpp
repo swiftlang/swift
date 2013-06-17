@@ -186,12 +186,12 @@ namespace {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
       }
 
-      // All other C pointers to concrete types map to CPointer<T>.
+      // All other C pointers to concrete types map to UnsafePointer<T>.
       auto pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Normal);
       if (pointeeType)
         return Impl.getNamedSwiftTypeSpecialization(Impl.getSwiftModule(),
-                                                    "CPointer", pointeeType);
+                                                    "UnsafePointer", pointeeType);
       
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.

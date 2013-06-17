@@ -337,7 +337,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
           swiftVarAddress, 0, Size(0));
         
         if (fnParameterName[3] == 'v') { // extra step for argv
-          // The first member of CPointer<T> is just an opaque LLVM
+          // The first member of UnsafePointer<T> is just an opaque LLVM
           // void*; interpret it as char** so we can store into it.
           firstMemberAddress = mainIGF.Builder.CreateBitCast(
               firstMemberAddress, 
