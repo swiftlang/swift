@@ -550,6 +550,19 @@ RValue SILGenFunction::visitUncheckedArchetypeToConcreteExpr(
   return emitArchetypeDowncast(*this, E, C);
 }
 
+namespace {
+  class CleanupUsedExistentialContainer : public Cleanup {
+    SILValue existential;
+  public:
+    CleanupUsedExistentialContainer(SILValue existential)
+      : existential(existential) {}
+    
+    void emit(SILGenFunction &gen) override {
+      gen.B.createDeinitExistential(SILLocation(), existential);
+    }
+  };
+}
+
 static RValue emitExistentialDowncast(SILGenFunction &gen,
                                       ExplicitCastExpr *E, SGFContext C) {
   ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
@@ -568,8 +581,9 @@ static RValue emitExistentialDowncast(SILGenFunction &gen,
     if (castTy.isLoadable(gen.F.getModule()))
       cast = gen.B.createLoad(E, cast);
     
-    // FIXME: The buffer in the existential container needs to be deallocated
-    // regardless of whether the concrete value is consumed.
+    // We'll pass on ownership of the contained value, but we still need to
+    // deallocate the existential buffer when we're done.
+    gen.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(base.getValue());
   }
   return RValue(gen, gen.emitManagedRValueWithCleanup(cast));
 }
