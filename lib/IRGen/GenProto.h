@@ -71,6 +71,12 @@ namespace irgen {
                                   bool isTakeOfSrc,
                                   ArrayRef<ProtocolConformance*> conformances);
   
+  /// "Deinitialize" an existential container whose contained value is allocated
+  /// but uninitialized, by deallocating the buffer owned by the container if any.
+  void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
+                                            Address container,
+                                            SILType type);
+  
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
   Address emitOpaqueExistentialProjection(IRGenFunction &IGF,

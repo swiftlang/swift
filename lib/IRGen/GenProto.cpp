@@ -3493,6 +3493,22 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
   }
 }
 
+/// "Deinitialize" an existential container whose contained value is allocated
+/// but uninitialized, by deallocating the buffer owned by the container if any.
+void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
+                                                 Address container,
+                                                 SILType type) {
+  assert(type.isExistentialType());
+  assert(!type.isClassBoundedExistentialType());
+  auto &ti = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
+  auto layout = ti.getLayout();
+  
+  llvm::Value *metadata = layout.loadMetadataRef(IGF, container);
+  llvm::Value *wtable = layout.loadValueWitnessTable(IGF, container, metadata);
+  Address buffer = layout.projectExistentialBuffer(IGF, container);
+  emitDeallocateBufferCall(IGF, wtable, metadata, buffer);
+}
+
 /// Emit a class-bounded existential container from a class instance value
 /// as an explosion.
 void irgen::emitClassBoundedExistentialContainer(IRGenFunction &IGF,

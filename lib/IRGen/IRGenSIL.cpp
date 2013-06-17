@@ -1441,6 +1441,13 @@ void IRGenSILFunction::visitUpcastExistentialRefInst(
   llvm_unreachable("not yet implemented");
 }
 
+void IRGenSILFunction::visitDeinitExistentialInst(
+                                              swift::DeinitExistentialInst *i) {
+  Address container = getLoweredAddress(i->getOperand());
+  emitOpaqueExistentialContainerDeinit(*this, container,
+                                       i->getOperand().getType());
+}
+
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   SILType baseTy = i->getOperand().getType();

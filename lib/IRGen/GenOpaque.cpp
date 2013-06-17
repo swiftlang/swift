@@ -279,7 +279,7 @@ llvm::Value *irgen::emitAllocateBufferCall(IRGenFunction &IGF,
 /// Emit a call to do a 'projectBuffer' operation.
 llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
                                           llvm::Value *witnessTable,
-                                           llvm::Value *metadata,
+                                          llvm::Value *metadata,
                                           Address buffer) {
   llvm::Value *projectFn = emitLoadOfValueWitness(IGF, witnessTable,
                                             ValueWitness::ProjectBuffer);
@@ -360,10 +360,23 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
 /// Emit a call to do a 'destroyBuffer' operation.
 void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
                                   llvm::Value *witnessTable,
-                                   llvm::Value *metadata,
+                                  llvm::Value *metadata,
                                   Address buffer) {
   auto fn = emitLoadOfValueWitness(IGF, witnessTable,
                                    ValueWitness::DestroyBuffer);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
+/// Emit a call to do a 'deallocateBuffer' operation.
+void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
+                                     llvm::Value *witnessTable,
+                                     llvm::Value *metadata,
+                                     Address buffer) {
+  auto fn = emitLoadOfValueWitness(IGF, witnessTable,
+                                   ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);

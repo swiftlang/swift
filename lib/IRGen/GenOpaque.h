@@ -102,6 +102,12 @@ namespace irgen {
                              llvm::Value *metadata,
                              Address buffer);
   
+  /// Emit a call to do a 'deallocateBuffer' operation.
+  void emitDeallocateBufferCall(IRGenFunction &IGF,
+                                llvm::Value *witnessTable,
+                                llvm::Value *metadata,
+                                Address buffer);
+  
   /// Emit a call to the 'typeof' operation.
   llvm::Value *emitTypeofCall(IRGenFunction &IGF,
                               llvm::Value *witnessTable,

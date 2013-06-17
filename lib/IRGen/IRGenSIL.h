@@ -507,7 +507,7 @@ public:
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitUpcastExistentialInst(UpcastExistentialInst *i);
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
-  //void visitDeinitExistentialInst(DeinitExistentialInst *i);
+  void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
