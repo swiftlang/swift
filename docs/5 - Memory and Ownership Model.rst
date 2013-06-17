@@ -24,8 +24,9 @@ and sized array values are all value types. For example::
 declares an array of 42 integers on the stack, there is no heap allocation
 involved.
 
-Objects (when we figure out what they look like) are always implicitly reference
-types. Functions and array slices are reference types. As a silly example::
+Objects—when we figure out what they look like—are always implicitly
+reference types. Closures (including functions) and array slices are
+reference types. As a silly example::
 
   func foo() {
     var myarray : int[42];
@@ -124,12 +125,15 @@ needs to be three words: pointer, element count, containing object pointer.
 Runtime Optimizations
 ---------------------
 
-As described, ARC would be very expensive at runtime, continuously atomically
-diddling around with refcounts. The optimizer should aim to eliminate as many
-redundant refcounts manipulations as it can (and is one more reason that neither
-the strong nor the weak refcount should be exposed/accessible to user
-code). This can clean up a lot of redundant manipulation from local variables on
-the stack and trivial getters, for example.
+As described, ARC would be very expensive at runtime, continuously
+atomically diddling around with refcounts. The optimizer should
+aggressively eliminate redundant refcount manipulations—e.g. from from
+local variables and trivial getters—whenever it can.  These
+opportunities are maximized by the decision to keep the details of
+strong and weak refcounts hidden from user code. [#uniqueness]_
 
+
+.. [#uniqueness] We do, however, expose reference *uniqueness*, so
+   users can implement Copy-On-Write efficiently.
 
 
