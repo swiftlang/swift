@@ -327,6 +327,31 @@ public:
                     SuperToArchetypeInst(Loc, SrcBase, DestArchetypeAddr));
   }
   
+  DowncastArchetypeAddrInst *createDowncastArchetypeAddr(SILLocation Loc,
+                                                         SILValue Archetype,
+                                                         SILType Ty) {
+    return insert(new (F.getModule())
+                    DowncastArchetypeAddrInst(Loc, Archetype, Ty));
+  }
+  DowncastArchetypeRefInst *createDowncastArchetypeRef(SILLocation Loc,
+                                                       SILValue Archetype,
+                                                       SILType Ty) {
+    return insert(new (F.getModule())
+                    DowncastArchetypeRefInst(Loc, Archetype, Ty));
+  }
+  ProjectDowncastExistentialAddrInst *createProjectDowncastExistentialAddr(SILLocation Loc,
+                                                         SILValue Existential,
+                                                         SILType Ty) {
+    return insert(new (F.getModule())
+                  ProjectDowncastExistentialAddrInst(Loc, Existential, Ty));
+  }
+  DowncastExistentialRefInst *createDowncastExistentialRef(SILLocation Loc,
+                                                       SILValue Existential,
+                                                       SILType Ty) {
+    return insert(new (F.getModule())
+                  DowncastExistentialRefInst(Loc, Existential, Ty));
+  }
+  
   IsaInst *createIsa(SILLocation Loc,
                      SILValue Operand,
                      SILType TestType,

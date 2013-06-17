@@ -933,6 +933,63 @@ public:
             "address-to-pointer result type must be RawPointer");
   }
 
+  void checkDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *DAAI) {
+    require(DAAI->getOperand().getType().isAddress(),
+            "downcast_archetype_addr operand must be an address");
+    ArchetypeType *archetype = DAAI->getOperand().getType().getAs<ArchetypeType>();
+    require(archetype, "downcast_archetype_addr operand must be an archetype");
+    require(!archetype->isClassBounded(),
+            "downcast_archetype_addr operand must be a non-class-bounded archetype");
+    
+    require(DAAI->getType().isAddress(),
+            "downcast_archetype_addr result must be an address");
+  }
+  
+  void checkDowncastArchetypeRefInst(DowncastArchetypeRefInst *DARI) {
+    require(!DARI->getOperand().getType().isAddress(),
+            "downcast_archetype_ref operand must not be an address");
+    ArchetypeType *archetype = DARI->getOperand().getType().getAs<ArchetypeType>();
+    require(archetype, "downcast_archetype_ref operand must be an archetype");
+    require(archetype->isClassBounded(),
+            "downcast_archetype_ref operand must be a class-bounded archetype");
+    
+    require(!DARI->getType().isAddress(),
+            "downcast_archetype_ref result must not be an address");
+    require(DARI->getType().getClassOrBoundGenericClass()
+            || (DARI->getType().is<ArchetypeType>()
+                && DARI->getType().castTo<ArchetypeType>()->isClassBounded()),
+            "downcast_archetype_ref result must be a class type "
+            "or class-bounded archetype");
+  }
+  
+  void checkProjectDowncastExistentialAddrInst(ProjectDowncastExistentialAddrInst *DEAI) {
+    require(DEAI->getOperand().getType().isAddress(),
+            "project_downcast_existential_addr operand must be an address");
+    require(DEAI->getOperand().getType().isExistentialType(),
+            "project_downcast_existential_addr operand must be an existential");
+    require(!DEAI->getOperand().getType().isClassBoundedExistentialType(),
+            "project_downcast_existential_addr operand must be a non-class-bounded "
+            "existential");
+    
+    require(DEAI->getType().isAddress(),
+            "project_downcast_existential_addr result must be an address");
+  }
+  
+  void checkDowncastExistentialRefInst(DowncastExistentialRefInst *DERI) {
+    require(!DERI->getOperand().getType().isAddress(),
+            "downcast_existential_ref operand must not be an address");
+    require(DERI->getOperand().getType().isClassBoundedExistentialType(),
+            "downcast_existential_ref operand must be a class-bounded existential");
+    
+    require(!DERI->getType().isAddress(),
+            "downcast_existential_ref result must not be an address");
+    require(DERI->getType().getClassOrBoundGenericClass()
+            || (DERI->getType().is<ArchetypeType>()
+                && DERI->getType().castTo<ArchetypeType>()->isClassBounded()),
+            "downcast_existential_ref result must be a class type "
+            "or class-bounded archetype");
+  }
+  
   void checkRefToObjectPointerInst(RefToObjectPointerInst *AI) {
     require(AI->getOperand().getType()
               .getSwiftType()->getClassOrBoundGenericClass(),

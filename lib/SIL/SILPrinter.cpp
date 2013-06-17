@@ -416,7 +416,19 @@ public:
     printConversionInst(CI, CI->getOperand(), "archetype_ref_to_super");
   }
   void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "supert_to_archetype_ref");
+    printConversionInst(CI, CI->getOperand(), "super_to_archetype_ref");
+  }
+  void visitDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "downcast_archetype_addr");
+  }
+  void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "downcast_archetype_ref");
+  }
+  void visitProjectDowncastExistentialAddrInst(ProjectDowncastExistentialAddrInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "project_downcast_existential_addr");
+  }
+  void visitDowncastExistentialRefInst(DowncastExistentialRefInst *CI) {
+    printConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
   }
 
   void visitSuperToArchetypeInst(SuperToArchetypeInst *I) {

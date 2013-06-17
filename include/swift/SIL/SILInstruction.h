@@ -867,7 +867,7 @@ public:
   SuperToArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-  
+
 /// IsaInst - Perform a runtime check of a class instance's type.
 class IsaInst : public UnaryInstructionBase<ValueKind::IsaInst> {
   SILType TestType;
@@ -881,6 +881,54 @@ public:
   SILType getTestType() const { return TestType; }
 };
 
+/// Given the address of an opaque archetype value, dynamically checks the concrete
+/// type represented by the archetype and casts the address to the destination type if
+/// successful or crashes if not.
+class DowncastArchetypeAddrInst
+  : public UnaryInstructionBase<ValueKind::DowncastArchetypeAddrInst,
+                                ConversionInst>
+{
+public:
+  DowncastArchetypeAddrInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Given a value of class-bounded archetype type, dynamically checks the concrete
+/// type represented by the archetype and casts to the destination type if
+/// successful or crashes if not.
+class DowncastArchetypeRefInst
+  : public UnaryInstructionBase<ValueKind::DowncastArchetypeRefInst,
+                                ConversionInst>
+{
+public:
+  DowncastArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Given the address of an opaque existential container, dynamically checks the
+/// concrete type contained in the existential and projects and casts the address of
+/// the contained value if successful or crashes if not.
+class ProjectDowncastExistentialAddrInst
+  : public UnaryInstructionBase<ValueKind::ProjectDowncastExistentialAddrInst,
+                                ConversionInst>
+{
+public:
+  ProjectDowncastExistentialAddrInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Given a value of class-bounded archetype type, dynamically checks the concrete
+/// type contained in the existential and casts the value to the destination type if
+/// successful or crashes if not.
+class DowncastExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::DowncastExistentialRefInst,
+                                ConversionInst>
+{
+public:
+  DowncastExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
 /// StructInst - Represents a constructed tuple.
 class StructInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;
