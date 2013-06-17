@@ -2246,9 +2246,9 @@ public:
   }
 };
 
-// \brief Represents an explicit unchecked cast from an archetype value to a
-// different archetype, spelled 't as! U' for an archetype value t and archetype
-// type U.
+/// \brief Represents an explicit unchecked cast from an archetype value to a
+/// different archetype, spelled 't as! U' for an archetype value t and
+/// archetype type U.
 class UncheckedArchetypeToArchetypeExpr : public ExplicitCastExpr {
   SourceLoc BangLoc;
   
@@ -2265,9 +2265,9 @@ public:
   }
 };
   
-// \brief Represents an explicit unchecked cast from an archetype value to a
-// concrete type, spelled 't as! A' for an archetype value t
-// and concrete type 'A'.
+/// \brief Represents an explicit unchecked cast from an archetype value to a
+/// concrete type, spelled 't as! A' for an archetype value t
+/// and concrete type 'A'.
 class UncheckedArchetypeToConcreteExpr : public ExplicitCastExpr {
   SourceLoc BangLoc;
 
@@ -2284,9 +2284,9 @@ public:
   }
 };
 
-// \brief Represents an explicit unchecked cast from an existential type value
-// to an archetype, spelled 'p as! T' for a protocol value p
-// and archetype type 'T'.
+/// \brief Represents an explicit unchecked cast from an existential type value
+/// to an archetype, spelled 'p as! T' for a protocol value p
+/// and archetype type 'T'.
 class UncheckedExistentialToArchetypeExpr : public ExplicitCastExpr {
   SourceLoc BangLoc;
 
@@ -2305,9 +2305,9 @@ public:
   }
 };
   
-// \brief Represents an explicit unchecked cast from an existential type value
-// to a concrete type, spelled 'p as! A' for a protocol value p
-// and conforming type 'A'.
+/// \brief Represents an explicit unchecked cast from an existential type value
+/// to a concrete type, spelled 'p as! A' for a protocol value p
+/// and conforming type 'A'.
 class UncheckedExistentialToConcreteExpr : public ExplicitCastExpr {
   SourceLoc BangLoc;
 

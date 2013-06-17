@@ -1492,7 +1492,7 @@ namespace {
       // If the from/to types are equivalent, this should have been a
       // coercion expression (b as A) rather than a cast (a as! B). Complain.
       if (fromType->isEqual(toType) || tc.isSubtypeOf(fromType, toType)) {
-        // Only complain if the cast itself was implicitly generated.
+        // Only complain if the cast was explicitly generated.
         // FIXME: This leniency is here for the Clang module importer,
         // which doesn't necessarily know whether it needs to force the
         // cast or not. instancetype should eliminate the need for it.
