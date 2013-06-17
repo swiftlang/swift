@@ -606,7 +606,7 @@ iteration, which we do by adding requirements into the protocol::
 Here, we are specifying constraints on an associated type (EnumeratorType must
 conform to the Enumerator protocol), by adding a conformance clause (: Enumerator)
 to the associated type definition. We also use a separate requires clause to
-require that the type of values produced by querying the iterator is the same as
+require that the type of values produced by querying the enumerator is the same as
 the type of values stored in the container. This is important, for example, for
 use with the Comparable protocol (and any protocol using This types), because it
 maintains type identity within the generic function or type.
@@ -623,13 +623,13 @@ Comparable::
     // ...
   }
 
-Naturally, one any generic operation on a SortedDictionary<T> would also require
-that T be Comparable, e.g.,::
+Naturally, one any generic operation on a SortedDictionary<K,V> would also require
+that K be Comparable, e.g.,::
 
   func forEachKey<Key : Comparable, Value>(c : SortedDictionary<Key, Value>,
                                            f : (Key) -> Void) { /* ... */ }
 
-However, this specification of Key conforming to Comparable is redundant: one
+However, explicitly requiring that Key conform to Comparable is redundant: one
 could not provide an argument for 'c' without the Key type of the
 SortedDictionary conforming to Comparable, because the SortedDictionary type
 itself could not be formed. Constraint inference infers these additional
@@ -739,24 +739,34 @@ Overloading
 Generic functions can be overloaded based entirely on constraints. For example,
 consider a binary search algorithm::
   
-  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType
-  requires C.Element : Comparable {
-    // We can perform log(N) comparisons, but EnumerableCollection only supports linear
-    // walks, so this is linear time
-  }
-  
-  protocol RandomAccessEnumerator : Enumerator {
-    func split() -> (Enumerator, Enumerator) // splits a range in half, returning both halves
-  }
+   func binarySearch<
+      C : EnumerableCollection requires C.Element : Comparable
+   >(collection : C, value : C.Element) 
+     -> C.EnumeratorType
+   {
+     // We can perform log(N) comparisons, but EnumerableCollection
+     // only supports linear walks, so this is linear time
+   }
 
-  func binarySearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType
-  requires C.Element : Comparable, C.EnumeratorType : RandomAccessEnumerator {
-    // We can perform log(N) comparisons and log(N) range splits, so this is logarithmic time
-  }
+   protocol RandomAccessEnumerator : Enumerator {
+     // splits a range in half, returning both halves
+     func split() -> (Enumerator, Enumerator) 
+   }
+
+   func binarySearch<
+      C : EnumerableCollection 
+        requires C.Element : Comparable, 
+                 C.EnumeratorType: RandomAccessEnumerator
+   >(collection : C, value : C.Element) 
+     -> C.EnumeratorType
+   {
+     // We can perform log(N) comparisons and log(N) range splits, 
+     // so this is logarithmic time
+   }
 
 If binarySearch is called with a sequence whose range type conforms to
 RandomAccessEnumerator, both of the generic functions match. However, the second
-function is more specialized, because it's constraints are a superset of the
+function is more specialized, because its constraints are a superset of the
 constraints of the first function. In such a case, overloading should pick the
 more specialized function.
 
@@ -764,7 +774,12 @@ There is a question as to when this overloading occurs. For example,
 binarySearch might be called as a subroutine of another generic function with
 minimal requirements::
 
-  func doSomethingWithSearch<C : EnumerableCollection>(collection : C, value : C.Element) -> C.EnumeratorType requires C.Element : Ordered {
+  func doSomethingWithSearch<
+    C : EnumerableCollection requires C.Element : Ordered
+  >(
+    collection : C, value : C.Element
+  ) -> C.EnumeratorType 
+  {
     binarySearch(collection, value)
   }
 

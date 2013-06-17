@@ -23,8 +23,9 @@ Function calls in swift either involve one of the following forms:
 API Fragility With Named Arguments
 ==================================
 
-Because we allow calls with tuple arguments, default arguments, named arguments,
-and reordering arguments is allowed.  For example, given::
+Default arguments, named arguments, and named argument reordering are
+supported (Note: these features “fall out” of our ability to pass
+argument sets as tuples).  For example, given::
 
   func foo(a : int = 4, b : int = 5, c : int = 6) { ... }
 
@@ -52,12 +53,12 @@ After extensive discussion, we decided that this is a feature (at least in the
 early stages of swift) and can be enhanced later if it becomes an problem in
 practice.
 
-Unlike C, Swift functions default to only being visible within the ownership
-domain that they are defined in.  By definition, all of the code in a domain can
-be changed and updated as code within the domain changes.  This means that
-renaming a parameter can be done for non-API in a straight-forward way,
-potentially enhanced by good refactoring support to automate any rewrites across
-the codebase.
+Unlike functions in C, Swift functions default to only being visible
+within the ownership domain in which they are defined.  By definition,
+all of the code in a domain can be changed and updated as code within
+the domain changes.  This means that renaming a parameter can be done
+for non-API in a straightforward way, potentially enhanced by good
+refactoring support to automate any rewrites across the codebase.
 
 Once a function gets promoted to API (by adding an attribute to the function),
 the person promoting the API needs to think about the arguments, and consider
