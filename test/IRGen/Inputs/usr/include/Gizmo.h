@@ -49,13 +49,16 @@ NSString *NSStringFromRect(struct NSRect r);
 
 @protocol NSRuncing
 - (void)runce;
+- (void)foo;
 @end
 
 @protocol NSFunging
 - (void)funge;
+- (void)foo;
 @end
 
 @interface NSSpoon <NSRuncing, NSFunging>
 - (void)runce;
 - (void)funge;
+- (void)foo;
 @end

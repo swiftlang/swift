@@ -1554,7 +1554,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
   if (isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
 
-  // Okay, ask the runtime for the class pointer of this
+  // OK, ask the runtime for the class pointer of this
   // potentially-ObjC object.
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),

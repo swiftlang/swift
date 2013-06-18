@@ -1459,10 +1459,22 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     llvm_unreachable("bad extension member kind");
   }
   
-  // If the original class is ObjC, generate a category.
+  // If the original class is ObjC, or the extension introduces a conformance to
+  // an ObjC protocol, generate a category.
   ClassDecl *origClass = ext->getDeclaredTypeInContext()
     ->getClassOrBoundGenericClass();
-  if (origClass && origClass->isObjC()) {
+  if (!origClass)
+    return;
+  bool needsCategory = origClass->isObjC();
+  if (!needsCategory) {
+    for (auto *protocol : ext->getProtocols())
+      if (protocol->isObjC()) {
+        needsCategory = true;
+        break;
+      }
+  }
+  
+  if (needsCategory) {
     llvm::Constant *category = emitCategoryData(*this, ext);
     category = llvm::ConstantExpr::getBitCast(category, Int8PtrTy);
     ObjCCategories.push_back(category);

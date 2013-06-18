@@ -1127,7 +1127,6 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
   ClassDecl *cls = ext->getDeclaredTypeInContext()
     ->getClassOrBoundGenericClass();
   assert(cls && "generating category metadata for a non-class extension");
-  assert(cls->isObjC() && "generating category metadata for a non-objc class");
   
   ClassDataBuilder builder(IGM, cls, ext);
   
