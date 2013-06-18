@@ -685,7 +685,7 @@ public:
   
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand().getType();
-    require(concreteType.getSwiftType()->getClassOrBoundGenericClass(),
+    require(concreteType.getSwiftType()->mayHaveSuperclass(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().isClassBoundedExistentialType(),
             "init_existential_ref result must be a class-bounded existential type");
@@ -936,9 +936,7 @@ public:
     
     require(!DARI->getType().isAddress(),
             "downcast_archetype_ref result must not be an address");
-    require(DARI->getType().getClassOrBoundGenericClass()
-            || (DARI->getType().is<ArchetypeType>()
-                && DARI->getType().castTo<ArchetypeType>()->isClassBounded()),
+    require(DARI->getType().getSwiftType()->mayHaveSuperclass(),
             "downcast_archetype_ref result must be a class type "
             "or class-bounded archetype");
   }
@@ -964,16 +962,14 @@ public:
     
     require(!DERI->getType().isAddress(),
             "downcast_existential_ref result must not be an address");
-    require(DERI->getType().getClassOrBoundGenericClass()
-            || (DERI->getType().is<ArchetypeType>()
-                && DERI->getType().castTo<ArchetypeType>()->isClassBounded()),
+    require(DERI->getType().getSwiftType()->mayHaveSuperclass(),
             "downcast_existential_ref result must be a class type "
             "or class-bounded archetype");
   }
   
   void checkRefToObjectPointerInst(RefToObjectPointerInst *AI) {
     require(AI->getOperand().getType()
-              .getSwiftType()->getClassOrBoundGenericClass(),
+              .getSwiftType()->mayHaveSuperclass(),
             "ref-to-object-pointer operand must be a class reference");
     require(AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
@@ -982,7 +978,7 @@ public:
   
   void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
     require(AI->getType()
-              .getSwiftType()->getClassOrBoundGenericClass(),
+              .getSwiftType()->mayHaveSuperclass(),
             "object-pointer-to-ref result must be a class reference");
     require(AI->getOperand().getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
@@ -991,7 +987,7 @@ public:
   
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
     require(AI->getOperand().getType()
-              .getSwiftType()->getClassOrBoundGenericClass() ||
+              .getSwiftType()->mayHaveSuperclass() ||
             AI->getOperand().getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
             "ref-to-raw-pointer operand must be a class reference or"
@@ -1003,7 +999,7 @@ public:
   
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
     require(AI->getType()
-              .getSwiftType()->getClassOrBoundGenericClass() ||
+              .getSwiftType()->mayHaveSuperclass() ||
             AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheObjectPointerType),
         "raw-pointer-to-ref result must be a class reference or ObjectPointer");

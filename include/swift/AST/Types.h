@@ -245,7 +245,7 @@ public:
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
-
+  
   /// \brief Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.
@@ -1859,7 +1859,7 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (!archetype)
     return nullptr;
 
-  return (bool)archetype->getSuperclass();
+  return (bool)archetype->isClassBounded();
 }
 
 inline Identifier SubstitutableType::getName() const {
