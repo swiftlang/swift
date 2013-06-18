@@ -219,22 +219,14 @@ namespace {
       // to a protocol requirement.
       if (containerTy && containerTy->is<ProtocolType>() &&
           (baseTy->is<ArchetypeType>() || baseTy->isExistentialType())) {
-        // For an archetype, just convert to the archetype itself.
-        if (baseTy->is<ArchetypeType>())
-          containerTy = baseTy;
-
         // Convert the base appropriately.
         if (baseIsInstance) {
-          // Convert the base to the appropriate container type, turning it
-          // into an lvalue if required.
+          // Turn the object argument into an lvalue if required.
           base = coerceObjectArgumentToType(
-                   base, containerTy,
+                   base, baseTy,
                    locator.withPathElement(ConstraintLocator::MemberRefBase));
         } else {
           // Convert the base to an rvalue of the appropriate metatype.
-          base = coerceToType(base, MetaTypeType::get(containerTy, context),
-                              locator.withPathElement(
-                                ConstraintLocator::MemberRefBase));
           base = tc.coerceToRValue(base);
         }
 
@@ -601,18 +593,23 @@ namespace {
         return subscriptExpr;
       }
 
-      // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, containerTy, locator);
-      if (!base)
-        return nullptr;
-
       // Handle subscripting of existential types.
       if (baseTy->isExistentialType()) {
+        // Materialize if we need to.
+        base = coerceObjectArgumentToType(base, baseTy, locator);
+        if (!base)
+          return nullptr;
+
         auto subscriptExpr
           = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
         subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }
+
+      // Coerce the base to the container type.
+      base = coerceObjectArgumentToType(base, containerTy, locator);
+      if (!base)
+        return nullptr;
 
       // Form a normal subscript.
       SubscriptExpr *subscriptExpr = new (tc.Context) SubscriptExpr(base,index);
