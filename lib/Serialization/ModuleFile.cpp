@@ -62,23 +62,24 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-StringRef readIdentifier(llvm::BitstreamCursor &Cursor) {
-  // Deserialize the name.
-  // FIXME: Move this to an identifier table instead of a trailing record.
-  auto entry = Cursor.advance();
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    return {};
+Identifier ModuleFile::getIdentifier(IdentifierID IID) {
+  if (IID == 0)
+    return Identifier();
 
-  StringRef blobData;
-  SmallVector<uint64_t, 0> empty;
-  unsigned recordID = Cursor.readRecord(entry.ID, empty, &blobData);
-  if (recordID != decls_block::NAME_HACK)
-    return {};
+  assert(IID <= Identifiers.size() && "invalid identifier ID");
+  auto identRecord = Identifiers[IID-1];
 
-  assert(empty.empty() && "no data in NAME_HACK records");
-  assert(!blobData.empty() && "missing name in NAME_HACK record");
+  if (identRecord.Offset == 0)
+    return identRecord.Ident;
 
-  return blobData;
+  assert(!IdentifierData.empty() && "no identifier data in module");
+
+  StringRef rawStrPtr = IdentifierData.substr(identRecord.Offset);
+  size_t terminatorOffset = rawStrPtr.find('\0');
+  assert(terminatorOffset != StringRef::npos &&
+         "unterminated identifier string data");
+
+  return ModuleContext->Ctx.getIdentifier(rawStrPtr.slice(0, terminatorOffset));
 }
 
 DeclContext *ModuleFile::getDeclContext(DeclID DID) {
@@ -128,24 +129,17 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
+    IdentifierID nameID;
     DeclID contextID;
     TypeID underlyingTypeID;
     bool isGeneric;
     bool isImplicit;
     ArrayRef<uint64_t> inheritedIDs;
 
-    decls_block::TypeAliasLayout::readRecord(scratch, contextID,
+    decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID,
                                              isGeneric, isImplicit,
                                              inheritedIDs);
-
-    // Deserialize the name.
-    // FIXME: Move this to an identifier table instead of a trailing record.
-    StringRef name = readIdentifier(DeclTypeCursor);
-    if (name.empty()) {
-      error();
-      return nullptr;
-    }
 
     auto inherited =
       MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
@@ -160,7 +154,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
     TypeLoc underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(),
-                                         ctx.getIdentifier(name),
+                                         getIdentifier(nameID),
                                          SourceLoc(),
                                          underlyingType,
                                          getDeclContext(contextID),
@@ -175,18 +169,13 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   }
 
   case decls_block::STRUCT_DECL: {
+    IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
     ArrayRef<uint64_t> inheritedIDs;
 
-    decls_block::StructLayout::readRecord(scratch, contextID, isImplicit,
-                                          inheritedIDs);
-
-    StringRef name = readIdentifier(DeclTypeCursor);
-    if (name.empty()) {
-      error();
-      return nullptr;
-    }
+    decls_block::StructLayout::readRecord(scratch, nameID, contextID,
+                                          isImplicit, inheritedIDs);
 
     auto inherited =
       MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
@@ -215,7 +204,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     }
     decls_block::DeclContextLayout::readRecord(memberIDBuffer, memberIDs);
 
-    auto theStruct = new (ctx) StructDecl(SourceLoc(), ctx.getIdentifier(name),
+    auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), inherited,
                                           /*generic params=*/nullptr,
                                           getDeclContext(contextID));
@@ -269,23 +258,18 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   }
 
   case decls_block::VAR_DECL: {
+    IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isNeverLValue;
     TypeID typeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
-    decls_block::VarLayout::readRecord(scratch, contextID, isImplicit,
+    decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isNeverLValue, typeID, getterID,
                                        setterID, overriddenID);
 
-    StringRef name = readIdentifier(DeclTypeCursor);
-    if (name.empty()) {
-      error();
-      return nullptr;
-    }
-
-    auto var = new (ctx) VarDecl(SourceLoc(), ctx.getIdentifier(name),
+    auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), nullptr);
     declOrOffset = var;
 
@@ -474,6 +458,38 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
 
+    case IDENTIFIER_DATA_BLOCK_ID: {
+      if (!hasValidControlBlock)
+        return error();
+
+      cursor.EnterSubBlock(IDENTIFIER_DATA_BLOCK_ID);
+
+      auto next = cursor.advanceSkippingSubblocks();
+      while (next.Kind == llvm::BitstreamEntry::Record) {
+        scratch.clear();
+        StringRef blobData;
+        unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+
+        switch (kind) {
+        case identifier_block::IDENTIFIER_DATA:
+          assert(scratch.empty());
+          IdentifierData = blobData;
+          break;
+        default:
+          // Unknown identifier data, which this version of the compiler won't
+          // use.
+          break;
+        }
+
+        next = cursor.advanceSkippingSubblocks();
+      }
+
+      if (next.Kind != llvm::BitstreamEntry::EndBlock)
+        return error();
+
+      break;
+    }
+
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock)
         return error();
@@ -494,6 +510,10 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
         case index_block::TYPE_OFFSETS:
           assert(blobData.empty());
           Types.assign(scratch.begin(), scratch.end());
+          break;
+        case index_block::IDENTIFIER_OFFSETS:
+          assert(blobData.empty());
+          Identifiers.assign(scratch.begin(), scratch.end());
           break;
         case index_block::TOP_LEVEL_DECLS:
           assert(blobData.empty());

@@ -68,6 +68,9 @@ class ModuleFile {
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
 
+  /// The data blob containing all of the module's identifiers.
+  StringRef IdentifierData;
+
   /// Paths to the source files used to build this module.
   SmallVector<StringRef, 4> SourcePaths;
 
@@ -76,6 +79,22 @@ class ModuleFile {
 
   /// Types referenced by this module.
   std::vector<PointerUnion<Type, serialization::BitOffset>> Types;
+
+  /// Represents an identifier that may or may not have been deserialized yet.
+  ///
+  /// If \c Offset is non-zero, the identifier has not been loaded yet.
+  class SerializedIdentifier {
+  public:
+    Identifier Ident;
+    serialization::BitOffset Offset;
+
+    template <typename IntTy>
+    /*implicit*/ SerializedIdentifier(IntTy rawOffset)
+      : Offset(rawOffset) {}
+  };
+
+  /// Types referenced by this module.
+  std::vector<SerializedIdentifier> Identifiers;
 
   /// All top-level decls in this module.
   // FIXME: A single identifier may refer to multiple decls.
@@ -103,8 +122,11 @@ class ModuleFile {
   /// Returns the decl with the given ID, deserializing it if needed.
   Decl *getDecl(serialization::DeclID DID);
 
-  /// Returns the type with the current ID, deserializing it if needed.
+  /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);
+
+  /// Returns the identifier with the given ID, deserializing it if needed.
+  Identifier getIdentifier(serialization::IdentifierID IID);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();

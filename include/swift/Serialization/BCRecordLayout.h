@@ -353,9 +353,14 @@ namespace impl {
 template<typename IDField, typename... Fields>
 class BCGenericRecordLayout {
   llvm::BitstreamWriter &Out;
-  unsigned AbbrevCode;
 
 public:
+  /// The abbreviation code used for this record in the current block.
+  ///
+  /// Note that this is not the same as the semantic record code, which is the
+  /// first field of the record.
+  const unsigned AbbrevCode;
+
   /// Create a layout and register it with the given bitstream writer.
   explicit BCGenericRecordLayout(llvm::BitstreamWriter &out)
     : Out(out), AbbrevCode(emitAbbrev(out)) {}

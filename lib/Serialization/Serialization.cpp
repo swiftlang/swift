@@ -74,19 +74,29 @@ namespace {
     /// A map from Types and Decls to their serialized IDs.
     llvm::DenseMap<DeclTypeUnion, DeclID> DeclIDs;
 
+    /// A map from Identifiers to their serialized IDs.
+    llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
+
     /// The queue of types and decls that need to be serialized.
     ///
     /// This is a queue and not simply a vector because serializing one
     /// decl-or-type might trigger the serialization of another one.
     std::queue<DeclTypeUnion> DeclsAndTypesToWrite;
 
+    /// All identifiers that need to be serialized.
+    std::vector<Identifier> IdentifiersToWrite;
+
     std::array<unsigned, 256> DeclTypeAbbrCodes;
 
     /// The offset of each Decl in the bitstream, indexed by DeclID.
     std::vector<BitOffset> DeclOffsets;
 
-    /// The offset of each Type in the bitstream, indexed by DeclID.
+    /// The offset of each Type in the bitstream, indexed by TypeID.
     std::vector<BitOffset> TypeOffsets;
+
+    /// The offset of each Identifier in the identifier data block, indexed by
+    /// IdentifierID.
+    std::vector<CharOffset> IdentifierOffsets;
 
     /// The last assigned DeclID for decls from this module.
     DeclID LastDeclID;
@@ -94,10 +104,27 @@ namespace {
     /// The last assigned DeclID for types from this module.
     TypeID LastTypeID;
 
+    /// The last assigned IdentifierID for types from this module.
+    IdentifierID LastIdentifierID;
+
     /// True if this module does not fully represent the original source file.
     ///
     /// This is a bring-up hack and will eventually go away.
     bool ShouldFallBackToTranslationUnit;
+
+    /// Returns the record code for serializing the given vector of offsets.
+    ///
+    /// This allows the offset-serialization code to be generic over all kinds
+    /// of offsets.
+    unsigned getOffsetRecordCode(const std::vector<BitOffset> &values) {
+      if (&values == &DeclOffsets)
+        return index_block::DECL_OFFSETS;
+      if (&values == &TypeOffsets)
+        return index_block::TYPE_OFFSETS;
+      if (&values == &IdentifierOffsets)
+        return index_block::IDENTIFIER_OFFSETS;
+      llvm_unreachable("unknown offset kind");
+    }
 
     /// Records the use of the given Decl.
     ///
@@ -112,6 +139,13 @@ namespace {
     ///
     /// \returns The ID for the given Type in this module.
     TypeID addTypeRef(Type ty);
+
+    /// Records the use of the given Identifier.
+    ///
+    /// The Identifier will be scheduled for serialization if necessary.
+    ///
+    /// \returns The ID for the given Identifier in this module.
+    IdentifierID addIdentifierRef(Identifier ident);
 
     /// Writes the BLOCKINFO block.
     void writeBlockInfoBlock();
@@ -150,9 +184,15 @@ namespace {
     /// in the queue trigger the serialization of additional decls and/or types.
     void writeAllDeclsAndTypes();
 
+    /// Writes all identifiers in the IdentifiersToWrite queue.
+    ///
+    /// This must be called after writeAllDeclsAndTypes(), since that may add
+    /// additional identifiers to the pool.
+    void writeAllIdentifiers();
+
     /// Writes the offsets for decls or types.
     void writeOffsets(const index_block::OffsetsLayout &Offsets,
-                      DeclOrType whichOffsets);
+                      const std::vector<BitOffset> &values);
 
     /// Top-level entry point for serializing a translation unit module.
     void writeTranslationUnit(const TranslationUnit *TU);
@@ -241,6 +281,19 @@ TypeID Serializer::addTypeRef(Type ty) {
   return id;
 }
 
+IdentifierID Serializer::addIdentifierRef(Identifier ident) {
+  if (ident.empty())
+    return 0;
+
+  IdentifierID &id = IdentifierIDs[ident];
+  if (id != 0)
+    return id;
+
+  id = ++LastIdentifierID;
+  IdentifiersToWrite.push_back(ident);
+  return id;
+}
+
 /// Record the name of a block.
 static void emitBlockID(llvm::BitstreamWriter &out, unsigned ID,
                         StringRef name,
@@ -290,11 +343,14 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
   RECORD(decls_block, DECL_CONTEXT);
-  RECORD(decls_block, NAME_HACK);
+
+  BLOCK(IDENTIFIER_DATA_BLOCK);
+  RECORD(identifier_block, IDENTIFIER_DATA);
 
   BLOCK(INDEX_BLOCK);
   RECORD(index_block, TYPE_OFFSETS);
   RECORD(index_block, DECL_OFFSETS);
+  RECORD(index_block, IDENTIFIER_OFFSETS);
   RECORD(index_block, TOP_LEVEL_DECLS);
 
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
@@ -385,15 +441,12 @@ bool Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addIdentifierRef(typeAlias->getName()),
                                 addDeclRef(DC),
                                 addTypeRef(underlying),
                                 typeAlias->isGenericParameter(),
                                 typeAlias->isImplicit(),
                                 inherited);
-
-    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
-    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                               typeAlias->getName().str());
     return true;
   }
 
@@ -416,13 +469,10 @@ bool Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                             addIdentifierRef(theStruct->getName()),
                              addDeclRef(DC),
                              theStruct->isImplicit(),
                              inherited);
-
-    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
-    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                               theStruct->getName().str());
 
     abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
     SmallVector<DeclID, 16> memberIDs;
@@ -449,16 +499,14 @@ bool Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                          addDeclRef(DC), var->isImplicit(),
+                          addIdentifierRef(var->getName()),
+                          addDeclRef(DC),
+                          var->isImplicit(),
                           var->isNeverUsedAsLValue(),
                           addTypeRef(var->getType()),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
                           addDeclRef(var->getOverriddenDecl()));
-
-    abbrCode = DeclTypeAbbrCodes[NameHackLayout::Code];
-    NameHackLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                               var->getName().str());
 
     return true;
   }
@@ -617,7 +665,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<decls_block::ConstructorLayout>();
   registerDeclTypeAbbr<decls_block::VarLayout>();
   registerDeclTypeAbbr<decls_block::DeclContextLayout>();
-  registerDeclTypeAbbr<decls_block::NameHackLayout>();
 
   while (!DeclsAndTypesToWrite.empty()) {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();
@@ -640,12 +687,27 @@ void Serializer::writeAllDeclsAndTypes() {
   }
 }
 
+void Serializer::writeAllIdentifiers() {
+  BCBlockRAII restoreBlock(Out, IDENTIFIER_DATA_BLOCK_ID, 3);
+  identifier_block::IdentifierDataLayout IdentifierData(Out);
+
+  llvm::SmallString<4096> stringData;
+
+  // Make sure no identifier has an offset of 0.
+  stringData.push_back('\0');
+
+  for (Identifier ident : IdentifiersToWrite) {
+    IdentifierOffsets.push_back(stringData.size());
+    stringData.append(ident.get());
+    stringData.push_back('\0');
+  }
+
+  IdentifierData.emit(ScratchRecord, stringData.str());
+}
+
 void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
-                              DeclOrType which) {
-  if (which == DeclOrType::IsDecl)
-    Offsets.emit(ScratchRecord, index_block::DECL_OFFSETS, DeclOffsets);
-  else
-    Offsets.emit(ScratchRecord, index_block::TYPE_OFFSETS, TypeOffsets);
+                              const std::vector<BitOffset> &values) {
+  Offsets.emit(ScratchRecord, getOffsetRecordCode(values), values);
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
@@ -662,13 +724,15 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   }
 
   writeAllDeclsAndTypes();
-  
+  writeAllIdentifiers();
+
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 3);
     index_block::OffsetsLayout Offsets(Out);
 
-    writeOffsets(Offsets, DeclOrType::IsDecl);
-    writeOffsets(Offsets, DeclOrType::IsType);
+    writeOffsets(Offsets, DeclOffsets);
+    writeOffsets(Offsets, TypeOffsets);
+    writeOffsets(Offsets, IdentifierOffsets);
 
     index_block::TopLevelDeclsLayout TopLevelDecls(Out);
     TopLevelDecls.emit(ScratchRecord, topLevelIDs);

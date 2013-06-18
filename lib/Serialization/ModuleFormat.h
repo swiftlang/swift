@@ -39,12 +39,6 @@ const unsigned VERSION_MAJOR = 1;
 /// be incremented.
 const unsigned VERSION_MINOR = 0;
 
-/// Discriminator between Decls and Types.
-enum class DeclOrType {
-  IsDecl,
-  IsType
-};
-
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
 
@@ -52,8 +46,16 @@ using DeclIDField = BCFixed<31>;
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
+using IdentifierID = Fixnum<31>;
+using IdentifierIDField = BCFixed<31>;
+
 using BitOffset = Fixnum<31>;
 using BitOffsetField = BCFixed<31>;
+
+// CharOffset must be the same as BitOffset because it is stored in the
+// same way.
+using CharOffset = BitOffset;
+using CharOffsetField = BitOffsetField;
 
 
 /// The various types of blocks that can occur within a serialized Swift
@@ -81,6 +83,14 @@ enum BlockID {
   ///
   /// \sa decls_block
   DECLS_AND_TYPES_BLOCK_ID,
+
+  /// The identifier block, which contains all of the strings used in
+  /// identifiers in the module.
+  ///
+  /// Unlike other blocks in the file, all data within this block is completely
+  /// opaque. Offsets into this block should point directly into the blob at a
+  /// null-terminated UTF-8 string.
+  IDENTIFIER_DATA_BLOCK_ID,
 
   /// The index block, which contains cross-referencing information for the
   /// module.
@@ -167,6 +177,7 @@ namespace decls_block {
 
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
+    IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
@@ -176,6 +187,7 @@ namespace decls_block {
 
   using StructLayout = BCRecordLayout<
     STRUCT_DECL,
+    IdentifierIDField, // name
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
@@ -190,6 +202,7 @@ namespace decls_block {
 
   using VarLayout = BCRecordLayout<
     VAR_DECL,
+    IdentifierIDField, // name
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit flag
     BCFixed<1>,   // never lvalue flag
@@ -203,11 +216,18 @@ namespace decls_block {
     DECL_CONTEXT,
     BCArray<DeclIDField>
   >;
-
-  /// Names will eventually be uniqued in an identifier table, but for now we
-  /// store them as trailing records.
-  using NameHackLayout = BCRecordLayout<NAME_HACK, BCBlob>;
 }
+
+/// The record types within the identifier block.
+///
+/// \sa IDENTIFIER_BLOCK_ID
+namespace identifier_block {
+  enum {
+    IDENTIFIER_DATA = 1
+  };
+
+  using IdentifierDataLayout = BCRecordLayout<IDENTIFIER_DATA, BCBlob>;
+};
 
 /// The record types within the index block.
 ///
@@ -218,6 +238,7 @@ namespace index_block {
   enum {
     TYPE_OFFSETS = 1,
     DECL_OFFSETS,
+    IDENTIFIER_OFFSETS,
     TOP_LEVEL_DECLS
   };
 
