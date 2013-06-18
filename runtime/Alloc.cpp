@@ -385,3 +385,12 @@ void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
 
   swift_rawDealloc(ptr, idx);
 }
+
+/// This is a function that is opaque to the optimizer.  It is called to ensure
+/// that an object is alive at least until that time.
+extern "C" void swift_keepAlive(HeapObject *object) {
+  // Parameters are passed at +1 reference count.  We need to release to
+  // balance.
+  swift_release(object);
+}
+
