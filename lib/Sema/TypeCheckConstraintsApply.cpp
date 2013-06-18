@@ -399,7 +399,7 @@ namespace {
     /// \param type The literal type. This type conforms to \c protocol,
     /// and may also conform to \c builtinProtocol.
     ///
-    /// \param type The literal type as it was opened in the type system.
+    /// \param openedType The literal type as it was opened in the type system.
     ///
     /// \param protocol The protocol that describes the literal requirement.
     ///
