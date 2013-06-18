@@ -42,6 +42,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "FunctionRef.h"
+#include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
@@ -923,30 +924,34 @@ namespace {
     : public HeapTypeInfo<ClassBoundedArchetypeTypeInfo>,
       public ArchetypeTypeInfoBase
   {
+    bool HasSwiftRefcount;
+    
     ClassBoundedArchetypeTypeInfo(ArchetypeType *archetype,
                                   llvm::PointerType *storageType,
                                   Size size, Alignment align,
-                                  ArrayRef<ProtocolEntry> protocols)
+                                  ArrayRef<ProtocolEntry> protocols,
+                                  bool hasSwiftRefcount)
       : HeapTypeInfo(storageType, size, align),
-        ArchetypeTypeInfoBase(archetype, this + 1, protocols)
+        ArchetypeTypeInfoBase(archetype, this + 1, protocols),
+        HasSwiftRefcount(hasSwiftRefcount)
     {}
     
   public:
     static const ClassBoundedArchetypeTypeInfo *create(ArchetypeType *archetype,
                                            llvm::PointerType *storageType,
                                            Size size, Alignment align,
-                                           ArrayRef<ProtocolEntry> protocols) {
+                                           ArrayRef<ProtocolEntry> protocols,
+                                           bool hasSwiftRefcount) {
       void *buffer = operator new(sizeof(ClassBoundedArchetypeTypeInfo)
                                     + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer)
         ClassBoundedArchetypeTypeInfo(archetype,
                                       storageType, size, align,
-                                      protocols);
+                                      protocols, hasSwiftRefcount);
     }
     
     bool hasSwiftRefcount() const {
-      // Can't assume that a generic class value has Swift refcount.
-      return false;
+      return HasSwiftRefcount;
     }
   };
   
@@ -2731,12 +2736,28 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   }
 
   // If the archetype is class-bounded, use the class-bounded representation.
-  if (archetype->isClassBounded())
+  if (archetype->isClassBounded()) {
+    // Fully general archetypes can't be assumed to have a Swift refcount.
+    bool swiftRefcount = false;
+    llvm::PointerType *reprTy = IGM.UnknownRefCountedPtrTy;
+    
+    // If the archetype has a superclass constraint, it has at least the
+    // retain semantics of its superclass, and it can be represented with
+    // the supertype's pointer type.
+    if (Type super = archetype->getSuperclass()) {
+      ClassDecl *superClass = super->getClassOrBoundGenericClass();
+      swiftRefcount = hasSwiftRefcount(IGM, superClass);
+      
+      auto &superTI = IGM.getFragileTypeInfo(super);
+      reprTy = cast<llvm::PointerType>(superTI.StorageType);
+    }
+    
     return ClassBoundedArchetypeTypeInfo::create(archetype,
-                                                 IGM.UnknownRefCountedPtrTy,
+                                                 reprTy,
                                                  IGM.getPointerSize(),
                                                  IGM.getPointerAlignment(),
-                                                 protocols);
+                                                 protocols, swiftRefcount);
+  }
   
   // Otherwise, for now, always use an opaque indirect type.
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();

@@ -203,17 +203,20 @@ namespace {
       // The check in visit should make this impossible.
       llvm_unreachable("difference with leaf types");
     }
+        
+    CanType getArchetypeReprType(ArchetypeType *a) {
+      if (Type super = a->getSuperclass())
+        return super->getCanonicalType();
+      return CanType(IGM.Context.TheObjCPointerType);
+    }
 
     bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
       // Archetypes vary by what we're considering this for.
 
       if (origTy->isClassBounded()) {
-        // Class-bounded archetypes are represented as an ObjC class
-        // pointer type. We differ unless the target type is ObjCPointer or
-        // another class-bounded archetype.
-        if (auto *substArchetype = dyn_cast<ArchetypeType>(substTy))
-          return !substArchetype->isClassBounded();
-        return substTy != CanType(IGM.Context.TheObjCPointerType);
+        // Class-bounded archetypes are represented as some refcounted
+        // pointer type that needs to be bitcast.
+        return CanType(origTy) != substTy;
       }
       
       // Archetypes are laid out in memory in the same way as a
@@ -398,8 +401,9 @@ namespace {
       // representation.
       if (origTy->isClassBounded()) {
         llvm::Value *inValue = In.claimNext();
+        auto &ti = IGF.getFragileTypeInfo(origTy);
         auto addr = IGF.Builder.CreateBitCast(inValue,
-                                              IGF.IGM.ObjCPtrTy,
+                                              ti.StorageType,
                                               "substitution.class_bound");
         Out.add(addr);
         return;

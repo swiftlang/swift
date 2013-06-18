@@ -60,6 +60,9 @@ namespace irgen {
   /// True if the value is of class type, or of a type that is bridged to class
   /// type in the ObjC world.
   bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
+  
+  /// Does the given class have a Swift refcount?
+  bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift
 

@@ -50,7 +50,7 @@ using namespace swift;
 using namespace irgen;
 
 /// Does the given class have a Swift refcount?
-static bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
+bool irgen::hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
   // Scan to the root class.
   while (theClass->hasBaseClass()) {
     theClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
