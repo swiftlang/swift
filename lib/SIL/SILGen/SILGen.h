@@ -84,6 +84,9 @@ public:
   
   /// Get the function for a SILConstant.
   SILFunction *getFunction(SILConstant constant);
+
+  /// True if a function has been emitted for a given SILConstant.
+  bool hasFunction(SILConstant constant);
   
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
@@ -147,6 +150,11 @@ public:
   /// Emit the ObjC-compatible getter and setter for an instance variable or
   /// property.
   void emitObjCPropertyMethodThunks(VarDecl *prop);
+  
+  /// Emit additional ObjC-compatible entry points required for any ObjC
+  /// protocols in the given conformance list.
+  void emitObjCProtocolConformanceEntryPoints(ArrayRef<ProtocolDecl*> protocols,
+                                   ArrayRef<ProtocolConformance*> conformances);
   
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.

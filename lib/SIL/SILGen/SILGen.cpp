@@ -230,6 +230,10 @@ SILFunction *SILGenModule::getFunction(SILConstant constant) {
   return F;
 }
 
+bool SILGenModule::hasFunction(SILConstant constant) {
+  return emittedFunctions.count(constant);
+}
+
 void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   emitFunction(fd, fd->getBody());
 }
@@ -366,7 +370,11 @@ void SILGenModule::emitDestructor(ClassDecl *cd,
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   SILConstant thunk(method, SILConstant::ConstructAtNaturalUncurryLevel,
                     /*isObjC*/ true);
-                    
+  
+  // Don't reemit the thunk if it already exists.
+  if (hasFunction(thunk))
+    return;
+  
   SILFunction *f = preEmitFunction(thunk, method->getBody());
   SILGenFunction(*this, *f, false).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
@@ -377,6 +385,10 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
                      SILConstant::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
                      
+  // Don't reemit the thunks if they already exist.
+  if (hasFunction(getter))
+    return;
+  
   SILFunction *f = preEmitFunction(getter, prop);
   SILGenFunction(*this, *f, false).emitObjCPropertyGetter(getter);
   postEmitFunction(getter, f);
@@ -391,6 +403,37 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
   f = preEmitFunction(setter, prop);
   SILGenFunction(*this, *f, false).emitObjCPropertySetter(setter);
   postEmitFunction(setter, f);
+}
+
+void SILGenModule::emitObjCProtocolConformanceEntryPoints(
+                          ArrayRef<swift::ProtocolDecl *> protocols,
+                          ArrayRef<swift::ProtocolConformance *> conformances) {
+  assert(protocols.size() == conformances.size()
+         && "protocol conformance mismatch");
+  
+  for (unsigned i = 0; i < protocols.size(); ++i) {
+    auto *proto = protocols[i];
+    auto *conformance = conformances[i];
+    
+    // We only care about objc protocols here.
+    if (!proto->isObjC())
+      continue;
+    
+    for (auto &mapping : conformance->Mapping) {
+      ValueDecl *impl = mapping.second;
+      // If the method normally requires ObjC dispatch, we will have already
+      // emitted its thunks.
+      if (requiresObjCDispatch(impl))
+        continue;
+
+      if (auto *method = dyn_cast<FuncDecl>(impl))
+        emitObjCMethodThunk(method);
+      else if (auto *prop = dyn_cast<VarDecl>(impl))
+        emitObjCPropertyMethodThunks(prop);
+      else
+        llvm_unreachable("unimplemented objc conformance mapping");
+    }
+  }
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
