@@ -97,9 +97,8 @@ public:
         // For nominal types and extensions thereof, record conformance.
         if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
           TC.Context.recordConformance(Proto, D);
-
-        Conformances.push_back(Conformance);
       }
+      Conformances.push_back(Conformance);
     }
   }
   
@@ -436,6 +435,21 @@ public:
     if (!IsFirstPass)
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
   }
+  
+  /// Mark class members needed to conform to ObjC protocols as requiring ObjC
+  /// interop.
+  void checkObjCConformances(ArrayRef<ProtocolDecl*> protocols,
+                             ArrayRef<ProtocolConformance*> conformances) {
+    assert(protocols.size() == conformances.size() &&
+           "protocol conformance mismatch");
+    
+    for (unsigned i = 0; i < protocols.size(); ++i) {
+      if (!protocols[i]->isObjC())
+        continue;
+      for (auto &mapping : conformances[i]->Mapping)
+        mapping.second->setIsObjC(true);
+    }
+  }
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
@@ -469,27 +483,19 @@ public:
     for (Decl *Member : CD->getMembers())
       visit(Member);
     
-    if (!IsFirstPass)
+    if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
+      checkObjCConformances(CD->getProtocols(), CD->getConformances());
+    }
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (IsSecondPass)
       return;
     
-    // The protocol requires ObjC interop if the protocol or any of the
-    // protocols it refines are [objc].
-    if (PD->getAttrs().isObjC())
-      PD->setIsObjC(true);
-    else {
-      PD->setIsObjC(false);
-      for (auto *parent : PD->getProtocols()) {
-        if (parent->isObjC()) {
-          PD->setIsObjC(true);
-          break;
-        }
-      }
-    }
+    // The protocol requires ObjC interop if the protocol is [objc]. Protocols
+    // do *not* implicitly inherit [objc] from refined protocols.
+    PD->setIsObjC(PD->getAttrs().isObjC());
 
     // Fix the 'This' associated type.
     TypeAliasDecl *thisDecl = nullptr;
@@ -656,8 +662,10 @@ public:
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
-    if (!IsFirstPass)
+    if (!IsFirstPass) {
       checkExplicitConformance(ED, ED->getExtendedType());
+      checkObjCConformances(ED->getProtocols(), ED->getConformances());
+    }
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

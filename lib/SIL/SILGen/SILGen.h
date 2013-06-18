@@ -151,11 +151,6 @@ public:
   /// property.
   void emitObjCPropertyMethodThunks(VarDecl *prop);
   
-  /// Emit additional ObjC-compatible entry points required for any ObjC
-  /// protocols in the given conformance list.
-  void emitObjCProtocolConformanceEntryPoints(ArrayRef<ProtocolDecl*> protocols,
-                                   ArrayRef<ProtocolConformance*> conformances);
-  
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);

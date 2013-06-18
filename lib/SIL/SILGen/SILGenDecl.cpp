@@ -796,12 +796,6 @@ public:
   void emitType() {
     for (Decl *member : theType->getMembers())
       visit(member);
-    
-    if (auto *classDecl = dyn_cast<ClassDecl>(theType)) {
-      // Emit ObjC entry points for ObjC protocol conformances.
-      SGM.emitObjCProtocolConformanceEntryPoints(classDecl->getProtocols(),
-                                                 classDecl->getConformances());
-    }
   }
   
   //===--------------------------------------------------------------------===//
@@ -920,11 +914,6 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
-  
-  // Emit addditional ObjC thunks for ObjC protocol conformances if the
-  // extended class isn't natively [objc].
-  emitObjCProtocolConformanceEntryPoints(ed->getProtocols(),
-                                         ed->getConformances());
 }
 
 void SILGenFunction::emitLocalVariable(VarDecl *vd) {
