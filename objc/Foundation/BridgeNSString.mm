@@ -192,10 +192,16 @@ const Metadata *swift::swift_getObjectType(id object) {
   return swift_getObjCClassMetadata(classAsMetadata);
 }
 
-extern "C" bool swift_comparePointers(id x, id y) {
+extern "C" bool swift_compareObjects(id x, id y) {
   [x release];
   [y release];
   return x == y;
+}
+
+// FIXME: Assumes Int is 64-bit.
+extern "C" int64_t swift_hashObject(id obj) {
+  [obj release];
+  return (int64_t)obj;
 }
 
 /// (String, UnsafePointer<BOOL>) -> () block shim
