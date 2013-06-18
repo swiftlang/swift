@@ -424,20 +424,18 @@ namespace {
     Type VisitObjCObjectType(const clang::ObjCObjectType *type) {
       // If this is id<P> , turn this into a protocol type.
       // FIXME: What about Class<P>?
-      if (Impl.SwiftContext.LangOpts.ImportObjCProtocolTypes) {
-        if (type->isObjCQualifiedId()) {
-          SmallVector<Type, 4> protocols;
-          for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
-               cp != cpEnd; ++cp) {
-            auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
-            if (!proto)
-              return Type();
+      if (type->isObjCQualifiedId()) {
+        SmallVector<Type, 4> protocols;
+        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
+             cp != cpEnd; ++cp) {
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          if (!proto)
+            return Type();
 
-            protocols.push_back(proto->getDeclaredType());
-          }
-
-          return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
+          protocols.push_back(proto->getDeclaredType());
         }
+
+        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
 
       // FIXME: Swift cannot express qualified object pointer types, e.g.,
@@ -474,20 +472,18 @@ namespace {
 
       // If this is id<P>, turn this into a protocol type.
       // FIXME: What about Class<P>?
-      if (Impl.SwiftContext.LangOpts.ImportObjCProtocolTypes) {
-        if (type->isObjCQualifiedIdType()) {
-          SmallVector<Type, 4> protocols;
-          for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
-               cp != cpEnd; ++cp) {
-            auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
-            if (!proto)
-              return Type();
+      if (type->isObjCQualifiedIdType()) {
+        SmallVector<Type, 4> protocols;
+        for (auto cp = type->qual_begin(), cpEnd = type->qual_end();
+             cp != cpEnd; ++cp) {
+          auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp));
+          if (!proto)
+            return Type();
 
-            protocols.push_back(proto->getDeclaredType());
-          }
-
-          return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
+          protocols.push_back(proto->getDeclaredType());
         }
+
+        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
 
       // FIXME: We fake 'id' and 'Class' by using NSObject. We need a proper
