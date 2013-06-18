@@ -463,6 +463,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (AP == Proto || AP->inheritsFrom(Proto))
         return true;
     }
+    
+    return false;
   }
 
   // If we have an existential type, check whether this type includes this
@@ -474,6 +476,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
         if (AP == Proto || AP->inheritsFrom(Proto))
           return true;
       }
+
+      return false;
     }
   }
 
