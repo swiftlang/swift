@@ -2675,10 +2675,13 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     // Add the class instance pointer to the fields.
     fields.push_back(IGM.UnknownRefCountedPtrTy);
     // Drop the type metadata pointer. We can get it from the class instance.
-    type->setBody(llvm::makeArrayRef(fields).slice(1));
+    ArrayRef<llvm::Type*> classBoundedFields = fields;
+    classBoundedFields = classBoundedFields.slice(1);
+    
+    type->setBody(classBoundedFields);
     
     Alignment align = IGM.getPointerAlignment();
-    Size size = fields.size() * IGM.getPointerSize();
+    Size size = classBoundedFields.size() * IGM.getPointerSize();
     
     return ClassBoundedExistentialTypeInfo::create(type, size, align,
                                                    entries);
