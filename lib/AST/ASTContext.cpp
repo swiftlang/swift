@@ -83,6 +83,10 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
     BoundGenericSubstitutions;
 
+  /// \brief The set of nominal types and extensions thereof known to conform
+  /// to each protocol.
+  llvm::DenseMap<ProtocolDecl *, SmallVector<Decl *, 4>> Conformances;
+
   /// \brief Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// \brief The allocator used for all allocations within this arena.
@@ -281,6 +285,20 @@ ClangNode ASTContext::getClangNode(Decl *decl) {
 
 void ASTContext::setClangNode(Decl *decl, ClangNode node) {
   Impl.ClangNodes[decl] = node;
+}
+
+void ASTContext::recordConformance(ProtocolDecl *protocol, Decl *decl) {
+  assert(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl));
+  Impl.Conformances[protocol].push_back(decl);
+}
+
+/// \brief Retrieve the set of nominal types and extensions thereof that
+/// conform to the given protocol.
+ArrayRef<Decl *> ASTContext::getTypesThatConformTo(ProtocolDecl *protocol) {
+  auto known = Impl.Conformances.find(protocol);
+  if (known == Impl.Conformances.end())
+    return { };
+  return known->second;
 }
 
 //===----------------------------------------------------------------------===//

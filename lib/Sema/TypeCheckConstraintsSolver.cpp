@@ -592,47 +592,42 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
     // try again.
     SmallVector<std::pair<Type, bool>, 4> newBindings;
 
-    // If this is our first attempt, note which bindings we already visited.
+    // Check whether this was our first attempt.
     if (tryCount == 0) {
+      // Note which bindings we already visited.
       for (auto binding : bindings)
         exploredTypes.insert(binding.first->getCanonicalType());
+
+      // Find types that conform to each of the protocols to which this
+      // type variable must conform.
+      // FIXME: We don't want to visit the supertypes of this type.
+      for (auto constraint : tvc.ConformsToConstraints) {
+        auto proto = constraint->getProtocol();
+        for (auto decl : tc.Context.getTypesThatConformTo(proto)) {
+          Type type;
+          if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
+            type = nominal->getDeclaredTypeOfContext();
+          else
+            type = cast<ExtensionDecl>(decl)->getDeclaredTypeOfContext();
+          
+          if (exploredTypes.insert(type->getCanonicalType()))
+            newBindings.push_back({type, true});
+        }
+      }
+
+      // If we found any new bindings, try them now.
+      if (!newBindings.empty()) {
+        // We have a new set of bindings; use them for our next loop.
+        storedBindings = std::move(newBindings);
+        bindings = storedBindings;
+        continue;
+      }
     }
 
-    // If we didn't find any solutions, introduce more potential types.
-    bool handledLiteralConstraints = false;
+    // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       auto type = binding.first;
 
-      // If this is a literal constraint, find all of the types that
-      // conform to the literal constraint protocol.
-      // FIXME: Except that we actually need said protocol :)
-      if (binding.second) {
-        if (handledLiteralConstraints)
-          continue;
-
-        // FIXME: Total hack. If there is an IntegerLiteralConvertible
-        // constraint, also try the default float literal type.
-        auto integerLiteralConvertible
-          = tc.getProtocol(SourceLoc(),
-                           KnownProtocolKind::IntegerLiteralConvertible);
-        for (auto constraint : tvc.ConformsToConstraints) {
-          if (constraint->getProtocol() == integerLiteralConvertible) {
-            if (auto floatLiteralConvertible
-                  = tc.getProtocol(SourceLoc(),
-                                   KnownProtocolKind::FloatLiteralConvertible)){
-              auto newType = tc.getDefaultType(floatLiteralConvertible);
-              if (newType && exploredTypes.insert(newType->getCanonicalType()))
-                newBindings.push_back({newType, false});
-              break;
-            }
-          }
-        }
-
-        handledLiteralConstraints = true;
-        continue;
-      }
-
-      // Enumerate the supertypes of each of the types we tried.
       for (auto supertype : cs.enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
         auto simpleSuper = checkTypeOfBinding(cs, typeVar, supertype);

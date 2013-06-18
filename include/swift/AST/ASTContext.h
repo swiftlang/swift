@@ -46,6 +46,7 @@ namespace swift {
   class BoundGenericType;
   class ClangModule;
   class Decl;
+  class ExtensionDecl;
   class SourceLoc;
   class Type;
   class TupleType;
@@ -134,6 +135,11 @@ public:
 
   ~ConstraintCheckerArenaRAII();
 };
+
+/// \brief Describes either a nominal type declaration or an extension
+/// declaration.
+typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
+  TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
@@ -368,7 +374,15 @@ public:
   ///
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
-  
+
+  /// \brief Record that the given nominal type or extension thereof conforms
+  /// to the given protocol.
+  void recordConformance(ProtocolDecl *protocol, Decl *decl);
+
+  /// \brief Retrieve the set of nominal types and extensions thereof that
+  /// conform to the given protocol.
+  ArrayRef<Decl *> getTypesThatConformTo(ProtocolDecl *protocol);
+
 private:
   friend class Decl;
   ClangNode getClangNode(Decl *decl);

@@ -93,8 +93,13 @@ public:
     
     for (auto Proto : Protocols) {
       ProtocolConformance *Conformance = nullptr;
-      TC.conformsToProtocol(T, Proto, &Conformance, D->getStartLoc());
-      Conformances.push_back(Conformance);
+      if (TC.conformsToProtocol(T, Proto, &Conformance, D->getStartLoc())) {
+        // For nominal types and extensions thereof, record conformance.
+        if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
+          TC.Context.recordConformance(Proto, D);
+
+        Conformances.push_back(Conformance);
+      }
     }
   }
   
