@@ -371,6 +371,10 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   SILConstant thunk(method, SILConstant::ConstructAtNaturalUncurryLevel,
                     /*isObjC*/ true);
   
+  // Don't emit the thunk if it already exists.
+  if (hasFunction(thunk))
+    return;
+  
   SILFunction *f = preEmitFunction(thunk, method->getBody());
   SILGenFunction(*this, *f, false).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
@@ -381,6 +385,10 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
                      SILConstant::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
                      
+  // Don't emit the thunks if they already exist.
+  if (hasFunction(getter))
+    return;
+
   SILFunction *f = preEmitFunction(getter, prop);
   SILGenFunction(*this, *f, false).emitObjCPropertyGetter(getter);
   postEmitFunction(getter, f);

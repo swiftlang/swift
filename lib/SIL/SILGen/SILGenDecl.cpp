@@ -883,6 +883,22 @@ public:
   void emitExtension(ExtensionDecl *e) {
     for (Decl *member : e->getMembers())
       visit(member);
+    
+    // ObjC protocol conformances may require ObjC thunks to be introduced for
+    // definitions from other contexts.
+    for (unsigned i = 0; i < e->getProtocols().size(); ++i) {
+      if (!e->getProtocols()[i]->isObjC())
+        continue;
+      for (auto &mapping : e->getConformances()[i]->Mapping) {
+        ValueDecl *vd = mapping.second;
+        if (auto *method = cast<FuncDecl>(vd))
+          SGM.emitObjCMethodThunk(method);
+        else if (auto *prop = cast<VarDecl>(vd))
+          SGM.emitObjCPropertyMethodThunks(prop);
+        else
+          llvm_unreachable("unexpected conformance mapping");
+      }
+    }
   }
   
   //===--------------------------------------------------------------------===//
