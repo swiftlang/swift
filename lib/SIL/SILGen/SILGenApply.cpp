@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
@@ -392,6 +393,7 @@ public:
       if (SpecializedEmitter e
             = getSpecializedEmitterForSILBuiltin(standaloneFunction))
         return e;
+      SWIFT_FALLTHROUGH;
     }
     case Kind::IndirectValue:
     case Kind::ClassMethod:
