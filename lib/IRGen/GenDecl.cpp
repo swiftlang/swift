@@ -1409,6 +1409,16 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect) {
                                  SizeTy, getPointerAlignment());
 }
 
+static bool protocolExtensionRequiresCategory(ProtocolDecl *protocol,
+                                            ProtocolConformance *conformance) {
+  if (protocol->isObjC())
+    return true;
+  for (auto &inherited : conformance->InheritedMapping)
+    if (protocolExtensionRequiresCategory(inherited.first, inherited.second))
+      return true;
+  return false;
+}
+
 /// Emit a type extension.
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {
@@ -1467,8 +1477,9 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     return;
   bool needsCategory = origClass->isObjC();
   if (!needsCategory) {
-    for (auto *protocol : ext->getProtocols())
-      if (protocol->isObjC()) {
+    for (unsigned i = 0, size = ext->getProtocols().size(); i < size; ++i)
+      if (protocolExtensionRequiresCategory(ext->getProtocols()[i],
+                                            ext->getConformances()[i])) {
         needsCategory = true;
         break;
       }

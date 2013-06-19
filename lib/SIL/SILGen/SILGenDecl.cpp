@@ -879,17 +879,12 @@ public:
   SILGenExtension(SILGenModule &SGM)
     : SGM(SGM) {}
   
-  /// Emit SIL functions for all the members of the type.
-  void emitExtension(ExtensionDecl *e) {
-    for (Decl *member : e->getMembers())
-      visit(member);
-    
-    // ObjC protocol conformances may require ObjC thunks to be introduced for
-    // definitions from other contexts.
-    for (unsigned i = 0, size = e->getProtocols().size(); i < size; ++i) {
-      if (!e->getProtocols()[i]->isObjC())
-        continue;
-      for (auto &mapping : e->getConformances()[i]->Mapping) {
+  /// Emit ObjC thunks necessary for an ObjC protocol conformance.
+  void emitObjCConformanceThunks(ProtocolDecl *protocol,
+                                 ProtocolConformance *conformance) {
+    assert(conformance);
+    if (protocol->isObjC())
+      for (auto &mapping : conformance->Mapping) {
         ValueDecl *vd = mapping.second;
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);
@@ -898,7 +893,20 @@ public:
         else
           llvm_unreachable("unexpected conformance mapping");
       }
-    }
+    for (auto &inherited : conformance->InheritedMapping)
+      emitObjCConformanceThunks(inherited.first, inherited.second);
+  }
+  
+  /// Emit SIL functions for all the members of the type.
+  void emitExtension(ExtensionDecl *e) {
+    for (Decl *member : e->getMembers())
+      visit(member);
+    
+    // ObjC protocol conformances may require ObjC thunks to be introduced for
+    // definitions from other contexts.
+    for (unsigned i = 0, size = e->getProtocols().size(); i < size; ++i)
+      emitObjCConformanceThunks(e->getProtocols()[i],
+                                e->getConformances()[i]);
   }
   
   //===--------------------------------------------------------------------===//

@@ -592,16 +592,24 @@ namespace {
       // ObjC protocol conformances may need to pull method descriptors for
       // definitions from other contexts into the category.
       for (unsigned i = 0, size = TheExtension->getProtocols().size();
-           i < size; ++i) {
-        if (!TheExtension->getProtocols()[i]->isObjC())
-          continue;
-        for (auto &mapping : TheExtension->getConformances()[i]->Mapping) {
+           i < size; ++i)
+        visitObjCConformance(TheExtension->getProtocols()[i],
+                             TheExtension->getConformances()[i]);
+    }
+    
+    void visitObjCConformance(ProtocolDecl *protocol,
+                              ProtocolConformance *conformance) {
+      assert(TheExtension &&
+             "should only consider objc conformances for extensions");
+      if (protocol->isObjC())
+        for (auto &mapping : conformance->Mapping) {
           ValueDecl *vd = mapping.second;
-          if (vd->getDeclContext() != TheExtension) {
+          if (vd->getDeclContext() != TheExtension)
             visit(vd);
-          }
         }
-      }
+      
+      for (auto &inherited : conformance->InheritedMapping)
+        visitObjCConformance(inherited.first, inherited.second);
     }
 
     /// Build the metaclass stub object.

@@ -436,6 +436,17 @@ public:
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
   }
   
+  void checkObjCConformance(ProtocolDecl *protocol,
+                            ProtocolConformance *conformance) {
+    if (!conformance)
+      return;
+    if (protocol->isObjC())
+      for (auto &mapping : conformance->Mapping)
+        mapping.second->setIsObjC(true);
+    for (auto &inherited : conformance->InheritedMapping)
+      checkObjCConformance(inherited.first, inherited.second);
+  }
+  
   /// Mark class members needed to conform to ObjC protocols as requiring ObjC
   /// interop.
   void checkObjCConformances(ArrayRef<ProtocolDecl*> protocols,
@@ -443,14 +454,8 @@ public:
     assert(protocols.size() == conformances.size() &&
            "protocol conformance mismatch");
     
-    for (unsigned i = 0, size = protocols.size(); i < size; ++i) {
-      if (!protocols[i]->isObjC())
-        continue;
-      if (!conformances[i])
-        continue;
-      for (auto &mapping : conformances[i]->Mapping)
-        mapping.second->setIsObjC(true);
-    }
+    for (unsigned i = 0, size = protocols.size(); i < size; ++i)
+      checkObjCConformance(protocols[i], conformances[i]);
   }
 
   void visitClassDecl(ClassDecl *CD) {
