@@ -201,6 +201,17 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     break;
   case BuiltinValueKind::BitCast:
     if (Output.isNull()) return nullptr;
+
+    // Support float <-> int bitcast where the types are the same widths.
+    if (auto *BIT = Input->getAs<BuiltinIntegerType>())
+      if (auto *BFT = Output->getAs<BuiltinFloatType>())
+        if (BIT->getBitWidth() == BFT->getBitWidth())
+            break;
+    if (auto *BFT = Input->getAs<BuiltinFloatType>())
+      if (auto *BIT = Output->getAs<BuiltinIntegerType>())
+        if (BIT->getBitWidth() == BFT->getBitWidth())
+          break;
+
     // FIXME: Implement bitcast typechecking.
     assert(0 && "Bitcast not supported yet!");
     return nullptr;

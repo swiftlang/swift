@@ -429,8 +429,19 @@ public:
   FPKind getFPKind() const {
     return Kind;
   }
-  
+
   const llvm::fltSemantics &getAPFloatSemantics() const;
+
+  unsigned getBitWidth() const {
+    switch (Kind) {
+    case IEEE16: return 16;
+    case IEEE32: return 32;
+    case IEEE64: return 64;
+    case IEEE80: return 80;
+    case IEEE128:
+    case PPC128: return 128;
+    }
+  }
   
   void print(raw_ostream &OS) const;
 
