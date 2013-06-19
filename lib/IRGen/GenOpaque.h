@@ -129,7 +129,6 @@ namespace irgen {
 
   /// Emit a load of the 'isInline' value witness.
   llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *wtable);
-
 } // end namespace irgen
 } // end namespace swift
 

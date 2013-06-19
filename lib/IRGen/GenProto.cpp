@@ -3859,10 +3859,11 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
 }
 
 /// Emit a projection from an existential container to its concrete value
-/// buffer.
-Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                               Address base,
-                                               SILType baseTy) {
+/// buffer with the type metadata for the contained value.
+static std::pair<Address, llvm::Value*>
+emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
+                                            Address base,
+                                            SILType baseTy) {
   assert(baseTy.isExistentialType());
   assert(!baseTy.isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
@@ -3872,7 +3873,16 @@ Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
   llvm::Value *wtable = layout.loadValueWitnessTable(IGF, base, metadata);
   Address buffer = layout.projectExistentialBuffer(IGF, base);
   llvm::Value *object = emitProjectBufferCall(IGF, wtable, metadata, buffer);
-  return Address(object, Alignment(1));
+  return {Address(object, Alignment(1)), metadata};
+}
+
+/// Emit a projection from an existential container to its concrete value
+/// buffer.
+Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
+                                               Address base,
+                                               SILType baseTy) {
+  return emitOpaqueExistentialProjectionWithMetadata(IGF, base, baseTy)
+    .first;
 }
 
 /// Extract the instance pointer from a class existential value.
@@ -3884,4 +3894,60 @@ llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
     .as<ClassExistentialTypeInfo>();
   
   return baseTI.getValue(IGF, base);
+}
+
+static Address
+emitUnconditionalOpaqueDowncast(IRGenFunction &IGF,
+                                Address value,
+                                llvm::Value *srcMetadata,
+                                SILType destType) {
+  llvm::Value *addr = IGF.Builder.CreateBitCast(value.getAddress(),
+                                                IGF.IGM.OpaquePtrTy);
+
+  srcMetadata = IGF.Builder.CreateBitCast(srcMetadata, IGF.IGM.Int8PtrTy);
+  llvm::Value *destMetadata = IGF.emitTypeMetadataRef(destType);
+  destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
+  
+  auto *call
+    = IGF.Builder.CreateCall3(IGF.IGM.getDynamicCastIndirectUnconditionalFn(),
+                              addr, srcMetadata, destMetadata);
+  // FIXME: Eventually, we may want to throw.
+  call->setDoesNotThrow();
+  
+  // Convert the cast address to the destination type.
+  auto &destTI = IGF.getFragileTypeInfo(destType);
+  llvm::Value *ptr = IGF.Builder.CreateBitCast(call,
+                                           destTI.StorageType->getPointerTo());
+  return destTI.getAddressForPointer(ptr);
+}
+
+/// Emit a checked unconditional cast of an opaque archetype.
+Address irgen::emitUnconditionalOpaqueArchetypeDowncast(IRGenFunction &IGF,
+                                                        Address value,
+                                                        SILType srcType,
+                                                        SILType destType) {
+  assert(srcType.is<ArchetypeType>());
+  assert(!srcType.castTo<ArchetypeType>()->requiresClass());
+  
+  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
+  return emitUnconditionalOpaqueDowncast(IGF, value, srcMetadata, destType);
+}
+
+/// Emit a checked unconditional cast of an opaque existential container's
+/// contained value.
+Address irgen::emitUnconditionalOpaqueExistentialDowncast(IRGenFunction &IGF,
+                                                          Address container,
+                                                          SILType srcType,
+                                                          SILType destType) {
+  assert(srcType.isExistentialType());
+  assert(!srcType.isClassExistentialType());
+  
+  // Project the value pointer and source type metadata out of the existential
+  // container.
+  Address value;
+  llvm::Value *srcMetadata;
+  std::tie(value, srcMetadata)
+    = emitOpaqueExistentialProjectionWithMetadata(IGF, container, srcType);
+
+  return emitUnconditionalOpaqueDowncast(IGF, value, srcMetadata, destType);
 }

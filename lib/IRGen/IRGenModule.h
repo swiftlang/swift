@@ -245,6 +245,8 @@ public:
   llvm::Constant *getDynamicCastClassUnconditionalFn();
   llvm::Constant *getDynamicCastFn();
   llvm::Constant *getDynamicCastUnconditionalFn();
+  llvm::Constant *getDynamicCastIndirectFn();
+  llvm::Constant *getDynamicCastIndirectUnconditionalFn();
 
   llvm::Constant *getObjCRetainFn();
   llvm::Constant *getObjCRetainAutoreleasedReturnValueFn();
@@ -292,6 +294,8 @@ private:
   llvm::Constant *DynamicCastClassUnconditionalFn = nullptr;
   llvm::Constant *DynamicCastFn = nullptr;
   llvm::Constant *DynamicCastUnconditionalFn = nullptr;
+  llvm::Constant *DynamicCastIndirectFn = nullptr;
+  llvm::Constant *DynamicCastIndirectUnconditionalFn = nullptr;
   llvm::Constant *CopyPODFn = nullptr;
   llvm::Constant *GetFunctionMetadataFn = nullptr;
   llvm::Constant *GetGenericMetadataFn = nullptr;

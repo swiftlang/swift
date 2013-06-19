@@ -311,6 +311,24 @@ llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
                       { Attribute::NoUnwind, Attribute::ReadOnly });
 }
 
+llvm::Constant *IRGenModule::getDynamicCastIndirectFn() {
+  // opaque *swift_dynamicCastIndirect(opaque*, void*, void*);
+  return getRuntimeFn(*this, DynamicCastIndirectFn,
+                      "swift_dynamicCastIndirect",
+                      { OpaquePtrTy },
+                      { OpaquePtrTy, Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, llvm::Attribute::ReadOnly });
+}
+
+llvm::Constant *IRGenModule::getDynamicCastIndirectUnconditionalFn() {
+  // opaque *swift_dynamicCastIndirectUnconditional(opaque*, void*, void*);
+  return getRuntimeFn(*this, DynamicCastIndirectUnconditionalFn,
+                      "swift_dynamicCastIndirectUnconditional",
+                      { OpaquePtrTy },
+                      { OpaquePtrTy, Int8PtrTy, Int8PtrTy },
+                      { Attribute::NoUnwind, llvm::Attribute::ReadOnly });
+}
+
 llvm::Constant *IRGenModule::getRetainNoResultFn() {
   // void swift_retainNoResult(void *ptr);
   getRuntimeFn(*this, RetainNoResultFn, "swift_retain_noresult",

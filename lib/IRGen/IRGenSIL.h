@@ -535,9 +535,11 @@ public:
   void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *i);
   void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *i);
   void visitDowncastExistentialRefInst(DowncastExistentialRefInst *i);
-  
+  void visitDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *i);
+  void visitProjectDowncastExistentialAddrInst(
+                                         ProjectDowncastExistentialAddrInst *i);
+
   void visitIsaInst(IsaInst *i);
-  
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);

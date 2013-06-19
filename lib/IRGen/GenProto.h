@@ -172,6 +172,19 @@ namespace irgen {
   llvm::Value *emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                              Explosion &value,
                                                              CanType type);
+
+  /// Emit a checked unconditional cast of an opaque archetype.
+  Address emitUnconditionalOpaqueArchetypeDowncast(IRGenFunction &IGF,
+                                                   Address value,
+                                                   SILType srcType,
+                                                   SILType destType);
+  
+  /// Emit a checked unconditional cast of an opaque existential container's
+  /// contained value.
+  Address emitUnconditionalOpaqueExistentialDowncast(IRGenFunction &IGF,
+                                                     Address value,
+                                                     SILType srcType,
+                                                     SILType destType);
 } // end namespace irgen
 } // end namespace swift
 

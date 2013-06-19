@@ -1311,12 +1311,30 @@ void IRGenSILFunction::visitDowncastExistentialRefInst(
   Explosion existential = getLoweredExplosion(i->getOperand());
   llvm::Value *instance
     = emitClassExistentialProjection(*this, existential,
-                                            i->getOperand().getType());
+                                     i->getOperand().getType());
 
   llvm::Value *toValue = emitUnconditionalDowncast(instance, i->getType());
   Explosion to(existential.getKind());
   to.add(toValue);
   newLoweredExplosion(SILValue(i,0), to);
+}
+
+void IRGenSILFunction::visitDowncastArchetypeAddrInst(
+                                          swift::DowncastArchetypeAddrInst *i) {
+  Address archetype = getLoweredAddress(i->getOperand());
+  Address cast = emitUnconditionalOpaqueArchetypeDowncast(*this, archetype,
+                                                      i->getOperand().getType(),
+                                                      i->getType());
+  newLoweredAddress(SILValue(i,0), cast);
+}
+
+void IRGenSILFunction::visitProjectDowncastExistentialAddrInst(
+                                 swift::ProjectDowncastExistentialAddrInst *i) {
+  Address existential = getLoweredAddress(i->getOperand());
+  Address cast = emitUnconditionalOpaqueExistentialDowncast(*this, existential,
+                                                      i->getOperand().getType(),
+                                                      i->getType());
+  newLoweredAddress(SILValue(i,0), cast);
 }
 
 void IRGenSILFunction::visitIsaInst(swift::IsaInst *i) {
