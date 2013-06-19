@@ -1428,13 +1428,20 @@ void IRGenSILFunction::visitUpcastExistentialInst(
   SILType srcType = i->getSrcExistential().getType();
   SILType destType = i->getDestExistential().getType();
   emitOpaqueExistentialContainerUpcast(*this, dest, destType, src, srcType,
-                                       i->isTakeOfSrc(),
-                                       i->getConformances());
+                                       i->isTakeOfSrc());
 }
 
 void IRGenSILFunction::visitUpcastExistentialRefInst(
                                            swift::UpcastExistentialRefInst *i) {
-  llvm_unreachable("not yet implemented");
+  Explosion src = getLoweredExplosion(i->getOperand());
+  Explosion dest(src.getKind());
+  SILType srcType = i->getOperand().getType();
+  SILType destType = i->getType();
+  
+  emitClassBoundedExistentialContainerUpcast(*this, dest, destType,
+                                             src, srcType);
+  
+  newLoweredExplosion(SILValue(i, 0), dest);
 }
 
 void IRGenSILFunction::visitDeinitExistentialInst(

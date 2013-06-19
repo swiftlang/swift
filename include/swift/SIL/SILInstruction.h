@@ -1288,13 +1288,11 @@ class UpcastExistentialInst : public SILInstruction {
   unsigned IsTakeOfSrc : 1;
   enum { SrcExistential, DestExistential };
   FixedOperandList<2> Operands;
-  ArrayRef<ProtocolConformance*> Conformances;
 public:
   UpcastExistentialInst(SILLocation Loc,
                         SILValue SrcExistential,
                         SILValue DestExistential,
-                        bool isTakeOfSrc,
-                        ArrayRef<ProtocolConformance*> Conformances);
+                        bool isTakeOfSrc);
   
   SILValue getSrcExistential() const { return Operands[SrcExistential].get(); }
   SILValue getDestExistential() const { return Operands[DestExistential].get();}
@@ -1302,10 +1300,6 @@ public:
   /// True if the destination can take ownership of the concrete value from the
   /// source.
   bool isTakeOfSrc() const { return IsTakeOfSrc; }
-  
-  ArrayRef<ProtocolConformance*> getConformances() const {
-    return Conformances;
-  }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
@@ -1320,14 +1314,11 @@ class UpcastExistentialRefInst
   : public UnaryInstructionBase<ValueKind::UpcastExistentialRefInst,
                                 ConversionInst>
 {
-  ArrayRef<ProtocolConformance*> Conformances;
 public:
   UpcastExistentialRefInst(SILLocation Loc,
                            SILValue Operand,
-                           SILType DestTy,
-                           ArrayRef<ProtocolConformance*> Conformances)
-    : UnaryInstructionBase(Loc, Operand, DestTy),
-      Conformances(Conformances)
+                           SILType DestTy)
+    : UnaryInstructionBase(Loc, Operand, DestTy)
   {}
 };
   

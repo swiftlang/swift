@@ -429,13 +429,12 @@ static RValue emitClassBoundErasure(SILGenFunction &gen, ErasureExpr *E) {
     // If the source value is already of protocol type, we can use
     // upcast_existential_ref to steal the already-initialized witness tables
     // and concrete value.
-    v = gen.B.createUpcastExistentialRef(E, sub.getValue(),
-                                         resultTy, E->getConformances());
+    v = gen.B.createUpcastExistentialRef(E, sub.getValue(), resultTy);
   else
     // Otherwise, create a new existential container value around the class
     // instance.
-    v = gen.B.createInitExistentialRef(E, resultTy,
-                                       sub.getValue(), E->getConformances());
+    v = gen.B.createInitExistentialRef(E, resultTy, sub.getValue(),
+                                       E->getConformances());
 
   return RValue(gen, ManagedValue(v, sub.getCleanup()));
 }
@@ -459,8 +458,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
       = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
 
     gen.B.createUpcastExistential(E, subExistential.getValue(), existential,
-                                  /*isTake=*/subExistential.hasCleanup(),
-                                  E->getConformances());
+                                  /*isTake=*/subExistential.hasCleanup());
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.

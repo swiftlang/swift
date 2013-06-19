@@ -666,6 +666,24 @@ namespace {
       return path.apply(IGF, witness);
     }
     
+    /// Deconstruct an existential object into witness tables and instance
+    /// pointer.
+    std::pair<ArrayRef<llvm::Value*>, llvm::Value*>
+    getWitnessTablesAndValue(Explosion &container) const {
+      ArrayRef<llvm::Value*> witnesses = container.claim(NumProtocols);
+      llvm::Value *instance = container.claimNext();
+      return {witnesses, instance};
+    }
+    
+    /// Given the witness table vector from an existential object, find the
+    /// witness table corresponding to the given protocol.
+    llvm::Value *findWitnessTable(IRGenFunction &IGF,
+                                  ArrayRef<llvm::Value *> witnesses,
+                                  ProtocolDecl *protocol) const {
+      ProtocolPath path(IGF.IGM, getProtocols(), protocol);
+      return path.apply(IGF, witnesses[path.getOriginIndex()]);
+    }
+    
     /// Given a class-bounded existential containe, returns the instance
     /// pointer value.
     llvm::Value *getValue(IRGenFunction &IGF, Explosion &container) const {
@@ -3455,8 +3473,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
 void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
                                  Address dest, SILType destType,
                                  Address src,  SILType srcType,
-                                 bool isTakeOfSrc,
-                                 ArrayRef<ProtocolConformance*> conformances) {
+                                 bool isTakeOfSrc) {
   assert(destType.isExistentialType());
   assert(!destType.isClassBoundedExistentialType());
   assert(srcType.isExistentialType());
@@ -3468,7 +3485,6 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
   auto srcLayout = srcTI.getLayout();
   
   ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
-  assert(destEntries.size() == conformances.size());
 
   // Take the data out of the other buffer.
   // UpcastExistential never implies a transformation of the *value*,
@@ -3505,7 +3521,7 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
   // into dest immediately because later fetches of protocols might
   // give us trouble.
   SmallVector<llvm::Value*, 4> destTables;
-  for (auto &entry : destTI.getProtocols()) {
+  for (auto &entry : destEntries) {
     auto table = srcTI.findWitnessTable(IGF, src, entry.getProtocol());
     destTables.push_back(table);
   }
@@ -3515,6 +3531,34 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
     Address destSlot = destLayout.projectWitnessTable(IGF, dest, i);
     IGF.Builder.CreateStore(destTables[i], destSlot);
   }
+}
+
+void irgen::emitClassBoundedExistentialContainerUpcast(IRGenFunction &IGF,
+                                                       Explosion &dest,
+                                                       SILType destType,
+                                                       Explosion &src,
+                                                       SILType srcType) {
+  assert(destType.isClassBoundedExistentialType());
+  assert(srcType.isClassBoundedExistentialType());
+  auto &destTI = IGF.getFragileTypeInfo(destType)
+    .as<ClassBoundedExistentialTypeInfo>();
+  auto &srcTI = IGF.getFragileTypeInfo(srcType)
+    .as<ClassBoundedExistentialTypeInfo>();
+
+  ArrayRef<llvm::Value*> srcTables;
+  llvm::Value *instance;
+  std::tie(srcTables, instance) = srcTI.getWitnessTablesAndValue(src);
+
+  // Find the destination tables and add them to the destination.
+  ArrayRef<ProtocolEntry> destEntries = destTI.getProtocols();
+  SmallVector<llvm::Value*, 4> destTables;
+  for (auto &entry : destEntries) {
+    auto table = srcTI.findWitnessTable(IGF, srcTables, entry.getProtocol());
+    dest.add(table);
+  }
+
+  // Add the instance.
+  dest.add(instance);
 }
 
 /// "Deinitialize" an existential container whose contained value is allocated

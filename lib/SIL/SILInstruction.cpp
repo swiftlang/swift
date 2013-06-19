@@ -430,12 +430,10 @@ ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
                                  SILValue SrcExistential,
                                  SILValue DestExistential,
-                                 bool isTakeOfSrc,
-                                 ArrayRef<ProtocolConformance*> Conformances)
+                                 bool isTakeOfSrc)
   : SILInstruction(ValueKind::UpcastExistentialInst, Loc),
     IsTakeOfSrc(isTakeOfSrc),
-    Operands(this, SrcExistential, DestExistential),
-    Conformances(Conformances)
+    Operands(this, SrcExistential, DestExistential)
 {
 }
 

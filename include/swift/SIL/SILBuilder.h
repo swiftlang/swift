@@ -468,22 +468,19 @@ public:
   UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
                                  SILValue SrcExistential,
                                  SILValue DestExistential,
-                                 bool isTakeOfSrc,
-                                 ArrayRef<ProtocolConformance*> Conformances) {
+                                 bool isTakeOfSrc) {
     return insert(new (F.getModule())
                     UpcastExistentialInst(Loc,
-                                            SrcExistential,
-                                            DestExistential,
-                                            isTakeOfSrc,
-                                            Conformances));
+                                          SrcExistential,
+                                          DestExistential,
+                                          isTakeOfSrc));
   }
   
   UpcastExistentialRefInst *createUpcastExistentialRef(SILLocation Loc,
                                  SILValue Operand,
-                                 SILType Ty,
-                                 ArrayRef<ProtocolConformance*> Conformances) {
+                                 SILType Ty) {
     return insert(new (F.getModule())
-                    UpcastExistentialRefInst(Loc, Operand, Ty, Conformances));
+                    UpcastExistentialRefInst(Loc, Operand, Ty));
   }
   
   DeinitExistentialInst *createDeinitExistential(SILLocation Loc,

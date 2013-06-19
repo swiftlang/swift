@@ -68,8 +68,16 @@ namespace irgen {
                                   SILType destType,
                                   Address src,
                                   SILType srcType,
-                                  bool isTakeOfSrc,
-                                  ArrayRef<ProtocolConformance*> conformances);
+                                  bool isTakeOfSrc);
+  
+  /// Initialize a class-bounded existential container using the value and
+  /// metadata from an existing, more specific class-bounded existential
+  /// container.
+  void emitClassBoundedExistentialContainerUpcast(IRGenFunction &IGF,
+                                  Explosion &dest,
+                                  SILType destType,
+                                  Explosion &src,
+                                  SILType srcType);
   
   /// "Deinitialize" an existential container whose contained value is allocated
   /// but uninitialized, by deallocating the buffer owned by the container if any.
