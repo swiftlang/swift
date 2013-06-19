@@ -446,6 +446,8 @@ public:
     for (unsigned i = 0, size = protocols.size(); i < size; ++i) {
       if (!protocols[i]->isObjC())
         continue;
+      if (!conformances[i])
+        continue;
       for (auto &mapping : conformances[i]->Mapping)
         mapping.second->setIsObjC(true);
     }
