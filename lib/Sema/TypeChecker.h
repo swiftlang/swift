@@ -180,8 +180,8 @@ public:
 
   /// \brief Determine whether one type is a subtype of another.
   ///
-  /// \param t1 The first type.
-  /// \param t2 The second type.
+  /// \param t1 The potential subtype.
+  /// \param t2 The potential supertype.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
   bool isSubtypeOf(Type t1, Type t2) {
@@ -191,15 +191,34 @@ public:
 
   /// \brief Determine whether one type is a subtype of another.
   ///
-  /// \param t1 The first type.
+  /// \param t1 The potential subtype.
   ///
-  /// \param t2 The second type.
+  /// \param t2 The potential supertype.
   ///
   /// \param isTrivial Will indicate whether this is a trivial subtyping
   /// relationship.
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
   bool isSubtypeOf(Type t1, Type t2, bool &isTrivial);
+  
+  /// \brief Determine whether one type is implicitly convertible to another.
+  ///
+  /// \param t1 The potential source type of the conversion.
+  ///
+  /// \param t2 The potential destination type of the conversion.
+  ///
+  /// \returns true if \c t1 can be implicitly converted to \c t2.
+  bool isConvertibleTo(Type t1, Type t2);
+  
+  /// \brief Determine whether one type would be a valid substitution for an
+  /// archetype.
+  ///
+  /// \param t1 The potential substitution type.
+  ///
+  /// \param t2 The potential substituted archetype.
+  ///
+  /// \returns true if \c t1 is a valid substitution for \c t2.
+  bool isSubstitutableFor(Type t1, ArchetypeType *t2);
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
 

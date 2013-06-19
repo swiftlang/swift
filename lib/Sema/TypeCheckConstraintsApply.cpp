@@ -1486,9 +1486,10 @@ namespace {
       bool toExistential = toType->isExistentialType();
       bool fromExistential = fromType->isExistentialType();
       
-      // If the from/to types are equivalent, this should have been a
-      // coercion expression (b as A) rather than a cast (a as! B). Complain.
-      if (fromType->isEqual(toType) || tc.isSubtypeOf(fromType, toType)) {
+      // If the from/to types are equivalent or implicitly convertible,
+      // this should have been a coercion expression (b as A) rather than a
+      // cast (a as! B). Complain.
+      if (fromType->isEqual(toType) || tc.isConvertibleTo(fromType, toType)) {
         // Only complain if the cast was explicitly generated.
         // FIXME: This leniency is here for the Clang module importer,
         // which doesn't necessarily know whether it needs to force the
@@ -1511,8 +1512,8 @@ namespace {
       if (toExistential) {
         tc.diagnose(expr->getLoc(), diag::downcast_to_existential,
                     origFromType, toType)
-        .highlight(sub->getSourceRange())
-        .highlight(expr->getTypeLoc().getSourceRange());
+          .highlight(sub->getSourceRange())
+          .highlight(expr->getTypeLoc().getSourceRange());
         return nullptr;
       }
       
@@ -1520,26 +1521,34 @@ namespace {
       //   - convert an archetype to a (different) archetype type.
       if (fromArchetype && toArchetype) {
         auto *atoa = new (C) UncheckedArchetypeToArchetypeExpr(sub,
-                                                               expr->getLoc(),
-                                                               expr->getBangLoc(),
-                                                               expr->getTypeLoc());
+                                                           expr->getLoc(),
+                                                           expr->getBangLoc(),
+                                                           expr->getTypeLoc());
         atoa->setType(expr->getType());
         return atoa;
       }
 
-      //   - convert from an existential to an archetype or conforming concrete type.
+      //   - convert from an existential to an archetype or conforming concrete
+      //     type.
       if (fromExistential) {
         Expr *etox;
-        if (toArchetype)
+        if (toArchetype) {
           etox = new (C) UncheckedExistentialToArchetypeExpr(sub,
-                                                             expr->getLoc(),
-                                                             expr->getBangLoc(),
-                                                             expr->getTypeLoc());
-        else {
+                                                           expr->getLoc(),
+                                                           expr->getBangLoc(),
+                                                           expr->getTypeLoc());
+        } else if (tc.isConvertibleTo(toType, fromType)) {
           etox = new (C) UncheckedExistentialToConcreteExpr(sub,
                                                             expr->getLoc(),
                                                             expr->getBangLoc(),
                                                             expr->getTypeLoc());
+        } else {
+          tc.diagnose(expr->getLoc(),
+                      diag::downcast_from_existential_to_unrelated,
+                      origFromType, toType)
+            .highlight(sub->getSourceRange())
+            .highlight(expr->getTypeLoc().getSourceRange());
+          return nullptr;
         }
         etox->setType(expr->getType());
         return etox;
@@ -1547,10 +1556,18 @@ namespace {
       
       //   - convert an archetype to a concrete type fulfilling its constraints.
       if (fromArchetype) {
+        if (!tc.isSubstitutableFor(toType, fromType->castTo<ArchetypeType>())) {
+          tc.diagnose(expr->getLoc(),
+                      diag::downcast_from_archetype_to_unrelated,
+                      origFromType, toType)
+            .highlight(sub->getSourceRange())
+            .highlight(expr->getTypeLoc().getSourceRange());
+          return nullptr;
+        }
         auto *atoc = new (C) UncheckedArchetypeToConcreteExpr(sub,
-                                                              expr->getLoc(),
-                                                              expr->getBangLoc(),
-                                                              expr->getTypeLoc());
+                                                            expr->getLoc(),
+                                                            expr->getBangLoc(),
+                                                            expr->getTypeLoc());
         atoc->setType(expr->getType());
         return atoc;
       }
@@ -1571,8 +1588,6 @@ namespace {
         stoa->setType(expr->getType());
         return stoa;
       }
-      
-      
 
       assert(!fromArchetype && "archetypes should have been handled above");
       assert(!toArchetype && "archetypes should have been handled above");

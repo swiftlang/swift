@@ -970,6 +970,13 @@ ERROR(downcast_to_unrelated,sema_tcc,none,
 ERROR(downcast_to_existential,sema_tcc,none,
       "cannot downcast from %0 to protocol type %1",
       (Type, Type))
+ERROR(downcast_from_existential_to_unrelated,sema_tcc,none,
+      "cannot cast from protocol type %0 to non-conforming type %1",
+      (Type, Type))
+ERROR(downcast_from_archetype_to_unrelated,sema_tcc,none,
+      "cannot cast from type variable %0 to type %1 that does not match "
+      "its constraints",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

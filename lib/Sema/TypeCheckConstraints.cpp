@@ -3470,6 +3470,24 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, bool &isTrivial) {
   return cs.isSubtypeOf(type1, type2, isTrivial);
 }
 
+bool TypeChecker::isConvertibleTo(Type type1, Type type2) {
+  ConstraintSystem cs(*this, nullptr);
+  bool isTrivial;
+  return cs.isConvertibleTo(type1, type2, isTrivial);
+}
+
+bool TypeChecker::isSubstitutableFor(Type type1, ArchetypeType *type2) {
+  ConstraintSystem cs(*this, nullptr);
+  
+  llvm::DenseMap<ArchetypeType*, TypeVariableType*> replacements;
+  Type type2var = cs.openType(type2, type2, replacements);
+
+  cs.addConstraint(ConstraintKind::Equal, type1, type2var);
+  
+  SmallVector<Solution, 1> solution;
+  return !cs.solve(solution);
+}
+
 Expr *TypeChecker::coerceToRValue(Expr *expr) {
   // If we already have an rvalue, we're done.
   auto lvalueTy = expr->getType()->getAs<LValueType>();
