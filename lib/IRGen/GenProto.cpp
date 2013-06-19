@@ -559,13 +559,13 @@ namespace {
     }
   };
   
-  /// A type info implementation for class-bounded existential types, that is,
+  /// A type info implementation for class existential types, that is,
   /// an existential type known to conform to one or more class protocols.
-  /// Class-bounded existentials can be represented directly as an aggregation
+  /// Class existentials can be represented directly as an aggregation
   /// of a refcounted pointer plus witness tables instead of using an indirect
   /// buffer.
-  class ClassBoundedExistentialTypeInfo
-    : public ScalarTypeInfo<ClassBoundedExistentialTypeInfo, FixedTypeInfo>
+  class ClassExistentialTypeInfo
+    : public ScalarTypeInfo<ClassExistentialTypeInfo, FixedTypeInfo>
   {
     unsigned NumProtocols;
     
@@ -576,7 +576,7 @@ namespace {
       return reinterpret_cast<const ProtocolEntry *>(this + 1);
     }
     
-    ClassBoundedExistentialTypeInfo(llvm::Type *ty,
+    ClassExistentialTypeInfo(llvm::Type *ty,
                                     Size size,
                                     Alignment align,
                                     ArrayRef<ProtocolEntry> protocols)
@@ -589,13 +589,13 @@ namespace {
     }
     
   public:    
-    static const ClassBoundedExistentialTypeInfo *
+    static const ClassExistentialTypeInfo *
     create(llvm::Type *ty, Size size, Alignment align,
            ArrayRef<ProtocolEntry> protocols)
     {
-      void *buffer = operator new(sizeof(ClassBoundedExistentialTypeInfo) +
+      void *buffer = operator new(sizeof(ClassExistentialTypeInfo) +
                                   protocols.size() * sizeof(ProtocolEntry));
-      return new (buffer) ClassBoundedExistentialTypeInfo(ty, size, align,
+      return new (buffer) ClassExistentialTypeInfo(ty, size, align,
                                                           protocols);
     }
 
@@ -607,10 +607,10 @@ namespace {
       return ArrayRef<ProtocolEntry>(getProtocolsBuffer(), NumProtocols);
     }
     
-    /// The storage type of a class-bounded existential is a struct containing
+    /// The storage type of a class existential is a struct containing
     /// witness table pointers for each conformed-to protocol followed by a
     /// refcounted pointer to the class instance value. Unlike for opaque
-    /// existentials, a class-bounded existential does not need to store type
+    /// existentials, a class existential does not need to store type
     /// metadata as an additional element, since it can be derived from the
     /// class instance.
     llvm::StructType *getStorageType() const {
@@ -627,7 +627,7 @@ namespace {
         schema.add(ExplosionSchema::Element::forScalar(ty->getElementType(i)));
     }
     
-    /// Given the address of a class-bounded existential container, returns
+    /// Given the address of a class existential container, returns
     /// the address of a witness table pointer.
     Address projectWitnessTable(IRGenFunction &IGF, Address address,
                                 unsigned n) const {
@@ -635,13 +635,13 @@ namespace {
       return IGF.Builder.CreateStructGEP(address, n, Size(0));
     }
     
-    /// Given the address of a class-bounded existential container, returns
+    /// Given the address of a class existential container, returns
     /// the address of its instance pointer.
     Address projectValue(IRGenFunction &IGF, Address address) const {
       return IGF.Builder.CreateStructGEP(address, NumProtocols, Size(0));
     }
     
-    /// Given a class-bounded existential container, returns a witness table
+    /// Given a class existential container, returns a witness table
     /// pointer out of the container, and the type metadata pointer for the
     /// value.
     llvm::Value *
@@ -684,7 +684,7 @@ namespace {
       return path.apply(IGF, witnesses[path.getOriginIndex()]);
     }
     
-    /// Given a class-bounded existential containe, returns the instance
+    /// Given a class existential container, returns the instance
     /// pointer value.
     llvm::Value *getValue(IRGenFunction &IGF, Explosion &container) const {
       container.claim(NumProtocols);
@@ -933,18 +933,18 @@ namespace {
     Dynamic
   };
 
-  /// A type implementation for a class-bounded archetype, that is, an archetype
-  /// bounded by a class-bounded protocol constraint. These archetypes can be
+  /// A type implementation for a class archetype, that is, an archetype
+  /// bounded by a class protocol constraint. These archetypes can be
   /// represented by a refcounted pointer instead of an opaque value buffer.
   /// We use an unknown-refcounted pointer in order to allow ObjC or Swift
   /// classes to conform to the type variable.
-  class ClassBoundedArchetypeTypeInfo
-    : public HeapTypeInfo<ClassBoundedArchetypeTypeInfo>,
+  class ClassArchetypeTypeInfo
+    : public HeapTypeInfo<ClassArchetypeTypeInfo>,
       public ArchetypeTypeInfoBase
   {
     bool HasSwiftRefcount;
     
-    ClassBoundedArchetypeTypeInfo(ArchetypeType *archetype,
+    ClassArchetypeTypeInfo(ArchetypeType *archetype,
                                   llvm::PointerType *storageType,
                                   Size size, Alignment align,
                                   ArrayRef<ProtocolEntry> protocols,
@@ -955,15 +955,15 @@ namespace {
     {}
     
   public:
-    static const ClassBoundedArchetypeTypeInfo *create(ArchetypeType *archetype,
+    static const ClassArchetypeTypeInfo *create(ArchetypeType *archetype,
                                            llvm::PointerType *storageType,
                                            Size size, Alignment align,
                                            ArrayRef<ProtocolEntry> protocols,
                                            bool hasSwiftRefcount) {
-      void *buffer = operator new(sizeof(ClassBoundedArchetypeTypeInfo)
+      void *buffer = operator new(sizeof(ClassArchetypeTypeInfo)
                                     + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer)
-        ClassBoundedArchetypeTypeInfo(archetype,
+        ClassArchetypeTypeInfo(archetype,
                                       storageType, size, align,
                                       protocols, hasSwiftRefcount);
     }
@@ -978,8 +978,8 @@ namespace {
   static const ArchetypeTypeInfoBase &
   getArchetypeInfo(IRGenFunction &IGF, ArchetypeType *t) {
     const TypeInfo &ti = IGF.getFragileTypeInfo(t);
-    if (t->isClassBounded())
-      return ti.as<ClassBoundedArchetypeTypeInfo>();
+    if (t->requiresClass())
+      return ti.as<ClassArchetypeTypeInfo>();
     return ti.as<OpaqueArchetypeTypeInfo>();
   }
 }
@@ -1554,11 +1554,11 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     assert(concreteType->isExistentialType() &&
            "non-existentials should have a known typeof witness");
     Address obj = getArgAs(IGF, argv, type, "obj");
-    if (concreteType->isClassBoundedExistentialType()) {
+    if (concreteType->requiresClassExistentialType()) {
       Explosion existential(IGF.CurExplosionLevel);
       type.loadAsTake(IGF, obj, existential);
       llvm::Value *result
-        = emitTypeMetadataRefForClassBoundedExistential(IGF, existential,
+        = emitTypeMetadataRefForClassExistential(IGF, existential,
                                                         concreteType);
       IGF.Builder.CreateRet(result);
       
@@ -2080,12 +2080,12 @@ namespace {
       AnyFunctionType *sigFnTy = cast<AnyFunctionType>(sigTy);
       AnyFunctionType *implFnTy = cast<AnyFunctionType>(implTy);
 
-      // We can derive the type metadata from class-bounded archetypes; for
+      // We can derive the type metadata from class archetypes; for
       // fully opaque archetypes, we need to pass in the metatype for the
       // archetype as an extra argument.
       if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
-        assert(archetype->isClassBounded() &&
-               "non-lvalue this argument for non-class-bounded This?!");
+        assert(archetype->requiresClass() &&
+               "non-lvalue this argument for non-class This?!");
         NeedsExtraMetatype = false;
       } else {
         NeedsExtraMetatype = true;
@@ -2198,7 +2198,7 @@ namespace {
         thisTy = CanType(metaTy->getInstanceType());
       } else {
         assert(thisTy->hasReferenceSemantics() &&
-               "non-class-bounded archetype This passed by value?");
+               "non-class archetype This passed by value?");
       }
       auto archetype = cast<ArchetypeType>(thisTy);
 
@@ -2672,12 +2672,12 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // The first field is the metadata reference.
   fields.push_back(IGM.TypeMetadataPtrTy);
 
-  bool isClassBounded = false;
+  bool requiresClass = false;
   
   for (auto protocol : protocols) {
-    // The existential container is class-bounded if any of its protocol bounds
-    // are.
-    isClassBounded |= protocol->isClassBounded();
+    // The existential container is class-constrained if any of its protocol
+    // constraints are.
+    requiresClass |= protocol->requiresClass();
     
     // ObjC protocols need no layout or witness table info. All dispatch is done
     // through objc_msgSend.
@@ -2692,21 +2692,21 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     fields.push_back(IGM.WitnessTablePtrTy);
   }
   
-  // If the existential is class-bounded, lower it to a class-bounded
+  // If the existential is class, lower it to a class
   // existential representation.
-  if (isClassBounded) {
+  if (requiresClass) {
     // Add the class instance pointer to the fields.
     fields.push_back(IGM.UnknownRefCountedPtrTy);
     // Drop the type metadata pointer. We can get it from the class instance.
-    ArrayRef<llvm::Type*> classBoundedFields = fields;
-    classBoundedFields = classBoundedFields.slice(1);
+    ArrayRef<llvm::Type*> ClassFields = fields;
+    ClassFields = ClassFields.slice(1);
     
-    type->setBody(classBoundedFields);
+    type->setBody(ClassFields);
     
     Alignment align = IGM.getPointerAlignment();
-    Size size = classBoundedFields.size() * IGM.getPointerSize();
+    Size size = ClassFields.size() * IGM.getPointerSize();
     
-    return ClassBoundedExistentialTypeInfo::create(type, size, align,
+    return ClassExistentialTypeInfo::create(type, size, align,
                                                    entries);
   }
 
@@ -2753,8 +2753,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     protocols.push_back(ProtocolEntry(protocol, impl));
   }
 
-  // If the archetype is class-bounded, use the class-bounded representation.
-  if (archetype->isClassBounded()) {
+  // If the archetype is class-constrained, use a class pointer
+  // representation.
+  if (archetype->requiresClass()) {
     // Fully general archetypes can't be assumed to have a Swift refcount.
     bool swiftRefcount = false;
     llvm::PointerType *reprTy = IGM.UnknownRefCountedPtrTy;
@@ -2770,7 +2771,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
     
-    return ClassBoundedArchetypeTypeInfo::create(archetype,
+    return ClassArchetypeTypeInfo::create(archetype,
                                                  reprTy,
                                                  IGM.getPointerSize(),
                                                  IGM.getPointerAlignment(),
@@ -3475,9 +3476,9 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
                                  Address src,  SILType srcType,
                                  bool isTakeOfSrc) {
   assert(destType.isExistentialType());
-  assert(!destType.isClassBoundedExistentialType());
+  assert(!destType.requiresClassExistentialType());
   assert(srcType.isExistentialType());
-  assert(!srcType.isClassBoundedExistentialType());
+  assert(!srcType.requiresClassExistentialType());
   auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType).as<OpaqueExistentialTypeInfo>();
 
@@ -3533,17 +3534,17 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
   }
 }
 
-void irgen::emitClassBoundedExistentialContainerUpcast(IRGenFunction &IGF,
+void irgen::emitClassExistentialContainerUpcast(IRGenFunction &IGF,
                                                        Explosion &dest,
                                                        SILType destType,
                                                        Explosion &src,
                                                        SILType srcType) {
-  assert(destType.isClassBoundedExistentialType());
-  assert(srcType.isClassBoundedExistentialType());
+  assert(destType.requiresClassExistentialType());
+  assert(srcType.requiresClassExistentialType());
   auto &destTI = IGF.getFragileTypeInfo(destType)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
 
   ArrayRef<llvm::Value*> srcTables;
   llvm::Value *instance;
@@ -3567,7 +3568,7 @@ void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
                                                  Address container,
                                                  SILType type) {
   assert(type.isExistentialType());
-  assert(!type.isClassBoundedExistentialType());
+  assert(!type.requiresClassExistentialType());
   auto &ti = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
   auto layout = ti.getLayout();
   
@@ -3577,19 +3578,19 @@ void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
   emitDeallocateBufferCall(IGF, wtable, metadata, buffer);
 }
 
-/// Emit a class-bounded existential container from a class instance value
+/// Emit a class existential container from a class instance value
 /// as an explosion.
-void irgen::emitClassBoundedExistentialContainer(IRGenFunction &IGF,
+void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                Explosion &out,
                                SILType outType,
                                llvm::Value *instance,
                                SILType instanceType,
                                ArrayRef<ProtocolConformance*> conformances) {
-  assert(outType.isClassBoundedExistentialType() &&
-         "creating a non-class-bounded existential type");
+  assert(outType.requiresClassExistentialType() &&
+         "creating a non-class existential type");
   
   auto &destTI = IGF.getFragileTypeInfo(outType)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
   
   // Emit the witness table pointers.
   forEachProtocolWitnessTable(IGF, instanceType, outType,
@@ -3612,8 +3613,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   SILType destType,
                                   SILType srcType,
                                   ArrayRef<ProtocolConformance*> conformances) {
-  assert(!destType.isClassBoundedExistentialType() &&
-         "initializing a class-bounded existential container as opaque");
+  assert(!destType.requiresClassExistentialType() &&
+         "initializing a class existential container as opaque");
   auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType);
   OpaqueExistentialLayout destLayout = destTI.getLayout();
@@ -3719,7 +3720,7 @@ irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
   
   // Acquire the archetype metadata for fully opaque archetype methods.
   llvm::Value *metadata = nullptr;
-  if (!archetype->isClassBounded())
+  if (!archetype->requiresClass())
     metadata = archetypeTI.getMetadataRef(IGF);
   
   // Build the value.
@@ -3752,8 +3753,8 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
                                      SILConstant member,
                                      Explosion &out) {
   assert(baseTy.isExistentialType());
-  assert(!baseTy.isClassBoundedExistentialType() &&
-         "emitting class-bounded existential as opaque existential");
+  assert(!baseTy.requiresClassExistentialType() &&
+         "emitting class existential as opaque existential");
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
@@ -3777,18 +3778,18 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
 }
 
-/// Extract the method pointer and metadata from a class-bounded existential
+/// Extract the method pointer and metadata from a class existential
 /// container's protocol witness table as a function value.
-void irgen::emitClassBoundedProtocolMethodValue(IRGenFunction &IGF,
+void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
                                                 Explosion &in,
                                                 SILType baseTy,
                                                 SILConstant member,
                                                 Explosion &out) {
-  assert(baseTy.isClassBoundedExistentialType());
+  assert(baseTy.requiresClassExistentialType());
 
   // The protocol we're calling on.
   auto &baseTI = IGF.getFragileTypeInfo(baseTy)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
@@ -3813,10 +3814,10 @@ irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
 }
 
 llvm::Value *
-irgen::emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                      Explosion &value,
                                                      SILType type) {
-  return emitTypeMetadataRefForClassBoundedExistential(IGF, value,
+  return emitTypeMetadataRefForClassExistential(IGF, value,
                                                  type.getSwiftRValueType());
 }
 
@@ -3824,7 +3825,7 @@ llvm::Value *
 irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
                                                CanType type) {
   assert(type->isExistentialType());
-  assert(!type->isClassBoundedExistentialType());
+  assert(!type->requiresClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
@@ -3841,12 +3842,12 @@ irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
 }
 
 llvm::Value *
-irgen::emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                      Explosion &value,
                                                      CanType type) {
-  assert(type->isClassBoundedExistentialType());
+  assert(type->requiresClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(type)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
   
   // Extract the class instance pointer.
   llvm::Value *instance = baseTI.getValue(IGF, value);
@@ -3860,7 +3861,7 @@ Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                                Address base,
                                                SILType baseTy) {
   assert(baseTy.isExistentialType());
-  assert(!baseTy.isClassBoundedExistentialType());
+  assert(!baseTy.requiresClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 
@@ -3871,13 +3872,13 @@ Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
   return Address(object, Alignment(1));
 }
 
-/// Extract the instance pointer from a class-bounded existential value.
-llvm::Value *irgen::emitClassBoundedExistentialProjection(IRGenFunction &IGF,
+/// Extract the instance pointer from a class existential value.
+llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                                           Explosion &base,
                                                           SILType baseTy) {
-  assert(baseTy.isClassBoundedExistentialType());
+  assert(baseTy.requiresClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy)
-    .as<ClassBoundedExistentialTypeInfo>();
+    .as<ClassExistentialTypeInfo>();
   
   return baseTI.getValue(IGF, base);
 }

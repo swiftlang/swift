@@ -529,9 +529,9 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
 void IRGenSILFunction::visitProtocolMetatypeInst(
                                                swift::ProtocolMetatypeInst *i) {
   llvm::Value *metatype;
-  if (i->getOperand().getType().isClassBoundedExistentialType()) {
+  if (i->getOperand().getType().requiresClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());
-    metatype = emitTypeMetadataRefForClassBoundedExistential(*this, existential,
+    metatype = emitTypeMetadataRefForClassExistential(*this, existential,
                                                      i->getOperand().getType());
   } else {
     Address existential = getLoweredAddress(i->getOperand());
@@ -1291,7 +1291,7 @@ void IRGenSILFunction::visitSuperToArchetypeRefInst(
   llvm::Value *in = super.claimNext();
   Explosion out(CurExplosionLevel);
   llvm::Value *cast
-    = emitSuperToClassBoundedArchetypeConversion(in, i->getType());
+    = emitSuperToClassArchetypeConversion(in, i->getType());
   out.add(cast);
   newLoweredExplosion(SILValue(i, 0), out);
 }
@@ -1310,7 +1310,7 @@ void IRGenSILFunction::visitDowncastExistentialRefInst(
                                          swift::DowncastExistentialRefInst *i) {
   Explosion existential = getLoweredExplosion(i->getOperand());
   llvm::Value *instance
-    = emitClassBoundedExistentialProjection(*this, existential,
+    = emitClassExistentialProjection(*this, existential,
                                             i->getOperand().getType());
 
   llvm::Value *toValue = emitUnconditionalDowncast(instance, i->getType());
@@ -1413,7 +1413,7 @@ void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion instance = getLoweredExplosion(i->getOperand());
   Explosion result(CurExplosionLevel);
-  emitClassBoundedExistentialContainer(*this,
+  emitClassExistentialContainer(*this,
                                result, i->getType(),
                                instance.claimNext(), i->getOperand().getType(),
                                i->getConformances());
@@ -1422,7 +1422,7 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
 
 void IRGenSILFunction::visitUpcastExistentialInst(
                                               swift::UpcastExistentialInst *i) {
-  /// FIXME: Handle source existential being class-bounded.
+  /// FIXME: Handle source existential being class existential.
   Address src = getLoweredAddress(i->getSrcExistential());
   Address dest = getLoweredAddress(i->getDestExistential());
   SILType srcType = i->getSrcExistential().getType();
@@ -1438,7 +1438,7 @@ void IRGenSILFunction::visitUpcastExistentialRefInst(
   SILType srcType = i->getOperand().getType();
   SILType destType = i->getType();
   
-  emitClassBoundedExistentialContainerUpcast(*this, dest, destType,
+  emitClassExistentialContainerUpcast(*this, dest, destType,
                                              src, srcType);
   
   newLoweredExplosion(SILValue(i, 0), dest);
@@ -1468,7 +1468,7 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
   
   Explosion result(CurExplosionLevel);
   llvm::Value *instance
-    = emitClassBoundedExistentialProjection(*this, base, baseTy);
+    = emitClassExistentialProjection(*this, base, baseTy);
   result.add(instance);
   newLoweredExplosion(SILValue(i, 0), result);
 }
@@ -1485,9 +1485,9 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   SILConstant member = i->getMember();
   
   Explosion lowered(CurExplosionLevel);
-  if (baseTy.isClassBoundedExistentialType()) {
+  if (baseTy.requiresClassExistentialType()) {
     Explosion base = getLoweredExplosion(i->getOperand());
-    emitClassBoundedProtocolMethodValue(*this, base, baseTy, member, lowered);
+    emitClassProtocolMethodValue(*this, base, baseTy, member, lowered);
   } else {
     Address base = getLoweredAddress(i->getOperand());
     emitOpaqueProtocolMethodValue(*this, base, baseTy, member, lowered);

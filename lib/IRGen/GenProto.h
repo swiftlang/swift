@@ -52,9 +52,9 @@ namespace irgen {
                                    SILType srcType,
                                    ArrayRef<ProtocolConformance*> conformances);
   
-  /// Emit a class-bounded existential container from a class instance value
+  /// Emit a class existential container from a class instance value
   /// as an explosion.
-  void emitClassBoundedExistentialContainer(IRGenFunction &IGF,
+  void emitClassExistentialContainer(IRGenFunction &IGF,
                                  Explosion &out,
                                  SILType outType,
                                  llvm::Value *instance,
@@ -70,10 +70,10 @@ namespace irgen {
                                   SILType srcType,
                                   bool isTakeOfSrc);
   
-  /// Initialize a class-bounded existential container using the value and
-  /// metadata from an existing, more specific class-bounded existential
+  /// Initialize a class existential container using the value and
+  /// metadata from an existing, more specific class existential
   /// container.
-  void emitClassBoundedExistentialContainerUpcast(IRGenFunction &IGF,
+  void emitClassExistentialContainerUpcast(IRGenFunction &IGF,
                                   Explosion &dest,
                                   SILType destType,
                                   Explosion &src,
@@ -91,8 +91,8 @@ namespace irgen {
                                           Address base,
                                           SILType baseTy);
   
-  /// Extract the instance pointer from a class-bounded existential value.
-  llvm::Value *emitClassBoundedExistentialProjection(IRGenFunction &IGF,
+  /// Extract the instance pointer from a class existential value.
+  llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
                                                      Explosion &base,
                                                      SILType baseTy);
 
@@ -111,9 +111,9 @@ namespace irgen {
                                      SILConstant member,
                                      Explosion &out);
   
-  /// Extract the method pointer and metadata from a class-bounded existential
+  /// Extract the method pointer and metadata from a class existential
   /// container's protocol witness table as a function value.
-  void emitClassBoundedProtocolMethodValue(IRGenFunction &IGF,
+  void emitClassProtocolMethodValue(IRGenFunction &IGF,
                                            Explosion &in,
                                            SILType baseTy,
                                            SILConstant member,
@@ -163,13 +163,13 @@ namespace irgen {
                                                  Address addr,
                                                  CanType type);
   
-  /// Emit a dynamic metatype lookup for the given class-bounded existential.
-  llvm::Value *emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+  /// Emit a dynamic metatype lookup for the given class existential.
+  llvm::Value *emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                              Explosion &value,
                                                              SILType type);
   
   /// Emit a dynamic metatype lookup for the given existential.
-  llvm::Value *emitTypeMetadataRefForClassBoundedExistential(IRGenFunction &IGF,
+  llvm::Value *emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                              Explosion &value,
                                                              CanType type);
 } // end namespace irgen

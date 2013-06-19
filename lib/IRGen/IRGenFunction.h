@@ -180,7 +180,7 @@ public:
 
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
-  llvm::Value *emitSuperToClassBoundedArchetypeConversion(llvm::Value *super,
+  llvm::Value *emitSuperToClassArchetypeConversion(llvm::Value *super,
                                                           SILType destType);
 
   /// \brief Convert the given value to the given destination type, using a

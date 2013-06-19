@@ -1230,10 +1230,10 @@ void CallEmission::emitToExplosion(Explosion &out) {
     }
       
     if (auto *origArchetype = dyn_cast<ArchetypeType>(CurOrigType)) {
-      if (origArchetype->isClassBounded()) {
-        // Remap a class-bounded archetype to an instance.
+      if (origArchetype->requiresClass()) {
+        // Remap a class archetype to an instance.
         assert(substType->getClassOrBoundGenericClass() &&
-               "remapping class-bounded archetype to non-class?!");
+               "remapping class archetype to non-class?!");
         Explosion temp(getCallee().getExplosionLevel());
         emitToUnmappedExplosion(temp);
         llvm::Value *pointer = temp.claimNext();

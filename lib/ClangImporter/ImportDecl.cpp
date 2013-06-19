@@ -1900,7 +1900,7 @@ namespace {
       // Import protocols this protocol conforms to.
       result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
 
-      // Note that this is an Objective-C and class-bounded protocol.
+      // Note that this is an Objective-C and class protocol.
       result->getMutableAttrs().ObjC = true;
       result->getMutableAttrs().ClassProtocol = true;
       result->setIsObjC(true);

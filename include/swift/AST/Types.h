@@ -206,7 +206,7 @@ public:
   
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
-  bool isClassBoundedExistentialType();
+  bool requiresClassExistentialType();
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -1336,8 +1336,8 @@ public:
   
   void print(raw_ostream &OS) const;
   
-  /// True if the protocol is class-bounded.
-  bool isClassBounded() const;
+  /// True if only classes may conform to the protocol.
+  bool requiresClass() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1383,8 +1383,8 @@ public:
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
-  /// True if one or more of the protocols is class-bounded.
-  bool isClassBounded() const;
+  /// True if one or more of the protocols is class.
+  bool requiresClass() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1600,9 +1600,10 @@ public:
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
   
-  /// isClassBounded - True if the type conforms to one or more class-bounded
-  /// protocols or has a superclass constraint.
-  bool isClassBounded() const;
+  /// requiresClass - True if the type can only be substituted with class types.
+  /// This is true if the type conforms to one or more class protocols or has
+  /// a superclass constraint.
+  bool requiresClass() const;
 
   /// \brief Retrieve the superclass of this type, if such a requirement exists.
   Type getSuperclass() const { return Superclass; }
@@ -1839,12 +1840,12 @@ inline bool TypeBase::isExistentialType() {
          || T->getKind() == TypeKind::ProtocolComposition;
 }
   
-inline bool TypeBase::isClassBoundedExistentialType() {
+inline bool TypeBase::requiresClassExistentialType() {
   CanType T = getCanonicalType();
   if (auto *pt = dyn_cast<ProtocolType>(T))
-    return pt->isClassBounded();
+    return pt->requiresClass();
   if (auto *pct = dyn_cast<ProtocolCompositionType>(T))
-    return pct->isClassBounded();
+    return pct->requiresClass();
   return false;
 }
 
@@ -1870,7 +1871,7 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (!archetype)
     return nullptr;
 
-  return (bool)archetype->isClassBounded();
+  return (bool)archetype->requiresClass();
 }
 
 inline Identifier SubstitutableType::getName() const {

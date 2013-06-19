@@ -1163,7 +1163,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     } else if (isa<VarDecl>(VD) && isInClassContext(VD)) {
       /* ok */
     } else if (auto *protocol = dyn_cast<ProtocolDecl>(VD)) {
-      if (!protocol->isClassBounded())
+      if (!protocol->requiresClass())
         error = diag::objc_protocol_not_class_protocol;
     } else {
       error = diag::invalid_objc_decl;

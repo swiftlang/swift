@@ -477,7 +477,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 }
 
 RValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
-  if (E->getType()->isClassBoundedExistentialType())
+  if (E->getType()->requiresClassExistentialType())
     return emitClassBoundErasure(*this, E);
   return emitAddressOnlyErasure(*this, E, C);
 }
@@ -513,7 +513,7 @@ static RValue emitArchetypeDowncast(SILGenFunction &gen,
   // concrete value, which should be more specific and more efficient than the
   // one on the original archetype.
   SILValue cast;
-  if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->isClassBounded()) {
+  if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->requiresClass()) {
     cast = gen.B.createDowncastArchetypeRef(E, base.forward(gen),
                                     gen.getLoweredLoadableType(E->getType()));
   } else {
@@ -556,7 +556,7 @@ static RValue emitExistentialDowncast(SILGenFunction &gen,
   ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
   
   SILValue cast;
-  if (E->getSubExpr()->getType()->isClassBoundedExistentialType()) {
+  if (E->getSubExpr()->getType()->requiresClassExistentialType()) {
     // Cast to the concrete type and replace the cleanup with a new one on the
     // archetype, which may be more specific.
     cast = gen.B.createDowncastExistentialRef(E, base.forward(gen),

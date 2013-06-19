@@ -1197,7 +1197,7 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
-  Optional<bool> ClassBounded;
+  Optional<bool> RequiresClass;
   
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -1230,7 +1230,7 @@ public:
   TypeAliasDecl *getThis() const;
 
   /// True if this protocol can only be conformed to by class types.
-  bool isClassBounded();
+  bool requiresClass();
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

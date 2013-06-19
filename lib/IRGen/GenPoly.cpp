@@ -213,8 +213,8 @@ namespace {
     bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
       // Archetypes vary by what we're considering this for.
 
-      if (origTy->isClassBounded()) {
-        // Class-bounded archetypes are represented as some refcounted
+      if (origTy->requiresClass()) {
+        // Class archetypes are represented as some refcounted
         // pointer type that needs to be bitcast.
         return CanType(origTy) != substTy;
       }
@@ -397,9 +397,9 @@ namespace {
     }
 
     void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
-      // For class-bounded protocols, bitcast to the archetype class pointer
+      // For class protocols, bitcast to the archetype class pointer
       // representation.
-      if (origTy->isClassBounded()) {
+      if (origTy->requiresClass()) {
         llvm::Value *inValue = In.claimNext();
         auto &ti = IGF.getFragileTypeInfo(origTy);
         auto addr = IGF.Builder.CreateBitCast(inValue,
@@ -683,11 +683,11 @@ void irgen::reemitAsSubstituted(IRGenFunction &IGF,
 }
 
 llvm::Value *
-IRGenFunction::emitSuperToClassBoundedArchetypeConversion(llvm::Value *super,
+IRGenFunction::emitSuperToClassArchetypeConversion(llvm::Value *super,
                                                           SILType destType) {
   assert(destType.is<ArchetypeType>() && "expected archetype type");
-  assert(destType.castTo<ArchetypeType>()->isClassBounded()
-         && "expected class-bounded archetype type");
+  assert(destType.castTo<ArchetypeType>()->requiresClass()
+         && "expected class archetype type");
 
   // Cast the super pointer to i8* for the runtime call.
   super = Builder.CreateBitCast(super, IGM.Int8PtrTy);

@@ -165,9 +165,9 @@ public:
   bool isExistentialType() const {
     return getSwiftRValueType()->isExistentialType();
   }
-  /// Returns true if the referenced type is a class-bounded existential type.
-  bool isClassBoundedExistentialType() const {
-    return getSwiftRValueType()->isClassBoundedExistentialType();
+  /// Returns true if the referenced type is a class existential type.
+  bool requiresClassExistentialType() const {
+    return getSwiftRValueType()->requiresClassExistentialType();
   }
   
   /// Returns the ASTContext for the referenced Swift type.

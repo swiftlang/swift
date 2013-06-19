@@ -801,7 +801,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// ArchetypeRefToSuperInst - Given a class-bounded archetype value with a base
+/// ArchetypeRefToSuperInst - Given a class archetype value with a base
 /// class constraint, returns a reference to the base class instance.
 class ArchetypeRefToSuperInst
   : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst, ConversionInst>
@@ -812,7 +812,7 @@ public:
 };
 
 /// SuperToArchetypeRefInst - Given a value of a class type, initializes a
-/// class-bounded archetype with a base class constraint to contain a reference to
+/// class archetype with a base class constraint to contain a reference to
 /// the value.
 class SuperToArchetypeRefInst
   : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,
@@ -848,7 +848,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
-/// Given a value of class-bounded archetype type, dynamically checks the concrete
+/// Given a value of class archetype type, dynamically checks the concrete
 /// type represented by the archetype and casts to the destination type if
 /// successful or crashes if not.
 class DowncastArchetypeRefInst
@@ -872,7 +872,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
-/// Given a value of class-bounded archetype type, dynamically checks the concrete
+/// Given a value of class archetype type, dynamically checks the concrete
 /// type contained in the existential and casts the value to the destination type if
 /// successful or crashes if not.
 class DowncastExistentialRefInst
@@ -1207,7 +1207,7 @@ public:
   ProjectExistentialInst(SILLocation Loc, SILValue Operand, SILFunction &F);
 };
   
-/// ProjectExistentialRefInst - Given a class-bounded existential, returns an
+/// ProjectExistentialRefInst - Given a class existential, returns an
 /// ObjCPointer referencing the contained class instance.
 class ProjectExistentialRefInst
   : public UnaryInstructionBase<ValueKind::ProjectExistentialRefInst>
@@ -1243,7 +1243,7 @@ public:
 };
   
 /// InitExistentialRefInst - Given a class instance reference and a set of
-/// conformances, creates a class-bounded existential value referencing the
+/// conformances, creates a class existential value referencing the
 /// class instance.
 class InitExistentialRefInst
   : public UnaryInstructionBase<ValueKind::InitExistentialRefInst>
@@ -1308,8 +1308,8 @@ public:
   }
 };
   
-/// UpcastExistentialRefInst - Converts a value of class-bounded existential
-/// container to another, more general class-bounded existential container type.
+/// UpcastExistentialRefInst - Converts a value of class existential
+/// container to another, more general class existential container type.
 class UpcastExistentialRefInst
   : public UnaryInstructionBase<ValueKind::UpcastExistentialRefInst,
                                 ConversionInst>

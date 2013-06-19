@@ -23,13 +23,13 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   // Handle the obvious cases inline.
 
   // Reference types are always loadable.
-  // NB: class-bounded archetypes and existentials are not address-only. This
+  // NB: class archetypes and existentials are not address-only. This
   // check must come before the check for archetype or existential types
   // below.
   if (Ty->hasReferenceSemantics())
     return false;
 
-  // Non-class-bounded archetypes and existentials are always address-only.
+  // Non-class archetypes and existentials are always address-only.
   // FIXME: if this is a struct has a resilient attribute, it is obviously
   // AddressOnly.
   if (Ty->is<ArchetypeType>() || Ty->isExistentialType())
