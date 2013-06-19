@@ -221,7 +221,7 @@ public:
     
     unsigned offset = info->getInputTypes().size() - PAI->getArguments().size();
     
-    for (unsigned i = 0; i < PAI->getArguments().size(); ++i) {
+    for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i].getType()
                 == info->getInputTypes()[i + offset],
               "applied argument types do not match suffix of function type's "
@@ -230,7 +230,8 @@ public:
     
     // The arguments to the result function type must match the prefix of the
     // original function's input types.
-    for (unsigned i = 0; i < resultInfo->getInputTypes().size(); ++i) {
+    for (unsigned i = 0, size = resultInfo->getInputTypes().size();
+         i < size; ++i) {
       require(resultInfo->getInputTypes()[i] == info->getInputTypes()[i],
               "inputs to result function type do not match unapplied inputs "
               "of original function");
@@ -335,7 +336,7 @@ public:
     require(TI->getElements().size() == ResTy->getFields().size(),
             "Tuple field count mismatch!");
     
-    for (size_t i = 0; i < TI->getElements().size(); ++i) {
+    for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
       require(TI->getElements()[i].getType().getSwiftType()
                ->isEqual(ResTy->getFields()[i].getType()),
               "Tuple element arguments do not match tuple type!");

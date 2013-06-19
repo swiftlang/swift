@@ -591,7 +591,8 @@ namespace {
       
       // ObjC protocol conformances may need to pull method descriptors for
       // definitions from other contexts into the category.
-      for (unsigned i = 0; i < TheExtension->getProtocols().size(); ++i) {
+      for (unsigned i = 0, size = TheExtension->getProtocols().size();
+           i < size; ++i) {
         if (!TheExtension->getProtocols()[i]->isObjC())
           continue;
         for (auto &mapping : TheExtension->getConformances()[i]->Mapping) {

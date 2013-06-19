@@ -3406,7 +3406,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   SmallVector<ProtocolConformance*, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
-  for (unsigned i = 0; i < destProtocols.size(); ++i)
+  for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
     if (!destProtocols[i]->isObjC())
       witnessConformances.push_back(conformances[i]);
 

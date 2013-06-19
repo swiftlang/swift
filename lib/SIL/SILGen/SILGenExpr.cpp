@@ -643,7 +643,7 @@ RValue SILGenFunction::visitTupleExpr(TupleExpr *E, SGFContext C) {
                                                        subInitializationBuf);
     assert(subInitializations.size() == E->getElements().size() &&
            "initialization for tuple has wrong number of elements");
-    for (unsigned i = 0; i < subInitializations.size(); ++i) {
+    for (unsigned i = 0, size = subInitializations.size(); i < size; ++i) {
       emitExprInto(E->getElements()[i], subInitializations[i].get());
     }
     I->finishInitialization(*this);
@@ -1357,7 +1357,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   
   // Emit the elementwise arguments.
   SmallVector<RValue, 4> elements;
-  for (size_t i = 0; i < TP->getFields().size(); ++i) {
+  for (size_t i = 0, size = TP->getFields().size(); i < size; ++i) {
     auto *P = cast<TypedPattern>(TP->getFields()[i].getPattern());
     
     elements.push_back(
@@ -1384,7 +1384,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     };
     findNextPhysicalField();
     
-    for (size_t i = 0; i < elements.size(); ++i) {
+    for (size_t i = 0, size = elements.size(); i < size; ++i) {
       assert(memberIndex < decl->getMembers().size() &&
              "not enough physical struct members for value constructor?!");
       SILType argTy = gen.getLoweredType(elements[i].getType());

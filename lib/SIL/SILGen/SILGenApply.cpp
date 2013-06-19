@@ -670,7 +670,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
         ->getInputTypesWithoutIndirectReturnType();
   
   // Gather the arguments.
-  for (size_t i = 0; i < Args.size(); ++i) {
+  for (size_t i = 0, size = Args.size(); i < size; ++i) {
     SILValue argValue
       = forwardIfConsumed(Args[i],
                           inputTypes[i],

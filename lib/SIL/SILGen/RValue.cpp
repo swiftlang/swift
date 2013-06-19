@@ -65,7 +65,7 @@ public:
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
-      for (unsigned i = 0; i < t->getFields().size(); ++i) {
+      for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
         SILValue member = gen.B.createTupleElementAddr(SILLocation(),
@@ -81,7 +81,7 @@ public:
       }
     } else {
       // Extract the elements from loadable tuples.
-      for (unsigned i = 0; i < t->getFields().size(); ++i) {
+      for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
         auto &field = t->getFields()[i];
         SILType fieldTy = gen.getLoweredType(field.getType());
         SILValue member = gen.B.createTupleExtract(SILLocation(),
@@ -162,7 +162,7 @@ public:
   }
   
   void visitTupleType(TupleType *t, SILValue address) {
-    for (unsigned n = 0; n < t->getFields().size(); ++n) {
+    for (unsigned n = 0, size = t->getFields().size(); n < size; ++n) {
       auto &field = t->getFields()[n];
       SILType fieldTy = gen.getLoweredType(field.getType());
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
@@ -446,7 +446,7 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
 
   auto fields = cast<TupleType>(type)->getFields();
   
-  for (unsigned n = 0; n < fields.size(); ++n) {
+  for (unsigned n = 0, size = fields.size(); n < size; ++n) {
     unsigned from = elementOffsets[n], to = elementOffsets[n+1];
     elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
                         CanType(fields[n].getType())});

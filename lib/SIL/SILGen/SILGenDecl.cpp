@@ -82,7 +82,7 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
     SILValue baseAddr = getAddress();
-    for (unsigned i = 0; i < tupleTy->getFields().size(); ++i) {
+    for (unsigned i = 0, size = tupleTy->getFields().size(); i < size; ++i) {
       auto &field = tupleTy->getFields()[i];
       SILType fieldTy = gen.getLoweredType(field.getType()).getAddressType();
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
@@ -478,7 +478,7 @@ struct ArgumentInitVisitor :
 
     assert(P->getFields().size() == subInits.size() &&
            "TupleInitialization size does not match tuple pattern size!");
-    for (size_t i = 0; i < P->getFields().size(); ++i)
+    for (size_t i = 0, size = P->getFields().size(); i < size; ++i)
       visit(P->getFields()[i].getPattern(), subInits[i].get());
     return SILValue();
   }
@@ -886,7 +886,7 @@ public:
     
     // ObjC protocol conformances may require ObjC thunks to be introduced for
     // definitions from other contexts.
-    for (unsigned i = 0; i < e->getProtocols().size(); ++i) {
+    for (unsigned i = 0, size = e->getProtocols().size(); i < size; ++i) {
       if (!e->getProtocols()[i]->isObjC())
         continue;
       for (auto &mapping : e->getConformances()[i]->Mapping) {
@@ -1115,7 +1115,7 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
 
   // Bridge the input types.
   Scope scope(gen.Cleanups);
-  for (unsigned i = 0; i < args.size(); ++i) {
+  for (unsigned i = 0, size = args.size(); i < size; ++i) {
     ManagedValue bridged = gen.emitManagedRValueWithCleanup(args[i]);
     ManagedValue native = gen.emitBridgedToNativeValue(thunk.getDecl(),
                                bridged,

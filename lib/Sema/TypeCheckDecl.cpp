@@ -443,7 +443,7 @@ public:
     assert(protocols.size() == conformances.size() &&
            "protocol conformance mismatch");
     
-    for (unsigned i = 0; i < protocols.size(); ++i) {
+    for (unsigned i = 0, size = protocols.size(); i < size; ++i) {
       if (!protocols[i]->isObjC())
         continue;
       for (auto &mapping : conformances[i]->Mapping)
