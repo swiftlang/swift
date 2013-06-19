@@ -916,9 +916,9 @@ extern "C" const void *
 swift_dynamicCastObjCClassUnconditional(const void *object,
                                         const ClassMetadata *targetType);
 
-/// \brief Checked dynamic cast to the given type.
+/// \brief Checked dynamic cast of a class instance pointer to the given type.
 ///
-/// \param object The object to cast.
+/// \param object The class instance to cast.
 ///
 /// \param targetType The type to which we are casting, which may be either a
 /// class type or a wrapped Objective-C class type.
@@ -927,11 +927,12 @@ swift_dynamicCastObjCClassUnconditional(const void *object,
 extern "C" const void *
 swift_dynamicCast(const void *object, const Metadata *targetType);
 
-/// \brief Unconditional checked dynamic cast to the given type.
+/// \brief Unconditional checked dynamic cast of a class instance pointer to
+/// the given type.
 ///
 /// Aborts if the object isn't of the target type.
 ///
-/// \param object The object to cast.
+/// \param object The class instance to cast.
 ///
 /// \param targetType The type to which we are casting, which may be either a
 /// class type or a wrapped Objective-C class type.
@@ -940,6 +941,33 @@ swift_dynamicCast(const void *object, const Metadata *targetType);
 extern "C" const void *
 swift_dynamicCastUnconditional(const void *object,
                                const Metadata *targetType);
+
+/// \brief Checked dynamic cast of an opaque value to the given type.
+///
+/// \param value Pointer to the value to cast.
+///
+/// \param sourceType The original static type of the value.
+///
+/// \param targetType The type to which we are casting, which may be any Swift
+/// type metadata pointer.
+extern "C" const OpaqueValue *
+swift_dynamicCastIndirect(const OpaqueValue *value,
+                          const Metadata *sourceType,
+                          const Metadata *targetType);
+
+/// \brief Unconditional checked dynamic cast of an opaque value to the given
+/// type.
+///
+/// \param value Pointer to the value to cast.
+///
+/// \param sourceType The original static type of the value.
+///
+/// \param targetType The type to which we are casting, which may be any Swift
+/// type metadata pointer.
+extern "C" const OpaqueValue *
+swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
+                                       const Metadata *sourceType,
+                                       const Metadata *targetType);
 
 /// \brief Standard 'typeof' value witness for types with static metatypes.
 ///
