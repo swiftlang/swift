@@ -198,11 +198,6 @@ problems. Here are some of the most commonly encountered issues:
   uninitialized variables will be zero-initialized instead of using a default
   constructor or raising an error.
 
-* Protocol support is limited: creating a variable of protocol type without
-  initializing it results in a variable that is unusable; any attempt to query
-  or assign it will cause a crash. Additionally, Objective-C protocols are not
-  supported.
-
 * Generics support is limited: only basic generic types and functions
   currently work. For example, one cannot create a type that has an instance
   variable whose type is that of a type parameter.
