@@ -96,13 +96,11 @@ getArgRefExpr(TypeChecker &TC,
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc);
-      TC.typeCheckExpressionShallow(ArgRef, Arg->getDeclContext());
       continue;
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
       VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
       ArgRef = new (Context) GenericMemberRefExpr(ArgRef, Loc, VD, Loc);
-      TC.typeCheckExpressionShallow(ArgRef, Arg->getDeclContext());
       continue;
     }
     TupleType *TT = cast<TupleType>(CurT);
@@ -138,20 +136,16 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
                                                     Loc,
                                                     MetaT);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc);
-    if (TC.typeCheckExpressionShallow(Res, Arg->getDeclContext()))
-      return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
-      goto dynamicTypeFailed;
     Res = CE;
 
     Expr *PrintStrFn = TC.buildRefExpr(PrintDecls, Loc);
     CE = new (Context) CallExpr(PrintStrFn, Res);
-    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
+    if (TC.typeCheckExpression(CE, Arg->getDeclContext()))
       goto dynamicTypeFailed;
     Res = CE;
 
@@ -356,14 +350,12 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                    EndLoc);
-    if (TC.typeCheckExpressionShallow(Res, Arg->getDeclContext()))
-      return;
     TupleExpr *CallArgs
       = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
                                 /*hasTrailingClosure=*/false,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, Type());
-    if (TC.typeCheckExpressionShallow(CE, Arg->getDeclContext()))
+    if (TC.typeCheckExpression(CE, Arg->getDeclContext()))
       return;
     Res = CE;
     BodyContent.push_back(Res);
