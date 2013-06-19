@@ -582,12 +582,25 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheClass(theClass), TheExtension(theExtension),
-        Layout(nullptr), FieldLayout(nullptr) {
-          
+        Layout(nullptr), FieldLayout(nullptr)
+    {
       buildCategoryName(CategoryName);
 
       for (Decl *member : TheExtension->getMembers())
         visit(member);
+      
+      // ObjC protocol conformances may need to pull method descriptors for
+      // definitions from other contexts into the category.
+      for (unsigned i = 0; i < TheExtension->getProtocols().size(); ++i) {
+        if (!TheExtension->getProtocols()[i]->isObjC())
+          continue;
+        for (auto &mapping : TheExtension->getConformances()[i]->Mapping) {
+          ValueDecl *vd = mapping.second;
+          if (vd->getDeclContext() != TheExtension) {
+            visit(vd);
+          }
+        }
+      }
     }
 
     /// Build the metaclass stub object.
