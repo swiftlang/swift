@@ -302,6 +302,26 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   return declOrOffset.get<Decl *>();
 }
 
+/// Translate from the Serialization calling convention enum values to the AST
+/// strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
+  switch (cc) {
+#define CASE(THE_CC) \
+  case static_cast<uint8_t>(serialization::AbstractCC::THE_CC): \
+    return swift::AbstractCC::THE_CC;
+  CASE(C)
+  CASE(ObjCMethod)
+  CASE(Freestanding)
+  CASE(Method)
+#undef CASE
+  default:
+    return Nothing;
+  }
+}
+
 Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -408,6 +428,31 @@ Type ModuleFile::getType(TypeID TID) {
     // FIXME: Actually recreate the IdentifierType instead of just aliasing the
     // underlying mapped type.
     typeOrOffset = getType(mappedID);
+    break;
+  }
+
+  case decls_block::FUNCTION_TYPE: {
+    TypeID inputID;
+    TypeID resultID;
+    uint8_t rawCallingConvention;
+    bool autoClosure;
+    bool thin;
+    bool blockCompatible;
+
+    decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
+                                                rawCallingConvention,
+                                                autoClosure, thin,
+                                                blockCompatible);
+    auto callingConvention = getActualCC(rawCallingConvention);
+    if (!callingConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+
+    typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
+                                     autoClosure, blockCompatible, thin,
+                                     callingConvention.getValue(),
+                                     ModuleContext->Ctx);
     break;
   }
 

@@ -58,6 +58,17 @@ using CharOffset = BitOffset;
 using CharOffsetField = BitOffsetField;
 
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class AbstractCC : uint8_t {
+  C = 0,
+  ObjCMethod,
+  Freestanding,
+  Method
+};
+using AbstractCCField = BCVBR<4>;
+
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -153,6 +164,7 @@ namespace decls_block {
     TUPLE_TYPE,
     TUPLE_TYPE_ELT,
     IDENTIFIER_TYPE,
+    FUNCTION_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -198,6 +210,16 @@ namespace decls_block {
     IDENTIFIER_TYPE,
     TypeIDField  // underlying mapped type
     // FIXME: Include the identifier chain for diagnostic purposes.
+  >;
+
+  using FunctionTypeLayout = BCRecordLayout<
+    FUNCTION_TYPE,
+    TypeIDField, // input
+    TypeIDField, // output
+    AbstractCCField, // calling convention
+    BCFixed<1>,  // auto-closure?
+    BCFixed<1>,  // thin?
+    BCFixed<1>  // block-compatible?
   >;
 
   using TypeAliasLayout = BCRecordLayout<

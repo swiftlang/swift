@@ -342,6 +342,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, TUPLE_TYPE);
   RECORD(decls_block, TUPLE_TYPE_ELT);
   RECORD(decls_block, IDENTIFIER_TYPE);
+  RECORD(decls_block, FUNCTION_TYPE);
   
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -559,6 +560,21 @@ bool Serializer::writeDecl(const Decl *D) {
   }
 }
 
+/// Translate from the AST calling convention enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableCC(swift::AbstractCC cc) {
+  switch (cc) {
+#define CASE(THE_CC) \
+  case swift::AbstractCC::THE_CC: \
+    return static_cast<uint8_t>(serialization::AbstractCC::THE_CC);
+  CASE(C)
+  CASE(ObjCMethod)
+  CASE(Freestanding)
+  CASE(Method)
+#undef CASE
+  }
+}
+
 bool Serializer::writeType(Type ty) {
   using namespace decls_block;
 
@@ -661,7 +677,21 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Substituted:
     return false;
 
-  case TypeKind::Function:
+  case TypeKind::Function: {
+    auto fnTy = cast<FunctionType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
+    FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addTypeRef(fnTy->getInput()),
+                                   addTypeRef(fnTy->getResult()),
+                                   getRawStableCC(fnTy->getAbstractCC()),
+                                   fnTy->isAutoClosure(),
+                                   fnTy->isThin(),
+                                   fnTy->isBlock());
+
+    return true;
+  }
+
   case TypeKind::PolymorphicFunction:
     return false;
 
@@ -696,10 +726,13 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TupleTypeLayout>();
     registerDeclTypeAbbr<TupleTypeEltLayout>();
     registerDeclTypeAbbr<IdentifierTypeLayout>();
+    registerDeclTypeAbbr<FunctionTypeLayout>();
+
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
+
     registerDeclTypeAbbr<DeclContextLayout>();
   }
 
