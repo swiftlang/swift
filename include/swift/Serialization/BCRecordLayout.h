@@ -400,13 +400,11 @@ public:
                                                    recordID, data...);
   }
 
-  /// Read a record identified by \p abbrCode from bitstream cursor \p in,
-  /// using \p buffer for scratch space.
+  /// Extract record data from \p buffer into the given data fields.
   ///
   /// Note that even fixed arguments must be specified here. Pass \c Nothing
-  /// if you don't care about a particular parameter. Blob data is returned via
-  /// StringRef, while array data can be returned raw as an ArrayRef or
-  /// \em appended (not assigned) to an existing vector-like type.
+  /// if you don't care about a particular parameter. Blob data is not included
+  /// in the buffer and should be handled separately by the caller.
   template <typename BufferTy, typename... Data>
   static void readRecord(BufferTy buffer, Data &... data) {
     // Weaker bounds checks here: a trailing blob is not decoded through the

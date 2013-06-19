@@ -150,6 +150,9 @@ namespace decls_block {
     NAME_ALIAS_TYPE,
     STRUCT_TYPE,
     PAREN_TYPE,
+    TUPLE_TYPE,
+    TUPLE_TYPE_ELT,
+    IDENTIFIER_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -178,6 +181,23 @@ namespace decls_block {
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
     TypeIDField  // inner type
+  >;
+
+  using TupleTypeLayout = BCRecordLayout<
+    TUPLE_TYPE
+  >;
+
+  using TupleTypeEltLayout = BCRecordLayout<
+    TUPLE_TYPE_ELT,
+    IdentifierIDField, // name
+    TypeIDField,       // type
+    TypeIDField        // vararg base type, or 0
+  >;
+
+  using IdentifierTypeLayout = BCRecordLayout<
+    IDENTIFIER_TYPE,
+    TypeIDField  // underlying mapped type
+    // FIXME: Include the identifier chain for diagnostic purposes.
   >;
 
   using TypeAliasLayout = BCRecordLayout<

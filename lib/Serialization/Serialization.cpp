@@ -339,6 +339,10 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, STRUCT_TYPE);
   RECORD(decls_block, PAREN_TYPE);
+  RECORD(decls_block, TUPLE_TYPE);
+  RECORD(decls_block, TUPLE_TYPE_ELT);
+  RECORD(decls_block, IDENTIFIER_TYPE);
+  
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
@@ -593,9 +597,14 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::Identifier:
-    // FIXME: this is very wrong!
-    return writeType(cast<IdentifierType>(ty.getPointer())->getMappedType());
+  case TypeKind::Identifier: {
+    auto identTy = cast<IdentifierType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[IdentifierTypeLayout::Code];
+    IdentifierTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addTypeRef(identTy->getMappedType()));
+    return true;
+  }
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
@@ -606,8 +615,23 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::Tuple:
-    return false;
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[TupleTypeLayout::Code];
+    TupleTypeLayout::emitRecord(Out, ScratchRecord, abbrCode);
+
+    abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
+    for (auto &elt : tupleTy->getFields()) {
+      // FIXME: Handle initializers.
+      TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addIdentifierRef(elt.getName()),
+                                     addTypeRef(elt.getType()),
+                                     addTypeRef(elt.getVarargBaseTy()));
+    }
+
+    return true;
+  }
 
   case TypeKind::Struct: {
     auto structTy = cast<StructType>(ty.getPointer());
@@ -663,15 +687,21 @@ bool Serializer::writeType(Type ty) {
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
 
-  registerDeclTypeAbbr<decls_block::BuiltinTypeLayout>();
-  registerDeclTypeAbbr<decls_block::NameAliasTypeLayout>();
-  registerDeclTypeAbbr<decls_block::StructTypeLayout>();
-  registerDeclTypeAbbr<decls_block::TypeAliasLayout>();
-  registerDeclTypeAbbr<decls_block::StructLayout>();
-  registerDeclTypeAbbr<decls_block::ConstructorLayout>();
-  registerDeclTypeAbbr<decls_block::VarLayout>();
-  registerDeclTypeAbbr<decls_block::DeclContextLayout>();
-  registerDeclTypeAbbr<decls_block::ParenTypeLayout>();
+  {
+    using namespace decls_block;
+    registerDeclTypeAbbr<BuiltinTypeLayout>();
+    registerDeclTypeAbbr<NameAliasTypeLayout>();
+    registerDeclTypeAbbr<StructTypeLayout>();
+    registerDeclTypeAbbr<ParenTypeLayout>();
+    registerDeclTypeAbbr<TupleTypeLayout>();
+    registerDeclTypeAbbr<TupleTypeEltLayout>();
+    registerDeclTypeAbbr<IdentifierTypeLayout>();
+    registerDeclTypeAbbr<TypeAliasLayout>();
+    registerDeclTypeAbbr<StructLayout>();
+    registerDeclTypeAbbr<ConstructorLayout>();
+    registerDeclTypeAbbr<VarLayout>();
+    registerDeclTypeAbbr<DeclContextLayout>();
+  }
 
   while (!DeclsAndTypesToWrite.empty()) {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();

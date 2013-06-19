@@ -13,6 +13,7 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -367,6 +368,46 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID underlyingID;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
     typeOrOffset = ParenType::get(ModuleContext->Ctx, getType(underlyingID));
+    break;
+  }
+
+  case decls_block::TUPLE_TYPE: {
+    // The tuple record itself is empty. Read all trailing elements.
+    SmallVector<TupleTypeElt, 8> elements;
+    while (true) {
+      auto entry = DeclTypeCursor.advance();
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                    &blobData);
+      if (recordID != decls_block::TUPLE_TYPE_ELT)
+        break;
+
+      IdentifierID nameID;
+      TypeID typeID;
+      TypeID varargBaseID;
+      decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
+                                                  varargBaseID);
+
+      {
+        BCOffsetRAII restoreOffset(DeclTypeCursor);
+        elements.push_back({getType(typeID), getIdentifier(nameID),
+                            /*initializer=*/nullptr, getType(varargBaseID)});
+      }
+    }
+
+    typeOrOffset = TupleType::get(elements, ModuleContext->Ctx);
+    break;
+  }
+
+  case decls_block::IDENTIFIER_TYPE: {
+    TypeID mappedID;
+    decls_block::IdentifierTypeLayout::readRecord(scratch, mappedID);
+    // FIXME: Actually recreate the IdentifierType instead of just aliasing the
+    // underlying mapped type.
+    typeOrOffset = getType(mappedID);
     break;
   }
 
