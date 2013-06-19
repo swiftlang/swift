@@ -329,6 +329,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     case MetadataKind::Tuple:
       return nullptr;
     }
+    break;
       
   case MetadataKind::Existential:
   case MetadataKind::Function:
@@ -379,6 +380,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::Tuple:
       abort();
     }
+    break;
       
   case MetadataKind::Existential:
   case MetadataKind::Function:
