@@ -604,12 +604,8 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // We mangle ProtocolType and ProtocolCompositionType using the
     // same production:
     //   <type> ::= P <protocol-list> _
-    // As a special case, if there is exactly one protocol in the
-    // list, and it is a substitution candidate, then the *entire*
-    // producton is substituted.
 
     auto protocols = cast<ProtocolCompositionType>(base)->getProtocols();
-    assert(protocols.size() != 1);
     Buffer << 'P';
     mangleProtocolList(protocols);
     Buffer << '_';
