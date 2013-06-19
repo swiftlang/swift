@@ -203,6 +203,9 @@ namespace {
         SmallVector<ProtocolDecl *, 4> baseProtos;
         baseType.getType()->isExistentialType(baseProtos);
         for (auto baseProto : baseProtos) {
+          // ObjC protocols do not have witnesses.
+          if (baseProto->isObjC())
+            continue;
           asDerived().addOutOfLineBaseProtocol(baseProto);
         }
       }
