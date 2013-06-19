@@ -293,6 +293,67 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     break;
   }
 
+  case decls_block::FUNC_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    bool isImplicit, isNeverLValue;
+    TypeID signatureID;
+    bool isClassMethod;
+    DeclID associatedDeclID;
+    DeclID overriddenID;
+
+    decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
+                                        isNeverLValue, signatureID,
+                                        isClassMethod, associatedDeclID,
+                                        overriddenID);
+
+    auto DC = getDeclContext(contextID);
+    auto signature = cast<FunctionType>(getType(signatureID).getPointer());
+
+    auto emptyArgs = TuplePattern::create(ctx, SourceLoc(), {}, SourceLoc());
+    auto body = FuncExpr::create(ctx, SourceLoc(), emptyArgs, emptyArgs,
+                                 TypeLoc::withoutLoc(signature->getResult()),
+                                 /*body=*/nullptr, DC);
+
+    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
+                                 getIdentifier(nameID), SourceLoc(),
+                                 /*generic params=*/nullptr, signature,
+                                 body, DC);
+    declOrOffset = fn;
+
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
+
+    fn->setNeverUsedAsLValue(isNeverLValue);
+    fn->setStatic(isClassMethod);
+    if (isImplicit)
+      fn->setImplicit();
+
+    if (Decl *associated = getDecl(associatedDeclID)) {
+      if (auto op = dyn_cast<OperatorDecl>(associated)) {
+        fn->setOperatorDecl(op);
+      } else {
+        bool isGetter = false;
+
+        if (auto subscript = dyn_cast<SubscriptDecl>(associated)) {
+          isGetter = (subscript->getGetter() == fn);
+          assert(isGetter || subscript->getSetter() == fn);
+        } else if (auto var = dyn_cast<VarDecl>(associated)) {
+          isGetter = (var->getGetter() == fn);
+          assert(isGetter || var->getSetter() == fn);
+        } else {
+          llvm_unreachable("unknown associated decl kind");
+        }
+
+        if (isGetter)
+          fn->makeGetter(associated);
+        else
+          fn->makeSetter(associated);
+      }
+    }
+
+    break;
+  }
+
   default:
     // We don't know how to deserialize this kind of decl.
     error();

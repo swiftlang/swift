@@ -170,6 +170,7 @@ namespace decls_block {
     STRUCT_DECL,
     CONSTRUCTOR_DECL,
     VAR_DECL,
+    FUNC_DECL,
 
     DECL_CONTEXT = 255
   };
@@ -257,6 +258,18 @@ namespace decls_block {
     DeclIDField,  // getter
     DeclIDField,  // setter
     DeclIDField   // overridden decl
+  >;
+
+  using FuncLayout = BCRecordLayout<
+    FUNC_DECL,
+    IdentifierIDField, // name
+    DeclIDField,  // context decl
+    BCFixed<1>,   // implicit flag
+    BCFixed<1>,   // never lvalue flag
+    TypeIDField,  // type (signature)
+    BCFixed<1>,   // class method
+    DeclIDField,  // associated decl (for get/set or operators)
+    DeclIDField   // overridden function
   >;
 
   using DeclContextLayout = BCRecordLayout<

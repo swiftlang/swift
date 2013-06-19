@@ -348,6 +348,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
+  RECORD(decls_block, FUNC_DECL);
   RECORD(decls_block, DECL_CONTEXT);
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
@@ -517,7 +518,41 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::Func:
+  case DeclKind::Func: {
+    auto fn = cast<FuncDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!fn->getAttrs().empty())
+      return false;
+
+    // FIXME: Handle generics.
+    if (fn->getGenericParams())
+      return false;
+
+    // FIXME: Handle arguments.
+    auto fnTy = cast<FunctionType>(fn->getType().getPointer());
+    if (fnTy->getInput()->getCanonicalType() !=
+        D->getASTContext().TheEmptyTupleType->getCanonicalType())
+      return false;
+
+    const Decl *DC = getDeclForContext(fn->getDeclContext());
+    const Decl *associated = fn->getGetterOrSetterDecl();
+    if (!associated)
+      associated = fn->getOperatorDecl();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
+    FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                           addIdentifierRef(fn->getName()),
+                           addDeclRef(DC),
+                           fn->isImplicit(),
+                           fn->isNeverUsedAsLValue(),
+                           addTypeRef(fn->getType()),
+                           fn->isStatic(),
+                           addDeclRef(associated),
+                           addDeclRef(fn->getOverriddenDecl()));
+    return true;
+  }
+
   case DeclKind::OneOfElement:
   case DeclKind::Subscript:
     return false;
@@ -732,6 +767,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
+    registerDeclTypeAbbr<FuncLayout>();
 
     registerDeclTypeAbbr<DeclContextLayout>();
   }
