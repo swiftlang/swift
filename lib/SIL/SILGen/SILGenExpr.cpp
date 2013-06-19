@@ -477,7 +477,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 }
 
 RValue SILGenFunction::visitErasureExpr(ErasureExpr *E, SGFContext C) {
-  if (E->getType()->requiresClassExistentialType())
+  if (E->getType()->isClassExistentialType())
     return emitClassBoundErasure(*this, E);
   return emitAddressOnlyErasure(*this, E, C);
 }
@@ -556,7 +556,7 @@ static RValue emitExistentialDowncast(SILGenFunction &gen,
   ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
   
   SILValue cast;
-  if (E->getSubExpr()->getType()->requiresClassExistentialType()) {
+  if (E->getSubExpr()->getType()->isClassExistentialType()) {
     // Cast to the concrete type and replace the cleanup with a new one on the
     // archetype, which may be more specific.
     cast = gen.B.createDowncastExistentialRef(E, base.forward(gen),

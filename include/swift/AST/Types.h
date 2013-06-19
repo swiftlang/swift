@@ -206,7 +206,7 @@ public:
   
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
-  bool requiresClassExistentialType();
+  bool isClassExistentialType();
 
   /// isExistentialType - Determines whether this type is an existential type,
   /// whose real (runtime) type is unknown but which is known to conform to
@@ -1840,7 +1840,7 @@ inline bool TypeBase::isExistentialType() {
          || T->getKind() == TypeKind::ProtocolComposition;
 }
   
-inline bool TypeBase::requiresClassExistentialType() {
+inline bool TypeBase::isClassExistentialType() {
   CanType T = getCanonicalType();
   if (auto *pt = dyn_cast<ProtocolType>(T))
     return pt->requiresClass();

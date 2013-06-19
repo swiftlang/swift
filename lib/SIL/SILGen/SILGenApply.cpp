@@ -150,7 +150,7 @@ private:
     Type thisTy;
     bool isThin;
     if (methodName.getDecl()->isInstanceMember()) {
-      if (proto.getType().requiresClassExistentialType()) {
+      if (proto.getType().isClassExistentialType()) {
         thisTy = memberType->getASTContext().TheObjCPointerType;
         isThin = true;
       } else {
@@ -523,7 +523,7 @@ public:
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
-      if (existential.getType().requiresClassExistentialType()) {
+      if (existential.getType().isClassExistentialType()) {
         SILValue val = gen.B.createProjectExistentialRef(e,
                                                          existential.getValue());
         proj = ManagedValue(val, existential.getCleanup());

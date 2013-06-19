@@ -529,7 +529,7 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
 void IRGenSILFunction::visitProtocolMetatypeInst(
                                                swift::ProtocolMetatypeInst *i) {
   llvm::Value *metatype;
-  if (i->getOperand().getType().requiresClassExistentialType()) {
+  if (i->getOperand().getType().isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());
     metatype = emitTypeMetadataRefForClassExistential(*this, existential,
                                                      i->getOperand().getType());
@@ -1485,7 +1485,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   SILConstant member = i->getMember();
   
   Explosion lowered(CurExplosionLevel);
-  if (baseTy.requiresClassExistentialType()) {
+  if (baseTy.isClassExistentialType()) {
     Explosion base = getLoweredExplosion(i->getOperand());
     emitClassProtocolMethodValue(*this, base, baseTy, member, lowered);
   } else {

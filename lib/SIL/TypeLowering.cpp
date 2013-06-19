@@ -436,7 +436,7 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
   if (!contextType)
     return false;
   return contextType->getClassOrBoundGenericClass()
-    || contextType->requiresClassExistentialType();
+    || contextType->isClassExistentialType();
 }
 
 static AbstractCC getAbstractCC(SILConstant c) {

@@ -1554,7 +1554,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     assert(concreteType->isExistentialType() &&
            "non-existentials should have a known typeof witness");
     Address obj = getArgAs(IGF, argv, type, "obj");
-    if (concreteType->requiresClassExistentialType()) {
+    if (concreteType->isClassExistentialType()) {
       Explosion existential(IGF.CurExplosionLevel);
       type.loadAsTake(IGF, obj, existential);
       llvm::Value *result
@@ -3476,9 +3476,9 @@ void irgen::emitOpaqueExistentialContainerUpcast(IRGenFunction &IGF,
                                  Address src,  SILType srcType,
                                  bool isTakeOfSrc) {
   assert(destType.isExistentialType());
-  assert(!destType.requiresClassExistentialType());
+  assert(!destType.isClassExistentialType());
   assert(srcType.isExistentialType());
-  assert(!srcType.requiresClassExistentialType());
+  assert(!srcType.isClassExistentialType());
   auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType).as<OpaqueExistentialTypeInfo>();
 
@@ -3539,8 +3539,8 @@ void irgen::emitClassExistentialContainerUpcast(IRGenFunction &IGF,
                                                        SILType destType,
                                                        Explosion &src,
                                                        SILType srcType) {
-  assert(destType.requiresClassExistentialType());
-  assert(srcType.requiresClassExistentialType());
+  assert(destType.isClassExistentialType());
+  assert(srcType.isClassExistentialType());
   auto &destTI = IGF.getFragileTypeInfo(destType)
     .as<ClassExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType)
@@ -3568,7 +3568,7 @@ void irgen::emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
                                                  Address container,
                                                  SILType type) {
   assert(type.isExistentialType());
-  assert(!type.requiresClassExistentialType());
+  assert(!type.isClassExistentialType());
   auto &ti = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
   auto layout = ti.getLayout();
   
@@ -3586,7 +3586,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                llvm::Value *instance,
                                SILType instanceType,
                                ArrayRef<ProtocolConformance*> conformances) {
-  assert(outType.requiresClassExistentialType() &&
+  assert(outType.isClassExistentialType() &&
          "creating a non-class existential type");
   
   auto &destTI = IGF.getFragileTypeInfo(outType)
@@ -3613,7 +3613,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   SILType destType,
                                   SILType srcType,
                                   ArrayRef<ProtocolConformance*> conformances) {
-  assert(!destType.requiresClassExistentialType() &&
+  assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getFragileTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
   auto &srcTI = IGF.getFragileTypeInfo(srcType);
@@ -3753,7 +3753,7 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
                                      SILConstant member,
                                      Explosion &out) {
   assert(baseTy.isExistentialType());
-  assert(!baseTy.requiresClassExistentialType() &&
+  assert(!baseTy.isClassExistentialType() &&
          "emitting class existential as opaque existential");
   // The protocol we're calling on.
   // TODO: support protocol compositions here.
@@ -3785,7 +3785,7 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
                                                 SILType baseTy,
                                                 SILConstant member,
                                                 Explosion &out) {
-  assert(baseTy.requiresClassExistentialType());
+  assert(baseTy.isClassExistentialType());
 
   // The protocol we're calling on.
   auto &baseTI = IGF.getFragileTypeInfo(baseTy)
@@ -3825,7 +3825,7 @@ llvm::Value *
 irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
                                                CanType type) {
   assert(type->isExistentialType());
-  assert(!type->requiresClassExistentialType());
+  assert(!type->isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(type).as<OpaqueExistentialTypeInfo>();
 
   // Get the static metadata.
@@ -3845,7 +3845,7 @@ llvm::Value *
 irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
                                                      Explosion &value,
                                                      CanType type) {
-  assert(type->requiresClassExistentialType());
+  assert(type->isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(type)
     .as<ClassExistentialTypeInfo>();
   
@@ -3861,7 +3861,7 @@ Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                                Address base,
                                                SILType baseTy) {
   assert(baseTy.isExistentialType());
-  assert(!baseTy.requiresClassExistentialType());
+  assert(!baseTy.isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 
@@ -3876,7 +3876,7 @@ Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
 llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                                           Explosion &base,
                                                           SILType baseTy) {
-  assert(baseTy.requiresClassExistentialType());
+  assert(baseTy.isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy)
     .as<ClassExistentialTypeInfo>();
   

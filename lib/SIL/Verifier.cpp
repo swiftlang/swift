@@ -587,14 +587,14 @@ public:
             "result method must be of a concrete function type");
     SILType operandType = EMI->getOperand().getType();
     require(methodType->isThin()
-              == operandType.requiresClassExistentialType(),
+              == operandType.isClassExistentialType(),
             "result method must be thin function type if class protocol, or "
             "thick if not class");
     
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential address");
-      if (operandType.requiresClassExistentialType()) {
+      if (operandType.isClassExistentialType()) {
         require(getMethodThisType(methodType)->isEqual(
                                operandType.getASTContext().TheObjCPointerType),
                 "result must be a method of objc pointer");
@@ -665,7 +665,7 @@ public:
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
     require(!PEI->getOperand().getType().isAddress(),
             "project_existential_ref operand must not be address");
-    require(PEI->getOperand().getType().requiresClassExistentialType(),
+    require(PEI->getOperand().getType().isClassExistentialType(),
             "project_existential_ref operand must be class existential");
     require(PEI->getType() == SILType::getObjCPointerType(F.getASTContext()),
             "project_existential_ref result must be an ObjCPointer");
@@ -677,7 +677,7 @@ public:
             "init_existential must be applied to an address");
     require(exType.isExistentialType(),
             "init_existential must be applied to address of existential");
-    require(!exType.requiresClassExistentialType(),
+    require(!exType.isClassExistentialType(),
             "init_existential must be applied to non-class existential");
     require(!AEI->getConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
@@ -688,7 +688,7 @@ public:
     SILType concreteType = IEI->getOperand().getType();
     require(concreteType.getSwiftType()->mayHaveSuperclass(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().requiresClassExistentialType(),
+    require(IEI->getType().isClassExistentialType(),
             "init_existential_ref result must be a class existential type");
     require(!IEI->getType().isAddress(),
             "init_existential_ref result must not be an address");
@@ -703,18 +703,18 @@ public:
             "upcast_existential dest must be an address");
     require(destType.isExistentialType(),
             "upcast_existential dest must be address of existential");
-    require(!destType.requiresClassExistentialType(),
+    require(!destType.isClassExistentialType(),
             "upcast_existential dest must be non-class existential");
   }
   
   void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
     require(!UEI->getOperand().getType().isAddress(),
             "upcast_existential_ref operand must not be an address");
-    require(UEI->getOperand().getType().requiresClassExistentialType(),
+    require(UEI->getOperand().getType().isClassExistentialType(),
             "upcast_existential_ref operand must be class existential");
     require(!UEI->getType().isAddress(),
             "upcast_existential_ref result must not be an address");
-    require(UEI->getType().requiresClassExistentialType(),
+    require(UEI->getType().isClassExistentialType(),
             "upcast_existential_ref result must be class existential");
   }
   
@@ -724,7 +724,7 @@ public:
             "deinit_existential must be applied to an address");
     require(exType.isExistentialType(),
             "deinit_existential must be applied to address of existential");
-    require(!exType.requiresClassExistentialType(),
+    require(!exType.isClassExistentialType(),
             "deinit_existential must be applied to non-class existential");
   }
   
@@ -947,7 +947,7 @@ public:
             "project_downcast_existential_addr operand must be an address");
     require(DEAI->getOperand().getType().isExistentialType(),
             "project_downcast_existential_addr operand must be an existential");
-    require(!DEAI->getOperand().getType().requiresClassExistentialType(),
+    require(!DEAI->getOperand().getType().isClassExistentialType(),
             "project_downcast_existential_addr operand must be a non-class "
             "existential");
     
@@ -958,7 +958,7 @@ public:
   void checkDowncastExistentialRefInst(DowncastExistentialRefInst *DERI) {
     require(!DERI->getOperand().getType().isAddress(),
             "downcast_existential_ref operand must not be an address");
-    require(DERI->getOperand().getType().requiresClassExistentialType(),
+    require(DERI->getOperand().getType().isClassExistentialType(),
             "downcast_existential_ref operand must be a class existential");
     
     require(!DERI->getType().isAddress(),
