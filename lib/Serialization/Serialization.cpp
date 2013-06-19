@@ -338,6 +338,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, BUILTIN_TYPE);
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, STRUCT_TYPE);
+  RECORD(decls_block, PAREN_TYPE);
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
@@ -596,9 +597,14 @@ bool Serializer::writeType(Type ty) {
     // FIXME: this is very wrong!
     return writeType(cast<IdentifierType>(ty.getPointer())->getMappedType());
 
-  case TypeKind::Paren:
-    // FIXME: trivial.
-    return false;
+  case TypeKind::Paren: {
+    auto parenTy = cast<ParenType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
+    ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addTypeRef(parenTy->getUnderlyingType()));
+    return true;
+  }
 
   case TypeKind::Tuple:
     return false;
@@ -665,6 +671,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<decls_block::ConstructorLayout>();
   registerDeclTypeAbbr<decls_block::VarLayout>();
   registerDeclTypeAbbr<decls_block::DeclContextLayout>();
+  registerDeclTypeAbbr<decls_block::ParenTypeLayout>();
 
   while (!DeclsAndTypesToWrite.empty()) {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();

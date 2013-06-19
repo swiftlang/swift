@@ -363,6 +363,13 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::PAREN_TYPE: {
+    TypeID underlyingID;
+    decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
+    typeOrOffset = ParenType::get(ModuleContext->Ctx, getType(underlyingID));
+    break;
+  }
+
   default:
     // We don't know how to deserialize this kind of type.
     error();

@@ -149,14 +149,14 @@ namespace decls_block {
     BUILTIN_TYPE = 1,
     NAME_ALIAS_TYPE,
     STRUCT_TYPE,
+    PAREN_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
     CONSTRUCTOR_DECL,
     VAR_DECL,
 
-    DECL_CONTEXT = 254,
-    NAME_HACK = 255
+    DECL_CONTEXT = 255
   };
 
   using BuiltinTypeLayout = BCRecordLayout<
@@ -173,6 +173,11 @@ namespace decls_block {
     STRUCT_TYPE,
     DeclIDField, // struct decl
     TypeIDField  // parent
+  >;
+
+  using ParenTypeLayout = BCRecordLayout<
+    PAREN_TYPE,
+    TypeIDField  // inner type
   >;
 
   using TypeAliasLayout = BCRecordLayout<
