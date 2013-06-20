@@ -307,7 +307,8 @@ public:
       SILValue classMethod = gen.B.createClassMethod(SILLocation(),
                                            method.thisValue,
                                            constant,
-                                           gen.SGM.getConstantType(constant));
+                                           gen.SGM.getConstantType(constant),
+                                           /*volatile*/ constant.isObjC);
       mv = ManagedValue(classMethod, ManagedValue::Unmanaged);
       break;
     }
@@ -316,7 +317,8 @@ public:
       SILValue superMethod = gen.B.createSuperMethod(SILLocation(),
                                            method.thisValue,
                                            constant,
-                                           gen.SGM.getConstantType(constant));
+                                           gen.SGM.getConstantType(constant),
+                                           /*volatile*/ constant.isObjC);
       mv = ManagedValue(superMethod, ManagedValue::Unmanaged);
       break;
     }
@@ -334,7 +336,8 @@ public:
       SILValue method = gen.B.createArchetypeMethod(SILLocation(),
                            gen.getLoweredType(archetypeType),
                            constant,
-                           gen.getLoweredType(genericMethod.origType, level));
+                           gen.getLoweredType(genericMethod.origType, level),
+                           /*volatile*/ constant.isObjC);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;
@@ -349,7 +352,8 @@ public:
       SILValue method = gen.B.createProtocolMethod(SILLocation(),
                             genericMethod.thisValue,
                             constant,
-                            gen.getLoweredType(genericMethod.origType, level));
+                            gen.getLoweredType(genericMethod.origType, level),
+                            /*volatile*/ constant.isObjC);
       mv = ManagedValue(method, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, method.getType());
       break;

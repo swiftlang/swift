@@ -1147,8 +1147,8 @@ class ClassMethodInst
 {
 public:
   ClassMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
-                  SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member) {}
+                  SILType Ty, bool Volatile = false)
+    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
 /// SuperMethodInst - Given the address of a value of class type and a method
@@ -1159,8 +1159,8 @@ class SuperMethodInst
 {
 public:
   SuperMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
-                  SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member) {}
+                  SILType Ty, bool Volatile = false)
+    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
 /// ArchetypeMethodInst - Given the address of an archetype value and a method
@@ -1169,8 +1169,9 @@ class ArchetypeMethodInst : public DynamicMethodInst {
   SILType LookupType;
 public:
   ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILConstant Member,
-                      SILType Ty)
-    : DynamicMethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member),
+                      SILType Ty, bool Volatile = false)
+    : DynamicMethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member,
+                        Volatile),
       LookupType(LookupType)
   {}
   
@@ -1194,8 +1195,8 @@ class ProtocolMethodInst
 {
 public:
   ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
-                     SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member) {}
+                     SILType Ty, bool Volatile = false)
+    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
   
 /// ProjectExistentialInst - Given the address of an existential, returns a

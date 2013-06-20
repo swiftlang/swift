@@ -400,35 +400,41 @@ public:
   
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILConstant Member,
-                                     SILType MethodTy)
+                                     SILType MethodTy,
+                                     bool Volatile = false)
   {
     return insert(new (F.getModule())
-                    ClassMethodInst(Loc, Operand, Member, MethodTy));
+                    ClassMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
   
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
                                      SILConstant Member,
-                                     SILType MethodTy)
+                                     SILType MethodTy,
+                                     bool Volatile = false)
   {
     return insert(new (F.getModule())
-                    SuperMethodInst(Loc, Operand, Member, MethodTy));
+                    SuperMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc,
                                              SILType LookupTy,
                                              SILConstant Member,
-                                             SILType MethodTy)
+                                             SILType MethodTy,
+                                             bool Volatile = false)
   {
     return insert(new (F.getModule())
-                    ArchetypeMethodInst(Loc, LookupTy, Member, MethodTy));
+                    ArchetypeMethodInst(Loc, LookupTy, Member, MethodTy,
+                                        Volatile));
   }
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
-                                                 SILValue Operand,
-                                                 SILConstant Member,
-                                                 SILType MethodTy) {
+                                           SILValue Operand,
+                                           SILConstant Member,
+                                           SILType MethodTy,
+                                           bool Volatile = false) {
     return insert(new (F.getModule())
-                    ProtocolMethodInst(Loc, Operand, Member, MethodTy));
+                    ProtocolMethodInst(Loc, Operand, Member, MethodTy,
+                                       Volatile));
   }
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
