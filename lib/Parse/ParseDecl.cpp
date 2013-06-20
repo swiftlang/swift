@@ -53,8 +53,8 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   // allows type declarations and other things to be parsed, name bound, and
   // type checked in batches, similar to immediate mode.  This also enforces
   // that SIL bodies can only be at the top level.
-  if (Tok.is(tok::kw_sil)) {   // This is only a keyword in SIL mode.
-    assert(isInSILMode() && "sil should only be a keyword in SIL mode");
+  if (Tok.is(tok::kw_sil)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseDeclSIL();
   } else {
     parseBraceItems(Items, true,

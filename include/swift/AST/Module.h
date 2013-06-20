@@ -197,6 +197,11 @@ public:
   /// binding is complete.
   llvm::StringMap<PrefixOperatorDecl*> PrefixOperators;
 
+  /// This keeps track of whether the swift standard library is autoimported
+  /// already.  This is lazily done the first time name binding is performed
+  /// when there are decls in a module.  This doesn't happen for SIL mode.
+  bool ShouldAutoImportStandardLibrary = true;
+
   TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
                   bool IsMainModule, bool IsReplModule)
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {

@@ -47,10 +47,8 @@ namespace {
   public:
     TranslationUnit *TU;
     ASTContext &Context;
-    bool ImportedBuiltinModule;
 
-    NameBinder(TranslationUnit *TU)
-    : TU(TU), Context(TU->Ctx), ImportedBuiltinModule(false) {
+    NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
       for (auto M : TU->getImportedModules()) {
         Module *&ref = Context.LoadedModules[M.second->Name.str()];
         if (ref)
@@ -105,10 +103,8 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // compiled form of AST's like clang's that support lazy deserialization.
 
   // FIXME: We shouldn't really allow arbitrary modules to import Builtin.
-  if (moduleID.first.str() == "Builtin") {
-    ImportedBuiltinModule = true;
+  if (moduleID.first.str() == "Builtin")
     return TU->Ctx.TheBuiltinModule;
-  }
 
   // If the imported module name is the same as the current translation unit,
   // skip the Swift module loader and use the Clang module loader instead.
@@ -174,16 +170,6 @@ void NameBinder::addImport(ImportDecl *ID,
 
 void NameBinder::
 addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
-  // FIXME: The current model is that if a module doesn't explicitly import
-  // Builtin or swift, we implicitly import swift.  This isn't really ideal.
-  if (ImportedBuiltinModule)
-    return;
-  for (ImportedModule M : Result)
-    if (M.second->Name.str() == "swift")
-      return;
-  if (TU->Name.str() == "swift")
-    return;
-
   Identifier SwiftID = Context.getIdentifier("swift");
   Module *M = getModule(std::make_pair(SwiftID, TU->Decls[0]->getStartLoc()));
   if (M == 0) return;
@@ -550,8 +536,6 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
   CaptureExternalsListener Capture(TU);
   
-  bool IsInitialNameBinding = TU->getImportedModules().empty();
-
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
   TU->clearLookupCache();
@@ -580,8 +564,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   // FIXME: The Swift modules themselves should re-export their dependencies,
   // if they show up in the interface.
   {
-    SmallVector<std::pair<clang::Module *, SourceLoc>, 4> importedClangModules;
-    llvm::SmallPtrSet<clang::Module *, 8> visited;
+    SmallVector<std::pair<clang::Module*, SourceLoc>, 4> importedClangModules;
+    llvm::SmallPtrSet<clang::Module*, 8> visited;
     for (auto imported : ImportedModules) {
       auto mod = dyn_cast<ClangModule>(imported.second);
       if (!mod)
@@ -645,10 +629,25 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
   }
 
   // Add the standard library import.
-  // FIXME: The semantics here are sort of strange if an import statement is
-  // after the first "chunk" in the main module.
-  if (IsInitialNameBinding)
-    Binder.addStandardLibraryImport(ImportedModules);
+  if (TU->ShouldAutoImportStandardLibrary) {
+    // FIXME: The semantics here are sort of strange if an import statement is
+    // after the first "chunk" in the main module.
+    //
+    // FIXME: The current model is that if a module doesn't explicitly import
+    // Builtin or swift, we implicitly import swift.  This isn't really ideal.
+    for (ImportedModule M : ImportedModules)
+      if (M.second->Name.str() == "swift" ||
+          M.second->Name.str() == "Builtin") {
+        TU->ShouldAutoImportStandardLibrary = false;
+        break;
+      }
+
+    if (TU->ShouldAutoImportStandardLibrary)
+      Binder.addStandardLibraryImport(ImportedModules);
+
+    // Only do this once.
+    TU->ShouldAutoImportStandardLibrary = false;
+  }
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,
   // import statements after the first "chunk" should be rare, though.)

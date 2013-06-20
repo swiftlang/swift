@@ -1,6 +1,6 @@
 // RUN: %swift %s -emit-sil -verify
 
-var dummy : Int
+import swift
 
 sil @block_errors : $() -> () {
 bb0:
