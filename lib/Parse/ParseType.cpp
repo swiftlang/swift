@@ -126,7 +126,6 @@ bool Parser::parseType(TypeLoc &Result) {
 ///
 bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   // Parse type-simple first.
-  SourceLoc StartLoc = Tok.getLoc();
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
