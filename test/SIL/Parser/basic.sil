@@ -56,11 +56,11 @@ bb0(%0 : $() -> Int64):
   %2 = store %0 to %1 : $*() -> Int64      // CHECK: store %0 to %1 : $*() -> Int64
   %3 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
   %4 = retain %3 : $() -> Int64            // CHECK: retain %3 : $() -> Int64
-//  %5 = apply %3()                          //
+  %5 = apply %3() : $() -> ()              //
   %6 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
   %7 = release %6 : $() -> Int64           // CHECK: release {{.*}} : $() -> Int64
   %8 = dealloc_var stack %1 : $*() -> Int64// CHECK: dealloc_var stack %1 : $*() -> Int64
-//%9 = return %5 : $Int64
+//  %9 = return %5 : $Int64                  // 
 }
 
 sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant

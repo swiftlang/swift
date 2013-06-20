@@ -70,6 +70,13 @@ namespace {
   public:
     // Parsing logic.
     bool parseSILType(SILType &Result);
+
+    struct UnresolvedValueName {
+      StringRef Name;
+      SourceLoc NameLoc;
+    };
+
+    bool parseValueName(UnresolvedValueName &Name);
     bool parseValueRef(SILValue &Result, SILType Ty);
     bool parseTypedValueRef(SILValue &Result, SourceLoc &Loc);
     bool parseTypedValueRef(SILValue &Result) {
@@ -271,6 +278,17 @@ bool SILParser::parseSILType(SILType &Result) {
   return false;
 }
 
+/// parseValueName - Parse a value name without a type available yet.
+///
+///     sil-value-name:
+///       sil-local-name
+///
+bool SILParser::parseValueName(UnresolvedValueName &Result) {
+  Result.Name = P.Tok.getText();
+
+  return P.parseToken(tok::sil_local_name, Result.NameLoc,
+                      diag::expected_sil_value_name);
+}
 
 /// parseValueRef - Parse a value, given a contextual type.
 ///
@@ -339,6 +357,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+    .Case("apply", ValueKind::ApplyInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("release", ValueKind::ReleaseInst)
@@ -396,6 +415,33 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SILValue ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
+  case ValueKind::ApplyInst: {
+    UnresolvedValueName FnPtr;
+    SmallVector<UnresolvedValueName, 4> Arguments;
+
+    if (parseValueName(FnPtr) ||
+        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      return true;
+
+    if (P.Tok.isNot(tok::r_paren)) {
+      do {
+        UnresolvedValueName Arg;
+        if (parseValueName(Arg)) return true;
+        Arguments.push_back(Arg);
+      } while (P.consumeIf(tok::comma));
+    }
+
+    SILType Ty;
+    if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(Ty))
+      return true;
+
+    
+
+    // FIXME, don't drop on the floor.
+    break;
+  }
   case ValueKind::IntegerLiteralInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
