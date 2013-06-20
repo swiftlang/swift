@@ -632,6 +632,8 @@ namespace {
     ALWAYS(AnyFunction, Fixed)
     ALWAYS(Class, Fixed)
     ALWAYS(BoundGenericClass, Fixed)
+    ALWAYS(Protocol, Fixed)
+    ALWAYS(ProtocolComposition, Fixed)
     ALWAYS(LValue, Dependent)
 #undef ALWAYS
     
@@ -641,18 +643,6 @@ namespace {
       return ObjectSize::Dependent;
     }
     
-    ObjectSize visitProtocolType(ProtocolType *protocol) {
-      if (protocol->requiresClass())
-        return ObjectSize::Fixed;
-      return ObjectSize::Dependent;
-    }
-    
-    ObjectSize visitProtocolComposition(ProtocolCompositionType *protocol) {
-      if (protocol->requiresClass())
-        return ObjectSize::Fixed;
-      return ObjectSize::Dependent;
-    }
-
     ObjectSize visitTupleType(TupleType *tuple) {
       ObjectSize result = ObjectSize::Fixed;
       for (auto &field : tuple->getFields()) {
