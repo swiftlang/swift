@@ -94,6 +94,10 @@ getArgRefExpr(TypeChecker &TC,
                                            Arg->getTypeOfReference());
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
+    bool failed = TC.typeCheckExpression(ArgRef, &TC.TU);
+    assert(!failed);
+    (void)failed;
+
     // For each index, we look through a TupleType or StructType.
     CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
@@ -255,6 +259,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // Construct the loop body.
   SmallVector<BraceStmt::ExprStmtOrDecl, 4> loopBodyContents;
 
+  SmallVector<unsigned, 2> subMemberIndexes;
+  
   // First, print the ", " between elements.
   if (firstVar) {
     // if branch: set first to false
@@ -285,19 +291,20 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   // If there is a key, print it and the ':'.
   if (keyVar) {
     PrintReplExpr(TC, keyVar, KeyTy, KeyTy->getCanonicalType(), Loc,
-                  EndLoc, MemberIndexes, loopBodyContents, PrintDecls, DC);
+                  EndLoc, subMemberIndexes, loopBodyContents, PrintDecls, DC);
 
     PrintLiteralString(" : ", TC, Loc, PrintDecls, loopBodyContents);
   }
 
   // Print the value
   PrintReplExpr(TC, valueVar, ValueTy, ValueTy->getCanonicalType(), Loc,
-                EndLoc, MemberIndexes, loopBodyContents, PrintDecls, DC);
+                EndLoc, subMemberIndexes, loopBodyContents, PrintDecls, DC);
 
   auto loopBody = BraceStmt::create(context, Loc, loopBodyContents, EndLoc);
 
   // Construct the loop.
-  Expr *argRef = new (context) DeclRefExpr(Arg, Loc, Arg->getTypeOfReference());
+  Expr *argRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
+  
   BodyContent.push_back(new (context) ForEachStmt(Loc, pattern, Loc, argRef,
                                                   loopBody));
 
