@@ -70,6 +70,10 @@ namespace {
   public:
     // Parsing logic.
     bool parseSILType(SILType &Result);
+    bool parseSILType(SILType &Result, SourceLoc &TypeLoc) {
+      TypeLoc = P.Tok.getLoc();
+      return parseSILType(Result);
+    }
 
     struct UnresolvedValueName {
       StringRef Name;
@@ -90,6 +94,9 @@ namespace {
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
+    bool parseCallInstruction(ValueKind Opcode, SILBuilder &B,
+                              SILValue &ResultVal);
+
     bool parseSILBasicBlock();
   };
 } // end anonymous namespace.
@@ -361,6 +368,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("apply", ValueKind::ApplyInst)
+    .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("release", ValueKind::ReleaseInst)
@@ -381,6 +389,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
   return true;
 }
+
 
 ///   sil-instruction:
 ///     sil_local_name '=' identifier ...
@@ -418,53 +427,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SILValue ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
-  case ValueKind::ApplyInst: {
-    UnresolvedValueName FnName;
-    SmallVector<UnresolvedValueName, 4> ArgNames;
-
-    if (parseValueName(FnName) ||
-        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+  case ValueKind::ApplyInst:
+    if (parseCallInstruction(Opcode, B, ResultVal))
       return true;
-
-    if (P.Tok.isNot(tok::r_paren)) {
-      do {
-        UnresolvedValueName Arg;
-        if (parseValueName(Arg)) return true;
-        ArgNames.push_back(Arg);
-      } while (P.consumeIf(tok::comma));
-    }
-
-    SILType Ty;
-    if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(Ty))
-      return true;
-
-    CanType ShTy = Ty.getSwiftType();
-    if (!ShTy->is<FunctionType>() && !ShTy->is<PolymorphicFunctionType>()) {
-      P.diagnose(OpcodeLoc, diag::expected_sil_type_kind, "be a function");
-      return true;
-    }
-
-    SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
-
-    SILValue FnVal = getLocalValue(FnName, Ty);
-
-    auto ArgTys = FTI->getInputTypes();
-    if (ArgTys.size() != ArgNames.size()) {
-      P.diagnose(OpcodeLoc, diag::expected_sil_type_kind,
-                 " have the right argument types");
-      return true;
-    }
-
-    SmallVector<SILValue, 4> Args;
-    unsigned ArgNo = 0;
-    for (auto &ArgName : ArgNames)
-      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
-
-    ResultVal = B.createApply(SILLocation(), FnVal, FTI->getResultType(), Args);
     break;
-  }
   case ValueKind::IntegerLiteralInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
@@ -629,6 +595,67 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   setLocalValue(ResultVal, ResultName, ResultNameLoc);
   return false;
 }
+
+bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
+                                     SILValue &ResultVal) {
+  UnresolvedValueName FnName;
+  SmallVector<UnresolvedValueName, 4> ArgNames;
+
+  if (parseValueName(FnName) ||
+      P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+    return true;
+
+  if (P.Tok.isNot(tok::r_paren)) {
+    do {
+      UnresolvedValueName Arg;
+      if (parseValueName(Arg)) return true;
+      ArgNames.push_back(Arg);
+    } while (P.consumeIf(tok::comma));
+  }
+
+  SILType Ty;
+  SourceLoc TypeLoc;
+  if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
+      P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+      parseSILType(Ty, TypeLoc))
+    return true;
+
+  CanType ShTy = Ty.getSwiftType();
+  if (!ShTy->is<FunctionType>() && !ShTy->is<PolymorphicFunctionType>()) {
+    P.diagnose(TypeLoc, diag::expected_sil_type_kind, "be a function");
+    return true;
+  }
+
+  SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
+
+  auto ArgTys = FTI->getInputTypes();
+  if (ArgTys.size() != ArgNames.size()) {
+    P.diagnose(TypeLoc, diag::expected_sil_type_kind,
+               " have the right argument types");
+    return true;
+  }
+
+
+  SILValue FnVal = getLocalValue(FnName, Ty);
+  unsigned ArgNo = 0;
+  SmallVector<SILValue, 4> Args;
+  for (auto &ArgName : ArgNames)
+    Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
+
+  SILType ResTy = FTI->getResultType();
+  switch (Opcode) {
+  default: assert(0 && "Unexpected case");
+  case ValueKind::ApplyInst:
+    ResultVal = B.createApply(SILLocation(), FnVal, ResTy, Args);
+    break;
+  case ValueKind::PartialApplyInst:
+      // FIXME: Arbitrary order difference in type argument?
+    ResultVal = B.createPartialApply(SILLocation(), FnVal, Args, ResTy);
+    break;
+  }
+  return false;
+}
+
 
 
 ///   sil-basic-block:
