@@ -68,8 +68,11 @@ PrintStruct(TypeChecker &TC, VarDecl *Arg,
           PrintLiteralString(", ", TC, Loc, PrintDecls, BodyContent);
         
         MemberIndexes.push_back(idx);
-        CanType SubType = VD->getType()->getCanonicalType();
-        PrintReplExpr(TC, Arg, VD->getType(), SubType,
+        
+        Type SubstType = VD->getType();
+        SubstType = TC.substMemberTypeWithBase(SubstType, VD, SugarT);
+        
+        PrintReplExpr(TC, Arg, SubstType, SubstType->getCanonicalType(),
                       Loc, EndLoc, MemberIndexes,
                       BodyContent, PrintDecls, DC);
         MemberIndexes.pop_back();
