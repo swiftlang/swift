@@ -188,6 +188,7 @@ public:
   
   void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Expr *E) { E->print(OS, Indent+2); }
+  void printRec(Pattern *P) { P->print(OS); }
 
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
@@ -269,6 +270,8 @@ public:
   }
   void visitForEachStmt(ForEachStmt *S) {
     OS.indent(Indent) << "(for_each_stmt\n";
+    printRec(S->getPattern());
+    OS << '\n';
     printRec(S->getContainer());
     OS << '\n';
     printRec(S->getBody());
