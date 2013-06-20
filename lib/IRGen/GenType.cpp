@@ -632,11 +632,26 @@ namespace {
     ALWAYS(AnyFunction, Fixed)
     ALWAYS(Class, Fixed)
     ALWAYS(BoundGenericClass, Fixed)
-    ALWAYS(Archetype, Dependent)
-    ALWAYS(Protocol, Dependent)
-    ALWAYS(ProtocolComposition, Dependent)
     ALWAYS(LValue, Dependent)
 #undef ALWAYS
+    
+    ObjectSize visitArchetypeType(ArchetypeType *archetype) {
+      if (archetype->requiresClass())
+        return ObjectSize::Fixed;
+      return ObjectSize::Dependent;
+    }
+    
+    ObjectSize visitProtocolType(ProtocolType *protocol) {
+      if (protocol->requiresClass())
+        return ObjectSize::Fixed;
+      return ObjectSize::Dependent;
+    }
+    
+    ObjectSize visitProtocolComposition(ProtocolCompositionType *protocol) {
+      if (protocol->requiresClass())
+        return ObjectSize::Fixed;
+      return ObjectSize::Dependent;
+    }
 
     ObjectSize visitTupleType(TupleType *tuple) {
       ObjectSize result = ObjectSize::Fixed;
