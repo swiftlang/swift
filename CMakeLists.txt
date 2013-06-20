@@ -228,10 +228,16 @@ function(compile_swift_files)
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift)
   endif()
 
+  set(stdlib_dep)
+  # Make sure that standard library does not depend on itself.
+  if(NOT objfile MATCHES "stdlib/swift.o$")
+    set(stdlib_dep swift_stdlib)
+  endif()
+
   add_custom_command(
     OUTPUT ${objfile}
     COMMAND swift "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS swift ${source_files} ${module_source_file}
+    DEPENDS swift ${stdlib_dep} ${source_files} ${module_source_file}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
