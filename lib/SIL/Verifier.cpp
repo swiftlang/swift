@@ -798,7 +798,8 @@ public:
               opFTy->getInput()->isEqual(resFTy->getInput()) &&
               opFTy->getResult()->isEqual(resFTy->getResult()) &&
               opFTy->isAutoClosure() == resFTy->isAutoClosure() &&
-              opFTy->isBlock() == resFTy->isBlock(),
+              opFTy->isBlock() == resFTy->isBlock() &&
+              opFTy->getAbstractCC() == resFTy->getAbstractCC(),
               "thin_to_thick_function operand and result type must differ only "
               " in thinness");
       require(!resFTy->isThin(),
@@ -811,7 +812,8 @@ public:
                                                TTFI->getType().getSwiftType());
       require(resPTy &&
               opPTy->getInput()->isEqual(resPTy->getInput()) &&
-              opPTy->getResult()->isEqual(resPTy->getResult()),
+              opPTy->getResult()->isEqual(resPTy->getResult()) &&
+              opPTy->getAbstractCC() == opPTy->getAbstractCC(),
               "thin_to_thick_function operand and result type must differ only "
               " in thinness");
       require(!resPTy->isThin(),
@@ -1020,7 +1022,8 @@ public:
 
     require(opFTy, "convert_function operand must be a function");
     require(resFTy, "convert_function result must be a function");
-    
+    require(opFTy->getAbstractCC() == resFTy->getAbstractCC(),
+            "convert_function cannot change function cc");
     require(opFTy->isThin() == resFTy->isThin(),
             "convert_function cannot change function thinness");
     
