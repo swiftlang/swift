@@ -127,7 +127,6 @@ bool Parser::parseType(TypeLoc &Result) {
 bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
   // Parse type-simple first.
   SourceLoc StartLoc = Tok.getLoc();
-  bool isTupleType = false;
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
@@ -139,7 +138,6 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
       return true;
     break;
   case tok::l_paren: {
-    isTupleType = true;
     if (parseTypeTupleBody(Result))
       return true;
     break;
@@ -164,11 +162,6 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
 
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
-    // If the argument was not syntactically a tuple type, report an error.
-    if (!isTupleType) {
-      diagnose(StartLoc, diag::expected_function_argument_must_be_paren);
-    }
-    
     TypeLoc SecondHalf;
     if (parseType(SecondHalf,
                   diag::expected_type_function_result))
@@ -568,8 +561,6 @@ bool Parser::canParseGenericArguments() {
 }
 
 bool Parser::canParseType() {
-  bool isTupleType = false;
-
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
@@ -581,7 +572,6 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::l_paren: {
-    isTupleType = true;
     consumeToken();
     if (!canParseTypeTupleBody())
       return false;
@@ -600,10 +590,6 @@ bool Parser::canParseType() {
   
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
-    // If the argument was not syntactically a tuple type, report an error.
-    if (!isTupleType)
-      return false;
-    
     if (!canParseType())
       return false;
     return true;
