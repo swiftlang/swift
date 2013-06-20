@@ -1,0 +1,72 @@
+//===--- BridgedTypes.def - Database of Autamatically Bridged Types -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of C types that are imported as swift stdlib
+// types.
+//
+// BRIDGE_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,
+//             SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES,
+//             CAN_BE_MISSING)
+//  - C_TYPE_NAME is the name of the C type.
+//  - C_TYPE_KIND is the expected kind of the C type (see BridgeCTypeKind
+//    enum).
+//  - C_TYPE_BITWIDTH is the expected size of the C type; a zero value
+//    means "don't check".
+//  - SWIFT_MODULE_NAME is the name of the swift library module.
+//  - SWIFT_TYPE_NAME is the name of the corresponding stdlib type.
+//  - LANGUAGES specifies the set of languages for which this mapping
+//    is applicable (see BridgeLanguages enum).
+//  - CAN_BE_MISSING is true if it is OK for swift type to be missing in the
+//    stdlib.
+//
+//===----------------------------------------------------------------------===//
+
+#define BRIDGE_STDLIB_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,  \
+                           SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING) \
+    BRIDGE_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,             \
+                "swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING)
+
+// MacTypes.h defines typedefs UIntXX, SIntXX, FloatXX.
+BRIDGE_STDLIB_TYPE("UInt8",  UnsignedInt, 8,  "UInt8",  All, false)
+BRIDGE_STDLIB_TYPE("UInt16", UnsignedInt, 16, "UInt16", All, false)
+BRIDGE_STDLIB_TYPE("UInt32", UnsignedInt, 32, "UInt32", All, false)
+BRIDGE_STDLIB_TYPE("UInt64", UnsignedInt, 64, "UInt64", All, false)
+
+BRIDGE_STDLIB_TYPE("SInt8",  SignedInt, 8,  "Int8",  All, false)
+BRIDGE_STDLIB_TYPE("SInt16", SignedInt, 16, "Int16", All, false)
+BRIDGE_STDLIB_TYPE("SInt32", SignedInt, 32, "Int32", All, false)
+BRIDGE_STDLIB_TYPE("SInt64", SignedInt, 64, "Int64", All, false)
+
+BRIDGE_STDLIB_TYPE("Float32", FloatIEEEsingle,        32, "Float32", All, false)
+BRIDGE_STDLIB_TYPE("Float64", FloatIEEEdouble,        64, "Float64", All, false)
+BRIDGE_STDLIB_TYPE("Float80", FloatX87DoubleExtended, 80, "Float80", All, true)
+
+// stdint.h types.
+BRIDGE_STDLIB_TYPE("uint8_t",  UnsignedInt, 8,  "UInt8",  All, false)
+BRIDGE_STDLIB_TYPE("uint16_t", UnsignedInt, 16, "UInt16", All, false)
+BRIDGE_STDLIB_TYPE("uint32_t", UnsignedInt, 32, "UInt32", All, false)
+BRIDGE_STDLIB_TYPE("uint64_t", UnsignedInt, 64, "UInt64", All, false)
+
+BRIDGE_STDLIB_TYPE("int8_t",  SignedInt, 8,  "Int8",  All, false)
+BRIDGE_STDLIB_TYPE("int16_t", SignedInt, 16, "Int16", All, false)
+BRIDGE_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false)
+BRIDGE_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false)
+
+// Objective-C types.
+BRIDGE_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", ObjC1, false)
+BRIDGE_TYPE("SEL",  ObjCSel,  0, "ObjectiveC", "ObjCSel",  ObjC1, false)
+BRIDGE_STDLIB_TYPE("NSUInteger", UnsignedInt, 64, "Int", ObjC1, false)
+BRIDGE_STDLIB_TYPE("NSInteger",  SignedInt,   64, "Int", ObjC1, false)
+
+#undef BRIDGE_STDLIB_TYPE
+#undef BRIDGE_TYPE
+

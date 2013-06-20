@@ -47,6 +47,130 @@ static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
   }
 }
 
+/// \brief Map a well-known C type to a swift type from the standard library.
+///
+/// \returns A pair of a swift type and its name that corresponds to a given
+/// C type.
+static std::pair<Type, StringRef>
+getSwiftStdlibType(clang::TypedefNameDecl *D,
+                   Identifier Name,
+                   ClangImporter::Implementation &Impl) {
+  BridgeCTypeKind CTypeKind;
+  unsigned Bitwidth;
+  StringRef SwiftModuleName;
+  bool IsSwiftModule; // True if SwiftModuleName == "swift".
+  StringRef SwiftTypeName;
+  BridgeLanguages Languages;
+  bool CanBeMissing;
+
+  do {
+#define BRIDGE_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
+                    SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
+                    CAN_BE_MISSING)                                \
+    if (Name.str() == C_TYPE_NAME) {                               \
+      CTypeKind = BridgeCTypeKind::C_TYPE_KIND;                    \
+      Bitwidth = C_TYPE_BITWIDTH;                                  \
+      if (StringRef("swift") == SWIFT_MODULE_NAME)                 \
+        IsSwiftModule = true;                                      \
+      else {                                                       \
+        IsSwiftModule = false;                                     \
+        SwiftModuleName = SWIFT_MODULE_NAME;                       \
+      }                                                            \
+      SwiftTypeName = SWIFT_TYPE_NAME;                             \
+      Languages = BridgeLanguages::LANGUAGES;                      \
+      CanBeMissing = CAN_BE_MISSING;                               \
+      break;                                                       \
+    }
+#include "BridgedTypes.def"
+
+    // We did not find this type, thus it is not bridged.
+    return std::make_pair(Type(), "");
+  } while(0);
+
+  clang::ASTContext &ClangCtx = Impl.getClangASTContext();
+
+  if (Languages != BridgeLanguages::All) {
+    if ((unsigned(Languages) & unsigned(BridgeLanguages::ObjC1)) != 0 &&
+        !ClangCtx.getLangOpts().ObjC1)
+      return std::make_pair(Type(), "");
+  }
+
+  auto ClangType = D->getUnderlyingType();
+
+  // If the C type does not have the expected size, don't import it as a stdlib
+  // type.
+  if (Bitwidth != 0 &&
+      Bitwidth != ClangCtx.getTypeSize(ClangType))
+    return std::make_pair(Type(), "");
+
+  // Chceck other expected properties of the C type.
+  switch(CTypeKind) {
+  case BridgeCTypeKind::UnsignedInt:
+    if (!ClangType->isUnsignedIntegerType())
+      return std::make_pair(Type(), "");
+    break;
+
+  case BridgeCTypeKind::SignedInt:
+    if (!ClangType->isSignedIntegerType())
+      return std::make_pair(Type(), "");
+    break;
+
+  case BridgeCTypeKind::FloatIEEEsingle:
+  case BridgeCTypeKind::FloatIEEEdouble:
+  case BridgeCTypeKind::FloatX87DoubleExtended: {
+    if (!ClangType->isFloatingType())
+      return std::make_pair(Type(), "");
+
+    const llvm::fltSemantics &Sem = ClangCtx.getFloatTypeSemantics(ClangType);
+    switch(CTypeKind) {
+    case BridgeCTypeKind::FloatIEEEsingle:
+      assert(Bitwidth == 32 && "FloatIEEEsingle should be 32 bits wide");
+      if (&Sem != &APFloat::IEEEsingle)
+        return std::make_pair(Type(), "");
+      break;
+
+    case BridgeCTypeKind::FloatIEEEdouble:
+      assert(Bitwidth == 64 && "FloatIEEEsingle should be 64 bits wide");
+      if (&Sem != &APFloat::IEEEdouble)
+        return std::make_pair(Type(), "");
+      break;
+
+    case BridgeCTypeKind::FloatX87DoubleExtended:
+      assert(Bitwidth == 80 && "FloatIEEEsingle should be 80 bits wide");
+      if (&Sem != &APFloat::x87DoubleExtended)
+        return std::make_pair(Type(), "");
+      break;
+
+    default:
+      llvm_unreachable("should see only floating point types here");
+    }
+    }
+    break;
+
+  case BridgeCTypeKind::ObjCBool:
+    if (!ClangCtx.hasSameType(ClangType, ClangCtx.ObjCBuiltinBoolTy))
+      return std::make_pair(Type(), "");
+    break;
+
+  case BridgeCTypeKind::ObjCSel:
+    if (auto PT = ClangType->getAs<clang::PointerType>()) {
+      if (!PT->getPointeeType()->isSpecificBuiltinType(
+                                  clang::BuiltinType::ObjCSel))
+        return std::make_pair(Type(), "");
+    }
+    break;
+  }
+
+  Type SwiftType;
+  if (IsSwiftModule)
+    SwiftType = Impl.getNamedSwiftType(Impl.getSwiftModule(), SwiftTypeName);
+  else
+    SwiftType = Impl.getNamedSwiftType(Impl.getNamedModule(SwiftModuleName),
+                                       SwiftTypeName);
+  assert(SwiftType || CanBeMissing);
+  return std::make_pair(SwiftType, SwiftTypeName);
+}
+
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
@@ -90,68 +214,48 @@ namespace {
       return nullptr;
     }
 
-    Decl *VisitTypedefNameDecl(clang::TypedefNameDecl *decl){
-      auto name = Impl.importName(decl->getDeclName());
-      if (name.empty())
+    Decl *VisitTypedefNameDecl(clang::TypedefNameDecl *Decl) {
+      auto Name = Impl.importName(Decl->getDeclName());
+      if (Name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
-      if (!dc)
+      auto DC = Impl.importDeclContext(Decl->getDeclContext());
+      if (!DC)
         return nullptr;
 
-      Type type;
+      Type SwiftType;
+      if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
+        StringRef StdlibTypeName;
+        std::tie(SwiftType, StdlibTypeName) =
+            getSwiftStdlibType(Decl, Name, Impl);
 
-      // If this is the Objective-C BOOL type, map it to ObjCBool.
-      auto &clangContext = Impl.getClangASTContext();
-      if (clangContext.getLangOpts().ObjC1) {
-        switch (name.str().size()) {
-        case 4:
-          // BOOL -> ObjCBool
-          if (name.str() == "BOOL" &&
-              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
-              clangContext.hasSameType(decl->getUnderlyingType(),
-                                       clangContext.ObjCBuiltinBoolTy))
-            type = Impl.getNamedSwiftType(Impl.getNamedModule("ObjectiveC"),
-                                          "ObjCBool");
-          break;
+        if (SwiftType) {
+          // Note that this typedef-name is special.
+          Impl.SpecialTypedefNames.insert(Decl);
 
-        case 9:
-          // NSInteger -> Int
-          if (name.str() == "NSInteger" &&
-              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
-              decl->getUnderlyingType()->isIntegralType(clangContext))
-            type = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
-          break;
-
-        case 10:
-          // NSUInteger -> Int
-          if (name.str() == "NSUInteger" &&
-              decl->getDeclContext()->getRedeclContext()->isTranslationUnit() &&
-              decl->getUnderlyingType()->isIntegralType(clangContext))
-            type = Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
-          break;
-        }
-
-        // If we swapped in a new type, note that this typedef-name is special.
-        if (type) {
-          Impl.SpecialTypedefNames.insert(decl);
+          if (Name.str() == StdlibTypeName) {
+            // Don't create an extra typealias in the imported module because
+            // doing so will cause ambiguity between the name in the imported
+            // module and the same name in the 'swift' module.
+            return SwiftType->castTo<StructType>()->getDecl();
+          }
         }
       }
 
-      if (!type)
-        type = Impl.importType(decl->getUnderlyingType(),
-                               ImportTypeKind::Normal);
+      if (!SwiftType)
+        SwiftType = Impl.importType(Decl->getUnderlyingType(),
+                                    ImportTypeKind::Normal);
 
-      if (!type)
+      if (!SwiftType)
         return nullptr;
 
-      auto loc = Impl.importSourceLoc(decl->getLocation());
+      auto Loc = Impl.importSourceLoc(Decl->getLocation());
       return new (Impl.SwiftContext) TypeAliasDecl(
-                                      Impl.importSourceLoc(decl->getLocStart()),
-                                      name,
-                                      loc,
-                                      TypeLoc(type, loc),
-                                      dc,
+                                      Impl.importSourceLoc(Decl->getLocStart()),
+                                      Name,
+                                      Loc,
+                                      TypeLoc(SwiftType, Loc),
+                                      DC,
                                       { });
     }
 
@@ -2283,7 +2387,9 @@ Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
   SwiftDeclConverter converter(*this);
   auto result = converter.Visit(decl);
   auto canon = decl->getCanonicalDecl();
-  if (result) {
+  // Note that the decl was imported from Clang.  Don't mark stdlib decls as
+  // imported.
+  if (result && result->getDeclContext() != getSwiftModule()) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(canon);
   }

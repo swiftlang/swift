@@ -806,6 +806,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
           !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
         Results.push_back(Result::getModuleMember(VD));
+        CurModuleTypes.insert(VD->getType()->getCanonicalType());
       }
     }
   }

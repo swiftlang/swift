@@ -82,6 +82,25 @@ enum class ImportTypeKind {
   Property
 };
 
+/// \brief Describes the kind of the C type that can be mapped to a stdlib
+/// swift type.
+enum class BridgeCTypeKind {
+  UnsignedInt,
+  SignedInt,
+  FloatIEEEsingle,
+  FloatIEEEdouble,
+  FloatX87DoubleExtended,
+  ObjCBool,
+  ObjCSel
+};
+
+/// \brief Bitmask constants for language dialects where a certain C to Swift
+/// type mapping applies.
+enum class BridgeLanguages {
+  ObjC1 = 0x1,
+  All = ObjC1
+};
+
 /// \brief Implementation of the Clang importer.
 struct ClangImporter::Implementation {
   /// \brief Describes how a particular C enumeration type will be imported

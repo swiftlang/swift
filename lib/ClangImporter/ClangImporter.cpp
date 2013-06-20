@@ -407,8 +407,12 @@ void ClangImporter::lookupValue(Module *module,
     for (auto decl : lookupResult) {
       if (auto swiftDecl = Impl.importDecl(decl->getUnderlyingDecl()))
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
-          results.push_back(valueDecl);
-          FoundType = FoundType || isa<TypeDecl>(valueDecl);
+          // If the importer gave us a declaration from the stdlib, make sure
+          // it does not show up in the lookup results for the imported module.
+          if (valueDecl->getDeclContext() != Impl.getSwiftModule()) {
+            results.push_back(valueDecl);
+            FoundType = FoundType || isa<TypeDecl>(valueDecl);
+          }
         }
     }
   }
