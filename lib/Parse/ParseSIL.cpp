@@ -77,6 +77,9 @@ namespace {
     };
 
     bool parseValueName(UnresolvedValueName &Name);
+    SILValue getLocalValue(UnresolvedValueName Name, SILType Type) {
+      return getLocalValue(Name.Name, Type, Name.NameLoc);
+    }
     bool parseValueRef(SILValue &Result, SILType Ty);
     bool parseTypedValueRef(SILValue &Result, SourceLoc &Loc);
     bool parseTypedValueRef(SILValue &Result) {
@@ -416,10 +419,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   switch (Opcode) {
   default: assert(0 && "Unreachable");
   case ValueKind::ApplyInst: {
-    UnresolvedValueName FnPtr;
-    SmallVector<UnresolvedValueName, 4> Arguments;
+    UnresolvedValueName FnName;
+    SmallVector<UnresolvedValueName, 4> ArgNames;
 
-    if (parseValueName(FnPtr) ||
+    if (parseValueName(FnName) ||
         P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
       return true;
 
@@ -427,7 +430,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       do {
         UnresolvedValueName Arg;
         if (parseValueName(Arg)) return true;
-        Arguments.push_back(Arg);
+        ArgNames.push_back(Arg);
       } while (P.consumeIf(tok::comma));
     }
 
@@ -437,9 +440,29 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(Ty))
       return true;
 
-    
+    CanType ShTy = Ty.getSwiftType();
+    if (!ShTy->is<FunctionType>() && !ShTy->is<PolymorphicFunctionType>()) {
+      P.diagnose(OpcodeLoc, diag::expected_sil_type_kind, "be a function");
+      return true;
+    }
 
-    // FIXME, don't drop on the floor.
+    SILFunctionTypeInfo *FTI = Ty.getFunctionTypeInfo(SILMod);
+
+    SILValue FnVal = getLocalValue(FnName, Ty);
+
+    auto ArgTys = FTI->getInputTypes();
+    if (ArgTys.size() != ArgNames.size()) {
+      P.diagnose(OpcodeLoc, diag::expected_sil_type_kind,
+                 " have the right argument types");
+      return true;
+    }
+
+    SmallVector<SILValue, 4> Args;
+    unsigned ArgNo = 0;
+    for (auto &ArgName : ArgNames)
+      Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++]));
+
+    ResultVal = B.createApply(SILLocation(), FnVal, FTI->getResultType(), Args);
     break;
   }
   case ValueKind::IntegerLiteralInst: {

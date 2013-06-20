@@ -319,6 +319,8 @@ ERROR(expected_sil_colon_value_ref,decl_parsing,none,
       "expected ':' after type in SIL value reference", ())
 ERROR(expected_sil_value_name,decl_parsing,none,
       "expected SIL value name", ())
+ERROR(expected_sil_type_kind, decl_parsing,none,
+      "expected SIL type to %0", (StringRef))
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,
