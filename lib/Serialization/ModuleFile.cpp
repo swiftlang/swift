@@ -203,7 +203,7 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
-Decl *ModuleFile::getDecl(DeclID DID) {
+Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
   if (DID == 0)
     return nullptr;
 
@@ -346,7 +346,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     NominalTypeDecl *parent;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      thisDecl = cast<VarDecl>(getDecl(implicitThisID));
+      thisDecl = cast<VarDecl>(getDecl(implicitThisID, SkipContext));
       parent = cast<NominalTypeDecl>(getDeclContext(parentID));
     }
 
@@ -355,6 +355,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
                                           thisDecl, /*generic params=*/nullptr,
                                           parent);
     declOrOffset = ctor;
+    thisDecl->setDeclContext(ctor);
 
     Pattern *args = maybeReadPattern();
     assert(args && "missing arguments for constructor");
@@ -379,8 +380,9 @@ Decl *ModuleFile::getDecl(DeclID DID) {
                                        isNeverLValue, typeID, getterID,
                                        setterID, overriddenID);
 
+    auto DC = (opts & SkipContext) ? nullptr : getDeclContext(contextID);
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
-                                 getType(typeID), nullptr);
+                                 getType(typeID), DC);
 
     // Explicitly set the getter and setter info /before/ recording the VarDecl
     // in the map. The functions will check this to know if they are getters or
@@ -393,10 +395,6 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     }
 
     declOrOffset = var;
-
-    // Explicitly set the DeclContext /after/ recording the VarDecl in the map.
-    // Sometimes the context has to reference this decl.
-    var->setDeclContext(getDeclContext(contextID));
 
     var->setNeverUsedAsLValue(isNeverLValue);
     if (isImplicit)

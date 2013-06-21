@@ -125,8 +125,18 @@ class ModuleFile {
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
+  /// Controls how a Decl is deserialized.
+  enum DeclDeserializationOptions {
+    /// Don't set the decl's context. It will be set by the caller instead.
+    ///
+    /// This is useful for declarations that reference each other at
+    /// construction time.
+    SkipContext = 0x1
+  };
+
   /// Returns the decl with the given ID, deserializing it if needed.
-  Decl *getDecl(serialization::DeclID DID);
+  Decl *getDecl(serialization::DeclID DID,
+                DeclDeserializationOptions opts = {});
 
   /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);
