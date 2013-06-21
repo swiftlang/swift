@@ -222,6 +222,12 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     return nullptr;
   }
 
+#ifndef NDEBUG
+  assert(declOrOffset.get<BitOffset>() != 0 &&
+         "this decl is already being deserialized");
+  declOrOffset = BitOffset(0);
+#endif
+
   ASTContext &ctx = ModuleContext->Ctx;
 
   SmallVector<uint64_t, 64> scratch;
@@ -547,6 +553,12 @@ Type ModuleFile::getType(TypeID TID) {
     error();
     return nullptr;
   }
+
+#ifndef NDEBUG
+  assert(typeOrOffset.get<BitOffset>() != 0 &&
+         "this type is already being deserialized");
+  typeOrOffset = BitOffset(0);
+#endif
 
   ASTContext &ctx = ModuleContext->Ctx;
 
