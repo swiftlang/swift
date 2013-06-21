@@ -19,6 +19,7 @@
 
 #include "Scope.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "llvm/ADT/SetVector.h"
@@ -121,12 +122,55 @@ public:
   bool isInSILMode() const { return SIL != nullptr; }
 
   //===--------------------------------------------------------------------===//
+  // Routines to save and restore parser state.
+
+  class ParserState {
+    ParserState(Lexer::State LS, SourceLoc PreviousLoc):
+        LS(LS), PreviousLoc(PreviousLoc)
+    {}
+    Lexer::State LS;
+    SourceLoc PreviousLoc;
+    friend class Parser;
+  };
+
+  ParserState getParserState() {
+    return ParserState(L->getStateForBeginnigOfToken(Tok),
+                       PreviousLoc);
+  }
+
+  void restoreParserState(ParserState PS) {
+    L->restoreState(PS.LS);
+    PreviousLoc = PS.PreviousLoc;
+    consumeToken();
+  }
+
+  void backtrackToState(ParserState PS) {
+    L->backtrackToState(PS.LS);
+    PreviousLoc = PS.PreviousLoc;
+    consumeToken();
+  }
+
+  /// RAII object that, when it is destructed, restores the parser and lexer to
+  /// their positions at the time the object was constructed.
+  struct BacktrackingScope {
+  private:
+    Parser &P;
+    ParserState PS;
+
+  public:
+    BacktrackingScope(Parser &P) : P(P), PS(P.getParserState()) {}
+
+    ~BacktrackingScope() {
+      P.backtrackToState(PS);
+    }
+  };
+
+  //===--------------------------------------------------------------------===//
   // Utilities
-  
-  /// peekToken - Return the next token that will be installed by consumeToken.
+
+  /// \brief Return the next token that will be installed by \c consumeToken.
   const Token &peekToken();
-  
-  // Utilities.
+
   SourceLoc consumeToken();
   SourceLoc consumeToken(tok K) {
     assert(Tok.is(K) && "Consuming wrong token kind");

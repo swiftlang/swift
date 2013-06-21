@@ -763,19 +763,16 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   while (1) {
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
-    
+    bool IsPeriod = false;
+    // Look ahead to see if we have '.foo(', '.foo[', '.foo.1(' or '.foo.1['.
     if (Tok.is(tok::period_prefix) && (peekToken().is(tok::identifier) ||
                                        peekToken().is(tok::integer_literal))) {
-      auto Backup = Tok;
-      consumeToken();
-      bool IsPeriod = peekToken().isFollowingLParen() ||
-                      peekToken().isFollowingLSquare();
-      Tok = Backup;
-      L->backtrackToToken(Backup);
-      if (IsPeriod)
-        Tok.setKind(tok::period);
+      BacktrackingScope BS(*this);
+      consumeToken(tok::period_prefix);
+      IsPeriod = peekToken().isFollowingLParen() ||
+                 peekToken().isFollowingLSquare();
     }
-    if (consumeIf(tok::period)) {
+    if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         diagnose(Tok, diag::expected_field_name);
         return 0;

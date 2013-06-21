@@ -506,27 +506,6 @@ static bool isGenericTypeDisambiguatingToken(Token &tok) {
   }
 }
 
-namespace {
-  /// RAII object that, when it is destructed, restores the parser and lexer to
-  /// their positions at the time the object was constructed.
-  struct BacktrackingScope {
-    Parser &P;
-    Token BacktrackParserTo;
-    SourceLoc BacktrackPreviousLocTo;
-
-    BacktrackingScope(Parser &P)
-      : P(P),
-        BacktrackParserTo(P.Tok),
-        BacktrackPreviousLocTo(P.PreviousLoc){}
-    
-    ~BacktrackingScope() {
-      P.Tok = BacktrackParserTo;
-      P.PreviousLoc = BacktrackPreviousLocTo;
-      P.L->backtrackToToken(BacktrackParserTo);
-    }
-  };
-} // end anonymous namespace
-
 bool Parser::canParseAsGenericArgumentList() {
   if (!Tok.isAnyOperator() || !Tok.getText().equals("<"))
     return false;

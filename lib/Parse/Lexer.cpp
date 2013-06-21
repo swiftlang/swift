@@ -172,7 +172,9 @@ Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
     
   // Prime the lexer.
   lexImpl();
-  NextToken.setAtStartOfLine(true);
+  assert((NextToken.isAtStartOfLine() || CurrentPosition != BufferStart) &&
+         "The token should be at the beginning of the line, "
+         "or we should be lexing from the middle of the buffer");
 }
 
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
@@ -1185,7 +1187,7 @@ void Lexer::lexImpl() {
   assert(CurPtr >= BufferStart &&
          CurPtr <= BufferEnd && "Cur Char Pointer out of range!");
 
-  NextToken.setAtStartOfLine(false);
+  NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
 Restart:
   // Remember the start of the token so we can form the text range.

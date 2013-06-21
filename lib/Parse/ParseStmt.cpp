@@ -403,12 +403,11 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // on.
 
   if (Tok.is(tok::l_paren)) {
-    auto Backup = Tok;
+    auto SavedState = getParserState();
     consumeToken(tok::l_paren);
     skipUntil(tok::r_paren);
     bool IsCStyle = peekToken().is(tok::l_brace);
-    Tok = Backup;
-    L->backtrackToToken(Backup);
+    backtrackToState(SavedState);
     if (IsCStyle)
       return parseStmtForCStyle(ForLoc);
     return parseStmtForEach(ForLoc);

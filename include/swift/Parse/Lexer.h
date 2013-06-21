@@ -72,15 +72,48 @@ public:
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
-  
-  /// backtrackToToken - Backtrack the lexer to the state of having just lexed
-  /// the specified token.
-  void backtrackToToken(const Token &pos) {
-    assert(pos.getText().end() <= CurPtr && "can't backtrack forward");
-    CurPtr = pos.getText().end();
-    NextToken = pos;
-    if (pos.isNot(tok::eof))
-      lexImpl();
+
+  /// \brief Lexer state can be saved/restored to/from objects of this class.
+  class State {
+    State(const char *CurPtr): CurPtr(CurPtr) {}
+    const char *CurPtr;
+    friend class Lexer;
+  };
+
+  /// \brief Returns the lexer state for the beginning of the given token.
+  /// After restoring the state, lexer will return this token and continue from
+  /// there.
+  State getStateForBeginnigOfToken(const Token &Tok) const {
+    const char *Ptr = Tok.getText().begin();
+    // Skip whitespace backwards until we hit a newline.  This is needed to
+    // correctly lex the token if it is at the beginning of the line.
+    while (Ptr >= BufferStart + 1) {
+      char C = Ptr[-1];
+      if (C == ' ' || C == '\t' || C == 0) {
+        Ptr--;
+        continue;
+      }
+      if (C == '\n' || C == '\r') {
+        Ptr--;
+        break;
+      }
+      break;
+    }
+    return State(Ptr);
+  }
+
+  /// \brief Restore the lexer state to a given one, that can be located either
+  /// before or after the current position.
+  void restoreState(State S) {
+    CurPtr = S.CurPtr;
+    lexImpl();
+  }
+
+  /// \brief Restore the lexer state to a given state that is located before
+  /// current position.
+  void backtrackToState(State S) {
+    assert(S.CurPtr <= CurPtr && "can't backtrack forward");
+    restoreState(S);
   }
 
   /// \brief Retrieve the source location that points just past the
