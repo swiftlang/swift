@@ -3897,10 +3897,11 @@ llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
 }
 
 static Address
-emitUnconditionalOpaqueDowncast(IRGenFunction &IGF,
-                                Address value,
-                                llvm::Value *srcMetadata,
-                                SILType destType) {
+emitOpaqueDowncast(IRGenFunction &IGF,
+                   Address value,
+                   llvm::Value *srcMetadata,
+                   SILType destType,
+                   CheckedCastMode mode) {
   llvm::Value *addr = IGF.Builder.CreateBitCast(value.getAddress(),
                                                 IGF.IGM.OpaquePtrTy);
 
@@ -3908,9 +3909,17 @@ emitUnconditionalOpaqueDowncast(IRGenFunction &IGF,
   llvm::Value *destMetadata = IGF.emitTypeMetadataRef(destType);
   destMetadata = IGF.Builder.CreateBitCast(destMetadata, IGF.IGM.Int8PtrTy);
   
-  auto *call
-    = IGF.Builder.CreateCall3(IGF.IGM.getDynamicCastIndirectUnconditionalFn(),
-                              addr, srcMetadata, destMetadata);
+  llvm::Value *castFn;
+  switch (mode) {
+  case CheckedCastMode::Unconditional:
+    castFn = IGF.IGM.getDynamicCastIndirectUnconditionalFn();
+    break;
+  case CheckedCastMode::Conditional:
+    castFn = IGF.IGM.getDynamicCastIndirectFn();
+    break;
+  }
+  
+  auto *call = IGF.Builder.CreateCall3(castFn, addr, srcMetadata, destMetadata);
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
   
@@ -3921,24 +3930,26 @@ emitUnconditionalOpaqueDowncast(IRGenFunction &IGF,
   return destTI.getAddressForPointer(ptr);
 }
 
-/// Emit a checked unconditional cast of an opaque archetype.
-Address irgen::emitUnconditionalOpaqueArchetypeDowncast(IRGenFunction &IGF,
-                                                        Address value,
-                                                        SILType srcType,
-                                                        SILType destType) {
+/// Emit a checked cast of an opaque archetype.
+Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
+                                           Address value,
+                                           SILType srcType,
+                                           SILType destType,
+                                           CheckedCastMode mode) {
   assert(srcType.is<ArchetypeType>());
   assert(!srcType.castTo<ArchetypeType>()->requiresClass());
   
   llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
-  return emitUnconditionalOpaqueDowncast(IGF, value, srcMetadata, destType);
+  return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }
 
 /// Emit a checked unconditional cast of an opaque existential container's
 /// contained value.
-Address irgen::emitUnconditionalOpaqueExistentialDowncast(IRGenFunction &IGF,
-                                                          Address container,
-                                                          SILType srcType,
-                                                          SILType destType) {
+Address irgen::emitOpaqueExistentialDowncast(IRGenFunction &IGF,
+                                             Address container,
+                                             SILType srcType,
+                                             SILType destType,
+                                             CheckedCastMode mode) {
   assert(srcType.isExistentialType());
   assert(!srcType.isClassExistentialType());
   
@@ -3949,5 +3960,5 @@ Address irgen::emitUnconditionalOpaqueExistentialDowncast(IRGenFunction &IGF,
   std::tie(value, srcMetadata)
     = emitOpaqueExistentialProjectionWithMetadata(IGF, container, srcType);
 
-  return emitUnconditionalOpaqueDowncast(IGF, value, srcMetadata, destType);
+  return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }

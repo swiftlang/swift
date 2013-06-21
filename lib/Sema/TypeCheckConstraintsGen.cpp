@@ -856,67 +856,21 @@ namespace {
     
     Type visitCoerceExpr(CoerceExpr *expr) {
       // FIXME: Could split the system here.
-      Type ty = expr->getTypeLoc().getType();
+      Type ty = expr->getCastTypeLoc().getType();
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), ty,
                        CS.getConstraintLocator(expr, { }));
       return ty;
     }
 
-    Type visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
+    Type visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr) {
       // FIXME: Open this type.
-      return expr->getTypeLoc().getType();
+      return expr->getCastTypeLoc().getType();
     }
 
-    Type visitUncheckedSuperToArchetypeExpr(
-            UncheckedSuperToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Type visitUncheckedArchetypeToArchetypeExpr(
-            UncheckedArchetypeToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Type visitUncheckedArchetypeToConcreteExpr(
-            UncheckedArchetypeToConcreteExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Type visitUncheckedExistentialToArchetypeExpr(
-            UncheckedExistentialToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Type visitUncheckedExistentialToConcreteExpr(
-            UncheckedExistentialToConcreteExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
-    Type visitIsSubtypeExpr(IsSubtypeExpr *expr) {
-      ASTContext &C = CS.getASTContext();
-
-      // The subexpression must be castable to the destination type.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }));
-      CS.addConstraint(ConstraintKind::EqualRvalue, tv,
-           expr->getSubExpr()->getType(),
-           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-
-      CS.addConstraint(ConstraintKind::Subtype,
-                       expr->getTypeLoc().getType(), tv);
-      
+    Type visitIsaExpr(IsaExpr *expr) {
       // The result is Bool.
-      auto &tc = CS.getTypeChecker();
-      UnqualifiedLookup boolLookup(C.getIdentifier("Bool"),
-                                   &tc.TU);
-      if (!boolLookup.isSuccess()) {
-        tc.diagnose(expr->getLoc(), diag::bool_type_broken);
-        return nullptr;
-      }
-      TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
-      
-      if (!tyDecl) {
-        tc.diagnose(expr->getLoc(), diag::bool_type_broken);
-        return nullptr;
-      }
-      
-      return tyDecl->getDeclaredType();
+      return CS.getTypeChecker().lookupBoolType();
     }
     
     Type visitAssignExpr(AssignExpr *expr) {
@@ -1036,10 +990,10 @@ namespace {
         return { false, expr };
       }
 
-      // For unchecked downcast expressions, we visit the subexpression
+      // For checked cast expressions, we visit the subexpression
       // separately.
-      if (auto unchecked = dyn_cast<UncheckedDowncastExpr>(expr)) {
-        auto type = CG.visitUncheckedDowncastExpr(unchecked);
+      if (auto unchecked = dyn_cast<CheckedCastExpr>(expr)) {
+        auto type = CG.visit(unchecked);
         expr->setType(type);
         return { false, expr };
       }

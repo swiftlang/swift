@@ -1291,7 +1291,7 @@ void IRGenSILFunction::visitSuperToArchetypeRefInst(
   llvm::Value *in = super.claimNext();
   Explosion out(CurExplosionLevel);
   llvm::Value *cast
-    = emitSuperToClassArchetypeConversion(in, i->getType());
+    = emitSuperToClassArchetypeConversion(in, i->getType(), i->getMode());
   out.add(cast);
   newLoweredExplosion(SILValue(i, 0), out);
 }
@@ -1300,7 +1300,7 @@ void IRGenSILFunction::visitDowncastArchetypeRefInst(
                                            swift::DowncastArchetypeRefInst *i) {
   Explosion archetype = getLoweredExplosion(i->getOperand());
   llvm::Value *fromValue = archetype.claimNext();
-  llvm::Value *toValue = emitUnconditionalDowncast(fromValue, i->getType());
+  llvm::Value *toValue = emitDowncast(fromValue, i->getType(), i->getMode());
   Explosion to(archetype.getKind());
   to.add(toValue);
   newLoweredExplosion(SILValue(i,0), to);
@@ -1313,7 +1313,7 @@ void IRGenSILFunction::visitDowncastExistentialRefInst(
     = emitClassExistentialProjection(*this, existential,
                                      i->getOperand().getType());
 
-  llvm::Value *toValue = emitUnconditionalDowncast(instance, i->getType());
+  llvm::Value *toValue = emitDowncast(instance, i->getType(), i->getMode());
   Explosion to(existential.getKind());
   to.add(toValue);
   newLoweredExplosion(SILValue(i,0), to);
@@ -1322,42 +1322,39 @@ void IRGenSILFunction::visitDowncastExistentialRefInst(
 void IRGenSILFunction::visitDowncastArchetypeAddrInst(
                                           swift::DowncastArchetypeAddrInst *i) {
   Address archetype = getLoweredAddress(i->getOperand());
-  Address cast = emitUnconditionalOpaqueArchetypeDowncast(*this, archetype,
-                                                      i->getOperand().getType(),
-                                                      i->getType());
+  Address cast = emitOpaqueArchetypeDowncast(*this, archetype,
+                                             i->getOperand().getType(),
+                                             i->getType(),
+                                             i->getMode());
   newLoweredAddress(SILValue(i,0), cast);
 }
 
 void IRGenSILFunction::visitProjectDowncastExistentialAddrInst(
                                  swift::ProjectDowncastExistentialAddrInst *i) {
   Address existential = getLoweredAddress(i->getOperand());
-  Address cast = emitUnconditionalOpaqueExistentialDowncast(*this, existential,
-                                                      i->getOperand().getType(),
-                                                      i->getType());
+  Address cast = emitOpaqueExistentialDowncast(*this, existential,
+                                               i->getOperand().getType(),
+                                               i->getType(),
+                                               i->getMode());
   newLoweredAddress(SILValue(i,0), cast);
 }
 
-void IRGenSILFunction::visitIsaInst(swift::IsaInst *i) {
-  // Emit the value we're testing.
-  Explosion from = getLoweredExplosion(i->getOperand());
-  llvm::Value *fromValue = from.claimNext();
-  fromValue = Builder.CreateBitCast(fromValue, IGM.Int8PtrTy);
-
-  // Emit the metadata of the type we're testing against.
-  CanType toType = i->getTestType().getSwiftRValueType();
-  Explosion metadata(ExplosionKind::Minimal);
-  emitMetaTypeRef(*this, toType, metadata);
-  llvm::Value *metadataValue = metadata.claimNext();
-  metadataValue = Builder.CreateBitCast(metadataValue, IGM.Int8PtrTy);
-  
-  // Perform a checked cast.
-  auto call = Builder.CreateCall2(IGM.getDynamicCastClassFn(),
-                                  fromValue, metadataValue);
-  call->setDoesNotThrow();
+void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
+  // Get the value we're testing, which may be an address or an instance
+  // pointer.
+  llvm::Value *val;
+  LoweredValue const &lv = getLoweredValue(i->getOperand());
+  if (lv.isAddress()) {
+    val = lv.getAddress().getAddress();
+  } else {
+    Explosion values = lv.getExplosion(*this);
+    val = values.claimNext();
+  }
   
   // Check that the result isn't null.
+  auto *valTy = cast<llvm::PointerType>(val->getType());
   llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                           call, llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+                                    val, llvm::ConstantPointerNull::get(valTy));
   
   Explosion out(CurExplosionLevel);
   out.add(result);
@@ -1383,9 +1380,7 @@ void IRGenSILFunction::visitDowncastInst(swift::DowncastInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(from.getKind());
   llvm::Value *fromValue = from.claimNext();
-  llvm::Value *castValue = emitUnconditionalDowncast(
-                                              fromValue,
-                                              i->getType());
+  llvm::Value *castValue = emitDowncast(fromValue, i->getType(), i->getMode());
   to.add(castValue);
   newLoweredExplosion(SILValue(i, 0), to);
 }

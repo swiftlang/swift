@@ -34,6 +34,7 @@ namespace swift {
   class ProtocolConformance;
   struct SILConstant;
   class SILType;
+  enum class CheckedCastMode : unsigned char;
 
 namespace irgen {
   class AbstractCallee;
@@ -173,18 +174,20 @@ namespace irgen {
                                                              Explosion &value,
                                                              CanType type);
 
-  /// Emit a checked unconditional cast of an opaque archetype.
-  Address emitUnconditionalOpaqueArchetypeDowncast(IRGenFunction &IGF,
-                                                   Address value,
-                                                   SILType srcType,
-                                                   SILType destType);
+  /// Emit a checked cast of an opaque archetype.
+  Address emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
+                                      Address value,
+                                      SILType srcType,
+                                      SILType destType,
+                                      CheckedCastMode mode);
   
-  /// Emit a checked unconditional cast of an opaque existential container's
+  /// Emit a checked cast of an opaque existential container's
   /// contained value.
-  Address emitUnconditionalOpaqueExistentialDowncast(IRGenFunction &IGF,
-                                                     Address value,
-                                                     SILType srcType,
-                                                     SILType destType);
+  Address emitOpaqueExistentialDowncast(IRGenFunction &IGF,
+                                        Address value,
+                                        SILType srcType,
+                                        SILType destType,
+                                        CheckedCastMode mode);
 } // end namespace irgen
 } // end namespace swift
 

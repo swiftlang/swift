@@ -187,6 +187,24 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   llvm_unreachable("Unhandled literal kind");
 }
 
+Type TypeChecker::lookupBoolType() {
+  return boolType.cache([&]{
+    UnqualifiedLookup boolLookup(Context.getIdentifier("Bool"), &TU);
+    if (!boolLookup.isSuccess()) {
+      diagnose(SourceLoc(), diag::bool_type_broken);
+      return Type();
+    }
+    TypeDecl *tyDecl = boolLookup.getSingleTypeResult();
+    
+    if (!tyDecl) {
+      diagnose(SourceLoc(), diag::bool_type_broken);
+      return Type();
+    }
+    
+    return tyDecl->getDeclaredType();
+  });
+}
+
 /// \brief Check for circular inheritance of protocols.
 ///
 /// \param Path The circular path through the protocol inheritance hierarchy,

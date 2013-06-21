@@ -539,7 +539,7 @@ public:
   void visitProjectDowncastExistentialAddrInst(
                                          ProjectDowncastExistentialAddrInst *i);
 
-  void visitIsaInst(IsaInst *i);
+  void visitIsNonnullInst(IsNonnullInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);

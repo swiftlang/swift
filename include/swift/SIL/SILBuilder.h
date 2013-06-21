@@ -241,11 +241,6 @@ public:
                     UpcastInst(Loc, Op, Ty));
   }
   
-  DowncastInst *createDowncast(SILLocation Loc, SILValue Op, SILType Ty) {
-    return insert(new (F.getModule())
-                    DowncastInst(Loc, Op, Ty));
-  }
-  
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
                                                SILType Ty) {
     return insert(new (F.getModule())
@@ -306,44 +301,55 @@ public:
                     ArchetypeRefToSuperInst(Loc, Archetype, BaseTy));
   }
   
+  DowncastInst *createDowncast(SILLocation Loc, SILValue Op, SILType Ty,
+                               CheckedCastMode Mode) {
+    return insert(new (F.getModule())
+                  DowncastInst(Loc, Op, Ty, Mode));
+  }
+  
   SuperToArchetypeRefInst *createSuperToArchetypeRef(SILLocation Loc,
                                                      SILValue Archetype,
-                                                     SILType BaseTy) {
+                                                     SILType BaseTy,
+                                                     CheckedCastMode Mode) {
     return insert(new (F.getModule())
-                    SuperToArchetypeRefInst(Loc, Archetype, BaseTy));
+                    SuperToArchetypeRefInst(Loc, Archetype, BaseTy, Mode));
   }
   
   DowncastArchetypeAddrInst *createDowncastArchetypeAddr(SILLocation Loc,
                                                          SILValue Archetype,
-                                                         SILType Ty) {
+                                                         SILType Ty,
+                                                         CheckedCastMode Mode) {
     return insert(new (F.getModule())
-                    DowncastArchetypeAddrInst(Loc, Archetype, Ty));
+                    DowncastArchetypeAddrInst(Loc, Archetype, Ty, Mode));
   }
   DowncastArchetypeRefInst *createDowncastArchetypeRef(SILLocation Loc,
                                                        SILValue Archetype,
-                                                       SILType Ty) {
+                                                       SILType Ty,
+                                                       CheckedCastMode Mode) {
     return insert(new (F.getModule())
-                    DowncastArchetypeRefInst(Loc, Archetype, Ty));
+                    DowncastArchetypeRefInst(Loc, Archetype, Ty, Mode));
   }
-  ProjectDowncastExistentialAddrInst *createProjectDowncastExistentialAddr(SILLocation Loc,
+  ProjectDowncastExistentialAddrInst *createProjectDowncastExistentialAddr(
+                                                         SILLocation Loc,
                                                          SILValue Existential,
-                                                         SILType Ty) {
+                                                         SILType Ty,
+                                                         CheckedCastMode Mode) {
     return insert(new (F.getModule())
-                  ProjectDowncastExistentialAddrInst(Loc, Existential, Ty));
+              ProjectDowncastExistentialAddrInst(Loc, Existential, Ty, Mode));
   }
   DowncastExistentialRefInst *createDowncastExistentialRef(SILLocation Loc,
                                                        SILValue Existential,
-                                                       SILType Ty) {
+                                                       SILType Ty,
+                                                       CheckedCastMode Mode) {
     return insert(new (F.getModule())
-                  DowncastExistentialRefInst(Loc, Existential, Ty));
+                  DowncastExistentialRefInst(Loc, Existential, Ty, Mode));
   }
   
-  IsaInst *createIsa(SILLocation Loc,
-                     SILValue Operand,
-                     SILType TestType,
-                     SILType ResultType) {
+  IsNonnullInst *createIsNonnull(SILLocation Loc,
+                           SILValue Operand,
+                           SILType ResultType) {
     return insert(new (F.getModule())
-                    IsaInst(Loc, Operand, TestType, ResultType));
+                    IsNonnullInst(Loc, Operand, ResultType));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,

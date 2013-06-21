@@ -531,18 +531,9 @@ public:
                                            SGFContext C);
   RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
   RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
-  RValue visitUncheckedDowncastExpr(UncheckedDowncastExpr *E, SGFContext C);
-  RValue visitUncheckedSuperToArchetypeExpr(
-                                UncheckedSuperToArchetypeExpr *E, SGFContext C);
-  RValue visitUncheckedArchetypeToArchetypeExpr(
-                                UncheckedArchetypeToArchetypeExpr *E, SGFContext C);
-  RValue visitUncheckedArchetypeToConcreteExpr(
-                                UncheckedArchetypeToConcreteExpr *E, SGFContext C);
-  RValue visitUncheckedExistentialToArchetypeExpr(
-                                UncheckedExistentialToArchetypeExpr *E, SGFContext C);
-  RValue visitUncheckedExistentialToConcreteExpr(
-                                UncheckedExistentialToConcreteExpr *E, SGFContext C);
-  RValue visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C);
+  RValue visitUnconditionalCheckedCastExpr(
+                                 UnconditionalCheckedCastExpr *E, SGFContext C);
+  RValue visitIsaExpr(IsaExpr *E, SGFContext C);
   RValue visitParenExpr(ParenExpr *E, SGFContext C);
   RValue visitTupleExpr(TupleExpr *E, SGFContext C);
   RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);

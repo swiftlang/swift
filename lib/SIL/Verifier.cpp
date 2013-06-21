@@ -894,19 +894,11 @@ public:
             "downcast must convert to a class type");
   }
   
-  void checkIsaInst(IsaInst *II) {
+  void checkIsNonnullInst(IsNonnullInst *II) {
     require(II->getOperand().getType().getSwiftType()
-              ->getClassOrBoundGenericClass(),
-            "isa operand must be a class type");
-    CanType testTy = II->getTestType().getSwiftRValueType();
-    if (auto *archetype = dyn_cast<ArchetypeType>(testTy))
-      require((bool)archetype->getSuperclass(),
-              "isa must test against a class type or base-class-constrained "
-              "archetype");
-    else
-      require(testTy->getClassOrBoundGenericClass(),
-              "isa must test against a class type or base-class-constrained "
-              "archetype");
+              ->mayHaveSuperclass()
+            || II->getOperand().getType().isAddress(),
+            "isa operand must be a class type or address");
   }
   
   void checkAddressToPointerInst(AddressToPointerInst *AI) {

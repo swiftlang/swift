@@ -701,20 +701,11 @@ public:
   UpcastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-
-/// DowncastInst - Perform an unchecked conversion of a class instance to a
-/// subclass type.
-class DowncastInst
-  : public UnaryInstructionBase<ValueKind::DowncastInst, ConversionInst>
-{
-public:
-  DowncastInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
   
 /// AddressToPointerInst - Convert a SIL address to a Builtin.RawPointer value.
 class AddressToPointerInst
-  : public UnaryInstructionBase<ValueKind::AddressToPointerInst, ConversionInst>
+  : public UnaryInstructionBase<ValueKind::AddressToPointerInst,
+                                ConversionInst>
 {
 public:
   AddressToPointerInst(SILLocation Loc, SILValue Operand, SILType Ty)
@@ -811,29 +802,54 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// Test that an address or reference type is not null.
+class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
+public:
+  IsNonnullInst(SILLocation Loc, SILValue Operand, SILType BoolTy)
+    : UnaryInstructionBase(Loc, Operand, BoolTy) {}
+};
+
+/// Discriminates checked cast modes.
+enum class CheckedCastMode : unsigned char {
+  // Abort if the cast fails.
+  Unconditional,
+  // Return null if the cast fails.
+  Conditional,
+};
+  
+/// CheckedConversionInst - Abstract base class for checked conversions.
+class CheckedConversionInst : public ConversionInst {
+  CheckedCastMode Mode;
+public:
+  CheckedConversionInst(ValueKind Kind, SILLocation Loc, SILType Ty,
+                        CheckedCastMode Mode)
+    : ConversionInst(Kind, Loc, Ty), Mode(Mode) {}
+  
+  CheckedCastMode getMode() const { return Mode; }
+};
+  
+/// DowncastInst - Perform an unchecked conversion of a class instance to a
+/// subclass type.
+class DowncastInst
+  : public UnaryInstructionBase<ValueKind::DowncastInst, CheckedConversionInst>
+{
+public:
+  DowncastInst(SILLocation Loc, SILValue Operand, SILType Ty,
+               CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
+};
+
 /// SuperToArchetypeRefInst - Given a value of a class type, initializes a
 /// class archetype with a base class constraint to contain a reference to
 /// the value.
 class SuperToArchetypeRefInst
   : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,
-                                ConversionInst>
+                                CheckedConversionInst>
 {
 public:
-  SuperToArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
-/// IsaInst - Perform a runtime check of a class instance's type.
-class IsaInst : public UnaryInstructionBase<ValueKind::IsaInst> {
-  SILType TestType;
-public:
-  IsaInst(SILLocation Loc,
-          SILValue Operand,
-          SILType TestTy,
-          SILType BoolTy)
-    : UnaryInstructionBase(Loc, Operand, BoolTy), TestType(TestTy) {}
-  
-  SILType getTestType() const { return TestType; }
+  SuperToArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
+                          CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
 
 /// Given the address of an opaque archetype value, dynamically checks the concrete
@@ -841,11 +857,12 @@ public:
 /// successful or crashes if not.
 class DowncastArchetypeAddrInst
   : public UnaryInstructionBase<ValueKind::DowncastArchetypeAddrInst,
-                                ConversionInst>
+                                CheckedConversionInst>
 {
 public:
-  DowncastArchetypeAddrInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
+  DowncastArchetypeAddrInst(SILLocation Loc, SILValue Operand, SILType Ty,
+                            CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
 /// Given a value of class archetype type, dynamically checks the concrete
@@ -853,11 +870,12 @@ public:
 /// successful or crashes if not.
 class DowncastArchetypeRefInst
   : public UnaryInstructionBase<ValueKind::DowncastArchetypeRefInst,
-                                ConversionInst>
+                                CheckedConversionInst>
 {
 public:
-  DowncastArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
+  DowncastArchetypeRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
+                           CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
 /// Given the address of an opaque existential container, dynamically checks the
@@ -865,11 +883,13 @@ public:
 /// the contained value if successful or crashes if not.
 class ProjectDowncastExistentialAddrInst
   : public UnaryInstructionBase<ValueKind::ProjectDowncastExistentialAddrInst,
-                                ConversionInst>
+                                CheckedConversionInst>
 {
 public:
-  ProjectDowncastExistentialAddrInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
+  ProjectDowncastExistentialAddrInst(SILLocation Loc, SILValue Operand,
+                                     SILType Ty,
+                                     CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
 /// Given a value of class archetype type, dynamically checks the concrete
@@ -877,11 +897,12 @@ public:
 /// successful or crashes if not.
 class DowncastExistentialRefInst
   : public UnaryInstructionBase<ValueKind::DowncastExistentialRefInst,
-                                ConversionInst>
+                                CheckedConversionInst>
 {
 public:
-  DowncastExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
+  DowncastExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty,
+                             CheckedCastMode Mode)
+    : UnaryInstructionBase(Loc, Operand, Ty, Mode) {}
 };
   
 /// StructInst - Represents a constructed tuple.

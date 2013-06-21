@@ -51,6 +51,7 @@ namespace swift {
   class TranslationUnit;
   class ValueDecl;
   class VarDecl;
+  enum class CheckedCastMode : unsigned char;
   
 namespace Mangle {
   enum class ExplosionKind : unsigned;
@@ -181,12 +182,14 @@ public:
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
   llvm::Value *emitSuperToClassArchetypeConversion(llvm::Value *super,
-                                                          SILType destType);
+                                                   SILType destType,
+                                                   CheckedCastMode mode);
 
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
-  llvm::Value *emitUnconditionalDowncast(llvm::Value *from,
-                                         SILType toType);
+  llvm::Value *emitDowncast(llvm::Value *from,
+                            SILType toType,
+                            CheckedCastMode mode);
   
 
 //--- Declaration emission -----------------------------------------------------

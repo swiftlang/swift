@@ -1457,25 +1457,22 @@ namespace {
       expr->setSubExpr(subExpr);
       return expr;
     }
-
-    Expr *visitUncheckedDowncastExpr(UncheckedDowncastExpr *expr) {
+    
+    /// Type-check a checked cast expression.
+    CheckedCastKind checkCheckedCastExpr(CheckedCastExpr *expr) {
       auto &tc = cs.getTypeChecker();
-      auto &C = cs.getASTContext();
 
       // Simplify the type we're converting to.
-      Type toType = simplifyType(expr->getType());
-      expr->setType(toType);
+      Type toType = expr->getCastTypeLoc().getType();
 
       // Type-check the subexpression in isolation.
       Expr *sub = expr->getSubExpr();
       if (tc.typeCheckExpression(sub, cs.DC)) {
-        // FIXME: Mark as error.
-        return nullptr;
+        return CheckedCastKind::Unresolved;
       }
       sub = tc.coerceToRValue(sub);
       if (!sub) {
-        // FIXME: Mark as error.
-        return nullptr;
+        return CheckedCastKind::Unresolved;
       }
       expr->setSubExpr(sub);
 
@@ -1488,24 +1485,9 @@ namespace {
       
       // If the from/to types are equivalent or implicitly convertible,
       // this should have been a coercion expression (b as A) rather than a
-      // cast (a as! B). Complain.
+      // checked cast (a as! B). Complain.
       if (fromType->isEqual(toType) || tc.isConvertibleTo(fromType, toType)) {
-        // Only complain if the cast was explicitly generated.
-        // FIXME: This leniency is here for the Clang module importer,
-        // which doesn't necessarily know whether it needs to force the
-        // cast or not. instancetype should eliminate the need for it.
-        if (!expr->isImplicit()) {
-          tc.diagnose(expr->getLoc(), diag::downcast_to_supertype,
-                      origFromType, toType)
-          .highlight(sub->getSourceRange())
-          .highlight(expr->getTypeLoc().getSourceRange())
-          .fixItRemove(SourceRange(expr->getBangLoc()));
-        }
-        
-        Expr *coerce = new (C) CoerceExpr(sub, expr->getLoc(),
-                                          expr->getTypeLoc());
-        coerce->setType(expr->getType());
-        return coerce;
+        return CheckedCastKind::InvalidCoercible;
       }
       
       // We can't downcast to an existential.
@@ -1513,45 +1495,31 @@ namespace {
         tc.diagnose(expr->getLoc(), diag::downcast_to_existential,
                     origFromType, toType)
           .highlight(sub->getSourceRange())
-          .highlight(expr->getTypeLoc().getSourceRange());
-        return nullptr;
+          .highlight(expr->getCastTypeLoc().getSourceRange());
+        return CheckedCastKind::Unresolved;
       }
       
       // A downcast can:
       //   - convert an archetype to a (different) archetype type.
       if (fromArchetype && toArchetype) {
-        auto *atoa = new (C) UncheckedArchetypeToArchetypeExpr(sub,
-                                                           expr->getLoc(),
-                                                           expr->getBangLoc(),
-                                                           expr->getTypeLoc());
-        atoa->setType(expr->getType());
-        return atoa;
+        return CheckedCastKind::ArchetypeToArchetype;
       }
 
       //   - convert from an existential to an archetype or conforming concrete
       //     type.
       if (fromExistential) {
-        Expr *etox;
         if (toArchetype) {
-          etox = new (C) UncheckedExistentialToArchetypeExpr(sub,
-                                                           expr->getLoc(),
-                                                           expr->getBangLoc(),
-                                                           expr->getTypeLoc());
+          return CheckedCastKind::ExistentialToArchetype;
         } else if (tc.isConvertibleTo(toType, fromType)) {
-          etox = new (C) UncheckedExistentialToConcreteExpr(sub,
-                                                            expr->getLoc(),
-                                                            expr->getBangLoc(),
-                                                            expr->getTypeLoc());
+          return CheckedCastKind::ExistentialToConcrete;
         } else {
           tc.diagnose(expr->getLoc(),
                       diag::downcast_from_existential_to_unrelated,
                       origFromType, toType)
             .highlight(sub->getSourceRange())
-            .highlight(expr->getTypeLoc().getSourceRange());
-          return nullptr;
+            .highlight(expr->getCastTypeLoc().getSourceRange());
+          return CheckedCastKind::Unresolved;
         }
-        etox->setType(expr->getType());
-        return etox;
       }
       
       //   - convert an archetype to a concrete type fulfilling its constraints.
@@ -1561,15 +1529,10 @@ namespace {
                       diag::downcast_from_archetype_to_unrelated,
                       origFromType, toType)
             .highlight(sub->getSourceRange())
-            .highlight(expr->getTypeLoc().getSourceRange());
-          return nullptr;
+            .highlight(expr->getCastTypeLoc().getSourceRange());
+          return CheckedCastKind::Unresolved;
         }
-        auto *atoc = new (C) UncheckedArchetypeToConcreteExpr(sub,
-                                                            expr->getLoc(),
-                                                            expr->getBangLoc(),
-                                                            expr->getTypeLoc());
-        atoc->setType(expr->getType());
-        return atoc;
+        return CheckedCastKind::ArchetypeToConcrete;
       }
       
       //   - convert from a superclass to an archetype.
@@ -1578,16 +1541,12 @@ namespace {
 
         // Coerce to the supertype of the archetype.
         if (tc.convertToType(sub, toSuperType, cs.DC))
-          return nullptr;
+          return CheckedCastKind::Unresolved;
         
-        // Construct the supertype-to-archetype cast.
-        auto *stoa = new (C) UncheckedSuperToArchetypeExpr(sub,
-                                                           expr->getLoc(),
-                                                           expr->getBangLoc(),
-                                                           expr->getTypeLoc());
-        stoa->setType(expr->getType());
-        return stoa;
+        return CheckedCastKind::SuperToArchetype;
       }
+
+      // The remaining case is a class downcast.
 
       assert(!fromArchetype && "archetypes should have been handled above");
       assert(!toArchetype && "archetypes should have been handled above");
@@ -1599,43 +1558,81 @@ namespace {
         tc.diagnose(expr->getLoc(), diag::downcast_to_unrelated,
                     origFromType, toType)
           .highlight(sub->getSourceRange())
-          .highlight(expr->getTypeLoc().getSourceRange());
-        return nullptr;
+          .highlight(expr->getCastTypeLoc().getSourceRange());
+        return CheckedCastKind::Unresolved;
       }
 
-      // Okay, we're done.
+      return CheckedCastKind::Downcast;
+    }
+    
+    Expr *visitIsaExpr(IsaExpr *expr) {
+      CheckedCastKind castKind = checkCheckedCastExpr(expr);
+      switch (castKind) {
+      // Invalid type check.
+      case CheckedCastKind::Unresolved:
+        return nullptr;
+      // Check is trivially true.
+      case CheckedCastKind::InvalidCoercible:
+        cs.getTypeChecker().diagnose(expr->getLoc(), diag::isa_is_always_true,
+                                     expr->getSubExpr()->getType(),
+                                     expr->getCastTypeLoc().getType());
+        break;
+          
+      // Valid checks.
+      case CheckedCastKind::Downcast:
+      case CheckedCastKind::SuperToArchetype:
+      case CheckedCastKind::ArchetypeToArchetype:
+      case CheckedCastKind::ArchetypeToConcrete:
+      case CheckedCastKind::ExistentialToArchetype:
+      case CheckedCastKind::ExistentialToConcrete:
+        expr->setCastKind(castKind);
+        break;
+      }
       return expr;
     }
     
-    Expr *visitUncheckedSuperToArchetypeExpr(
-            UncheckedSuperToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Expr *visitUncheckedArchetypeToArchetypeExpr(
-            UncheckedArchetypeToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Expr *visitUncheckedArchetypeToConcreteExpr(
-            UncheckedArchetypeToConcreteExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Expr *visitUncheckedExistentialToArchetypeExpr(
-            UncheckedExistentialToArchetypeExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    Expr *visitUncheckedExistentialToConcreteExpr(
-            UncheckedExistentialToConcreteExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-    
-    Expr *visitIsSubtypeExpr(IsSubtypeExpr *expr) {
-      expr->setType(simplifyType(expr->getType()));
-      
-      auto &tc = cs.getTypeChecker();
-      Expr *sub = tc.coerceToRValue(expr->getSubExpr());
-      if (!sub) return nullptr;
-      expr->setSubExpr(sub);
+    Expr *visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *expr){
+      Type toType = expr->getCastTypeLoc().getType();
+      expr->setType(toType);
 
+      CheckedCastKind castKind = checkCheckedCastExpr(expr);
+      switch (castKind) {
+      /// Invalid cast.
+      case CheckedCastKind::Unresolved:
+        return nullptr;
+      /// Cast trivially succeeds. Emit a fixit and reduce to a coercion.
+      case CheckedCastKind::InvalidCoercible: {
+        // Only complain if the cast was explicitly generated.
+        // FIXME: This leniency is here for the Clang module importer,
+        // which doesn't necessarily know whether it needs to force the
+        // cast or not. instancetype should eliminate the need for it.
+        if (!expr->isImplicit()) {
+          cs.getTypeChecker().diagnose(expr->getLoc(),
+                                       diag::downcast_to_supertype,
+                                       expr->getSubExpr()->getType(),
+                                       expr->getCastTypeLoc().getType())
+            .highlight(expr->getSubExpr()->getSourceRange())
+            .highlight(expr->getCastTypeLoc().getSourceRange())
+            .fixItRemove(SourceRange(expr->getBangLoc()));
+        }
+        
+        Expr *coerce = new (cs.getASTContext()) CoerceExpr(expr->getSubExpr(),
+                                                        expr->getLoc(),
+                                                        expr->getCastTypeLoc());
+        coerce->setType(expr->getType());
+        return coerce;
+      }
+
+      // Valid casts.
+      case CheckedCastKind::Downcast:
+      case CheckedCastKind::SuperToArchetype:
+      case CheckedCastKind::ArchetypeToArchetype:
+      case CheckedCastKind::ArchetypeToConcrete:
+      case CheckedCastKind::ExistentialToArchetype:
+      case CheckedCastKind::ExistentialToConcrete:
+        expr->setCastKind(castKind);
+        break;
+      }
       return expr;
     }
     
@@ -2498,10 +2495,10 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         return { false, expr };
       }
 
-      // For unchecked downcast expressions, the subexpression is checked
+      // For checked cast expressions, the subexpression is checked
       // separately.
-      if (auto unchecked = dyn_cast<UncheckedDowncastExpr>(expr)) {
-        return { false, Rewriter.visitUncheckedDowncastExpr(unchecked) };
+      if (auto unchecked = dyn_cast<CheckedCastExpr>(expr)) {
+        return { false, Rewriter.visit(unchecked) };
       }
 
       // For a default-value expression, do nothing.

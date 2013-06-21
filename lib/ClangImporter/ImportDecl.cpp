@@ -1210,11 +1210,13 @@ namespace {
 
         // Cast the result of the alloc call to the (metatype) 'this'.
         // FIXME: instancetype should make this unnecessary.
-        initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
+        auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
                                              initExpr,
                                              SourceLoc(),
                                              SourceLoc(),
                                              TypeLoc::withoutLoc(thisTy));
+        cast->setCastKind(CheckedCastKind::Downcast);
+        initExpr = cast;
 
         result->setAllocThisExpr(initExpr);
       }
@@ -1281,11 +1283,13 @@ namespace {
 
       // Cast the result of the alloc call to the (metatype) 'this'.
       // FIXME: instancetype should make this unnecessary.
-      initExpr = new (Impl.SwiftContext) UncheckedDowncastExpr(
+      auto cast = new (Impl.SwiftContext) UnconditionalCheckedCastExpr(
                                            initExpr,
                                            SourceLoc(),
                                            SourceLoc(),
                                            TypeLoc::withoutLoc(thisTy));
+      cast->setCastKind(CheckedCastKind::Downcast);
+      initExpr = cast;
 
       // Form the assignment statement.
       auto refThis
@@ -2581,10 +2585,15 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                     TypeLoc::withoutLoc(type));
     break;
 
-  case ConstantConvertKind::Downcast:
-    expr = new (context) UncheckedDowncastExpr(expr, SourceLoc(), SourceLoc(),
-                                               TypeLoc::withoutLoc(type));
+  case ConstantConvertKind::Downcast: {
+    auto cast = new (context) UnconditionalCheckedCastExpr(expr,
+                                                     SourceLoc(),
+                                                     SourceLoc(),
+                                                     TypeLoc::withoutLoc(type));
+    cast->setCastKind(CheckedCastKind::Downcast);
+    expr = cast;
     break;
+  }
   }
 
   // Create the return statement.

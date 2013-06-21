@@ -267,6 +267,8 @@ private:
   /// implicitly defined.
   llvm::DenseSet<StructDecl *> structsNeedingImplicitDefaultConstructor;
 
+  Optional<Type> boolType;
+  
 public:
   /// \brief Determine whether the given type can be default-initialized.
   ///
@@ -449,6 +451,9 @@ public:
   /// \returns true if any members were found, false otherwise.
   bool lookupConstructors(Type type,SmallVectorImpl<ValueDecl *> &constructors);
 
+  /// \brief Look up the Bool type in the standard library.
+  Type lookupBoolType();
+  
   /// @}
 
   /// \name Overload resolution

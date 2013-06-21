@@ -964,6 +964,9 @@ ERROR(cannot_construct_type,sema_tcc,none,
 ERROR(downcast_to_supertype,sema_tcc,none,
       "downcast from %0 to supertype %1 is a coercion; remove the '!'", 
       (Type, Type))
+ERROR(isa_is_always_true,sema_tcc,none,
+      "'is' test is always true",
+      (Type, Type))
 ERROR(downcast_to_unrelated,sema_tcc,none,
       "downcast from %0 to unrelated type %1", (Type, Type))
 ERROR(downcast_to_existential,sema_tcc,none,

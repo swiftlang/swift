@@ -486,58 +486,6 @@ RValue SILGenFunction::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
   return visit(E->getSubExpr(), C);
 }
 
-RValue SILGenFunction::visitUncheckedDowncastExpr(UncheckedDowncastExpr *E,
-                                                  SGFContext C) {
-  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(*this);
-  SILValue converted = B.createDowncast(E, original.getValue(),
-                                     getLoweredLoadableType(E->getType()));
-  return RValue(*this, ManagedValue(converted, original.getCleanup()));
-}
-
-RValue SILGenFunction::visitUncheckedSuperToArchetypeExpr(
-                                              UncheckedSuperToArchetypeExpr *E,
-                                              SGFContext C) {
-  ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
-  // Initialize it with a SuperToArchetypeInst.
-  SILValue archetype = B.createSuperToArchetypeRef(E, base.getValue(),
-                                         getLoweredLoadableType(E->getType()));
-  // Keep the base-class-typed cleanup so we use a concrete release.
-  return RValue(*this, ManagedValue(archetype, base.getCleanup()));
-}
-
-static RValue emitArchetypeDowncast(SILGenFunction &gen,
-                                    ExplicitCastExpr *E, SGFContext C) {
-  ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
-  
-  // Cast to the concrete type and replace the cleanup with a new one on the
-  // concrete value, which should be more specific and more efficient than the
-  // one on the original archetype.
-  SILValue cast;
-  if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->requiresClass()) {
-    cast = gen.B.createDowncastArchetypeRef(E, base.forward(gen),
-                                    gen.getLoweredLoadableType(E->getType()));
-  } else {
-    SILType castTy = gen.getLoweredType(E->getType());
-    cast = gen.B.createDowncastArchetypeAddr(E, base.forward(gen),
-                                             castTy.getAddressType());
-    if (castTy.isLoadable(gen.F.getModule()))
-      cast = gen.B.createLoad(E, cast);
-  }
-  return RValue(gen, gen.emitManagedRValueWithCleanup(cast));
-}
-
-RValue SILGenFunction::visitUncheckedArchetypeToArchetypeExpr(
-                                  UncheckedArchetypeToArchetypeExpr *E,
-                                  SGFContext C) {
-  return emitArchetypeDowncast(*this, E, C);
-}
-
-RValue SILGenFunction::visitUncheckedArchetypeToConcreteExpr(
-                                   UncheckedArchetypeToConcreteExpr *E,
-                                   SGFContext C) {
-  return emitArchetypeDowncast(*this, E, C);
-}
-
 namespace {
   class CleanupUsedExistentialContainer : public Cleanup {
     SILValue existential;
@@ -551,50 +499,94 @@ namespace {
   };
 }
 
-static RValue emitExistentialDowncast(SILGenFunction &gen,
-                                      ExplicitCastExpr *E, SGFContext C) {
-  ManagedValue base = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
+/// \brief Emit the cast instruction appropriate to the kind of checked cast.
+///
+/// \param gen          The SILGenFunction.
+/// \param E            The CheckedCastExpr to emit.
+/// \param mode         Whether to emit an unconditional or conditional cast.
+/// \param useCastValue If true, the cleanup on the original value will be
+///                     disabled, and the callee will be expected to take
+///                     ownership of the returned value. If false, the original
+///                     value's cleanup is left intact, and an unowned reference
+///                     or address is returned.
+static SILValue emitCheckedCast(SILGenFunction &gen,
+                                CheckedCastExpr *E,
+                                CheckedCastMode mode,
+                                bool useCastValue) {
+  ManagedValue originalMV = gen.visit(E->getSubExpr()).getAsSingleValue(gen);
+  SILValue original = useCastValue
+    ? originalMV.forward(gen)
+    : originalMV.getValue();
   
-  SILValue cast;
-  if (E->getSubExpr()->getType()->isClassExistentialType()) {
-    // Cast to the concrete type and replace the cleanup with a new one on the
-    // archetype, which may be more specific.
-    cast = gen.B.createDowncastExistentialRef(E, base.forward(gen),
-                                     gen.getLoweredLoadableType(E->getType()));
-  } else {
-    // Project the concrete value address out of the container.
-    SILType castTy = gen.getLoweredType(E->getType());
-    cast = gen.B.createProjectDowncastExistentialAddr(E, base.forward(gen),
-                                                      castTy.getAddressType());
-    if (castTy.isLoadable(gen.F.getModule()))
-      cast = gen.B.createLoad(E, cast);
-    
-    // We'll pass on ownership of the contained value, but we still need to
-    // deallocate the existential buffer when we're done.
-    gen.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(base.getValue());
+  Type castTy = E->getCastTypeLoc().getType();
+  
+  switch (E->getCastKind()) {
+  case CheckedCastKind::Unresolved:
+  case CheckedCastKind::InvalidCoercible:
+    llvm_unreachable("invalid checked cast?!");
+      
+  case CheckedCastKind::Downcast:
+    return gen.B.createDowncast(E, original,
+                                gen.getLoweredLoadableType(castTy), mode);
+  case CheckedCastKind::SuperToArchetype:
+    return gen.B.createSuperToArchetypeRef(E, original,
+                                gen.getLoweredLoadableType(castTy), mode);
+  case CheckedCastKind::ArchetypeToArchetype:
+  case CheckedCastKind::ArchetypeToConcrete:
+    if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->requiresClass()) {
+      return gen.B.createDowncastArchetypeRef(E, original,
+                                gen.getLoweredLoadableType(castTy), mode);
+    } else {
+      SILType loweredTy = gen.getLoweredType(castTy);
+      SILValue cast = gen.B.createDowncastArchetypeAddr(E, original,
+                                             loweredTy.getAddressType(), mode);
+      if (useCastValue && loweredTy.isLoadable(gen.F.getModule()))
+        cast = gen.B.createLoad(E, cast);
+      return cast;
+    }
+  
+  case CheckedCastKind::ExistentialToArchetype:
+  case CheckedCastKind::ExistentialToConcrete:
+    if (E->getSubExpr()->getType()->isClassExistentialType()) {
+      return gen.B.createDowncastExistentialRef(E, original,
+                                gen.getLoweredLoadableType(castTy), mode);
+    } else {
+      // Project the concrete value address out of the container.
+      SILType loweredTy = gen.getLoweredType(castTy);
+      SILValue cast = gen.B.createProjectDowncastExistentialAddr(E, original,
+                                                 loweredTy.getAddressType(), mode);
+      if (useCastValue) {
+        if (loweredTy.isLoadable(gen.F.getModule()))
+          cast = gen.B.createLoad(E, cast);
+      
+        // We'll pass on ownership of the contained value, but we still need to
+        // deallocate the existential buffer when we're done.
+        gen.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(original);
+      }
+
+      return cast;
+    }
   }
-  return RValue(gen, gen.emitManagedRValueWithCleanup(cast));
 }
 
-RValue SILGenFunction::visitUncheckedExistentialToArchetypeExpr(
-                                   UncheckedExistentialToArchetypeExpr *E,
-                                   SGFContext C) {
-  return emitExistentialDowncast(*this, E, C);
+RValue SILGenFunction::visitUnconditionalCheckedCastExpr(
+                                               UnconditionalCheckedCastExpr *E,
+                                               SGFContext C) {
+  // Disable the original cleanup because the cast-to type is more specific and
+  // should have a more efficient cleanup.
+  SILValue cast = emitCheckedCast(*this, E, CheckedCastMode::Unconditional,
+                                  /*useCastValue*/ true);
+  return RValue(*this, emitManagedRValueWithCleanup(cast));
 }
 
-RValue SILGenFunction::visitUncheckedExistentialToConcreteExpr(
-                                   UncheckedExistentialToConcreteExpr *E,
-                                   SGFContext C) {
-  return emitExistentialDowncast(*this, E, C);
-}
-
-RValue SILGenFunction::visitIsSubtypeExpr(IsSubtypeExpr *E, SGFContext C)
-{
-  ManagedValue base = visit(E->getSubExpr()).getAsSingleValue(*this);
-  SILValue res = B.createIsa(E, base.getValue(),
-                             getLoweredType(E->getTypeLoc().getType()),
-                             getLoweredLoadableType(E->getType()));
-  return RValue(*this, emitManagedRValueWithCleanup(res));
+RValue SILGenFunction::visitIsaExpr(IsaExpr *E, SGFContext C) {
+  // Cast the value using a conditional cast.
+  SILValue cast = emitCheckedCast(*this, E, CheckedCastMode::Conditional,
+                                  /*useCastValue*/ false);
+  // Check the result.
+  SILValue is = B.createIsNonnull(E, cast,
+                                  getLoweredLoadableType(E->getType()));
+  return RValue(*this, emitManagedRValueWithCleanup(is));
 }
 
 RValue SILGenFunction::visitParenExpr(ParenExpr *E, SGFContext C) {
@@ -1805,7 +1797,8 @@ RValue SILGenFunction::visitRebindThisInConstructorExpr(
            "delegating ctor type mismatch for non-reference type?!");
     CleanupsDepth newThisCleanup = newThis.getCleanup();
     SILValue newThisValue = B.createDowncast(E, newThis.getValue(),
-                              getLoweredLoadableType(E->getThis()->getType()));
+                              getLoweredLoadableType(E->getThis()->getType()),
+                              CheckedCastMode::Unconditional);
     newThis = ManagedValue(newThisValue, newThisCleanup);
   }
   

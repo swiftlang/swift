@@ -130,7 +130,7 @@ bool Expr::isImplicit() const {
     return true;
   }
 
-  if (auto downcast = dyn_cast<UncheckedDowncastExpr>(this)) {
+  if (auto downcast = dyn_cast<ExplicitCastExpr>(this)) {
     return downcast->getLoc().isInvalid() &&
            downcast->getSubExpr()->isImplicit();
   }
@@ -863,7 +863,7 @@ public:
   
   void printExplicitCastExpr(ExplicitCastExpr *E, const char *name) {
     printCommon(E, name) << ' ';
-    E->getTypeLoc().getType()->print(OS);
+    E->getCastTypeLoc().getType()->print(OS);
     OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
@@ -872,23 +872,11 @@ public:
   void visitCoerceExpr(CoerceExpr *E) {
     printExplicitCastExpr(E, "coerce_expr");
   }
-  void visitUncheckedDowncastExpr(UncheckedDowncastExpr *E) {
-    printExplicitCastExpr(E, "unchecked_downcast_expr");
+  void visitUnconditionalCheckedCastExpr(UnconditionalCheckedCastExpr *E) {
+    printExplicitCastExpr(E, "unconditional_checked_cast_expr");
   }
-  void visitUncheckedSuperToArchetypeExpr(UncheckedSuperToArchetypeExpr *E) {
-    printExplicitCastExpr(E, "unchecked_super_to_archetype_expr");
-  }
-  void visitUncheckedArchetypeToArchetypeExpr(UncheckedArchetypeToArchetypeExpr *E) {
-    printExplicitCastExpr(E, "unchecked_archetype_to_archetype_expr");
-  }
-  void visitUncheckedArchetypeToConcreteExpr(UncheckedArchetypeToConcreteExpr *E) {
-    printExplicitCastExpr(E, "unchecked_archetype_to_concrete_expr");
-  }
-  void visitUncheckedExistentialToArchetypeExpr(UncheckedExistentialToArchetypeExpr *E) {
-    printExplicitCastExpr(E, "unchecked_existential_to_archetype_expr");
-  }
-  void visitUncheckedExistentialToConcreteExpr(UncheckedExistentialToConcreteExpr *E) {
-    printExplicitCastExpr(E, "unchecked_existential_to_concrete_expr");
+  void visitIsaExpr(IsaExpr *E) {
+    printExplicitCastExpr(E, "is_subtype_expr");
   }
   void visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E) {
     printCommon(E, "rebind_this_in_constructor_expr") << '\n';
@@ -902,13 +890,6 @@ public:
     printRec(E->getThenExpr());
     OS << '\n';
     printRec(E->getElseExpr());
-    OS << ')';
-  }
-  void visitIsSubtypeExpr(IsSubtypeExpr *E) {
-    printCommon(E, "is_subtype_expr") << ' ';
-    E->getTypeLoc().getType()->print(OS);
-    OS << '\n';
-    printRec(E->getSubExpr());
     OS << ')';
   }
   void visitDefaultValueExpr(DefaultValueExpr *E) {

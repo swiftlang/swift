@@ -146,12 +146,8 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     return InfixData(90, Associativity::Right);
-  } else if (auto *is = dyn_cast<IsSubtypeExpr>(E)) {
-    // 'is' has fixed precedence.
-    assert(!is->isFolded() && "already folded 'is' expr in sequence?!");
-    return InfixData(95, Associativity::None);
   } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
-    // 'as' casts have fixed precedence.
+    // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     return InfixData(95, Associativity::None);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -198,16 +194,8 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     return assign;
   }
   
-  if (auto *is = dyn_cast<IsSubtypeExpr>(Op)) {
-    // Resolve the 'is' expression.
-    assert(!is->isFolded() && "already folded 'is' expr in sequence?!");
-    assert(RHS == is && "'is' with non-type RHS?!");
-    is->setSubExpr(LHS);
-    return is;
-  }
-  
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
-    // Resolve the 'as' expression.
+    // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);

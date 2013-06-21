@@ -2891,13 +2891,7 @@ namespace {
 
       // Type check the type parameters in cast expressions.
       if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
-        if (TC.validateType(cast->getTypeLoc()))
-          return nullptr;
-        return expr;
-      }
-      
-      if (auto is = dyn_cast<IsSubtypeExpr>(expr)) {
-        if (TC.validateType(is->getTypeLoc()))
+        if (TC.validateType(cast->getCastTypeLoc()))
           return nullptr;
         return expr;
       }

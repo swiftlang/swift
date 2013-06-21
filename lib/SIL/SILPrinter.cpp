@@ -370,6 +370,21 @@ public:
                            llvm::StringRef name) {
     OS << name << " " << getID(operand) << ", " << CI->getType();
   }
+
+  void printConversionInst(CheckedConversionInst *CI,
+                           SILValue operand,
+                           llvm::StringRef name) {
+    OS << name;
+    switch (CI->getMode()) {
+    case CheckedCastMode::Conditional:
+      OS << " conditional ";
+      break;
+    case CheckedCastMode::Unconditional:
+      OS << " unconditional ";
+      break;
+    }
+    OS << getID(operand) << ", " << CI->getType();
+  }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printConversionInst(CI, CI->getOperand(), "convert_function");
@@ -429,8 +444,8 @@ public:
     printConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
   }
 
-  void visitIsaInst(IsaInst *I) {
-    OS << "isa " << getID(I->getOperand()) << ", " << I->getTestType();
+  void visitIsNonnullInst(IsNonnullInst *I) {
+    OS << "is_nonnull " << getIDAndType(I->getOperand());
   }
 
   void visitStructInst(StructInst *SI) {

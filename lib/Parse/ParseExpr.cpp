@@ -92,8 +92,8 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::PostfixUnary:
   case ExprKind::PrefixUnary:
   case ExprKind::Sequence:
-  case ExprKind::IsSubtype:
-  case ExprKind::UncheckedDowncast:
+  case ExprKind::Isa:
+  case ExprKind::UnconditionalCheckedCast:
   case ExprKind::Assign:
     return false;
 
@@ -156,11 +156,6 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::Specialize:
   case ExprKind::TupleElement:
   case ExprKind::TupleShuffle:
-  case ExprKind::UncheckedSuperToArchetype:
-  case ExprKind::UncheckedArchetypeToArchetype:
-  case ExprKind::UncheckedArchetypeToConcrete:
-  case ExprKind::UncheckedExistentialToArchetype:
-  case ExprKind::UncheckedExistentialToConcrete:
   case ExprKind::ZeroValue:
     llvm_unreachable("Not a parsed expression");
 
@@ -256,7 +251,7 @@ NullablePtr<Expr> Parser::parseExprIs() {
   if (parseType(type, diag::expected_type_after_is))
     return nullptr;
   
-  return new (Context) IsSubtypeExpr(isLoc, type);
+  return new (Context) IsaExpr(isLoc, type);
 }
 
 /// parseExprAs
@@ -276,7 +271,7 @@ NullablePtr<Expr> Parser::parseExprAs() {
     return nullptr;
   
   return bangLoc.isValid()
-    ? (Expr*) new (Context) UncheckedDowncastExpr(asLoc, bangLoc, type)
+    ? (Expr*) new (Context) UnconditionalCheckedCastExpr(asLoc, bangLoc, type)
     : (Expr*) new (Context) CoerceExpr(asLoc, type);
 }
 

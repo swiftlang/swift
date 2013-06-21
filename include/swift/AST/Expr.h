@@ -2142,23 +2142,30 @@ public:
   }
 };
 
-/// \brief Represents an explicit cast, 'a as T', 'a as? T', or 'a as! T',
-/// where "T" is a type, and "a" is the expression that will be converted to
-/// the type.
+/// \brief Represents an explicit cast, 'a as T', 'a as? T', 'a as! T', or
+/// 'a is T', where "T" is a type, and "a" is the expression that will be
+/// converted to the type.
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
   SourceLoc AsLoc;
-  TypeLoc Ty;
+  TypeLoc CastTy;
 
 protected:
-  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc type)
-    : Expr(kind, type.getType()), SubExpr(sub), AsLoc(AsLoc), Ty(type)
+  ExplicitCastExpr(ExprKind kind, Expr *sub, SourceLoc AsLoc, TypeLoc castTy,
+                   Type resultTy)
+    : Expr(kind), SubExpr(sub), AsLoc(AsLoc), CastTy(castTy)
   {}
 
 public:
   Expr *getSubExpr() const { return SubExpr; }
-  TypeLoc &getTypeLoc() { return Ty; }
-  TypeLoc getTypeLoc() const { return Ty; }
+  
+  /// Get the type syntactically spelled in the cast. For some forms of checked
+  /// cast this is different from the result type of the expression.
+  TypeLoc &getCastTypeLoc() { return CastTy; }
+
+  /// Get the type syntactically spelled in the cast. For some forms of checked
+  /// cast this is different from the result type of the expression.
+  TypeLoc getCastTypeLoc() const { return CastTy; }
 
   void setSubExpr(Expr *E) { SubExpr = E; }
 
@@ -2166,8 +2173,8 @@ public:
 
   SourceRange getSourceRange() const {
     return SubExpr
-      ? SourceRange{SubExpr->getStartLoc(), Ty.getSourceRange().End}
-      : SourceRange{AsLoc, Ty.getSourceRange().End};
+      ? SourceRange{SubExpr->getStartLoc(), CastTy.getSourceRange().End}
+      : SourceRange{AsLoc, CastTy.getSourceRange().End};
   }
   
   /// True if the node has been processed by SequenceExpr folding.
@@ -2188,7 +2195,8 @@ public:
 class CoerceExpr : public ExplicitCastExpr {
 public:
   CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type) { }
+    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type,
+                       type.getType()) { }
   
   CoerceExpr(SourceLoc asLoc, TypeLoc type)
     : CoerceExpr(nullptr, asLoc, type)
@@ -2198,169 +2206,103 @@ public:
     return E->getKind() == ExprKind::Coerce;
   }
 };
+  
+/// Discriminates the different kinds of checked cast supported.
+enum class CheckedCastKind {
+  /// The kind has not been determined yet.
+  Unresolved,
+  /// The requested conversion is implicit and should be represented as a
+  /// coercion.
+  InvalidCoercible,
+  
+  /// Valid resolved kinds start here.
+  First_Resolved,
+  
+  /// A cast from a class to one of its subclasses.
+  Downcast = First_Resolved,
+  /// A cast from a class to a type parameter constrained by that class as a
+  /// base class.
+  SuperToArchetype,
+  /// A cast from a type parameter to another type parameter.
+  ArchetypeToArchetype,
+  /// A cast from a type parameter to a concrete type.
+  ArchetypeToConcrete,
+  /// A cast from an existential type to a type parameter.
+  ExistentialToArchetype,
+  /// A cast from an existential type to a concrete type.
+  ExistentialToConcrete,
+};
+  
+/// \brief Abstract base class for checked casts 'as!' and 'is'. These represent
+/// casts that can dynamically fail.
+class CheckedCastExpr : public ExplicitCastExpr {
+  CheckedCastKind CastKind;
+public:
+  CheckedCastExpr(ExprKind kind,
+                  Expr *sub, SourceLoc asLoc, TypeLoc castTy, Type resultTy)
+    : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy),
+      CastKind(CheckedCastKind::Unresolved)
+  {}
+  
+  /// Return the semantic kind of cast performed.
+  CheckedCastKind getCastKind() const { return CastKind; }
+  void setCastKind(CheckedCastKind kind) { CastKind = kind; }
+  
+  /// True if the cast has been type-checked and its kind has been set.
+  bool isResolved() const {
+    return CastKind >= CheckedCastKind::First_Resolved;
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_CheckedCastExpr
+        && E->getKind() <= ExprKind::Last_CheckedCastExpr;
+  }
+};
 
-/// \brief Represents an explicit unchecked downcast, converting from a
-/// supertype to its subtype or crashing if the cast is not possible,
+/// \brief Represents an explicit unconditional checked cast, which converts
+/// from a type to some subtype or aborts if the cast is not possible,
 /// spelled 'a as! T'.
 ///
-/// FIXME: At present, only class downcasting is supported.
-/// FIXME: All downcasts are currently unchecked, which is horrible.
-class UncheckedDowncastExpr : public ExplicitCastExpr {
+/// FIXME: All downcasts are currently unconditional, which is horrible.
+class UnconditionalCheckedCastExpr : public CheckedCastExpr {
   SourceLoc BangLoc;
   
 public:
-  UncheckedDowncastExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
-                        TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedDowncast, sub, asLoc, type),
+  UnconditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
+                               TypeLoc type)
+    : CheckedCastExpr(ExprKind::UnconditionalCheckedCast,
+                      sub, asLoc, type, type.getType()),
       BangLoc(bangLoc) { }
   
-  UncheckedDowncastExpr(SourceLoc asLoc, SourceLoc bangLoc, TypeLoc type)
-    : UncheckedDowncastExpr(nullptr, asLoc, bangLoc, type)
+  UnconditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc bangLoc, TypeLoc type)
+    : UnconditionalCheckedCastExpr(nullptr, asLoc, bangLoc, type)
   {}
 
   SourceLoc getBangLoc() const { return BangLoc; }
-    
+
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedDowncast;
+    return E->getKind() == ExprKind::UnconditionalCheckedCast;
   }
 };
 
-/// \brief Represents an explicit unchecked downcast, converting from a
-/// superclass of an archetype to the archetype iself or crashing if the cast
-/// is not possible, spelled 'a as! T' for an archetype type T.
-///
-/// FIXME: All downcasts are currently unchecked, which is horrible.
-class UncheckedSuperToArchetypeExpr : public ExplicitCastExpr {
-  SourceLoc BangLoc;
-  
-public:
-  UncheckedSuperToArchetypeExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
-                                TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedSuperToArchetype, sub, asLoc, type),
-      BangLoc(bangLoc) { }
-  
-  SourceLoc getBangLoc() const { return BangLoc; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedSuperToArchetype;
-  }
-};
-
-/// \brief Represents an explicit unchecked cast from an archetype value to a
-/// different archetype, spelled 't as! U' for an archetype value t and
-/// archetype type U.
-class UncheckedArchetypeToArchetypeExpr : public ExplicitCastExpr {
-  SourceLoc BangLoc;
-  
-public:
-  UncheckedArchetypeToArchetypeExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
-                                    TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedArchetypeToArchetype, sub, asLoc, type),
-      BangLoc(bangLoc) { }
-  
-  SourceLoc getBangLoc() const { return BangLoc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedArchetypeToArchetype;
-  }
-};
-  
-/// \brief Represents an explicit unchecked cast from an archetype value to a
-/// concrete type, spelled 't as! A' for an archetype value t
-/// and concrete type 'A'.
-class UncheckedArchetypeToConcreteExpr : public ExplicitCastExpr {
-  SourceLoc BangLoc;
-
-public:
-  UncheckedArchetypeToConcreteExpr(Expr *sub, SourceLoc asLoc, SourceLoc bangLoc,
-                                   TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedArchetypeToConcrete, sub, asLoc, type),
-      BangLoc(bangLoc) { }
-  
-  SourceLoc getBangLoc() const { return BangLoc; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedArchetypeToConcrete;
-  }
-};
-
-/// \brief Represents an explicit unchecked cast from an existential type value
-/// to an archetype, spelled 'p as! T' for a protocol value p
-/// and archetype type 'T'.
-class UncheckedExistentialToArchetypeExpr : public ExplicitCastExpr {
-  SourceLoc BangLoc;
-
-public:
-  UncheckedExistentialToArchetypeExpr(Expr *sub, SourceLoc asLoc,
-                                      SourceLoc bangLoc,
-                                      TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedExistentialToArchetype,
-                       sub, asLoc, type),
-      BangLoc(bangLoc) { }
-  
-  SourceLoc getBangLoc() const { return BangLoc; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedExistentialToArchetype;
-  }
-};
-  
-/// \brief Represents an explicit unchecked cast from an existential type value
-/// to a concrete type, spelled 'p as! A' for a protocol value p
-/// and conforming type 'A'.
-class UncheckedExistentialToConcreteExpr : public ExplicitCastExpr {
-  SourceLoc BangLoc;
-
-public:
-  UncheckedExistentialToConcreteExpr(Expr *sub, SourceLoc asLoc,
-                                     SourceLoc bangLoc,
-                                     TypeLoc type)
-    : ExplicitCastExpr(ExprKind::UncheckedExistentialToConcrete,
-                       sub, asLoc, type),
-      BangLoc(bangLoc) { }
-  
-  SourceLoc getBangLoc() const { return BangLoc; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UncheckedExistentialToConcrete;
-  }
-};
-  
 /// \brief Represents a runtime type check query, 'a is T', where 'T' is a type
-/// and 'a' is a value of a supertype of T. Evaluates to true if 'a' is of the
+/// and 'a' is a value of some related type. Evaluates to true if 'a' is of the
 /// type and 'a as! T' would succeed, false otherwise.
-class IsSubtypeExpr : public Expr {
-  Expr *SubExpr;
-  TypeLoc Type;
-  SourceLoc IsLoc;
-
+///
+/// FIXME: We should support type queries with a runtime metatype value too.
+class IsaExpr : public CheckedCastExpr {
 public:
-  IsSubtypeExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : Expr(ExprKind::IsSubtype), SubExpr(sub), Type(type), IsLoc(isLoc)
+  IsaExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
+    : CheckedCastExpr(ExprKind::Isa,
+                      sub, isLoc, type, Type())
   {}
   
-  IsSubtypeExpr(SourceLoc isLoc, TypeLoc type)
-    : IsSubtypeExpr(nullptr, isLoc, type)
+  IsaExpr(SourceLoc isLoc, TypeLoc type)
+    : IsaExpr(nullptr, isLoc, type)
   {}
-  
-  Expr *getSubExpr() const { return SubExpr; }
-  TypeLoc &getTypeLoc() { return Type; }
-  TypeLoc getTypeLoc() const { return Type; }
-  
-  void setSubExpr(Expr *E) { SubExpr = E; }
-  
-  SourceLoc getLoc() const { return IsLoc; }
-  SourceRange getSourceRange() const {
-    return SubExpr
-      ? SourceRange{SubExpr->getStartLoc(), Type.getSourceRange().End}
-      : SourceRange{IsLoc, Type.getSourceRange().End};
-  }
-  
-  /// True if the node has been processed by SequenceExpr folding.
-  bool isFolded() const { return SubExpr; }
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::IsSubtype;
+    return E->getKind() == ExprKind::Isa;
   }
 };
   

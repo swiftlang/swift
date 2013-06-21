@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -684,7 +685,8 @@ void irgen::reemitAsSubstituted(IRGenFunction &IGF,
 
 llvm::Value *
 IRGenFunction::emitSuperToClassArchetypeConversion(llvm::Value *super,
-                                                          SILType destType) {
+                                                   SILType destType,
+                                                   CheckedCastMode mode) {
   assert(destType.is<ArchetypeType>() && "expected archetype type");
   assert(destType.castTo<ArchetypeType>()->requiresClass()
          && "expected class archetype type");
@@ -698,9 +700,18 @@ IRGenFunction::emitSuperToClassArchetypeConversion(llvm::Value *super,
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
 
   // Call the (unconditional) dynamic cast.
+  llvm::Value *castFn;
+  switch (mode) {
+  case CheckedCastMode::Unconditional:
+    castFn = IGM.getDynamicCastUnconditionalFn();
+    break;
+  case CheckedCastMode::Conditional:
+    castFn = IGM.getDynamicCastFn();
+    break;
+  }
+  
   auto call
-    = Builder.CreateCall2(IGM.getDynamicCastUnconditionalFn(),
-                          super, metadataRef);
+    = Builder.CreateCall2(castFn, super, metadataRef);
   
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();

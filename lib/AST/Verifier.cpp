@@ -508,10 +508,29 @@ namespace {
     }
 
     void verifyChecked(CoerceExpr *E) {
-      Type Ty = E->getTypeLoc().getType();
+      Type Ty = E->getCastTypeLoc().getType();
       if (!Ty->isEqual(E->getType()) ||
           !Ty->isEqual(E->getSubExpr()->getType())) {
         Out << "CoerceExpr types don't match\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(UnconditionalCheckedCastExpr *E) {
+      Type Ty = E->getCastTypeLoc().getType();
+      if (!Ty->isEqual(E->getType())) {
+        Out << "UnconditionalCheckedCast types don't match\n";
+        abort();
+      }
+      if (!E->isResolved()) {
+        Out << "UnconditionalCheckedCast kind not resolved\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(CheckedCastExpr *E) {
+      if (!E->isResolved()) {
+        Out << "CheckedCast kind not resolved\n";
         abort();
       }
     }
