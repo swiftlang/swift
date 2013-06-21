@@ -303,18 +303,19 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *DRI) {
-    OS << "function_ref " << DRI->getType() << ", ";
+    OS << "function_ref ";
     DRI->getFunction()->printName(OS);
+    OS << " : " << DRI->getType();
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref " << BFI->getType()
-       << ", @" << BFI->getFunction()->getName();
+    OS << "builtin_function_ref @" << BFI->getFunction()->getName()
+       << " : " << BFI->getType();
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
-    OS << "global_addr " << GAI->getType() << ", @";
-    OS << GAI->getGlobal()->getName();
+    OS << "global_addr @" << GAI->getGlobal()->getName()
+       << " : " << GAI->getType();
   }
 
   void visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
