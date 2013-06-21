@@ -73,9 +73,8 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 }
 
 
-Module *SourceLoader::loadModule(
-    SourceLoc importLoc,
-    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+Module *SourceLoader::loadModule(SourceLoc importLoc,
+                             ArrayRef<std::pair<Identifier, SourceLoc>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -102,10 +101,15 @@ Module *SourceLoader::loadModule(
 
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();
-  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
-                                             TranslationUnit::Library);
 
+  auto Kind = moduleID.first.str() == "swift"
+    ? TranslationUnit::StandardLibrary : TranslationUnit::Library;
+
+  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx, Kind);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
+
+  performAutoImport(importTU);
+
   parseIntoTranslationUnit(importTU, bufferID);
 
   // We have to do name binding on it to ensure that types are fully resolved.

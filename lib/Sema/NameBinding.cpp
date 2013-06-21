@@ -67,7 +67,6 @@ namespace {
     }
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
-    void addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result);
 
     /// resolveIdentifierType - Perform name binding for a IdentifierType,
     /// resolving it or diagnosing the error as appropriate and return true on
@@ -143,7 +142,7 @@ void NameBinder::addImport(ImportDecl *ID,
     return;
   }
   
-  Result.push_back(std::make_pair(Path.slice(1), M));
+  Result.push_back(ImportedModule(Path.slice(1), M));
 
   // If the module we loaded is a translation unit that imports a Clang
   // module with the same name, add that Clang module to our own set of imports.
@@ -161,19 +160,29 @@ void NameBinder::addImport(ImportDecl *ID,
         if (clangMod->Name != Path[0].first)
           continue;
 
-        Result.push_back(std::make_pair(Path.slice(1), clangMod));
+        Result.push_back(ImportedModule(Path.slice(1), clangMod));
         break;
       }
     }
   }
 }
 
-void NameBinder::
-addStandardLibraryImport(SmallVectorImpl<ImportedModule> &Result) {
-  Identifier SwiftID = Context.getIdentifier("swift");
-  Module *M = getModule(std::make_pair(SwiftID, TU->Decls[0]->getStartLoc()));
-  if (M == 0) return;
-  Result.push_back(std::make_pair(Module::AccessPathTy(), M));
+/// performAutoImport - When a translation unit is first set up, this handles
+/// setting up any auto imports of the standard library.
+void swift::performAutoImport(TranslationUnit *TU) {
+  // If we're building the standard library, import the magic Builtin module,
+  // otherwise, import the standard library.
+  Module *M;
+  if (TU->Kind == TranslationUnit::StandardLibrary)
+    M = TU->Ctx.TheBuiltinModule;
+  else
+    M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
+                                         SourceLoc()));
+
+  SmallVector<ImportedModule, 1> ImportedModules;
+  ImportedModules.push_back({Module::AccessPathTy(), M});
+
+  TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
 }
 
 /// resolveIdentifierType - Perform name binding for a IdentifierType,
@@ -205,7 +214,7 @@ bool NameBinder::resolveIdentifierTypeImpl(IdentifierType *DNT) {
     }
 
     if (Globals.Results.empty()) {
-      diagnose(Loc, Components.size() == 1 ? 
+      diagnose(Loc, Components.size() == 1 ?
                  diag::use_undeclared_type : diag::unknown_name_in_type, Name)
         .highlight(SourceRange(Loc, Components.back().Loc));
       return true;
@@ -626,27 +635,6 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       TU->Decls.push_back(import);
       Binder.addImport(import, ImportedModules);
     }
-  }
-
-  // Add the standard library import.
-  if (TU->ShouldAutoImportStandardLibrary) {
-    // FIXME: The semantics here are sort of strange if an import statement is
-    // after the first "chunk" in the main module.
-    //
-    // FIXME: The current model is that if a module doesn't explicitly import
-    // Builtin or swift, we implicitly import swift.  This isn't really ideal.
-    for (ImportedModule M : ImportedModules)
-      if (M.second->Name.str() == "swift" ||
-          M.second->Name.str() == "Builtin") {
-        TU->ShouldAutoImportStandardLibrary = false;
-        break;
-      }
-
-    if (TU->ShouldAutoImportStandardLibrary)
-      Binder.addStandardLibraryImport(ImportedModules);
-
-    // Only do this once.
-    TU->ShouldAutoImportStandardLibrary = false;
   }
 
   // FIXME: This algorithm has quadratic memory usage.  (In practice,

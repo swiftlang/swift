@@ -38,10 +38,12 @@ enum class DeclRefKind {
   /// A reference to an identifier as a binary operator, e.g. '+' in 'a+b'.
   BinaryOperator,
 
-  /// A reference to an identifier as a postfix unary operator, e.g. '++' in 'a++'.
+  /// A reference to an identifier as a postfix unary operator, e.g. '++' in
+  /// 'a++'.
   PostfixOperator,
 
-  /// A reference to an identifier as a prefix unary operator, e.g. '--' in '--a'.
+  /// A reference to an identifier as a prefix unary operator, e.g. '--' in
+  /// '--a'.
   PrefixOperator
 };
   

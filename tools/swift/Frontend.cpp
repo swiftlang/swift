@@ -76,8 +76,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   Context.LoadedModules[ID.str()] = TU;
 
   // If we're in SIL mode, don't auto import any libraries.
-  if (SIL)
-    TU->ShouldAutoImportStandardLibrary = false;
+  if (!SIL)
+    performAutoImport(TU);
 
   unsigned CurTUElem = 0;
   for (auto &BufferID : BufferIDs) {
