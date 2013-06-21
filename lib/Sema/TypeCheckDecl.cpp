@@ -500,9 +500,33 @@ public:
     if (IsSecondPass)
       return;
     
-    // The protocol requires ObjC interop if the protocol is [objc]. Protocols
-    // do *not* implicitly inherit [objc] from refined protocols.
-    PD->setIsObjC(PD->getAttrs().isObjC());
+    // If the protocol is [objc], it may only refine other [objc] protocols.
+    // FIXME: Revisit this restriction.
+    if (PD->getAttrs().isObjC()) {
+      bool isObjC = true;
+      
+      SmallVector<ProtocolDecl*, 2> inheritedProtocols;
+      for (auto inherited : PD->getInherited()) {
+        if (!inherited.getType()->isExistentialType(inheritedProtocols))
+          continue;
+        
+        for (auto proto : inheritedProtocols) {
+          if (!proto->getAttrs().isObjC()) {
+            TC.diagnose(PD->getLoc(),
+                        diag::objc_protocol_inherits_non_objc_protocol,
+                        PD->getDeclaredType(), proto->getDeclaredType());
+            TC.diagnose(proto->getLoc(),
+                        diag::protocol_here,
+                        proto->getName());
+            isObjC = false;
+          }
+        }
+        
+        inheritedProtocols.clear();
+      }
+      
+      PD->setIsObjC(isObjC);
+    }
 
     // Fix the 'This' associated type.
     TypeAliasDecl *thisDecl = nullptr;

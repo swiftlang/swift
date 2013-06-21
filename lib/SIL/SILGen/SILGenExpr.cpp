@@ -532,6 +532,7 @@ static SILValue emitCheckedCast(SILGenFunction &gen,
     return gen.B.createSuperToArchetypeRef(E, original,
                                 gen.getLoweredLoadableType(castTy), mode);
   case CheckedCastKind::ArchetypeToArchetype:
+    // In the archetype-to-archetype case, we have to 
   case CheckedCastKind::ArchetypeToConcrete:
     if (E->getSubExpr()->getType()->castTo<ArchetypeType>()->requiresClass()) {
       return gen.B.createDowncastArchetypeRef(E, original,

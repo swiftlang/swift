@@ -1079,6 +1079,8 @@ NOTE(protocol_here,sema_tcd,none,
      "protocol %0 declared here", (Identifier))
 ERROR(protocol_composition_not_protocol,sema_tcd,none, 
       "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
+ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
+      "[objc] protocol %0 cannot refine non-[objc] protocol %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,sema_tcd,none,
       "type %0 constrained to non-protocol type %1", (Type, Type))
