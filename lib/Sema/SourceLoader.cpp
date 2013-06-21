@@ -102,10 +102,8 @@ Module *SourceLoader::loadModule(
 
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();
-  TranslationUnit *importTU = new (Ctx) TranslationUnit(moduleID.first, comp,
-                                                        Ctx,
-                                                        /*IsMainModule*/false,
-                                                        /*IsReplModule*/false);
+  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
+                                             TranslationUnit::Library);
 
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
   parseIntoTranslationUnit(importTU, bufferID);

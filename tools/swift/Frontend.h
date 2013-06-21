@@ -16,22 +16,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Module.h"
 
 namespace llvm {
   class MemoryBuffer;
 }
 
 namespace swift {
-  class ASTContext;
-  class TranslationUnit;
   class REPLContext;
   class SILModule;
-  
+
   TranslationUnit *buildSingleTranslationUnit(ASTContext &Context,
                                               StringRef OutputName,
                                               ArrayRef<unsigned>BufferIDs,
                                               bool ParseOnly,
-                                              bool IsMainModule,
+                                              TranslationUnit::TU_Kind Kind,
                                               SILModule *SIL);
 
   bool appendToREPLTranslationUnit(TranslationUnit *TU,

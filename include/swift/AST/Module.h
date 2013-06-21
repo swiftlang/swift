@@ -173,7 +173,8 @@ private:
   ArrayRef<ImportedModule> ImportedModules;
 
 public:
-  enum {
+  enum TU_Kind {
+    StandardLibrary,
     Library,
     Main,
     Repl,
@@ -202,15 +203,8 @@ public:
   /// when there are decls in a module.  This doesn't happen for SIL mode.
   bool ShouldAutoImportStandardLibrary = true;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C,
-                  bool IsMainModule, bool IsReplModule)
-    : Module(DeclContextKind::TranslationUnit, Name, Comp, C) {
-    if (IsReplModule)
-      Kind = Repl;
-    else if (IsMainModule)
-      Kind = Main;
-    else
-      Kind = Library;
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TU_Kind Kind)
+    : Module(DeclContextKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
   ArrayRef<TupleTypeAndContext> getTypesWithDefaultValues() const {

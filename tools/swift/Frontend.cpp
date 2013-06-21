@@ -38,7 +38,7 @@ using namespace swift;
 
 static Identifier getModuleIdentifier(StringRef OutputName,
                                       ASTContext &Context,
-                                      bool IsMainModule) {
+                                      TranslationUnit::TU_Kind moduleKind) {
   StringRef moduleName = OutputName;
 
   // As a special case, recognize <stdin>.
@@ -50,7 +50,7 @@ static Identifier getModuleIdentifier(StringRef OutputName,
 
   // Complain about non-identifier characters in the module name.
   if (!Lexer::isIdentifier(moduleName)) {
-    if (IsMainModule) {
+    if (moduleKind == TranslationUnit::Main) {
       moduleName = "main";
     } else {
       SourceLoc Loc;
@@ -68,13 +68,11 @@ TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
                                   StringRef OutputName,
                                   ArrayRef<unsigned> BufferIDs,
-                                  bool ParseOnly, bool IsMainModule,
+                                  bool ParseOnly, TranslationUnit::TU_Kind Kind,
                                   SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
-  Identifier ID = getModuleIdentifier(OutputName, Context, IsMainModule);
-  TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context,
-                                                      IsMainModule,
-                                                      /*IsReplModule=*/false);
+  Identifier ID = getModuleIdentifier(OutputName, Context, Kind);
+  TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context, Kind);
   Context.LoadedModules[ID.str()] = TU;
 
   // If we're in SIL mode, don't auto import any libraries.

@@ -94,10 +94,10 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
 
 static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
                       ArrayRef<StringRef> inputPaths) {
+  // FIXME: The kind of the TU should be read from the serialized file.
   Component *comp = new (ctx.Allocate<Component>(1)) Component();
   TranslationUnit *TU = new (ctx) TranslationUnit(moduleID.first, comp, ctx,
-                                                  /*IsMainModule=*/false,
-                                                  /*IsReplModule=*/false);
+                                                  TranslationUnit::Library);
 
   ctx.LoadedModules[moduleID.first.str()] = TU;
 
