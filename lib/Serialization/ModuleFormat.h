@@ -165,6 +165,7 @@ namespace decls_block {
     TUPLE_TYPE_ELT,
     IDENTIFIER_TYPE,
     FUNCTION_TYPE,
+    METATYPE_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -230,6 +231,11 @@ namespace decls_block {
     BCFixed<1>  // block-compatible?
   >;
 
+  using MetaTypeTypeLayout = BCRecordLayout<
+    METATYPE_TYPE,
+    TypeIDField  // instance type
+  >;
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
@@ -252,6 +258,7 @@ namespace decls_block {
     CONSTRUCTOR_DECL,
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
+    TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
   >;
 

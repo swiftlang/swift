@@ -346,6 +346,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, TUPLE_TYPE_ELT);
   RECORD(decls_block, IDENTIFIER_TYPE);
   RECORD(decls_block, FUNCTION_TYPE);
+  RECORD(decls_block, METATYPE_TYPE);
   
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -634,11 +635,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (ctor->isGeneric())
       return false;
 
-    // FIXME: Handle arguments.
-    if (ctor->getArgumentType()->getCanonicalType() !=
-        D->getASTContext().TheEmptyTupleType->getCanonicalType())
-      return false;
-
     // FIXME: Handle allocating constructors.
     // FIXME: Does this ever occur in Swift modules? If it's only used by the
     // importer, perhaps we don't need to worry about it here.
@@ -651,7 +647,11 @@ bool Serializer::writeDecl(const Decl *D) {
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(cast<NominalTypeDecl>(DC)),
-                                  ctor->isImplicit(), addDeclRef(implicitThis));
+                                  ctor->isImplicit(),
+                                  addTypeRef(ctor->getType()),
+                                  addDeclRef(implicitThis));
+
+    writePattern(ctor->getArguments());
 
     return true;
   }
@@ -765,8 +765,14 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Protocol:
     return false;
 
-  case TypeKind::MetaType:
-    return false;
+  case TypeKind::MetaType: {
+    auto metatypeTy = cast<MetaTypeType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[MetaTypeTypeLayout::Code];
+    MetaTypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addTypeRef(metatypeTy->getInstanceType()));
+    return true;
+  }
 
   case TypeKind::Module:
     return false;
@@ -828,6 +834,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TupleTypeEltLayout>();
     registerDeclTypeAbbr<IdentifierTypeLayout>();
     registerDeclTypeAbbr<FunctionTypeLayout>();
+    registerDeclTypeAbbr<MetaTypeTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();

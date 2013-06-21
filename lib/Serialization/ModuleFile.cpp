@@ -331,27 +331,24 @@ Decl *ModuleFile::getDecl(DeclID DID) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit;
+    TypeID signatureID;
     DeclID implicitThisID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
-                                               implicitThisID);
+                                               signatureID, implicitThisID);
+    Pattern *args = maybeReadPattern();
+    assert(args && "missing arguments for constructor");
+    
     auto thisDecl = cast<VarDecl>(getDecl(implicitThisID));
     auto parent = cast<NominalTypeDecl>(getDeclContext(parentID));
 
-    auto emptyArgs = TuplePattern::create(ctx, SourceLoc(), {}, SourceLoc());
     auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
-                                          SourceLoc(), emptyArgs, thisDecl,
+                                          SourceLoc(), args, thisDecl,
                                           /*generic params=*/nullptr,
                                           parent);
     declOrOffset = ctor;
 
-    // FIXME: Actually serialize the type instead of reconstructing it here.
-    ctor->setType(FunctionType::get(MetaTypeType::get(thisDecl->getType(),
-                                                      ctx),
-                                    FunctionType::get(ctx.TheEmptyTupleType,
-                                                      thisDecl->getType(),
-                                                      ctx),
-                                    ctx));
+    ctor->setType(getType(signatureID));
 
     if (isImplicit)
       ctor->setImplicit();
@@ -627,6 +624,13 @@ Type ModuleFile::getType(TypeID TID) {
                                      autoClosure, blockCompatible, thin,
                                      callingConvention.getValue(),
                                      ModuleContext->Ctx);
+    break;
+  }
+
+  case decls_block::METATYPE_TYPE: {
+    TypeID instanceID;
+    decls_block::MetaTypeTypeLayout::readRecord(scratch, instanceID);
+    typeOrOffset = MetaTypeType::get(getType(instanceID), ModuleContext->Ctx);
     break;
   }
 
