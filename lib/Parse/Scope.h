@@ -78,7 +78,7 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
 public:
-  explicit Scope(Parser *P, bool ResolvableScope);
+  Scope(Parser *P, bool ResolvableScope);
   ~Scope() {
     assert(SI.CurScope == this && "Scope mismatch");
     SI.CurScope = PrevScope;
