@@ -75,6 +75,8 @@ namespace {
       return parseSILType(Result);
     }
 
+    bool parseGlobalName(Identifier &Name);
+
     struct UnresolvedValueName {
       StringRef Name;
       SourceLoc NameLoc;
@@ -96,6 +98,7 @@ namespace {
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseCallInstruction(ValueKind Opcode, SILBuilder &B,
                               SILValue &ResultVal);
+    bool parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal);
 
     bool parseSILBasicBlock();
   };
@@ -169,6 +172,10 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
   return BB;
 }
 
+bool SILParser::parseGlobalName(Identifier &Name) {
+  return P.parseToken(tok::sil_at_sign, diag::expected_sil_value_name) ||
+         P.parseIdentifier(Name, diag::expected_sil_value_name);
+}
 
 /// getLocalValue - Get a reference to a local value with the specified name
 /// and type.
@@ -367,19 +374,20 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
-    .Case("apply", ValueKind::ApplyInst)
-    .Case("partial_apply", ValueKind::PartialApplyInst)
-    .Case("integer_literal", ValueKind::IntegerLiteralInst)
-    .Case("retain", ValueKind::RetainInst)
-    .Case("release", ValueKind::ReleaseInst)
-    .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
-    .Case("load", ValueKind::LoadInst)
-    .Case("store", ValueKind::StoreInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
+    .Case("apply", ValueKind::ApplyInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
+    .Case("integer_literal", ValueKind::IntegerLiteralInst)
+    .Case("function_ref", ValueKind::FunctionRefInst)
+    .Case("load", ValueKind::LoadInst)
     .Case("metatype", ValueKind::MetatypeInst)
-    .Case("tuple", ValueKind::TupleInst)
+    .Case("partial_apply", ValueKind::PartialApplyInst)
+    .Case("release", ValueKind::ReleaseInst)
+    .Case("retain", ValueKind::RetainInst)
+    .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("return", ValueKind::ReturnInst)
+    .Case("store", ValueKind::StoreInst)
+    .Case("tuple", ValueKind::TupleInst)
     .Default(ValueKind::SILArgument);
   
   if (Opcode != ValueKind::SILArgument) {
@@ -428,6 +436,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   switch (Opcode) {
   default: assert(0 && "Unreachable");
   case ValueKind::ApplyInst:
+  case ValueKind::PartialApplyInst:
     if (parseCallInstruction(Opcode, B, ResultVal))
       return true;
     break;
@@ -446,6 +455,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     P.consumeToken(tok::integer_literal);
     break;
   }
+  case ValueKind::FunctionRefInst:
+    if (parseSILFunctionRef(B, ResultVal))
+      return true;
+    break;
   case ValueKind::RetainInst:
     if (parseTypedValueRef(Val)) return true;
     B.createRetainInst(SILLocation(), Val);
@@ -656,7 +669,30 @@ bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
   return false;
 }
 
-
+bool SILParser::parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal) {
+  Identifier Name;
+  SILType Ty;
+  if (parseGlobalName(Name) ||
+      P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
+      parseSILType(Ty))
+    return true;
+  
+  // Scan the SIL module to find the function being referenced.  Symbol tables
+  // are overrated.
+  SILFunction *FnRef = nullptr;
+  for (SILFunction &F : SILMod)
+    if (F.getMangledName() == Name.str()) {
+      FnRef = &F;
+      break;
+    }
+  
+  // FIXME: Diagnose these errors.
+  assert(FnRef);
+  assert(FnRef->getLoweredType() == Ty);
+  
+  ResultVal = B.createFunctionRef(SILLocation(), FnRef);
+  return false;
+}
 
 ///   sil-basic-block:
 ///     sil-instruction+
