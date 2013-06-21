@@ -507,8 +507,10 @@ Type ConstraintSystem::openBindingType(Type type) {
     if (!boundStruct->getParent() &&
         boundStruct->getDecl()->getName().str() == "Slice" &&
         boundStruct->getGenericArgs().size() == 1) {
-      return getTypeChecker().getArraySliceType(
-               SourceLoc(), boundStruct->getGenericArgs()[0]);
+      if (auto replacement = getTypeChecker().getArraySliceType(
+                               SourceLoc(), boundStruct->getGenericArgs()[0])) {
+        return replacement;
+      }
     }
   }
 
