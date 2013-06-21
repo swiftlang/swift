@@ -327,6 +327,7 @@ static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
+#ifndef NDEBUG
   SmallVector<unsigned char, 64> nameBuffer;
 #define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
 #define RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
@@ -347,12 +348,14 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, IDENTIFIER_TYPE);
   RECORD(decls_block, FUNCTION_TYPE);
   RECORD(decls_block, METATYPE_TYPE);
+  RECORD(decls_block, LVALUE_TYPE);
   
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
   RECORD(decls_block, FUNC_DECL);
+  RECORD(decls_block, PATTERN_BINDING_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -375,6 +378,7 @@ void Serializer::writeBlockInfoBlock() {
 
 #undef BLOCK
 #undef RECORD
+#endif /* NDEBUG */
 }
 
 void Serializer::writeHeader() {
@@ -483,9 +487,25 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
 
   case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::TopLevelCode:
     return false;
+
+  case DeclKind::PatternBinding: {
+    auto binding = cast<PatternBindingDecl>(D);
+    const Decl *DC = getDeclForContext(binding->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
+    PatternBindingLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addDeclRef(DC), binding->isImplicit());
+
+    writePattern(binding->getPattern());
+    // Ignore initializer; external clients don't need to know about it.
+
+    return true;
+  }
+
+  case DeclKind::TopLevelCode:
+    // Top-level code is ignored; external clients don't need to know about it.
+    return true;
 
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
@@ -807,7 +827,19 @@ bool Serializer::writeType(Type ty) {
     return false;
 
   case TypeKind::ProtocolComposition:
-  case TypeKind::LValue:
+    return false;
+
+  case TypeKind::LValue: {
+    auto lValueTy = cast<LValueType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[LValueTypeLayout::Code];
+    LValueTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(lValueTy->getObjectType()),
+                                 lValueTy->getQualifiers().isImplicit(),
+                                 !lValueTy->getQualifiers().isSettable());
+    return true;
+  }
+
   case TypeKind::UnboundGeneric:
     return false;
 
@@ -835,12 +867,14 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<IdentifierTypeLayout>();
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetaTypeTypeLayout>();
+    registerDeclTypeAbbr<LValueTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
     registerDeclTypeAbbr<FuncLayout>();
+    registerDeclTypeAbbr<PatternBindingLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();

@@ -336,17 +336,23 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                signatureID, implicitThisID);
-    Pattern *args = maybeReadPattern();
-    assert(args && "missing arguments for constructor");
-    
-    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID));
-    auto parent = cast<NominalTypeDecl>(getDeclContext(parentID));
+    VarDecl *thisDecl;
+    NominalTypeDecl *parent;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      thisDecl = cast<VarDecl>(getDecl(implicitThisID));
+      parent = cast<NominalTypeDecl>(getDeclContext(parentID));
+    }
 
     auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
-                                          SourceLoc(), args, thisDecl,
-                                          /*generic params=*/nullptr,
+                                          SourceLoc(), /*args=*/nullptr,
+                                          thisDecl, /*generic params=*/nullptr,
                                           parent);
     declOrOffset = ctor;
+
+    Pattern *args = maybeReadPattern();
+    assert(args && "missing arguments for constructor");
+    ctor->setArguments(args);
 
     ctor->setType(getType(signatureID));
 
@@ -369,22 +375,26 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), nullptr);
-    declOrOffset = var;
 
-    // Explicitly set the DeclContext /after/ creating the VarDecl.
-    // Sometimes the context has to reference this decl.
-    var->setDeclContext(getDeclContext(contextID));
-
-    var->setNeverUsedAsLValue(isNeverLValue);
-    if (isImplicit)
-      var->setImplicit();
-
+    // Explicitly set the getter and setter info /before/ recording the VarDecl
+    // in the map. The functions will check this to know if they are getters or
+    // setters.
     if (getterID || setterID) {
       var->setProperty(ctx, SourceLoc(),
                        cast_or_null<FuncDecl>(getDecl(getterID)),
                        cast_or_null<FuncDecl>(getDecl(setterID)),
                        SourceLoc());
     }
+
+    declOrOffset = var;
+
+    // Explicitly set the DeclContext /after/ recording the VarDecl in the map.
+    // Sometimes the context has to reference this decl.
+    var->setDeclContext(getDeclContext(contextID));
+
+    var->setNeverUsedAsLValue(isNeverLValue);
+    if (isImplicit)
+      var->setImplicit();
 
     var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
@@ -404,12 +414,23 @@ Decl *ModuleFile::getDecl(DeclID DID) {
                                         isClassMethod, associatedDeclID,
                                         overriddenID);
 
+    DeclContext *DC;
+    FunctionType *signature;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      DC = getDeclContext(contextID);
+      signature = cast<FunctionType>(getType(signatureID).getPointer());
+    }
+
+    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
+                                 getIdentifier(nameID), SourceLoc(),
+                                 /*generic params=*/nullptr, signature,
+                                 /*body=*/nullptr, DC);
+    declOrOffset = fn;
+
     SmallVector<Pattern *, 16> patternBuf;
     while (Pattern *pattern = maybeReadPattern())
       patternBuf.push_back(pattern);
-
-    auto DC = getDeclContext(contextID);
-    auto signature = cast<FunctionType>(getType(signatureID).getPointer());
 
     assert(!patternBuf.empty());
     size_t patternCount = patternBuf.size() / 2;
@@ -424,12 +445,7 @@ Decl *ModuleFile::getDecl(DeclID DID) {
                                  argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  /*body=*/nullptr, DC);
-
-    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
-                                 getIdentifier(nameID), SourceLoc(),
-                                 /*generic params=*/nullptr, signature,
-                                 body, DC);
-    declOrOffset = fn;
+    fn->setBody(body);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 
@@ -464,6 +480,26 @@ Decl *ModuleFile::getDecl(DeclID DID) {
     break;
   }
 
+  case decls_block::PATTERN_BINDING_DECL: {
+    DeclID contextID;
+    bool isImplicit;
+
+    decls_block::PatternBindingLayout::readRecord(scratch, contextID,
+                                                  isImplicit);
+    Pattern *pattern = maybeReadPattern();
+    assert(pattern);
+
+    auto binding = new (ctx) PatternBindingDecl(SourceLoc(), pattern,
+                                                /*init=*/nullptr,
+                                                getDeclContext(contextID));
+    declOrOffset = binding;
+
+    if (isImplicit)
+      binding->setImplicit();
+
+    break;
+  }
+      
   default:
     // We don't know how to deserialize this kind of decl.
     error();
@@ -512,6 +548,8 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
+  ASTContext &ctx = ModuleContext->Ctx;
+
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
@@ -521,7 +559,6 @@ Type ModuleFile::getType(TypeID TID) {
     assert(!blobData.empty() && "missing name in BUILTIN_TYPE record");
 
     SmallVector<ValueDecl *, 1> lookupResult;
-    ASTContext &ctx = ModuleContext->Ctx;
     ctx.TheBuiltinModule->lookupValue({}, ctx.getIdentifier(blobData),
                                       NLKind::QualifiedLookup, lookupResult);
     if (lookupResult.empty()) {
@@ -551,14 +588,14 @@ Type ModuleFile::getType(TypeID TID) {
     TypeID parentID;
     decls_block::StructTypeLayout::readRecord(scratch, structID, parentID);
     typeOrOffset = StructType::get(cast<StructDecl>(getDecl(structID)),
-                                   getType(parentID), ModuleContext->Ctx);
+                                   getType(parentID), ctx);
     break;
   }
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
-    typeOrOffset = ParenType::get(ModuleContext->Ctx, getType(underlyingID));
+    typeOrOffset = ParenType::get(ctx, getType(underlyingID));
     break;
   }
 
@@ -589,7 +626,7 @@ Type ModuleFile::getType(TypeID TID) {
       }
     }
 
-    typeOrOffset = TupleType::get(elements, ModuleContext->Ctx);
+    typeOrOffset = TupleType::get(elements, ctx);
     break;
   }
 
@@ -622,15 +659,29 @@ Type ModuleFile::getType(TypeID TID) {
 
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      autoClosure, blockCompatible, thin,
-                                     callingConvention.getValue(),
-                                     ModuleContext->Ctx);
+                                     callingConvention.getValue(), ctx);
     break;
   }
 
   case decls_block::METATYPE_TYPE: {
     TypeID instanceID;
     decls_block::MetaTypeTypeLayout::readRecord(scratch, instanceID);
-    typeOrOffset = MetaTypeType::get(getType(instanceID), ModuleContext->Ctx);
+    typeOrOffset = MetaTypeType::get(getType(instanceID), ctx);
+    break;
+  }
+
+  case decls_block::LVALUE_TYPE: {
+    TypeID objectTypeID;
+    bool isImplicit, isNonSettable;
+    decls_block::LValueTypeLayout::readRecord(scratch, objectTypeID,
+                                              isImplicit, isNonSettable);
+    LValueType::Qual quals;
+    if (isImplicit)
+      quals |= LValueType::Qual::Implicit;
+    if (isNonSettable)
+      quals |= LValueType::Qual::NonSettable;
+
+    typeOrOffset = LValueType::get(getType(objectTypeID), quals, ctx);
     break;
   }
 

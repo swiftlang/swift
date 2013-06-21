@@ -166,12 +166,14 @@ namespace decls_block {
     IDENTIFIER_TYPE,
     FUNCTION_TYPE,
     METATYPE_TYPE,
+    LVALUE_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
     CONSTRUCTOR_DECL,
     VAR_DECL,
     FUNC_DECL,
+    PATTERN_BINDING_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -236,6 +238,13 @@ namespace decls_block {
     TypeIDField  // instance type
   >;
 
+  using LValueTypeLayout = BCRecordLayout<
+    LVALUE_TYPE,
+    TypeIDField, // object type
+    BCFixed<1>,  // implicit?
+    BCFixed<1>   // non-settable?
+  >;
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
@@ -284,6 +293,13 @@ namespace decls_block {
     BCFixed<1>,   // class method
     DeclIDField,  // associated decl (for get/set or operators)
     DeclIDField   // overridden function
+  >;
+
+  using PatternBindingLayout = BCRecordLayout<
+    PATTERN_BINDING_DECL,
+    DeclIDField, // context decl
+    BCFixed<1>   // implicit flag
+    // The pattern trails the record.
   >;
 
   using ParenPatternLayout = BCRecordLayout<
