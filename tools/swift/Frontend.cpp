@@ -38,7 +38,7 @@ using namespace swift;
 
 static Identifier getModuleIdentifier(StringRef OutputName,
                                       ASTContext &Context,
-                                      TranslationUnit::TU_Kind moduleKind) {
+                                      TranslationUnit::TUKind moduleKind) {
   StringRef moduleName = OutputName;
 
   // As a special case, recognize <stdin>.
@@ -68,7 +68,7 @@ TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
                                   StringRef OutputName,
                                   ArrayRef<unsigned> BufferIDs,
-                                  bool ParseOnly, TranslationUnit::TU_Kind Kind,
+                                  bool ParseOnly, TranslationUnit::TUKind Kind,
                                   SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = getModuleIdentifier(OutputName, Context, Kind);

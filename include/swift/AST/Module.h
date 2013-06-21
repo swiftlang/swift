@@ -173,7 +173,7 @@ private:
   ArrayRef<ImportedModule> ImportedModules;
 
 public:
-  enum TU_Kind {
+  enum TUKind {
     StandardLibrary,
     Library,
     Main,
@@ -203,7 +203,7 @@ public:
   /// when there are decls in a module.  This doesn't happen for SIL mode.
   bool ShouldAutoImportStandardLibrary = true;
 
-  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TU_Kind Kind)
+  TranslationUnit(Identifier Name, Component *Comp, ASTContext &C, TUKind Kind)
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   

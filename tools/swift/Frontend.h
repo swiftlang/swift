@@ -30,7 +30,7 @@ namespace swift {
                                               StringRef OutputName,
                                               ArrayRef<unsigned>BufferIDs,
                                               bool ParseOnly,
-                                              TranslationUnit::TU_Kind Kind,
+                                              TranslationUnit::TUKind Kind,
                                               SILModule *SIL);
 
   bool appendToREPLTranslationUnit(TranslationUnit *TU,
