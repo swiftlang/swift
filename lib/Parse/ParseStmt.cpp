@@ -49,24 +49,9 @@ bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   }
 }
 
-/// isFuncExpr - Return true if this two token sequence is the start of a func
-/// expression (i.e. not a func *decl* or something else).
-static bool isFuncExpr(const Token &Tok1, const Token &Tok2) {
-  if (Tok1.isNot(tok::kw_func)) return false;
-  
-  // "func identifier" and "func [attribute]" is a func declaration,
-  // otherwise we have a func expression.
-  return Tok2.isNot(tok::identifier) && Tok2.isNotAnyOperator() &&
-         Tok2.isNot(tok::l_square);
-}
-
 /// isStartOfDecl - Return true if this is the start of a decl or decl-import.
 bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   switch (Tok.getKind()) {
-  case tok::kw_func:
-    // "func identifier" and "func [attribute]" is a func declaration,
-    // otherwise we have a func expression.
-    return !isFuncExpr(Tok, Tok2);
   case tok::kw_static:
     return Tok2.is(tok::kw_func);
   case tok::kw_extension:
@@ -79,6 +64,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_subscript:
   case tok::kw_constructor:
   case tok::kw_destructor:
+  case tok::kw_func:
     return true;
   case tok::kw_protocol:
     return !(Tok2.isAnyOperator() && Tok2.getText().equals("<"));

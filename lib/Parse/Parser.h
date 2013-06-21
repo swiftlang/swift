@@ -467,8 +467,7 @@ public:
                                    Expr *FirstExpr);
   NullablePtr<Expr> parseExprDictionary(SourceLoc LSquareLoc,
                                         Expr *FirstKey);
-  NullablePtr<Expr> parseExprFunc();
-  
+
   Expr *parseExprOperator();
   Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
   FuncExpr *actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,

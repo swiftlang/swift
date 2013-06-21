@@ -2036,11 +2036,9 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-primary  ::= <a href="#expr-identifier">expr-identifier</a>
     expr-primary  ::= <a href="#expr-super">expr-super</a>
     expr-primary  ::= <a href="#expr-closure">expr-closure</a>
-    expr-primary  ::= <a href="#expr-explicit-closure">expr-explicit-closure</a>
     expr-primary  ::= <a href="#expr-anon-closure-arg">expr-anon-closure-arg</a>
     expr-primary  ::= <a href="#expr-paren">expr-paren</a>
     expr-primary  ::= <a href="#expr-delayed-identifier">expr-delayed-identifier</a>
-    expr-primary  ::= <a href="#expr-func">expr-func</a>
 
     expr-postfix  ::= expr-primary
     expr-postfix  ::= expr-postfix <a href="#operator">operator-postfix</a>
@@ -2500,56 +2498,6 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="expr-explicit-closure">Explicit Closure Expression</h3>
-  <!-- ===================================================================== -->
-  
-  <div class="commentary">
-    It would be possible to allow { expr } and { brace-item* } here -
-    allowing the same syntax as func decls.  The
-    intepretation of this would be that a single expression is evaluated and
-    returned implicitly, but that a multi-statement sequence would require an
-    explicit return.  This would mean that {4} and {return 4} both do the same
-    thing. OTOH, it is possibly confusing that {4} and {4;} would have very
-    different meanings.
-  </div>
-
-  <pre class="grammar">
-    expr-explicit-closure ::= '{' expr? '}'
-  </pre>
-  
-  <p>A closure expression is a super-concise version of <a 
-     href="#expr-func">expr-func</a> for cases where very simple predicates and
-     other small closures are needed (e.g. sorting and searching predicates).
-     It uses Swift's aggressive type system to infer both the argument and
-     return values types for the closure from the context it is used in, and
-     allows access to the formal arguments of the closure through <a 
-      href="#expr-anon-closure-arg">anonymous closure argument expressions</a>.
-     In tuples with no body expression, the '()' expression is used as the
-     result.
-  </p>
-  
-  <p>It is illegal to use these expressions when there is insufficient context
-     to infer the argument and return types of the closure.</p>
-  
-  <pre class="example">
-    <i>// Takes a closure that it calls to determine an ordering relation.</i>
-    func magic(val : Int, predicate : (a : Int, b : Int) -> Bool)
-    
-    func f() {
-      <i>// Compare one way.  Closure is inferred to return Bool and take two ints</i>
-      <i>// from the argument context.  This same information infers that $0 and $1</i>
-      <i>// both have type 'Int'.</i>
-      magic(42, { $0 &lt; $1 })
-    
-      <i>// Compare the other way way.</i>
-      magic(42, { $1 &lt; $0 })
-    
-      <i>// Error, not enough context to infer the type of $0.</i>
-      var x = { $0 } 
-    }
-  </pre>
-
-  <!-- ===================================================================== -->
   <h3 id="expr-anon-closure-arg">Anonymous Closure Arguments</h3>
   <!-- ===================================================================== -->
 
@@ -2563,7 +2511,7 @@ ill-formed if the type does not conform to the protocol.</p>
   context</a>.  All other dollar identifiers are invalid.</p>
   
   <p>This can only be used in the body of a closure (<a
-     href="#expr-closure">expr-closure</a>) that does not have explicitly-specified parameters or an explicit closure (<a href="#expr-explicit-closure">expr-explicit-closure</a>).
+     href="#expr-closure">expr-closure</a>) that does not have explicitly-specified parameters.
   </p>
   
 
@@ -2640,43 +2588,6 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   
-  <!-- ===================================================================== -->
-  <h3 id="expr-func">Func Expressions</h3>
-  <!-- ===================================================================== -->
-
-  <div class="commentary">
-    Func expressions will probably not be widely used directly, but they are
-    the core semantic model underlying 'func' declarations, and can be
-    convenient for declaring first-class function values that want named
-    arguments.
-  </div>
-  
-  <pre class="grammar">
-    expr-func ::= 'func' <a href="#func-signature">func-signature</a>? <a href="#brace-item-list">brace-item-list</a>
-  </pre>
-
-  <p>A func expression is an anonymous (unnamed) function literal definition,
-     which can define named arguments (and whose names are in scope for its
-     body) and that can refer to values defined in parent scopes.</p>
-  
-  <p>A func expression captures a reference to any values in parent scopes that
-     are used.</p>
-
-  <p>If the function signature is omitted, it is implicitly <tt>() -> ()</tt>.</p>
-  
-  <p>TODO: Allow attributes on funcs when useful.</p>
-
-  <pre class="example">
-    <i>// A simple func expression.</i>
-    var a = func(val : Int) { print(val+1) }
-    
-    <i>// A recursive func expression.</i>
-    var fib = func(n : Int) -> Int {
-      if (n &lt; 2) { return n; }
-      return fib(n-1)+fib(n-2)
-    }
-  </pre>
-
   <!-- ===================================================================== -->
   <h3 id="expr-dot">Dot Expressions</h3>
   <!-- ===================================================================== -->
@@ -2930,7 +2841,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   </pre>
   
   <p>The return statement sets the return value of the current <a 
-     href="#decl-func">func declaration</a> or <a href="#expr-func">func
+     href="#decl-func">func declaration</a> or <a href="#expr-closure">closure
      expression</a> and transfers control out of the function.  It sets the
      return value by converting the specified expression result (or '()' if
      none is specified) to the return type of the 'func'.

@@ -743,11 +743,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::l_square:
     Result = parseExprCollection();
     break;
-      
-  case tok::kw_func:
-    Result = parseExprFunc();
-    break;
-      
+
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:
@@ -1457,51 +1453,6 @@ NullablePtr<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 
   return new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc);
 }
-
-/// parseExprFunc - Parse a func expression.
-///
-///   expr-func: 
-///     'func' func-signature? stmt-brace
-///
-NullablePtr<Expr> Parser::parseExprFunc() {
-  SourceLoc FuncLoc = consumeToken(tok::kw_func);
-
-  SmallVector<Pattern*, 4> ArgParams;
-  SmallVector<Pattern*, 4> BodyParams;
-  TypeLoc RetTy;
-  if (Tok.is(tok::l_brace)) {
-    // If the func-signature isn't present, then this is a ()->Unresolved
-    // function.
-    TuplePattern *unitPattern = TuplePattern::create(Context, SourceLoc(),
-      llvm::ArrayRef<TuplePatternElt>(),
-      SourceLoc());
-    ArgParams.push_back(unitPattern);
-    BodyParams.push_back(unitPattern);
-  } else if (!Tok.is(tok::l_paren)) {
-    diagnose(Tok, diag::func_decl_without_paren);
-    return 0;
-  } else if (parseFunctionSignature(ArgParams, BodyParams, RetTy)) {
-    return 0;
-  }
-  
-  // The arguments to the func are defined in their own scope.
-  Scope FuncBodyScope(this, /*AllowLookup=*/true);
-  FuncExpr *FE = actOnFuncExprStart(FuncLoc, RetTy, ArgParams, BodyParams);
-
-  // Establish the new context.
-  ContextChange CC(*this, FE);
-
-  // Then parse the expression.
-  NullablePtr<BraceStmt> Body =
-    parseBraceItemList(diag::expected_lbrace_func_expr);
-  if (Body.isNull())
-    return 0;
-
-  FE->setBody(Body.get());
-
-  return FE;
-}
-
 
 /// AddFuncArgumentsToScope - Walk the type specified for a Func object (which
 /// is known to be a FunctionType on the outer level) creating and adding named
