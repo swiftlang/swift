@@ -134,7 +134,7 @@ public:
   };
 
   ParserState getParserState() {
-    return ParserState(L->getStateForBeginnigOfToken(Tok),
+    return ParserState(L->getStateForBeginningOfToken(Tok),
                        PreviousLoc);
   }
 

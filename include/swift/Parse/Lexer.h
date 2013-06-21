@@ -83,7 +83,7 @@ public:
   /// \brief Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from
   /// there.
-  State getStateForBeginnigOfToken(const Token &Tok) const {
+  State getStateForBeginningOfToken(const Token &Tok) const {
     const char *Ptr = Tok.getText().begin();
     // Skip whitespace backwards until we hit a newline.  This is needed to
     // correctly lex the token if it is at the beginning of the line.
