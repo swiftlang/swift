@@ -63,6 +63,106 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+Pattern *ModuleFile::maybeReadPattern() {
+  using namespace decls_block;
+  
+  SmallVector<uint64_t, 8> scratch;
+
+  auto next = DeclTypeCursor.advance();
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
+  switch (kind) {
+  case decls_block::PAREN_PATTERN: {
+    Pattern *subPattern = maybeReadPattern();
+    assert(subPattern);
+
+    auto result = new (ModuleContext->Ctx) ParenPattern(SourceLoc(),
+                                                        subPattern,
+                                                        SourceLoc());
+    result->setType(subPattern->getType());
+    return result;
+  }
+  case decls_block::TUPLE_PATTERN: {
+    TypeID tupleTypeID;
+    unsigned count;
+
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count);
+
+    SmallVector<TuplePatternElt, 8> elements;
+    for ( ; count > 0; --count) {
+      scratch.clear();
+      next = DeclTypeCursor.advance();
+      assert(next.Kind == llvm::BitstreamEntry::Record);
+
+      kind = DeclTypeCursor.readRecord(next.ID, scratch);
+      assert(kind == decls_block::TUPLE_PATTERN_ELT);
+
+      TypeID varargsTypeID;
+      TuplePatternEltLayout::readRecord(scratch, varargsTypeID);
+
+      Pattern *subPattern = maybeReadPattern();
+      assert(subPattern);
+
+      elements.push_back(TuplePatternElt(subPattern));
+      if (varargsTypeID) {
+        BCOffsetRAII restoreOffset(DeclTypeCursor);
+        elements.back().setVarargBaseType(getType(varargsTypeID));
+      }
+    }
+
+    auto result = TuplePattern::create(ModuleContext->Ctx, SourceLoc(),
+                                       elements, SourceLoc());
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      result->setType(getType(tupleTypeID));
+    }
+    return result;
+  }
+  case decls_block::NAMED_PATTERN: {
+
+    DeclID varID;
+    NamedPatternLayout::readRecord(scratch, varID);
+
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+    auto var = cast<VarDecl>(getDecl(varID));
+    auto result = new (ModuleContext->Ctx) NamedPattern(var);
+    result->setType(var->getType());
+    return result;
+  }
+  case decls_block::ANY_PATTERN: {
+    TypeID typeID;
+
+    AnyPatternLayout::readRecord(scratch, typeID);
+    auto result = new (ModuleContext->Ctx) AnyPattern(SourceLoc());
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      result->setType(getType(typeID));
+    }
+    return result;
+  }
+  case decls_block::TYPED_PATTERN: {
+    TypeID typeID;
+
+    TypedPatternLayout::readRecord(scratch, typeID);
+    Pattern *subPattern = maybeReadPattern();
+    assert(subPattern);
+
+    TypeLoc typeInfo = TypeLoc::withoutLoc(getType(typeID));
+    auto result = new (ModuleContext->Ctx) TypedPattern(subPattern, typeInfo);
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      result->setType(typeInfo.getType());
+    }
+    return result;
+  }
+  default:
+    return nullptr;
+  }
+}
+
 Identifier ModuleFile::getIdentifier(IdentifierID IID) {
   if (IID == 0)
     return Identifier();
@@ -307,11 +407,24 @@ Decl *ModuleFile::getDecl(DeclID DID) {
                                         isClassMethod, associatedDeclID,
                                         overriddenID);
 
+    SmallVector<Pattern *, 16> patternBuf;
+    while (Pattern *pattern = maybeReadPattern())
+      patternBuf.push_back(pattern);
+
     auto DC = getDeclContext(contextID);
     auto signature = cast<FunctionType>(getType(signatureID).getPointer());
 
-    auto emptyArgs = TuplePattern::create(ctx, SourceLoc(), {}, SourceLoc());
-    auto body = FuncExpr::create(ctx, SourceLoc(), emptyArgs, emptyArgs,
+    assert(!patternBuf.empty());
+    size_t patternCount = patternBuf.size() / 2;
+    assert(patternCount * 2 == patternBuf.size() &&
+           "two sets of patterns don't  match up");
+
+    ArrayRef<Pattern *> patterns(patternBuf);
+    ArrayRef<Pattern *> argPatterns = patterns.slice(0, patternCount);
+    ArrayRef<Pattern *> bodyPatterns = patterns.slice(patternCount);
+
+    auto body = FuncExpr::create(ctx, SourceLoc(),
+                                 argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  /*body=*/nullptr, DC);
 

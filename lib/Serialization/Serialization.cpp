@@ -157,6 +157,9 @@ namespace {
     /// Writes the input file paths.
     void writeInputFiles(llvm::SourceMgr &sourceMgr, FileBufferIDs inputFiles);
 
+    /// Writes the given pattern, recursively.
+    void writePattern(const Pattern *pattern);
+
     /// Writes the given decl.
     ///
     /// Returns false if the decl cannot be serialized without losing
@@ -349,6 +352,13 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
   RECORD(decls_block, FUNC_DECL);
+
+  RECORD(decls_block, PAREN_PATTERN);
+  RECORD(decls_block, TUPLE_PATTERN);
+  RECORD(decls_block, TUPLE_PATTERN_ELT);
+  RECORD(decls_block, NAMED_PATTERN);
+  RECORD(decls_block, ANY_PATTERN);
+  RECORD(decls_block, TYPED_PATTERN);
   RECORD(decls_block, DECL_CONTEXT);
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
@@ -401,6 +411,60 @@ void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
       continue;
     
     SourceFile.emit(ScratchRecord, path);
+  }
+}
+
+void Serializer::writePattern(const Pattern *pattern) {
+  using namespace decls_block;
+
+  assert(pattern && "null pattern");
+  switch (pattern->getKind()) {
+  case PatternKind::Paren: {
+    unsigned abbrCode = DeclTypeAbbrCodes[ParenPatternLayout::Code];
+    ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    writePattern(cast<ParenPattern>(pattern)->getSubPattern());
+    break;
+  }
+  case PatternKind::Tuple: {
+    auto tuple = cast<TuplePattern>(pattern);
+
+    unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
+    TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addTypeRef(tuple->getType()),
+                                   tuple->getNumFields());
+
+    abbrCode = DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
+    for (auto &elt : tuple->getFields()) {
+      // FIXME: Handle default arguments?
+      TuplePatternEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addTypeRef(elt.getVarargBaseType()));
+      writePattern(elt.getPattern());
+    }
+    break;
+  }
+  case PatternKind::Named: {
+    auto named = cast<NamedPattern>(pattern);
+
+    unsigned abbrCode = DeclTypeAbbrCodes[NamedPatternLayout::Code];
+    NamedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addDeclRef(named->getDecl()));
+    break;
+  }
+  case PatternKind::Any: {
+    unsigned abbrCode = DeclTypeAbbrCodes[AnyPatternLayout::Code];
+    AnyPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(pattern->getType()));
+    break;
+  }
+  case PatternKind::Typed: {
+    auto typed = cast<TypedPattern>(pattern);
+
+    unsigned abbrCode = DeclTypeAbbrCodes[TypedPatternLayout::Code];
+    TypedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addTypeRef(typed->getType()));
+    writePattern(typed->getSubPattern());
+    break;
+  }
   }
 }
 
@@ -529,12 +593,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (fn->getGenericParams())
       return false;
 
-    // FIXME: Handle arguments.
-    auto fnTy = cast<FunctionType>(fn->getType().getPointer());
-    if (fnTy->getInput()->getCanonicalType() !=
-        D->getASTContext().TheEmptyTupleType->getCanonicalType())
-      return false;
-
     const Decl *DC = getDeclForContext(fn->getDeclContext());
     const Decl *associated = fn->getGetterOrSetterDecl();
     if (!associated)
@@ -550,6 +608,14 @@ bool Serializer::writeDecl(const Decl *D) {
                            fn->isStatic(),
                            addDeclRef(associated),
                            addDeclRef(fn->getOverriddenDecl()));
+
+    // Write both argument and body parameters. This is important for proper
+    // error messages with selector-style declarations.
+    for (auto pattern : fn->getBody()->getArgParamPatterns())
+      writePattern(pattern);
+    for (auto pattern : fn->getBody()->getBodyParamPatterns())
+      writePattern(pattern);
+
     return true;
   }
 
@@ -769,6 +835,12 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<VarLayout>();
     registerDeclTypeAbbr<FuncLayout>();
 
+    registerDeclTypeAbbr<ParenPatternLayout>();
+    registerDeclTypeAbbr<TuplePatternLayout>();
+    registerDeclTypeAbbr<TuplePatternEltLayout>();
+    registerDeclTypeAbbr<NamedPatternLayout>();
+    registerDeclTypeAbbr<AnyPatternLayout>();
+    registerDeclTypeAbbr<TypedPatternLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
   }
 

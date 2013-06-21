@@ -172,6 +172,13 @@ namespace decls_block {
     VAR_DECL,
     FUNC_DECL,
 
+    PAREN_PATTERN = 200,
+    TUPLE_PATTERN,
+    TUPLE_PATTERN_ELT,
+    NAMED_PATTERN,
+    ANY_PATTERN,
+    TYPED_PATTERN,
+
     DECL_CONTEXT = 255
   };
 
@@ -270,6 +277,41 @@ namespace decls_block {
     BCFixed<1>,   // class method
     DeclIDField,  // associated decl (for get/set or operators)
     DeclIDField   // overridden function
+  >;
+
+  using ParenPatternLayout = BCRecordLayout<
+    PAREN_PATTERN
+    // The sub-pattern trails the record.
+  >;
+
+  using TuplePatternLayout = BCRecordLayout<
+    TUPLE_PATTERN,
+    TypeIDField, // type
+    BCVBR<5>     // arity
+    // The elements trail the record.
+  >;
+
+  using TuplePatternEltLayout = BCRecordLayout<
+    TUPLE_PATTERN_ELT,
+    TypeIDField  // vararg base type, or 0
+    // The element pattern trails the record.
+  >;
+
+  using NamedPatternLayout = BCRecordLayout<
+    NAMED_PATTERN,
+    DeclIDField // associated VarDecl
+  >;
+
+  using AnyPatternLayout = BCRecordLayout<
+    ANY_PATTERN,
+    TypeIDField // type
+    // FIXME: is the type necessary?
+  >;
+
+  using TypedPatternLayout = BCRecordLayout<
+    TYPED_PATTERN,
+    TypeIDField // associated type
+    // The sub-pattern trails the record.
   >;
 
   using DeclContextLayout = BCRecordLayout<

@@ -33,6 +33,7 @@ namespace swift {
 class Decl;
 class DeclContext;
 class Module;
+class Pattern;
 class ValueDecl;
 
 /// Describes whether a loaded module can be used.
@@ -115,6 +116,11 @@ class ModuleFile {
            issue != ModuleStatus::FallBackToTranslationUnit);
     Status = issue;
   }
+
+  /// Recursively reads a pattern from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a pattern, returns null.
+  Pattern *maybeReadPattern();
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
