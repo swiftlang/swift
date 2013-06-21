@@ -860,7 +860,7 @@ StringRef FuncDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {
   // We should always have exactly two levels of argument pattern.
   auto argPatterns = getBody()->getArgParamPatterns();
   assert(argPatterns.size() == 2);
-  Pattern *pattern = argPatterns[1];
+  const Pattern *pattern = argPatterns[1];
   auto tuple = dyn_cast<TuplePattern>(pattern);
 
   // If it's an empty tuple pattern, it's a nullary selector.

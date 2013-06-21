@@ -1516,7 +1516,8 @@ public:
   
   /// Returns the parameter patterns of the function, using
   /// FuncExpr::getArgParamPatterns or ClosureExpr::getParamPatterns.
-  ArrayRef<Pattern *> getParamPatterns() const;
+  ArrayRef<Pattern *> getParamPatterns();
+  ArrayRef<const Pattern *> getParamPatterns() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_CapturingExpr &&
@@ -1581,9 +1582,11 @@ public:
   ///
   /// If the function expression refers to a method definition, there will
   /// be an additional first argument pattern for the `this` parameter.
-  
-  ArrayRef<Pattern*> getArgParamPatterns() const {
+  ArrayRef<Pattern*> getArgParamPatterns() {
     return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
+  }
+  ArrayRef<const Pattern*> getArgParamPatterns() const {
+    return ArrayRef<const Pattern*>(getParamsBuffer(), NumPatterns);
   }
 
   /// getBodyParamPatterns - Returns the parameter pattern(s) for the function
@@ -1600,8 +1603,13 @@ public:
   /// `getBodyParamPatterns().size()`, and the corresponding elements of each
   /// tuple type should have equivalent types.
   
-  ArrayRef<Pattern*> getBodyParamPatterns() const {
-    return ArrayRef<Pattern*>(getParamsBuffer() + NumPatterns, NumPatterns);
+  ArrayRef<Pattern*> getBodyParamPatterns() {
+    return ArrayRef<Pattern*>(getParamsBuffer() + NumPatterns,
+                              NumPatterns);
+  }
+  ArrayRef<const Pattern*> getBodyParamPatterns() const {
+    return ArrayRef<const Pattern*>(getParamsBuffer() + NumPatterns,
+                                    NumPatterns);
   }
 
   /// getNaturalArgumentCount - Returns the "natural" number of
@@ -1667,7 +1675,8 @@ public:
   SourceLoc getLoc() const;
 
   /// \brief Retrieve the parameters of this closure.
-  Pattern *getParams() const { return params.getPointer(); }
+  Pattern *getParams() { return params.getPointer(); }
+  const Pattern *getParams() const { return params.getPointer(); }
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
@@ -1769,7 +1778,11 @@ public:
   Pattern *getPattern() { return Pat; }
   const Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *pat) { Pat = pat; }
-  ArrayRef<Pattern*> getParamPatterns() const {
+ 
+  ArrayRef<Pattern*> getParamPatterns() {
+    return Pat;
+  }
+  ArrayRef<const Pattern*> getParamPatterns() const {
     return Pat;
   }
 
@@ -1795,8 +1808,11 @@ public:
 
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
 
-  ArrayRef<Pattern*> getParamPatterns() const {
-    return ArrayRef<Pattern*>();
+  ArrayRef<Pattern*> getParamPatterns() {
+    return {};
+  }
+  ArrayRef<const Pattern*> getParamPatterns() const {
+    return {};
   }
 
   // Implement isa/cast/dyncast/etc.

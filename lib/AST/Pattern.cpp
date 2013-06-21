@@ -208,8 +208,10 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
   if (elements.size() == 1 &&
       elements[0].getInit() == nullptr &&
       elements[0].getPattern()->getBoundName().empty() &&
-      !elements[0].isVararg())
-    return new (C) ParenPattern(lp, elements[0].getPattern(), rp);
+      !elements[0].isVararg()) {
+    auto &first = const_cast<TuplePatternElt&>(elements.front());
+    return new (C) ParenPattern(lp, first.getPattern(), rp);
+  }
 
   return create(C, lp, elements, rp);
 }

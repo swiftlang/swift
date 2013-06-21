@@ -63,7 +63,7 @@ namespace {
     }
 
     void printAttributes(const DeclAttributes &attrs);
-    void printPattern(Pattern *pattern);
+    void printPattern(const Pattern *pattern);
     void printGenericParams(GenericParamList *params);
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
@@ -170,7 +170,7 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
   OS << "] ";
 }
 
-void PrintAST::printPattern(Pattern *pattern) {
+void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Any:
     OS << "_";

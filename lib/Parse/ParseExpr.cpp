@@ -936,7 +936,8 @@ static SourceLoc consumePipe(Parser &parser) {
 }
 
 // Note: defined below.
-static void AddFuncArgumentsToScope(Pattern *pat, CapturingExpr *CE, Parser &P);
+static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
+                                    Parser &P);
 
 Expr *Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
@@ -1506,7 +1507,8 @@ NullablePtr<Expr> Parser::parseExprFunc() {
 /// is known to be a FunctionType on the outer level) creating and adding named
 /// arguments to the current scope.  This causes redefinition errors to be
 /// emitted.
-static void AddFuncArgumentsToScope(Pattern *pat, CapturingExpr *CE, Parser &P){
+static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
+                                    Parser &P) {
   switch (pat->getKind()) {
   case PatternKind::Named: {
     // Reparent the decl and add it to the scope.

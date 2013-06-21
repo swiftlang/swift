@@ -1782,7 +1782,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   return Invalid;
 }
 
-static void AddConstructorArgumentsToScope(Pattern *pat, ConstructorDecl *CD,
+static void AddConstructorArgumentsToScope(const Pattern *pat,
+                                           ConstructorDecl *CD,
                                            Parser &P) {
   switch (pat->getKind()) {
   case PatternKind::Named: {

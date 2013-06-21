@@ -124,7 +124,8 @@ public:
     : Pattern(PatternKind::Paren),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {}
 
-  Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  const Pattern *getSubPattern() const { return SubPattern; }
 
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
@@ -150,8 +151,11 @@ public:
                            Type varargBaseType = Type())
     : ThePattern(P), Init(init), VarargBaseType(varargBaseType) {}
 
-  Pattern *getPattern() const { return ThePattern; }
+  Pattern *getPattern() { return ThePattern; }
+  const Pattern *getPattern() const { return ThePattern; }
+
   ExprHandle *getInit() const { return Init; }
+
   bool isVararg() const { return !VarargBaseType.isNull(); }
   Type getVarargBaseType() const { return VarargBaseType; }
   void setVarargBaseType(Type ty) { VarargBaseType = ty; }
@@ -258,7 +262,9 @@ public:
   TypedPattern(Pattern *pattern, TypeLoc tl)
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {}
 
-  Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  const Pattern *getSubPattern() const { return SubPattern; }
+
   TypeLoc &getTypeLoc() { return PatType; }
   TypeLoc getTypeLoc() const { return PatType; }
 

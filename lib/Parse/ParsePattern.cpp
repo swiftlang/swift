@@ -129,11 +129,11 @@ static bool parseSelectorArgument(Parser *parser,
 }
 
 static Pattern *getFirstSelectorPattern(ASTContext &Context,
-                                     Pattern *argPattern,
-                                     SourceLoc loc)
+                                        const Pattern *argPattern,
+                                        SourceLoc loc)
 {
   Pattern *pattern = new (Context) AnyPattern(loc);
-  if (TypedPattern *typed = dyn_cast<TypedPattern>(argPattern)) {
+  if (auto typed = dyn_cast<TypedPattern>(argPattern)) {
     pattern = new (Context) TypedPattern(pattern, typed->getTypeLoc());
   }
   return pattern;

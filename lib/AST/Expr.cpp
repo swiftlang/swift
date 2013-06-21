@@ -316,7 +316,7 @@ GenericSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
          "use SubscriptExpr for non-generic type subscript");
 }
 
-ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
+ArrayRef<Pattern *> CapturingExpr::getParamPatterns() {
   if (auto *func = dyn_cast<FuncExpr>(this))
     return func->getArgParamPatterns();
   if (auto *closure = dyn_cast<PipeClosureExpr>(this))
@@ -325,6 +325,12 @@ ArrayRef<Pattern *> CapturingExpr::getParamPatterns() const {
     return closure->getParamPatterns();
   llvm_unreachable("unknown capturing expr");
 }
+
+ArrayRef<const Pattern *> CapturingExpr::getParamPatterns() const {
+  auto patterns = const_cast<CapturingExpr*>(this)->getParamPatterns();
+  return ArrayRef<const Pattern *>(patterns.data(), patterns.size());
+}
+
 
 FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> argParams,
@@ -349,7 +355,7 @@ SourceRange FuncExpr::getSourceRange() const {
     return { FuncLoc, Body->getEndLoc() };
   if (FnRetType.hasLocation())
     return { FuncLoc, FnRetType.getSourceRange().End };
-  Pattern *LastPat = getArgParamPatterns().back();
+  const Pattern *LastPat = getArgParamPatterns().back();
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
@@ -387,11 +393,11 @@ VarDecl *FuncExpr::getImplicitThisDecl() const {
   if (getNumParamPatterns() == 0) return nullptr;
   
   // "this" is represented as (typed_pattern (named_pattern (var_decl 'this')).
-  TypedPattern *TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
+  auto TP = dyn_cast<TypedPattern>(getArgParamPatterns()[0]);
   if (TP == 0) return nullptr;
   
   // The decl should be named 'this' and have no location information.
-  NamedPattern *NP = dyn_cast<NamedPattern>(TP->getSubPattern());
+  auto NP = dyn_cast<NamedPattern>(TP->getSubPattern());
   if (NP && NP->getBoundName().str() == "this" && !NP->getLoc().isValid())
     return NP->getDecl();
   return nullptr;

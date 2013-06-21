@@ -763,7 +763,8 @@ public:
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
-  Pattern *getPattern() const { return Pat; }
+  Pattern *getPattern() { return Pat; }
+  const Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *P) { Pat = P; }
 
   bool hasInit() const { return Init; }
@@ -1555,8 +1556,9 @@ public:
   SourceRange getSourceRange() const;
 
   /// \brief Retrieve the indices for this subscript operation.
-  Pattern *getIndices() const { return Indices; }
-  
+  Pattern *getIndices() { return Indices; }
+  const Pattern *getIndices() const { return Indices; }
+
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
   Type getElementType() const { return ElementTy.getType(); }
@@ -1621,6 +1623,8 @@ public:
   SourceRange getSourceRange() const;
 
   Pattern *getArguments() { return Arguments; }
+  const Pattern *getArguments() const { return Arguments; }
+
   void setArguments(Pattern *args) {
     assert(!Arguments && "Resetting arguments?");
     Arguments = args;
