@@ -82,6 +82,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
       -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
       -DLLVM_TARGETS_TO_BUILD="X86" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
       .. &&
     make -j8) || exit 1
 fi
@@ -101,6 +102,7 @@ if [ \! "$SKIP_BUILD_SWIFT" ]; then
       -DSWIFT_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
       -DSWIFT_PATH_TO_LLVM_BUILD="$WORKSPACE/llvm/build" \
       -DSWIFT_MODULE_CACHE_PATH="$WORKSPACE/swift-module-cache" \
+      -DLLVM_ENABLE_ASSERTIONS="ON" \
       .. &&
     make -j8) || exit 1
 fi
