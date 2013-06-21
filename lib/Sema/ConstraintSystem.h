@@ -1708,7 +1708,7 @@ public:
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocator *locator = nullptr) {
     assert(first && "Missing first type");
-    assert(second && "Missing first type");
+    assert(second && "Missing second type");
     addConstraint(new (*this) Constraint(kind, first, second, Identifier(),
                                          locator));
   }
