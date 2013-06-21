@@ -327,7 +327,6 @@ static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
-#ifndef NDEBUG
   SmallVector<unsigned char, 64> nameBuffer;
 #define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
 #define RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
@@ -378,7 +377,6 @@ void Serializer::writeBlockInfoBlock() {
 
 #undef BLOCK
 #undef RECORD
-#endif /* NDEBUG */
 }
 
 void Serializer::writeHeader() {
