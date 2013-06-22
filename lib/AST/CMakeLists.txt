@@ -1,5 +1,6 @@
 add_swift_library(swiftAST
   ASTContext.cpp
+  ASTDumper.cpp
   ASTPrinter.cpp
   ASTWalker.cpp
   Attr.cpp
