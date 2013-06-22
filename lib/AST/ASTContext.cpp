@@ -140,7 +140,7 @@ ASTContext::ASTContext(LangOptions &langOpts, llvm::SourceMgr &sourcemgr,
     LangOpts(langOpts),
     SourceMgr(sourcemgr),
     Diags(Diags),
-    TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"),*this)),
+    TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheObjectPointerType(new (*this, AllocationArena::Permanent)
@@ -189,7 +189,7 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
 /// specified string.
 Identifier ASTContext::getIdentifier(StringRef Str) {
   // Make sure null pointers stay null.
-  if (Str.empty()) return Identifier(0);
+  if (Str.data() == nullptr) return Identifier(0);
   
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
 }

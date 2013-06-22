@@ -173,11 +173,14 @@ private:
   ArrayRef<ImportedModule> ImportedModules;
 
 public:
+  /// Kind - This is the sort of file the translation unit was parsed for, which
+  /// can affect some type checking and other behavior.
   enum TUKind {
     StandardLibrary,
     Library,
     Main,
     Repl,
+    SIL       // Came from a .sil file.
   } Kind;
 
   /// Decls; the list of top-level declarations for a translation unit.

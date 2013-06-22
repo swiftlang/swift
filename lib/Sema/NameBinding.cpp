@@ -101,8 +101,8 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // fine for now since they are each a single file.  Ultimately we'll want a
   // compiled form of AST's like clang's that support lazy deserialization.
 
-  // FIXME: We shouldn't really allow arbitrary modules to import Builtin.
-  if (moduleID.first.str() == "Builtin")
+  // The Builtin module cannot be explicitly imported unless we're a .sil file.
+  if (TU->Kind == TranslationUnit::SIL && moduleID.first.str() == "Builtin")
     return TU->Ctx.TheBuiltinModule;
 
   // If the imported module name is the same as the current translation unit,
