@@ -19,3 +19,6 @@ add_swift_library(swiftAST
   Verifier.cpp
   DEPENDS swiftBasic)
 
+if( NOT SWIFT_BUILT_STANDALONE )
+  add_dependencies(swiftAST intrinsics_gen)
+endif()

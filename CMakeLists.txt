@@ -96,6 +96,26 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib )
 
   set( SWIFT_BUILT_STANDALONE 1 )
+
+else()
+  set(PATH_TO_LLVM_SOURCE "${CMAKE_SOURCE_DIR}")
+  set(PATH_TO_LLVM_BUILD "${CMAKE_BINARY_DIR}")
+  set(SWIFT_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
+  set(PATH_TO_CLANG_BUILD "${SWIFT_PATH_TO_CLANG_BUILD}")
+  set(CLANG_MAIN_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/tools/clang/include")
+  set(CLANG_BUILD_INCLUDE_DIR "${CMAKE_BINARY_DIR}/tools/clang/include")
+
+  if( NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h" )
+    message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
+  endif()
+
+  include_directories("${CLANG_BUILD_INCLUDE_DIR}"
+                      "${CLANG_MAIN_INCLUDE_DIR}")
+
+  check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
+  if( CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types" )
+  endif()
 endif()
 
 set(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
