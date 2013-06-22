@@ -27,8 +27,8 @@ using namespace swift;
 
 /// getASTContext - Return the ASTContext for a specified DeclContetx by
 /// walking up to the translation unit and returning its ASTContext.
-ASTContext &DeclContext::getASTContext() {
-  if (Module *M = dyn_cast<Module>(this))
+ASTContext &DeclContext::getASTContext() const {
+  if (const Module *M = dyn_cast<Module>(this))
     return M->Ctx;
   
   return getParent()->getASTContext();

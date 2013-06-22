@@ -149,7 +149,7 @@ public:
   
   /// getASTContext - Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.
-  ASTContext &getASTContext();
+  ASTContext &getASTContext() const;
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
