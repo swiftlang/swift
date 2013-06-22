@@ -25,7 +25,6 @@
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
-  class Component;
   class MemoryBuffer;
   class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
