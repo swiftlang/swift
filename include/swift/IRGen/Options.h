@@ -56,6 +56,9 @@ public:
   /// The optimization level, as in -O2.
   unsigned OptLevel : 2;
 
+  /// Whether we should emit debug info.
+  unsigned DebugInfo : 1;
+
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
 

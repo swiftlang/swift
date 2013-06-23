@@ -85,7 +85,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
 
 void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
   // Enter a new scope.
-  Scope BraceScope(Cleanups);
+  LexicalScope BraceScope(Cleanups, B, S);
   
   for (auto &ESD : S->getElements()) {
     assert(B.hasValidInsertionPoint());

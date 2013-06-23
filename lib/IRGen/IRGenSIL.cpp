@@ -40,6 +40,7 @@
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
@@ -360,8 +361,12 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // branches.
   
   // Generate the body.
-  for (auto &I : *BB)
+  for (auto &I : *BB) {
+    // Set the debug info location for I, if applicable.
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->SetCurrentLoc(Builder, I.getLoc(), I.getDebugScope());
     visit(&I);
+  }
   
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }

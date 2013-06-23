@@ -82,6 +82,7 @@ namespace irgen {
   class ExplosionSchema;
   class FormalType;
   class FunctionRef;
+  class IRGenDebugInfo;
   class LinkEntity;
   class Options;
   class ProtocolInfo;
@@ -99,6 +100,8 @@ public:
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
   SILModule *SILMod;
+  /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
+  IRGenDebugInfo *DebugInfo;
 
   /// Does the current target require Objective-C interoperation?
   static const bool ObjCInterop = true;

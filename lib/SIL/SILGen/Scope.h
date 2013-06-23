@@ -17,6 +17,8 @@
 #ifndef SCOPE_H
 #define SCOPE_H
 
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 
 namespace swift {
@@ -54,7 +56,7 @@ public:
     Depth = CleanupsDepth::invalid();
   }
 
-  ~Scope() {
+  virtual ~Scope() {
     if (Depth.isValid()) popImpl();
   }
 };
@@ -69,6 +71,28 @@ public:
   explicit FullExpr(CleanupManager &Cleanups) : Scope(Cleanups) {}
   using Scope::pop;
 };
+
+/// A LexicalScope is a Scope that is also exposed to the debug info.
+class LLVM_LIBRARY_VISIBILITY LexicalScope : private Scope {
+  SILBuilder& Builder;
+public:
+  explicit LexicalScope(CleanupManager &Cleanups,
+                        SILBuilder& B,
+                        SILLocation Loc)
+    : Scope(Cleanups), Builder(B) {
+    SILDebugScope *DS = new (B.getFunction().getModule()) SILDebugScope(Loc);
+    Builder.enterDebugScope(DS);
+  }
+  using Scope::pop;
+
+  ~LexicalScope() {
+    Builder.leaveDebugScope();
+    Scope::~Scope();
+  }
+
+};
+
+
 
 } // end namespace Lowering
 } // end namespace swift

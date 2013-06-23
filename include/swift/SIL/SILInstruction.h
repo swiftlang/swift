@@ -28,19 +28,20 @@
 
 namespace swift {
 
-class ValueDecl;
-class SILType;
-class SILFunction;
-class SILBasicBlock;
 class CharacterLiteralExpr;
 class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
 class IntegerLiteralExpr;
-class StringLiteralExpr;
+class SILBasicBlock;
+class SILDebugScope;
+class SILFunction;
+class SILType;
 class Stmt;
-class VarDecl;
+class StringLiteralExpr;
 class Substitution;
+class ValueDecl;
+class VarDecl;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
@@ -51,7 +52,10 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   /// ilist_traits<SILInstruction>.
   SILBasicBlock *ParentBB;
 
+  /// This instruction's location (i.e., AST).
   SILLocation Loc;
+  /// This instruction's containing lexical scope used for debug info.
+  SILDebugScope* DebugScope;
 
   friend struct llvm::ilist_sentinel_traits<SILInstruction>;
   SILInstruction() = delete;
@@ -59,10 +63,12 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   void operator delete(void *Ptr, size_t) = delete;
 
 protected:
-  SILInstruction(ValueKind Kind, SILLocation Loc, SILType Ty)
-    : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc) {}
-  SILInstruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0)
-    : ValueBase(Kind, TypeList), ParentBB(0), Loc(Loc) {}
+  SILInstruction(ValueKind Kind, SILLocation Loc, SILType Ty,
+                 SILDebugScope *DS=0)
+    : ValueBase(Kind, Ty), ParentBB(0), Loc(Loc), DebugScope(DS) {}
+  SILInstruction(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
+                 SILDebugScope *DS=0)
+    : ValueBase(Kind, TypeList), ParentBB(0), Loc(Loc), DebugScope(DS) {}
 
 public:
 
@@ -70,6 +76,8 @@ public:
   SILBasicBlock *getParent() { return ParentBB; }
 
   SILLocation getLoc() const { return Loc; }
+  SILDebugScope *getDebugScope() const { return DebugScope; }
+  void setDebugScope(SILDebugScope *DS)  { DebugScope = DS; }
 
   /// Return the AST expression that this instruction is produced from, or null
   /// if it is implicitly generated.  Note that this is aborts on locations that

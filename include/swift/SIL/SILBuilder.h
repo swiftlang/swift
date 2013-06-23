@@ -13,10 +13,13 @@
 #ifndef SWIFT_SIL_SILBUILDER_H
 #define SWIFT_SIL_SILBUILDER_H
 
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {
+
+class SILDebugScope;
 
 class SILBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
@@ -25,8 +28,9 @@ class SILBuilder {
   SILFunction &F;
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
+  // ScopeStack - Keep track of our current nested scope.
+  std::vector<SILDebugScope*> DebugScopeStack;
 public:
-
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
   explicit SILBuilder(SILInstruction *I)
@@ -107,6 +111,21 @@ public:
     if (&F->getBlocks().back() != BB)
       F->getBlocks().splice(F->end(), F->getBlocks(), BB);
   }
+
+  /// enterDebugScope - Push a new debug scope and set its parent pointer.
+  void enterDebugScope(SILDebugScope *DS) {
+    if (DebugScopeStack.size())
+      DS->setParent(DebugScopeStack.back());
+    DebugScopeStack.push_back(DS);
+  }
+
+  /// enterDebugScope - return to the previous debug scope.
+  void leaveDebugScope() {
+    assert(ScopeStack.size());
+    DebugScopeStack.pop_back();
+  }
+
+  SILFunction& getFunction() const { return F; }
   
   //===--------------------------------------------------------------------===//
   // SILInstruction Creation Methods
@@ -664,6 +683,10 @@ private:
 
   void insertImpl(SILInstruction *TheInst) {
     if (BB == 0) return;
+
+    if (DebugScopeStack.size())
+      TheInst->setDebugScope(DebugScopeStack.back());
+
     BB->getInsts().insert(InsertPt, TheInst);
   }
 };

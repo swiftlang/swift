@@ -30,6 +30,7 @@
 
 #include "GenType.h"
 #include "IRGenModule.h"
+#include "IRGenDebugInfo.h"
 #include "Linking.h"
 
 #include <initializer_list>
@@ -61,7 +62,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
                          Options &Opts, llvm::Module &Module,
                          const llvm::DataLayout &DataLayout,
                          SILModule *SILMod)
-  : Context(Context), Opts(Opts),
+  : Context(Context), Opts(Opts), DebugInfo(0),
     Module(Module), LLVMContext(Module.getContext()),
     DataLayout(DataLayout), SILMod(SILMod),
     Types(*new TypeConverter(*this)) {
@@ -173,10 +174,15 @@ IRGenModule::IRGenModule(ASTContext &Context,
       
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
+
+  if (Opts.DebugInfo)
+    DebugInfo = new IRGenDebugInfo(Context.SourceMgr, Module);
 }
 
 IRGenModule::~IRGenModule() {
   delete &Types;
+  if (DebugInfo)
+    delete DebugInfo;
 }
 
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
