@@ -148,6 +148,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
         SubOpts.Triple = Opts.Triple;
         SubOpts.OutputKind = OutputKind::Module;
         SubOpts.OptLevel = 2;
+	SubOpts.DebugInfo = Opts.DebugInfo;
         llvm::Module SubModule(SubTU->Name.str(), Module->getContext());
         performCaptureAnalysis(SubTU);
         performIRGeneration(SubOpts, &SubModule, SubTU, SILMod);

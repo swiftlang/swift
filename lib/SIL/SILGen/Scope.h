@@ -87,7 +87,6 @@ public:
 
   ~LexicalScope() {
     Builder.leaveDebugScope();
-    Scope::~Scope();
   }
 
 };
