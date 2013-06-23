@@ -28,7 +28,7 @@ class SILBuilder {
   SILFunction &F;
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
-  // ScopeStack - Keep track of our current nested scope.
+  // DebugScopeStack - Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
@@ -121,7 +121,7 @@ public:
 
   /// enterDebugScope - return to the previous debug scope.
   void leaveDebugScope() {
-    assert(ScopeStack.size());
+    assert(DebugScopeStack.size());
     DebugScopeStack.pop_back();
   }
 
