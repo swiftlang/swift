@@ -62,10 +62,9 @@ IRGenModule::IRGenModule(ASTContext &Context,
                          Options &Opts, llvm::Module &Module,
                          const llvm::DataLayout &DataLayout,
                          SILModule *SILMod)
-  : Context(Context), Opts(Opts), DebugInfo(0),
-    Module(Module), LLVMContext(Module.getContext()),
-    DataLayout(DataLayout), SILMod(SILMod),
-    Types(*new TypeConverter(*this)) {
+  : Context(Context), Opts(Opts), Module(Module),
+    LLVMContext(Module.getContext()), DataLayout(DataLayout),
+    SILMod(SILMod), DebugInfo(0), Types(*new TypeConverter(*this)) {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());
