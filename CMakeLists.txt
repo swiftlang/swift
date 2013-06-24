@@ -555,13 +555,6 @@ include_directories(BEFORE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
-# clang/swift doesn't print colored diagnostics when invoked from Ninja
-if (UNIX AND
-    CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
-    CMAKE_GENERATOR STREQUAL "Ninja")
-  append("-fcolor-diagnostics" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-endif()
-
 # Add all of the subdirectories, where we actually do work.
 add_subdirectory(lib)
 add_subdirectory(tools)
