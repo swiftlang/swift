@@ -140,7 +140,7 @@ struct ClangImporter::Implementation {
   std::unique_ptr<clang::SyntaxOnlyAction> Action;
 
   /// \brief Mapping of already-imported declarations.
-  llvm::DenseMap<clang::Decl *, Decl *> ImportedDecls;
+  llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
 
   /// \brief The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -151,11 +151,11 @@ struct ClangImporter::Implementation {
   /// when this is not the case, e.g., Objective-C's "BOOL" has an underlying
   /// type of "signed char", but is mapped to a special Swift struct type
   /// ObjCBool.
-  llvm::SmallPtrSet<clang::TypedefNameDecl *, 8> SpecialTypedefNames;
+  llvm::SmallPtrSet<const clang::TypedefNameDecl *, 8> SpecialTypedefNames;
 
   /// \brief Mapping of already-imported declarations from protocols, which
   /// can (and do) get replicated into classes.
-  llvm::DenseMap<std::pair<clang::Decl *, DeclContext *>, Decl *>
+  llvm::DenseMap<std::pair<const clang::Decl *, DeclContext *>, Decl *>
     ImportedProtocolDecls;
 
   /// \brief Mapping of already-imported macros.
@@ -267,13 +267,13 @@ public:
 
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
-  EnumKind classifyEnum(clang::EnumDecl *decl);
+  EnumKind classifyEnum(const clang::EnumDecl *decl);
 
   /// \brief Import the given Clang declaration into Swift.
   ///
   /// \returns The imported declaration, or null if this declaration could
   /// not be represented in Swift.
-  Decl *importDecl(clang::NamedDecl *decl);
+  Decl *importDecl(const clang::NamedDecl *decl);
 
   /// \brief Import a cloned version of the given declaration, which is part of
   /// an Objective-C protocol and currently must be a method, into the given
@@ -281,13 +281,13 @@ public:
   ///
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
-  Decl *importMirroredDecl(clang::ObjCMethodDecl *decl, DeclContext *dc);
+  Decl *importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContext(clang::DeclContext *dc);
+  DeclContext *importDeclContext(const clang::DeclContext *dc);
 
   /// \brief Create a new named constant with the given value.
   ///
@@ -366,7 +366,7 @@ public:
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
   Type importFunctionType(clang::QualType resultType,
-                          ArrayRef<clang::ParmVarDecl *> params,
+                          ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic,
                           SmallVectorImpl<Pattern*> &argPatterns,
                           SmallVectorImpl<Pattern*> &bodyPatterns,

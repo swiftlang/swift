@@ -532,7 +532,7 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
 
 Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
-       ArrayRef<clang::ParmVarDecl *> params,
+       ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic,
        SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns,

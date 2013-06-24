@@ -59,7 +59,7 @@ namespace swift {
   class Stmt;
   class ValueDecl;
 
-  typedef llvm::PointerUnion<clang::Decl *, clang::MacroInfo *> ClangNode;
+  typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
   
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -234,11 +234,11 @@ public:
 
   /// \brief Retrieve the Clang declaration from which this declaration was
   /// synthesized, if any.
-  clang::Decl *getClangDecl() {
+  const clang::Decl *getClangDecl() {
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangNodeSlow().dyn_cast<clang::Decl *>();
+    return getClangNodeSlow().dyn_cast<const clang::Decl *>();
   }
 
   /// \brief Retrieve the Clang macro from which this declaration was

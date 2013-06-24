@@ -52,7 +52,7 @@ static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
 /// \returns A pair of a swift type and its name that corresponds to a given
 /// C type.
 static std::pair<Type, StringRef>
-getSwiftStdlibType(clang::TypedefNameDecl *D,
+getSwiftStdlibType(const clang::TypedefNameDecl *D,
                    Identifier Name,
                    ClangImporter::Implementation &Impl) {
   BridgeCTypeKind CTypeKind;
@@ -177,7 +177,7 @@ namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
-    : public clang::DeclVisitor<SwiftDeclConverter, Decl *>
+    : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
   {
     ClangImporter::Implementation &Impl;
 
@@ -185,36 +185,36 @@ namespace {
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl)
       : Impl(impl) { }
 
-    Decl *VisitDecl(clang::Decl *decl) {
+    Decl *VisitDecl(const clang::Decl *decl) {
       return nullptr;
     }
 
-    Decl *VisitTranslationUnitDecl(clang::TranslationUnitDecl *decl) {
+    Decl *VisitTranslationUnitDecl(const clang::TranslationUnitDecl *decl) {
       // Note: translation units are handled specially by importDeclContext.
       return nullptr;
     }
 
-    Decl *VisitNamespaceDecl(clang::NamespaceDecl *decl) {
+    Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
       // FIXME: Implement once Swift has namespaces.
       return nullptr;
     }
 
-    Decl *VisitUsingDirectiveDecl(clang::UsingDirectiveDecl *decl) {
+    Decl *VisitUsingDirectiveDecl(const clang::UsingDirectiveDecl *decl) {
       // Never imported.
       return nullptr;
     }
 
-    Decl *VisitNamespaceAliasDecl(clang::NamespaceAliasDecl *decl) {
+    Decl *VisitNamespaceAliasDecl(const clang::NamespaceAliasDecl *decl) {
       // FIXME: Implement once Swift has namespaces.
       return nullptr;
     }
 
-    Decl *VisitLabelDecl(clang::LabelDecl *decl) {
+    Decl *VisitLabelDecl(const clang::LabelDecl *decl) {
       // Labels are function-local, and therefore never imported.
       return nullptr;
     }
 
-    Decl *VisitTypedefNameDecl(clang::TypedefNameDecl *Decl) {
+    Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       auto Name = Impl.importName(Decl->getDeclName());
       if (Name.empty())
         return nullptr;
@@ -260,7 +260,7 @@ namespace {
     }
 
     Decl *
-    VisitUnresolvedUsingTypenameDecl(clang::UnresolvedUsingTypenameDecl *decl) {
+    VisitUnresolvedUsingTypenameDecl(const clang::UnresolvedUsingTypenameDecl *decl) {
       // Note: only occurs in templates.
       return nullptr;
     }
@@ -357,7 +357,7 @@ namespace {
       return constructor;
     }
 
-    Decl *VisitEnumDecl(clang::EnumDecl *decl) {
+    Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
       if (!decl)
         return nullptr;
@@ -467,7 +467,7 @@ namespace {
       return result;
     }
 
-    Decl *VisitRecordDecl(clang::RecordDecl *decl) {
+    Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // FIXME: Skip unions for now. We can't properly map them to oneofs,
       // because they aren't discriminated in any way. We could map them to
       // structs, but that would make them very, very unsafe to use.
@@ -552,24 +552,24 @@ namespace {
     }
 
     Decl *VisitClassTemplateSpecializationDecl(
-                 clang::ClassTemplateSpecializationDecl *decl) {
+                 const clang::ClassTemplateSpecializationDecl *decl) {
       // FIXME: We could import specializations, but perhaps only as unnamed
       // structural types.
       return nullptr;
     }
 
     Decl *VisitClassTemplatePartialSpecializationDecl(
-                 clang::ClassTemplatePartialSpecializationDecl *decl) {
+                 const clang::ClassTemplatePartialSpecializationDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitTemplateTypeParmDecl(clang::TemplateTypeParmDecl *decl) {
+    Decl *VisitTemplateTypeParmDecl(const clang::TemplateTypeParmDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitEnumConstantDecl(clang::EnumConstantDecl *decl) {
+    Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto &context = Impl.SwiftContext;
       
       auto name = Impl.importName(decl->getDeclName());
@@ -681,12 +681,12 @@ namespace {
 
 
     Decl *
-    VisitUnresolvedUsingValueDecl(clang::UnresolvedUsingValueDecl *decl) {
+    VisitUnresolvedUsingValueDecl(const clang::UnresolvedUsingValueDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitIndirectFieldDecl(clang::IndirectFieldDecl *decl) {
+    Decl *VisitIndirectFieldDecl(const clang::IndirectFieldDecl *decl) {
       // Check whether the context of any of the fields in the chain is a
       // union. If so, don't import this field.
       for (auto f = decl->chain_begin(), fEnd = decl->chain_end(); f != fEnd;
@@ -715,7 +715,7 @@ namespace {
                        name, type, dc);
     }
 
-    Decl *VisitFunctionDecl(clang::FunctionDecl *decl) {
+    Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       decl = decl->getMostRecentDecl();
       if (!decl->hasPrototype()) {
         // We can't import a function without a prototype.
@@ -767,12 +767,12 @@ namespace {
       return result;
     }
 
-    Decl *VisitCXXMethodDecl(clang::CXXMethodDecl *decl) {
+    Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       // FIXME: Import C++ member functions as methods.
       return nullptr;
     }
 
-    Decl *VisitFieldDecl(clang::FieldDecl *decl) {
+    Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
       // Fields are imported as variables.
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
@@ -798,18 +798,18 @@ namespace {
       return result;
     }
 
-    Decl *VisitObjCIvarDecl(clang::ObjCIvarDecl *decl) {
+    Decl *VisitObjCIvarDecl(const clang::ObjCIvarDecl *decl) {
       // FIXME: Deal with fact that a property and an ivar can have the same
       // name.
       return VisitFieldDecl(decl);
     }
 
-    Decl *VisitObjCAtDefsFieldDecl(clang::ObjCAtDefsFieldDecl *decl) {
+    Decl *VisitObjCAtDefsFieldDecl(const clang::ObjCAtDefsFieldDecl *decl) {
       // @defs is an anachronism; ignore it.
       return nullptr;
     }
 
-    Decl *VisitVarDecl(clang::VarDecl *decl) {
+    Decl *VisitVarDecl(const clang::VarDecl *decl) {
       // FIXME: Swift does not have static variables in structs/classes yet.
       if (decl->getDeclContext()->isRecord())
         return nullptr;
@@ -832,39 +832,39 @@ namespace {
                        name, type, dc);
     }
 
-    Decl *VisitImplicitParamDecl(clang::ImplicitParamDecl *decl) {
+    Decl *VisitImplicitParamDecl(const clang::ImplicitParamDecl *decl) {
       // Parameters are never directly imported.
       return nullptr;
     }
 
-    Decl *VisitParmVarDecl(clang::ParmVarDecl *decl) {
+    Decl *VisitParmVarDecl(const clang::ParmVarDecl *decl) {
       // Parameters are never directly imported.
       return nullptr;
     }
 
     Decl *
-    VisitNonTypeTemplateParmDecl(clang::NonTypeTemplateParmDecl *decl) {
+    VisitNonTypeTemplateParmDecl(const clang::NonTypeTemplateParmDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitTemplateDecl(clang::TemplateDecl *decl) {
+    Decl *VisitTemplateDecl(const clang::TemplateDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitUsingDecl(clang::UsingDecl *decl) {
+    Decl *VisitUsingDecl(const clang::UsingDecl *decl) {
       // Using declarations are not imported.
       return nullptr;
     }
 
-    Decl *VisitUsingShadowDecl(clang::UsingShadowDecl *decl) {
+    Decl *VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
       // Using shadow declarations are not imported; rather, name lookup just
       // looks through them.
       return nullptr;
     }
 
-    Decl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl) {
+    Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
       auto dc = Impl.importDeclContext(decl->getDeclContext());
       if (!dc)
         return nullptr;
@@ -872,7 +872,7 @@ namespace {
       return VisitObjCMethodDecl(decl, dc);
     }
 
-    Decl *VisitObjCMethodDecl(clang::ObjCMethodDecl *decl, DeclContext *dc) {
+    Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc) {
       auto loc = Impl.importSourceLoc(decl->getLocStart());
 
       // The name of the method is the first part of the selector.
@@ -1038,7 +1038,7 @@ namespace {
     /// new NSArray(1024) // in objc: [[NSArray alloc] initWithCapacity:1024]
     /// \endcode
     ConstructorDecl *importConstructor(Decl *decl,
-                                       clang::ObjCMethodDecl *objcMethod,
+                                       const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc) {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
@@ -1089,7 +1089,7 @@ namespace {
         
         // Make sure we have a usable 'alloc' method. Otherwise, we can't
         // build this constructor anyway.
-        clang::ObjCInterfaceDecl *interface;
+        const clang::ObjCInterfaceDecl *interface;
         if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
           // For a protocol method, look into the context in which we'll be
           // mirroring the method to find 'alloc'.
@@ -1588,7 +1588,7 @@ namespace {
     /// \brief Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
-                                   clang::ObjCMethodDecl *objcMethod,
+                                   const clang::ObjCMethodDecl *objcMethod,
                                    DeclContext *dc) {
       assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
@@ -1817,7 +1817,7 @@ namespace {
     /// FIXME: This whole thing is a hack, because name lookup should really
     /// just find these members when it looks in the protocol. Unfortunately,
     /// that's not something the name lookup code can handle right now.
-    void importMirroredProtocolMembers(clang::ObjCContainerDecl *decl,
+    void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
                                        ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members) {
@@ -1846,8 +1846,8 @@ namespace {
     /// \brief Determine whether the given Objective-C class has an instance or
     /// class method with the given selector directly declared (i.e., not in
     /// a superclass or protocol).
-    static bool hasMethodShallow(clang::Selector sel, bool isInstance,
-                                 clang::ObjCInterfaceDecl *objcClass) {
+    static bool hasMethodShallow(const clang::Selector sel, bool isInstance,
+                                 const clang::ObjCInterfaceDecl *objcClass) {
       if (objcClass->getMethod(sel, isInstance))
         return true;
 
@@ -1867,13 +1867,13 @@ namespace {
     ///
     /// FIXME: Does it make sense to have inherited constructors as a real
     /// Swift feature?
-    void importInheritedConstructors(clang::ObjCInterfaceDecl *objcClass,
+    void importInheritedConstructors(const clang::ObjCInterfaceDecl *objcClass,
                                      DeclContext *dc,
                                      SmallVectorImpl<Decl *> &members) {
       // FIXME: Would like a more robust way to ensure that we aren't creating
       // duplicates.
       llvm::SmallSet<clang::Selector, 16> knownSelectors;
-      auto inheritConstructors = [&](clang::ObjCContainerDecl *container) {
+      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container) {
         for (auto meth = container->meth_begin(),
                   methEnd = container->meth_end();
              meth != methEnd; ++meth) {
@@ -1904,7 +1904,7 @@ namespace {
       }
     }
 
-    Decl *VisitObjCCategoryDecl(clang::ObjCCategoryDecl *decl) {
+    Decl *VisitObjCCategoryDecl(const clang::ObjCCategoryDecl *decl) {
       // Objective-C categories and extensions map to Swift extensions.
 
       // Find the Swift class being extended.
@@ -1978,7 +1978,7 @@ namespace {
       return result;
     }
 
-    Decl *VisitObjCProtocolDecl(clang::ObjCProtocolDecl *decl) {
+    Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
@@ -2081,7 +2081,7 @@ namespace {
       return result;
     }
 
-    Decl *VisitObjCInterfaceDecl(clang::ObjCInterfaceDecl *decl) {
+    Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
@@ -2174,7 +2174,7 @@ namespace {
       return result;
     }
 
-    Decl *VisitObjCImplDecl(clang::ObjCImplDecl *decl) {
+    Decl *VisitObjCImplDecl(const clang::ObjCImplDecl *decl) {
       // Implementations of Objective-C classes and categories are not
       // reflected into Swift.
       return nullptr;
@@ -2211,7 +2211,7 @@ namespace {
       return collectionTy;
     }
 
-    Decl *VisitObjCPropertyDecl(clang::ObjCPropertyDecl *decl) {
+    Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
       // Properties are imported as variables.
 
       // FIXME: For now, don't import properties in protocols, because IRGen
@@ -2300,60 +2300,60 @@ namespace {
     }
 
     Decl *
-    VisitObjCCompatibleAliasDecl(clang::ObjCCompatibleAliasDecl *decl) {
+    VisitObjCCompatibleAliasDecl(const clang::ObjCCompatibleAliasDecl *decl) {
       // Like C++ using declarations, name lookup simply looks through
       // Objective-C compatibility aliases. They are not imported directly.
       return nullptr;
     }
 
-    Decl *VisitLinkageSpecDecl(clang::LinkageSpecDecl *decl) {
+    Decl *VisitLinkageSpecDecl(const clang::LinkageSpecDecl *decl) {
       // Linkage specifications are not imported.
       return nullptr;
     }
 
-    Decl *VisitObjCPropertyImplDecl(clang::ObjCPropertyImplDecl *decl) {
+    Decl *VisitObjCPropertyImplDecl(const clang::ObjCPropertyImplDecl *decl) {
       // @synthesize and @dynamic are not imported, since they are not part
       // of the interface to a class.
       return nullptr;
     }
 
-    Decl *VisitFileScopeAsmDecl(clang::FileScopeAsmDecl *decl) {
+    Decl *VisitFileScopeAsmDecl(const clang::FileScopeAsmDecl *decl) {
       return nullptr;
     }
 
-    Decl *VisitAccessSpecDecl(clang::AccessSpecDecl *decl) {
+    Decl *VisitAccessSpecDecl(const clang::AccessSpecDecl *decl) {
       return nullptr;
     }
 
-    Decl *VisitFriendDecl(clang::FriendDecl *decl) {
+    Decl *VisitFriendDecl(const clang::FriendDecl *decl) {
       // Friends are not imported; Swift has a different access control
       // mechanism.
       return nullptr;
     }
 
-    Decl *VisitFriendTemplateDecl(clang::FriendTemplateDecl *decl) {
+    Decl *VisitFriendTemplateDecl(const clang::FriendTemplateDecl *decl) {
       // Friends are not imported; Swift has a different access control
       // mechanism.
       return nullptr;
     }
 
-    Decl *VisitStaticAssertDecl(clang::StaticAssertDecl *decl) {
+    Decl *VisitStaticAssertDecl(const clang::StaticAssertDecl *decl) {
       // Static assertions are an implementation detail.
       return nullptr;
     }
 
-    Decl *VisitBlockDecl(clang::BlockDecl *decl) {
+    Decl *VisitBlockDecl(const clang::BlockDecl *decl) {
       // Blocks are not imported (although block types can be imported).
       return nullptr;
     }
 
     Decl *VisitClassScopeFunctionSpecializationDecl(
-                 clang::ClassScopeFunctionSpecializationDecl *decl) {
+                 const clang::ClassScopeFunctionSpecializationDecl *decl) {
       // Note: templates are not imported.
       return nullptr;
     }
 
-    Decl *VisitImportDecl(clang::ImportDecl *decl) {
+    Decl *VisitImportDecl(const clang::ImportDecl *decl) {
       // Transitive module imports are not handled at the declaration level.
       // Rather, they are understood from the module itself.
       return nullptr;
@@ -2362,7 +2362,7 @@ namespace {
 }
 
 /// \brief Classify the given Clang enumeration to describe how it
-EnumKind ClangImporter::Implementation::classifyEnum(clang::EnumDecl *decl) {
+EnumKind ClangImporter::Implementation::classifyEnum(const clang::EnumDecl *decl) {
   Identifier name;
   if (decl->getDeclName())
     name = importName(decl->getDeclName());
@@ -2380,7 +2380,7 @@ EnumKind ClangImporter::Implementation::classifyEnum(clang::EnumDecl *decl) {
   return EnumKind::Options;
 }
 
-Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
+Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
   if (!decl)
     return nullptr;
   
@@ -2401,7 +2401,7 @@ Decl *ClangImporter::Implementation::importDecl(clang::NamedDecl *decl) {
 }
 
 Decl *
-ClangImporter::Implementation::importMirroredDecl(clang::ObjCMethodDecl *decl,
+ClangImporter::Implementation::importMirroredDecl(const clang::ObjCMethodDecl *decl,
                                                   DeclContext *dc) {
   if (!decl)
     return nullptr;
@@ -2421,7 +2421,7 @@ ClangImporter::Implementation::importMirroredDecl(clang::ObjCMethodDecl *decl,
 }
 
 DeclContext *
-ClangImporter::Implementation::importDeclContext(clang::DeclContext *dc) {
+ClangImporter::Implementation::importDeclContext(const clang::DeclContext *dc) {
   // FIXME: Should map to the module we want to import into (?).
   if (dc->isTranslationUnit())
     return firstClangModule;

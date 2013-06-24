@@ -58,7 +58,7 @@ private:
       returnKind(returnKind)
   {}
   
-  static OwnershipConventions getForClangDecl(clang::Decl *method,
+  static OwnershipConventions getForClangDecl(const clang::Decl *method,
                                               SILFunctionTypeInfo *ft);
   static OwnershipConventions getForObjCSelectorFamily(SelectorFamily family,
                                                        SILFunctionTypeInfo *ft);

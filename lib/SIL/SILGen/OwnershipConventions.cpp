@@ -75,7 +75,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
 }
 
 /// Try to find a clang method declaration for the given function.
-static clang::Decl *findClangMethod(ValueDecl *method) {
+static const clang::Decl *findClangMethod(ValueDecl *method) {
   if (FuncDecl *methodFn = dyn_cast<FuncDecl>(method)) {
     if (auto *decl = methodFn->getClangDecl())
       return decl;
@@ -120,7 +120,7 @@ OwnershipConventions OwnershipConventions::getDefault(SILGenFunction &gen,
   };
 }
 
-static OwnershipConventions::Return getReturnKind(clang::Decl *clangDecl,
+static OwnershipConventions::Return getReturnKind(const clang::Decl *clangDecl,
                                                   clang::QualType resultType) {
   // If the result type is an ObjC pointer, consult the decl attributes (if any)
   if (resultType->isObjCRetainableType()) {
@@ -143,7 +143,7 @@ static void getConsumedArgs(PARAM_RANGE params,
   // FIXME: This assumes a 1:1 correspondence of SIL arguments to ObjC
   // arguments, which won't be true if we ever map tuples to foreign types.
   size_t argIndex = 1;
-  for (clang::ParmVarDecl *param : params) {
+  for (const clang::ParmVarDecl *param : params) {
     if (param->hasAttr<clang::NSConsumedAttr>())
       consumedArgs.set(argIndex);
     ++argIndex;
@@ -151,7 +151,7 @@ static void getConsumedArgs(PARAM_RANGE params,
 }
 
 OwnershipConventions
-OwnershipConventions::getForClangDecl(clang::Decl *clangDecl,
+OwnershipConventions::getForClangDecl(const clang::Decl *clangDecl,
                                       SILFunctionTypeInfo *ft) {
   size_t inputTypeCount = ft->getInputTypes().size();
   llvm::SmallBitVector consumedArgs(inputTypeCount, false);

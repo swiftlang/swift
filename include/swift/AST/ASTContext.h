@@ -65,7 +65,7 @@ namespace swift {
   class DiagnosticEngine;
   class Substitution;
 
-  typedef llvm::PointerUnion<clang::Decl *, clang::MacroInfo *> ClangNode;
+  typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
