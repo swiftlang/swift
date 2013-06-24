@@ -14,6 +14,7 @@
 // whether a given type conforms to a given protocol.
 //===----------------------------------------------------------------------===//
 
+#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -141,8 +142,7 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
 /// \returns the result of performing the match.
 static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
                                      ValueDecl *req, Type reqType,
-                                     Type model, ValueDecl *witness,
-                                     TypeSubstitutionMap &typeMapping) {
+                                     Type model, ValueDecl *witness) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -205,79 +205,78 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     decomposeFunctionType = isa<SubscriptDecl>(req);
   }
 
-  // If the types match, success!
-  if (witnessType->isEqual(reqType))
-    return RequirementMatch(witness, MatchKind::ExactMatch, witnessType);
-
-  // If we don't need to decompose function types, simply remove labels and
-  // check the types.
-  if (!decomposeFunctionType) {
-    // Remove labels from the types.
-    if (witnessType->getUnlabeledType(tc.Context)->isEqual(
-          reqType->getUnlabeledType(tc.Context)))
-      return RequirementMatch(witness, MatchKind::RenamedMatch, witnessType);
-
-    // We don't have a match.
-    return RequirementMatch(witness, MatchKind::TypeConflict,
-                            witnessType->getUnlabeledType(tc.Context));
-  }
-
-  // Break up the function types. We'll check parameters/return type separately.
-  auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
-  auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
-  auto witnessInputType = witnessType->castTo<AnyFunctionType>()->getInput();
-  auto witnessResultType = witnessType->castTo<AnyFunctionType>()->getResult();
-
-  // Check the result type.
-  if (!witnessResultType->getUnlabeledType(tc.Context)->isEqual(
-        reqResultType->getUnlabeledType(tc.Context))) {
-    // The types did not match.
-    // FIXME: More specific information here!
-    return RequirementMatch(witness, MatchKind::TypeConflict,
-                            witnessType->getUnlabeledType(tc.Context));
-  }
-
-  // Decompose the input types into parameters.
-  auto reqParams = decomposeIntoTupleElements(reqInputType);
-  auto witnessParams = decomposeIntoTupleElements(witnessInputType);
-
-  // If the number of parameters
-  if (reqParams.size() != witnessParams.size())
-    return RequirementMatch(witness, MatchKind::TypeConflict,
-                            witnessType->getUnlabeledType(tc.Context));
-
-  // Match each of the parameters.
+  // Construct a constraint system to use to solve the equality between
+  // the required type and the witness type.
+  // FIXME: Pass the nominal/extension context in as the DeclContext?
+  constraints::ConstraintSystem cs(tc, &tc.TU);
   bool anyRenaming = false;
-  for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
-    // Variadic bits must match.
-    // FIXME: Specialize the match failure kind
-    if (reqParams[i].isVararg() != witnessParams[i].isVararg())
+  if (decomposeFunctionType) {
+    // Decompose function types into parameters and result type.
+    auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
+    auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
+    auto witnessInputType = witnessType->castTo<AnyFunctionType>()->getInput();
+    auto witnessResultType = witnessType->castTo<AnyFunctionType>()->getResult();
+
+    // Result types must match.
+    // FIXME: Could allow (trivial?) subtyping here.
+    cs.addConstraint(constraints::ConstraintKind::Equal,
+                     witnessResultType->getUnlabeledType(tc.Context),
+                     reqResultType->getUnlabeledType(tc.Context));
+    // FIXME: Check whether this has already failed.
+
+    // Parameter types and kinds must match. Start by decomposing the input
+    // types into sets of tuple elements.
+    // Decompose the input types into parameters.
+    auto reqParams = decomposeIntoTupleElements(reqInputType);
+    auto witnessParams = decomposeIntoTupleElements(witnessInputType);
+
+    // If the number of parameters doesn't match, we're done.
+    if (reqParams.size() != witnessParams.size())
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType->getUnlabeledType(tc.Context));
 
-    // Check whether the parameter types match.
-    // FIXME: Specialize the match failure kind
-    if (!reqParams[i].getType()->getUnlabeledType(tc.Context)->isEqual(
-          witnessParams[i].getType()->getUnlabeledType(tc.Context)))
-      return RequirementMatch(witness, MatchKind::TypeConflict,
-                              witnessType->getUnlabeledType(tc.Context));
+    // Match each of the parameters.
+    for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
+      // Variadic bits must match.
+      // FIXME: Specialize the match failure kind
+      if (reqParams[i].isVararg() != witnessParams[i].isVararg())
+        return RequirementMatch(witness, MatchKind::TypeConflict,
+                                witnessType->getUnlabeledType(tc.Context));
 
-    // FIXME: Consider default arguments here?
+      // Check the parameter names.
+      if (reqParams[i].getName() != witnessParams[i].getName()) {
+        // A parameter has been renamed.
+        anyRenaming = true;
 
-    // If the parameter names match, keep going.
-    if (reqParams[i].getName() == witnessParams[i].getName())
-      continue;
+        // For an Objective-C requirement, all but the first parameter name is
+        // significant.
+        // FIXME: Specialize the match failure kind.
+        // FIXME: Constructors care about the first name.
+        if (protocol->getAttrs().isObjC() && i > 0)
+          return RequirementMatch(witness, MatchKind::TypeConflict,
+                                  witnessType);
+      }
 
-    // A parameter has been renamed.
-    anyRenaming = true;
+      // Check whether the parameter types match.
+      cs.addConstraint(constraints::ConstraintKind::Equal,
+                       witnessParams[i].getType()->getUnlabeledType(tc.Context),
+                       reqParams[i].getType()->getUnlabeledType(tc.Context));
+      // FIXME: Check whether this failed.
 
-    // For an Objective-C requirement, all but the first parameter name is
-    // significant.
-    // FIXME: Specialize the match failure kind.
-    // FIXME: Constructors care about the first name.
-    if (protocol->getAttrs().isObjC() && i > 0)
-      return RequirementMatch(witness, MatchKind::TypeConflict,
-                              witnessType);
+      // FIXME: Consider default arguments here?
+    }
+  } else {
+    // Simple case: remove labels and add the constraint.
+    cs.addConstraint(constraints::ConstraintKind::Equal,
+                     witnessType->getUnlabeledType(tc.Context),
+                     reqType->getUnlabeledType(tc.Context));
+  }
+
+  // Try to solve the system.
+  SmallVector<constraints::Solution, 1> solutions;
+  if (cs.solve(solutions)) {
+    return RequirementMatch(witness, MatchKind::TypeConflict,
+                            witnessType->getUnlabeledType(tc.Context));
   }
 
   // Success. If anything was renamed, report that.
@@ -587,8 +586,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     unsigned numViable = 0;
     unsigned bestIdx = 0;
     for (auto witness : witnesses) {
-      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
-                                TypeMapping);
+      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness);
       if (match.isViable()) {
         ++numViable;
         bestIdx = matches.size();
