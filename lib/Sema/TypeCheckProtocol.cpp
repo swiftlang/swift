@@ -21,18 +21,6 @@
 
 using namespace swift;
 
-static Type getInstanceUsageType(ValueDecl *Value, ASTContext &Context) {
-  Type Ty = Value->getType();
-  if (FuncDecl *Func = dyn_cast<FuncDecl>(Value)) {
-    if (Func->getDeclContext()->isTypeContext()) {
-      if (auto FuncTy = Func->getType()->getAs<AnyFunctionType>())
-        return FuncTy->getResult()->getUnlabeledType(Context);
-    }
-  }
-  
-  return Ty->getUnlabeledType(Context);
-}
-
 /// \brief Retrieve the kind of requirement described by the given declaration,
 /// for use in some diagnostics.
 /// FIXME: Enumify this.
@@ -47,22 +35,260 @@ int getRequirementKind(ValueDecl *VD) {
   return 2;
 }
 
-static bool valueMemberMatches(ValueDecl *Candidate, ValueDecl *Requirement,
-                               Type RequiredTy, ASTContext &Context) {
-  if (Candidate->getKind() != Requirement->getKind())
-    return false;
-  if (!RequiredTy->isEqual(getInstanceUsageType(Candidate, Context)))
-    return false;
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(Candidate)) {
-    FuncDecl *ReqFD = cast<FuncDecl>(Requirement);
-    if (FD->isStatic() != ReqFD->isStatic() ||
-        FD->getAttrs().isPrefix() != ReqFD->getAttrs().isPrefix() ||
-        FD->getAttrs().isPostfix() != ReqFD->getAttrs().isPostfix())
-      return false;
-  }
-  return true;
+namespace {
+  /// \brief The result of matching a particular declaration to a given
+  /// requirement.
+  enum class MatchKind : unsigned char {
+    /// \brief The witness matched the requirement exactly.
+    ExactMatch,
+
+    /// \brief The witness matched the requirement with some renaming.
+    RenamedMatch,
+
+    /// \brief The witness is invalid or has an invalid type.
+    WitnessInvalid,
+
+    /// \brief The kind of the witness and requirement differ, e.g., one
+    /// is a function and the other is a variable.
+    KindConflict,
+
+    /// \brief The types conflict.
+    TypeConflict,
+
+    /// \brief The witness did not match due to static/non-static differences.
+    StaticNonStaticConflict,
+
+    /// \brief The witness did not match due to prefix/non-prefix differences.
+    PrefixNonPrefixConflict,
+
+    /// \brief The witness did not match due to postfix/non-postfix differences.
+    PostfixNonPostfixConflict,
+
+    /// \brief The requirement requires [objc] but the witness is not [objc].
+    ObjCNonObjCConflict
+  };
+
+  /// \brief Describes a match between a requirement and a witness.
+  struct RequirementMatch {
+    RequirementMatch(ValueDecl *witness, MatchKind kind,
+                     Type witnessType = Type())
+      : Witness(witness), Kind(kind), WitnessType(witnessType)
+    {
+      assert(hasWitnessType() == !witnessType.isNull() &&
+             "Should (or should not) have witness type");
+    }
+    
+    /// \brief The witness that matches the (implied) requirement.
+    ValueDecl *Witness;
+    
+    /// \brief The kind of match.
+    MatchKind Kind;
+
+    /// \brief The type of the witness when it is referenced.
+    Type WitnessType;
+
+    /// \brief Determine whether this match is viable.
+    bool isViable() const {
+      switch(Kind) {
+      case MatchKind::ExactMatch:
+      case MatchKind::RenamedMatch:
+        return true;
+
+      case MatchKind::WitnessInvalid:
+      case MatchKind::KindConflict:
+      case MatchKind::TypeConflict:
+      case MatchKind::StaticNonStaticConflict:
+      case MatchKind::PrefixNonPrefixConflict:
+      case MatchKind::PostfixNonPostfixConflict:
+      case MatchKind::ObjCNonObjCConflict:
+        return false;
+      }
+    }
+
+    /// \brief Determine whether this requirement match has a witness type.
+    bool hasWitnessType() const {
+      switch(Kind) {
+      case MatchKind::ExactMatch:
+      case MatchKind::RenamedMatch:
+      case MatchKind::TypeConflict:
+        return true;
+
+      case MatchKind::WitnessInvalid:
+      case MatchKind::KindConflict:
+      case MatchKind::StaticNonStaticConflict:
+      case MatchKind::PrefixNonPrefixConflict:
+      case MatchKind::PostfixNonPostfixConflict:
+      case MatchKind::ObjCNonObjCConflict:
+        return false;
+      }
+    }
+
+    /// FIXME: Generic substitutions here.
+    /// FIXME: Associated type deductions here.
+  };
 }
 
+/// \brief Match the given witness to the given requirement.
+///
+/// \returns the result of performing the match.
+static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
+                                     ValueDecl *req, Type reqType,
+                                     Type model, ValueDecl *witness,
+                                     TypeSubstitutionMap &typeMapping) {
+  assert(!req->isInvalid() && "Cannot have an invalid requirement here");
+
+  /// Make sure the witness is of the same kind as the requirement.
+  if (req->getKind() != witness->getKind())
+    return RequirementMatch(witness, MatchKind::KindConflict);
+
+  // If the witness is invalid, record that and stop now.
+  if (witness->isInvalid())
+    return RequirementMatch(witness, MatchKind::WitnessInvalid);
+
+  // Get the requirement and witness attributes.
+  const auto &reqAttrs = req->getAttrs();
+  const auto &witnessAttrs = witness->getAttrs();
+
+  // An Objective-C protocol requires all of the witnesses to be
+  // Objective-C-compatible declarations.
+  if (protocol->getAttrs().isObjC() && !witnessAttrs.isObjC())
+    return RequirementMatch(witness, MatchKind::ObjCNonObjCConflict);
+
+  // Compute the type of the witness, below.
+  Type witnessType;
+
+  // Check properties specific to functions.
+  if (auto funcReq = dyn_cast<FuncDecl>(req)) {
+    auto funcWitness = cast<FuncDecl>(witness);
+
+    // Either both must be 'static' or neither.
+    if (funcReq->isStatic() != funcWitness->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
+    // If we require a prefix operator and the witness is not a prefix operator,
+    // these don't match.
+    if (reqAttrs.isPrefix() && !witnessAttrs.isPrefix())
+      return RequirementMatch(witness, MatchKind::PrefixNonPrefixConflict);
+
+    // If we require a postfix operator and the witness is not a postfix
+    // operator, these don't match.
+    if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
+      return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
+
+    // Determine the witness type.
+    witnessType = witness->getType();
+
+    // If the witness resides within a type context, substitute through the
+    // based type and ignore 'this'.
+    if (witness->getDeclContext()->isTypeContext()) {
+      witnessType = witness->getType()->castTo<AnyFunctionType>()->getResult();
+      witnessType = tc.substMemberTypeWithBase(witnessType, witness, model);
+      assert(witnessType && "Cannot refer to witness?");
+    }
+  } else {
+    // FIXME: Static variables will have to check static vs. non-static here.
+
+    // The witness type is the type of the declaration with the base
+    // substituted.
+    witnessType = tc.substMemberTypeWithBase(witness->getType(), witness,
+                                             model);
+    assert(witnessType && "Cannot refer to witness?");
+  }
+
+  // If the types match, success!
+  if (witnessType ->isEqual(reqType))
+    return RequirementMatch(witness, MatchKind::ExactMatch, witnessType);
+
+  // Remove labels from the types.
+  // FIXME: This is wrong for [objc] requirements.
+  if (witnessType->getUnlabeledType(tc.Context)->isEqual(
+                            reqType->getUnlabeledType(tc.Context)))
+    return RequirementMatch(witness, MatchKind::RenamedMatch, witnessType);
+
+  // The types did not match.
+  // FIXME: More specific information here!
+  return RequirementMatch(witness, MatchKind::TypeConflict,
+                          witnessType->getUnlabeledType(tc.Context));
+}
+
+/// \brief Determine whether one requirement match is better than the other.
+static bool isBetterMatch(const RequirementMatch &match1,
+                          const RequirementMatch &match2) {
+  // Earlier match kinds are better. This prefers exact matches over matches
+  // that require renaming, for example.
+  if (match1.Kind != match2.Kind)
+    return static_cast<unsigned>(match1.Kind)
+             < static_cast<unsigned>(match2.Kind);
+
+  // FIXME: Should use the same "at least as specialized as" rules as overload
+  // resolution.
+  return false;
+}
+
+/// \brief Diagnose a requirement match, describing what went wrong (or not).
+static void diagnoseMatch(TypeChecker &tc, ValueDecl *req,
+                          const RequirementMatch &match) {
+  /// \brief The kind of conflict between function attributes.
+  ///
+  /// The order of enumerators must match the order of the select in
+  /// \c diag::protocol_witness_func_conflict.
+  enum FuncConflictKind {
+    FCK_Static,
+    FCK_Prefix,
+    FCK_Postfix
+  };
+
+  switch (match.Kind) {
+  case MatchKind::ExactMatch:
+    tc.diagnose(match.Witness, diag::protocol_witness_exact_match);
+    break;
+
+  case MatchKind::RenamedMatch:
+    tc.diagnose(match.Witness, diag::protocol_witness_renamed);
+    break;
+
+  case MatchKind::KindConflict:
+    tc.diagnose(match.Witness, diag::protocol_witness_kind_conflict,
+                getRequirementKind(req));
+    break;
+
+  case MatchKind::WitnessInvalid:
+    // Don't bother to diagnose invalid witnesses; we've already complained
+    // about them.
+    break;
+
+  case MatchKind::TypeConflict:
+    tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
+                match.WitnessType);
+    break;
+
+  case MatchKind::StaticNonStaticConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_static_conflict,
+                !req->isInstanceMember());
+    break;
+
+  case MatchKind::PrefixNonPrefixConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
+                false, match.Witness->getAttrs().isPostfix()? 2 : 0);
+    break;
+
+  case MatchKind::PostfixNonPostfixConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
+                true, match.Witness->getAttrs().isPrefix() ? 1 : 0);
+    break;
+
+  case MatchKind::ObjCNonObjCConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_objc_conflict);
+    break;  
+  }
+}
+
+/// \brief Determine whether the type \c T conforms to the protocol \c Proto,
+/// recording the complete witness table if it does.
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
@@ -260,183 +486,123 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (isa<TypeAliasDecl>(Requirement))
       continue;
 
-    // FIXME: This screams 'refactor me!', starting with collapsing the
-    // lookup-results structures of member lookup and unqualified lookup into
-    // a single structure.
-    // Determine the type that we require the witness to have, substituting
-    // in the witnesses we've collected for our archetypes.
-    Type RequiredTy = TC.substType(getInstanceUsageType(Requirement,TC.Context),
-                                   TypeMapping)->getUnlabeledType(TC.Context);
-    TC.validateTypeSimple(RequiredTy);
+    // Determine the type that the requirement is expected to have. If the
+    // requirement is for a function, look past the 'this' parameter.
+    Type reqType = Requirement->getType();
+    if (isa<FuncDecl>(Requirement))
+      reqType = reqType->castTo<AnyFunctionType>()->getResult();
 
+    // Substitute the type mappings we have into the requirement type.
+    reqType = TC.substType(reqType, TypeMapping);
+    assert(reqType && "We didn't check our type mappings?");
+
+    // Gather the witnesses.
+    SmallVector<ValueDecl *, 4> witnesses;
     if (Requirement->getName().isOperator()) {
       // Operator lookup is always global.
       UnqualifiedLookup Lookup(Requirement->getName(), &TC.TU);
 
       if (Lookup.isSuccess()) {
-        SmallVector<ValueDecl *, 2> Viable;
         for (auto Candidate : Lookup.Results) {
-          switch (Candidate.Kind) {
-          case UnqualifiedLookupResult::ModuleMember:
-            if (valueMemberMatches(Candidate.getValueDecl(), Requirement,
-                                   RequiredTy, TC.Context))
-              Viable.push_back(Candidate.getValueDecl());
-            break;
-
-          case UnqualifiedLookupResult::ArchetypeMember:
-          case UnqualifiedLookupResult::ExistentialMember:
-          case UnqualifiedLookupResult::LocalDecl:
-          case UnqualifiedLookupResult::MemberFunction:
-          case UnqualifiedLookupResult::MemberProperty:
-          case UnqualifiedLookupResult::MetaArchetypeMember:
-          case UnqualifiedLookupResult::MetatypeMember:
-          case UnqualifiedLookupResult::ModuleName:
-            break;
-          }
-        }
-
-        if (Viable.size() == 1) {
-          Mapping[Requirement] = Viable.front();
-          continue;
-        }
-
-        if (ComplainLoc.isInvalid())
-          return nullptr;
-
-        if (!Viable.empty()) {
-          if (!Complained) {
-            TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                        T, Proto->getDeclaredType());
-            Complained = true;
-          }
-
-          TC.diagnose(Requirement, diag::ambiguous_witnesses,
-                      getRequirementKind(Requirement),
-                      Requirement->getName(),
-                      RequiredTy);
-
-          for (auto Candidate : Viable)
-            TC.diagnose(Candidate, diag::protocol_witness,
-                        getInstanceUsageType(Candidate, TC.Context));
-          
-          continue;
+          assert(Candidate.hasValueDecl());
+          witnesses.push_back(Candidate.getValueDecl());
         }
       }
-
-      if (ComplainLoc.isValid()) {
-        if (!Complained) {
-          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                      T, Proto->getDeclaredType());
-          Complained = true;
-        }
-
-        TC.diagnose(Requirement, diag::no_witnesses,
-                    getRequirementKind(Requirement),
-                    Requirement->getName(),
-                    getInstanceUsageType(Requirement, TC.Context));
-        for (auto Candidate : Lookup.Results)
-          if (Candidate.hasValueDecl())
-          TC.diagnose(Candidate.getValueDecl(),
-                      diag::protocol_witness,
-                      getInstanceUsageType(Candidate.getValueDecl(),
-                                           TC.Context));
-        continue;
-      }
-
-      return nullptr;
-    }
-
-    // Variable/function/subscript requirements.
-    MemberLookup Lookup(metaT, Requirement->getName(), TC.TU);
-
-    if (Lookup.isSuccess()) {
-      SmallVector<ValueDecl *, 2> Viable;
-
-      for (auto Candidate : Lookup.Results) {
-        switch (Candidate.Kind) {
-        case MemberLookupResult::MetatypeMember:
-        case MemberLookupResult::MetaArchetypeMember:
-        case MemberLookupResult::MemberProperty:
-        case MemberLookupResult::MemberFunction:
-        case MemberLookupResult::ExistentialMember: {
-          if (Candidate.D->getKind() != Requirement->getKind())
-            break;
-          
-          if (Candidate.D->isInstanceMember() != Requirement->isInstanceMember())
-            break ;
-
-          Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
-          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, Candidate.D,T);
-          if (RequiredTy->isEqual(CandidateTy))
-            Viable.push_back(Candidate.D);
-          break;
-        }
-
-        case MemberLookupResult::ArchetypeMember: {
-          if (Candidate.D->getKind() != Requirement->getKind())
-            break;
-
-          // Determine the effective type of the candidate.
-          Type CandidateTy = getInstanceUsageType(Candidate.D, TC.Context);
-          CandidateTy = TC.substMemberTypeWithBase(CandidateTy, Candidate.D, T);
-          if (!CandidateTy)
-            break;
-
-          if (RequiredTy->isEqual(CandidateTy))
-            Viable.push_back(Candidate.D);
-          break;
-        }
-        case MemberLookupResult::GenericParameter:
-            // Generic parameters are never viable.
-          break;
-        }
-      }
-      
-      if (Viable.size() == 1) {
-        Mapping[Requirement] = Viable.front();
-        continue;
-      }
-      
-      if (ComplainLoc.isInvalid())
-        return nullptr;
-      
-      if (!Viable.empty()) {
-        if (!Complained) {
-          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                      T, Proto->getDeclaredType());
-          Complained = true;
-        }
-        
-        TC.diagnose(Requirement, diag::ambiguous_witnesses,
-                    getRequirementKind(Requirement),
-                    Requirement->getName(),
-                    RequiredTy);
-
-        for (auto Candidate : Viable)
-          TC.diagnose(Candidate, diag::protocol_witness,
-                      getInstanceUsageType(Candidate, TC.Context));
-        
-        continue;
-      }
-    }
-    
-    if (ComplainLoc.isValid()) {
-      if (!Complained) {
-        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                    T, Proto->getDeclaredType());
-        Complained = true;
-      }
-
-      TC.diagnose(Requirement, diag::no_witnesses,
-                  getRequirementKind(Requirement),
-                  Requirement->getName(),
-                  getInstanceUsageType(Requirement, TC.Context));
-      for (auto Candidate : Lookup.Results)
-        TC.diagnose(Candidate.D, diag::protocol_witness,
-                    getInstanceUsageType(Candidate.D, TC.Context));
     } else {
-      return nullptr;
+      // Variable/function/subscript requirements.
+      MemberLookup Lookup(metaT, Requirement->getName(), TC.TU);
+
+      if (Lookup.isSuccess()) {
+        for (auto Candidate : Lookup.Results) {
+          assert(Candidate.D);
+          witnesses.push_back(Candidate.D);
+        }
+      }
     }
+
+    // Match each of the witnesses to the requirement, to see which ones
+    // succeed.
+    SmallVector<RequirementMatch, 4> matches;
+    unsigned numViable = 0;
+    unsigned bestIdx = 0;
+    for (auto witness : witnesses) {
+      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
+                                TypeMapping);
+      if (match.isViable()) {
+        ++numViable;
+        bestIdx = matches.size();
+      }
+
+      matches.push_back(std::move(match));
+    }
+
+    // If there are any viable matches, try to find the best.
+    if (numViable >= 1) {
+      // If there numerous viable matches, throw out the non-viable matches
+      // and try to find a "best" match.
+      bool isReallyBest = true;
+      if (numViable > 1) {
+        matches.erase(std::remove_if(matches.begin(), matches.end(),
+                                     [](const RequirementMatch &match) {
+                                       return !match.isViable();
+                                     }),
+                        matches.end());
+
+        // Find the best match.
+        bestIdx = 0;
+        for (unsigned i = 1, n = matches.size(); i != n; ++i) {
+          if (isBetterMatch(matches[i], matches[bestIdx]))
+            bestIdx = i;
+        }
+
+        // Make sure it is, in fact, the best.
+        for (unsigned i = 0, n = matches.size(); i != n; ++i) {
+          if (i == bestIdx)
+            continue;
+
+          if (!isBetterMatch(matches[bestIdx], matches[i])) {
+            isReallyBest = false;
+            break;
+          }
+        }
+      }
+
+      // If we really do have a best match, record it.
+      if (isReallyBest) {
+        Mapping[Requirement] = matches[bestIdx].Witness;
+        continue;
+      }
+
+      // We have an ambiguity; diagnose it below.
+    }
+
+    // We have either no matches or an ambiguous match. Diagnose it.
+
+    // If we're not supposed to complain, don't; just return null to indicate
+    // failure.
+    if (ComplainLoc.isInvalid())
+      return nullptr;
+
+    // Complain that this type does not conform to this protocol.
+    if (!Complained) {
+      TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                  T, Proto->getDeclaredType());
+      Complained = true;
+    }
+
+    // Point out the requirement that wasn't met.
+    TC.diagnose(Requirement,
+                numViable > 0? diag::ambiguous_witnesses
+                             : diag::no_witnesses,
+                getRequirementKind(Requirement),
+                Requirement->getName(),
+                reqType);
+
+    // Diagnose each of the matches.
+    for (const auto &match : matches)
+      diagnoseMatch(TC, Requirement, match);
+
+    // FIXME: Suggest a new declaration that does match?
   }
   
   if (Complained)
