@@ -50,6 +50,10 @@ namespace {
 
     NameBinder(TranslationUnit *TU) : TU(TU), Context(TU->Ctx) {
       for (auto M : TU->getImportedModules()) {
+        // Don't add the builtin module to the LoadedModules list.
+        if (isa<BuiltinModule>(M.second))
+          continue;
+        
         Module *&ref = Context.LoadedModules[M.second->Name.str()];
         if (ref)
           assert(ref == M.second ||
