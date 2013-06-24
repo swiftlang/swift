@@ -637,6 +637,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
         
     case PatternKind::Typed:
       return visitPatternVarGetSet(cast<TypedPattern>(P)->getSubPattern());
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) \
+    case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) \
+    case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+      llvm_unreachable("cannot appear in get/set pattern");
     }
   }
   

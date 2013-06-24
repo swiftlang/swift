@@ -566,6 +566,7 @@ public:
   TypeBase *getDesugaredType();
 
   void print(raw_ostream &OS) const;
+  static void printComponents(raw_ostream &OS, ArrayRef<Component> Components);
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

@@ -105,53 +105,98 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   case PatternKind::Typed:
     return cast<TypedPattern>(this)->getSubPattern()
              ->collectVariables(variables);
+      
+  case PatternKind::Isa:
+    return;
+  
+  case PatternKind::UnresolvedCall:
+    return cast<UnresolvedCallPattern>(this)->getSubPattern()
+             ->collectVariables(variables);
+  
+  case PatternKind::NominalType:
+    return cast<NominalTypePattern>(this)->getSubPattern()
+             ->collectVariables(variables);
+  
+  case PatternKind::Expr:
+    return;
   }
 }
 
 Pattern *Pattern::clone(ASTContext &context) const {
   Pattern *result;
   switch (getKind()) {
-    case PatternKind::Any:
-      result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
-      break;
+  case PatternKind::Any:
+    result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
+    break;
 
-    case PatternKind::Named: {
-      auto named = cast<NamedPattern>(this);
-      VarDecl *var = new (context) VarDecl(named->getLoc(),
-                                           named->getBoundName(),
-                                           named->getDecl()->hasType()
-                                             ? named->getDecl()->getType()
-                                             : Type(),
-                                           named->getDecl()->getDeclContext());
-      result = new (context) NamedPattern(var);
-      break;
-    }
+  case PatternKind::Named: {
+    auto named = cast<NamedPattern>(this);
+    VarDecl *var = new (context) VarDecl(named->getLoc(),
+                                         named->getBoundName(),
+                                         named->getDecl()->hasType()
+                                           ? named->getDecl()->getType()
+                                           : Type(),
+                                         named->getDecl()->getDeclContext());
+    result = new (context) NamedPattern(var);
+    break;
+  }
 
-    case PatternKind::Paren: {
-      auto paren = cast<ParenPattern>(this);
-      return new (context) ParenPattern(paren->getLParenLoc(),
-                                        paren->getSubPattern()->clone(context),
-                                        paren->getRParenLoc());
-    }
+  case PatternKind::Paren: {
+    auto paren = cast<ParenPattern>(this);
+    return new (context) ParenPattern(paren->getLParenLoc(),
+                                      paren->getSubPattern()->clone(context),
+                                      paren->getRParenLoc());
+  }
 
-    case PatternKind::Tuple: {
-      auto tuple = cast<TuplePattern>(this);
-      SmallVector<TuplePatternElt, 2> elts;
-      elts.reserve(tuple->getNumFields());
-      for (const auto &elt : tuple->getFields())
-        elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
-                                       elt.getInit(), elt.getVarargBaseType()));
-      result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                    tuple->getRParenLoc());
-      break;
-    }
+  case PatternKind::Tuple: {
+    auto tuple = cast<TuplePattern>(this);
+    SmallVector<TuplePatternElt, 2> elts;
+    elts.reserve(tuple->getNumFields());
+    for (const auto &elt : tuple->getFields())
+      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
+                                     elt.getInit(), elt.getVarargBaseType()));
+    result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
+                                  tuple->getRParenLoc());
+    break;
+  }
 
-    case PatternKind::Typed: {
-      auto typed = cast<TypedPattern>(this);
-      result = new(context) TypedPattern(typed->getSubPattern()->clone(context),
-                                         typed->getTypeLoc());
-      break;
-    }
+  case PatternKind::Typed: {
+    auto typed = cast<TypedPattern>(this);
+    result = new(context) TypedPattern(typed->getSubPattern()->clone(context),
+                                       typed->getTypeLoc());
+    break;
+  }
+      
+  case PatternKind::Isa: {
+    auto isa = cast<IsaPattern>(this);
+    result = new(context) IsaPattern(isa->getLoc(),
+                                     isa->getCastTypeLoc(),
+                                     isa->getCastKind());
+    break;
+  }
+      
+  case PatternKind::UnresolvedCall: {
+    auto call = cast<UnresolvedCallPattern>(this);
+    result = UnresolvedCallPattern::create(context,
+                                         call->getNameComponents(),
+                                         call->getSubPattern()->clone(context));
+    break;
+  }
+      
+  case PatternKind::NominalType: {
+    auto nom = cast<NominalTypePattern>(this);
+    result = new(context) NominalTypePattern(nom->getCastTypeLoc(),
+                                           nom->getSubPattern()->clone(context),
+                                           nom->getCastKind());
+    break;
+  }
+      
+  case PatternKind::Expr: {
+    auto expr = cast<ExprPattern>(this);
+    result = new(context) ExprPattern(expr->getSubExpr(),
+                                      expr->getMatchFnExpr());
+    break;
+  }
   }
 
   if (hasType())
@@ -218,4 +263,29 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
 
 SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
+}
+
+UnresolvedCallPattern::UnresolvedCallPattern(
+                               ArrayRef<IdentifierType::Component> components,
+                               Pattern *Sub)
+  : Pattern(PatternKind::UnresolvedCall),
+    NumComponents(components.size()), SubPattern(Sub)
+{
+  MutableArrayRef<IdentifierType::Component> buf{getComponentsBuffer(),
+                                                 NumComponents};
+  for (size_t i = 0, size = NumComponents; i < size; ++i) {
+    new (&buf[i]) IdentifierType::Component(components[i]);
+  }
+}
+
+/// Allocate a new UnresolvedCallPattern referring to a named path of
+/// dotted identifier components.
+UnresolvedCallPattern *
+UnresolvedCallPattern::create(ASTContext &C,
+                              ArrayRef<IdentifierType::Component> components,
+                              Pattern *Sub) {
+  void *buf = UnresolvedCallPattern::operator new(
+    sizeof(UnresolvedCallPattern)
+      + components.size() * sizeof(IdentifierType::Component), C);
+  return ::new (buf) UnresolvedCallPattern(components, Sub);
 }

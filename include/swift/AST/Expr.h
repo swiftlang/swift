@@ -1582,8 +1582,8 @@ public:
   ///
   /// If the function expression refers to a method definition, there will
   /// be an additional first argument pattern for the `this` parameter.
-  ArrayRef<Pattern*> getArgParamPatterns() {
-    return ArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
+  MutableArrayRef<Pattern*> getArgParamPatterns() {
+    return MutableArrayRef<Pattern*>(getParamsBuffer(), NumPatterns);
   }
   ArrayRef<const Pattern*> getArgParamPatterns() const {
     return ArrayRef<const Pattern*>(getParamsBuffer(), NumPatterns);
@@ -1603,9 +1603,9 @@ public:
   /// `getBodyParamPatterns().size()`, and the corresponding elements of each
   /// tuple type should have equivalent types.
   
-  ArrayRef<Pattern*> getBodyParamPatterns() {
-    return ArrayRef<Pattern*>(getParamsBuffer() + NumPatterns,
-                              NumPatterns);
+  MutableArrayRef<Pattern*> getBodyParamPatterns() {
+    return MutableArrayRef<Pattern*>(getParamsBuffer() + NumPatterns,
+                                     NumPatterns);
   }
   ArrayRef<const Pattern*> getBodyParamPatterns() const {
     return ArrayRef<const Pattern*>(getParamsBuffer() + NumPatterns,
@@ -1677,6 +1677,7 @@ public:
   /// \brief Retrieve the parameters of this closure.
   Pattern *getParams() { return params.getPointer(); }
   const Pattern *getParams() const { return params.getPointer(); }
+  void setParams(Pattern *p) { params.setPointer(p); }
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
@@ -1779,7 +1780,7 @@ public:
   const Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *pat) { Pat = pat; }
  
-  ArrayRef<Pattern*> getParamPatterns() {
+  MutableArrayRef<Pattern*> getParamPatterns() {
     return Pat;
   }
   ArrayRef<const Pattern*> getParamPatterns() const {
@@ -1808,7 +1809,7 @@ public:
 
   SourceRange getSourceRange() const { return getBody()->getSourceRange(); }
 
-  ArrayRef<Pattern*> getParamPatterns() {
+  MutableArrayRef<Pattern*> getParamPatterns() {
     return {};
   }
   ArrayRef<const Pattern*> getParamPatterns() const {
@@ -2277,7 +2278,7 @@ public:
 
 /// \brief Represents an explicit unconditional checked cast, which converts
 /// from a type to some subtype or aborts if the cast is not possible,
-/// spelled 'a as! T'.
+/// spelled 'a as! T' and producing a value of type T.
 ///
 /// FIXME: All downcasts are currently unconditional, which is horrible.
 class UnconditionalCheckedCastExpr : public CheckedCastExpr {
@@ -2302,8 +2303,8 @@ public:
 };
 
 /// \brief Represents a runtime type check query, 'a is T', where 'T' is a type
-/// and 'a' is a value of some related type. Evaluates to true if 'a' is of the
-/// type and 'a as! T' would succeed, false otherwise.
+/// and 'a' is a value of some related type. Evaluates to a Bool true if 'a' is
+/// of the type and 'a as! T' would succeed, false otherwise.
 ///
 /// FIXME: We should support type queries with a runtime metatype value too.
 class IsaExpr : public CheckedCastExpr {

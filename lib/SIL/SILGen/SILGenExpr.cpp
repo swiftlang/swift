@@ -1539,6 +1539,16 @@ namespace {
     void visitNamedPattern(NamedPattern *P) {
       makeArgument(P->getType());
     }
+    
+#define INVALID_PATTERN(Id, Parent) \
+    void visit##Id##Pattern(Id##Pattern *) { \
+      llvm_unreachable("pattern not valid in argument binding"); \
+    }
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+
   };
 } // end anonymous namespace
 

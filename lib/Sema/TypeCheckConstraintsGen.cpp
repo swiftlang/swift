@@ -37,6 +37,13 @@ static Identifier findPatternName(Pattern *pattern) {
 
   case PatternKind::Typed:
     return findPatternName(cast<TypedPattern>(pattern)->getSubPattern());
+
+  // TODO
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("not implemented");
   }
 
   llvm_unreachable("Unhandled pattern kind");  
@@ -605,6 +612,13 @@ namespace {
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }
+      
+      // TODO
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+        llvm_unreachable("not implemented");
       }
 
       llvm_unreachable("Unhandled pattern kind");

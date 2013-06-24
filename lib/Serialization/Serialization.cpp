@@ -468,6 +468,28 @@ void Serializer::writePattern(const Pattern *pattern) {
     writePattern(typed->getSubPattern());
     break;
   }
+  case PatternKind::Isa: {
+    auto isa = cast<IsaPattern>(pattern);
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[IsaPatternLayout::Code];
+    IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(isa->getCastTypeLoc().getType()));
+    break;
+  }
+  case PatternKind::UnresolvedCall:
+    llvm_unreachable("serializing unresolved ast");
+
+  case PatternKind::NominalType: {
+    auto nom = cast<NominalTypePattern>(pattern);
+
+    unsigned abbrCode = DeclTypeAbbrCodes[NominalTypePatternLayout::Code];
+    IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(nom->getCastTypeLoc().getType()));
+    writePattern(nom->getSubPattern());
+    break;
+  }
+  case PatternKind::Expr:
+    llvm_unreachable("FIXME: not implemented");
   }
 }
 

@@ -664,6 +664,14 @@ void Parser::addVarsToScope(Pattern *Pat,
     return addVarsToScope(cast<TypedPattern>(Pat)->getSubPattern(), Decls,
                           Attributes);
 
+  case PatternKind::UnresolvedCall:
+    return addVarsToScope(cast<UnresolvedCallPattern>(Pat)->getSubPattern(),
+                          Decls, Attributes);
+
+  case PatternKind::NominalType:
+    return addVarsToScope(cast<NominalTypePattern>(Pat)->getSubPattern(),
+                          Decls, Attributes);
+      
   // Handle vars.
   case PatternKind::Named: {
     VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
@@ -689,9 +697,11 @@ void Parser::addVarsToScope(Pattern *Pat,
     ScopeInfo.addToScope(VD);
     return;
   }
-
+      
   // Handle non-vars.
   case PatternKind::Any:
+  case PatternKind::Isa:
+  case PatternKind::Expr:
     return;
   }
   llvm_unreachable("bad pattern kind!");
@@ -1811,6 +1821,12 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
     for (const TuplePatternElt &field : cast<TuplePattern>(pat)->getFields())
       AddConstructorArgumentsToScope(field.getPattern(), CD, P);
     return;
+
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("pattern can't appear as a constructor argument!");
   }
   llvm_unreachable("bad pattern kind!");
 }

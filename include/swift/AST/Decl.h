@@ -1558,6 +1558,7 @@ public:
   /// \brief Retrieve the indices for this subscript operation.
   Pattern *getIndices() { return Indices; }
   const Pattern *getIndices() const { return Indices; }
+  void setIndices(Pattern *p) { Indices = p; }
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
@@ -1626,7 +1627,6 @@ public:
   const Pattern *getArguments() const { return Arguments; }
 
   void setArguments(Pattern *args) {
-    assert(!Arguments && "Resetting arguments?");
     Arguments = args;
   }
 

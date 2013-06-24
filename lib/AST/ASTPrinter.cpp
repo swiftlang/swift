@@ -179,6 +179,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     recordDeclLoc(named->getDecl());
+    if (named->getIntroducerLoc().isValid())
+      OS << '?';
     OS << named->getBoundName();
     break;
   }
@@ -211,7 +213,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
-  case PatternKind::Typed:
+  case PatternKind::Typed: {
     auto typed = cast<TypedPattern>(pattern);
     printPattern(typed->getSubPattern());
     OS << " : ";
@@ -220,6 +222,34 @@ void PrintAST::printPattern(const Pattern *pattern) {
     else
       OS << "<<null type>>";
     break;
+  }
+      
+  case PatternKind::Isa: {
+    auto isa = cast<IsaPattern>(pattern);
+    OS << "is ";
+    isa->getCastTypeLoc().getType()->print(OS);
+    break;
+  }
+      
+  case PatternKind::UnresolvedCall: {
+    auto call = cast<UnresolvedCallPattern>(pattern);
+    IdentifierType::printComponents(OS,
+                                    call->getNameComponents());
+    OS << call->getSubPattern();
+    break;
+  }
+      
+  case PatternKind::NominalType: {
+    auto type = cast<NominalTypePattern>(pattern);
+    OS << type->getCastTypeLoc().getType();
+    OS << type->getSubPattern();
+    break;
+  }
+      
+  case PatternKind::Expr: {
+    // FIXME: Print expr.
+    break;
+  }
   }
 }
 

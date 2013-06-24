@@ -19,8 +19,10 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
 
 namespace swift {
@@ -126,6 +128,7 @@ public:
 
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
 
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
@@ -153,6 +156,7 @@ public:
 
   Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const { return ThePattern; }
+  void setPattern(Pattern *p) { ThePattern = p; }
 
   ExprHandle *getInit() const { return Init; }
 
@@ -220,6 +224,7 @@ public:
 
 /// A pattern which binds a name to an arbitrary value of its type.
 class NamedPattern : public Pattern {
+  SourceLoc IntroducerLoc;
   VarDecl *const Var;
 
 public:
@@ -228,8 +233,17 @@ public:
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }
 
+  /// Return the location of the introducer token for a named pattern in a
+  /// matching pattern. Returns an invalid SourceLoc for named patterns in
+  /// 'var' or 'func' decls, where an introducer is unnecessary.
+  SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
+  
   SourceLoc getLoc() const { return Var->getLoc(); }
-  SourceRange getSourceRange() const { return getLoc(); }
+  SourceRange getSourceRange() const {
+    return IntroducerLoc.isValid()
+      ? SourceRange{IntroducerLoc, getLoc()}
+      : getLoc();
+  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Named;
@@ -253,7 +267,9 @@ public:
 };
 
 /// A pattern which matches a sub-pattern and annotates it with a
-/// type.
+/// type. It is a compile-time error if the pattern does not statically match
+/// a value of the type. This is different from IsaPattern, which is a refutable
+/// dynamic type match.
 class TypedPattern : public Pattern {
   Pattern *SubPattern;
   TypeLoc PatType;
@@ -264,6 +280,7 @@ public:
 
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
 
   TypeLoc &getTypeLoc() { return PatType; }
   TypeLoc getTypeLoc() const { return PatType; }
@@ -283,7 +300,153 @@ inline Pattern *Pattern::getSemanticsProvidingPattern() {
     return tp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }
+  
+/// A pattern which performs a dynamic type check. The match succeeds if the
+/// class, archetype, or existential value is dynamically of the given type.
+///
+/// TODO: Introduce type refinement of the value being matched.
+class IsaPattern : public Pattern {
+  SourceLoc IsLoc;
+  
+  /// The semantics of the type check (class downcast, archetype-to-concrete,
+  /// etc.)
+  CheckedCastKind CastKind;
+  
+  /// The type being checked for.
+  TypeLoc CastType;
+  
+public:
+  IsaPattern(SourceLoc IsLoc, TypeLoc CastTy,
+             CheckedCastKind Kind = CheckedCastKind::Unresolved)
+    : Pattern(PatternKind::Isa),
+      IsLoc(IsLoc),
+      CastKind(Kind),
+      CastType(CastTy)
+  {}
+  
+  CheckedCastKind getCastKind() const { return CastKind; }
+  void setCastKind(CheckedCastKind kind) { CastKind = kind; }
+  
+  SourceLoc getLoc() const { return IsLoc; }
+  SourceRange getSourceRange() const {
+    return {IsLoc, CastType.getSourceRange().End};
+  }
+  
+  TypeLoc &getCastTypeLoc() { return CastType; }
+  TypeLoc getCastTypeLoc() const { return CastType; }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Isa;
+  }
+};
 
+/// A pattern that syntactically resembles a function call. This will get
+/// resolved by Sema to a DestructureTypePattern or ExprPattern based on whether
+/// the callee resolves to a type, oneof element, or a non-type.
+class UnresolvedCallPattern : public Pattern {
+  IdentifierType::Component *getComponentsBuffer() {
+    return reinterpret_cast<IdentifierType::Component*>(this + 1);
+  }
+  IdentifierType::Component const *getComponentsBuffer() const {
+    return reinterpret_cast<IdentifierType::Component const *>(this + 1);
+  }
+  
+  unsigned NumComponents;
+  Pattern *SubPattern;
+  
+  UnresolvedCallPattern(ArrayRef<IdentifierType::Component> components,
+                        Pattern *Sub);
+  
+public:
+  /// Allocate a new UnresolvedCallPattern referring to a named path of
+  /// dotted identifier components.
+  static UnresolvedCallPattern *create(
+                               ASTContext &C,
+                               ArrayRef<IdentifierType::Component> components,
+                               Pattern *Sub);
+  
+  ArrayRef<IdentifierType::Component> getNameComponents() const {
+    return {getComponentsBuffer(), NumComponents};
+  }
+  
+  const Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+  
+  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceRange getSourceRange() const {
+    return {getNameComponents()[0].Loc, SubPattern->getSourceRange().End};
+  }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::UnresolvedCall;
+  }
+};
+
+
+/// A pattern that matches a nominal type and destructures elements out of it.
+/// The match succeeds if the matched value is dynamically of the specified
+/// type and the subpattern matches the the value cast to the match type.
+class NominalTypePattern : public Pattern {
+  TypeLoc CastType;
+  Pattern *SubPattern;
+  CheckedCastKind Kind;
+public:
+  NominalTypePattern(TypeLoc CastTy, Pattern *Sub,
+                     CheckedCastKind Kind = CheckedCastKind::Unresolved)
+    : Pattern(PatternKind::NominalType), CastType(CastTy), SubPattern(Sub),
+      Kind(Kind)
+  {}
+  
+  const Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+  
+  TypeLoc &getCastTypeLoc() { return CastType; }
+  TypeLoc getCastTypeLoc() const { return CastType; }
+  
+  CheckedCastKind getCastKind() const { return Kind; }
+  void setCastKind(CheckedCastKind kind) { Kind = kind; }
+  
+  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceRange getSourceRange() const {
+    return {CastType.getSourceRange().Start, SubPattern->getSourceRange().End};
+  }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::NominalType;
+  }
+};
+  
+/// A pattern which matches a value obtained by evaluating an expression.
+/// The match will be tested using the '=~' operator; it succeeds if
+/// 'matchedValue =~ patternValue' produces a true value.
+class ExprPattern : public Pattern {
+  Expr *SubExpr;
+  
+  /// An expression constructed during type-checking that produces a reference
+  /// to the '=~' operator resolved for the match.
+  Expr *MatchFnExpr;
+  
+public:
+  ExprPattern(Expr *e, Expr *match = nullptr)
+    : Pattern(PatternKind::Expr), SubExpr(e), MatchFnExpr(match)
+  {}
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *e) { SubExpr = e; }
+  
+  Expr *getMatchFnExpr() const { return MatchFnExpr; }
+  void setMatchFnExpr(Expr *e) { MatchFnExpr = e; }
+  
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Expr;
+  }
+};
+  
 } // end namespace swift
 
 #endif

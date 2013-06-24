@@ -103,6 +103,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     P->setType(TupleType::get(typeElts, Context));
     return false;
   }
+
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("not implemented");
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -205,6 +211,13 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
 
     return hadError;
   }
+      
+  // TODO
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("not implemented");
   }
   llvm_unreachable("bad pattern kind!");
 }

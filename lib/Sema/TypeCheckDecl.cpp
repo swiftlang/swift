@@ -225,6 +225,10 @@ public:
       return visitBoundVars(cast<ParenPattern>(P)->getSubPattern());
     case PatternKind::Typed:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
+    case PatternKind::NominalType:
+      return visitBoundVars(cast<NominalTypePattern>(P)->getSubPattern());
+    case PatternKind::UnresolvedCall:
+      return visitBoundVars(cast<UnresolvedCallPattern>(P)->getSubPattern());
 
     // Handle vars.
     case PatternKind::Named: {
@@ -253,6 +257,8 @@ public:
 
     // Handle non-vars.
     case PatternKind::Any:
+    case PatternKind::Isa:
+    case PatternKind::Expr:
       return;
     }
     llvm_unreachable("bad pattern kind!");

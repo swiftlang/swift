@@ -344,6 +344,17 @@ struct InitializationForPattern
       init->subInitializations.push_back(visit(elt.getPattern()));
     return InitializationPtr(init);
   }
+  
+  // TODO: Handle bindings from 'case' labels and match expressions.
+#define INVALID_PATTERN(Id, Parent) \
+  InitializationPtr visit##Id##Pattern(Id##Pattern *) { \
+    llvm_unreachable("pattern not valid in argument or var binding"); \
+  }
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+#undef INVALID_PATTERN
 };
 
 } // end anonymous namespace
@@ -497,6 +508,16 @@ struct ArgumentInitVisitor :
     return makeArgumentInto(P->getType(), f.begin(),
                             P->getDecl(), I);
   }
+  
+#define INVALID_PATTERN(Id, Parent) \
+  SILValue visit##Id##Pattern(Id##Pattern *, Initialization *) { \
+    llvm_unreachable("pattern not valid in argument binding"); \
+  }
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+
 };
 
 class CleanupCaptureBox : public Cleanup {

@@ -56,6 +56,8 @@ namespace {
       OS << ')';
     }
     void visitNamedPattern(NamedPattern *P) {
+      if (P->getIntroducerLoc().isValid())
+        OS << "?";
       OS << P->getBoundName().str();
     }
     void visitAnyPattern(AnyPattern *P) {
@@ -68,6 +70,22 @@ namespace {
         OS << "<no type yet>";
       else
         P->getType()->print(OS);
+    }
+    
+    void visitIsaPattern(IsaPattern *P) {
+      OS << "is ";
+      P->getCastTypeLoc().getType()->print(OS);
+    }
+    void visitUnresolvedCallPattern(UnresolvedCallPattern *P) {
+      IdentifierType::printComponents(OS, P->getNameComponents());
+      P->getSubPattern()->print(OS);
+    }
+    void visitNominalTypePattern(NominalTypePattern *P) {
+      P->getCastTypeLoc().getType()->print(OS);
+      P->getSubPattern()->print(OS);
+    }
+    void visitExprPattern(ExprPattern *P) {
+      P->getSubExpr()->print(OS);
     }
   };
 

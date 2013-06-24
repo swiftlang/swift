@@ -1464,11 +1464,15 @@ static void printGenericArgs(raw_ostream &OS, ArrayRef<TypeLoc> Args) {
   OS << '>';
 }
 
-
 void IdentifierType::print(raw_ostream &OS) const {
+  printComponents(OS, Components);
+}
+
+void IdentifierType::printComponents(raw_ostream &OS,
+                               ArrayRef<IdentifierType::Component> Components) {
   OS << Components[0].Id.get();
   printGenericArgs(OS, Components[0].GenericArgs);
-
+  
   for (const Component &C : Components.slice(1, Components.size()-1)) {
     OS << '.' << C.Id.get();
     printGenericArgs(OS, C.GenericArgs);

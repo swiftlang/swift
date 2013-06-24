@@ -893,6 +893,12 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
       case PatternKind::Named:
       case PatternKind::Any:
         return;
+          
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+        llvm_unreachable("pattern can't appear in argument list!");
       }
       llvm_unreachable("bad pattern kind!");
     }

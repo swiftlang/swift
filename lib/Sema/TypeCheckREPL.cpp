@@ -493,6 +493,15 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
     // way we print the expression.
     visit(P->getSubPattern());
   }
+  
+#define INVALID_PATTERN(Id, Parent) \
+  void visit##Id##Pattern(Id##Pattern *P) { \
+    llvm_unreachable("pattern cannot appear in an LHS!"); \
+  }
+#define PATTERN(Id, Parent)
+#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
 };
 } // end anonymous namespace.
 

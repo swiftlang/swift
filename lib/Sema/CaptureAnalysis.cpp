@@ -52,8 +52,16 @@ static void WalkPattern(Pattern *P) {
   case PatternKind::Named:
     VisitValueDecl(cast<NamedPattern>(P)->getDecl());
     break;
+  
+  case PatternKind::UnresolvedCall:
+    return WalkPattern(cast<UnresolvedCallPattern>(P)->getSubPattern());
+  
+  case PatternKind::NominalType:
+    return WalkPattern(cast<NominalTypePattern>(P)->getSubPattern());
 
   case PatternKind::Any:
+  case PatternKind::Isa:
+    case PatternKind::Expr:
     break;
   }
 }
