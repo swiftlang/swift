@@ -101,8 +101,6 @@ public:
   /// type checker.
   std::vector<FuncExprLike> implicitlyDefinedFunctions;
 
-  DeclContext *CurDC = nullptr;
-  
 private:
   /// \brief The number of known protocols.
   static const unsigned numKnownProtocols
