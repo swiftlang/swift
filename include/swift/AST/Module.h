@@ -179,7 +179,7 @@ public:
     StandardLibrary,
     Library,
     Main,
-    Repl,
+    REPL,
     SIL       // Came from a .sil file.
   } Kind;
 

@@ -934,7 +934,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   // If we're in REPL mode, inject temporary result variables and other stuff
   // that the REPL needs to synthesize.
-  if (TU->Kind == TranslationUnit::Repl && !TC.Context.hadError())
+  if (TU->Kind == TranslationUnit::REPL && !TC.Context.hadError())
     TC.processREPLTopLevel(StartElem);
   
   // Check overloaded vars/funcs.

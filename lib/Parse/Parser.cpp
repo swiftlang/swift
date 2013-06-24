@@ -50,7 +50,7 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      SILModule *SIL) {
   Parser P(BufferID, TU, BufferOffset ? *BufferOffset : 0, BufferEndOffset,
            TU->Kind == TranslationUnit::Main ||
-           TU->Kind == TranslationUnit::Repl, SIL);
+           TU->Kind == TranslationUnit::REPL, SIL);
   PrettyStackTraceParser stackTrace(P);
   bool FoundSideEffects = P.parseTranslationUnit(TU);
   if (BufferOffset)

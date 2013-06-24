@@ -107,7 +107,7 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
                                         llvm::MemoryBuffer *Buffer,
                                         unsigned &BufferOffset,
                                         unsigned BufferEndOffset) {
-  assert(TU->Kind == TranslationUnit::Repl && "Can't append to a non-REPL TU");
+  assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
   
   RC.CurBufferID
     = TU->getASTContext().SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());

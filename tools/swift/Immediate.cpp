@@ -980,7 +980,7 @@ public:
       CmdLine(CmdLine),
       Comp(new (Context.Allocate<Component>(1)) Component()),
       TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
-                                       Comp, Context, TranslationUnit::Repl)),
+                                       Comp, Context, TranslationUnit::REPL)),
       RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),

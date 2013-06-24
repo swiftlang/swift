@@ -243,7 +243,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
                       attrs);
   llvm::Function *initFn = nullptr;
   if (tunit->Kind != TranslationUnit::Main &&
-      tunit->Kind != TranslationUnit::Repl) {
+      tunit->Kind != TranslationUnit::REPL) {
     // Create a global initializer for library modules.
     // FIXME: This is completely, utterly, wrong.
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
@@ -258,7 +258,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   
   SmallVector<llvm::Constant *, 2> allInits;
   if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::Repl) {
+      tunit->Kind == TranslationUnit::REPL) {
     // We don't need global init to call main().
   } else if (isTrivialGlobalInit(topLevelCodeFn)) {
     // Not all translation units need a global initialization function.
@@ -292,7 +292,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   emitGlobalLists();
   
   if (tunit->Kind == TranslationUnit::Main ||
-      tunit->Kind == TranslationUnit::Repl) {
+      tunit->Kind == TranslationUnit::REPL) {
     // Emit main().
     // FIXME: We should only emit this in non-JIT modes.
 

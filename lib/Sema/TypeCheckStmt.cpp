@@ -533,7 +533,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       // Type check the expression.
       if (typeCheckExpr(SubExpr)) continue;
       
-      if (TC.TU.Kind != TranslationUnit::Repl || !isa<TopLevelCodeDecl>(DC))
+      if (TC.TU.Kind != TranslationUnit::REPL || !isa<TopLevelCodeDecl>(DC))
         TC.typeCheckIgnoredExpr(SubExpr);
       elem = SubExpr;
       continue;
