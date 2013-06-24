@@ -62,10 +62,7 @@ namespace {
     PrefixNonPrefixConflict,
 
     /// \brief The witness did not match due to postfix/non-postfix differences.
-    PostfixNonPostfixConflict,
-
-    /// \brief The requirement requires [objc] but the witness is not [objc].
-    ObjCNonObjCConflict
+    PostfixNonPostfixConflict
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -100,7 +97,6 @@ namespace {
       case MatchKind::StaticNonStaticConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
-      case MatchKind::ObjCNonObjCConflict:
         return false;
       }
     }
@@ -118,7 +114,6 @@ namespace {
       case MatchKind::StaticNonStaticConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
-      case MatchKind::ObjCNonObjCConflict:
         return false;
       }
     }
@@ -161,11 +156,6 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   // Get the requirement and witness attributes.
   const auto &reqAttrs = req->getAttrs();
   const auto &witnessAttrs = witness->getAttrs();
-
-  // An Objective-C protocol requires all of the witnesses to be
-  // Objective-C-compatible declarations.
-  if (protocol->getAttrs().isObjC() && !witnessAttrs.isObjC())
-    return RequirementMatch(witness, MatchKind::ObjCNonObjCConflict);
 
   // Compute the type of the witness, below.
   Type witnessType;
@@ -355,11 +345,6 @@ static void diagnoseMatch(TypeChecker &tc, ValueDecl *req,
     tc.diagnose(match.Witness, diag::protocol_witness_prefix_postfix_conflict,
                 true, match.Witness->getAttrs().isPrefix() ? 1 : 0);
     break;
-
-  case MatchKind::ObjCNonObjCConflict:
-    // FIXME: Could emit a Fix-It here.
-    tc.diagnose(match.Witness, diag::protocol_witness_objc_conflict);
-    break;  
   }
 }
 

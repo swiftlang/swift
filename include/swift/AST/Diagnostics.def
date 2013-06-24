@@ -1082,9 +1082,6 @@ NOTE(protocol_witness_static_conflict,sema_tcd,none,
 NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
-NOTE(protocol_witness_objc_conflict,sema_tcd,none,
-     "candidate is not Objective-C compatible ([objc]) as required by protocol", 
-     ())
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,sema_tcd,none,
