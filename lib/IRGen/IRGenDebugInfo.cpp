@@ -71,7 +71,7 @@ typedef struct {
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
 Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
-  Location L = {0};
+  Location L = {};
 
   SourceLoc Start = S->getStartLoc();
   int BufferIndex = SM.FindBufferContainingLoc(Start.Value);
@@ -94,7 +94,7 @@ static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
   if (Decl* D = Loc.dyn_cast<Decl*>())
     return getStartLoc(SM, D);
 
-  Location None = {0};
+  Location None = {};
   return None;
 }
 
