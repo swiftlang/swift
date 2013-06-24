@@ -603,50 +603,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
     return S;
   }
-  
-  bool visitPatternVarGetSet(Pattern *P) {
-    switch (P->getKind()) {
-    case PatternKind::Paren:
-      return visitPatternVarGetSet(cast<ParenPattern>(P)->getSubPattern());
-
-    case PatternKind::Tuple:
-      for (auto &Elt : cast<TuplePattern>(P)->getFields())
-        if (visitPatternVarGetSet(Elt.getPattern()))
-          return true;
-      return false;
-        
-    case PatternKind::Named:
-      if (VarDecl *Var = cast<NamedPattern>(P)->getDecl()) {
-        if (!Var->isProperty())
-          return false;
-        
-        if (FuncDecl *Get = Var->getGetter()) {
-          if (doIt(Get))
-            return true;
-        }
-        
-        if (FuncDecl *Set = Var->getSetter()) {
-          if (doIt(Set))
-            return true;
-        }
-      }
-      return false;
-
-    case PatternKind::Any:
-      return false;
-        
-    case PatternKind::Typed:
-      return visitPatternVarGetSet(cast<TypedPattern>(P)->getSubPattern());
-#define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) \
-    case PatternKind::Id:
-#define REFUTABLE_PATTERN(Id, Parent) \
-    case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-      llvm_unreachable("cannot appear in get/set pattern");
-    }
-  }
-  
+    
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -689,12 +646,7 @@ public:
     if (!Walker.walkToDeclPre(D))
       return false;
 
-    if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {
-#if 0
-      if (visitPatternVarGetSet(PBD->getPattern()))
-        return true;
-#endif
-      
+    if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {      
       if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
