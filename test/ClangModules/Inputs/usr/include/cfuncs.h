@@ -24,3 +24,10 @@ inline int createSomething(void);
 
 int renamed(int) __asm("_something_else");
 
+void decay_param_array(int p[]);
+
+// FIXME: These two should work some day, too.  Right now we don't import
+// function types.
+void decay_param_func(void g(int));
+void decay_param_nested(void g(int p[]));
+

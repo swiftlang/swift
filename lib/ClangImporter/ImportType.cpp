@@ -342,6 +342,10 @@ namespace {
       return underlyingType;
     }
 
+    Type VisitDecayedType(const clang::DecayedType *Type) {
+      return Impl.importType(Type->getDecayedType(), kind);
+    }
+
     Type VisitTypeOfExpr(const clang::TypeOfExprType *type) {
       return Impl.importType(
                Impl.getClangASTContext().getCanonicalType(clang::QualType(type,
