@@ -128,6 +128,19 @@ namespace {
   };
 }
 
+///\ brief Decompose the given type into a set of tuple elements.
+static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
+  SmallVector<TupleTypeElt, 4> result;
+
+  if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
+    result.append(tupleTy->getFields().begin(), tupleTy->getFields().end());
+    return result;
+  }
+
+  result.push_back(type);
+  return result;
+}
+
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -156,6 +169,7 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
   // Compute the type of the witness, below.
   Type witnessType;
+  bool decomposeFunctionType = false;
 
   // Check properties specific to functions.
   if (auto funcReq = dyn_cast<FuncDecl>(req)) {
@@ -185,6 +199,9 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
       witnessType = tc.substMemberTypeWithBase(witnessType, witness, model);
       assert(witnessType && "Cannot refer to witness?");
     }
+
+    // We want to decompose the parameters to handle them separately.
+    decomposeFunctionType = true;
   } else {
     // FIXME: Static variables will have to check static vs. non-static here.
 
@@ -193,22 +210,91 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     witnessType = tc.substMemberTypeWithBase(witness->getType(), witness,
                                              model);
     assert(witnessType && "Cannot refer to witness?");
+
+    // Decompose the parameters for subscript declarations.
+    decomposeFunctionType = isa<SubscriptDecl>(req);
   }
 
   // If the types match, success!
-  if (witnessType ->isEqual(reqType))
+  if (witnessType->isEqual(reqType))
     return RequirementMatch(witness, MatchKind::ExactMatch, witnessType);
 
-  // Remove labels from the types.
-  // FIXME: This is wrong for [objc] requirements.
-  if (witnessType->getUnlabeledType(tc.Context)->isEqual(
-                            reqType->getUnlabeledType(tc.Context)))
+  // If we don't need to decompose function types, simply remove labels and
+  // check the types.
+  if (!decomposeFunctionType) {
+    // Remove labels from the types.
+    if (witnessType->getUnlabeledType(tc.Context)->isEqual(
+          reqType->getUnlabeledType(tc.Context)))
+      return RequirementMatch(witness, MatchKind::RenamedMatch, witnessType);
+
+    // We don't have a match.
+    return RequirementMatch(witness, MatchKind::TypeConflict,
+                            witnessType->getUnlabeledType(tc.Context));
+  }
+
+  // Break up the function types. We'll check parameters/return type separately.
+  auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
+  auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
+  auto witnessInputType = witnessType->castTo<AnyFunctionType>()->getInput();
+  auto witnessResultType = witnessType->castTo<AnyFunctionType>()->getResult();
+
+  // Check the result type.
+  if (!witnessResultType->getUnlabeledType(tc.Context)->isEqual(
+        reqResultType->getUnlabeledType(tc.Context))) {
+    // The types did not match.
+    // FIXME: More specific information here!
+    return RequirementMatch(witness, MatchKind::TypeConflict,
+                            witnessType->getUnlabeledType(tc.Context));
+  }
+
+  // Decompose the input types into parameters.
+  auto reqParams = decomposeIntoTupleElements(reqInputType);
+  auto witnessParams = decomposeIntoTupleElements(witnessInputType);
+
+  // If the number of parameters
+  if (reqParams.size() != witnessParams.size())
+    return RequirementMatch(witness, MatchKind::TypeConflict,
+                            witnessType->getUnlabeledType(tc.Context));
+
+  // Match each of the parameters.
+  bool anyRenaming = false;
+  for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
+    // Variadic bits must match.
+    // FIXME: Specialize the match failure kind
+    if (reqParams[i].isVararg() != witnessParams[i].isVararg())
+      return RequirementMatch(witness, MatchKind::TypeConflict,
+                              witnessType->getUnlabeledType(tc.Context));
+
+    // Check whether the parameter types match.
+    // FIXME: Specialize the match failure kind
+    if (!reqParams[i].getType()->getUnlabeledType(tc.Context)->isEqual(
+          witnessParams[i].getType()->getUnlabeledType(tc.Context)))
+      return RequirementMatch(witness, MatchKind::TypeConflict,
+                              witnessType->getUnlabeledType(tc.Context));
+
+    // FIXME: Consider default arguments here?
+
+    // If the parameter names match, keep going.
+    if (reqParams[i].getName() == witnessParams[i].getName())
+      continue;
+
+    // A parameter has been renamed.
+    anyRenaming = true;
+
+    // For an Objective-C requirement, all but the first parameter name is
+    // significant.
+    // FIXME: Specialize the match failure kind.
+    // FIXME: Constructors care about the first name.
+    if (protocol->getAttrs().isObjC() && i > 0)
+      return RequirementMatch(witness, MatchKind::TypeConflict,
+                              witnessType);
+  }
+
+  // Success. If anything was renamed, report that.
+  if (anyRenaming)
     return RequirementMatch(witness, MatchKind::RenamedMatch, witnessType);
 
-  // The types did not match.
-  // FIXME: More specific information here!
-  return RequirementMatch(witness, MatchKind::TypeConflict,
-                          witnessType->getUnlabeledType(tc.Context));
+  return RequirementMatch(witness, MatchKind::ExactMatch, witnessType);
 }
 
 /// \brief Determine whether one requirement match is better than the other.
@@ -228,16 +314,6 @@ static bool isBetterMatch(const RequirementMatch &match1,
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void diagnoseMatch(TypeChecker &tc, ValueDecl *req,
                           const RequirementMatch &match) {
-  /// \brief The kind of conflict between function attributes.
-  ///
-  /// The order of enumerators must match the order of the select in
-  /// \c diag::protocol_witness_func_conflict.
-  enum FuncConflictKind {
-    FCK_Static,
-    FCK_Prefix,
-    FCK_Postfix
-  };
-
   switch (match.Kind) {
   case MatchKind::ExactMatch:
     tc.diagnose(match.Witness, diag::protocol_witness_exact_match);
