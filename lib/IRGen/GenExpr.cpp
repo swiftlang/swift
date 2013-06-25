@@ -47,10 +47,10 @@ llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
     from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
   
   // Emit a reference to the metadata.
-  bool isClass = toType.getClassOrBoundGenericClass();
+  bool isConcreteClass = toType.is<ClassType>();
   llvm::Value *metadataRef;
   llvm::Constant *castFn;
-  if (isClass) {
+  if (isConcreteClass) {
     // If the dest type is a concrete class, get the full class metadata
     // and call dynamicCastClass directly.
     metadataRef
