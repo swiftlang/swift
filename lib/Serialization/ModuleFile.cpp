@@ -203,6 +203,49 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
+
+/// Finds all value decls with the given name in the given context,
+/// visible or not.
+static void lookupImmediateDecls(DeclContext *DC, Identifier name,
+                                 SmallVectorImpl<ValueDecl *> &results) {
+  ArrayRef<Decl *> members;
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::SerializedModule:
+  case DeclContextKind::ClangModule:
+    llvm_unreachable("should not be used for module contexts");
+
+  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::ConstructorDecl:
+  case DeclContextKind::DestructorDecl:
+    // Don't look at params or local variables.
+    return;
+
+  case DeclContextKind::NominalTypeDecl: {
+    members = cast<NominalTypeDecl>(DC)->getMembers();
+    break;
+  }
+
+  case DeclContextKind::ExtensionDecl: {
+    members = cast<ExtensionDecl>(DC)->getMembers();
+    break;
+  }
+
+  case DeclContextKind::TopLevelCodeDecl:
+    llvm_unreachable("libraries do not expose their top-level code");
+  }
+
+  for (Decl *member : members) {
+    if (auto value = dyn_cast<ValueDecl>(member)) {
+      if (value->getName() == name)
+        results.push_back(value);
+    }
+  }
+}
+
+
 Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
   if (DID == 0)
     return nullptr;
@@ -503,6 +546,115 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
 
     break;
   }
+
+  case decls_block::XREF: {
+    uint8_t kind;
+    TypeID expectedTypeID;
+    ArrayRef<uint64_t> rawAccessPath;
+
+    decls_block::XRefLayout::readRecord(scratch, kind, expectedTypeID,
+                                        rawAccessPath);
+
+    // First, find the module this reference is referring to.
+    Identifier moduleName = getIdentifier(rawAccessPath.front());
+    rawAccessPath = rawAccessPath.slice(1);
+    // FIXME: provide a real source location.
+    Module *M = ctx.getModule(std::make_pair(moduleName, SourceLoc()));
+    assert(M && "missing dependency");
+
+    switch (kind) {
+    case XRefKind::SwiftValue: {
+      // Start by looking up the top-level decl in the module.
+      SmallVector<ValueDecl *, 8> values;
+      M->lookupValue(Module::AccessPathTy(),
+                     getIdentifier(rawAccessPath.front()),
+                     NLKind::QualifiedLookup,
+                     values);
+      rawAccessPath = rawAccessPath.slice(1);
+
+      // Then, follow the chain of nested ValueDecls until we run out of
+      // identifiers in the access path.
+      SmallVector<ValueDecl *, 8> baseValues;
+      while (!rawAccessPath.empty()) {
+        baseValues.swap(values);
+        values.clear();
+        for (auto base : baseValues) {
+          // FIXME: extensions?
+          if (auto nominal = dyn_cast<NominalTypeDecl>(base))
+            lookupImmediateDecls(nominal,
+                                 getIdentifier(rawAccessPath.front()),
+                                 values);
+        }
+        rawAccessPath = rawAccessPath.slice(1);
+      }
+
+      // If we have a type to validate against, filter out any ValueDecls that
+      // don't match that type.
+      CanType expectedTy;
+      Type maybeExpectedTy = getType(expectedTypeID);
+      if (maybeExpectedTy)
+        expectedTy = maybeExpectedTy->getCanonicalType();
+
+      ValueDecl *result = nullptr;
+      for (auto value : values) {
+        if (!expectedTy || value->getType()->getCanonicalType() == expectedTy) {
+          // It's an error if more than one value has the same type.
+          // FIXME: Functions and constructors can overload based on parameter
+          // names.
+          if (result) {
+            error();
+            return nullptr;
+          }
+          result = value;
+        }
+      }
+
+      // It's an error if lookup doesn't actually find anything -- that means
+      // the module's out of date.
+      if (!result) {
+        error();
+        return nullptr;
+      }
+
+      declOrOffset = result;
+      break;
+    }
+    case XRefKind::SwiftOperator: {
+      assert(rawAccessPath.size() == 1 &&
+             "can't import operators not at module scope");
+      Identifier opName = getIdentifier(rawAccessPath.back());
+
+      switch (expectedTypeID) {
+      case OperatorKind::Infix: {
+        auto op = M->lookupInfixOperator(opName);
+        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        break;
+      }
+      case OperatorKind::Prefix: {
+        auto op = M->lookupPrefixOperator(opName);
+        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        break;
+      }
+      case OperatorKind::Postfix: {
+        auto op = M->lookupPostfixOperator(opName);
+        declOrOffset = op.hasValue() ? op.getValue() : nullptr;
+        break;
+      }
+      default:
+        // Unknown operator kind.
+        error();
+        return nullptr;
+      }
+      break;
+    }
+    default:
+      // Unknown cross-reference kind.
+      error();
+      return nullptr;
+    }
+
+    break;
+  }
       
   default:
     // We don't know how to deserialize this kind of decl.
@@ -521,7 +673,7 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
 static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
   switch (cc) {
 #define CASE(THE_CC) \
-  case static_cast<uint8_t>(serialization::AbstractCC::THE_CC): \
+  case serialization::AbstractCC::THE_CC: \
     return swift::AbstractCC::THE_CC;
   CASE(C)
   CASE(ObjCMethod)

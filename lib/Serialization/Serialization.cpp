@@ -37,6 +37,9 @@ namespace {
     /// A reusable buffer for emitting records.
     SmallVector<uint64_t, 64> ScratchRecord;
 
+    /// The TranslationUnit currently being serialized.
+    const TranslationUnit *TU;
+
   public:    
     /// Stores a declaration or a type to be written to the AST file.
     ///
@@ -161,6 +164,12 @@ namespace {
     /// Writes the given pattern, recursively.
     void writePattern(const Pattern *pattern);
 
+    /// Writes a reference to a decl in another module.
+    ///
+    /// Returns false if the decl cannot be serialized without losing
+    /// information.
+    bool writeCrossReference(const Decl *D);
+
     /// Writes the given decl.
     ///
     /// Returns false if the decl cannot be serialized without losing
@@ -203,7 +212,7 @@ namespace {
 
   public:
     Serializer()
-      : Out(Buffer), LastDeclID(0), LastTypeID(0),
+      : Out(Buffer), TU(nullptr), LastDeclID(0), LastTypeID(0),
         ShouldFallBackToTranslationUnit(false) {
     }
 
@@ -364,6 +373,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, NAMED_PATTERN);
   RECORD(decls_block, ANY_PATTERN);
   RECORD(decls_block, TYPED_PATTERN);
+
+  RECORD(decls_block, XREF);
   RECORD(decls_block, DECL_CONTEXT);
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
@@ -512,12 +523,76 @@ void Serializer::writePattern(const Pattern *pattern) {
   }
 }
 
+bool Serializer::writeCrossReference(const Decl *D) {
+  using namespace decls_block;
+
+  SmallVector<IdentifierID, 4> accessPath;
+  XRefKind kind;
+  TypeID typeID;
+
+  if (auto value = dyn_cast<ValueDecl>(D)) {
+    kind = XRefKind::SwiftValue;
+    accessPath.push_back(addIdentifierRef(value->getName()));
+
+    // Make sure we don't create a self-referential type.
+    Type ty = value->getType();
+    if (ty->is<MetaTypeType>())
+      ty = nullptr;
+    typeID = addTypeRef(ty);
+
+  } else if (auto op = dyn_cast<OperatorDecl>(D)) {
+    kind = XRefKind::SwiftOperator;
+    accessPath.push_back(addIdentifierRef(op->getName()));
+
+    switch (op->getKind()) {
+      case DeclKind::InfixOperator:
+        typeID = OperatorKind::Infix;
+        break;
+      case DeclKind::PrefixOperator:
+        typeID = OperatorKind::Prefix;
+        break;
+      case DeclKind::PostfixOperator:
+        typeID = OperatorKind::Postfix;
+        break;
+      default:
+        llvm_unreachable("unknown operator kind");
+    }
+  } else {
+    llvm_unreachable("cannot cross-reference this kind of decl");
+  }
+
+  // Build up the access path by walking through parent DeclContexts.
+  const DeclContext *DC;
+  for (DC = D->getDeclContext(); !DC->isModuleContext(); DC = DC->getParent()) {
+    // FIXME: Handle references to things in extensions.
+    if (isa<ExtensionDecl>(D))
+      return false;
+
+    auto value = cast<ValueDecl>(getDeclForContext(DC));
+    accessPath.push_back(addIdentifierRef(value->getName()));
+  }
+
+  accessPath.push_back(addIdentifierRef(cast<Module>(DC)->Name));
+  // Store the access path in forward order.
+  std::reverse(accessPath.begin(), accessPath.end());
+
+  unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
+  XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                         kind, typeID, accessPath);
+
+  return true;
+}
+
 bool Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   if (D->hasClangNode())
     return false;
+
+  Module *M = D->getModuleContext();
+  if (M != TU)
+    return writeCrossReference(D);
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -726,7 +801,7 @@ static uint8_t getRawStableCC(swift::AbstractCC cc) {
   switch (cc) {
 #define CASE(THE_CC) \
   case swift::AbstractCC::THE_CC: \
-    return static_cast<uint8_t>(serialization::AbstractCC::THE_CC);
+    return serialization::AbstractCC::THE_CC;
   CASE(C)
   CASE(ObjCMethod)
   CASE(Freestanding)
@@ -921,6 +996,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<NamedPatternLayout>();
     registerDeclTypeAbbr<AnyPatternLayout>();
     registerDeclTypeAbbr<TypedPatternLayout>();
+
+    registerDeclTypeAbbr<XRefLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
   }
 
@@ -969,6 +1046,9 @@ void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
+  assert(!this->TU && "already serializing a translation unit");
+  this->TU = TU;
+
   SmallVector<DeclID, 32> topLevelIDs;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
@@ -990,6 +1070,10 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     index_block::TopLevelDeclsLayout TopLevelDecls(Out);
     TopLevelDecls.emit(ScratchRecord, topLevelIDs);
   }
+
+#ifndef NDEBUG
+  this->TU = nullptr;
+#endif
 }
 
 void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,

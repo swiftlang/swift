@@ -60,14 +60,31 @@ using CharOffsetField = BitOffsetField;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum class AbstractCC : uint8_t {
+enum AbstractCC : uint8_t {
   C = 0,
   ObjCMethod,
   Freestanding,
   Method
 };
-using AbstractCCField = BCVBR<4>;
+using AbstractCCField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum XRefKind : uint8_t {
+  SwiftValue = 0,
+  SwiftOperator
+};
+using XRefKindField = BCFixed<1>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum OperatorKind : uint8_t {
+  Infix = 0,
+  Prefix,
+  Postfix
+};
+static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
+              "too many operator kinds");
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -190,6 +207,7 @@ namespace decls_block {
     ISA_PATTERN,
     NOMINAL_TYPE_PATTERN,
 
+    XREF = 254,
     DECL_CONTEXT = 255
   };
 
@@ -354,6 +372,13 @@ namespace decls_block {
     NOMINAL_TYPE_PATTERN,
     TypeIDField
     // The sub-pattern trails the record.
+  >;
+
+  using XRefLayout = BCRecordLayout<
+    XREF,
+    XRefKindField, // reference kind
+    TypeIDField,   // type if value, operator kind if operator
+    BCArray<IdentifierIDField> // access path
   >;
 
   using DeclContextLayout = BCRecordLayout<
