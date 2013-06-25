@@ -913,8 +913,17 @@ SourceLoc ConstructorDecl::getLoc() const {
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {
-  if (!Body || !Body->getEndLoc().isValid())
-    return cast<NominalTypeDecl>(getDeclContext())->getLoc();
+  if (!Body || !Body->getEndLoc().isValid()) {
+    const DeclContext *DC = getDeclContext();
+    switch (DC->getContextKind()) {
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(DC)->getLoc();
+    case DeclContextKind::NominalTypeDecl:
+      return cast<NominalTypeDecl>(DC)->getLoc();
+    default:
+      llvm_unreachable("Unhandled decl kind");
+    }
+  }
   return { ConstructorLoc, Body->getEndLoc() };
 }
 
