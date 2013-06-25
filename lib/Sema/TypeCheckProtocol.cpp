@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -28,7 +29,7 @@ using namespace swift;
 int getRequirementKind(ValueDecl *VD) {
   if (isa<FuncDecl>(VD))
     return 0;
-  
+
   if (isa<VarDecl>(VD))
     return 1;
   
@@ -120,7 +121,9 @@ namespace {
     }
 
     /// FIXME: Generic substitutions here.
-    /// FIXME: Associated type deductions here.
+
+    /// \brief Associated types determined by matching this requirement.
+    SmallVector<std::pair<TypeAliasDecl *, Type>, 2> AssociatedTypeDeductions;
   };
 }
 
@@ -140,9 +143,11 @@ static SmallVector<TupleTypeElt, 4> decomposeIntoTupleElements(Type type) {
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
-static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
-                                     ValueDecl *req, Type reqType,
-                                     Type model, ValueDecl *witness) {
+static RequirementMatch
+matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
+             ValueDecl *req, Type reqType,
+             Type model, ValueDecl *witness,
+             ArrayRef<TypeAliasDecl *> unresolvedAssocTypes) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -209,6 +214,19 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   // the required type and the witness type.
   // FIXME: Pass the nominal/extension context in as the DeclContext?
   constraints::ConstraintSystem cs(tc, &tc.TU);
+
+  // Open up the type of the requirement, replacing any unresolved archetypes
+  // with type variables.
+  llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
+  SmallVector<ArchetypeType *, 4> unresolvedArchetypes;
+  if (!unresolvedAssocTypes.empty()) {
+    for (auto assoc : unresolvedAssocTypes)
+      unresolvedArchetypes.push_back(
+        assoc->getDeclaredType()->castTo<ArchetypeType>());
+
+    reqType = cs.openType(reqType, unresolvedArchetypes, replacements);
+  }
+
   bool anyRenaming = false;
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
@@ -278,12 +296,30 @@ static RequirementMatch matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     return RequirementMatch(witness, MatchKind::TypeConflict,
                             witnessType->getUnlabeledType(tc.Context));
   }
+  auto &solution = solutions.front();
+  
+  // Success. Form the match result.
+  RequirementMatch result(witness,
+                          anyRenaming? MatchKind::RenamedMatch
+                                     : MatchKind::ExactMatch,
+                          witnessType);
 
-  // Success. If anything was renamed, report that.
-  if (anyRenaming)
-    return RequirementMatch(witness, MatchKind::RenamedMatch, witnessType);
+  // If we deduced any associated types, record them in the result.
+  if (!replacements.empty()) {
+    for (auto assocType : unresolvedAssocTypes) {
+      auto archetype = assocType->getDeclaredType()->castTo<ArchetypeType>();
+      auto known = replacements.find(archetype);
+      if (known == replacements.end())
+        continue;
 
-  return RequirementMatch(witness, MatchKind::ExactMatch, witnessType);
+      auto replacement = solution.simplifyType(tc, known->second);
+      assert(replacement && "Couldn't simplify type variable?");
+
+      result.AssociatedTypeDeductions.push_back({assocType, replacement});
+    }
+  }
+
+  return result;
 }
 
 /// \brief Determine whether one requirement match is better than the other.
@@ -300,16 +336,46 @@ static bool isBetterMatch(const RequirementMatch &match1,
   return false;
 }
 
+/// \brief Add the next associated type deduction to the string representation
+/// of the deductions, used in diagnostics.
+static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
+                                        TypeAliasDecl *assocType,
+                                        Type deduced) {
+  if (str.empty())
+    str = " [with ";
+  else
+    str += ", ";
+
+  str += assocType->getName().str();
+  str += " = ";
+  str += deduced.getString();
+}
+
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
-static void diagnoseMatch(TypeChecker &tc, ValueDecl *req,
-                          const RequirementMatch &match) {
+static void
+diagnoseMatch(TypeChecker &tc, ValueDecl *req,
+              const RequirementMatch &match,
+              ArrayRef<std::pair<TypeAliasDecl *, Type>> deducedAssocTypes) {
+  // Form a string describing the associated type deductions.
+  // FIXME: Determine which associated types matter, and only print those.
+  llvm::SmallString<128> withAssocTypes;
+  for (const auto &deduced : deducedAssocTypes) {
+    addAssocTypeDeductionString(withAssocTypes, deduced.first, deduced.second);
+  }
+  for (const auto &deduced : match.AssociatedTypeDeductions) {
+    addAssocTypeDeductionString(withAssocTypes, deduced.first, deduced.second);
+  }
+  if (!withAssocTypes.empty())
+    withAssocTypes += "]";
+
   switch (match.Kind) {
   case MatchKind::ExactMatch:
-    tc.diagnose(match.Witness, diag::protocol_witness_exact_match);
+    tc.diagnose(match.Witness, diag::protocol_witness_exact_match,
+                withAssocTypes);
     break;
 
   case MatchKind::RenamedMatch:
-    tc.diagnose(match.Witness, diag::protocol_witness_renamed);
+    tc.diagnose(match.Witness, diag::protocol_witness_renamed, withAssocTypes);
     break;
 
   case MatchKind::KindConflict:
@@ -324,7 +390,7 @@ static void diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 
   case MatchKind::TypeConflict:
     tc.diagnose(match.Witness, diag::protocol_witness_type_conflict,
-                match.WitnessType);
+                match.WitnessType, withAssocTypes);
     break;
 
   case MatchKind::StaticNonStaticConflict:
@@ -393,13 +459,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   bool Complained = false;
   auto metaT = MetaTypeType::get(T, TC.Context);
   
-  // First, resolve any associated type members. They'll be used for checking
-  // other members.
-  
-  // FIXME: This algorithm is totally busted. We want to allow deduction of
-  // associated type witnesses from the parameter/return types of other
-  // witnesses, or to figure out an associated type based on one of its other
-  // names, which means we need a rather more sophisticated algorithm.
+  // First, resolve any associated type members that have bindings. We'll
+  // attempt to deduce any associated types that don't have explicit
+  // definitions.
+  SmallVector<TypeAliasDecl *, 4> unresolvedAssocTypes;
   for (auto Member : Proto->getMembers()) {
     auto AssociatedType = dyn_cast<TypeAliasDecl>(Member);
     if (!AssociatedType)
@@ -407,110 +470,117 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     
     // Bind the implicit 'This' type to the type T.
     // FIXME: Should have some kind of 'implicit' bit to detect this.
+    auto archetype
+      = AssociatedType->getUnderlyingType()->castTo<ArchetypeType>();
     if (AssociatedType->getName().str().equals("This")) {
-      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-        = T;
+      TypeMapping[archetype]= T;
       continue;
     }
 
     MemberLookup Lookup(metaT, AssociatedType->getName(), TC.TU);
-    if (Lookup.isSuccess()) {
-      SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
-      SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
 
-      for (auto Candidate : Lookup.Results) {
-        switch (Candidate.Kind) {
-        case MemberLookupResult::MetaArchetypeMember:
-        case MemberLookupResult::MetatypeMember:
-          if (auto TypeD = dyn_cast<TypeDecl>(Candidate.D)) {
-            // Check this type against the protocol requirements.
-            bool SatisfiesRequirements = true;
+    // If we didn't find any matches, consider this associated type to be
+    // unresolved.
+    if (!Lookup.isSuccess()) {
+      unresolvedAssocTypes.push_back(AssociatedType);
+      continue;
+    }
 
-            Type WitnessTy
-              = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
+    SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
+    SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
 
-            for (auto Req : AssociatedType->getInherited()) {
-              SmallVector<ProtocolDecl *, 4> ReqProtos;
-              if (!Req.getType()->isExistentialType(ReqProtos))
-                return nullptr;
+    for (auto Candidate : Lookup.Results) {
+      switch (Candidate.Kind) {
+      case MemberLookupResult::MetaArchetypeMember:
+      case MemberLookupResult::MetatypeMember:
+        if (auto TypeD = dyn_cast<TypeDecl>(Candidate.D)) {
+          // Check this type against the protocol requirements.
+          bool SatisfiesRequirements = true;
 
-              for (auto ReqProto : ReqProtos) {
-                if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
-                  SatisfiesRequirements = false;
+          Type WitnessTy
+            = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
 
-                  NonViable.push_back({TypeD, ReqProto});
-                  break;
-                }
-              }
+          for (auto Req : AssociatedType->getInherited()) {
+            SmallVector<ProtocolDecl *, 4> ReqProtos;
+            if (!Req.getType()->isExistentialType(ReqProtos))
+              return nullptr;
 
-              if (!SatisfiesRequirements)
+            for (auto ReqProto : ReqProtos) {
+              if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
+                SatisfiesRequirements = false;
+
+                NonViable.push_back({TypeD, ReqProto});
                 break;
+              }
             }
 
-            if (SatisfiesRequirements)
-              Viable.push_back({TypeD, WitnessTy});
+            if (!SatisfiesRequirements)
+              break;
           }
-          break;
 
-        case MemberLookupResult::MemberProperty:
-        case MemberLookupResult::MemberFunction:
-        case MemberLookupResult::ExistentialMember:
-        case MemberLookupResult::ArchetypeMember:
-        case MemberLookupResult::GenericParameter:
-          // These results cannot satisfy type requirements.
-          break;
+          if (SatisfiesRequirements)
+            Viable.push_back({TypeD, WitnessTy});
         }
+        break;
+
+      case MemberLookupResult::MemberProperty:
+      case MemberLookupResult::MemberFunction:
+      case MemberLookupResult::ExistentialMember:
+      case MemberLookupResult::ArchetypeMember:
+      case MemberLookupResult::GenericParameter:
+        // These results cannot satisfy type requirements.
+        break;
+      }
+    }
+    
+    if (Viable.size() == 1) {
+      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+        = Viable.front().second;
+      continue;
+    }
+    
+    if (ComplainLoc.isInvalid())
+      return nullptr;
+    
+    if (!Viable.empty()) {
+      if (!Complained) {
+        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                    T, Proto->getDeclaredType());
+        Complained = true;
       }
       
-      if (Viable.size() == 1) {
-        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-          = Viable.front().second;
-        continue;
-      }
+      TC.diagnose(AssociatedType,
+                  diag::ambiguous_witnesses_type,
+                  AssociatedType->getName());
       
-      if (ComplainLoc.isInvalid())
-        return nullptr;
+      for (auto Candidate : Viable)
+        TC.diagnose(Candidate.first, diag::protocol_witness_type);
       
-      if (!Viable.empty()) {
-        if (!Complained) {
-          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                      T, Proto->getDeclaredType());
-          Complained = true;
-        }
-        
-        TC.diagnose(AssociatedType,
-                    diag::ambiguous_witnesses_type,
-                    AssociatedType->getName());
-        
-        for (auto Candidate : Viable)
-          TC.diagnose(Candidate.first, diag::protocol_witness_type);
-        
-        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-          = ErrorType::get(TC.Context);
-        continue;
+      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+        = ErrorType::get(TC.Context);
+      continue;
+    }
+
+    if (!NonViable.empty()) {
+      if (!Complained) {
+        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                    T, Proto->getDeclaredType());
+        Complained = true;
       }
 
-      if (!NonViable.empty()) {
-        if (!Complained) {
-          TC.diagnose(ComplainLoc, diag::type_does_not_conform,
-                      T, Proto->getDeclaredType());
-          Complained = true;
-        }
+      TC.diagnose(AssociatedType, diag::no_witnesses_type,
+                  AssociatedType->getName());
 
-        TC.diagnose(AssociatedType, diag::no_witnesses_type,
-                    AssociatedType->getName());
-
-        for (auto Candidate : NonViable) {
-          TC.diagnose(Candidate.first,
-                      diag::protocol_witness_nonconform_type,
-                      Candidate.first->getDeclaredType(),
-                      Candidate.second->getDeclaredType());
-        }
-
-        TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-          = ErrorType::get(TC.Context);
-        continue;
+      for (auto Candidate : NonViable) {
+        TC.diagnose(Candidate.first,
+                    diag::protocol_witness_nonconform_type,
+                    Candidate.first->getDeclaredType(),
+                    Candidate.second->getDeclaredType());
       }
+
+      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
+        = ErrorType::get(TC.Context);
+      continue;
     }
     
     if (ComplainLoc.isValid()) {
@@ -525,8 +595,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       for (auto Candidate : Lookup.Results)
         TC.diagnose(Candidate.D, diag::protocol_witness_type);
       
-      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-        = ErrorType::get(TC.Context);
+      TypeMapping[archetype] = ErrorType::get(TC.Context);
     } else {
       return nullptr;
     }
@@ -537,6 +606,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return nullptr;
 
   // Check that T provides all of the required func/variable/subscript members.
+  SmallVector<std::pair<TypeAliasDecl *, Type>, 4> deducedAssocTypes;
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
     if (!Requirement)
@@ -553,7 +623,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       reqType = reqType->castTo<AnyFunctionType>()->getResult();
 
     // Substitute the type mappings we have into the requirement type.
-    reqType = TC.substType(reqType, TypeMapping);
+    reqType = TC.substType(reqType, TypeMapping, /*IgnoreMissing=*/true);
     assert(reqType && "We didn't check our type mappings?");
 
     // Gather the witnesses.
@@ -586,7 +656,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     unsigned numViable = 0;
     unsigned bestIdx = 0;
     for (auto witness : witnesses) {
-      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness);
+      auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
+                                unresolvedAssocTypes);
       if (match.isViable()) {
         ++numViable;
         bestIdx = matches.size();
@@ -628,7 +699,41 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
       // If we really do have a best match, record it.
       if (isReallyBest) {
-        Mapping[Requirement] = matches[bestIdx].Witness;
+        auto &best = matches[bestIdx];
+
+        // Record the match.
+        Mapping[Requirement] = best.Witness;
+
+        // If we deduced any associated types, record them now.
+        if (!best.AssociatedTypeDeductions.empty()) {
+          // Record the deductions.
+          for (auto deduction : best.AssociatedTypeDeductions) {
+            auto archetype
+              = deduction.first->getDeclaredType()->castTo<ArchetypeType>();
+            TypeMapping[archetype] = deduction.second;
+          }
+
+          // Remove the now-resolved associated types from the set of
+          // unresolved associated types.
+          unresolvedAssocTypes.erase(
+            std::remove_if(unresolvedAssocTypes.begin(),
+                           unresolvedAssocTypes.end(),
+                           [&](TypeAliasDecl *assocType) {
+                             auto archetype
+                               = assocType->getDeclaredType()
+                                   ->castTo<ArchetypeType>();
+
+                             auto known = TypeMapping.find(archetype);
+                             if (known == TypeMapping.end())
+                               return false;
+
+                             deducedAssocTypes.push_back({assocType,
+                                                          known->second});
+                             return true;
+                           }),
+            unresolvedAssocTypes.end());
+        }
+
         continue;
       }
 
@@ -659,14 +764,34 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     // Diagnose each of the matches.
     for (const auto &match : matches)
-      diagnoseMatch(TC, Requirement, match);
+      diagnoseMatch(TC, Requirement, match, deducedAssocTypes);
 
     // FIXME: Suggest a new declaration that does match?
   }
   
   if (Complained)
     return nullptr;
-  
+
+  // If any associated types were left unresolved, diagnose them.
+  if (!unresolvedAssocTypes.empty()) {
+    if (ComplainLoc.isInvalid())
+      return nullptr;
+
+    // Diagnose all missing associated types.
+    for (auto assocType : unresolvedAssocTypes) {
+      if (!Complained) {
+        TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+                    T, Proto->getDeclaredType());
+        Complained = true;
+      }
+
+      TC.diagnose(assocType, diag::no_witnesses_type,
+                  assocType->getName());
+    }
+
+    return nullptr;
+  }
+
   std::unique_ptr<ProtocolConformance> Result(new ProtocolConformance);
   // FIXME: Make DenseMap movable to make this efficient.
   Result->Mapping = std::move(Mapping);

@@ -844,7 +844,8 @@ Type TypeChecker::transformType(Type type,
   llvm_unreachable("Unhandled type in transformation");
 }
 
-Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions) {
+Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
+                            bool IgnoreMissing) {
   return transformType(origType,
                        [&](Type type) -> Type {
     auto substOrig = dyn_cast<SubstitutableType>(type.getPointer());
@@ -891,6 +892,9 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions) {
     // Retrieve the type with the given name.
     // FIXME: Shouldn't we be using protocol-conformance information here?
     MemberLookup ML(SubstParent, substOrig->getName(), TU, /*TypeLookup*/true);
+    if (ML.Results.empty() && IgnoreMissing)
+      return type;
+
     assert(ML.Results.size() && "No type lookup results?");
     TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
     return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);

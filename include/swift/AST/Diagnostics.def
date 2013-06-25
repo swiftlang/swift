@@ -1072,14 +1072,14 @@ NOTE(no_witnesses_type,sema_tcd,none,
 NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,sema_tcd,none,
-     "candidate exactly matches", ())
+     "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_renamed,sema_tcd,none,
-     "candidate matches (with renaming)", ())
+     "candidate matches (with renaming)%0", (StringRef))
 NOTE(protocol_witness_kind_conflict,sema_tcd,none,
      "candidate has is not a %select{function|variable|subscript operator}0",
      (unsigned))
 NOTE(protocol_witness_type_conflict,sema_tcd,none,
-     "candidate has non-matching type %0", (Type))
+     "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_static_conflict,sema_tcd,none,
      "candidate is %select{|not }0'static'"
      "%select{, but requirement is not| as required}0", (bool))

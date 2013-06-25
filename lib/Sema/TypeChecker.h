@@ -161,12 +161,16 @@ public:
   /// \brief Substitute the given archetypes for their substitution types
   /// within the given type.
   ///
+  /// \param IgnoreMissing Ignore missing mappings; useful when something else
+  /// may establish those mappings later, e.g., as in protocol conformance.
+  ///
   /// \returns The substituted type, or null if the substitution failed.
   ///
   /// FIXME: We probably want to have both silent and loud failure modes. However,
   /// the only possible failure now is from array slice types, which occur
   /// simply because we don't have Slice<T> yet.
-  Type substType(Type T, TypeSubstitutionMap &Substitutions);
+  Type substType(Type T, TypeSubstitutionMap &Substitutions,
+                 bool IgnoreMissing = false);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.
