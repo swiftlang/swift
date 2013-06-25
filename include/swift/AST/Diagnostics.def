@@ -848,6 +848,10 @@ ERROR(serialization_malformed_module,sema,none,
       "malformed module file", ())
 ERROR(serialization_module_too_new,sema,none,
       "module file was created by a newer version of the compiler", ())
+ERROR(serialization_missing_single_dependency,sema,none,
+      "missing required module '%0'", (StringRef))
+ERROR(serialization_missing_dependencies,sema,none,
+      "missing required modules: %0", (StringRef))
 
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))

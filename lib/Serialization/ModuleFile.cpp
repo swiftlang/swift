@@ -757,6 +757,10 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
           assert(scratch.empty());
           SourcePaths.push_back(blobData);
           break;
+        case input_block::IMPORTED_MODULE:
+          assert(scratch.empty());
+          Dependencies.push_back(blobData);
+          break;
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.
@@ -883,6 +887,30 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
   
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
     return error();
+}
+
+bool ModuleFile::associateWithModule(Module *module) {
+  assert(!ModuleContext && "already associated with an AST module");
+  assert(Status == ModuleStatus::Valid && "invalid module file");
+
+  ASTContext &ctx = module->Ctx;
+  bool missingDependency = false;
+  for (auto &dependency : Dependencies) {
+    assert(!dependency.Mod && "already loaded?");
+    Identifier ID = ctx.getIdentifier(dependency.Name);
+    // FIXME: Provide a proper source location.
+    dependency.Mod = ctx.getModule(std::make_pair(ID, SourceLoc()));
+    if (!dependency.Mod)
+      missingDependency = true;
+  }
+
+  if (missingDependency) {
+    error(ModuleStatus::MissingDependency);
+    return false;
+  }
+
+  ModuleContext = module;
+  return true;
 }
 
 void ModuleFile::buildTopLevelDeclMap() {

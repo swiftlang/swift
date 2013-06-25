@@ -16,6 +16,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/Interleave.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -167,6 +168,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     Ctx.Diags.diagnose(moduleID.second, diag::serialization_malformed_module);
     loadedModuleFile.reset();
     break;
+  case ModuleStatus::MissingDependency:
+    llvm_unreachable("dependencies haven't been loaded yet");
   }
 
   auto comp = new (Ctx.Allocate<Component>(1)) Component();
@@ -174,10 +177,43 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                                            loadedModuleFile.get());
 
   if (loadedModuleFile) {
-    loadedModuleFile->associateWithModule(module);
-    LoadedModuleFiles.push_back(std::move(loadedModuleFile));
+    bool success = loadedModuleFile->associateWithModule(module);
+    if (success) {
+      LoadedModuleFiles.push_back(std::move(loadedModuleFile));
+    } else {
+      assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
+
+      SmallVector<ModuleFile::Dependency, 4> missing;
+      std::copy_if(loadedModuleFile->getDependencies().begin(),
+                   loadedModuleFile->getDependencies().end(),
+                   std::back_inserter(missing),
+                   [](const ModuleFile::Dependency &dependency) {
+        return dependency.Mod == nullptr;
+      });
+
+      assert(!missing.empty() && "unknown missing dependency?");
+      if (missing.size() == 1) {
+        Ctx.Diags.diagnose(moduleID.second,
+                           diag::serialization_missing_single_dependency,
+                           missing.front().Name);
+      } else {
+        llvm::SmallString<64> missingNames;
+        missingNames += '\'';
+        interleave(missing,
+                   [&](const ModuleFile::Dependency &next) {
+                     missingNames += next.Name;
+                   },
+                   [&] { missingNames += "', '"; });
+        missingNames += '\'';
+
+        Ctx.Diags.diagnose(moduleID.second,
+                           diag::serialization_missing_dependencies,
+                           missingNames);
+      }
+    }
   }
 
+  // Whether we succeeded or failed, don't try to load this module again.
   Ctx.LoadedModules[moduleID.first.str()] = module;
   return module;
 }

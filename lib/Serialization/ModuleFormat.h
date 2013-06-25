@@ -141,12 +141,18 @@ namespace input_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum {
-    SOURCE_FILE = 1
+    SOURCE_FILE = 1,
+    IMPORTED_MODULE
   };
 
   using SourceFileLayout = BCRecordLayout<
     SOURCE_FILE, // ID
     BCBlob // path
+  >;
+
+  using ImportedModuleLayout = BCRecordLayout<
+    IMPORTED_MODULE,
+    BCBlob // module name
   >;
 }
 

@@ -51,6 +51,9 @@ enum class ModuleStatus {
   /// compiler.
   FormatTooNew,
 
+  /// The module file depends on another module that can't be loaded.
+  MissingDependency,
+
   /// The module file is malformed in some way.
   Malformed
 };
@@ -74,6 +77,22 @@ class ModuleFile {
 
   /// Paths to the source files used to build this module.
   SmallVector<StringRef, 4> SourcePaths;
+
+public:
+  /// Represents another module that has been imported as a dependency.
+  ///
+  /// If \c Mod is null, the dependency hasn't been resolved yet.
+  class Dependency {
+  public:
+    Module *Mod;
+    StringRef Name;
+
+    /*implicit*/ Dependency(StringRef name) : Mod(nullptr), Name(name) {}
+  };
+
+private:
+  /// All modules this module depends on.
+  SmallVector<Dependency, 8> Dependencies;
 
   /// Decls referenced by this module.
   std::vector<PointerUnion<Decl*, serialization::BitOffset>> Decls;
@@ -163,10 +182,9 @@ public:
   }
 
   /// Associates this module file with an AST module.
-  void associateWithModule(Module *module) {
-    assert(!ModuleContext && "already associated with an AST module");
-    ModuleContext = module;
-  }
+  ///
+  /// Returns false if the association failed.
+  bool associateWithModule(Module *module);
 
   /// Checks whether this module can be used.
   ModuleStatus getStatus() const { return Status; }
@@ -176,6 +194,11 @@ public:
     assert(getStatus() == ModuleStatus::Valid ||
            getStatus() == ModuleStatus::FallBackToTranslationUnit);
     return SourcePaths;
+  }
+
+  /// Returns the list of modules this module depends on.
+  ArrayRef<Dependency> getDependencies() const {
+    return Dependencies;
   }
 
   /// Searches the module's top-level decls for the given identifier.

@@ -154,8 +154,9 @@ namespace {
     /// non-TU-specific metadata.
     void writeHeader();
 
-    /// Writes the input file paths.
-    void writeInputFiles(llvm::SourceMgr &sourceMgr, FileBufferIDs inputFiles);
+    /// Writes the dependencies used to build this module: its imported
+    /// modules and its source files.
+    void writeInputFiles(const TranslationUnit *TU, FileBufferIDs inputFiles);
 
     /// Writes the given pattern, recursively.
     void writePattern(const Pattern *pattern);
@@ -336,6 +337,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(INPUT_BLOCK);
   RECORD(input_block, SOURCE_FILE);
+  RECORD(input_block, IMPORTED_MODULE);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, BUILTIN_TYPE);
@@ -398,11 +400,13 @@ void Serializer::writeHeader() {
   }
 }
 
-void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
+void Serializer::writeInputFiles(const TranslationUnit *TU,
                                  FileBufferIDs inputFiles) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
+  input_block::ImportedModuleLayout ImportedModule(Out);
 
+  auto &sourceMgr = TU->Ctx.SourceMgr;
   for (auto bufferID : inputFiles) {
     // FIXME: We could really use a real FileManager here.
     auto buffer = sourceMgr.getMemoryBuffer(bufferID);
@@ -415,6 +419,21 @@ void Serializer::writeInputFiles(llvm::SourceMgr &sourceMgr,
     
     SourceFile.emit(ScratchRecord, path);
   }
+
+  SmallVector<StringRef, 16> imported;
+  for (auto &moduleEntry : TU->Ctx.LoadedModules) {
+    if (moduleEntry.second == TU)
+      continue;
+    // FIXME: Submodules? Packages?
+    imported.push_back(moduleEntry.second->Name.str());
+  }
+  // Arbitrarily sort by name.
+  // FIXME: It would be more efficient to linearize the dependency graph, but
+  // that's more difficult, especially with Clang modules in the mix. This is
+  // at least deterministic.
+  std::sort(imported.begin(), imported.end());
+  for (auto name : imported)
+    ImportedModule.emit(ScratchRecord, name);
 }
 
 void Serializer::writePattern(const Pattern *pattern) {
@@ -950,11 +969,6 @@ void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
 }
 
 void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
-  // We don't handle imported modules at all yet, not even the standard library.
-  for (auto &M : TU->getImportedModules())
-    if (!isa<BuiltinModule>(M.second))
-      ShouldFallBackToTranslationUnit = true;
-
   SmallVector<DeclID, 32> topLevelIDs;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
@@ -985,7 +999,7 @@ void Serializer::writeToStream(raw_ostream &os, const TranslationUnit *TU,
     Out.Emit(byte, 8);
 
   writeHeader();
-  writeInputFiles(TU->Ctx.SourceMgr, inputFiles);
+  writeInputFiles(TU, inputFiles);
   writeTranslationUnit(TU);
 
   if (ShouldFallBackToTranslationUnit)
