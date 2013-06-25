@@ -178,6 +178,7 @@ Pattern *Pattern::clone(ASTContext &context) const {
   case PatternKind::UnresolvedCall: {
     auto call = cast<UnresolvedCallPattern>(this);
     result = UnresolvedCallPattern::create(context,
+                                         call->getNameDeclContext(),
                                          call->getNameComponents(),
                                          call->getSubPattern()->clone(context));
     break;
@@ -266,10 +267,12 @@ SourceRange TypedPattern::getSourceRange() const {
 }
 
 UnresolvedCallPattern::UnresolvedCallPattern(
+                               DeclContext *DC,
                                ArrayRef<IdentifierType::Component> components,
                                Pattern *Sub)
   : Pattern(PatternKind::UnresolvedCall),
-    NumComponents(components.size()), SubPattern(Sub)
+    SubPattern(Sub),
+    NumComponents(components.size())
 {
   MutableArrayRef<IdentifierType::Component> buf{getComponentsBuffer(),
                                                  NumComponents};
@@ -282,10 +285,11 @@ UnresolvedCallPattern::UnresolvedCallPattern(
 /// dotted identifier components.
 UnresolvedCallPattern *
 UnresolvedCallPattern::create(ASTContext &C,
+                              DeclContext *DC,
                               ArrayRef<IdentifierType::Component> components,
                               Pattern *Sub) {
   void *buf = UnresolvedCallPattern::operator new(
     sizeof(UnresolvedCallPattern)
       + components.size() * sizeof(IdentifierType::Component), C);
-  return ::new (buf) UnresolvedCallPattern(components, Sub);
+  return ::new (buf) UnresolvedCallPattern(DC, components, Sub);
 }

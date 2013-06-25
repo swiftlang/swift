@@ -347,76 +347,109 @@ public:
   }
 };
   
-/// A 'case' or 'default' block of a switch statement. Only valid as the
-/// substatement of a SwitchStmt. Type-checking synthesizes a condition expr
-/// using the '=~' operator to compare the subject of the switch to the
-/// value(s) of the case.
-class CaseStmt : public Stmt {
-  SourceLoc CaseOrDefaultLoc;
+/// A label used at the head of a 'case' block. Each 'case' label may have one
+/// or more comma-separated patterns. The 'case' may also optionally have a
+/// 'where' guard expression. 'default' is allowed as an alternate spelling of
+/// 'case _'.
+///
+/// Some examples:
+///
+/// case 1:
+/// case 2, 3:
+/// case Foo(?x, ?y) where x < y:
+class CaseLabel {
+  SourceLoc CaseLoc;
   SourceLoc ColonLoc;
-  Stmt *Body;
-  Expr *ConditionExpr;
-  unsigned ValueExprCount;
-
-  Expr * const *getValueExprBuffer() const {
-    return reinterpret_cast<Expr * const *>(this + 1);
+  SourceLoc WhereLoc;
+  llvm::PointerIntPair<Expr *, 1, bool> GuardExprAndIsDefault;
+  unsigned NumPatterns;
+  
+  CaseLabel(bool isDefault,
+            SourceLoc caseLoc, ArrayRef<Pattern*> patterns,
+            SourceLoc whereLoc, Expr *guardExpr,
+            SourceLoc colonLoc);
+  
+  Pattern **getPatternsBuffer() {
+    return reinterpret_cast<Pattern**>(this + 1);
   }
-  Expr **getValueExprBuffer() {
-    return reinterpret_cast<Expr**>(this + 1);
+  const Pattern * const *getPatternsBuffer() const {
+    return reinterpret_cast<const Pattern * const *>(this + 1);
   }
   
-  CaseStmt(SourceLoc CaseOrDefaultLoc,
-           unsigned ValueExprCount,
-           SourceLoc ColonLoc,
-           BraceStmt *Body)
-    : Stmt(StmtKind::Case),
-      CaseOrDefaultLoc(CaseOrDefaultLoc),
-      ColonLoc(ColonLoc),
-      Body(Body),
-      ConditionExpr(nullptr),
-      ValueExprCount(ValueExprCount)
-  {}
+  /// CaseLabels should be allocated with an ASTContext using create.
+  void *operator new(size_t) = delete;
+  void operator delete(void*) = delete;
   
 public:
-  /// Allocate a new CaseStmt in the given ASTContext.
-  static CaseStmt *create(SourceLoc CaseOrDefaultLoc,
-                          ArrayRef<Expr*> ValueExprs,
-                          SourceLoc ColonLoc,
-                          BraceStmt *Body,
-                          ASTContext &C);
+  static CaseLabel *create(ASTContext &C,
+                           bool isDefault,
+                           SourceLoc caseLoc,
+                           ArrayRef<Pattern*> patterns,
+                           SourceLoc whereLoc,
+                           Expr * /*nullable*/ guardExpr,
+                           SourceLoc colonLoc);
   
-  /// True if this is the 'default' block of a switch.
-  bool isDefault() const { return ValueExprCount == 0; }
-  
-  /// Get the source location of the 'case' or 'default' keyword.
-  SourceLoc getCaseOrDefaultLoc() const { return CaseOrDefaultLoc; }
-  /// Get the source location of the label colon.
+  SourceLoc getLoc() const { return CaseLoc; }
+  SourceLoc getCaseLoc() const { return CaseLoc; }
   SourceLoc getColonLoc() const { return ColonLoc; }
-
-  SourceLoc getLoc() const { return CaseOrDefaultLoc; }
+  SourceLoc getWhereLoc() const { return WhereLoc; }
+  
   SourceRange getSourceRange() const {
-    return {CaseOrDefaultLoc, Body->getEndLoc()};
+    return {CaseLoc, ColonLoc};
   }
   
-  /// Get the list of value expressions for this case. Empty for a 'default'
-  /// block.
-  ArrayRef<Expr*> getValueExprs() const {
-    return {getValueExprBuffer(), ValueExprCount};
+  MutableArrayRef<Pattern*> getPatterns() {
+    return {getPatternsBuffer(), NumPatterns};
   }
-  MutableArrayRef<Expr*> getMutableValueExprs() {
-    return {getValueExprBuffer(), ValueExprCount};
+  ArrayRef<const Pattern *> getPatterns() const {
+    return {getPatternsBuffer(), NumPatterns};
   }
+  
+  /// Return the guard expression if present, or null if the case label has
+  /// no guard.
+  Expr *getGuardExpr() const { return GuardExprAndIsDefault.getPointer(); }
+  void setGuardExpr(Expr *e) { GuardExprAndIsDefault.setPointer(e); }
+  
+  /// Returns true if this is syntactically a 'default' label.
+  bool isDefault() const { return GuardExprAndIsDefault.getPointer(); }
+};
+  
+/// A 'case' or 'default' block of a switch statement. Only valid as the
+/// substatement of a SwitchStmt. A case block begins either with one or more
+/// CaseLabels or a single 'default' label.
+class CaseStmt : public Stmt {
+  Stmt *Body;
+  unsigned NumCaseLabels;
 
-  /// Get the body of the case or default block.
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *S) { Body = S; }
+  CaseLabel * const *getCaseLabelsBuffer() const {
+    return reinterpret_cast<CaseLabel * const *>(this + 1);
+  }
+  CaseLabel **getCaseLabelsBuffer() {
+    return reinterpret_cast<CaseLabel **>(this + 1);
+  }
   
-  /// Get the condition expr for this case. This expr is synthesized during
-  /// type-checking and returns an Int1 indicating whether this case branch
-  /// is taken. This returns null if the case has not been type-checked or if
-  /// this is the default case.
-  Expr *getConditionExpr() const { return ConditionExpr; }
-  void setConditionExpr(Expr *e) { ConditionExpr = e; }
+  CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body);
+  
+public:
+  static CaseStmt *create(ASTContext &C,
+                          ArrayRef<CaseLabel*> Labels,
+                          Stmt *Body);
+  
+  ArrayRef<CaseLabel *> getCaseLabels() const {
+    return {getCaseLabelsBuffer(), NumCaseLabels};
+  }
+  
+  Stmt *getBody() const { return Body; }
+  void setBody(Stmt *body) { Body = body; }
+  
+  /// Get the source location of the 'case' or 'default' of the first label.
+  SourceLoc getLoc() const {
+    return getCaseLabels()[0]->getLoc();
+  }
+  
+  SourceRange getSourceRange() const {
+    return {getLoc(), Body->getEndLoc()};
+  }
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Case;

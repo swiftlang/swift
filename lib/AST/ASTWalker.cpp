@@ -26,12 +26,14 @@ namespace {
 /// Traversal - This class implements a simple expression/statement
 /// recursive traverser which queries a user-provided walker class
 /// on every node in an AST.
-class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
-  friend class ASTVisitor<Traversal, Expr*, Stmt*>;
+class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
+                                    /*Decl*/ void,
+                                    Pattern *>
+{
+  friend class ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*>;
+  typedef ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*> inherited;
 
   ASTWalker &Walker;
-
-  typedef ASTVisitor<Traversal, Expr*, Stmt*> inherited;
   
   /// \brief RAII object that sets the parent of the walk context 
   /// appropriately.
@@ -59,6 +61,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   Stmt *visit(Stmt *S) {
     SetParentRAII SetParent(Walker, S);
     return inherited::visit(S);
+  }
+  
+  Pattern *visit(Pattern *P) {
+    SetParentRAII SetParent(Walker, P);
+    return inherited::visit(P);
   }
   
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
@@ -580,17 +587,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
   }
   
   Stmt *visitCaseStmt(CaseStmt *S) {
-    // If type-checking has built a condition expr for this case, walk it.
-    // The value exprs are just for source fidelity.
-    if (Expr *condExpr = S->getConditionExpr()) {
-      if (Expr *newCondExpr = doIt(condExpr))
-        S->setConditionExpr(newCondExpr);
-      else
-        return nullptr;
-    } else {
-      for (Expr *&valueExpr : S->getMutableValueExprs()) {
-        if (Expr *newExpr = doIt(valueExpr))
-          valueExpr = newExpr;
+    for (CaseLabel *label : S->getCaseLabels()) {
+      for (Pattern *&pattern : label->getPatterns()) {
+        if (Pattern *newPattern = doIt(pattern))
+          pattern = newPattern;
+        else
+          return nullptr;
+      }
+      if (label->getGuardExpr()) {
+        if (Expr *newGuard = doIt(label->getGuardExpr()))
+          label->setGuardExpr(newGuard);
         else
           return nullptr;
       }
@@ -603,7 +609,69 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*> {
 
     return S;
   }
-    
+  
+  Pattern *visitParenPattern(ParenPattern *P) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
+  Pattern *visitTuplePattern(TuplePattern *P) {
+    for (auto &field : P->getFields()) {
+      if (Pattern *newField = doIt(field.getPattern()))
+        field.setPattern(newField);
+      else
+        return nullptr;
+    }
+    return P;
+  }
+  
+  Pattern *visitNamedPattern(NamedPattern *P) {
+    return P;
+  }
+  
+  Pattern *visitAnyPattern(AnyPattern *P) {
+    return P;
+  }
+  
+  Pattern *visitTypedPattern(TypedPattern *P) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
+  Pattern *visitIsaPattern(IsaPattern *P) {
+    return P;
+  }
+  
+  Pattern *visitUnresolvedCallPattern(UnresolvedCallPattern *P) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
+  Pattern *visitNominalTypePattern(NominalTypePattern *P) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
+  Pattern *visitExprPattern(ExprPattern *P) {
+    if (Expr *newSub = doIt(P->getSubExpr()))
+      P->setSubExpr(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -698,6 +766,22 @@ public:
     }
     
     return !Walker.walkToDeclPost(D);
+  }
+  
+  Pattern *doIt(Pattern *P) {
+    // Do the pre-order visitation.  If it returns false, we just
+    // skip entering subnodes of this tree.
+    auto Pre = Walker.walkToPatternPre(P);
+    if (!Pre.first || !Pre.second)
+      return Pre.second;
+
+    // Otherwise, visit the children.
+    P = visit(P);
+
+    // If we didn't bail out, do post-order visitation.
+    if (P) P = Walker.walkToPatternPost(P);
+
+    return P;
   }
 };
 

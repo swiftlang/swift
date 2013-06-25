@@ -873,7 +873,7 @@ namespace {
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current,
-                           llvm::PointerUnion<Expr *, Stmt *> Parent,
+                           llvm::PointerUnion3<Expr*, Stmt*, Pattern*> Parent,
                            std::function<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())
@@ -883,22 +883,24 @@ namespace {
         Enclosing = S->getSourceRange();
         if (S->isImplicit())
           return;
-
-      } else {
+      } else if (Pattern *P = Parent.dyn_cast<Pattern*>()) {
+        Enclosing = P->getSourceRange();
+      } else if (Expr *E = Parent.dyn_cast<Expr*>()) {
         // FIXME: This hack is required because the inclusion check below
         // doesn't compares the *start* of the ranges, not the end of the
         // ranges.  In the case of an interpolated string literal expr, the
         // subexpressions are contained within the string token.  This means
         // that comparing the start of the string token to the end of an
         // embedded expression will fail.
-        if (isa<InterpolatedStringLiteralExpr>(Parent.get<Expr*>()))
+        if (isa<InterpolatedStringLiteralExpr>(E))
           return;
 
-        Expr *E = Parent.get<Expr*>();
         if (E->isImplicit())
           return;
         
         Enclosing = E->getSourceRange();
+      } else {
+        llvm_unreachable("impossible parent node");
       }
       
       // FIXME: This is a very ugly way to check inclusion.

@@ -721,14 +721,27 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
 }
 
 void PrintAST::visitCaseStmt(CaseStmt *stmt) {
-  if (stmt->isDefault())
-    OS << "default:";
-  else {
-    OS << "case ";
-    // FIXME: print case exprs
-    OS << ':';
-    printBraceStmtElements(cast<BraceStmt>(stmt->getBody()));
-  }
+  auto printCaseLabel = [&](CaseLabel *label) {
+    if (label->isDefault()) {
+      OS << "default";
+      // '_' pattern is implicit and doesn't need to be printed.
+    } else {
+      OS << "case ";
+      interleave(label->getPatterns(),
+                 [&](Pattern *p) { printPattern(p); },
+                 [&] { OS << ", "; });
+    }
+    if (label->getGuardExpr()) {
+      OS << " where ";
+      // FIXME: print guard expr
+    }
+    OS << ":\n";
+  };
+
+  for (auto *label : stmt->getCaseLabels())
+    printCaseLabel(label);
+
+  printBraceStmtElements(cast<BraceStmt>(stmt->getBody()));
 }
 
 void Decl::print(raw_ostream &os) const {

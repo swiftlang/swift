@@ -583,15 +583,19 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     OS.indent(Indent) << "(case_stmt";
-    for (Expr *valueExpr : S->getValueExprs()) {
+    for (CaseLabel *label : S->getCaseLabels()) {
       OS << '\n';
-      printRec(valueExpr);
-    }
-    if (Expr *condExpr = S->getConditionExpr()) {
-      OS << "\n";
-      OS.indent(Indent+2);
-      OS << "condition=";
-      condExpr->print(OS, Indent+2);
+      OS.indent(Indent+2) << "(case_label";
+      for (Pattern *p : label->getPatterns()) {
+        OS << '\n';
+        OS.indent(Indent+4);
+        p->print(OS);
+      }
+      if (Expr *guard = label->getGuardExpr()) {
+        OS << '\n';
+        printRec(guard);
+      }
+      OS << ')';
     }
     OS << '\n';
     printRec(S->getBody());

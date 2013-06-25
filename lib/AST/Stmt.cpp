@@ -128,19 +128,38 @@ Pattern *ForEachStmt::getPattern() const {
   return Pat.get<PatternBindingDecl *>()->getPattern();
 }
 
-CaseStmt *CaseStmt::create(SourceLoc CaseOrDefaultLoc,
-                           ArrayRef<Expr*> ValueExprs,
-                           SourceLoc ColonLoc,
-                           BraceStmt *Body,
-                           ASTContext &C) {
-  void *p = C.Allocate(sizeof(CaseStmt) + ValueExprs.size() * sizeof(Expr*),
+CaseLabel::CaseLabel(bool isDefault,
+                     SourceLoc caseLoc, ArrayRef<Pattern*> patterns,
+                     SourceLoc whereLoc, Expr *guardExpr,
+                     SourceLoc colonLoc)
+  : CaseLoc(caseLoc), ColonLoc(colonLoc), WhereLoc(whereLoc),
+    GuardExprAndIsDefault(guardExpr, isDefault),
+    NumPatterns(patterns.size())
+{
+  MutableArrayRef<Pattern*> patternBuf{getPatternsBuffer(), NumPatterns};
+  
+  for (unsigned i = 0; i < NumPatterns; ++i) {
+    patternBuf[i] = patterns[i];
+  }
+}
+
+CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body)
+  : Stmt(StmtKind::Case), Body(Body), NumCaseLabels(Labels.size())
+{
+  assert(NumCaseLabels > 0 && "case block must have at least one label");
+  MutableArrayRef<CaseLabel*> buf{getCaseLabelsBuffer(), NumCaseLabels};
+  
+  for (unsigned i = 0; i < NumCaseLabels; ++i) {
+    buf[i] = Labels[i];
+  }
+}
+
+CaseStmt *CaseStmt::create(ASTContext &C,
+                           ArrayRef<CaseLabel*> Labels,
+                           Stmt *Body) {
+  void *p = C.Allocate(sizeof(CaseStmt) + Labels.size() * sizeof(CaseLabel*),
                        alignof(CaseStmt));
-  CaseStmt *theCase = ::new (p) CaseStmt(CaseOrDefaultLoc,
-                                         ValueExprs.size(),
-                                         ColonLoc, Body);
-  memcpy(theCase->getValueExprBuffer(),
-         ValueExprs.data(), ValueExprs.size() * sizeof(Expr*));
-  return theCase;
+  return ::new (p) CaseStmt(Labels, Body);
 }
 
 SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,

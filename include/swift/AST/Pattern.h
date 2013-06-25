@@ -350,11 +350,13 @@ class UnresolvedCallPattern : public Pattern {
   IdentifierType::Component const *getComponentsBuffer() const {
     return reinterpret_cast<IdentifierType::Component const *>(this + 1);
   }
-  
-  unsigned NumComponents;
+
+  DeclContext *NameDC;
   Pattern *SubPattern;
+  unsigned NumComponents;
   
-  UnresolvedCallPattern(ArrayRef<IdentifierType::Component> components,
+  UnresolvedCallPattern(DeclContext *DC,
+                        ArrayRef<IdentifierType::Component> components,
                         Pattern *Sub);
   
 public:
@@ -362,8 +364,12 @@ public:
   /// dotted identifier components.
   static UnresolvedCallPattern *create(
                                ASTContext &C,
+                               DeclContext *DC,
                                ArrayRef<IdentifierType::Component> components,
                                Pattern *Sub);
+  
+  /// Get the DeclContext in which the name should be looked up.
+  DeclContext *getNameDeclContext() const { return NameDC; }
   
   ArrayRef<IdentifierType::Component> getNameComponents() const {
     return {getComponentsBuffer(), NumComponents};

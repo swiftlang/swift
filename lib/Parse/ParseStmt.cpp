@@ -582,60 +582,8 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
                             Context);
 }
 
-///
-///    stmt-case:
-///      'case' expr (',' expr)* ':' stmt-brace-item*
-///      'default' ':' stmt-brace-item*
 NullablePtr<CaseStmt> Parser::parseStmtCase() {
-  SourceLoc caseLoc = Tok.getLoc();
-  StringRef caseLabel = Tok.getText();
-  
-  llvm::SmallVector<Expr*, 2> valueExprs;
-  if (Tok.is(tok::kw_case)) {
-    consumeToken(tok::kw_case);
-    NullablePtr<Expr> expr = parseExpr(diag::expected_case_expr);
-    if (expr.isNull())
-      skipUntil(tok::colon);
-    else
-      valueExprs.push_back(expr.get());
-    
-    while (Tok.is(tok::comma)) {
-      consumeToken(tok::comma);
-      NullablePtr<Expr> expr = parseExpr(diag::expected_case_expr);
-      if (expr.isNull())
-        skipUntil(tok::colon);
-      else
-        valueExprs.push_back(expr.get());
-    }
-  } else if (Tok.is(tok::kw_default)) {
-    consumeToken(tok::kw_default);
-  } else {
-    // If we see a statement before any 'case' or 'default', give a descriptive
-    // error and recover by trying to parse the statement.
-    ExprStmtOrDecl junk;
-    if (!parseExprOrStmt(junk)) {
-      diagnose(caseLoc, diag::stmt_in_switch_not_covered_by_case);
-      return nullptr;
-    }
-    
-    // Otherwise, we got something malformed, so try to find the closing brace
-    // of the switch and bail out.
-    skipUntil(tok::r_brace);
-    return nullptr;
-  }
-  
-  if (Tok.isNot(tok::colon)) {
-    diagnose(Tok.getLoc(), diag::expected_case_colon, caseLabel);
-    return nullptr;
-  }
-
-  SourceLoc colonLoc = consumeToken(tok::colon);
-  
-  llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
-  parseBraceItems(bodyItems, /*isTopLevel*/ false, BraceItemListKind::Case);
-  BraceStmt *body = BraceStmt::create(Context,
-                                      colonLoc, bodyItems, Tok.getLoc());
-  
-  return CaseStmt::create(caseLoc, valueExprs, colonLoc, body, Context);
+  // TODO
+  diagnose(Tok.getLoc(), diag::not_implemented);
+  return nullptr;
 }
-

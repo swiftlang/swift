@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "swift/AST/Diagnostics.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -346,62 +347,7 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
 }
 
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
-  Scope OuterSwitchScope(Cleanups);
-  
-  // Emit and bind the subject variable.
-  {
-    InitializationPtr initSubject
-      = emitLocalVariableWithCleanup(S->getSubjectDecl());
-    emitExprInto(S->getSubjectExpr(), initSubject.get());
-  }
-  
-  // Emit the skeleton of the switch. Map cases to blocks so we can handle
-  // fallthrough statements.
-  CaseStmt *defaultCase = nullptr;
-  FallthroughDest::Map caseBodyBlocks;
-
-  for (auto *C : S->getCases()) {
-    // The default case is emitted last.
-    if (C->isDefault()) {
-      defaultCase = C;
-      continue;
-    }
-    
-    // Emit the condition for this case.
-    SILValue cond = emitConditionValue(*this, C->getConditionExpr());
-    
-    SILBasicBlock *trueBB = new (F.getModule()) SILBasicBlock(&F);
-    SILBasicBlock *falseBB = new (F.getModule()) SILBasicBlock(&F);
-
-    B.createCondBranch(C, cond, trueBB, falseBB);
-    
-    caseBodyBlocks[C] = trueBB;
-    
-    B.emitBlock(falseBB);
-  }
-  SILBasicBlock *contBB;
-  if (defaultCase) {
-    caseBodyBlocks[defaultCase] = B.getInsertionBB();
-    contBB = new (F.getModule()) SILBasicBlock(&F);
-  } else {
-    contBB = B.getInsertionBB();
-  }
-  
-  // Emit the case bodies.
-  for (auto &caseAndBlock : caseBodyBlocks) {
-    CaseStmt *c = caseAndBlock.first;
-    SILBasicBlock *bb = caseAndBlock.second;
-    
-    B.setInsertionPoint(bb);
-    Scope CaseScope(Cleanups);
-    FallthroughDestStack.emplace_back(caseBodyBlocks, getCleanupsDepth());
-    visit(c->getBody());
-    FallthroughDestStack.pop_back();
-    if (B.hasValidInsertionPoint())
-      B.createBranch(c, contBB);
-  }
-  
-  B.setInsertionPoint(contBB);
+  SGM.diagnose(S->getLoc(), diag::not_implemented);
 }
 
 void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
