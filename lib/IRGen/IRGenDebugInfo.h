@@ -28,7 +28,9 @@
 
 #include "IRBuilder.h"
 
-class llvm::DIBuilder;
+namespace llvm {
+class DIBuilder;
+}
 
 namespace swift {
 
