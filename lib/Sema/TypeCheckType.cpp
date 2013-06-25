@@ -160,7 +160,6 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       
   case TypeKind::Module:
   case TypeKind::Protocol:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::TypeVariable:
     // Nothing to validate.
     break;
@@ -514,7 +513,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       else {
         // Record these substitutions.
         BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
-                                                  Conformance, false, true));
+                                                  Conformance, true));
       }
     }
     break;
@@ -868,20 +867,6 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
     // If the parent didn't change, we won't change.
     if (SubstParent.getPointer() == parent)
       return type;
-
-    // If the parent is a deducible generic parameter, build a new child
-    // generic parameter and record it.
-    if (auto DeducibleParent = SubstParent->getAs<DeducibleGenericParamType>()){
-      auto OriginalArchetype = dyn_cast<ArchetypeType>(substOrig);
-      if (!OriginalArchetype)
-        return type;
-
-      auto NewChild
-        = DeducibleGenericParamType::getNew(Context, DeducibleParent,
-                                            OriginalArchetype);
-      Substitutions[substOrig] = NewChild;
-      return NewChild;
-    }
 
     // If the parent is an archetype, extract the child archetype with the
     // given name.

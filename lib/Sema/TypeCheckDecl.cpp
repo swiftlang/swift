@@ -1015,7 +1015,6 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
 #define TYPE(Id, Parent)
 #define UNCHECKED_TYPE(Id, Parent) case TypeKind::Id:
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::UnboundGeneric:
     // Error cases.
     return false;

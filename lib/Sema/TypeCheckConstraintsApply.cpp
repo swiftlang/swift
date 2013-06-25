@@ -188,7 +188,6 @@ namespace {
       // Build the specialization expression.
       auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
                                                 substitutions, conformances,
-                                                /*ArchetypesAreOpen=*/false,
                                                 /*OnlyInnermostParams=*/true);
       return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
     }
@@ -295,7 +294,6 @@ namespace {
           Expr *specializedRef
             = tc.buildSpecializeExpr(ref, substTy, substitutions,
                                      conformances,
-                                     /*ArchetypesAreOpen=*/false,
                                      /*OnlyInnermostParams=*/false);
 
           ApplyExpr *apply;
@@ -323,7 +321,7 @@ namespace {
         result->setSubstitutions(tc.encodeSubstitutions(genericParams,
                                                         substitutions,
                                                         conformances,
-                                                        false, false));
+                                                        false));
         return result;
       }
 
@@ -589,7 +587,7 @@ namespace {
         subscriptExpr->setType(resultTy);
         subscriptExpr->setSubstitutions(
           tc.encodeSubstitutions(genericParams, substitutions,
-                                 conformances, false, false));
+                                 conformances, false));
         return subscriptExpr;
       }
 

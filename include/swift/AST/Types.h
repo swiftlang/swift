@@ -26,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace llvm {
   struct fltSemantics;
@@ -1696,58 +1697,6 @@ private:
       Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
-/// DeducibleGenericParamType - A type that refers to a generic type parameter
-/// that can be deduced, specified, and substituted.
-///
-/// In the given generic function:
-///
-/// \code
-/// func identity<T>(x : T) { return x }
-/// \endcode
-///
-/// The type of 'identity', for the purpose of substitution, contains a
-/// \c DeducibleGenericParamType in the input type of the function.
-class DeducibleGenericParamType : public SubstitutableType {
-  DeducibleGenericParamType *Parent;
-  ArchetypeType *Archetype;
-
-  DeducibleGenericParamType(ASTContext &Ctx,
-                            DeducibleGenericParamType *Parent,
-                            ArchetypeType *Archetype)
-    : SubstitutableType(TypeKind::DeducibleGenericParam, &Ctx,
-                        /*Unresolved=*/true, Archetype->getConformsTo(),
-                        Archetype->getSuperclass()),
-      Parent(Parent), Archetype(Archetype)
-  {
-  }
-
-public:
-  static DeducibleGenericParamType *getNew(ASTContext &Ctx,
-                                           DeducibleGenericParamType *Parent,
-                                           ArchetypeType *Archetype);
-
-  /// \brief Retrieve the archetype that generic parameter will substitute.
-  ArchetypeType *getArchetype() const { return Archetype; }
-
-  /// \brief Retrieve the parent of this generic parameter, if this generic
-  /// parameter describes a nested type.
-  DeducibleGenericParamType *getParent() const { return Parent; }
-
-  /// getName - Retrieve the name of this deducible generic parameter.
-  Identifier getName() const { return Archetype->getName(); }
-
-  /// getIndex - Retrieve the index into the list of generic parameters in
-  /// which this generic parameter occurs.
-  unsigned getIndex() const { return Archetype->getPrimaryIndex(); }
-
-  void print(raw_ostream &OS) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::DeducibleGenericParam;
-  }
-};
-
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
 /// the original type.
@@ -1879,34 +1828,34 @@ inline Identifier SubstitutableType::getName() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->getName();
 
-  return cast<DeducibleGenericParamType>(this)->getName();
+  llvm_unreachable("Not a substitutable type");
 }
 
 inline SubstitutableType *SubstitutableType::getParent() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->getParent();
 
-  return cast<DeducibleGenericParamType>(this)->getParent();
+  llvm_unreachable("Not a substitutable type");
 }
 
 inline ArchetypeType *SubstitutableType::getArchetype() {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype;
 
-  return cast<DeducibleGenericParamType>(this)->getArchetype();
+  llvm_unreachable("Not a substitutable type");
 }
 
 inline bool SubstitutableType::isPrimary() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->isPrimary();
 
-  return cast<DeducibleGenericParamType>(this)->getParent() == nullptr;
+  llvm_unreachable("Not a substitutable type");
 }
 
 inline unsigned SubstitutableType::getPrimaryIndex() const {
   if (auto Archetype = dyn_cast<ArchetypeType>(this))
     return Archetype->getPrimaryIndex();
-  return cast<DeducibleGenericParamType>(this)->getIndex();
+  llvm_unreachable("Not a substitutable type");
 }
 
 } // end namespace swift

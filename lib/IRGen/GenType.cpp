@@ -342,8 +342,6 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
     llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::DeducibleGenericParam:
-    llvm_unreachable("deducible generic parameter");
 
   case TypeKind::UnboundGeneric:
     llvm_unreachable("unbound generic type");

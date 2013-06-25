@@ -20,14 +20,12 @@ SpecializeExpr *
 TypeChecker::buildSpecializeExpr(Expr *Sub, Type Ty,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances,
-                                 bool ArchetypesAreOpen,
                                  bool OnlyInnermostParams) {
   auto polyFn = Sub->getType()->castTo<PolymorphicFunctionType>();
   return new (Context) SpecializeExpr(Sub, Ty,
                          encodeSubstitutions(&polyFn->getGenericParams(),
                                              Substitutions,
                                              Conformances,
-                                             ArchetypesAreOpen,
                                              OnlyInnermostParams));
 }
 
@@ -35,22 +33,7 @@ ArrayRef<Substitution>
 TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
                                  const TypeSubstitutionMap &Substitutions,
                                  const ConformanceMap &Conformances,
-                                 bool ArchetypesAreOpen,
                                  bool OnlyInnermostParams) {
-  // Figure out the mapping from primary archetypes to their deducible
-  // parameters.
-  // FIXME: This is terribly inefficient. We should keep track of this
-  // information when we substituted in deducible parameters for the archetypes.
-  llvm::SmallDenseMap<ArchetypeType *, DeducibleGenericParamType *>
-    closedToOpen;
-  if (ArchetypesAreOpen) {
-    for (auto subst : Substitutions) {
-      if (auto deducible = subst.first->getAs<DeducibleGenericParamType>()) {
-        closedToOpen[deducible->getArchetype()] = deducible;
-      }
-    }
-  }
-
   // Collect all of the archetypes.
   SmallVector<ArchetypeType *, 2> allArchetypesList;
   ArrayRef<ArchetypeType *> allArchetypes = GenericParams->getAllArchetypes();
@@ -76,10 +59,6 @@ TypeChecker::encodeSubstitutions(const GenericParamList *GenericParams,
   for (auto archetype : allArchetypes) {
     // Figure out the key into the maps we were given.
     SubstitutableType *key = archetype;
-    if (ArchetypesAreOpen && archetype->isPrimary()) {
-      key = closedToOpen[archetype];
-      assert(key && "can't find deducible form of primary archetype");
-    }
     assert(Substitutions.count(key) && "Missing substitution information");
     assert(Conformances.count(key) && "Missing conformance information");
 

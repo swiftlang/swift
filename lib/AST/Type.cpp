@@ -92,7 +92,6 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::Struct:
   case TypeKind::MetaType:
   case TypeKind::Module:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
@@ -198,7 +197,6 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -266,7 +264,6 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -298,7 +295,6 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Archetype:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::ProtocolComposition:
     // None of these types ever have type variables.
     return;
@@ -439,7 +435,6 @@ static Type getStrippedType(ASTContext &context, Type type,
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::DeducibleGenericParam:
   case TypeKind::TypeVariable:
     return type;
 
@@ -1237,14 +1232,6 @@ std::string ArchetypeType::getFullName() const {
   return Result.str().str();
 }
 
-DeducibleGenericParamType *
-DeducibleGenericParamType::getNew(ASTContext &Ctx,
-                                  DeducibleGenericParamType *Parent,
-                                  ArchetypeType *Archetype) {
-  auto arena = AllocationArena::Permanent;
-  return new (Ctx, arena) DeducibleGenericParamType(Ctx, Parent, Archetype);
-}
-
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
                                       ArrayRef<Type> Protocols) {
   for (auto P : Protocols)
@@ -1689,10 +1676,6 @@ void OneOfType::print(raw_ostream &OS) const {
 
 void ArchetypeType::print(raw_ostream &OS) const {
   OS << getFullName();
-}
-
-void DeducibleGenericParamType::print(raw_ostream &OS) const {
-  getArchetype()->print(OS);
 }
 
 void SubstitutedType::print(raw_ostream &OS) const {

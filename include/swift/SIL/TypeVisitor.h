@@ -45,11 +45,6 @@ public:
   }
 #include "swift/AST/TypeNodes.def"
 
-  RetTy visitDeducibleGenericParamType(DeducibleGenericParamType *T,
-                                       Args... args) {
-    llvm_unreachable("DeducibleGenericParamType should not survive Sema");
-  }
-
   template <class... As>
   RetTy visitUnboundGenericType(UnboundGenericType *T, Args... args) {
     llvm_unreachable("UnboundGenericType should not survive Sema");

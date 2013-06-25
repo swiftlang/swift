@@ -912,7 +912,6 @@ bool Serializer::writeType(Type ty) {
     return false;
 
   case TypeKind::Archetype:
-  case TypeKind::DeducibleGenericParam:
     return false;
 
   case TypeKind::Substituted:

@@ -474,9 +474,6 @@ public:
   ///
   /// \param Conformances The set of protocol conformances.
   ///
-  /// \param ArchetypesAreOpen Whether the substitutions refer to the opened
-  /// form of the archetypes, as is used by the coercion code.
-  ///
   /// \returns an ASTContext-allocate array of substitutions.
   ///
   /// \param OnlyInnermostParams Whether we're specializing only the innermost
@@ -485,7 +482,6 @@ public:
   encodeSubstitutions(const GenericParamList *GenericParams,
                       const TypeSubstitutionMap &Substitutions,
                       const ConformanceMap &Conformances,
-                      bool ArchetypesAreOpen,
                       bool OnlyInnermostParams);
 
   /// \brief Build a new SpecializeExpr wrapping the given subexpression.
@@ -501,15 +497,11 @@ public:
   /// \param Conformances The set of protocol-conformance structures for each
   /// of the substitutions.
   ///
-  /// \param ArchetypesAreOpen Whether the substitutions refer to the opened
-  /// form of the archetypes, as is used by the coercion code.
-  ///
   /// \param OnlyInnermostParams Whether we're specializing only the innermost
   /// generic parameters (rather than all levels of generic parameters).
   SpecializeExpr *buildSpecializeExpr(Expr *Sub, Type Ty,
                                       const TypeSubstitutionMap &Substitutions,
                                       const ConformanceMap &Conformances,
-                                      bool ArchetypesAreOpen,
                                       bool OnlyInnermostParams);
 
   /// \brief Build a reference to a declaration, where name lookup returned
