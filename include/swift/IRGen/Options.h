@@ -43,6 +43,8 @@ enum class OutputKind : unsigned {
 /// irgen::Options - The set of options support by IR generation.
 class Options {
 public:
+  /// The name of the first input file, used by the debug info.
+  std::string MainInputFilename;
   std::string OutputFilename;
   std::string Triple;
 

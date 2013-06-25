@@ -46,7 +46,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                                llvm::Module &M)
   : SM(SM), DBuilder(M) {
   assert(Opts.DebugInfo);
-  std::string MainFileName = "<unknown>";//CGM.getCodeGenOpts().MainFileName;
+  std::string MainFileName = Opts.MainInputFilename;
+  if (MainFileName.empty())
+    MainFileName = "<unknown>";
 
   StringRef Filename = BumpAllocatedString(MainFileName, DebugInfoNames);
   // DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
