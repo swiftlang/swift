@@ -16,13 +16,17 @@
 
 #include "IRGenDebugInfo.h"
 #include "swift/AST/Expr.h"
+#include "swift/IRGen/Options.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "llvm/config/config.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Dwarf.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
 
@@ -30,23 +34,33 @@
 namespace swift {
 namespace irgen {
 
+/// Strdup S using the bump pointer.
+static
+StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
+  char *Ptr = BP.Allocate<char>(S.length());
+  memcpy(Ptr, S.c_str(), S.length());
+  return StringRef(Ptr, S.length());
+}
 
-IRGenDebugInfo::IRGenDebugInfo(llvm::SourceMgr &SM, llvm::Module &M)
+IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
+                               llvm::Module &M)
   : SM(SM), DBuilder(M) {
+  assert(Opts.DebugInfo);
   std::string MainFileName = "<unknown>";//CGM.getCodeGenOpts().MainFileName;
 
-  // Save filename string.
-  char *FilenamePtr = DebugInfoNames.Allocate<char>(MainFileName.length());
-  memcpy(FilenamePtr, MainFileName.c_str(), MainFileName.length());
-  StringRef Filename(FilenamePtr, MainFileName.length());
-
-  // FIXME: If we use a new enum value here, we hit an assert in LLVM.
-  unsigned Lang = llvm::dwarf::DW_LANG_Python;
+  StringRef Filename = BumpAllocatedString(MainFileName, DebugInfoNames);
+  // DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
+  // But for now, we need to use a constant in
+  // DW_LANG_lo_user..DW_LANG_hi_user, because LLVM will assert on that.
+  unsigned Lang = 0x9999 /*llvm::dwarf::DW_LANG_Swift*/;
   StringRef Dir = getCurrentDirname();
-  // FIXME.
-  StringRef Producer = StringRef();
-  // FIXME.
-  bool IsOptimized = false;
+
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+  OS << "Swift version ? (based on LLVM " << PACKAGE_VERSION << ")";
+  StringRef Producer = BumpAllocatedString(OS.str(), DebugInfoNames);
+
+  bool IsOptimized = Opts.OptLevel > 0;
 
   // FIXME.
   StringRef Flags = StringRef();
@@ -147,16 +161,14 @@ StringRef IRGenDebugInfo::getCurrentDirname() {
     return CWDName;
   llvm::SmallString<256> CWD;
   llvm::sys::fs::current_path(CWD);
-  char *CompDirnamePtr = DebugInfoNames.Allocate<char>(CWD.size());
-  memcpy(CompDirnamePtr, CWD.data(), CWD.size());
-  return CWDName = StringRef(CompDirnamePtr, CWD.size());
+  return BumpAllocatedString(CWD.str(), DebugInfoNames);
 }
 
 /// getOrCreateFile - Translate filenames into DIFiles.
-llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *filename) {
+llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   // Look in the cache first.
   llvm::DenseMap<const char *, llvm::WeakVH>::iterator it =
-    DIFileCache.find(filename);
+    DIFileCache.find(Filename);
 
   if (it != DIFileCache.end()) {
     // Verify that the information still exists.
@@ -165,10 +177,16 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *filename) {
   }
 
   // Create a new one.
-  llvm::DIFile F = DBuilder.createFile(filename, getCurrentDirname());
+  llvm::SmallString<64>  File = llvm::sys::path::filename(Filename);
+  llvm::SmallString<512> Path(Filename);
+  llvm::sys::path::remove_filename(Path);
+  llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
+  // Basically ignore any error.
+  assert(ec == llvm::errc::success);
+  llvm::DIFile F = DBuilder.createFile(File, Path);
 
   // Cache it.
-  DIFileCache[filename] = F;
+  DIFileCache[Filename] = F;
   return F;
 }
 

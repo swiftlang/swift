@@ -175,7 +175,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   RuntimeCC = llvm::CallingConv::C;
 
   if (Opts.DebugInfo)
-    DebugInfo = new IRGenDebugInfo(Context.SourceMgr, Module);
+    DebugInfo = new IRGenDebugInfo(Opts, Context.SourceMgr, Module);
 }
 
 IRGenModule::~IRGenModule() {

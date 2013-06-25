@@ -36,6 +36,8 @@ class SILDebugScope;
 
 namespace irgen {
 
+class Options;
+
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
@@ -49,7 +51,8 @@ class IRGenDebugInfo {
   llvm::BumpPtrAllocator DebugInfoNames;
 
 public:
-  IRGenDebugInfo(llvm::SourceMgr &SM, llvm::Module &M);
+  IRGenDebugInfo(const Options& opts,
+                 llvm::SourceMgr &SM, llvm::Module &M);
   /// SetCurrentLoc - Update the IRBuilder's current debug location to
   /// the location Loc and the lexical scope DS.
   void SetCurrentLoc(IRBuilder& Builder, SILLocation Loc, SILDebugScope *DS);
