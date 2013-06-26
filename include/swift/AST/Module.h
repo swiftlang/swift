@@ -176,14 +176,17 @@ public:
   /// Kind - This is the sort of file the translation unit was parsed for, which
   /// can affect some type checking and other behavior.
   enum TUKind {
-    StandardLibrary,
     Library,
     Main,
     REPL,
     SIL       // Came from a .sil file.
   } Kind;
 
-  /// Decls; the list of top-level declarations for a translation unit.
+  /// If this is true, then the translation unit is allowed to access the
+  /// Builtin module with an explicit import.
+  bool HasBuiltinModuleAccess = false;
+  
+  /// The list of top-level declarations for a translation unit.
   std::vector<Decl*> Decls;
   
   /// A map of operator names to InfixOperatorDecls.

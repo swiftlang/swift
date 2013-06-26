@@ -30,6 +30,7 @@ namespace swift {
                                               StringRef OutputName,
                                               ArrayRef<unsigned>BufferIDs,
                                               bool ParseOnly,
+                                              bool AllowBuiltinModule,
                                               TranslationUnit::TUKind Kind,
                                               SILModule *SIL);
 

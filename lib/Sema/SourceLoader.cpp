@@ -102,11 +102,13 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   // For now, treat all separate modules as unique components.
   Component *comp = new (Ctx.Allocate<Component>(1)) Component();
 
-  auto Kind = moduleID.first.str() == "swift"
-    ? TranslationUnit::StandardLibrary : TranslationUnit::Library;
-
-  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx, Kind);
+  auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
+                                             TranslationUnit::Library);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
+  
+  // FIXME: This is a terrible hack for the standard library.  It should come
+  // from metadata about the imported module.
+  importTU->HasBuiltinModuleAccess = moduleID.first.str() == "swift";
 
   performAutoImport(importTU);
 

@@ -68,12 +68,16 @@ TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
                                   StringRef OutputName,
                                   ArrayRef<unsigned> BufferIDs,
-                                  bool ParseOnly, TranslationUnit::TUKind Kind,
+                                  bool ParseOnly,
+                                  bool AllowBuiltinModule,
+                                  TranslationUnit::TUKind Kind,
                                   SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = getModuleIdentifier(OutputName, Context, Kind);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context, Kind);
   Context.LoadedModules[ID.str()] = TU;
+  
+  TU->HasBuiltinModuleAccess = AllowBuiltinModule;
 
   // If we're in SIL mode, don't auto import any libraries.
   if (Kind != TranslationUnit::SIL)

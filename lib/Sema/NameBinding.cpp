@@ -179,7 +179,7 @@ void swift::performAutoImport(TranslationUnit *TU) {
   // If we're building the standard library, import the magic Builtin module,
   // otherwise, import the standard library.
   Module *M;
-  if (TU->Kind == TranslationUnit::StandardLibrary)
+  if (TU->HasBuiltinModuleAccess)
     M = TU->Ctx.TheBuiltinModule;
   else
     M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
