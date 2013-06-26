@@ -123,8 +123,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 
-  class ParserState {
-    ParserState(Lexer::State LS, SourceLoc PreviousLoc):
+  class ParserPosition {
+    ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
         LS(LS), PreviousLoc(PreviousLoc)
     {}
     Lexer::State LS;
@@ -132,20 +132,20 @@ public:
     friend class Parser;
   };
 
-  ParserState getParserState() {
-    return ParserState(L->getStateForBeginningOfToken(Tok),
-                       PreviousLoc);
+  ParserPosition getParserPosition() {
+    return ParserPosition(L->getStateForBeginningOfToken(Tok),
+                          PreviousLoc);
   }
 
-  void restoreParserState(ParserState PS) {
-    L->restoreState(PS.LS);
-    PreviousLoc = PS.PreviousLoc;
+  void restoreParserPosition(ParserPosition PP) {
+    L->restoreState(PP.LS);
+    PreviousLoc = PP.PreviousLoc;
     consumeToken();
   }
 
-  void backtrackToState(ParserState PS) {
-    L->backtrackToState(PS.LS);
-    PreviousLoc = PS.PreviousLoc;
+  void backtrackToState(ParserPosition PP) {
+    L->backtrackToState(PP.LS);
+    PreviousLoc = PP.PreviousLoc;
     consumeToken();
   }
 
@@ -154,13 +154,13 @@ public:
   struct BacktrackingScope {
   private:
     Parser &P;
-    ParserState PS;
+    ParserPosition PP;
 
   public:
-    BacktrackingScope(Parser &P) : P(P), PS(P.getParserState()) {}
+    BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToState(PS);
+      P.backtrackToState(PP);
     }
   };
 

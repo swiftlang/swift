@@ -405,7 +405,7 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // on.
 
   if (Tok.is(tok::l_paren)) {
-    auto SavedState = getParserState();
+    auto SavedState = getParserPosition();
     consumeToken(tok::l_paren);
     skipUntil(tok::r_paren);
     bool IsCStyle = peekToken().is(tok::l_brace);
