@@ -34,6 +34,7 @@
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Debug.h"
@@ -41,7 +42,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/PathV1.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -162,13 +163,14 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLine) {
   // FIXME: Need error-checking.
-  llvm::sys::Path LibPath =
-  llvm::sys::Path::GetMainExecutable(CmdLine[0].data(), (void*)&swift::RunImmediately);
-  LibPath.eraseComponent();
-  LibPath.eraseComponent();
-  LibPath.appendComponent("lib");
-  LibPath.appendComponent("swift");
-  LibPath.appendComponent(sharedLibName);
+  llvm::SmallString<128> LibPath(
+      llvm::sys::fs::getMainExecutable(CmdLine[0].data(),
+                                       (void*)&swift::RunImmediately));
+  llvm::sys::path::remove_filename(LibPath); // Remove /swift
+  llvm::sys::path::remove_filename(LibPath); // Remove /bin
+  llvm::sys::path::append(LibPath, "lib");
+  llvm::sys::path::append(LibPath, "swift");
+  llvm::sys::path::append(LibPath, sharedLibName);
   dlopen(LibPath.c_str(), 0);
 }
 
