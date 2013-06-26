@@ -172,6 +172,8 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
   return BB;
 }
 
+///   sil-global-name:
+///     '@' identifier
 bool SILParser::parseGlobalName(Identifier &Name) {
   return P.parseToken(tok::sil_at_sign, diag::expected_sil_value_name) ||
          P.parseIdentifier(Name, diag::expected_sil_value_name);
@@ -672,24 +674,30 @@ bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
 bool SILParser::parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal) {
   Identifier Name;
   SILType Ty;
+  SourceLoc Loc = P.Tok.getLoc();
   if (parseGlobalName(Name) ||
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
       parseSILType(Ty))
     return true;
   
-  // Scan the SIL module to find the function being referenced.  Symbol tables
-  // are overrated.
-  SILFunction *FnRef = nullptr;
-  for (SILFunction &F : SILMod)
-    if (F.getMangledName() == Name.str()) {
-      FnRef = &F;
-      break;
-    }
+  // Scan the SIL module to find the function being referenced.
+  SILFunction *FnRef = SILMod.lookup(Name.str());
   
-  // FIXME: Diagnose these errors.
-  assert(FnRef);
-  assert(FnRef->getLoweredType() == Ty);
-  
+  // Check for matching types.
+  if (FnRef && FnRef->getLoweredType() != Ty) {
+    P.diagnose(Loc, diag::sil_value_use_type_mismatch,
+               Ty.getAsString(), FnRef->getLoweredType().getAsString());
+    FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+  }
+
+  // If we didn't find a function, create a new one - it must be a forward
+  // reference.
+  if (FnRef == nullptr) {
+    FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
+                                     Name.str(), Ty);
+    // FIXME: Diagnose redefinitions etc.
+  }
+
   ResultVal = B.createFunctionRef(SILLocation(), FnRef);
   return false;
 }

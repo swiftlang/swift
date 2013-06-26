@@ -17,3 +17,9 @@ bb0:
   %1 = tuple (%0 : $(), %0 : $(Int))  // expected-error {{value '%0' defined with mismatching type '$()'}}
   %2 = tuple (%199 : $())  // expected-error {{use of undefined value '%199'}}
 }
+
+
+sil @global_value_errors : $() -> () {
+bb0:
+  %0 = function_ref @global_value_errors : $ () // expected-error {{value '$()' defined with mismatching type '$() -> ()'}}
+}

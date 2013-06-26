@@ -131,6 +131,14 @@ public:
   const_iterator begin() const { return functions.begin(); }
   const_iterator end() const { return functions.end(); }
 
+  SILFunction *lookup(StringRef Name) {
+    // FIXME: Linear lookup is ridiculous here.
+    for (SILFunction &F : *this)
+      if (F.getMangledName() == Name)
+        return &F;
+    return nullptr;
+  }
+  
   /// verify - Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
