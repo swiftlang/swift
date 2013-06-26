@@ -387,7 +387,45 @@ public:
     return T->getKind() == TypeKind::BuiltinObjCPointer;
   }
 };
-  
+
+/// \brief A builtin vector type.
+class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
+  Type elementType;
+  unsigned numElements;
+
+  friend class ASTContext;
+
+  BuiltinVectorType(ASTContext &context, Type elementType, unsigned numElements)
+    : BuiltinType(TypeKind::BuiltinVector, context),
+      elementType(elementType), numElements(numElements) { }
+
+public:
+  static BuiltinVectorType *get(ASTContext &context, Type elementType,
+                                unsigned numElements);
+
+  void print(raw_ostream &OS) const;
+
+  /// \brief Retrieve the type of this vector's elements.
+  Type getElementType() const { return elementType; }
+
+  /// \brief Retrieve the number of elements in this vector.
+  unsigned getNumElements() const { return numElements; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getElementType(), getNumElements());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, Type elementType,
+                      unsigned numElements) {
+    ID.AddPointer(elementType.getPointer());
+    ID.AddInteger(numElements);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinVector;
+  }
+};
+
+
 /// BuiltinIntegerType - The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.

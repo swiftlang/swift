@@ -86,6 +86,7 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinVector:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::Tuple:
   case TypeKind::OneOf:
@@ -197,6 +198,7 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
+  case TypeKind::BuiltinVector:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -264,6 +266,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
+  case TypeKind::BuiltinVector:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -289,6 +292,7 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinVector:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::NameAlias:
   case TypeKind::Identifier:
@@ -422,6 +426,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
+  case TypeKind::BuiltinVector:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::OneOf:
   case TypeKind::Struct:
@@ -1399,6 +1404,22 @@ void BuiltinFloatType::print(raw_ostream &OS) const {
   case IEEE128: OS << "Builtin.FP_IEEE128"; return;
   case PPC128:  OS << "Builtin.FP_PPC128"; return;
   }
+}
+
+void BuiltinVectorType::print(raw_ostream &OS) const {
+  llvm::SmallString<32> underlyingStrVec;
+  StringRef underlyingStr;
+  {
+    // FIXME: Ugly hack: remove the .Builtin from the element type.
+    llvm::raw_svector_ostream underlyingOS(underlyingStrVec);
+    elementType.print(OS);
+    if (underlyingStrVec.startswith("Builtin."))
+      underlyingStr = underlyingStrVec.substr(9);
+    else
+      underlyingStr = underlyingStrVec;
+  }
+
+  OS << "Builtin.Vec" << numElements << "x" << underlyingStr;
 }
 
 void ErrorType::print(raw_ostream &OS) const {

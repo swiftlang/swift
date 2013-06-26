@@ -42,25 +42,25 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast")
 #ifndef BUILTIN_BINARY_OPERATION
 #define BUILTIN_BINARY_OPERATION(Id, Name, Overload) BUILTIN(Id, Name)
 #endif
-BUILTIN_BINARY_OPERATION(Add,     "add",      Integer)
-BUILTIN_BINARY_OPERATION(FAdd,    "fadd",     Float)
-BUILTIN_BINARY_OPERATION(And,     "and",      Integer)
-BUILTIN_BINARY_OPERATION(AShr,    "ashr",     Integer)
-BUILTIN_BINARY_OPERATION(LShr,    "lshr",     Integer)
-BUILTIN_BINARY_OPERATION(Or,      "or",       Integer)
-BUILTIN_BINARY_OPERATION(FDiv,    "fdiv",     Float)
-BUILTIN_BINARY_OPERATION(Mul,     "mul",      Integer)
-BUILTIN_BINARY_OPERATION(FMul,    "fmul",     Float)
-BUILTIN_BINARY_OPERATION(SDiv,    "sdiv",     Integer)
-BUILTIN_BINARY_OPERATION(ExactSDiv, "sdiv_exact", Integer)
-BUILTIN_BINARY_OPERATION(Shl,     "shl",      Integer)
-BUILTIN_BINARY_OPERATION(SRem,    "srem",     Integer)
-BUILTIN_BINARY_OPERATION(Sub,     "sub",      Integer)
-BUILTIN_BINARY_OPERATION(FSub,    "fsub",     Float)
-BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     Integer)
-BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", Integer)
+BUILTIN_BINARY_OPERATION(Add,     "add",      IntegerOrVector)
+BUILTIN_BINARY_OPERATION(FAdd,    "fadd",     FloatOrVector)
+BUILTIN_BINARY_OPERATION(And,     "and",      IntegerOrVector)
+BUILTIN_BINARY_OPERATION(AShr,    "ashr",     IntegerOrVector)
+BUILTIN_BINARY_OPERATION(LShr,    "lshr",     IntegerOrVector)
+BUILTIN_BINARY_OPERATION(Or,      "or",       IntegerOrVector)
+BUILTIN_BINARY_OPERATION(FDiv,    "fdiv",     FloatOrVector)
+BUILTIN_BINARY_OPERATION(Mul,     "mul",      IntegerOrVector)
+BUILTIN_BINARY_OPERATION(FMul,    "fmul",     FloatOrVector)
+BUILTIN_BINARY_OPERATION(SDiv,    "sdiv",     IntegerOrVector)
+BUILTIN_BINARY_OPERATION(ExactSDiv, "sdiv_exact", IntegerOrVector)
+BUILTIN_BINARY_OPERATION(Shl,     "shl",      IntegerOrVector)
+BUILTIN_BINARY_OPERATION(SRem,    "srem",     IntegerOrVector)
+BUILTIN_BINARY_OPERATION(Sub,     "sub",      IntegerOrVector)
+BUILTIN_BINARY_OPERATION(FSub,    "fsub",     FloatOrVector)
+BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     IntegerOrVector)
+BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(URem,    "urem",     Integer)
-BUILTIN_BINARY_OPERATION(Xor,     "xor",      Integer)
+BUILTIN_BINARY_OPERATION(Xor,     "xor",      IntegerOrVector)
 #undef BUILTIN_BINARY_OPERATION
 
 /// Unary operations have type (T) -> T.
@@ -71,37 +71,38 @@ BUILTIN_BINARY_OPERATION(Xor,     "xor",      Integer)
 // "fneg" is a separate builtin because its LLVM representation is
 // 'fsub -0.0, %x', but defining it in swift as
 // 'func [prefix] -(x) { -0.0 - x }' would be infinitely recursive.
-BUILTIN_UNARY_OPERATION(FNeg, "fneg", Float)
+BUILTIN_UNARY_OPERATION(FNeg, "fneg", FloatOrVector)
 #undef BUILTIN_UNARY_OPERATION
 
-/// Binary predicates have type (T,T) -> i1
+// Binary predicates have type (T,T) -> i1 or (T, T) -> Vector<i1> for scalars
+// and vectors, respectively.
 #ifndef BUILTIN_BINARY_PREDICATE
 #define BUILTIN_BINARY_PREDICATE(Id, Name, Overload) BUILTIN(Id, Name)
 #endif
-BUILTIN_BINARY_PREDICATE(ICMP_EQ,  "cmp_eq",   IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(ICMP_NE,  "cmp_ne",   IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(ICMP_SLE, "cmp_sle",  Integer)
-BUILTIN_BINARY_PREDICATE(ICMP_SLT, "cmp_slt",  Integer)
-BUILTIN_BINARY_PREDICATE(ICMP_SGE, "cmp_sge",  Integer)
-BUILTIN_BINARY_PREDICATE(ICMP_SGT, "cmp_sgt",  Integer)
-BUILTIN_BINARY_PREDICATE(ICMP_ULE, "cmp_ule",  IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(ICMP_ULT, "cmp_ult",  IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(ICMP_UGE, "cmp_uge",  IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(ICMP_UGT, "cmp_ugt",  IntegerOrRawPointer)
-BUILTIN_BINARY_PREDICATE(FCMP_OEQ, "fcmp_oeq", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_OGT, "fcmp_ogt", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_OGE, "fcmp_oge", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_OLT, "fcmp_olt", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_OLE, "fcmp_ole", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_ONE, "fcmp_one", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_ORD, "fcmp_ord", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_UEQ, "fcmp_ueq", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_UGT, "fcmp_ugt", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_UGE, "fcmp_uge", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_ULT, "fcmp_ult", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", Float)
-BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", Float)
+BUILTIN_BINARY_PREDICATE(ICMP_EQ,  "cmp_eq",   IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_NE,  "cmp_ne",   IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_SLE, "cmp_sle",  IntegerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_SLT, "cmp_slt",  IntegerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_SGE, "cmp_sge",  IntegerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_SGT, "cmp_sgt",  IntegerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_ULE, "cmp_ule",  IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_ULT, "cmp_ult",  IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_UGE, "cmp_uge",  IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(ICMP_UGT, "cmp_ugt",  IntegerOrRawPointerOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_OEQ, "fcmp_oeq", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_OGT, "fcmp_ogt", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_OGE, "fcmp_oge", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_OLT, "fcmp_olt", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_OLE, "fcmp_ole", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_ONE, "fcmp_one", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_ORD, "fcmp_ord", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_UEQ, "fcmp_ueq", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_UGT, "fcmp_ugt", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_UGE, "fcmp_uge", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_ULT, "fcmp_ult", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", FloatOrVector)
+BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", FloatOrVector)
 #undef BUILTIN_BINARY_PREDICATE
 
 // BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
@@ -182,6 +183,14 @@ BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", Special)
 
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.
 BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", IntegerOrRawPointer)
+
+/// ExtractElement has type (Vector<N, T>, Int32) -> T
+BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", Special)
+
+/// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
+BUILTIN_MISC_OPERATION(InsertElement, "insertelement", Special)
+
+// FIXME: shufflevector
 
 #undef BUILTIN_MISC_OPERATION
 

@@ -820,6 +820,7 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinVector:
     llvm_unreachable("should always be accessed through an implicit typealias");
 
   case TypeKind::UnstructuredUnresolved:

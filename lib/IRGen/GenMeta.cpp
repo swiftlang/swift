@@ -306,6 +306,10 @@ namespace {
       return emitDirectMetadataRef(CanType(type));
     }
 
+    llvm::Value *visitBuiltinVectorType(BuiltinVectorType *type) {
+      return emitDirectMetadataRef(CanType(type));
+    }
+
     llvm::Value *visitNominalType(NominalType *type) {
       return emitNominalMetadataRef(IGF, type->getDecl(), CanType(type));
     }

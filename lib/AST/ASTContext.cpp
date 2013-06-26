@@ -75,7 +75,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
   llvm::DenseMap<unsigned, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
-
+  llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
+  
   /// \brief The permanent arena.
   Arena Permanent;
 
@@ -324,6 +325,25 @@ static AllocationArena getArena(bool hasTypeVariable) {
   return hasTypeVariable? AllocationArena::ConstraintSolver
                         : AllocationArena::Permanent;;
 }
+
+BuiltinVectorType *BuiltinVectorType::get(ASTContext &context, Type elementType,
+                                          unsigned numElements) {
+  llvm::FoldingSetNodeID id;
+  BuiltinVectorType::Profile(id, elementType, numElements);
+
+  void *insertPos;
+  if (BuiltinVectorType *vecType
+        = context.Impl.BuiltinVectorTypes.FindNodeOrInsertPos(id, insertPos))
+    return vecType;
+
+  assert(elementType->isCanonical() && "Non-canonical builtin vector?");
+  BuiltinVectorType *vecTy
+    = new (context, AllocationArena::Permanent)
+       BuiltinVectorType(context, elementType, numElements);
+  context.Impl.BuiltinVectorTypes.InsertNode(vecTy, insertPos);
+  return vecTy;
+}
+
 
 ParenType *ParenType::get(ASTContext &C, Type underlying) {
   bool hasTypeVariable = underlying->hasTypeVariable();

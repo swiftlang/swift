@@ -91,6 +91,7 @@ public:
     case TypeKind::BuiltinObjCPointer:
     case TypeKind::BuiltinOpaquePointer:
     case TypeKind::BuiltinRawPointer:
+    case TypeKind::BuiltinVector:
     case TypeKind::Class:
     case TypeKind::Module:
     case TypeKind::OneOf:

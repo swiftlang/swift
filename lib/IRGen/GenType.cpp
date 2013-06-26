@@ -328,10 +328,67 @@ const TypeInfo &TypeConverter::getFragileTypeInfo(ClassDecl *theClass) {
   return *entry.get<const TypeInfo*>();
 }
 
+/// \brief Convert a primitive builtin type to its LLVM type, size, and
+/// alignment.
+static std::tuple<llvm::Type *, Size, Alignment>
+convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
+  llvm::LLVMContext &ctx = IGM.getLLVMContext();
+  TypeBase *ty = canTy.getPointer();
+  switch (ty->getKind()) {
+  case TypeKind::BuiltinRawPointer:
+    return { IGM.Int8PtrTy, IGM.getPointerSize(), IGM.getPointerAlignment() };
+  case TypeKind::BuiltinOpaquePointer:
+    return { IGM.OpaquePtrTy, IGM.getPointerSize(), IGM.getPointerAlignment() };
+  case TypeKind::BuiltinFloat:
+    switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
+    case BuiltinFloatType::IEEE16:
+      return { llvm::Type::getHalfTy(ctx), Size(2), Alignment(2) };
+    case BuiltinFloatType::IEEE32:
+      return { llvm::Type::getFloatTy(ctx), Size(4), Alignment(4) };
+    case BuiltinFloatType::IEEE64:
+      return { llvm::Type::getDoubleTy(ctx), Size(8), Alignment(8) };
+    case BuiltinFloatType::IEEE80:
+      return { llvm::Type::getX86_FP80Ty(ctx), Size(10), Alignment(16) };
+    case BuiltinFloatType::IEEE128:
+      return { llvm::Type::getFP128Ty(ctx), Size(16), Alignment(16) };
+    case BuiltinFloatType::PPC128:
+      return { llvm::Type::getPPC_FP128Ty(ctx),Size(16), Alignment(16) };
+    }
+    llvm_unreachable("bad builtin floating-point type kind");
+  case TypeKind::BuiltinInteger: {
+    unsigned BitWidth = cast<BuiltinIntegerType>(ty)->getBitWidth();
+    unsigned ByteSize = (BitWidth+7U)/8U;
+    // Round up the memory size and alignment to a power of 2.
+    if (!llvm::isPowerOf2_32(ByteSize))
+      ByteSize = llvm::NextPowerOf2(ByteSize);
+
+    return { llvm::IntegerType::get(ctx, BitWidth), Size(ByteSize),
+             Alignment(ByteSize) };
+  }
+  case TypeKind::BuiltinVector: {
+    auto vecTy = ty->castTo<BuiltinVectorType>();
+    llvm::Type *elementTy;
+    Size size;
+    Alignment align;
+    std::tie(elementTy, size, align)
+      = convertPrimitiveBuiltin(IGM,
+                                vecTy->getElementType()->getCanonicalType());
+
+    auto llvmVecTy = llvm::VectorType::get(elementTy, vecTy->getNumElements());
+    unsigned bitSize = size.getValue() * 8;
+    if (!llvm::isPowerOf2_32(bitSize))
+      bitSize = llvm::NextPowerOf2(bitSize);
+
+    return { llvmVecTy, Size(bitSize / 8), align };
+  }
+  default:
+    llvm_unreachable("Not a primitive builtin type");
+  }
+}
+
 TypeCacheEntry TypeConverter::convertType(CanType canTy) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", canTy);
 
-  llvm::LLVMContext &Ctx = IGM.getLLVMContext();
   TypeBase *ty = canTy.getPointer();
   switch (ty->getKind()) {
 #define UNCHECKED_TYPE(id, parent) \
@@ -350,47 +407,20 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
     return convertMetaTypeType(cast<MetaTypeType>(ty));
   case TypeKind::Module:
     return convertModuleType(cast<ModuleType>(ty));
-  case TypeKind::BuiltinRawPointer:
-    return createPrimitive(IGM.Int8PtrTy, IGM.getPointerSize(),
-                           IGM.getPointerAlignment());
-  case TypeKind::BuiltinOpaquePointer:
-    return createPrimitive(IGM.OpaquePtrTy, IGM.getPointerSize(),
-                           IGM.getPointerAlignment());
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer();
   case TypeKind::BuiltinObjCPointer:
     return convertBuiltinObjCPointer();
+  case TypeKind::BuiltinRawPointer:
+  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinFloat:
-    switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
-    case BuiltinFloatType::IEEE16:
-      return createPrimitive(llvm::Type::getHalfTy(Ctx),
-                             Size(2), Alignment(2));
-    case BuiltinFloatType::IEEE32:
-      return createPrimitive(llvm::Type::getFloatTy(Ctx),
-                             Size(4), Alignment(4));
-    case BuiltinFloatType::IEEE64:
-      return createPrimitive(llvm::Type::getDoubleTy(Ctx),
-                             Size(8), Alignment(8));
-    case BuiltinFloatType::IEEE80:
-      return createPrimitive(llvm::Type::getX86_FP80Ty(Ctx),
-                             Size(10), Alignment(16));
-    case BuiltinFloatType::IEEE128:
-      return createPrimitive(llvm::Type::getFP128Ty(Ctx),
-                             Size(16), Alignment(16));
-    case BuiltinFloatType::PPC128:
-      return createPrimitive(llvm::Type::getPPC_FP128Ty(Ctx),
-                             Size(16), Alignment(16));
-    }
-    llvm_unreachable("bad builtin floating-point type kind");
-  case TypeKind::BuiltinInteger: {
-    unsigned BitWidth = cast<BuiltinIntegerType>(ty)->getBitWidth();
-    unsigned ByteSize = (BitWidth+7U)/8U;
-    // Round up the memory size and alignment to a power of 2. 
-    if (!llvm::isPowerOf2_32(ByteSize))
-      ByteSize = llvm::NextPowerOf2(ByteSize);
-    
-    return createPrimitive(llvm::IntegerType::get(Ctx, BitWidth),
-                           Size(ByteSize), Alignment(ByteSize));
+  case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinVector: {
+    llvm::Type *llvmTy;
+    Size size;
+    Alignment align;
+    std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, canTy);
+    return createPrimitive(llvmTy, size, align);
   }
 
   case TypeKind::Archetype:

@@ -532,6 +532,7 @@ static bool isLocalLinkageType(CanType type) {
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinVector:
     return false;
 
 #define SUGARED_TYPE(id, parent)                \

@@ -23,6 +23,26 @@
 using namespace swift;
 
 Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
+  // Vectors are VecNxT, where "N" is the number of elements and
+  // T is the element type.
+  if (Name.startswith("Vec")) {
+    Name = Name.substr(3);
+    StringRef::size_type xPos = Name.find('x');
+    if (xPos == StringRef::npos)
+      return Type();
+
+    unsigned numElements;
+    if (Name.substr(0, xPos).getAsInteger(10, numElements) ||
+        numElements == 0 || numElements > 1024)
+      return Type();
+
+    Type elementType = getBuiltinType(Context, Name.substr(xPos + 1));
+    if (!elementType)
+      return Type();
+
+    return BuiltinVectorType::get(Context, elementType, numElements);
+  }
+
   if (Name == "RawPointer")
     return Context.TheRawPointerType;
   if (Name == "OpaquePointer")
@@ -128,8 +148,12 @@ static ValueDecl *getBinaryPredicate(ASTContext &Context, Identifier Id,
                                      Type ArgType) {
   TupleTypeElt ArgElts[] = { ArgType, ArgType };
   Type Arg = TupleType::get(ArgElts, Context);
-  Type FnTy = FunctionType::get(Arg, BuiltinIntegerType::get(1, Context),
-                                Context);
+  Type ResultTy = BuiltinIntegerType::get(1, Context);
+  if (auto VecTy = ArgType->getAs<BuiltinVectorType>()) {
+    ResultTy = BuiltinVectorType::get(Context, ResultTy,
+                                      VecTy->getNumElements());
+  }
+  Type FnTy = FunctionType::get(Arg, ResultTy, Context);
   return getBuiltinFunction(Context, Id, FnTy);
 }
 
@@ -140,75 +164,100 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
   if (Types.size() == 0 || Types.size() > 2) return nullptr;
   Type Input = Types[0];
   Type Output = Types.size() == 2 ? Types[1] : Type();
-  
+
+  // If both types are vectors, look through the vectors.
+  Type CheckInput = Input;
+  Type CheckOutput = Output;
+  bool UnwrappedVector = false;
+  auto InputVec = Input->getAs<BuiltinVectorType>();
+  auto OutputVec = Output.isNull()? nullptr :Output->getAs<BuiltinVectorType>();
+  if (InputVec && OutputVec &&
+      InputVec->getNumElements() == OutputVec->getNumElements()) {
+    UnwrappedVector = true;
+    CheckInput = InputVec->getElementType();
+    CheckOutput = OutputVec->getElementType();
+  }
+
   // Custom type checking.  We know the one or two types have been subjected to
   // the "isBuiltinTypeOverloaded" predicate successfully.
   switch (VK) {
   default: assert(0 && "Not a cast operation");
   case BuiltinValueKind::Trunc:
-    if (Output.isNull() ||
-        !Input->is<BuiltinIntegerType>() || !Output->is<BuiltinIntegerType>() ||
-        Input->castTo<BuiltinIntegerType>()->getBitWidth() <=
-        Output->castTo<BuiltinIntegerType>()->getBitWidth())
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinIntegerType>() ||
+        !CheckOutput->is<BuiltinIntegerType>() ||
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() <=
+        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
     break;
       
   case BuiltinValueKind::ZExt:
-  case BuiltinValueKind::SExt:
-    if (Output.isNull() ||
-        !Input->is<BuiltinIntegerType>() || !Output->is<BuiltinIntegerType>() ||
-        Input->castTo<BuiltinIntegerType>()->getBitWidth() >=
-        Output->castTo<BuiltinIntegerType>()->getBitWidth())
+  case BuiltinValueKind::SExt: {
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinIntegerType>() ||
+        !CheckOutput->is<BuiltinIntegerType>() ||
+        CheckInput->castTo<BuiltinIntegerType>()->getBitWidth() >=
+        CheckOutput->castTo<BuiltinIntegerType>()->getBitWidth())
       return nullptr;
     break;
+  }
+
   case BuiltinValueKind::FPToUI:
   case BuiltinValueKind::FPToSI:
-    if (Output.isNull() || !Input->is<BuiltinFloatType>() ||
-        !Output->is<BuiltinIntegerType>())
+    if (CheckOutput.isNull() || !CheckInput->is<BuiltinFloatType>() ||
+        !CheckOutput->is<BuiltinIntegerType>())
       return nullptr;
     break;
       
   case BuiltinValueKind::UIToFP:
   case BuiltinValueKind::SIToFP:
-    if (Output.isNull() || !Input->is<BuiltinIntegerType>() ||
-        !Output->is<BuiltinFloatType>())
+    if (CheckOutput.isNull() || !CheckInput->is<BuiltinIntegerType>() ||
+        !CheckOutput->is<BuiltinFloatType>())
       return nullptr;
     break;
 
   case BuiltinValueKind::FPTrunc:
-    if (Output.isNull() ||
-        !Input->is<BuiltinFloatType>() || !Output->is<BuiltinFloatType>() ||
-        Input->castTo<BuiltinFloatType>()->getFPKind() <=
-        Output->castTo<BuiltinFloatType>()->getFPKind())
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinFloatType>() ||
+        !CheckOutput->is<BuiltinFloatType>() ||
+        CheckInput->castTo<BuiltinFloatType>()->getFPKind() <=
+        CheckOutput->castTo<BuiltinFloatType>()->getFPKind())
       return nullptr;
     break;
   case BuiltinValueKind::FPExt:
-    if (Output.isNull() ||
-        !Input->is<BuiltinFloatType>() || !Output->is<BuiltinFloatType>() ||
-        Input->castTo<BuiltinFloatType>()->getFPKind() >=
-        Output->castTo<BuiltinFloatType>()->getFPKind())
+    if (CheckOutput.isNull() ||
+        !CheckInput->is<BuiltinFloatType>() ||
+        !CheckOutput->is<BuiltinFloatType>() ||
+        CheckInput->castTo<BuiltinFloatType>()->getFPKind() >=
+        CheckOutput->castTo<BuiltinFloatType>()->getFPKind())
       return nullptr;
     break;
 
   case BuiltinValueKind::PtrToInt:
-    if (!Output.isNull() || !Input->is<BuiltinIntegerType>()) return nullptr;
+    // FIXME: Do we care about vectors of pointers?
+    if (!CheckOutput.isNull() || !CheckInput->is<BuiltinIntegerType>() ||
+        UnwrappedVector)
+      return nullptr;
     Output = Input;
     Input = Context.TheRawPointerType;
     break;
   case BuiltinValueKind::IntToPtr:
-    if (!Output.isNull() || !Input->is<BuiltinIntegerType>()) return nullptr;
+    // FIXME: Do we care about vectors of pointers?
+    if (!CheckOutput.isNull() || !CheckInput->is<BuiltinIntegerType>() ||
+        UnwrappedVector)
+      return nullptr;
     Output = Context.TheRawPointerType;
     break;
   case BuiltinValueKind::BitCast:
-    if (Output.isNull()) return nullptr;
+    if (CheckOutput.isNull()) return nullptr;
 
     // Support float <-> int bitcast where the types are the same widths.
-    if (auto *BIT = Input->getAs<BuiltinIntegerType>())
-      if (auto *BFT = Output->getAs<BuiltinFloatType>())
+    if (auto *BIT = CheckInput->getAs<BuiltinIntegerType>())
+      if (auto *BFT = CheckOutput->getAs<BuiltinFloatType>())
         if (BIT->getBitWidth() == BFT->getBitWidth())
             break;
-    if (auto *BFT = Input->getAs<BuiltinFloatType>())
-      if (auto *BIT = Output->getAs<BuiltinIntegerType>())
+    if (auto *BFT = CheckInput->getAs<BuiltinFloatType>())
+      if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->getBitWidth() == BFT->getBitWidth())
           break;
 
@@ -424,6 +473,50 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
                                 Context.TheBuiltinModule);
 }
 
+static ValueDecl *getExtractElementOperation(ASTContext &context, Identifier id,
+                                             Type firstTy, Type secondTy) {
+  // (Vector<N, T>, Int32) -> T
+  auto vecTy = firstTy->getAs<BuiltinVectorType>();
+  if (!vecTy)
+    return nullptr;
+  auto elementTy = vecTy->getElementType();
+
+  auto indexTy = secondTy->getAs<BuiltinIntegerType>();
+  if (!indexTy || indexTy->getBitWidth() != 32)
+    return nullptr;
+
+  TupleTypeElt elements[2] = { vecTy, indexTy };
+  Type inputTy = TupleType::get(elements, context);
+  Type fnTy = FunctionType::get(inputTy, elementTy, context);
+  return new (context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init=*/nullptr,
+                                context.TheBuiltinModule);
+}
+
+static ValueDecl *getInsertElementOperation(ASTContext &context, Identifier id,
+                                            Type firstTy, Type secondTy,
+                                            Type thirdTy) {
+  // (Vector<N, T>, T, Int32) -> Vector<N, T>
+  auto vecTy = firstTy->getAs<BuiltinVectorType>();
+  if (!vecTy)
+    return nullptr;
+  auto elementTy = vecTy->getElementType();
+
+  if (!secondTy->isEqual(elementTy))
+    return nullptr;
+
+  auto indexTy = thirdTy->getAs<BuiltinIntegerType>();
+  if (!indexTy || indexTy->getBitWidth() != 32)
+    return nullptr;
+
+  TupleTypeElt elements[3] = { vecTy, elementTy, indexTy };
+  Type inputTy = TupleType::get(elements, context);
+  Type fnTy = FunctionType::get(inputTy, vecTy, context);
+  return new (context) FuncDecl(SourceLoc(), SourceLoc(), id, SourceLoc(),
+                                nullptr, fnTy, /*init=*/nullptr,
+                                context.TheBuiltinModule);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -451,10 +544,25 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
     return false;  // always fail. 
   case OverloadedBuiltinKind::Integer:
     return T->is<BuiltinIntegerType>();
+  case OverloadedBuiltinKind::IntegerOrVector:
+    return T->is<BuiltinIntegerType>() ||
+           (T->is<BuiltinVectorType>() &&
+            T->castTo<BuiltinVectorType>()->getElementType()
+              ->is<BuiltinIntegerType>());
   case OverloadedBuiltinKind::IntegerOrRawPointer:
     return T->is<BuiltinIntegerType>() || T->is<BuiltinRawPointerType>();
+  case OverloadedBuiltinKind::IntegerOrRawPointerOrVector:
+    return T->is<BuiltinIntegerType>() || T->is<BuiltinRawPointerType>() ||
+           (T->is<BuiltinVectorType>() &&
+            T->castTo<BuiltinVectorType>()->getElementType()
+              ->is<BuiltinIntegerType>());
   case OverloadedBuiltinKind::Float:
     return T->is<BuiltinFloatType>();
+  case OverloadedBuiltinKind::FloatOrVector:
+    return T->is<BuiltinFloatType>() ||
+           (T->is<BuiltinVectorType>() &&
+            T->castTo<BuiltinVectorType>()->getElementType()
+              ->is<BuiltinFloatType>());
   case OverloadedBuiltinKind::Special:
     return true;
   }
@@ -757,6 +865,14 @@ ValueDecl *swift::getBuiltinValue(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TypeOf:
     if (!Types.empty()) return nullptr;
     return getTypeOfOperation(Context, Id);
+
+  case BuiltinValueKind::ExtractElement:
+    if (Types.size() != 2) return nullptr;
+    return getExtractElementOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::InsertElement:
+    if (Types.size() != 3) return nullptr;
+    return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
   }
   llvm_unreachable("bad builtin value!");
 }

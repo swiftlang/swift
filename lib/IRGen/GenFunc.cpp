@@ -1020,6 +1020,25 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, FuncDecl *fn,
     return;
   }
 
+  if (BuiltinName == "extractelement") {
+    using namespace llvm;
+
+    auto vector = args.claimNext();
+    auto index = args.claimNext();
+    out->add(IGF.Builder.CreateExtractElement(vector, index));
+    return;
+  }
+
+  if (BuiltinName == "insertelement") {
+    using namespace llvm;
+
+    auto vector = args.claimNext();
+    auto newValue = args.claimNext();
+    auto index = args.claimNext();
+    out->add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 

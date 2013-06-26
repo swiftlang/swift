@@ -418,6 +418,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= Bo                    # Builtin.ObjectPointer
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= Bu                    # Builtin.OpaquePointer
+/// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
@@ -476,6 +477,11 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
   case TypeKind::BuiltinObjCPointer:
     Buffer << "BO";
+    return;
+  case TypeKind::BuiltinVector:
+    Buffer << "Bv" << cast<BuiltinVectorType>(base)->getNumElements();
+    mangleType(cast<BuiltinVectorType>(base)->getElementType(), explosion,
+               uncurryLevel);
     return;
 
 #define SUGARED_TYPE(id, parent) \
