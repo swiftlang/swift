@@ -55,20 +55,20 @@ static std::pair<Type, StringRef>
 getSwiftStdlibType(const clang::TypedefNameDecl *D,
                    Identifier Name,
                    ClangImporter::Implementation &Impl) {
-  BridgeCTypeKind CTypeKind;
+  MappedCTypeKind CTypeKind;
   unsigned Bitwidth;
   StringRef SwiftModuleName;
   bool IsSwiftModule; // True if SwiftModuleName == "swift".
   StringRef SwiftTypeName;
-  BridgeLanguages Languages;
+  MappedLanguages Languages;
   bool CanBeMissing;
 
   do {
-#define BRIDGE_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
-                    SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
-                    CAN_BE_MISSING)                                \
+#define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
+                 SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
+                 CAN_BE_MISSING)                                \
     if (Name.str() == C_TYPE_NAME) {                               \
-      CTypeKind = BridgeCTypeKind::C_TYPE_KIND;                    \
+      CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
       if (StringRef("swift") == SWIFT_MODULE_NAME)                 \
         IsSwiftModule = true;                                      \
@@ -77,20 +77,20 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
         SwiftModuleName = SWIFT_MODULE_NAME;                       \
       }                                                            \
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
-      Languages = BridgeLanguages::LANGUAGES;                      \
+      Languages = MappedLanguages::LANGUAGES;                      \
       CanBeMissing = CAN_BE_MISSING;                               \
       break;                                                       \
     }
-#include "BridgedTypes.def"
+#include "MappedTypes.def"
 
-    // We did not find this type, thus it is not bridged.
+    // We did not find this type, thus it is not mapped.
     return std::make_pair(Type(), "");
   } while(0);
 
   clang::ASTContext &ClangCtx = Impl.getClangASTContext();
 
-  if (Languages != BridgeLanguages::All) {
-    if ((unsigned(Languages) & unsigned(BridgeLanguages::ObjC1)) != 0 &&
+  if (Languages != MappedLanguages::All) {
+    if ((unsigned(Languages) & unsigned(MappedLanguages::ObjC1)) != 0 &&
         !ClangCtx.getLangOpts().ObjC1)
       return std::make_pair(Type(), "");
   }
@@ -105,37 +105,37 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 
   // Chceck other expected properties of the C type.
   switch(CTypeKind) {
-  case BridgeCTypeKind::UnsignedInt:
+  case MappedCTypeKind::UnsignedInt:
     if (!ClangType->isUnsignedIntegerType())
       return std::make_pair(Type(), "");
     break;
 
-  case BridgeCTypeKind::SignedInt:
+  case MappedCTypeKind::SignedInt:
     if (!ClangType->isSignedIntegerType())
       return std::make_pair(Type(), "");
     break;
 
-  case BridgeCTypeKind::FloatIEEEsingle:
-  case BridgeCTypeKind::FloatIEEEdouble:
-  case BridgeCTypeKind::FloatX87DoubleExtended: {
+  case MappedCTypeKind::FloatIEEEsingle:
+  case MappedCTypeKind::FloatIEEEdouble:
+  case MappedCTypeKind::FloatX87DoubleExtended: {
     if (!ClangType->isFloatingType())
       return std::make_pair(Type(), "");
 
     const llvm::fltSemantics &Sem = ClangCtx.getFloatTypeSemantics(ClangType);
     switch(CTypeKind) {
-    case BridgeCTypeKind::FloatIEEEsingle:
+    case MappedCTypeKind::FloatIEEEsingle:
       assert(Bitwidth == 32 && "FloatIEEEsingle should be 32 bits wide");
       if (&Sem != &APFloat::IEEEsingle)
         return std::make_pair(Type(), "");
       break;
 
-    case BridgeCTypeKind::FloatIEEEdouble:
+    case MappedCTypeKind::FloatIEEEdouble:
       assert(Bitwidth == 64 && "FloatIEEEsingle should be 64 bits wide");
       if (&Sem != &APFloat::IEEEdouble)
         return std::make_pair(Type(), "");
       break;
 
-    case BridgeCTypeKind::FloatX87DoubleExtended:
+    case MappedCTypeKind::FloatX87DoubleExtended:
       assert(Bitwidth == 80 && "FloatIEEEsingle should be 80 bits wide");
       if (&Sem != &APFloat::x87DoubleExtended)
         return std::make_pair(Type(), "");
@@ -147,12 +147,12 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     }
     break;
 
-  case BridgeCTypeKind::ObjCBool:
+  case MappedCTypeKind::ObjCBool:
     if (!ClangCtx.hasSameType(ClangType, ClangCtx.ObjCBuiltinBoolTy))
       return std::make_pair(Type(), "");
     break;
 
-  case BridgeCTypeKind::ObjCSel:
+  case MappedCTypeKind::ObjCSel:
     if (auto PT = ClangType->getAs<clang::PointerType>()) {
       if (!PT->getPointeeType()->isSpecificBuiltinType(
                                   clang::BuiltinType::ObjCSel))

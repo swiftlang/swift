@@ -84,7 +84,7 @@ enum class ImportTypeKind {
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
 /// swift type.
-enum class BridgeCTypeKind {
+enum class MappedCTypeKind {
   UnsignedInt,
   SignedInt,
   FloatIEEEsingle,
@@ -96,7 +96,7 @@ enum class BridgeCTypeKind {
 
 /// \brief Bitmask constants for language dialects where a certain C to Swift
 /// type mapping applies.
-enum class BridgeLanguages {
+enum class MappedLanguages {
   ObjC1 = 0x1,
   All = ObjC1
 };
