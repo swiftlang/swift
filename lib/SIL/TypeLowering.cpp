@@ -50,13 +50,16 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
   return t;
 }
 
-CanType TypeConverter::getStringType() {
-  return getKnownType(StringTy, M.getASTContext(), "swift", "String");
-}
-
-CanType TypeConverter::getNSStringType() {
-  return getKnownType(NSStringTy, M.getASTContext(), "Foundation", "NSString");
-}
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+  CanType TypeConverter::get##BridgedType##Type() {         \
+    return getKnownType(BridgedType##Ty, M.getASTContext(), \
+                        #BridgedModule, #BridgedType);      \
+  }                                                         \
+  CanType TypeConverter::get##NativeType##Type() {          \
+    return getKnownType(NativeType##Ty, M.getASTContext(),  \
+                        #NativeModule, #NativeType);        \
+  }
+#include "swift/SIL/BridgedTypes.def"
 
 UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
   switch (cc) {
@@ -702,9 +705,12 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
     return t;
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    // Swift String maps to ObjC NSString.
-    if (getStringType() && getNSStringType() && t->isEqual(getStringType()))
-      return getNSStringType();
+    // Map native types back to bridged types.
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+    if (get##NativeType##Type() && get##BridgedType##Type()             \
+        && t->isEqual(get##NativeType##Type()))                         \
+      return get##BridgedType##Type();
+#include "swift/SIL/BridgedTypes.def"
     return t;
   }
 }

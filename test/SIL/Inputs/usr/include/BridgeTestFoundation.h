@@ -1,3 +1,4 @@
+typedef signed char BOOL;
 @class NSString;
 
 @interface NSObject
@@ -22,6 +23,9 @@
 
 - (NSString*) foo;
 - (void) setFoo: (NSString*)s;
+
+- (BOOL) zim;
+- (void) setZim: (BOOL)b;
 
 @end
 

@@ -63,6 +63,8 @@ public:
   
   Optional<SILConstant> StringToNSStringFn;
   Optional<SILConstant> NSStringToStringFn;
+  Optional<SILConstant> BoolToObjCBoolFn;
+  Optional<SILConstant> ObjCBoolToBoolFn;
   
 public:
   SILGenModule(SILModule &M);
@@ -169,6 +171,8 @@ public:
   /// Known functions for bridging.
   SILConstant getStringToNSStringFn();
   SILConstant getNSStringToStringFn();
+  SILConstant getBoolToObjCBoolFn();
+  SILConstant getObjCBoolToBoolFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

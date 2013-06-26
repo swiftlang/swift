@@ -1949,6 +1949,34 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(str);
 }
 
+static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ManagedValue swiftBool) {
+  // func convertBoolToObjCBool(Bool) -> ObjCBool
+  SILValue boolToObjCBoolFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getBoolToObjCBoolFn());
+  
+  SILType resultTy =gen.getLoweredLoadableType(gen.SGM.Types.getObjCBoolType());
+  
+  SILValue result = gen.B.createApply(loc, boolToObjCBoolFn,
+                                      resultTy, swiftBool.forward(gen));
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ManagedValue objcBool) {
+  // func convertObjCBoolToBool(ObjCBool) -> Bool
+  SILValue objcBoolToBoolFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getObjCBoolToBoolFn());
+  
+  SILType resultTy = gen.getLoweredLoadableType(gen.SGM.Types.getBoolType());
+  
+  SILValue result = gen.B.createApply(loc, objcBoolToBoolFn,
+                                      resultTy, objcBool.forward(gen));
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                       ManagedValue v,
                                                       AbstractCC destCC,
@@ -1964,11 +1992,13 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
     return v;
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    // If the input is a String, convert it to an NSString.
-    if (v.getType().getSwiftType() == SGM.Types.getStringType()
-        && bridgedTy == SGM.Types.getNSStringType()) {
-      return emitBridgeStringToNSString(*this, loc, v);
+    // If the input is a native type with a bridged mapping, convert it.
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+    if (v.getType().getSwiftType() == SGM.Types.get##NativeType##Type() \
+        && bridgedTy == SGM.Types.get##BridgedType##Type()) {           \
+      return emitBridge##NativeType##To##BridgedType(*this, loc, v);    \
     }
+#include "swift/SIL/BridgedTypes.def"
     return v;
   }
 }
@@ -1985,11 +2015,13 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    // If the output is an NSString, convert it back to a String.
-    if (v.getType().getSwiftType() == SGM.Types.getNSStringType()
-        && nativeTy == SGM.Types.getStringType()) {
-      return emitBridgeNSStringToString(*this, loc, v);
+    // If the output is a bridged type, convert it back to a native type.
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType)  \
+    if (v.getType().getSwiftType() == SGM.Types.get##BridgedType##Type() \
+        && nativeTy == SGM.Types.get##NativeType##Type()) {              \
+      return emitBridge##BridgedType##To##NativeType(*this, loc, v);     \
     }
+#include "swift/SIL/BridgedTypes.def"
     return v;
   }
 }

@@ -194,8 +194,10 @@ class TypeConverter {
   Type makeConstantType(SILConstant constant);
   
   // Types converted during foreign bridging.
-  Optional<CanType> StringTy;
-  Optional<CanType> NSStringTy;
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+  Optional<CanType> BridgedType##Ty; \
+  Optional<CanType> NativeType##Ty;
+#include "swift/SIL/BridgedTypes.def"
   
 public:
   SILModule &M;
@@ -263,8 +265,10 @@ public:
   Type getLoweredBridgedType(Type t, AbstractCC cc);
   
   /// Known types for bridging.
-  CanType getStringType();
-  CanType getNSStringType();
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+  CanType get##BridgedType##Type(); \
+  CanType get##NativeType##Type();
+#include "swift/SIL/BridgedTypes.def"
 };
   
 } // namespace Lowering

@@ -49,6 +49,15 @@ namespace {
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
+    
+    /// True if we're converting a function parameter, property type, or
+    /// function result type, and can thus safely apply representation
+    /// conversions for bridged types.
+    bool canBridgeTypes() const {
+      return kind == ImportTypeKind::Parameter ||
+             kind == ImportTypeKind::Result ||
+             kind == ImportTypeKind::Property;
+    }
 
     Type VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
@@ -315,6 +324,12 @@ namespace {
     }
 
     Type VisitTypedefType(const clang::TypedefType *type) {
+      // When BOOL is the type of a function parameter or a function
+      // result type, map it to swift's Bool.
+      if (canBridgeTypes() && type->getDecl()->getName() == "BOOL") {
+        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "Bool");
+      }
+      
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
 
@@ -445,11 +460,9 @@ namespace {
       if (!imported)
         return nullptr;
 
-      // When NSString* is the type of a function parameter or as a function
+      // When NSString* is the type of a function parameter or a function
       // result type, map it to String.
-      if ((kind == ImportTypeKind::Parameter ||
-           kind == ImportTypeKind::Result ||
-           kind == ImportTypeKind::Property) &&
+      if (canBridgeTypes() &&
           !imported->getName().empty() &&
           imported->getName().str() == "NSString") {
         return Impl.getNamedSwiftType(Impl.getSwiftModule(), "String");

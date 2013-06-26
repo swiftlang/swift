@@ -166,6 +166,14 @@ static SILType getNSStringTy(SILGenModule &SGM) {
   return SGM.getLoweredType(SGM.Types.getNSStringType());
 }
 
+static SILType getBoolTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getBoolType());
+}
+
+static SILType getObjCBoolTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getObjCBoolType());
+}
+
 SILConstant SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
                        "Foundation", "convertNSStringToString",
@@ -178,6 +186,20 @@ SILConstant SILGenModule::getStringToNSStringFn() {
                        "Foundation", "convertStringToNSString",
                        {getByrefStringTy(*this)},
                        getNSStringTy(*this));
+}
+
+SILConstant SILGenModule::getBoolToObjCBoolFn() {
+  return getBridgingFn(BoolToObjCBoolFn, *this,
+                       "ObjectiveC", "convertBoolToObjCBool",
+                       {getBoolTy(*this)},
+                       getObjCBoolTy(*this));
+}
+
+SILConstant SILGenModule::getObjCBoolToBoolFn() {
+  return getBridgingFn(ObjCBoolToBoolFn, *this,
+                       "ObjectiveC", "convertObjCBoolToBool",
+                       {getObjCBoolTy(*this)},
+                       getBoolTy(*this));
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction() {
