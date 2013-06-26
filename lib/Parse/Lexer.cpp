@@ -488,6 +488,7 @@ void Lexer::lexIdentifier() {
     .Case("super", tok::kw_super)
     .Case("this", tok::kw_this)
     .Case("This", tok::kw_This)
+    .Case("_", tok::kw__)
 
     .Default(tok::identifier);
 

@@ -179,7 +179,7 @@ static bool parseSelectorFunctionArguments(Parser *parser,
   llvm::StringMap<VarDecl*> selectorNames;
 
   for (;;) {
-    if (parser->Tok.is(tok::identifier)) {
+    if (parser->Tok.is(tok::identifier) || parser->Tok.is(tok::kw__)) {
       if (parseSelectorArgument(parser, argElts, bodyElts, selectorNames, rp)) {
         return true;
       }
@@ -204,7 +204,7 @@ bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
   else {
     Pattern *firstPattern = pattern.get();
     
-    if (Tok.is(tok::identifier)) {
+    if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
       // This looks like a selector-style argument. Try to convert the first
       // argument pattern into a single argument type and parse subsequent
       // selector forms.
@@ -265,30 +265,30 @@ NullablePtr<Pattern> Parser::parsePattern() {
 
 /// \brief Determine whether this token can start a pattern.
 bool Parser::isStartOfPattern(Token tok) {
-  return tok.is(tok::identifier) || tok.is(tok::l_paren);
+  return tok.is(tok::kw__) || tok.is(tok::identifier) || tok.is(tok::l_paren);
 }
 
 /// Parse an identifier as a pattern.
 NullablePtr<Pattern> Parser::parsePatternIdentifier() {
   SourceLoc loc = Tok.getLoc();
+  if (consumeIf(tok::kw__)) {
+    return new (Context) AnyPattern(loc);
+  }
+  
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {
-    // '_' is a special case which means 'ignore this'.
-    if (text == "_") {
-      return new (Context) AnyPattern(loc);
-    } else {
-      Identifier ident = Context.getIdentifier(text);
-      VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
-      return new (Context) NamedPattern(var);
-    }
-  } else
-    return nullptr;
+    Identifier ident = Context.getIdentifier(text);
+    VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
+    return new (Context) NamedPattern(var);
+  }
+  return nullptr;
 }
 
 /// Parse a pattern "atom", meaning the part that precedes the
 /// optional type annotation.
 ///
 ///   pattern-atom ::= identifier
+///   pattern-atom ::= '_'
 ///   pattern-atom ::= pattern-tuple
 NullablePtr<Pattern> Parser::parsePatternAtom() {
   switch (Tok.getKind()) {
@@ -296,6 +296,7 @@ NullablePtr<Pattern> Parser::parsePatternAtom() {
     return parsePatternTuple(/*AllowInitExpr*/false);
 
   case tok::identifier:
+  case tok::kw__:
     return parsePatternIdentifier();
 
 #define IDENTIFIER_KEYWORD(kw) case tok::kw_##kw:

@@ -78,6 +78,9 @@ IDENTIFIER_KEYWORD(super)
 IDENTIFIER_KEYWORD(this)
 IDENTIFIER_KEYWORD(This)
 
+// Pattern keywords.
+KEYWORD(_)
+
 // Punctuators.
 PUNCTUATOR(l_paren,       "(")
 PUNCTUATOR(r_paren,       ")")
