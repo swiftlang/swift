@@ -588,7 +588,7 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
-  Scope ExtensionScope(this, /*AllowLookup=*/false);
+  Scope S(this, ScopeKind::Extension);
 
   SmallVector<Decl*, 8> MemberDecls;
 
@@ -772,7 +772,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                             ArrayRef<TuplePatternElt>(),
                                             SourceLoc()));
 
-      Scope FnBodyScope(this, /*AllowLookup=*/true);
+      Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
       Type GetterRetTy = ElementTy;
@@ -883,7 +883,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Params.push_back(ValueParamsPattern);
     }
 
-    Scope FnBodyScope(this, /*AllowLookup=*/true);
+    Scope S(this, ScopeKind::FunctionBody);
 
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
@@ -1149,7 +1149,7 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
-  GenericsScope.emplace(this, /*AllowLookup*/true);
+  GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
 
   // If the name is an operator token that ends in '<' and the following token
@@ -1195,7 +1195,7 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   // duplication.
   FuncExpr *FE = 0;
   {
-    Scope FnBodyScope(this, /*AllowLookup=*/true);
+    Scope S(this, ScopeKind::FunctionBody);
     
     FE = actOnFuncExprStart(FuncLoc, FuncRetTy, ArgParams, BodyParams);
 
@@ -1274,7 +1274,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
-    Scope GenericsScope(this, /*AllowLookup*/true);
+    Scope S(this, ScopeKind::Generics);
     GenericParams = maybeParseGenericParams();
   }
 
@@ -1311,7 +1311,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   {
     ContextChange CC(*this, OOD);
-    Scope OneofBodyScope(this, /*AllowLookup=*/false);
+    Scope S(this, ScopeKind::OneofBody);
 
     // Parse the comma separated list of oneof elements.
     while (Tok.is(tok::identifier)) {
@@ -1369,7 +1369,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the extended body of the oneof.
   {
     ContextChange CC(*this, OOD);
-    Scope OneofBodyScope(this, /*AllowLookup=*/false);
+    Scope S(this, ScopeKind::OneofBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                        diag::expected_rbrace_oneof_type,
                                        PD_HasContainerType|PD_DisallowVar);
@@ -1441,7 +1441,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
-    Scope GenericsScope(this, /*AllowLookup*/true);
+    Scope S(this, ScopeKind::Generics);
     GenericParams = maybeParseGenericParams();
   }
 
@@ -1477,7 +1477,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, SD);
-    Scope StructBodyScope(this, /*AllowLookup=*/false);
+    Scope S(this, ScopeKind::StructBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                        diag::expected_rbrace_struct,
                                        PD_HasContainerType);
@@ -1519,7 +1519,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
-    Scope GenericsScope(this, /*AllowLookup*/true);
+    Scope S(this, ScopeKind::Generics);
     GenericParams = maybeParseGenericParams();
   }
 
@@ -1552,7 +1552,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, CD);
-    Scope ClassBodyScope(this, /*AllowLookup=*/false);
+    Scope S(this, ScopeKind::ClassBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                        diag::expected_rbrace_class,
                                        PD_HasContainerType|PD_AllowDestructor);
@@ -1628,7 +1628,7 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
   if (Attributes.isValid()) Proto->getMutableAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);
-  Scope ProtocolBodyScope(this, /*AllowLookup=*/false);
+  Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
 
   {
     // Parse the body.
@@ -1841,7 +1841,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
   parseAttributeList(Attributes);
 
   // Parse the generic-params, if present.
-  Scope GenericsScope(this, /*AllowLookup*/true);
+  Scope S(this, ScopeKind::Generics);
   GenericParamList *GenericParams = maybeParseGenericParams();
 
   // pattern-tuple
@@ -1864,7 +1864,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
 
-  Scope ConstructorBodyScope(this, /*AllowLookup=*/true);
+  Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
       new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                     ConstructorLoc, Arguments.get(), ThisDecl,
@@ -1906,7 +1906,7 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
     = new (Context) VarDecl(SourceLoc(), Context.getIdentifier("this"),
                             Type(), CurDeclContext);
 
-  Scope DestructorBodyScope(this, /*AllowLookup=*/true);
+  Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD =
       new (Context) DestructorDecl(Context.getIdentifier("destructor"),
                                    DestructorLoc, ThisDecl, CurDeclContext);

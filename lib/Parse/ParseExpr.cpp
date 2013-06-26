@@ -1048,7 +1048,7 @@ Expr *Parser::parseExprClosure() {
                                                            explicitResultType,
                                                            CurDeclContext);
   // The arguments to the func are defined in their own scope.
-  Scope closureBodyScope(this, /*AllowLookup=*/true);
+  Scope S(this, ScopeKind::ClosureParams);
   ContextChange cc(*this, closure);
 
   // Handle parameters.

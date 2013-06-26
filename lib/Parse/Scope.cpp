@@ -24,16 +24,44 @@ using namespace swift;
 // Scope Implementation
 //===----------------------------------------------------------------------===//
 
-Scope::Scope(Parser *P, bool ResolvableScope)
-  : SI(P->ScopeInfo), ValueHTScope(SI.ValueScopeHT), PrevScope(SI.CurScope),
-    PrevResolvableDepth(SI.ResolvableDepth) {
+static bool isResolvableScope(ScopeKind SK) {
+  switch (SK) {
+  case ScopeKind::Extension:
+  case ScopeKind::OneofBody:
+  case ScopeKind::StructBody:
+  case ScopeKind::ClassBody:
+  case ScopeKind::ProtocolBody:
+  case ScopeKind::TopLevel:
+    return false;
+  case ScopeKind::FunctionBody:
+  case ScopeKind::Generics:
+  case ScopeKind::ConstructorBody:
+  case ScopeKind::DestructorBody:
+  case ScopeKind::Brace:
+  case ScopeKind::ForVars:
+  case ScopeKind::ForeachVars:
+  case ScopeKind::ClosureParams:
+    return true;
+  }
+}
+
+Scope::Scope(Parser *P, ScopeKind SC):
+    SI(P->ScopeInfo),
+    ValueHTScope(SI.ValueScopeHT),
+    PrevScope(SI.CurScope),
+    PrevResolvableDepth(SI.ResolvableDepth),
+    Kind(SC) {
   if (SI.CurScope)
     Depth = SI.CurScope->Depth+1;
   else
     Depth = 0;
   SI.CurScope = this;
-  if (!ResolvableScope)
+  if (!isResolvableScope(SC))
     SI.ResolvableDepth = Depth + 1;
+}
+
+bool Scope::isResolvable() const {
+  return isResolvableScope(Kind);
 }
 
 //===----------------------------------------------------------------------===//
@@ -54,6 +82,12 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
 /// addToScope - Register the specified decl as being in the current lexical
 /// scope.
 void ScopeInfo::addToScope(ValueDecl *D) {
+  if (!CurScope->isResolvable())
+    return;
+
+  assert(CurScope->getDepth() >= ResolvableDepth &&
+         "inserting names into a non-resolvable scope");
+
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
   ValueScopeHTTy::iterator EntryI = ValueScopeHT.begin(D->getName());

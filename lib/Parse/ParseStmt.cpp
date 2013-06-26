@@ -146,8 +146,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
 void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
                              bool IsTopLevel, BraceItemListKind Kind) {
   // This forms a lexical scope.
-  Scope BraceScope(this, !IsTopLevel);
-    
+  Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
+
   SmallVector<Decl*, 8> TmpDecls;
 
   bool previousHadSemi = true;
@@ -453,7 +453,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   NullablePtr<BraceStmt> Body;
   
   // Introduce a new scope to contain any var decls in the init value.
-  Scope ForScope(this, /*AllowLookup=*/true);
+  Scope S(this, ScopeKind::ForVars);
   
   if (Tok.is(tok::l_paren)) {
     LPLoc = consumeToken();
@@ -523,7 +523,7 @@ NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // scope.
   // FIXME: We may want to merge this scope with the scope introduced by
   // the stmt-brace, as in C++.
-  Scope ForEachScope(this, /*AllowLookup=*/true);
+  Scope S(this, ScopeKind::ForeachVars);
   if (Pattern.isNonNull()) {
     SmallVector<Decl *, 2> Decls;
     DeclAttributes Attributes;

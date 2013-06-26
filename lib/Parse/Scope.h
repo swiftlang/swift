@@ -23,12 +23,9 @@
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-  class SourceLoc;
   class ValueDecl;
-  class TypeAliasDecl;
   class Parser;
   class Scope;
-  class Type;
 
 /// ScopeInfo - A single instance of this class is maintained by the Parser to
 /// track the current scope.
@@ -62,6 +59,24 @@ public:
   void addToScope(ValueDecl *D);  
 };
 
+enum class ScopeKind {
+  Extension,
+  FunctionBody,
+  Generics,
+  OneofBody,
+  StructBody,
+  ClassBody,
+  ProtocolBody,
+  ConstructorBody,
+  DestructorBody,
+
+  Brace,
+  TopLevel,
+  ForVars,
+  ForeachVars,
+
+  ClosureParams,
+};
 
 /// Scope - This class represents lexical scopes.  These objects are created
 /// and destroyed as the parser is running, and name lookup happens relative
@@ -77,8 +92,9 @@ class Scope {
   Scope *PrevScope;
   unsigned PrevResolvableDepth;
   unsigned Depth;
+  ScopeKind Kind;
 public:
-  Scope(Parser *P, bool ResolvableScope);
+  Scope(Parser *P, ScopeKind SC);
   ~Scope() {
     assert(SI.CurScope == this && "Scope mismatch");
     SI.CurScope = PrevScope;
@@ -88,6 +104,8 @@ public:
   unsigned getDepth() const {
     return Depth;
   }
+
+  bool isResolvable() const;
 };
 
 } // end namespace swift
