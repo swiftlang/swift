@@ -664,10 +664,6 @@ void Parser::addVarsToScope(Pattern *Pat,
     return addVarsToScope(cast<TypedPattern>(Pat)->getSubPattern(), Decls,
                           Attributes);
 
-  case PatternKind::UnresolvedCall:
-    return addVarsToScope(cast<UnresolvedCallPattern>(Pat)->getSubPattern(),
-                          Decls, Attributes);
-
   case PatternKind::NominalType:
     return addVarsToScope(cast<NominalTypePattern>(Pat)->getSubPattern(),
                           Decls, Attributes);
@@ -1823,7 +1819,6 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
     return;
 
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("pattern can't appear as a constructor argument!");

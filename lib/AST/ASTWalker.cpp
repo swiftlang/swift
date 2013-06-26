@@ -648,14 +648,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
   
-  Pattern *visitUnresolvedCallPattern(UnresolvedCallPattern *P) {
-    if (Pattern *newSub = doIt(P->getSubPattern()))
-      P->setSubPattern(newSub);
-    else
-      return nullptr;
-    return P;
-  }
-  
   Pattern *visitNominalTypePattern(NominalTypePattern *P) {
     if (Pattern *newSub = doIt(P->getSubPattern()))
       P->setSubPattern(newSub);

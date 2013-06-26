@@ -76,10 +76,6 @@ namespace {
       OS << "is ";
       P->getCastTypeLoc().getType()->print(OS);
     }
-    void visitUnresolvedCallPattern(UnresolvedCallPattern *P) {
-      IdentifierType::printComponents(OS, P->getNameComponents());
-      P->getSubPattern()->print(OS);
-    }
     void visitNominalTypePattern(NominalTypePattern *P) {
       P->getCastTypeLoc().getType()->print(OS);
       P->getSubPattern()->print(OS);

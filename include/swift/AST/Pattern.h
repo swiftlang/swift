@@ -340,56 +340,7 @@ public:
   }
 };
 
-/// A pattern that syntactically resembles a function call. This will get
-/// resolved by Sema to a DestructureTypePattern or ExprPattern based on whether
-/// the callee resolves to a type, oneof element, or a non-type.
-class UnresolvedCallPattern : public Pattern {
-  IdentifierType::Component *getComponentsBuffer() {
-    return reinterpret_cast<IdentifierType::Component*>(this + 1);
-  }
-  IdentifierType::Component const *getComponentsBuffer() const {
-    return reinterpret_cast<IdentifierType::Component const *>(this + 1);
-  }
-
-  DeclContext *NameDC;
-  Pattern *SubPattern;
-  unsigned NumComponents;
   
-  UnresolvedCallPattern(DeclContext *DC,
-                        ArrayRef<IdentifierType::Component> components,
-                        Pattern *Sub);
-  
-public:
-  /// Allocate a new UnresolvedCallPattern referring to a named path of
-  /// dotted identifier components.
-  static UnresolvedCallPattern *create(
-                               ASTContext &C,
-                               DeclContext *DC,
-                               ArrayRef<IdentifierType::Component> components,
-                               Pattern *Sub);
-  
-  /// Get the DeclContext in which the name should be looked up.
-  DeclContext *getNameDeclContext() const { return NameDC; }
-  
-  ArrayRef<IdentifierType::Component> getNameComponents() const {
-    return {getComponentsBuffer(), NumComponents};
-  }
-  
-  const Pattern *getSubPattern() const { return SubPattern; }
-  Pattern *getSubPattern() { return SubPattern; }
-  void setSubPattern(Pattern *p) { SubPattern = p; }
-  
-  SourceLoc getLoc() const { return SubPattern->getLoc(); }
-  SourceRange getSourceRange() const {
-    return {getNameComponents()[0].Loc, SubPattern->getSourceRange().End};
-  }
-  
-  static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::UnresolvedCall;
-  }
-};
-
-
 /// A pattern that matches a nominal type and destructures elements out of it.
 /// The match succeeds if the matched value is dynamically of the specified
 /// type and the subpattern matches the the value cast to the match type.

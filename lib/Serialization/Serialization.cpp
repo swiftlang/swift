@@ -506,9 +506,6 @@ void Serializer::writePattern(const Pattern *pattern) {
                                  addTypeRef(isa->getCastTypeLoc().getType()));
     break;
   }
-  case PatternKind::UnresolvedCall:
-    llvm_unreachable("serializing unresolved ast");
-
   case PatternKind::NominalType: {
     auto nom = cast<NominalTypePattern>(pattern);
 

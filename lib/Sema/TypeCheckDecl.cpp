@@ -227,8 +227,6 @@ public:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
     case PatternKind::NominalType:
       return visitBoundVars(cast<NominalTypePattern>(P)->getSubPattern());
-    case PatternKind::UnresolvedCall:
-      return visitBoundVars(cast<UnresolvedCallPattern>(P)->getSubPattern());
 
     // Handle vars.
     case PatternKind::Named: {

@@ -1286,7 +1286,6 @@ namespace {
 
       //TODO
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
         llvm_unreachable("not implemented");

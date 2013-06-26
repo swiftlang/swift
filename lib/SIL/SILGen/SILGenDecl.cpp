@@ -351,7 +351,6 @@ struct InitializationForPattern
     llvm_unreachable("pattern not valid in argument or var binding"); \
   }
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
 #undef INVALID_PATTERN
@@ -509,13 +508,11 @@ struct ArgumentInitVisitor :
                             P->getDecl(), I);
   }
   
-#define INVALID_PATTERN(Id, Parent) \
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) \
   SILValue visit##Id##Pattern(Id##Pattern *, Initialization *) { \
     llvm_unreachable("pattern not valid in argument binding"); \
   }
-#define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
 
 };

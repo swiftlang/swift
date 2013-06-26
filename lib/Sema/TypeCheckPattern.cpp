@@ -105,7 +105,6 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   }
 
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("not implemented");
@@ -214,7 +213,6 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
       
   // TODO
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("not implemented");

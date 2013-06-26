@@ -1482,7 +1482,6 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
       AddFuncArgumentsToScope(field.getPattern(), CE, P);
     return;
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("pattern can't appear as a func argument!");

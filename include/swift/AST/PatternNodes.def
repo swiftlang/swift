@@ -21,13 +21,6 @@
 # error Included PatternNodes.def without defining PATTERN!
 #endif
 
-/// UNRESOLVED_PATTERN(Id, Parent)
-///   The pattern should be resolved by name lookup and not exist in a valid
-///   typechecked AST.
-#ifndef UNRESOLVED_PATTERN
-# define UNRESOLVED_PATTERN(Id, Parent) PATTERN(Id, Parent)
-#endif
-
 /// REFUTABLE_PATTERN(Id, Parent)
 ///   Matching this pattern can fail. These patterns cannot appear syntactically
 ///   in variable declarations, assignments, or function declarations.
@@ -41,10 +34,8 @@ PATTERN(Named, Pattern)
 PATTERN(Any, Pattern)
 PATTERN(Typed, Pattern)
 REFUTABLE_PATTERN(Isa, Pattern)
-UNRESOLVED_PATTERN(UnresolvedCall, Pattern)
 REFUTABLE_PATTERN(NominalType, Pattern)
 REFUTABLE_PATTERN(Expr, Pattern)
 
 #undef PATTERN
-#undef UNRESOLVED_PATTERN
 #undef REFUTABLE_PATTERN

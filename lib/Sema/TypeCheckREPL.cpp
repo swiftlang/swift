@@ -499,7 +499,6 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
     llvm_unreachable("pattern cannot appear in an LHS!"); \
   }
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
 #include "swift/AST/PatternNodes.def"
 };

@@ -231,14 +231,6 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
-  case PatternKind::UnresolvedCall: {
-    auto call = cast<UnresolvedCallPattern>(pattern);
-    IdentifierType::printComponents(OS,
-                                    call->getNameComponents());
-    OS << call->getSubPattern();
-    break;
-  }
-      
   case PatternKind::NominalType: {
     auto type = cast<NominalTypePattern>(pattern);
     OS << type->getCastTypeLoc().getType();

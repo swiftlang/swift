@@ -538,7 +538,6 @@ static Expr *createPatternMemberRefExpr(TypeChecker &tc, VarDecl *thisDecl,
              cast<TypedPattern>(pattern)->getSubPattern());
       
 #define PATTERN(Id, Parent)
-#define UNRESOLVED_PATTERN(Id, Parent) case PatternKind::Id:
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("pattern can't appear in constructor decl!");

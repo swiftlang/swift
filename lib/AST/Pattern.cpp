@@ -109,10 +109,6 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   case PatternKind::Isa:
     return;
   
-  case PatternKind::UnresolvedCall:
-    return cast<UnresolvedCallPattern>(this)->getSubPattern()
-             ->collectVariables(variables);
-  
   case PatternKind::NominalType:
     return cast<NominalTypePattern>(this)->getSubPattern()
              ->collectVariables(variables);
@@ -172,15 +168,6 @@ Pattern *Pattern::clone(ASTContext &context) const {
     result = new(context) IsaPattern(isa->getLoc(),
                                      isa->getCastTypeLoc(),
                                      isa->getCastKind());
-    break;
-  }
-      
-  case PatternKind::UnresolvedCall: {
-    auto call = cast<UnresolvedCallPattern>(this);
-    result = UnresolvedCallPattern::create(context,
-                                         call->getNameDeclContext(),
-                                         call->getNameComponents(),
-                                         call->getSubPattern()->clone(context));
     break;
   }
       
@@ -264,32 +251,4 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
 
 SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
-}
-
-UnresolvedCallPattern::UnresolvedCallPattern(
-                               DeclContext *DC,
-                               ArrayRef<IdentifierType::Component> components,
-                               Pattern *Sub)
-  : Pattern(PatternKind::UnresolvedCall),
-    SubPattern(Sub),
-    NumComponents(components.size())
-{
-  MutableArrayRef<IdentifierType::Component> buf{getComponentsBuffer(),
-                                                 NumComponents};
-  for (size_t i = 0, size = NumComponents; i < size; ++i) {
-    new (&buf[i]) IdentifierType::Component(components[i]);
-  }
-}
-
-/// Allocate a new UnresolvedCallPattern referring to a named path of
-/// dotted identifier components.
-UnresolvedCallPattern *
-UnresolvedCallPattern::create(ASTContext &C,
-                              DeclContext *DC,
-                              ArrayRef<IdentifierType::Component> components,
-                              Pattern *Sub) {
-  void *buf = UnresolvedCallPattern::operator new(
-    sizeof(UnresolvedCallPattern)
-      + components.size() * sizeof(IdentifierType::Component), C);
-  return ::new (buf) UnresolvedCallPattern(DC, components, Sub);
 }
