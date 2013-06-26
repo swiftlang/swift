@@ -2792,12 +2792,17 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="grammar">
     stmt ::= <a href="#stmt-semicolon">stmt-semicolon</a>
-    stmt ::= <a href="#stmt-return">stmt-return</a>
     stmt ::= <a href="#stmt-if">stmt-if</a>
     stmt ::= <a href="#stmt-while">stmt-while</a>
     stmt ::= <a href="#stmt-for-c-style">stmt-for-c-style</a>
     stmt ::= <a href="#stmt-for-each">stmt-for-each</a>
     stmt ::= <a href="#stmt-for-each">stmt-switch</a>
+    stmt ::= <a href="#stmt-fallthrough">stmt-fallthrough</a>
+    stmt ::= stmt-control-transfer
+    
+    stmt-control-transfer ::= <a href="#stmt-return">stmt-return</a>
+    stmt-control-transfer ::= <a href="#stmt-break">stmt-break</a>
+    stmt-control-transfer ::= <a href="#stmt-continue">stmt-continue</a>
   </pre>
 
   <p>Statements provide the control flow constructs of function bodies and
@@ -2850,7 +2855,30 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
      {"return" "4"} or as a single statement.  Ambiguity here is resolved toward
      the first production, because control flow can't transfer to an
      subexpression.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="stmt-break">'break' Statement</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    stmt-return ::= 'break'
+  </pre>
+
+  <p>The 'break' statement transfers control out of the enclosing 'for' loop,
+  'while' loop, or 'switch' statement.</p>
+
+  <!-- ===================================================================== -->
+  <h3 id="stmt-continue">'continue' Statement</h3>
+  <!-- ===================================================================== -->
   
+  <pre class="grammar">
+    stmt-return ::= 'continue'
+  </pre>
+  
+  <p>The 'continue' statement transfers control back to the start of the
+  enclosing 'for' loop or 'while' loop.</p>
+    
+
   <!-- ===================================================================== -->
   <h3 id="stmt-if">'if' Statement</h3>
   <!-- ===================================================================== -->
@@ -3053,6 +3081,16 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   and control does not implicitly 'fall through' from one case block to the next.
   'break' and 'continue' within a 'switch' will break or continue out of an enclosing
   'while' or 'for' loop, not out of the 'switch' itself.
+
+  <!-- ===================================================================== -->
+  <h3 id="stmt-fallthrough">'fallthrough' Statement</h3>
+  <!-- ===================================================================== -->
+
+  <pre class="grammar">
+    stmt-fallthrough ::= 'fallthrough'
+  </pre>
+
+  <p>write me.</p>
 
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>

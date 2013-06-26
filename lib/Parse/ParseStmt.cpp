@@ -28,9 +28,6 @@ using namespace swift;
 /// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
 /// a statement (other than assignment, which starts looking like an expr).
 ///
-/// Note this also returns true for '{' which can be the start of a stmt-brace
-/// or the start of an expr-closure.  This ambiguity is resolved towards
-/// statements when not in a subexpression context.
 bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
@@ -134,11 +131,15 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
 ///   stmt:
 ///     ';'
 ///     stmt-assign
-///     stmt-return
 ///     stmt-if
 ///     stmt-for-c-style
 ///     stmt-for-each
 ///     stmt-switch
+///     stmt-control-transfer
+///  stmt-control-transfer:
+///     stmt-return
+///     stmt-break
+///     stmt-continue
 ///   stmt-assign:
 ///     expr '=' expr
 void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
