@@ -140,6 +140,7 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
 ///     stmt-return
 ///     stmt-break
 ///     stmt-continue
+///     stmt-fallthrough
 ///   stmt-assign:
 ///     expr '=' expr
 void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
