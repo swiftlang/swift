@@ -83,6 +83,8 @@ enum class ScopeKind {
 /// to them.
 ///
 class Scope {
+  friend class ScopeInfo;
+
   Scope(const Scope&) = delete;
   void operator=(const Scope&) = delete;
   ScopeInfo &SI;
@@ -93,6 +95,13 @@ class Scope {
   unsigned PrevResolvableDepth;
   unsigned Depth;
   ScopeKind Kind;
+
+  unsigned getDepth() const {
+    return Depth;
+  }
+
+  bool isResolvable() const;
+
 public:
   Scope(Parser *P, ScopeKind SC);
   ~Scope() {
@@ -100,12 +109,6 @@ public:
     SI.CurScope = PrevScope;
     SI.ResolvableDepth = PrevResolvableDepth;
   }
-
-  unsigned getDepth() const {
-    return Depth;
-  }
-
-  bool isResolvable() const;
 };
 
 } // end namespace swift
