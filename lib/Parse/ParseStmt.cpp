@@ -405,11 +405,11 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // on.
 
   if (Tok.is(tok::l_paren)) {
-    auto SavedState = getParserPosition();
+    auto SavedPosition = getParserPosition();
     consumeToken(tok::l_paren);
     skipUntil(tok::r_paren);
     bool IsCStyle = peekToken().is(tok::l_brace);
-    backtrackToState(SavedState);
+    backtrackToPosition(SavedPosition);
     if (IsCStyle)
       return parseStmtForCStyle(ForLoc);
     return parseStmtForEach(ForLoc);

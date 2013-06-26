@@ -143,7 +143,7 @@ public:
     consumeToken();
   }
 
-  void backtrackToState(ParserPosition PP) {
+  void backtrackToPosition(ParserPosition PP) {
     L->backtrackToState(PP.LS);
     PreviousLoc = PP.PreviousLoc;
     consumeToken();
@@ -160,7 +160,7 @@ public:
     BacktrackingScope(Parser &P) : P(P), PP(P.getParserPosition()) {}
 
     ~BacktrackingScope() {
-      P.backtrackToState(PP);
+      P.backtrackToPosition(PP);
     }
   };
 
