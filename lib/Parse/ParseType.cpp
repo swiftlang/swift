@@ -356,7 +356,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
     // If the tuple element starts with "ident :" or "ident =", then
     // the identifier is an element tag, and it is followed by a
     // value-specifier.
-    if ((Tok.is(tok::identifier) || Tok.is(tok::kw__)) &&
+    if (isStartOfBindingName(Tok) &&
         (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
       Identifier name = Context.getIdentifier(Tok.getText());
       consumeToken();

@@ -429,6 +429,10 @@ public:
 
   /// \brief Determine whether this token can start a pattern.
   bool isStartOfPattern(Token tok);
+  
+  /// \brief Determine whether this token can start a binding name, whether an
+  /// identifier or the special discard-value binding '_'.
+  bool isStartOfBindingName(Token tok);
 
   /// Parse a tuple pattern element.
   ///

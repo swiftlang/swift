@@ -417,7 +417,7 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
 
   // If we have a leading identifier followed by a ':' or 'in', then this is a
   // pattern, so it is foreach.
-  if (Tok.is(tok::identifier) &&
+  if (isStartOfBindingName(Tok) &&
       (peekToken().is(tok::colon) || peekToken().isContextualKeyword("in")))
     return parseStmtForEach(ForLoc);
 

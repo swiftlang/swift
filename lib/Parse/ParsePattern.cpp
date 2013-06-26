@@ -179,7 +179,7 @@ static bool parseSelectorFunctionArguments(Parser *parser,
   llvm::StringMap<VarDecl*> selectorNames;
 
   for (;;) {
-    if (parser->Tok.is(tok::identifier) || parser->Tok.is(tok::kw__)) {
+    if (parser->isStartOfBindingName(parser->Tok)) {
       if (parseSelectorArgument(parser, argElts, bodyElts, selectorNames, rp)) {
         return true;
       }
@@ -204,7 +204,7 @@ bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
   else {
     Pattern *firstPattern = pattern.get();
     
-    if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
+    if (isStartOfBindingName(Tok)) {
       // This looks like a selector-style argument. Try to convert the first
       // argument pattern into a single argument type and parse subsequent
       // selector forms.
@@ -266,6 +266,12 @@ NullablePtr<Pattern> Parser::parsePattern() {
 /// \brief Determine whether this token can start a pattern.
 bool Parser::isStartOfPattern(Token tok) {
   return tok.is(tok::kw__) || tok.is(tok::identifier) || tok.is(tok::l_paren);
+}
+
+/// \brief Determine whether this token can start a binding name, whether an
+/// identifier or the special discard-value binding '_'.
+bool Parser::isStartOfBindingName(Token tok) {
+  return tok.is(tok::kw__) || tok.is(tok::identifier);
 }
 
 /// Parse an identifier as a pattern.
