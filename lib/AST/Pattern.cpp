@@ -115,6 +115,9 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   
   case PatternKind::Expr:
     return;
+      
+  case PatternKind::Var:
+    return cast<VarPattern>(this)->getSubPattern()->collectVariables(variables);
   }
 }
 
@@ -182,8 +185,15 @@ Pattern *Pattern::clone(ASTContext &context) const {
   case PatternKind::Expr: {
     auto expr = cast<ExprPattern>(this);
     result = new(context) ExprPattern(expr->getSubExpr(),
+                                      expr->isResolved(),
                                       expr->getMatchFnExpr());
     break;
+  }
+      
+  case PatternKind::Var: {
+    auto var = cast<VarPattern>(this);
+    result = new(context) VarPattern(var->getLoc(),
+                                     var->getSubPattern()->clone(context));
   }
   }
 

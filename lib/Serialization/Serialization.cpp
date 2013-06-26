@@ -510,13 +510,22 @@ void Serializer::writePattern(const Pattern *pattern) {
     auto nom = cast<NominalTypePattern>(pattern);
 
     unsigned abbrCode = DeclTypeAbbrCodes[NominalTypePatternLayout::Code];
-    IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    NominalTypePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addTypeRef(nom->getCastTypeLoc().getType()));
     writePattern(nom->getSubPattern());
     break;
   }
   case PatternKind::Expr:
     llvm_unreachable("FIXME: not implemented");
+
+  case PatternKind::Var: {
+    auto var = cast<VarPattern>(pattern);
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
+    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    writePattern(var->getSubPattern());
+    break;
+  }
   }
 }
 

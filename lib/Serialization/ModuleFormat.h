@@ -206,6 +206,7 @@ namespace decls_block {
     TYPED_PATTERN,
     ISA_PATTERN,
     NOMINAL_TYPE_PATTERN,
+    VAR_PATTERN,
 
     XREF = 254,
     DECL_CONTEXT = 255
@@ -371,6 +372,11 @@ namespace decls_block {
   using NominalTypePatternLayout = BCRecordLayout<
     NOMINAL_TYPE_PATTERN,
     TypeIDField
+    // The sub-pattern trails the record.
+  >;
+
+  using VarPatternLayout = BCRecordLayout<
+    VAR_PATTERN
     // The sub-pattern trails the record.
   >;
 

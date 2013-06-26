@@ -664,6 +664,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
   
+  Pattern *visitVarPattern(VarPattern *P) {
+    if (Pattern *newSub = doIt(P->getSubPattern()))
+      P->setSubPattern(newSub);
+    else
+      return nullptr;
+    return P;
+  }
+  
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 

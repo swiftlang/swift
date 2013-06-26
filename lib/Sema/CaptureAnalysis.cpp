@@ -56,9 +56,12 @@ static void WalkPattern(Pattern *P) {
   case PatternKind::NominalType:
     return WalkPattern(cast<NominalTypePattern>(P)->getSubPattern());
 
+  case PatternKind::Var:
+    return WalkPattern(cast<VarPattern>(P)->getSubPattern());
+
   case PatternKind::Any:
   case PatternKind::Isa:
-    case PatternKind::Expr:
+  case PatternKind::Expr:
     break;
   }
 }

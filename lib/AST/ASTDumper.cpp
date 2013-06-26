@@ -56,8 +56,6 @@ namespace {
       OS << ')';
     }
     void visitNamedPattern(NamedPattern *P) {
-      if (P->getIntroducerLoc().isValid())
-        OS << "?";
       OS << P->getBoundName().str();
     }
     void visitAnyPattern(AnyPattern *P) {
@@ -82,6 +80,10 @@ namespace {
     }
     void visitExprPattern(ExprPattern *P) {
       P->getSubExpr()->print(OS);
+    }
+    void visitVarPattern(VarPattern *P) {
+      OS << "var ";
+      P->getSubPattern()->print(OS);
     }
   };
 

@@ -667,6 +667,10 @@ void Parser::addVarsToScope(Pattern *Pat,
   case PatternKind::NominalType:
     return addVarsToScope(cast<NominalTypePattern>(Pat)->getSubPattern(),
                           Decls, Attributes);
+
+  case PatternKind::Var:
+    return addVarsToScope(cast<VarPattern>(Pat)->getSubPattern(),
+                          Decls, Attributes);
       
   // Handle vars.
   case PatternKind::Named: {

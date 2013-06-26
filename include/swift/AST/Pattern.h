@@ -224,7 +224,6 @@ public:
 
 /// A pattern which binds a name to an arbitrary value of its type.
 class NamedPattern : public Pattern {
-  SourceLoc IntroducerLoc;
   VarDecl *const Var;
 
 public:
@@ -233,17 +232,8 @@ public:
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }
 
-  /// Return the location of the introducer token for a named pattern in a
-  /// matching pattern. Returns an invalid SourceLoc for named patterns in
-  /// 'var' or 'func' decls, where an introducer is unnecessary.
-  SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
-  
   SourceLoc getLoc() const { return Var->getLoc(); }
-  SourceRange getSourceRange() const {
-    return IntroducerLoc.isValid()
-      ? SourceRange{IntroducerLoc, getLoc()}
-      : getLoc();
-  }
+  SourceRange getSourceRange() const { return getLoc(); }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Named;
@@ -376,31 +366,65 @@ public:
 };
   
 /// A pattern which matches a value obtained by evaluating an expression.
-/// The match will be tested using the '=~' operator; it succeeds if
-/// 'matchedValue =~ patternValue' produces a true value.
+/// The match will be tested using user-defined '~=' operator function lookup;
+/// the match succeeds if 'patternValue ~= matchedValue' produces a true value.
 class ExprPattern : public Pattern {
-  Expr *SubExpr;
+  llvm::PointerIntPair<Expr *, 1, bool> SubExprAndIsResolved;
   
   /// An expression constructed during type-checking that produces a reference
-  /// to the '=~' operator resolved for the match.
+  /// to the '~=' operator resolved for the match.
   Expr *MatchFnExpr;
   
 public:
-  ExprPattern(Expr *e, Expr *match = nullptr)
-    : Pattern(PatternKind::Expr), SubExpr(e), MatchFnExpr(match)
+  ExprPattern(Expr *e, bool isResolved, Expr *match)
+    : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
+      MatchFnExpr(match)
   {}
   
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *e) { SubExpr = e; }
+  Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
+  void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
   
   Expr *getMatchFnExpr() const { return MatchFnExpr; }
-  void setMatchFnExpr(Expr *e) { MatchFnExpr = e; }
+  void setMatchFnExpr(Expr *e) {
+    assert(isResolved() && "cannot set match fn for unresolved expr patter");
+    MatchFnExpr = e;
+  }
   
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
+  SourceRange getSourceRange() const { return getSubExpr()->getSourceRange(); }
+  
+  /// True if pattern resolution has been applied to the subexpression.
+  bool isResolved() const { return SubExprAndIsResolved.getInt(); }
+  void setResolved(bool isResolved) { SubExprAndIsResolved.setInt(isResolved); }
   
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Expr;
+  }
+};
+  
+/// A pattern which introduces variable bindings. This pattern node has no
+/// semantics of its own, but has a syntactic effect on the subpattern. Bare
+/// identifiers in the subpattern create new variable bindings instead of being
+/// parsed as expressions referencing existing entities.
+class VarPattern : public Pattern {
+  SourceLoc VarLoc;
+  Pattern *SubPattern;
+public:
+  VarPattern(SourceLoc loc, Pattern *sub)
+    : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub)
+  {}
+  
+  SourceLoc getLoc() const { return VarLoc; }
+  SourceRange getSourceRange() const {
+    return {VarLoc, SubPattern->getSourceRange().End};
+  }
+  
+  const Pattern *getSubPattern() const { return SubPattern; }
+  Pattern *getSubPattern() { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Var;
   }
 };
   
