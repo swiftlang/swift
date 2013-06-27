@@ -346,10 +346,13 @@ void IRGenSILFunction::emitSILFunction() {
   }
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
-  
+
+  // Set up a (debug-info-)lexical scope for the function body.
+  //DebugScope(B, CurSilFn
   // Emit the function body.
   for (SILBasicBlock &bb : *CurSILFn)
     visitSILBasicBlock(&bb);
+  //Builder.leaveDebugScope();
 }
 
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
@@ -364,7 +367,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {
     // Set the debug info location for I, if applicable.
     if (IGM.DebugInfo)
-      IGM.DebugInfo->SetCurrentLoc(Builder, I.getLoc(), I.getDebugScope());
+      IGM.DebugInfo->setCurrentLoc(Builder, I.getLoc(), I.getDebugScope());
+
     visit(&I);
   }
   
@@ -377,8 +381,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ExplosionKind level) {
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  if (llvm::Function *fn = Module.getFunction(f->getMangledName()))
-    return fn;
+  llvm::Function *fn = Module.getFunction(f->getMangledName());
+  if (fn) return fn;
     
   LinkEntity entity = LinkEntity::forSILFunction(f, level);
   
@@ -390,7 +394,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   
   auto cc = expandAbstractCC(*this, f->getAbstractCC());
   LinkInfo link = LinkInfo::get(*this, entity);
-  return link.createFunction(*this, fnType, cc, attrs);
+
+  fn = link.createFunction(*this, fnType, cc, attrs);
+  if (DebugInfo)
+    DebugInfo->createFunction(f->getDebugScope(), fn);
+
+  return fn;
 }
 
 void IRGenSILFunction::visitBuiltinFunctionRefInst(

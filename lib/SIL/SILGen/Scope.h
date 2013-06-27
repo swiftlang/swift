@@ -88,9 +88,7 @@ public:
   ~LexicalScope() {
     Builder.leaveDebugScope();
   }
-
 };
-
 
 
 } // end namespace Lowering

@@ -51,13 +51,21 @@ class IRGenDebugInfo {
   /// The current working directory.
   StringRef CWDName;
   llvm::BumpPtrAllocator DebugInfoNames;
-
+  llvm::DICompileUnit TheCU;
+  const Options& Opts;
 public:
-  IRGenDebugInfo(const Options& opts,
+  IRGenDebugInfo(const Options& Opts,
                  llvm::SourceMgr &SM, llvm::Module &M);
-  /// SetCurrentLoc - Update the IRBuilder's current debug location to
-  /// the location Loc and the lexical scope DS.
-  void SetCurrentLoc(IRBuilder& Builder, SILLocation Loc, SILDebugScope *DS);
+
+  /// Finalize the DIBuilder.
+  void Finalize();
+
+  /// Update the IRBuilder's current debug location to the location
+  /// Loc and the lexical scope DS.
+  void setCurrentLoc(IRBuilder& Builder, SILLocation Loc, SILDebugScope *DS);
+
+  /// Create debug info for the given funtion.
+  void createFunction(SILDebugScope *DS, llvm::Function *Fn);
 
 private:
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);

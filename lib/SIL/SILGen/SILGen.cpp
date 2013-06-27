@@ -16,6 +16,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
@@ -68,6 +69,9 @@ SILGenModule::SILGenModule(SILModule &M)
   : M(M), Types(M.Types), TopLevelSGF(nullptr) {
   
   SILFunction *toplevel = emitTopLevelFunction();
+  // Assign a debug scope pointing into the void to the top level function.
+  toplevel->setDebugScope(new (M) SILDebugScope());
+
   TopLevelSGF = new SILGenFunction(*this, *toplevel,
                                    /*hasVoidReturn=*/true);
 }
@@ -263,9 +267,11 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
 template<typename T>
 SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
   SILFunction *f = getFunction(constant);
-  
   assert(f->empty() && "already emitted function?!");
-  
+
+  // Create a debug scope for the function using astNode as source location.
+  f->setDebugScope(new (M) SILDebugScope(astNode));
+
   DEBUG(llvm::dbgs() << "lowering ";
         f->printName(llvm::dbgs());
         llvm::dbgs() << " : $";
@@ -275,7 +281,7 @@ SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
           astNode->print(llvm::dbgs());
           llvm::dbgs() << '\n';
         });
-  
+
   return f;
 }
 

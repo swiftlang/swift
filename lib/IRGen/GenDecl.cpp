@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/IRGen/Options.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
@@ -36,6 +37,7 @@
 #include "GenClass.h"
 #include "GenObjC.h"
 #include "GenMeta.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
@@ -247,7 +249,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     // Create a global initializer for library modules.
     // FIXME: This is completely, utterly, wrong.
     initFn = llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
-                                tunit->Name.str() + ".init", &Module);
+                                    tunit->Name.str() + ".init", &Module);
     initFn->setAttributes(attrs);
     
     // Insert a call to the top_level_code symbol from the SIL module.
@@ -305,8 +307,13 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
       llvm::Function::Create(
         llvm::FunctionType::get(Int32Ty, argcArgvTypes, false),
           llvm::GlobalValue::ExternalLinkage, "main", &Module);
-    
+
     IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
+    if (DebugInfo) {
+      SILDebugScope *mainScope = new (*SILMod) SILDebugScope();
+      DebugInfo->createFunction(mainScope, mainFn);
+      DebugInfo->setCurrentLoc(mainIGF.Builder, (Expr*)nullptr, mainScope);
+    }
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();
@@ -384,6 +391,10 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   Module.addModuleFlag(llvm::Module::Override,
                        "Objective-C Garbage Collection", (uint32_t)0);
   // FIXME: Simulator flag.
+
+  // Fix up the DICompileUnit.
+  if (DebugInfo)
+    DebugInfo->Finalize();
 }
 
 /// Add the given global value to @llvm.used.

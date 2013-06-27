@@ -19,8 +19,6 @@
 
 namespace swift {
 
-class SILDebugScope;
-
 class SILBuilder {
   /// BB - If this is non-null, the instruction is inserted in the specified
   /// basic block, at the specified InsertPt.  If null, created instructions
@@ -116,6 +114,8 @@ public:
   void enterDebugScope(SILDebugScope *DS) {
     if (DebugScopeStack.size())
       DS->setParent(DebugScopeStack.back());
+    else
+      DS->setParent(F.getDebugScope());
     DebugScopeStack.push_back(DS);
   }
 

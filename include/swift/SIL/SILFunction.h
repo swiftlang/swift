@@ -60,6 +60,9 @@ private:
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;
+
+  /// The source location and scope of the function.
+  SILDebugScope *DebugScope;
 public:
 
   SILFunction(SILModule &Module, SILLinkage Linkage,
@@ -90,6 +93,12 @@ public:
   
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
+
+  /// Initialize the source location of the function.
+  void setDebugScope(SILDebugScope *DS) { DebugScope = DS; }
+
+  /// Get the source location of the function.
+  SILDebugScope *getDebugScope() const { return DebugScope; }
   
   //===--------------------------------------------------------------------===//
   // Block List Access

@@ -44,7 +44,7 @@ StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                                llvm::Module &M)
-  : SM(SM), DBuilder(M) {
+  : Opts(Opts), SM(SM), DBuilder(M) {
   assert(Opts.DebugInfo);
   std::string MainFileName = Opts.MainInputFilename;
   if (MainFileName.empty())
@@ -75,7 +75,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
   DBuilder.createCompileUnit(Lang, Filename, Dir, Producer,
                              IsOptimized, Flags, RuntimeVersion,
                              SplitName);
-
+  TheCU = llvm::DICompileUnit(DBuilder.getCU());
 }
 
 
@@ -88,6 +88,7 @@ typedef struct {
 template<typename WithLoc>
 Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
   Location L = {};
+  if (S == nullptr) return L;
 
   SourceLoc Start = S->getStartLoc();
   int BufferIndex = SM.FindBufferContainingLoc(Start.Value);
@@ -114,7 +115,7 @@ static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
   return None;
 }
 
-void IRGenDebugInfo::SetCurrentLoc(IRBuilder& Builder, SILLocation Loc,
+void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder, SILLocation Loc,
                                    SILDebugScope *DS) {
   Location L = getStartLoc(SM, Loc);
   // No location: we should stick with the previous location.
@@ -143,7 +144,8 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   Location L = getStartLoc(SM, DS->Loc);
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
-  if (Parent == 0) Parent = File;
+  if (Parent == 0)
+    Parent = File;
 
   llvm::DILexicalBlock DScope =
     DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
@@ -168,6 +170,9 @@ StringRef IRGenDebugInfo::getCurrentDirname() {
 
 /// getOrCreateFile - Translate filenames into DIFiles.
 llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
+  if (!Filename)
+    return llvm::DIFile();
+
   // Look in the cache first.
   llvm::DenseMap<const char *, llvm::WeakVH>::iterator it =
     DIFileCache.find(Filename);
@@ -185,6 +190,8 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
   // Basically ignore any error.
   assert(ec == llvm::errc::success);
+  // remove any trailing path separator
+  llvm::sys::path::remove_filename(Path);
   llvm::DIFile F = DBuilder.createFile(File, Path);
 
   // Cache it.
@@ -192,6 +199,59 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   return F;
 }
 
+/// Attempt to figure out the unmangled name of a function.
+static StringRef getName(SILLocation L) {
+  if (Expr* E = L.dyn_cast<Expr*>())
+    if (FuncExpr* FE = dyn_cast<FuncExpr>(E))
+      if (FuncDecl* FD = FE->getDecl())
+        return FD->getName().str();
+
+  if (Decl* D = L.dyn_cast<Decl*>())
+    if (FuncDecl* FD = dyn_cast<FuncDecl>(D))
+      return FD->getName().str();
+
+  return StringRef();
+}
+
+void IRGenDebugInfo::createFunction(SILDebugScope* DS,
+                                    llvm::Function *Fn) {
+  StringRef Name;
+  Location L = {};
+  if (DS) {
+    L = getStartLoc(SM, DS->Loc);
+    Name = getName(DS->Loc);
+  }
+  StringRef LinkageName = Fn->getName();
+  llvm::DIFile File = getOrCreateFile(L.Filename);
+  llvm::DIDescriptor Scope = TheCU;
+  unsigned Line = L.Line;
+
+  // We don't support debug info for types.
+  llvm::DIArray ParameterTypes;
+  llvm::DICompositeType FnType =
+    DBuilder.createSubroutineType(File, ParameterTypes);
+  llvm::DIArray TParams;
+  llvm::DISubprogram Decl;
+
+  // Various flags
+  bool isLocalToUnit = false;
+  bool isDefinition = true;
+  unsigned Flags = 0;
+  if (Name.empty())
+    Flags |= llvm::DIDescriptor::FlagArtificial;
+  bool isOptimized = Opts.OptLevel > 0;
+
+  llvm::DISubprogram SP =
+    DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
+                            FnType, isLocalToUnit, isDefinition,
+                            /*ScopeLine =*/Line,
+                            Flags, isOptimized, Fn, TParams, Decl);
+  ScopeMap[DS] = SP;
+}
+
+void IRGenDebugInfo::Finalize() {
+  DBuilder.finalize();
+}
 
 } // irgen
 } // swift
