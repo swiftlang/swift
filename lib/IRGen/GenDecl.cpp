@@ -312,7 +312,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     if (DebugInfo) {
       SILDebugScope *mainScope = new (*SILMod) SILDebugScope();
       DebugInfo->createFunction(mainScope, mainFn);
-      DebugInfo->setCurrentLoc(mainIGF.Builder, (Expr*)nullptr, mainScope);
+      DebugInfo->setCurrentLoc(mainIGF.Builder, SILLocation(), mainScope);
     }
 
     // Poke argc and argv into variables declared in the Swift stdlib
