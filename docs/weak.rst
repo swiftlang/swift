@@ -757,9 +757,8 @@ the capture semantics within the closure, so someone reading the
 closure should be able to find them easily.  Another reason is that
 they can involve executing interesting code in the enclosing context
 and so should reliably appear near the closure formation site in the
-source code.
+source code::
 
-::
   decl                   ::= decl-capture
   decl-capture           ::= 'capture' attribute-list '=' expr-var-or-member
   decl-capture           ::= 'capture' attribute-list decl-capture-expr-list
@@ -799,18 +798,16 @@ Attributes on a :code:`capture` declaration affect all the fields it
 declares.
 
 Let's spell out some examples.  I expect the dominant form to be a
-simple identifier:
+simple identifier::
 
-::
   capture [backref] foo
 
 This captures the current value of whatever :code:`foo` resolves to
 (potentially a member of :code:`this`!) and binds it within the
 closure as a back-reference.
 
-Permitting the slightly more general form:
+Permitting the slightly more general form::
 
-::
   capture window.title
 
 allows users to conveniently capture specific values without mucking
@@ -845,9 +842,8 @@ There are many situations where adding a new declaration to the start
 of a closure would add a lot of syntactic overhead, so we need a way
 to easily declare that a value should be captured as a back-reference.
 
-I propose this fairly obvious syntax:
+I propose this fairly obvious syntax::
 
-::
     button1.setAction { backref(this).tapOut() }
 
 The operand here must be an :code:`expr-var-or-member`: since it gets
@@ -871,18 +867,16 @@ choose between working with the property's instantaneous value (at the
 time the closure is created) or its current value (at the time the
 closure is invoked).
 
-Therefore I also suggest a closely-related form of decoration:
+Therefore I also suggest a closely-related form of decoration::
 
-::
     button2.setAction { capture(this.model).addProfitStep() }
 
 This syntax would force :code:`capture` to become a real keyword.
 
 Either kind of decoration is equivalent to adding a capture declaration
 with a nonce identifier to the top of the closure, with or without
-the :code:`[backref]` attribute respectively:
+the :code:`[backref]` attribute respectively::
 
-::
     button1.setAction {
       capture [backref] _V1 = this
       _V1.tapOut()
@@ -906,9 +900,8 @@ understand how the variable is captured).
 The compiler should guarantee to merge captures with identical forms:
 the same properties applied to the same variable.  That is, we should
 guarantee that we'll only evaluate the :code:`state` property in this
-example once:
+example once::
 
-::
     resetButton.setAction {
       log("resetting state to " + capture(this.state))
       capture(this.model).setState(capture(this.state))
@@ -955,9 +948,8 @@ captures.
 
 The motivation for this prohibition is that the intent of such
 captures is actually quite ambiguous and/or dangerous.  Consider
-the following code:
+the following code::
 
-::
    async { doSomething(); GUI.sync { backref(view).fireCompleted() } }
 
 The intent of this code is to have captured a back-reference to the
