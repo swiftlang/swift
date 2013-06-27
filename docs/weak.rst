@@ -493,9 +493,8 @@ the type checker would need to introduce implicit conversions in the
 right places.
 
 These implicit conversions require some thought.  Consider code like
-the following:
+the following::
 
-::
   func moveToWindow(newWindow : Window) {
     var oldWindow = this.window   // a back reference
     oldWindow.hide()              // might remove the UI's strong reference
@@ -514,9 +513,8 @@ generics is substitutability: the semantics of generic code should
 match the semantics of the code you'd get from copy-pasting the
 generic code and substituting the arguments wherever they're written.
 But if a generic argument can be :code:`[backref] T`, then this
-won't be true; consider:
+won't be true; consider::
 
-::
   func foo<T>(x : T) {
     var y = x
     ...
@@ -623,9 +621,8 @@ executing code re-entrantly during the finalization process.
 I suggest adopting an interface centered around the Java
 concept of a :code:`ReferenceQueue`.  A reference structure
 is registered with the runtime for a particular object with
-a particular set of flags and an optional reference queue:
+a particular set of flags and an optional reference queue::
 
-::
   struct Reference {
     void *Referent; // must be non-null upon registration
     struct ReferenceQueue *Queue; // must be valid or null
@@ -663,26 +660,23 @@ reference will not race with each other.  However, user operations on
 different references to the same referent may be concurrent, either
 with each other or with other refcount operations on the referent.
 
-The operations on references are as follows:
+The operations on references are as follows::
 
-::
   void *swift_readReference(struct Reference *reference);
 
 This operation atomically either produces a strong reference to the
 referent of the given object or yields :code:`null` if the referent
 has been finalized (or if the referent is :code:`null`).  The
-reference must currently be registered with the runtime.
+reference must currently be registered with the runtime::
 
-::
   void swift_writeReference(struct Reference *reference,
                             void *newReferent);
 
 This operation changes the referent of the reference to a new object,
 potentially :code:`null`.  The argument is taken at +0.  The reference
 must currently be registered with the runtime.  The reference keeps
-the same flags and reference queue.
+the same flags and reference queue::
 
-::
   void swift_unregisterReference(struct Reference *Reference);
 
 This operation clears a reference, removes it from its reference
@@ -691,21 +685,18 @@ The reference must currently be registered with the runtime.
 
 I propose the following simple interface to a ReferenceQueue;
 arguably, however, it ought to be a reference-counted library
-type with a small amount of native implementation:
+type with a small amount of native implementation::
 
-::
     struct ReferenceQueue;
     struct ReferenceQueue *swift_createReferenceQueue(void);
 
-Allocate a new reference queue.
+Allocate a new reference queue::
 
-::
     void swift_destroyReferenceQueue(struct ReferenceQueue *queue);
 
 Destroy a reference queue.  There must not be any references with
-this queue currently registered with the runtime.
+this queue currently registered with the runtime::
 
-::
      struct Reference *swift_pollReferenceQueue(struct ReferenceQueue *queue);
 
 Captures
@@ -907,7 +898,7 @@ example once::
       capture(this.model).setState(capture(this.state))
     }
 
-I don't see any immediate need for other kinds of capture decoaration.
+I don't see any immediate need for other kinds of capture decoration.
 In particular, I think back references are likely to be the right kind
 of weak reference here for basically every use, and I don't think that
 making it easy to capture a value with, say, a zeroable weak reference
@@ -924,14 +915,14 @@ It is important to spell out how these rules affect captures in nested
 closures.
 
 Recall that all of the above rules can be transformed into
-:code:`capture` declarations at the beginning of a closure, and that
-:code:`capture` declarations always introduce a by-value capture
+``capture`` declarations at the beginning of a closure, and that
+``capture`` declarations always introduce a by-value capture
 instead of a by-reference capture.
 
 A by-reference capture is always of either a local variable or a
-:code:`capture` declaration.  In neither case do we currently permit
+``capture`` declaration.  In neither case do we currently permit
 such captures to "drag in" other declarations silently, to the extent
-that this is detactable.  This means that mutable :code:`capture`
+that this is detectable.  This means that mutable ``capture``
 declarations that are themselves captured by reference must be
 separately allocated from the closure object, much like what happens
 with normal locals captured by reference.
@@ -940,10 +931,10 @@ I've considered it quite a bit, and I think that a by-value capture of
 a variable from a non-immediately enclosing context must be made
 ill-formed.  At the very least, it must be ill-formed if either the
 original variable is mutable (or anything along the path is, if it
-involves properties) or the capture adds :code:`[backref]`.
+involves properties) or the capture adds ``[backref]``.
 
 This rule will effectively force programmers to use extra variables or
-:code:`capture`s as a way of promising validity of the internal
+``capture``s as a way of promising validity of the internal
 captures.
 
 The motivation for this prohibition is that the intent of such
