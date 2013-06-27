@@ -425,9 +425,27 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
 
 NullablePtr<Pattern> Parser::parseMatchingPattern() {
   // TODO: Since we expect a pattern in this position, we should optimistically
-  // parse pattern nodes for shared productions. For ease of initial
-  // implementation, for now we always go through the expr parser and let name
-  // binding determine what productions are really patterns.
+  // parse pattern nodes for productions shared by pattern and expression
+  // grammar. For short-term ease of initial implementation, we always go
+  // through the expr parser for ambiguious productions.
+
+  // Parse productions that can only be patterns.
+  // matching-pattern ::= matching-pattern-var
+  if (Tok.is(tok::kw_var)) {
+    return parseMatchingPatternVar();
+  }
+  // matching-pattern ::= '_'
+  if (Tok.is(tok::kw__)) {
+    return new (Context) AnyPattern(consumeToken());
+  }
+  // matching-pattern ::= 'is' type
+  if (Tok.is(tok::kw_is)) {
+    return parseMatchingPatternIsa();
+  }
+  
+  // matching-pattern ::= expr
+  // Fall back to expression parsing for ambiguous forms. Name lookup will
+  // disambiguate.
   NullablePtr<Expr> subExpr = parseExpr(diag::expected_pattern);
   if (subExpr.isNull())
     return nullptr;
@@ -435,4 +453,31 @@ NullablePtr<Pattern> Parser::parseMatchingPattern() {
   return new (Context) ExprPattern(subExpr.get(),
                                    /*isResolved*/ false,
                                    /*matchExpr*/ nullptr);
+}
+
+NullablePtr<Pattern> Parser::parseMatchingPatternVar() {
+  // 'var' patterns shouldn't nest.
+  if (VarPatternDepth >= 1)
+    diagnose(Tok.getLoc(), diag::var_pattern_in_var);
+  
+  VarPatternScope scope(*this);
+  
+  SourceLoc varLoc = consumeToken(tok::kw_var);
+  NullablePtr<Pattern> subPattern = parseMatchingPattern();
+  if (subPattern.isNull()) return nullptr;
+  return new (Context) VarPattern(varLoc, subPattern.get());
+}
+
+NullablePtr<Pattern> Parser::parseMatchingPatternIsa() {
+  SourceLoc isLoc = consumeToken(tok::kw_is);
+  TypeLoc castType;
+  if (parseType(castType))
+    return nullptr;
+  return new (Context) IsaPattern(isLoc, castType);
+}
+
+bool Parser::isOnlyStartOfMatchingPattern() {
+  return Tok.is(tok::kw_var)
+    || Tok.is(tok::kw__)
+    || Tok.is(tok::kw_is);
 }

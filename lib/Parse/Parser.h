@@ -74,6 +74,7 @@ public:
   ScopeInfo ScopeInfo;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
+  unsigned VarPatternDepth = 0;
   bool IsMainModule;
 
   /// \brief Whether the '|' character is currently a delimiter character,
@@ -151,8 +152,7 @@ public:
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
   /// their positions at the time the object was constructed.
-  struct BacktrackingScope {
-  private:
+  class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
 
@@ -162,6 +162,16 @@ public:
     ~BacktrackingScope() {
       P.backtrackToPosition(PP);
     }
+  };
+  
+  /// RAII object for managing 'var' patterns. Inside a 'var' pattern, bare
+  /// identifiers are parsed as new VarDecls instead of references to existing
+  /// ones.
+  class VarPatternScope {
+    Parser &P;
+  public:
+    VarPatternScope(Parser &P) : P(P) { ++P.VarPatternDepth; }
+    ~VarPatternScope() { --P.VarPatternDepth; }
   };
 
   //===--------------------------------------------------------------------===//
@@ -447,7 +457,21 @@ public:
   NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
   NullablePtr<Pattern> parsePatternAtom();
   NullablePtr<Pattern> parsePatternIdentifier();
+  
+  //===--------------------------------------------------------------------===//
+  // Pattern Parsing
+
+  // TODO: Depending on how robust our distributive-var design works out, we
+  // may be able to integrate exhaustive pattern parsing in var/func decls
+  // with matching pattern parsing when it matures.
+  
   NullablePtr<Pattern> parseMatchingPattern();
+  NullablePtr<Pattern> parseMatchingPatternVar();
+  NullablePtr<Pattern> parseMatchingPatternIsa();
+  
+  /// \brief Determine whether this token can only start a matching pattern
+  /// production and not an expression.
+  bool isOnlyStartOfMatchingPattern();
 
   //===--------------------------------------------------------------------===//
   // Speculative type list parsing

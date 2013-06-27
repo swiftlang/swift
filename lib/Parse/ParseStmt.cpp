@@ -695,6 +695,7 @@ bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels) {
   return false;
 }
 
+// stmt-case ::= case-label+ brace-item*
 NullablePtr<CaseStmt> Parser::parseStmtCase() {
   llvm::SmallVector<CaseLabel*, 2> labels;
   if (parseStmtCaseLabels(labels))
