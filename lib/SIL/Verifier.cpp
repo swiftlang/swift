@@ -67,7 +67,7 @@ public:
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
       CurInstruction->print(llvm::dbgs());
-      llvm::dbgs() << "In basic block:\n";
+      llvm::dbgs() << "In function @" << F.getMangledName() << " basic block:\n";
       CurInstruction->getParent()->print(llvm::dbgs());
     }
 
