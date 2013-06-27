@@ -490,7 +490,7 @@ public:
   TranslationUnit *getTU();
 
   REPLInputKind getREPLInput(llvm::SmallVectorImpl<char> &Line) {
-    unsigned BraceCount = 0;
+    int BraceCount = 0;
     bool HadLineContinuation = false;
     bool UnfinishedInfixExpr = false;
     unsigned CurChunkLines = 0;
@@ -579,7 +579,7 @@ public:
         if (*p == ' ' || *p == '\t')
           UnfinishedInfixExpr = true;
       }
-    } while (BraceCount != 0 || HadLineContinuation || UnfinishedInfixExpr);
+    } while (BraceCount > 0 || HadLineContinuation || UnfinishedInfixExpr);
     
     // The lexer likes null-terminated data.
     Line.push_back('\0');
