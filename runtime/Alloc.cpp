@@ -67,6 +67,17 @@ swift::swift_allocObject(HeapMetadata const *metadata,
   return object;
 }
 
+/// \brief Allocate a reference-counted object on the heap that
+/// occupies <size> bytes of maximally-aligned storage.  The object is
+/// uninitialized except for its header.
+extern "C" HeapObject* swift_bufferAllocate(
+  HeapMetadata const* bufferType, int64_t size)
+{
+  return swift::swift_allocObject(bufferType, size, 0);
+}
+
+extern "C" int64_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
+
 namespace {
   /// Header for a generic box created by swift_allocBox in the worst case.
   struct GenericBox : HeapObject {
@@ -392,5 +403,25 @@ extern "C" void swift_keepAlive(HeapObject *object) {
   // Parameters are passed at +1 reference count.  We need to release to
   // balance.
   swift_release(object);
+}
+
+/// \brief Lets us know whether the given Object is referenced
+/// more than once.  This information is useful for implementing
+/// copy-on-write in Swift.
+extern "C" bool swift_isUniquelyReferenced(HeapObject *object) {
+
+  // Sometimes we have a NULL "owner" object, e.g. because the data
+  // being referenced (usually via UnsafePointer<T>) has infinite
+  // lifetime, or lifetime managed outside the Swift object system.
+  // In these cases we have to assume the data is shared among
+  // multiple references, and needs to be copied before modification.
+  if (object == nullptr) {
+    return false;
+  }
+  
+  bool result = (object->refCount <= 2 * RC_INTERVAL);
+  swift_release(object);
+
+  return result;
 }
 
