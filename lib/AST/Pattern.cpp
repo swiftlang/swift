@@ -48,7 +48,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
 
 // Metaprogram to verify that every concrete class implements
 // a 'static bool classof(const Pattern*)'.
-template <bool (&fn)(const Pattern*)> struct CheckClassOfPattern {
+template <bool fn(const Pattern*)> struct CheckClassOfPattern {
   static const bool IsImplemented = true;
 };
 template <> struct CheckClassOfPattern<Pattern::classof> {
