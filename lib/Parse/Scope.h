@@ -42,7 +42,8 @@ private:
   unsigned ResolvableDepth;
 
 public:
-  ScopeInfo(Parser &TheParser) : TheParser(TheParser), CurScope(0) {}
+  ScopeInfo(Parser &TheParser)
+      : TheParser(TheParser), CurScope(0), ResolvableDepth(0) {}
   ~ScopeInfo() {}
 
   ValueDecl *lookupValueName(Identifier Name) {
