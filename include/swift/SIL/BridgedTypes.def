@@ -27,3 +27,4 @@ BRIDGE_TYPE(Foundation,NSString, swift,String)
 BRIDGE_TYPE(ObjectiveC,ObjCBool, swift,Bool)
 
 #undef BRIDGE_TYPE
+
