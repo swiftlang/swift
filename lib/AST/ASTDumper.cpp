@@ -1079,6 +1079,12 @@ public:
     printRec(E->getSrc());
     OS << ')';
   }
+  void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
+    OS.indent(Indent) << "(unresolved_pattern_expr\n";
+    OS << '\n';
+    OS.indent(Indent+2);
+    E->getSubPattern()->print(OS);
+  }
 };
 
 } // end anonymous namespace.

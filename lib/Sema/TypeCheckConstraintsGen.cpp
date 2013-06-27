@@ -902,6 +902,14 @@ namespace {
       expr->setType(TupleType::getEmpty(CS.getASTContext()));
       return expr->getType();
     }
+    
+    Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
+      // If there are UnresolvedPatterns floating around after name binding,
+      // they are pattern productions in invalid positions.
+      CS.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
+                     expr->getSubPattern()->getKind());
+      return Type();
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the

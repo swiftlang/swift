@@ -130,6 +130,7 @@ EXPR(If, Expr)
 EXPR(Assign, Expr)
 EXPR(ZeroValue, Expr)
 EXPR(DefaultValue, Expr)
+UNCHECKED_EXPR(UnresolvedPattern, Expr)
 
 #undef EXPR_RANGE
 #undef UNCHECKED_EXPR

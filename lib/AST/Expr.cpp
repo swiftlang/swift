@@ -438,3 +438,9 @@ SourceRange AssignExpr::getSourceRange() const {
     return SourceRange(Dest->getStartLoc(), Src->getEndLoc());
   return EqualLoc;
 }
+
+SourceLoc UnresolvedPatternExpr::getLoc() const { return subPattern->getLoc(); }
+SourceRange UnresolvedPatternExpr::getSourceRange() const {
+  return subPattern->getSourceRange();
+}
+

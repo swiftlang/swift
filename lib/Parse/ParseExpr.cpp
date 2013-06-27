@@ -95,6 +95,7 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::Isa:
   case ExprKind::UnconditionalCheckedCast:
   case ExprKind::Assign:
+  case ExprKind::UnresolvedPattern:
     return false;
 
   // Postfix expressions.

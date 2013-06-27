@@ -422,6 +422,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     E->setSubExpr(sub);
     return E;
   }
+  
+  Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
+    Pattern *sub = doIt(E->getSubPattern());
+    if (!sub) return nullptr;
+    
+    E->setSubPattern(sub);
+    return E;
+  }
 
   Stmt *visitBreakStmt(BreakStmt *BS) {
     return BS;

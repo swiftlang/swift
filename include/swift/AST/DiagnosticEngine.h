@@ -40,6 +40,8 @@ namespace swift {
   class Decl;
   class DiagnosticEngine;
   
+  enum class PatternKind : uint8_t;
+  
   /// \brief Enumeration describing all of possible diagnostics.
   ///
   /// Each of the diagnostics described in Diagnostics.def has an entry in
@@ -80,7 +82,8 @@ namespace swift {
     Integer,
     Unsigned,
     Identifier,
-    Type
+    Type,
+    PatternKind
   };
 
   /// \brief Variant type that holds a single diagnostic argument of a known
@@ -95,6 +98,7 @@ namespace swift {
       StringRef StringVal;
       Identifier IdentifierVal;
       Type TypeVal;
+      PatternKind PatternKindVal;
     };
     
   public:
@@ -116,6 +120,10 @@ namespace swift {
 
     DiagnosticArgument(Type T)
       : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
+    }
+    
+    DiagnosticArgument(PatternKind K)
+      : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {      
     }
 
     DiagnosticArgumentKind getKind() const { return Kind; }
@@ -143,6 +151,11 @@ namespace swift {
     Type getAsType() const {
       assert(Kind == DiagnosticArgumentKind::Type);
       return TypeVal;
+    }
+    
+    PatternKind getAsPatternKind() const {
+      assert(Kind == DiagnosticArgumentKind::PatternKind);
+      return PatternKindVal;
     }
   };
   

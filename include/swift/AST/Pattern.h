@@ -31,11 +31,14 @@ namespace swift {
 
 /// PatternKind - The classification of different kinds of
 /// value-matching pattern.
-enum class PatternKind {
+enum class PatternKind : uint8_t {
 #define PATTERN(ID, PARENT) ID,
 #include "PatternNodes.def"
 };
 
+/// Diagnostic printing of PatternKinds.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, PatternKind kind);
+  
 /// Pattern - Base class for all patterns in Swift.
 class alignas(8) Pattern {
   class PatternBitfields {
@@ -227,7 +230,7 @@ class NamedPattern : public Pattern {
   VarDecl *const Var;
 
 public:
-  NamedPattern(VarDecl *var) : Pattern(PatternKind::Named), Var(var) {}
+  explicit NamedPattern(VarDecl *var) : Pattern(PatternKind::Named), Var(var) {}
 
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }

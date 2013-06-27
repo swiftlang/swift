@@ -1663,6 +1663,10 @@ namespace {
       
       return expr;
     }
+    
+    Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
+      llvm_unreachable("should have been eliminated during name binding");
+    }
   };
 }
 

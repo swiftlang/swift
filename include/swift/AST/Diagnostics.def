@@ -983,6 +983,8 @@ ERROR(downcast_from_archetype_to_unrelated,sema_tcc,none,
       "cannot cast from type variable %0 to type %1 that does not match "
       "its constraints",
       (Type, Type))
+ERROR(pattern_in_expr,sema_tcc,none,
+      "%0 cannot appear in an expression", (PatternKind))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

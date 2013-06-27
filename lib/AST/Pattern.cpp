@@ -21,6 +21,31 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+/// Diagnostic printing of PatternKinds.
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
+  switch (kind) {
+  case PatternKind::Paren:
+    return OS << "parethesized pattern";
+  case PatternKind::Tuple:
+    return OS << "tuple pattern";
+  case PatternKind::Named:
+    return OS << "pattern variable binding";
+  case PatternKind::Any:
+    return OS << "'_' pattern";
+  case PatternKind::Typed:
+    return OS << "pattern type annotation";
+  case PatternKind::Isa:
+    return OS << "prefix 'is' pattern";
+  case PatternKind::NominalType:
+    return OS << "type destructuring pattern";
+  case PatternKind::Expr:
+    return OS << "expression pattern";
+  case PatternKind::Var:
+    return OS << "'var' binding pattern";
+  }
+}
+
+
 // Metaprogram to verify that every concrete class implements
 // a 'static bool classof(const Pattern*)'.
 template <bool (&fn)(const Pattern*)> struct CheckClassOfPattern {

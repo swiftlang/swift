@@ -2466,6 +2466,29 @@ public:
   }
 };
   
+/// \brief A pattern production that has been parsed but hasn't been resolved
+/// into a complete pattern. Name binding converts these into standalone pattern
+/// nodes or raises an error if a pattern production appears in an invalid
+/// position.
+class UnresolvedPatternExpr : public Expr {
+  Pattern *subPattern;
+
+public:
+  explicit UnresolvedPatternExpr(Pattern *subPattern)
+    : Expr(ExprKind::UnresolvedPattern), subPattern(subPattern) { }
+  
+  const Pattern *getSubPattern() const { return subPattern; }
+  Pattern *getSubPattern() { return subPattern; }
+  void setSubPattern(Pattern *p) { subPattern = p; }
+  
+  SourceLoc getLoc() const;
+  SourceRange getSourceRange() const;
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedPattern;
+  }
+};
+  
 } // end namespace swift
 
 #endif
