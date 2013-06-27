@@ -81,12 +81,13 @@ types where the metadata itself has unknown layout.)
   function ::= entity
 
   type ::= 'A' natural type                  // fixed-size array
-  type ::= 'Bf' natural '_'                  // Builtin.Float
-  type ::= 'Bi' natural '_'                  // Builtin.Integer
+  type ::= 'Bf' natural '_'                  // Builtin.Float<n>
+  type ::= 'Bi' natural '_'                  // Builtin.Int<n>
   type ::= 'BO'                              // Builtin.ObjCPointer
   type ::= 'Bo'                              // Builtin.ObjectPointer
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= 'Bu'                              // Builtin.OpaquePointer
+  type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= nominal-type
   type ::= 'b' type type                     // objc block function type
   type ::= 'F' type type                     // function type
