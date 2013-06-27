@@ -302,7 +302,6 @@ public:
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
-
   
   /// parseMatchingToken - Parse the specified expected token and return its
   /// location on success.  On failure, emit the specified error diagnostic, and
@@ -434,10 +433,12 @@ public:
   /// identifier or the special discard-value binding '_'.
   bool isStartOfBindingName(Token tok);
 
-  /// Parse a tuple pattern element.
+  /// \brief Parse a tuple pattern element.
   ///
+  /// \code
   ///   pattern-tuple-element:
   ///     pattern ('=' expr)?
+  /// \endcode
   ///
   /// \param allowInitExpr Whether to allow initializers.
   ///
@@ -538,6 +539,7 @@ public:
   NullablePtr<Stmt> parseStmtForEach(SourceLoc ForLoc);
   NullablePtr<Stmt> parseStmtSwitch();
   NullablePtr<CaseStmt> parseStmtCase();
+  bool parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel*> &labels);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

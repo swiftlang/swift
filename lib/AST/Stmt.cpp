@@ -143,6 +143,17 @@ CaseLabel::CaseLabel(bool isDefault,
   }
 }
 
+CaseLabel *CaseLabel::create(ASTContext &C, bool isDefault,
+                             SourceLoc caseLoc, ArrayRef<Pattern *> patterns,
+                             SourceLoc whereLoc, Expr *guardExpr,
+                             SourceLoc colonLoc) {
+  void *buf = C.Allocate(sizeof(CaseLabel) + sizeof(Pattern*) * patterns.size(),
+                         alignof(CaseLabel));
+  return ::new (buf) CaseLabel(isDefault,
+                               caseLoc, patterns,
+                               whereLoc, guardExpr, colonLoc);
+}
+
 CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body)
   : Stmt(StmtKind::Case), Body(Body), NumCaseLabels(Labels.size())
 {

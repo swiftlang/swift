@@ -69,6 +69,7 @@ KEYWORD(fallthrough)
 KEYWORD(switch)
 KEYWORD(case)
 KEYWORD(default)
+KEYWORD(where)
 
 // Expression keywords.
 KEYWORD(new)

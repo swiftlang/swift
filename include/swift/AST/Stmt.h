@@ -356,7 +356,8 @@ public:
 ///
 /// case 1:
 /// case 2, 3:
-/// case Foo(?x, ?y) where x < y:
+/// case Foo(var x, var y) where x < y:
+/// default:
 class CaseLabel {
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
@@ -411,7 +412,7 @@ public:
   void setGuardExpr(Expr *e) { GuardExprAndIsDefault.setPointer(e); }
   
   /// Returns true if this is syntactically a 'default' label.
-  bool isDefault() const { return GuardExprAndIsDefault.getPointer(); }
+  bool isDefault() const { return GuardExprAndIsDefault.getInt(); }
 };
   
 /// A 'case' or 'default' block of a switch statement. Only valid as the
@@ -449,6 +450,10 @@ public:
   
   SourceRange getSourceRange() const {
     return {getLoc(), Body->getEndLoc()};
+  }
+  
+  bool isDefault() {
+    return getCaseLabels()[0]->isDefault();
   }
   
   static bool classof(const Stmt *S) {

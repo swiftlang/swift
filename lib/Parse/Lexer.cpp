@@ -477,6 +477,7 @@ void Lexer::lexIdentifier() {
     .Case("switch", tok::kw_switch)
     .Case("case", tok::kw_case)
     .Case("default", tok::kw_default)
+    .Case("where", tok::kw_where)
 
     // Expressions
     .Case("new", tok::kw_new)

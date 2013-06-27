@@ -548,14 +548,25 @@ ERROR(case_outside_of_switch,stmt_parsing,none,
 ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
       "all statements inside a switch must be covered by a 'case' or 'default'",
       ())
+ERROR(case_after_default,stmt_parsing,none,
+      "additional 'case' blocks cannot appear after the 'default' block of a 'switch'",
+      ())
 
 // Case Stmt
-ERROR(expected_case_expr,stmt_parsing,none,
-      "expected expression for 'case'", ())
+ERROR(expected_case_where_expr,stmt_parsing,none,
+      "expected expression for 'where' guard of 'case'", ())
 ERROR(expected_case_colon,stmt_parsing,none,
       "expected ':' after '%0'", (StringRef))
 ERROR(expected_case_stmt,stmt_parsing,none,
       "expected statement or expression in 'switch'", ())
+ERROR(expected_switch_case_or_default,stmt_parsing,none,
+      "expected 'case' or 'default' in 'switch'", ())
+ERROR(default_with_other_labels,stmt_parsing,none,
+      "'default' cannot appear with other 'case' or 'default' labels over the same block",
+      ())
+ERROR(default_with_where,stmt_parsing,none,
+      "'default' cannot be used with a 'where' guard expression",
+      ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
