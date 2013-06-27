@@ -559,7 +559,7 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     Identifier moduleName = getIdentifier(rawAccessPath.front());
     rawAccessPath = rawAccessPath.slice(1);
     // FIXME: provide a real source location.
-    Module *M = ctx.getModule(std::make_pair(moduleName, SourceLoc()));
+    Module *M = ctx.getModule(std::make_pair(moduleName, SourceLoc()), false);
     assert(M && "missing dependency");
 
     switch (kind) {
@@ -1051,7 +1051,7 @@ bool ModuleFile::associateWithModule(Module *module) {
     assert(!dependency.Mod && "already loaded?");
     Identifier ID = ctx.getIdentifier(dependency.Name);
     // FIXME: Provide a proper source location.
-    dependency.Mod = ctx.getModule(std::make_pair(ID, SourceLoc()));
+    dependency.Mod = ctx.getModule(std::make_pair(ID, SourceLoc()), false);
     if (!dependency.Mod)
       missingDependency = true;
   }

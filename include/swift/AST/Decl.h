@@ -580,6 +580,9 @@ public:
 private:
   SourceLoc ImportLoc;
 
+  /// This is true if the import declaration has the [stdlib] attribute on it.
+  bool IsStdlibImport;
+
   /// The number of elements in this path.
   unsigned NumPathElements;
 
@@ -591,16 +594,19 @@ private:
   }
   
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
-             ArrayRef<AccessPathElement> Path);
+             ArrayRef<AccessPathElement> Path, bool isStdlibImport);
 
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc,
-                            ArrayRef<AccessPathElement> Path);
+                            ArrayRef<AccessPathElement> Path,
+                            bool isStdlibImport);
 
   ArrayRef<AccessPathElement> getAccessPath() const {
     return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
   }
+
+  bool isStdlibImport() const { return IsStdlibImport; }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
   SourceLoc getLoc() const { return ImportLoc; }

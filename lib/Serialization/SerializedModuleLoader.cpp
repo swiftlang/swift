@@ -133,7 +133,8 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
 
 
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                           Module::AccessPathTy path) {
+                                           Module::AccessPathTy path,
+                                           bool isStdlibImport) {
 
   // FIXME: Swift submodules?
   if (path.size() > 1)

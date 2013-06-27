@@ -89,7 +89,8 @@ namespace {
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
-    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
+    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID,
+                      bool isStdlibImport);
     
   private:
     bool resolveIdentifierTypeImpl(IdentifierType *DNT);
@@ -97,7 +98,8 @@ namespace {
 }
 
 Module *
-NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
+NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
+                      bool isStdlibImport) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
   
@@ -116,11 +118,11 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // This allows a Swift module to extend a Clang module of the same name.
   if (moduleID.first == TU->Name && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
-      return importer->loadModule(moduleID.second, modulePath);
+      return importer->loadModule(moduleID.second, modulePath, isStdlibImport);
     return nullptr;
   }
   
-  return Context.getModule(modulePath);
+  return Context.getModule(modulePath, isStdlibImport);
 }
 
 
@@ -135,7 +137,7 @@ void NameBinder::addImport(ImportDecl *ID,
   if (!Context.getClangModuleLoader())
     importPath = importPath.slice(0, 1);
 
-  Module *M = getModule(importPath);
+  Module *M = getModule(importPath, ID->isStdlibImport());
   if (M == 0) {
     diagnose(Path[0].second, diag::sema_no_import, Path[0].first.str());
     return;
@@ -183,7 +185,7 @@ void swift::performAutoImport(TranslationUnit *TU) {
     M = TU->Ctx.TheBuiltinModule;
   else
     M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
-                                         SourceLoc()));
+                                         SourceLoc()), true);
 
   SmallVector<ImportedModule, 1> ImportedModules;
   ImportedModules.push_back({Module::AccessPathTy(), M});
@@ -614,7 +616,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
 
         // It's a little wasteful to load the module here and then again below,
         // but the one below should pick up the same (already-loaded) module.
-        auto module = ctx.getModule(importPair);
+        auto module = ctx.getModule(importPair, false);
 
         hasSwiftModule = !isa<ClangModule>(module);
         topModules[topClangMod] = hasSwiftModule;
@@ -637,7 +639,7 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       // FIXME: Mark as implicit!
       // FIXME: Actually pass through the whole access path.
       auto import = ImportDecl::create(ctx, TU, clangImport.second,
-                                       accessPath[0]);
+                                       accessPath[0], false);
       TU->Decls.push_back(import);
       Binder.addImport(import, ImportedModules);
     }

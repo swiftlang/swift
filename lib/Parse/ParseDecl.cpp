@@ -122,6 +122,7 @@ static Resilience getResilience(AttrName attr) {
 ///     'infix_left' '=' numeric_constant
 ///     'infix_right' '=' numeric_constant
 ///     'unary'
+///     'stdlib'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::expected_attribute_name);
@@ -356,6 +357,15 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
+  case AttrName::stdlib: {
+    if (Attributes.Stdlib)
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    Attributes.Stdlib = true;
+    return false;
+  }
+
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();
@@ -529,7 +539,10 @@ Decl *Parser::parseDeclImport(unsigned Flags) {
                         diag::expected_identifier_in_decl, "import"))
       return 0;
   }
-  
+
+  bool isStdlibImport = Attributes.Stdlib;
+  Attributes.Stdlib = false;
+
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::import_attributes);
   
@@ -538,7 +551,8 @@ Decl *Parser::parseDeclImport(unsigned Flags) {
     return 0;
   }
 
-  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
+  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath,
+                            isStdlibImport);
 }
 
 /// parseInheritance - Parse an inheritance clause.

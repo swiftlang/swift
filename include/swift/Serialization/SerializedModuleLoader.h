@@ -54,7 +54,8 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual Module *
-  loadModule(SourceLoc importLoc, Module::AccessPathTy path) override;
+  loadModule(SourceLoc importLoc, Module::AccessPathTy path,
+             bool isStdlibImport) override;
 
   /// \brief Look for declarations associated with the given name.
   ///

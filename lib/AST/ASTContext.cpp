@@ -260,7 +260,8 @@ llvm::IntrusiveRefCntPtr<ModuleLoader> ASTContext::getClangModuleLoader() const{
 }
 
 Module *
-ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
+ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
+                      bool isStdlibImport) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
 
@@ -271,7 +272,8 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   }
 
   for (auto importer : Impl.ModuleLoaders) {
-    if (Module *M = importer->loadModule(moduleID.second, modulePath))
+    if (Module *M = importer->loadModule(moduleID.second, modulePath,
+                                         isStdlibImport))
       return M;
   }
 

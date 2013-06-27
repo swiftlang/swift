@@ -234,7 +234,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
 
 Module *ClangImporter::loadModule(
           SourceLoc importLoc,
-          ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+          ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                                  bool isStdlibImport) {
   // Convert the Swift import path over to a Clang import path.
   // FIXME: Map source locations over. Fun, fun!
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>

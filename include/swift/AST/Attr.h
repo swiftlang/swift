@@ -153,6 +153,7 @@ public:
   bool IBOutlet = false;
   bool IBAction = false;
   bool ClassProtocol = false;
+  bool Stdlib = false;
   Optional<AbstractCC> cc = Nothing;
   
   DeclAttributes() {}
@@ -182,7 +183,7 @@ public:
            !isAutoClosure() && !isThin() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !isClassProtocol() && !hasCC();
+           !isClassProtocol() && !hasCC() && !Stdlib;
   }
 };
   

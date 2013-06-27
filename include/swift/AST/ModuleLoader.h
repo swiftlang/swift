@@ -39,11 +39,16 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param isStdlibImport True if this is a [stdlib] import.  FIXME: this
+  /// should be removed when we have real binary modules and/or build system
+  /// support.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
   Module *loadModule(SourceLoc importLoc,
-                     ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                     ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                     bool isStdlibImport) = 0;
 
   /// \brief Look for declarations associated with the given name.
   ///

@@ -357,7 +357,8 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath);
+  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
+                    bool isStdlibImport);
 
   /// \brief Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of
