@@ -91,11 +91,13 @@ SmallVector<Type, 4> ConstraintSystem::enumerateDirectSupertypes(Type type) {
   SmallVector<Type, 4> result;
 
   if (auto tupleTy = type->getAs<TupleType>()) {
-    // A one-element tuple can be viewed as a scalar by dropping the label.
+    // A tuple that can be constructed from a scalar has a value of that
+    // scalar type as its supertype.
     // FIXME: There is a way more general property here, where we can drop
     // one label from the tuple, maintaining the rest.
-    if (tupleTy->getFields().size() == 1) {
-      auto &elt = tupleTy->getFields()[0];
+    int scalarIdx = tupleTy->getFieldForScalarInit();
+    if (scalarIdx >= 0) {
+      auto &elt = tupleTy->getFields()[scalarIdx];
       if (elt.isVararg()) // FIXME: Should we keep the name?
         result.push_back(elt.getVarargBaseTy());
       else if (!elt.getName().empty())
@@ -603,6 +605,12 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
       // FIXME: We don't want to visit the supertypes of this type.
       for (auto constraint : tvc.ConformsToConstraints) {
         auto proto = constraint->getProtocol();
+
+        // Only do this for protocols that have default types, i.e., protocols
+        // for literals.
+        if (!tc.getDefaultType(proto))
+          continue;
+
         for (auto decl : tc.Context.getTypesThatConformTo(proto)) {
           Type type;
           if (auto nominal = dyn_cast<NominalTypeDecl>(decl))

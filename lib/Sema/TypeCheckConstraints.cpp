@@ -1246,6 +1246,18 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   llvm_unreachable("unhandled type matching kind");
 }
 
+/// \brief Retrieve the fixed type for this type variable, looking through a
+/// chain of type variables to get at the undlying type.
+static Type getFixedTypeRecursive(ConstraintSystem &cs,
+                                  TypeVariableType *typeVar) {
+  while (auto fixed = cs.getFixedType(typeVar)) {
+    typeVar = fixed->getAs<TypeVariableType>();
+    if (!typeVar)
+      return fixed;
+  }
+  return nullptr;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1259,7 +1271,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // to the fixed type.
   auto typeVar1 = dyn_cast<TypeVariableType>(desugar1);
   if (typeVar1) {
-    if (auto fixed = getFixedType(typeVar1)) {
+    if (auto fixed = getFixedTypeRecursive(*this, typeVar1)) {
+      fixed = simplifyType(fixed);
       type1 = fixed;
       desugar1 = fixed->getDesugaredType();
       typeVar1 = nullptr;
@@ -1268,7 +1281,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   auto typeVar2 = dyn_cast<TypeVariableType>(desugar2);
   if (typeVar2) {
-    if (auto fixed = getFixedType(typeVar2)) {
+    if (auto fixed = getFixedTypeRecursive(*this, typeVar2)) {
+      fixed = simplifyType(fixed);
       type2 = fixed;
       desugar2 = fixed->getDesugaredType();
       typeVar2 = nullptr;
