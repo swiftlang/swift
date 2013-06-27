@@ -44,7 +44,7 @@ StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                                llvm::Module &M)
-  : Opts(Opts), SM(SM), DBuilder(M) {
+  : SM(SM), DBuilder(M), Opts(Opts) {
   assert(Opts.DebugInfo);
   std::string MainFileName = Opts.MainInputFilename;
   if (MainFileName.empty())
