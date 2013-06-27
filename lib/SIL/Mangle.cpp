@@ -157,12 +157,19 @@ void Mangler::addSubstitution(void *ptr) {
 void Mangler::mangleContextOf(ValueDecl *decl) {
   auto clangDecl = decl->getClangDecl();
 
-  // Classes published as Objective-C classes have a special context mangling.
+  // Classes and protocols published to Objective-C have a special context
+  // mangling.
   //   known-context ::= 'So'
   if (isa<ClassDecl>(decl) && (clangDecl || decl->isObjC())) {
     assert(!clangDecl || isa<clang::ObjCInterfaceDecl>(clangDecl));
     Buffer << "So";
     return;
+  }
+  
+  if (isa<ProtocolDecl>(decl) && (clangDecl || decl->isObjC())) {
+    assert(!clangDecl || isa<clang::ObjCProtocolDecl>(clangDecl));
+    Buffer << "So";
+    return; 
   }
 
   // Otherwise, just mangle the decl's DC.
@@ -175,17 +182,12 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     llvm_unreachable("mangling member of builtin module!");
 
   case DeclContextKind::ClangModule:
-    // Clang modules aren't namespaces, so there's nothing to mangle.
-    // FIXME: This isn't right for C++, which does have namespaces,
-    // but they aren't reflected into Swift anyway.
-    return;
-
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::SerializedModule: {
     Module *module = cast<Module>(ctx);
 
     // Try the special 'swift' substitution.
-    // context ::= Ss
+    // context ::= 'Ss'
     if (isSwiftModule(module)) {
       Buffer << "Ss";
       return;
@@ -240,8 +242,8 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
     return;
 
   case DeclContextKind::TopLevelCodeDecl:
-    // FIXME: I'm not sure this is correct.
-    return;
+    // Mangle the containing module context.
+    return mangleDeclContext(ctx->getParent());
   }
 
   llvm_unreachable("bad decl context");

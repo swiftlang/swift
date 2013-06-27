@@ -54,3 +54,7 @@ typedef long NSInteger;
 struct NSRect NSMakeRect(double, double, double, double);
 struct NSRect NSInsetRect(struct NSRect, double, double);
 NSString *NSStringFromRect(struct NSRect r);
+
+@protocol NSAnsing
+- (void) anse;
+@end
