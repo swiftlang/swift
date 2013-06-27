@@ -525,8 +525,8 @@ public:
   // Statement Parsing
   // Each of these returns null (in a NullablePtr) on a parse error, or an
   // ErrorStmt on a semantic error.
-  static bool isStartOfStmtOtherThanAssignment(const Token &Tok);
-  NullablePtr<Stmt> parseStmtOtherThanAssignment();
+  static bool isStartOfStmt(const Token &Tok);
+  NullablePtr<Stmt> parseStmt();
   bool parseExprOrStmt(ExprStmtOrDecl &Results);
   NullablePtr<Stmt> parseStmtReturn();
   NullablePtr<Stmt> parseStmtIf();

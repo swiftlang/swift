@@ -25,10 +25,10 @@
 
 using namespace swift;
 
-/// isStartOfStmtOtherThanAssignment - Return true if the specified token starts
-/// a statement (other than assignment, which starts looking like an expr).
+/// isStartOfStmt - Return true if the specified token starts
+/// a statement.
 ///
-bool Parser::isStartOfStmtOtherThanAssignment(const Token &Tok) {
+bool Parser::isStartOfStmt(const Token &Tok) {
   switch (Tok.getKind()) {
   default: return false;
   case tok::kw_return:
@@ -76,8 +76,8 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
       .fixItRemove(SourceRange(Tok.getLoc()));
     consumeToken();
     return true;
-  } else if (isStartOfStmtOtherThanAssignment(Tok)) {
-    NullablePtr<Stmt> Res = parseStmtOtherThanAssignment();
+  } else if (isStartOfStmt(Tok)) {
+    NullablePtr<Stmt> Res = parseStmt();
     if (Res.isNull())
       return true;
     Result = Res.get();
@@ -247,10 +247,7 @@ static NullablePtr<Stmt> recoverFromInvalidCase(Parser &P) {
   return nullptr;
 }
 
-/// parseStmtOtherThanAssignment - Note that this doesn't handle the
-/// "expr '=' expr" production.
-///
-NullablePtr<Stmt> Parser::parseStmtOtherThanAssignment() {
+NullablePtr<Stmt> Parser::parseStmt() {
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
@@ -314,7 +311,7 @@ NullablePtr<Stmt> Parser::parseStmtReturn() {
   // followed by a '}', ';', or statement keyword.
   Expr *RetExpr = nullptr;
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
-      !isStartOfStmtOtherThanAssignment(Tok)) {
+      !isStartOfStmt(Tok)) {
     NullablePtr<Expr> Result = parseExpr(diag::expected_expr_return);
     if (Result.isNull())
       return 0;
