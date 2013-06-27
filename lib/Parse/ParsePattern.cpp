@@ -164,6 +164,7 @@ static bool parseSelectorFunctionArguments(Parser &P,
     
     TuplePatternElt const &firstElt = firstTuple->getFields()[0];
     bodyElts.push_back(firstElt);
+    lp = firstTuple->getLParenLoc();
     argElts.push_back(TuplePatternElt(
       getFirstSelectorPattern(P.Context,
                               firstElt.getPattern(),

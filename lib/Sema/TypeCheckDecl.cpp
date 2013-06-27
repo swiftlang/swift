@@ -820,7 +820,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
         continue;
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(structDecl->getLoc(),
+      auto *arg = new (context) VarDecl(SourceLoc(),
                                         var->getName(),
                                         var->getType(), structDecl);
       allArgs.push_back(arg);

@@ -44,8 +44,9 @@ class alignas(8) Pattern {
   class PatternBitfields {
     friend class Pattern;
     unsigned Kind : 8;
+    unsigned isImplicit : 1;
   };
-  enum { NumPatternBits = 8 };
+  enum { NumPatternBits = 9 };
   enum { NumBitsAllocated = 32 };
 
   class TuplePatternBitfields {
@@ -62,6 +63,7 @@ protected:
 
   Pattern(PatternKind kind) {
     PatternBits.Kind = unsigned(kind);
+    PatternBits.isImplicit = false;
   }
 
 private:
@@ -70,6 +72,9 @@ private:
 
 public:
   PatternKind getKind() const { return PatternKind(PatternBits.Kind); }
+
+  bool isImplicit() const { return PatternBits.isImplicit; }
+  void setImplicit() { PatternBits.isImplicit = true; }
 
   Pattern *getSemanticsProvidingPattern();
   const Pattern *getSemanticsProvidingPattern() const {
@@ -127,7 +132,11 @@ class ParenPattern : public Pattern {
 public:
   ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp)
     : Pattern(PatternKind::Paren),
-      LPLoc(lp), RPLoc(rp), SubPattern(sub) {}
+      LPLoc(lp), RPLoc(rp), SubPattern(sub) {
+    assert(lp.isValid() == rp.isValid());
+    if (!lp.isValid())
+      setImplicit();
+  }
 
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
@@ -190,6 +199,9 @@ class TuplePattern : public Pattern {
   TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
     TuplePatternBits.NumFields = numFields;
+    assert(lp.isValid() == rp.isValid());
+    if (!lp.isValid())
+      setImplicit();
   }
 
 public:
@@ -230,7 +242,10 @@ class NamedPattern : public Pattern {
   VarDecl *const Var;
 
 public:
-  explicit NamedPattern(VarDecl *var) : Pattern(PatternKind::Named), Var(var) {}
+  explicit NamedPattern(VarDecl *Var) : Pattern(PatternKind::Named), Var(Var) {
+    if (!Var->getLoc().isValid())
+      setImplicit();
+  }
 
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }
@@ -249,7 +264,10 @@ class AnyPattern : public Pattern {
   SourceLoc Loc;
 
 public:
-  AnyPattern(SourceLoc loc) : Pattern(PatternKind::Any), Loc(loc) {}
+  AnyPattern(SourceLoc Loc) : Pattern(PatternKind::Any), Loc(Loc) {
+    if (!Loc.isValid())
+      setImplicit();
+  }
 
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
@@ -269,7 +287,11 @@ class TypedPattern : public Pattern {
 
 public:
   TypedPattern(Pattern *pattern, TypeLoc tl)
-    : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {}
+    : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
+    assert(pattern->isImplicit() == !tl.hasLocation());
+    if (pattern->isImplicit())
+      setImplicit();
+  }
 
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
@@ -314,9 +336,12 @@ public:
     : Pattern(PatternKind::Isa),
       IsLoc(IsLoc),
       CastKind(Kind),
-      CastType(CastTy)
-  {}
-  
+      CastType(CastTy) {
+    assert(IsLoc.isValid() == CastTy.hasLocation());
+    if (!IsLoc.isValid())
+      setImplicit();
+  }
+
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
   
@@ -345,9 +370,11 @@ public:
   NominalTypePattern(TypeLoc CastTy, Pattern *Sub,
                      CheckedCastKind Kind = CheckedCastKind::Unresolved)
     : Pattern(PatternKind::NominalType), CastType(CastTy), SubPattern(Sub),
-      Kind(Kind)
-  {}
-  
+      Kind(Kind) {
+    if (Sub->isImplicit())
+      setImplicit();
+  }
+
   const Pattern *getSubPattern() const { return SubPattern; }
   Pattern *getSubPattern() { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
@@ -381,8 +408,11 @@ class ExprPattern : public Pattern {
 public:
   ExprPattern(Expr *e, bool isResolved, Expr *match)
     : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
-      MatchFnExpr(match)
-  {}
+      MatchFnExpr(match) {
+    assert(!match || e->isImplicit() == match->isImplicit());
+    if (e->isImplicit())
+      setImplicit();
+  }
   
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
@@ -414,8 +444,11 @@ class VarPattern : public Pattern {
   Pattern *SubPattern;
 public:
   VarPattern(SourceLoc loc, Pattern *sub)
-    : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub)
-  {}
+    : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
+    assert(loc.isValid() == !sub->isImplicit());
+    if (sub->isImplicit())
+      setImplicit();
+  }
   
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {

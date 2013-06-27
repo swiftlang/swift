@@ -827,6 +827,20 @@ namespace {
       abort();
     }
 
+    void checkSourceRanges(FuncExpr *FE) {
+      for (auto P : FE->getArgParamPatterns()) {
+        if (!P->getSourceRange().isValid()) {
+          if (P->isImplicit())
+            continue;
+
+          Out << "invalid source range for arg param pattern: ";
+          P->print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+    }
+
     void checkSourceRanges(Expr *E) {
       if (!E->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated

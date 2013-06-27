@@ -893,7 +893,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     TypeLoc::withoutLoc(ElementTy));
+                                     TypeLoc(ElementTy,
+                                             Value->getSourceRange()));
       TuplePatternElt ValueElt(ValuePattern);
       Pattern *ValueParamsPattern
         = TuplePattern::create(Context, SetNameParens.Start, ValueElt,

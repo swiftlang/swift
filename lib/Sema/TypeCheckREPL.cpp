@@ -198,7 +198,8 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
   if (boolDecl && trueDecl && falseDecl) {
     auto boolTy = boolDecl->getDeclaredType();
     
-    firstVar = new (context) VarDecl(Loc, context.getIdentifier("first"),
+    firstVar = new (context) VarDecl(SourceLoc(),
+                                     context.getIdentifier("first"),
                                      boolDecl->getDeclaredType(), DC);
     Pattern *pattern = new (context) NamedPattern(firstVar);
     pattern->setType(boolTy);
@@ -216,7 +217,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
   // Create the "value" variable and its pattern.
   auto valueId = context.getIdentifier("value");
-  VarDecl *valueVar = new (context) VarDecl(Loc, valueId, ValueTy, DC);
+  VarDecl *valueVar = new (context) VarDecl(SourceLoc(), valueId, ValueTy, DC);
   Pattern *valuePattern = new (context) NamedPattern(valueVar);
   valuePattern->setType(ValueTy);
   valuePattern = new (context) TypedPattern(valuePattern,
@@ -231,7 +232,7 @@ PrintCollection(TypeChecker &TC, VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     // Form the key variable and its pattern.
     auto keyId = context.getIdentifier("key");
-    keyVar = new (context) VarDecl(Loc, keyId, KeyTy, DC);
+    keyVar = new (context) VarDecl(SourceLoc(), keyId, KeyTy, DC);
     Pattern *keyPattern = new (context) NamedPattern(keyVar);
     keyPattern->setType(KeyTy);
     keyPattern = new (context) TypedPattern(keyPattern,
@@ -525,7 +526,8 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
     PrintDecls.push_back(Result.getValueDecl());
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (C) VarDecl(Loc,TC->Context.getIdentifier("arg"),
+  VarDecl *Arg = new (C) VarDecl(SourceLoc(),
+                                 TC->Context.getIdentifier("arg"),
                                  E->getType(), nullptr);
   Pattern *ParamPat = new (C) NamedPattern(Arg);
   ParamPat = new (C) TypedPattern(ParamPat,TypeLoc::withoutLoc(Arg->getType()));
