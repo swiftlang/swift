@@ -180,6 +180,26 @@ public:
                 U &&...args) {
     M.getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
+  
+  static SourceLoc getSourceLocForSILLocation(SILLocation loc) {
+    if (auto decl = loc.dyn_cast<Decl*>()) {
+      return decl->getLoc();
+    }
+    if (auto expr = loc.dyn_cast<Expr*>()) {
+      return expr->getLoc();
+    }
+    if (auto stmt = loc.dyn_cast<Stmt*>()) {
+      return stmt->getStartLoc();
+    }
+    llvm_unreachable("impossible SILLocation");
+  }
+  
+  template<typename...T, typename...U>
+  void diagnose(SILLocation loc, Diag<T...> diag,
+                U &&...args) {
+    M.getASTContext().Diags.diagnose(getSourceLocForSILLocation(loc),
+                                     diag, std::forward<U>(args)...);
+  }
 };
   
 /// Materialize - Represents a temporary allocation.

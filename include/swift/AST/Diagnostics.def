@@ -1420,6 +1420,9 @@ ERROR(bridging_function_not_function,sil_gen,none,
 ERROR(bridging_function_not_correct_type,sil_gen,none,
       "definition of implicit conversion function '%0.%1' is not of the correct type",
       (StringRef, StringRef))
+ERROR(invalid_sil_builtin,sil_gen,none,
+      "INTERNAL ERROR: invalid use of builtin: %0",
+      (StringRef))
 
 //==============================================================================
 // IR Generation Diagnostics

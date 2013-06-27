@@ -16,6 +16,7 @@
 #include "SILGen.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
@@ -1069,6 +1070,15 @@ namespace {
                                            ArrayRef<ManagedValue> args,
                                            SGFContext C) {
     assert(args.size() == 1 && "cast should have a single argument");
+    assert(substitutions.size() == 1 && "cast should have a type substitution");
+    
+    // Bail if the source type is not a class reference of some kind.
+    if (!substitutions[0].Replacement->mayHaveSuperclass()) {
+      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                       "castToObjectPointer source must be a class");
+      // FIXME: Recovery?
+      exit(1);
+    }
     
     // Save the cleanup on the argument so we can forward it onto the cast
     // result.
@@ -1092,6 +1102,14 @@ namespace {
     assert(substitutions.size() == 1 &&
            "cast should have a single substitution");
 
+    // Bail if the source type is not a class reference of some kind.
+    if (!substitutions[0].Replacement->mayHaveSuperclass()) {
+      gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                       "castFromObjectPointer dest must be a class");
+      // FIXME: Recovery?
+      exit(1);
+    }
+    
     // Save the cleanup on the argument so we can forward it onto the cast
     // result.
     auto cleanup = args[0].getCleanup();
