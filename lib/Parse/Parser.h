@@ -446,6 +446,7 @@ public:
   NullablePtr<Pattern> parsePatternTuple(bool AllowInitExpr);
   NullablePtr<Pattern> parsePatternAtom();
   NullablePtr<Pattern> parsePatternIdentifier();
+  NullablePtr<Pattern> parseMatchingPattern();
 
   //===--------------------------------------------------------------------===//
   // Speculative type list parsing

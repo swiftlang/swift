@@ -375,7 +375,7 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
 /// Parse a tuple pattern.
 ///
 ///   pattern-tuple:
-////    '(' pattern-tuple-body? ')'
+///     '(' pattern-tuple-body? ')'
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 
@@ -421,4 +421,18 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
     return new (Context) ParenPattern(LPLoc, elts[0].getPattern(), RPLoc);
 
   return TuplePattern::create(Context, LPLoc, elts, RPLoc);
+}
+
+NullablePtr<Pattern> Parser::parseMatchingPattern() {
+  // TODO: Since we expect a pattern in this position, we should optimistically
+  // parse pattern nodes for shared productions. For ease of initial
+  // implementation, for now we always go through the expr parser and let name
+  // binding determine what productions are really patterns.
+  NullablePtr<Expr> subExpr = parseExpr(diag::expected_pattern);
+  if (subExpr.isNull())
+    return nullptr;
+  
+  return new (Context) ExprPattern(subExpr.get(),
+                                   /*isResolved*/ false,
+                                   /*matchExpr*/ nullptr);
 }
