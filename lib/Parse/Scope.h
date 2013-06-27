@@ -38,12 +38,11 @@ public:
 private:
   Parser &TheParser;
   ValueScopeHTTy ValueScopeHT;
-  Scope *CurScope;
-  unsigned ResolvableDepth;
+  Scope *CurScope = nullptr;
+  unsigned ResolvableDepth = 0;
 
 public:
-  ScopeInfo(Parser &TheParser)
-      : TheParser(TheParser), CurScope(0), ResolvableDepth(0) {}
+  ScopeInfo(Parser &TheParser) : TheParser(TheParser) {}
   ~ScopeInfo() {}
 
   ValueDecl *lookupValueName(Identifier Name) {
