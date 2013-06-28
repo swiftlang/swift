@@ -115,13 +115,10 @@ static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
   return None;
 }
 
-void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder, SILLocation Loc,
-                                   SILDebugScope *DS) {
+void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
+                                   SILDebugScope *DS,
+                                   SILLocation Loc) {
   Location L = getStartLoc(SM, Loc);
-  // No location: we should stick with the previous location.
-  if (L.Line == 0)
-    return;
-
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   llvm::MDNode *InlinedAt = 0;
   llvm::DebugLoc DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);

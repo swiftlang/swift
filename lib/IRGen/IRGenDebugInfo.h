@@ -62,7 +62,8 @@ public:
 
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
-  void setCurrentLoc(IRBuilder& Builder, SILLocation Loc, SILDebugScope *DS);
+  void setCurrentLoc(IRBuilder& Builder, SILDebugScope *DS,
+                     SILLocation Loc = SILLocation());
 
   /// Create debug info for the given funtion.
   void createFunction(SILDebugScope *DS, llvm::Function *Fn);

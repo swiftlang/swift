@@ -44,6 +44,7 @@ namespace swift {
   template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;
+  class SILDebugScope;
   class SILType;
   class SourceLoc;
   class StructType;
@@ -65,7 +66,6 @@ namespace irgen {
   class LinkEntity;
   class Scope;
   class TypeInfo;
-
 
 /// LocalTypeData - A nonce value for storing some sort of
 /// locally-known information about a type.
@@ -90,7 +90,8 @@ public:
 
   IRGenFunction(IRGenModule &IGM,
                 Mangle::ExplosionKind explosion,
-                llvm::Function *fn);
+                llvm::Function *fn,
+                SILDebugScope* DS = nullptr);
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);

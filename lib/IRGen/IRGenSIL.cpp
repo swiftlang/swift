@@ -116,7 +116,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f,
                                    ExplosionKind explosionLevel)
   : IRGenFunction(IGM, explosionLevel,
-                  IGM.getAddrOfSILFunction(f, explosionLevel)),
+                  IGM.getAddrOfSILFunction(f, explosionLevel),
+                  f->getDebugScope()),
     CurSILFn(f)
 {}
 
@@ -365,7 +366,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   for (auto &I : *BB) {
     // Set the debug info location for I, if applicable.
     if (IGM.DebugInfo)
-      IGM.DebugInfo->setCurrentLoc(Builder, I.getLoc(), I.getDebugScope());
+      IGM.DebugInfo->setCurrentLoc(Builder, I.getDebugScope(), I.getLoc());
 
     visit(&I);
   }

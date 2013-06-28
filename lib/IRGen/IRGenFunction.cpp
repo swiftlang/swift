@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceLoc.h"
 
 #include "Explosion.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
@@ -30,10 +31,15 @@ using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              ExplosionKind explosionLevel,
-                             llvm::Function *Fn)
+                             llvm::Function *Fn,
+                             SILDebugScope *DS)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
     ContextPtr(nullptr) {
+  // Make sure the instructions in this function are attached its debug scope.
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->setCurrentLoc(Builder, DS);
+
   emitPrologue();
 }
 
