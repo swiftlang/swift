@@ -1394,8 +1394,12 @@ private:
   unsigned OverloadSetCounter = 0;
 
   /// \brief Cached member lookups.
-  llvm::DenseMap<std::pair<Type, Identifier>, std::unique_ptr<MemberLookup>>
+  llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
     MemberLookups;
+
+  /// \brief Cached member type lookups.
+  llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
+    MemberTypeLookups;
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
@@ -1559,7 +1563,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  MemberLookup &lookupMember(Type base, Identifier name);
+  LookupResult &lookupMember(Type base, Identifier name, bool isTypeLookup);
 
   /// \brief Retrieve an unresolved overload set.
   OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {

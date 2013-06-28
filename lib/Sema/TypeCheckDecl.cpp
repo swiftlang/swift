@@ -1021,8 +1021,8 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   }
 
   // We need to look for a default constructor.
-  llvm::SmallVector<ValueDecl *, 4> ctors;
-  if (!lookupConstructors(ty, ctors))
+  auto ctors = lookupConstructors(ty);
+  if (!ctors)
     return false;
 
   // Check whether we have a constructor that can be called with an empty

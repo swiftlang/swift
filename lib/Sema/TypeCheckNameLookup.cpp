@@ -20,13 +20,10 @@
 
 using namespace swift;
 
-bool TypeChecker::lookupMember(Type type, Identifier name,
-                               SmallVectorImpl<ValueDecl *> &members) {
-  // Look through metatypes.
-  while (auto meta = type->getAs<MetaTypeType>()) {
-    type = meta->getInstanceType();
-  }
-
+LookupResult TypeChecker::lookupMember(Type type, Identifier name,
+                                       bool isTypeLookup) {
+  LookupResult result;
+  
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
@@ -44,29 +41,22 @@ bool TypeChecker::lookupMember(Type type, Identifier name,
     }
 
     ConstructorLookup lookup(type, TU);
-    members = lookup.Results;
-    return lookup.isSuccess();
+    for (auto res : lookup.Results) {
+      result.addResult(res);
+    }
+    return result;
   }
 
   // Look for the member.
-  members.clear();
-  MemberLookup lookup(type, name, TU, /*IsTypeLookup=*/false);
-  if (!lookup.isSuccess())
-    return false;
-
-  for (const auto &result : lookup.Results) {
-    if (result.D)
-      members.push_back(result.D);
+  MemberLookup lookup(type, name, TU, isTypeLookup);
+  for (const auto &res : lookup.Results) {
+    if (res.D)
+      result.addResult(res.D);
   }
-
-  assert(!members.empty() && "Cannot have a successful lookup with no members");
-  return true;
+  return result;
 }
 
-bool TypeChecker::lookupConstructors(
-       Type type,
-       SmallVectorImpl<ValueDecl *> &constructors) {
-
+LookupResult TypeChecker::lookupConstructors(Type type) {
   // FIXME: Use of string literal here is lame.
-  return lookupMember(type, Context.getIdentifier("constructor"), constructors);
+  return lookupMember(type, Context.getIdentifier("constructor"), false);
 }

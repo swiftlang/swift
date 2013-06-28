@@ -592,10 +592,11 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
                           memberRef->getBase()->getSemanticsProvidingExpr())) {
           if (base->getDecl()->getName().str().equals("this")) {
             // Look for the member within this type.
-            MemberLookup lookup(nominalDecl->getDeclaredTypeInContext(),
-                                memberRef->getName(), TU);
-            if (lookup.isSuccess() && lookup.Results.size() == 1)
-              member = dyn_cast<VarDecl>(lookup.Results[0].D);
+            auto memberDecls
+              = lookupMember(nominalDecl->getDeclaredTypeInContext(),
+                             memberRef->getName(), /*isTypeLookup=*/false);
+            if (memberDecls.size() == 1)
+              member = dyn_cast<VarDecl>(memberDecls[0]);
           }
         }
       } else if (auto declRef = dyn_cast<DeclRefExpr>(dest)) {

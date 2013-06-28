@@ -2657,8 +2657,9 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
-  MemberLookup lookup(type->getRValueType(), builtinName, tc.TU);
-  if (!lookup.isSuccess()) {
+  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName,
+                                   /*isTypeLookup=*/false);
+  if (!witnesses) {
     // Find the witness we need to use.
     auto witness = findNamedWitness(tc, type->getRValueType(), protocol,
                                     generalName, brokenProtocolDiag);
@@ -2683,19 +2684,20 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
-    lookup = MemberLookup(type->getRValueType(), builtinName, tc.TU);
-    if (!lookup.isSuccess()) {
+    witnesses = tc.lookupMember(type->getRValueType(), builtinName,
+                                /*isTypeLookup=*/false);
+    if (!witnesses) {
       tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
       return nullptr;
     }
   }
 
   // Find the builtin method.
-  if (lookup.Results.size() != 1) {
+  if (witnesses.size() != 1) {
     tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
     return nullptr;
   }
-  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(lookup.Results[0].D);
+  FuncDecl *builtinMethod = dyn_cast<FuncDecl>(witnesses[0]);
   if (!builtinMethod) {
     tc.diagnose(protocol->getLoc(), brokenBuiltinDiag);
     return nullptr;

@@ -26,7 +26,6 @@
 
 namespace swift {
 
-class MemberLookup;
 class TypeChecker;
 
 /// \brief A mapping from substitutable types to the protocol-conformance
@@ -90,6 +89,31 @@ enum class KnownProtocolKind : unsigned {
 
   /// \brief The 'StringLiteralConvertible' protocol, used for string literals.
   StringLiteralConvertible
+};
+
+/// The result of name lookup.
+class LookupResult {
+  /// The set of results found.
+  SmallVector<ValueDecl *, 4> Results;
+
+public:
+  typedef SmallVector<ValueDecl *, 4>::iterator iterator;
+  iterator begin() { return Results.begin(); }
+  iterator end() { return Results.end(); }
+  unsigned size() const { return Results.size(); }
+
+  ValueDecl *operator[](unsigned index) const { return Results[index]; }
+
+  ValueDecl *front() const { return Results.front(); }
+  ValueDecl *back() const { return Results.front(); }
+
+  /// Add a result to the set of results.
+  void addResult(ValueDecl *result) { Results.push_back(result); }
+
+  /// Determine whether the result set is nonempty.
+  explicit operator bool() const {
+    return !Results.empty();
+  }
 };
 
 class TypeChecker : public ASTMutationListener {
@@ -439,19 +463,18 @@ public:
   ///
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
-  /// \param members Will be populated with the set of members found.
+  /// \param isTypeLookup Whether we're looking for a type only (vs. a value).
   ///
-  /// \returns true if any members were found, false otherwise.
-  bool lookupMember(Type type, Identifier name,
-                    SmallVectorImpl<ValueDecl *> &members);
+  /// \returns The result of name lookup.
+  LookupResult lookupMember(Type type, Identifier name,
+                            bool isTypeLookup);
 
   /// \brief Lookup the constructors of the given type.
   ///
   /// \param type The type for which we will look for constructors.
-  /// \param constructors Will be populated with the set of constructors found.
   ///
-  /// \returns true if any members were found, false otherwise.
-  bool lookupConstructors(Type type,SmallVectorImpl<ValueDecl *> &constructors);
+  /// \returns the constructors found for this type.
+  LookupResult lookupConstructors(Type type);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType();

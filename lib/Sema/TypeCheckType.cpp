@@ -273,10 +273,10 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
         // Lookup into a type.
         BaseTy = T;
-        MemberLookup ML(T, C.Id, TU, /*TypeLookup*/true);
-        if (ML.Results.size() == 1)
-          TD = dyn_cast<TypeDecl>(ML.Results.back().D);
+        auto Members = lookupMember(T, C.Id, /*isTypeLookup=*/true);
         // FIXME: Diagnostic if not found or ambiguous?
+        if (Members.size() == 1)
+          TD = dyn_cast<TypeDecl>(Members.back());
       } else {
         diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
           .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
@@ -877,12 +877,16 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
      
     // Retrieve the type with the given name.
     // FIXME: Shouldn't we be using protocol-conformance information here?
-    MemberLookup ML(SubstParent, substOrig->getName(), TU, /*TypeLookup*/true);
-    if (ML.Results.empty() && IgnoreMissing)
+    LookupResult Members;
+    if (!SubstParent->is<TupleType>())
+      Members = lookupMember(SubstParent, substOrig->getName(),
+                             /*isTypeLookup=*/true);
+    if (!Members && IgnoreMissing)
       return type;
 
-    assert(ML.Results.size() && "No type lookup results?");
-    TypeDecl *TD = cast<TypeDecl>(ML.Results.back().D);
+    // FIXME: Detect ambiguities here?
+    assert(Members && "No type lookup results?");
+    TypeDecl *TD = cast<TypeDecl>(Members.back());
     return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);
   });
 }

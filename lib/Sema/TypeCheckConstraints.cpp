@@ -302,12 +302,15 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   return false;
 }
 
-MemberLookup &ConstraintSystem::lookupMember(Type base, Identifier name) {
+LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name,
+                                             bool isTypeLookup) {
   base = base->getCanonicalType();
-  auto &ptr = MemberLookups[{base, name}];
-  if (!ptr)
-    ptr.reset(new MemberLookup(base, name, TC.TU));
-  return *ptr;
+  auto &result = isTypeLookup? MemberTypeLookups[{base, name}]
+                             : MemberLookups[{base, name}];
+  if (!result) {
+    result = TC.lookupMember(base, name, isTypeLookup);
+  }
+  return *result;
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
@@ -736,8 +739,10 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
                                       mappedTypes);
 
   // Look for this member type.
-  MemberLookup &lookup = cs.lookupMember(parentTy, archetype->getName());
-  auto member = cast<TypeDecl>(lookup.Results[0].D);
+  // FIXME: Ambiguity check.
+  LookupResult &lookup = cs.lookupMember(parentTy, archetype->getName(),
+                                         /*isTypeLookup=*/true);
+  auto member = cast<TypeDecl>(lookup[0]);
   auto type = member->getDeclaredType();
   type = cs.getTypeChecker().substMemberTypeWithBase(type, member, parentTy);
   mappedTypes[archetype] = type;
@@ -1784,8 +1789,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     auto &context = getASTContext();
     // FIXME: lame name!
     auto name = context.getIdentifier("__conversion");
-    MemberLookup &lookup = lookupMember(type1, name);
-    if (lookup.isSuccess()) {
+    if (lookupMember(type1, name, /*isTypeLookup=*/false)) {
       auto memberLocator = getConstraintLocator(
                               locator.withPathElement(
                                 ConstraintLocator::ConversionMember));
@@ -2036,8 +2040,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
     return SolutionKind::Error;
   }
 
-  SmallVector<ValueDecl *, 4> ctors;
-  if (!TC.lookupConstructors(valueType, ctors)) {
+  auto ctors = TC.lookupConstructors(valueType);
+  if (!ctors) {
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
       recordFailure(locator, Failure::TypesNotConstructible,
@@ -2168,8 +2172,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   bool isExistential = baseObjTy->isExistentialType();
   if (name.str() == "constructor") {
     // Constructors have their own approach to name lookup.
-    SmallVector<ValueDecl *, 4> ctors;
-    if (!TC.lookupConstructors(baseObjTy, ctors)) {
+    auto ctors = TC.lookupConstructors(baseObjTy);
+    if (!ctors) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
 
@@ -2238,8 +2242,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   }
 
   // Look for members within the base.
-  MemberLookup &lookup = lookupMember(baseObjTy, name);
-  if (!lookup.isSuccess()) {
+  LookupResult &lookup = lookupMember(baseObjTy, name,
+                                      /*isTypeLookup=*/constraint.getKind()
+                                        == ConstraintKind::TypeMember);
+  if (!lookup) {
     recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                   baseObjTy, name);
 
@@ -2251,24 +2257,24 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
   bool isMetatype = baseObjTy->is<MetaTypeType>();
-  for (auto &result : lookup.Results) {
+  for (auto result : lookup) {
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     // FIXME: Mark this as 'unavailable'.
-    if (isExistential && involvesAssociatedTypes(getTypeChecker(), result.D))
+    if (isExistential && involvesAssociatedTypes(getTypeChecker(), result))
       continue;
 
     // If we are looking for a metatype member, don't include members that can
     // only be accessed on an instance of the object.
     // FIXME: Mark as 'unavailable' somehow.
     if (isMetatype &&
-        !(isa<FuncDecl>(result.D) ||
-          isa<OneOfElementDecl>(result.D) ||
-          !result.D->isInstanceMember())) {
+        !(isa<FuncDecl>(result) ||
+          isa<OneOfElementDecl>(result) ||
+          !result->isInstanceMember())) {
       continue;
     }
 
-    choices.push_back(OverloadChoice(baseTy, result.D));
+    choices.push_back(OverloadChoice(baseTy, result));
   }
 
   if (choices.empty()) {

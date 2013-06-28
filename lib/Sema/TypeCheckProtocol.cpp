@@ -477,11 +477,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     }
 
-    MemberLookup Lookup(metaT, AssociatedType->getName(), TC.TU);
+    auto candidates = TC.lookupMember(metaT, AssociatedType->getName(),
+                                      /*isTypeLookup=*/true);
 
     // If we didn't find any matches, consider this associated type to be
     // unresolved.
-    if (!Lookup.isSuccess()) {
+    if (!candidates) {
       unresolvedAssocTypes.push_back(AssociatedType);
       continue;
     }
@@ -489,48 +490,37 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
     SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
 
-    for (auto Candidate : Lookup.Results) {
-      switch (Candidate.Kind) {
-      case MemberLookupResult::MetaArchetypeMember:
-      case MemberLookupResult::MetatypeMember:
-        if (auto TypeD = dyn_cast<TypeDecl>(Candidate.D)) {
-          // Check this type against the protocol requirements.
-          bool SatisfiesRequirements = true;
+    for (auto Candidate : candidates) {
+      auto TypeD = dyn_cast<TypeDecl>(Candidate);
+      if (!TypeD)
+        continue;
 
-          Type WitnessTy
-            = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
+      // Check this type against the protocol requirements.
+      bool SatisfiesRequirements = true;
 
-          for (auto Req : AssociatedType->getInherited()) {
-            SmallVector<ProtocolDecl *, 4> ReqProtos;
-            if (!Req.getType()->isExistentialType(ReqProtos))
-              return nullptr;
+      Type WitnessTy
+        = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
 
-            for (auto ReqProto : ReqProtos) {
-              if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
-                SatisfiesRequirements = false;
+      for (auto Req : AssociatedType->getInherited()) {
+        SmallVector<ProtocolDecl *, 4> ReqProtos;
+        if (!Req.getType()->isExistentialType(ReqProtos))
+          return nullptr;
 
-                NonViable.push_back({TypeD, ReqProto});
-                break;
-              }
-            }
+        for (auto ReqProto : ReqProtos) {
+          if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
+            SatisfiesRequirements = false;
 
-            if (!SatisfiesRequirements)
-              break;
+            NonViable.push_back({TypeD, ReqProto});
+            break;
           }
-
-          if (SatisfiesRequirements)
-            Viable.push_back({TypeD, WitnessTy});
         }
-        break;
 
-      case MemberLookupResult::MemberProperty:
-      case MemberLookupResult::MemberFunction:
-      case MemberLookupResult::ExistentialMember:
-      case MemberLookupResult::ArchetypeMember:
-      case MemberLookupResult::GenericParameter:
-        // These results cannot satisfy type requirements.
-        break;
+        if (!SatisfiesRequirements)
+          break;
       }
+
+      if (SatisfiesRequirements)
+        Viable.push_back({TypeD, WitnessTy});
     }
     
     if (Viable.size() == 1) {
@@ -592,8 +582,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       
       TC.diagnose(AssociatedType, diag::no_witnesses_type,
                   AssociatedType->getName());
-      for (auto Candidate : Lookup.Results)
-        TC.diagnose(Candidate.D, diag::protocol_witness_type);
+      for (auto candidate : candidates)
+        TC.diagnose(candidate, diag::protocol_witness_type);
       
       TypeMapping[archetype] = ErrorType::get(TC.Context);
     } else {
@@ -640,13 +630,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
     } else {
       // Variable/function/subscript requirements.
-      MemberLookup Lookup(metaT, Requirement->getName(), TC.TU);
-
-      if (Lookup.isSuccess()) {
-        for (auto Candidate : Lookup.Results) {
-          assert(Candidate.D);
-          witnesses.push_back(Candidate.D);
-        }
+      for (auto candidate : TC.lookupMember(metaT, Requirement->getName(),
+                                            /*isTypeLookup=*/false)) {
+          witnesses.push_back(candidate);
       }
     }
 

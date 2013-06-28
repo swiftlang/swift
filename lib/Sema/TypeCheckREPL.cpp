@@ -126,7 +126,6 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
            SmallVectorImpl<ValueDecl*> &PrintDecls) {
 
   ASTContext &Context = TC.Context;
-  TranslationUnit &TU = TC.TU;
 
   PrintLiteralString("<", TC, Loc, PrintDecls, BodyContent);
   
@@ -135,9 +134,7 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
   bool showedDynamicType = false;
   Identifier MemberName = Context.getIdentifier("className");
   Type MetaT = MetaTypeType::get(SugarT, Context);
-  MemberLookup Lookup(MetaT, MemberName, TU);
-  
-  if (Lookup.isSuccess()) {
+  if (TC.lookupMember(MetaT,MemberName,/*isTypeLookup=*/false)){
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
@@ -322,7 +319,6 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
               SmallVectorImpl<ValueDecl*> &PrintDecls,
               DeclContext *DC) {
   ASTContext &Context = TC.Context;
-  TranslationUnit &TU = TC.TU;
 
   if (TupleType *TT = dyn_cast<TupleType>(T)) {
     // We print a tuple by printing each element.
@@ -344,20 +340,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   }
 
   Identifier MemberName = Context.getIdentifier("replPrint");
-  MemberLookup Lookup(T, MemberName, TU);
-
-  // Don't try to use an instance method to print a metatype. Filter out
-  // instance members if our expression evaluated to a metatype.
-  if (T->is<MetaTypeType>()) {
-    auto staticEnd = std::remove_if(
-                        Lookup.Results.begin(), Lookup.Results.end(),
-                        [](MemberLookupResult const &r) {
-                          return r.Kind != MemberLookupResult::MetatypeMember;
-                        });
-    Lookup.Results.erase(staticEnd, Lookup.Results.end());
-  }
-  
-  if (Lookup.isSuccess()) {
+  if (TC.lookupMember(T, MemberName, /*isTypeLookup=*/false)) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                    EndLoc);
