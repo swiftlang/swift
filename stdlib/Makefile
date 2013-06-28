@@ -23,6 +23,8 @@ SHARED_LIBRARY := 1
 # sed is used here to strip comments.
 SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/SwiftLibSources.txt" )
 
+POSIX_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/POSIXLibSources.txt" )
+
 # Replace Word.swift with Word64.swift or Word32.swift, according to
 # the target architecture
 ifeq ($(ARCH),x86_64)
@@ -48,7 +50,7 @@ endif
 # Done with SWIFT_SOURCES
 #
 
-SOURCES := swift.swift
+SOURCES := swift.swift POSIX.swift
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
@@ -74,19 +76,29 @@ LDFLAGS += -framework Foundation \
 	   -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
+PATH_TO_POSIX_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(POSIX_SOURCES))
 
 $(SWIFT_HEADER_DIR)/swift.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
+$(SWIFT_HEADER_DIR)/POSIX.swift: $(PATH_TO_POSIX_SOURCES) $(SWIFT_HEADER_DIR)
+	$(Echo) FIXME -- HACK -- Concatenating $(POSIX_SOURCES) to build dir
+	$(Verb) cat $(PATH_TO_POSIX_SOURCES) > $@
+
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
+
 $(ObjDir)/swift.o: $(SWIFT_HEADER_DIR)/swift.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) -o $@ -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+
+$(ObjDir)/POSIX.o: $(SWIFT_HEADER_DIR)/POSIX.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a $(ObjDir)/swift.o
+	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
+	$(Verb) $(SWIFT_COMPILER) -o $@ -parse-as-library $(PATH_TO_POSIX_SOURCES)
 
 $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
 	ln -s ../$(@F) $@
 
 $(SharedLibDir)/%.$(SHLIBEXT): $(SharedLibDir)/swift/%.$(SHLIBEXT)
 
-all-local:: $(SWIFT_HEADER_DIR)/swift.swift
+all-local:: $(SWIFT_HEADER_DIR)/swift.swift $(SWIFT_HEADER_DIR)/POSIX.swift
