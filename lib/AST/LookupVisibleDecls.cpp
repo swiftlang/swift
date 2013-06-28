@@ -102,8 +102,6 @@ static void doMemberLookup(Type BaseTy,
                            bool IsTypeLookup,
                            bool OnlyInstanceMembers,
                            VisitedSet &Visited) {
-  typedef MemberLookupResult Result;
-  
   // Just look through l-valueness.  It doesn't affect name lookup.
   BaseTy = BaseTy->getRValueType();
 

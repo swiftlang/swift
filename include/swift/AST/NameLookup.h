@@ -34,125 +34,6 @@ namespace swift {
   class Module;
   class TupleType;
 
-/// MemberLookupResult - One result of member name lookup.
-struct MemberLookupResult {
-  /// D - The decl found.
-  ValueDecl *D;
-
-  /// Kind - The kind of reference.
-  enum KindTy {
-    /// MemberProperty - "a.x" refers to an "x" which is an instance property
-    /// of "a".
-    MemberProperty,
-
-    /// MemberFunction - "a.x" refers to an "x" which is an instance function
-    /// of "a".  "A.x" refers to a curried function such that "A.x(a)" is
-    /// equivalent to "x.a" if "A" is the metatype of the type of "a".
-    MemberFunction,
-
-    /// MetatypeMember - "A.x" refers to an "x" which is a member of the
-    /// metatype "A". "a.x" is illegal.
-    MetatypeMember,
-    
-    /// ExistentialMember - "a.x" refers to a member of an existential type.
-    ExistentialMember,
-
-    /// ArchetypeMember - "a.x" refers to a member of an archetype (which was
-    /// actually found in a protocol to which that archetype conforms).
-    ArchetypeMember,
-
-    /// MetaArchetypeMember - "A.x"  refers to an "x" which is a member of
-    /// the metatype A of an archetype (A'). May also occur for "a.x" when "x"
-    /// is not an instance member, e.g., it is a type or a static function.
-    /// In either case, the base is evaluated and ignored.
-    MetaArchetypeMember,
-
-    /// \brief Lookup has found a generic parameter.
-    GenericParameter
-  } Kind;
-  
-  static MemberLookupResult getMemberProperty(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = MemberProperty;
-    return R;
-  }
-  static MemberLookupResult getMemberFunction(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = MemberFunction;
-    return R;
-  }
-  static MemberLookupResult getMetatypeMember(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = MetatypeMember;
-    return R;
-  }
-  static MemberLookupResult getExistentialMember(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = ExistentialMember;
-    return R;
-  }
-  static MemberLookupResult getArchetypeMember(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = ArchetypeMember;
-    return R;
-  }
-
-  static MemberLookupResult getMetaArchetypeMember(ValueDecl *D) {
-    MemberLookupResult R;
-    R.D = D;
-    R.Kind = MetaArchetypeMember;
-    return R;
-  }
-
-  static MemberLookupResult getGenericParameter(TypeAliasDecl *D) {
-    MemberLookupResult R;
-    R.D = reinterpret_cast<ValueDecl *>(D);
-    R.Kind = GenericParameter;
-    return R;
-  }
-};
-  
-/// MemberLookup - This class implements and represents the result of performing
-/// "dot" style member lookup.
-class MemberLookup {
-  MemberLookup(const MemberLookup&) = delete;
-  void operator=(const MemberLookup&) = delete;
-public:
-  MemberLookup(MemberLookup&&) = default;
-  MemberLookup &operator=(MemberLookup&&) = default;
-
-  /// MemberLookup ctor - Lookup a member 'Name' in 'BaseTy' within the context
-  /// of a given module 'M'.  This operation corresponds to a standard "dot" 
-  /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
-  /// operation is only valid after name binding.
-  MemberLookup(Type BaseTy, Identifier Name, Module &M,
-               bool IsTypeLookup = false, bool VisitSuperclasses = true);
-
-  /// Results - The constructor fills this vector in with all of the results.
-  /// If name lookup failed, this is empty.
-  llvm::SmallVector<MemberLookupResult, 4> Results;
-  
-  /// isSuccess - Return true if anything was found by the name lookup.
-  bool isSuccess() const { return !Results.empty(); }
-  
-  /// getMemberName - Retrieve the name of the member this lookup searched for.
-  Identifier getMemberName() const { return MemberName; }
-  
-private:
-  Identifier MemberName;
-  bool IsTypeLookup;
-  bool VisitSuperclasses;
-  typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-  void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
-  void lookupMembers(Type BaseType, Module &M,
-                     SmallVectorImpl<ValueDecl*> &Result);
-};
-
 /// UnqualifiedLookupResult - One result of unqualified lookup.
 struct UnqualifiedLookupResult {
 private:
@@ -303,8 +184,6 @@ public:
 /// UnqualifiedLookup - This class implements and represents the result of
 /// performing unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
-  UnqualifiedLookup(const MemberLookup&) = delete;
-  void operator=(const MemberLookup&) = delete;
 public:
   /// UnqualifiedLookup ctor - Lookup an unqualfied identifier 'Name' in the
   /// context.  If the current DeclContext is nested in a FuncExpr, the

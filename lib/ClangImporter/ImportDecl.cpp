@@ -1738,11 +1738,12 @@ namespace {
       // FIXME: This ends up looking in the superclass for entirely bogus
       // reasons. Fix it.
       auto containerTy = dc->getDeclaredTypeInContext();
-      auto containerMetaTy = MetaTypeType::get(containerTy, context);
-      MemberLookup lookup(containerMetaTy, name, *Impl.firstClangModule);
+      SmallVector<ValueDecl *, 2> lookup;
+      context.lookup(containerTy, name, Impl.firstClangModule, NL_Default,
+                     lookup);
       Type unlabeledIndices;
-      for (const auto &result : lookup.Results) {
-        auto parentSub = dyn_cast<SubscriptDecl>(result.D);
+      for (auto result : lookup) {
+        auto parentSub = dyn_cast<SubscriptDecl>(result);
         if (!parentSub)
           continue;
 
@@ -2232,13 +2233,14 @@ namespace {
       // the methods directly, to avoid ambiguities.
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
-      auto containerMetaTy = MetaTypeType::get(containerTy, Impl.SwiftContext);
-      MemberLookup lookup(containerMetaTy, name, *Impl.firstClangModule);
-      for (const auto &result : lookup.Results) {
-        if (isa<FuncDecl>(result.D))
+      SmallVector<ValueDecl *, 2> lookup;
+      Impl.SwiftContext.lookup(containerTy, name, Impl.firstClangModule,
+                               NL_Default, lookup);
+      for (auto result : lookup) {
+        if (isa<FuncDecl>(result))
           return nullptr;
 
-        if (auto var = dyn_cast<VarDecl>(result.D))
+        if (auto var = dyn_cast<VarDecl>(result))
           overridden = var;
       }
 

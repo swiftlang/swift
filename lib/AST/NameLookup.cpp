@@ -133,204 +133,6 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
               decls.end());
 }
 
-MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M,
-                           bool TypeLookup, bool VisitSuperclasses) {
-  MemberName = Name;
-  IsTypeLookup = TypeLookup;
-  this->VisitSuperclasses = VisitSuperclasses;
-  VisitedSet Visited;
-  doIt(BaseTy, M, Visited);
-}
-
-/// doIt - Lookup a member 'Name' in 'BaseTy' within the context
-/// of a given module 'M'.  This operation corresponds to a standard "dot" 
-/// lookup operation like "a.b" where 'this' is the type of 'a'.  This
-/// operation is only valid after name binding.
-void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
-  typedef MemberLookupResult Result;
-  
-  // Just look through l-valueness.  It doesn't affect name lookup.
-  BaseTy = BaseTy->getRValueType();
-
-  // Type check metatype references, as in "some_type.some_member".  These are
-  // special and can't have extensions.
-  if (MetaTypeType *MTT = BaseTy->getAs<MetaTypeType>()) {
-    // The metatype represents an arbitrary named type: dig through to the
-    // declared type to see what we're dealing with.
-    Type Ty = MTT->getInstanceType();
-
-    // Just perform normal dot lookup on the type with the specified
-    // member name to see if we find extensions or anything else.  For example,
-    // type SomeTy.SomeMember can look up static functions, and can even look
-    // up non-static functions as well (thus getting the address of the member).
-    doIt(Ty, M, Visited);
-    return;
-  }
-  
-  // Lookup module references, as on some_module.some_member.  These are
-  // special and can't have extensions.
-  if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-    SmallVector<ValueDecl*, 8> Decls;
-    MT->getModule()->lookupValue(Module::AccessPathTy(), MemberName,
-                                 NLKind::QualifiedLookup, Decls);
-    for (ValueDecl *VD : Decls) {
-      Results.push_back(Result::getMetatypeMember(VD));
-    }
-    return;
-  }
-
-  // If the base is a protocol, see if this is a reference to a declared
-  // protocol member.
-  if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    if (!Visited.insert(PT->getDecl()))
-      return;
-      
-    for (auto Inherited : PT->getDecl()->getInherited())
-      doIt(Inherited.getType(), M, Visited);
-    
-    for (auto Member : PT->getDecl()->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-        if (VD->getName() != MemberName) continue;
-        if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) || isa<FuncDecl>(VD)) {
-          Results.push_back(Result::getExistentialMember(VD));
-        } else {
-          assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
-          Results.push_back(Result::getMetatypeMember(VD));
-        }
-      }
-    }
-    return;
-  }
-  
-  // If the base is a protocol composition, see if this is a reference to a
-  // declared protocol member in any of the protocols.
-  if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
-    for (auto Proto : PC->getProtocols())
-      doIt(Proto, M, Visited);
-    return;
-  }
-
-  // Check to see if any of an archetype's requirements have the member.
-  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
-    for (auto Proto : Archetype->getConformsTo())
-      doIt(Proto->getDeclaredType(), M, Visited);
-
-    if (auto superclass = Archetype->getSuperclass())
-      doIt(superclass, M, Visited);
-
-    // Change existential and metatype members to archetype members, since
-    // we're in an archetype.
-    for (auto &Result : Results) {
-      switch (Result.Kind) {
-      case MemberLookupResult::ExistentialMember:
-        Result.Kind = MemberLookupResult::ArchetypeMember;
-        break;
-
-      case MemberLookupResult::MetatypeMember:
-        Result.Kind = MemberLookupResult::MetaArchetypeMember;
-        break;
-
-      case MemberLookupResult::MemberProperty:
-      case MemberLookupResult::MemberFunction:
-      case MemberLookupResult::GenericParameter:
-        break;
-          
-      case MemberLookupResult::MetaArchetypeMember:
-      case MemberLookupResult::ArchetypeMember:
-        llvm_unreachable("wrong member lookup result in archetype");
-        break;
-      }
-    }
-    return;
-  }
-
-  do {
-    // Look in for members of a nominal type.
-    SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupMembers(BaseTy, M, ExtensionMethods);
-
-    for (ValueDecl *VD : ExtensionMethods) {
-      if (TypeDecl *TD = dyn_cast<TypeDecl>(VD)) {
-        auto TAD = dyn_cast<TypeAliasDecl>(TD);
-        if (TAD && TAD->isGenericParameter())
-          Results.push_back(Result::getGenericParameter(TAD));
-        else
-          Results.push_back(Result::getMetatypeMember(TD));
-        continue;
-      }
-
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
-        if (FD->isStatic())
-          Results.push_back(Result::getMetatypeMember(FD));
-        else
-          Results.push_back(Result::getMemberFunction(FD));
-        continue;
-      }
-      if (OneOfElementDecl *OOED = dyn_cast<OneOfElementDecl>(VD)) {
-        Results.push_back(Result::getMetatypeMember(OOED));
-        continue;
-      }
-      assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) ||
-              isa<ConstructorDecl>(VD)) &&
-             "Unexpected extension member");
-      Results.push_back(Result::getMemberProperty(VD));
-    }
-
-    // If we have a class type, look into its base class.
-    ClassDecl *CurClass = nullptr;
-    if (auto CT = BaseTy->getAs<ClassType>())
-      CurClass = CT->getDecl();
-    else if (auto BGT = BaseTy->getAs<BoundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(BGT->getDecl());
-    else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
-      CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
-
-    if (VisitSuperclasses && CurClass && CurClass->hasBaseClass()) {
-      BaseTy = CurClass->getBaseClass();
-    } else {
-      break;
-    }
-  } while (1);
-
-  // Find any overridden methods.
-  llvm::SmallPtrSet<ValueDecl*, 8> Overridden;
-  for (const auto &Result : Results) {
-    if (auto FD = dyn_cast<FuncDecl>(Result.D)) {
-      if (FD->getOverriddenDecl())
-        Overridden.insert(FD->getOverriddenDecl());
-    } else if (auto VarD = dyn_cast<VarDecl>(Result.D)) {
-      if (VarD->getOverriddenDecl())
-        Overridden.insert(VarD->getOverriddenDecl());
-    } else if (auto SD = dyn_cast<SubscriptDecl>(Result.D)) {
-      if (SD->getOverriddenDecl())
-        Overridden.insert(SD->getOverriddenDecl());
-    }
-  }
-
-  // If any methods were overridden, remove them from the results.
-  if (!Overridden.empty()) {
-    Results.erase(std::remove_if(Results.begin(), Results.end(),
-                                 [&](MemberLookupResult &Res) -> bool {
-                                   return Overridden.count(Res.D);
-                                 }),
-                  Results.end());
-  }
-}
-
-void MemberLookup::lookupMembers(Type BaseType, Module &M,
-                                 SmallVectorImpl<ValueDecl*> &Result) {
-  NominalTypeDecl *D = BaseType->getAnyNominal();
-  if (!D)
-    return;
-
-  // Look for the members of this nominal type and its extensions.
-  auto DirectMembers = D->lookupDirect(MemberName);
-  Result.append(DirectMembers.begin(), DirectMembers.end());
-
-  // Handle shadowing.
-  removeShadowedDecls(Result, &M);
-}
-
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   SourceLoc Loc;
   Identifier Name;
@@ -582,51 +384,63 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     }
 
     if (BaseDecl) {
-      MemberLookup Lookup(ExtendedType, Name, M, IsTypeLookup);
-      
-      for (auto Result : Lookup.Results) {
-        switch (Result.Kind) {
-        case MemberLookupResult::MemberProperty:
-          Results.push_back(Result::getMemberProperty(BaseDecl, Result.D));
-          break;
-        case MemberLookupResult::MemberFunction:
-          if (ExtendedType->is<MetaTypeType>() ||
-              Result.D->isInstanceMember())
-            Results.push_back(Result::getMemberFunction(BaseDecl, Result.D));
-          break;
-        case MemberLookupResult::MetatypeMember:
-          // For results that can only be accessed via the metatype (e.g.,
-          // type aliases), we need to use the metatype declaration as the
-          // base.
-          if (ExtendedType->is<MetaTypeType>() ||
-              !isa<FuncDecl>(Result.D) ||
-              Result.D->isInstanceMember())
-            Results.push_back(Result::getMetatypeMember(isa<FuncDecl>(Result.D)
-                                                          ? BaseDecl
-                                                          : MetaBaseDecl,
-                                                        Result.D));
-          break;
-        case MemberLookupResult::ExistentialMember:
-          Results.push_back(Result::getExistentialMember(BaseDecl, Result.D));
-          break;
-        case MemberLookupResult::ArchetypeMember:
-          Results.push_back(Result::getArchetypeMember(BaseDecl, Result.D));
-          break;
-        case MemberLookupResult::MetaArchetypeMember:
-          // For results that can only be accessed via the metatype (e.g.,
-          // type aliases), we need to use the metatype declaration as the
-          // base.
-          Results.push_back(Result::getMetaArchetypeMember(
-                              isa<FuncDecl>(Result.D)? BaseDecl : MetaBaseDecl,
-                              Result.D));
-          break;
-        case MemberLookupResult::GenericParameter:
-          // All generic parameters are 'local'.
-          Results.push_back(Result::getLocalDecl(Result.D));
-          break;
+      SmallVector<ValueDecl *, 4> Lookup;
+      DC->getASTContext().lookup(ExtendedType, Name, &M, NL_Default, Lookup);
+      bool isMetatypeType = ExtendedType->is<MetaTypeType>();
+      bool FoundAny = false;
+      for (auto Result : Lookup) {
+        // If we're looking into an instance, skip static functions.
+        if (!isMetatypeType &&
+            isa<FuncDecl>(Result) &&
+            cast<FuncDecl>(Result)->isStatic())
+          continue;
+
+        // Classify this declaration.
+        FoundAny = true;
+
+        // Types are local or metatype members.
+        if (auto TD = dyn_cast<TypeDecl>(Result)) {
+          auto TAD = dyn_cast<TypeAliasDecl>(TD);
+          if (TAD && TAD->isGenericParameter())
+            Results.push_back(Result::getLocalDecl(Result));
+          else
+            Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
+          continue;
         }
+
+        // Functions are either metatype members or member functions.
+        if (auto FD = dyn_cast<FuncDecl>(Result)) {
+          if (FD->isStatic()) {
+            if (isMetatypeType)
+              Results.push_back(Result::getMetatypeMember(BaseDecl, Result));
+          } else {
+            Results.push_back(Result::getMemberFunction(BaseDecl, Result));
+          }
+          continue;
+        }
+
+        if (isa<OneOfElementDecl>(Result)) {
+          Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
+          continue;
+        }
+
+        // Archetype members
+        if (ExtendedType->is<ArchetypeType>()) {
+          Results.push_back(Result::getArchetypeMember(BaseDecl, Result));
+          continue;
+        }
+
+        // Existential members.
+        if (ExtendedType->isExistentialType()) {
+          Results.push_back(Result::getExistentialMember(BaseDecl, Result));
+          continue;
+        }
+
+        // Everything else is a member property.
+        Results.push_back(Result::getMemberProperty(BaseDecl, Result));
       }
-      if (Lookup.isSuccess())
+
+      if (FoundAny)
         return;
     }
 
