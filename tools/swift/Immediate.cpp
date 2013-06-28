@@ -168,9 +168,7 @@ static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLin
                                        (void*)&swift::RunImmediately));
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  llvm::sys::path::append(LibPath, "lib");
-  llvm::sys::path::append(LibPath, "swift");
-  llvm::sys::path::append(LibPath, sharedLibName);
+  llvm::sys::path::append(LibPath, "lib", "swift", sharedLibName);
   dlopen(LibPath.c_str(), 0);
 }
 
