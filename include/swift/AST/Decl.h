@@ -639,10 +639,15 @@ class ExtensionDecl : public Decl, public DeclContext {
   ArrayRef<ProtocolConformance *> Conformances;
 
   /// \brief The next extension in the linked list of extensions.
-  ExtensionDecl *NextExtension = nullptr;
+  ///
+  /// The bit indicates whether this extension has been resolved to refer to
+  /// a known nominal type.
+  llvm::PointerIntPair<ExtensionDecl *, 1, bool> NextExtension
+    = {nullptr, false};
 
   friend class ExtensionIterator;
   friend class NominalTypeDecl;
+  friend class MemberLookupTable;
 
 public:
   using Decl::getASTContext;
@@ -685,10 +690,7 @@ public:
   }
 
   ArrayRef<Decl*> getMembers() const { return Members; }
-  void setMembers(ArrayRef<Decl*> M, SourceRange B) {
-    Members = M;
-    Braces = B;
-  }
+  void setMembers(ArrayRef<Decl*> M, SourceRange B);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -713,7 +715,7 @@ public:
   ExtensionDecl *operator->() const { return current; }
 
   ExtensionIterator &operator++() {
-    current = current->NextExtension;
+    current = current->NextExtension.getPointer();
     return *this;
   }
 
@@ -1023,6 +1025,8 @@ public:
   }
 };
 
+class MemberLookupTable;
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
@@ -1040,11 +1044,23 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// \brief The generation at which we last loaded extensions.
   unsigned ExtensionGeneration = 0;
 
+  /// \brief A lookup table containing all of the members of this type and
+  /// its extensions.
+  ///
+  /// The table itself is lazily constructed and updated when lookupDirect() is
+  /// called.
+  MemberLookupTable *LookupTable = nullptr;
+
+  friend class MemberLookupTable;
+  friend class ExtensionDecl;
+  
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
   
 public:
+  using TypeDecl::getASTContext;
+
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
                   MutableArrayRef<TypeLoc> inherited,
                   GenericParamList *GenericParams) :
@@ -1054,10 +1070,7 @@ public:
 
   ArrayRef<Decl*> getMembers() const { return Members; }
   SourceRange getBraces() const { return Braces; }
-  void setMembers(ArrayRef<Decl*> M, SourceRange B) {
-    Members = M;
-    Braces = B;
-  }
+  void setMembers(ArrayRef<Decl*> M, SourceRange B);
 
   GenericParamList *getGenericParams() const { return GenericParams; }
 
@@ -1075,6 +1088,15 @@ public:
 
   /// \brief Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
+
+  /// Find all of the declarations with the given name within this nominal type
+  /// and its extensions.
+  ///
+  /// This routine does not look into base classes, nor does it consider
+  /// protocols to which the nominal type conforms. Furthermore, the resulting
+  /// set of declarations has not been filtered for visibility, nor have
+  /// overridden declarations been removed.
+  ArrayRef<ValueDecl *> lookupDirect(Identifier name);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

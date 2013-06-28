@@ -27,8 +27,9 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
-#include <vector>
+#include <functional>
 #include <utility>
+#include <vector>
 
 namespace llvm {
   class BumpPtrAllocator;
@@ -293,6 +294,9 @@ public:
   /// \brief Notify all of the mutation listeners that the given type
   /// was just added.
   void addedExternalType(Type type);
+
+  /// Add a cleanup function to be called when the ASTContext is deallocated.
+  void addCleanup(std::function<void(void)> cleanup);
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions

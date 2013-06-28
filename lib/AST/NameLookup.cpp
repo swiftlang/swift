@@ -1,3 +1,4 @@
+
 //===--- NameLookup.cpp - Swift Name Lookup Routines ----------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -351,7 +352,18 @@ void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
 
 void MemberLookup::lookupMembers(Type BaseType, Module &M,
                                  SmallVectorImpl<ValueDecl*> &Result) {
-  NominalTypeDecl *D;
+  NominalTypeDecl *D = BaseType->getAnyNominal();
+  if (!D)
+    return;
+
+#if 1
+  // Look for the members of this nominal type and its extensions.
+  auto DirectMembers = D->lookupDirect(MemberName);
+  Result.append(DirectMembers.begin(), DirectMembers.end());
+
+  // Handle shadowing.
+  removeShadowedDecls(Result, IsTypeLookup, &M);
+#else
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
   if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
@@ -381,6 +393,7 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
 
   DoGlobalExtensionLookup(BaseType, MemberName, BaseMembers, &M,
                           cast<Module>(DC), IsTypeLookup, Result);
+#endif
 }
 
 ConstructorLookup::ConstructorLookup(Type BaseType, Module &M) {
@@ -846,3 +859,176 @@ TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
     return nullptr;
   return cast<TypeDecl>(Results.back().getValueDecl());
 }
+
+#pragma mark Member lookup table
+
+/// Lookup table used to store members of a nominal type (and its extensions)
+/// for fast retrieval.
+class swift::MemberLookupTable {
+  /// The last extension that was included within the member lookup table's
+  /// results.
+  ExtensionDecl *LastExtensionIncluded = nullptr;
+
+  /// The type of the internal lookup table.
+  typedef llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl *>>
+    LookupTable;
+
+  /// Lookup table mapping names to the set of declarations with that name.
+  LookupTable Lookup;
+
+public:
+  /// Create a new member lookup table for the given nominal type.
+  explicit MemberLookupTable(NominalTypeDecl *nominal);
+
+  /// Update a lookup table with members from newly-added extensions.
+  void updateLookupTable(NominalTypeDecl *nominal);
+
+  /// \brief Add the given members to the lookup table.
+  void addMembers(ArrayRef<Decl *> members);
+
+  /// \brief The given extension has been extended with new members; add them
+  /// if appropriate.
+  void addExtensionMembers(NominalTypeDecl *nominal,
+                           ExtensionDecl *ext,
+                           ArrayRef<Decl *> members);
+
+  /// Iterator into the lookup table.
+  typedef LookupTable::iterator iterator;
+
+  iterator begin() { return Lookup.begin(); }
+  iterator end() { return Lookup.end(); }
+
+  iterator find(Identifier name) {
+    return Lookup.find(name);
+  }
+};
+
+MemberLookupTable::MemberLookupTable(NominalTypeDecl *nominal) {
+  // Add the members of the nominal declaration to the table.
+  addMembers(nominal->getMembers());
+
+  // If this type has generic parameters, add them.
+  // FIXME: This feels wrong. Shouldn't these only be available for
+  // unqualified name lookup?
+  if (nominal->getGenericParams())
+    for (auto gp : *nominal->getGenericParams())
+      addMembers(gp.getDecl());
+
+  // Update the lookup table to introduce members from extensions.
+  updateLookupTable(nominal);
+}
+
+void MemberLookupTable::addMembers(ArrayRef<Decl *> members) {
+  for (auto member : members) {
+    // Only value declarations matter.
+    auto vd = dyn_cast<ValueDecl>(member);
+    if (!vd)
+      continue;
+
+    // Unnamed entities cannot be found by name lookup.
+    if (vd->getName().empty())
+      continue;
+
+    // Add this declaration to the lookup set.
+    Lookup[vd->getName()].push_back(vd);
+  }
+}
+
+void MemberLookupTable::addExtensionMembers(NominalTypeDecl *nominal,
+                                            ExtensionDecl *ext,
+                                            ArrayRef<Decl *> members) {
+  // We have not processed any extensions yet, so there's nothing to do.
+  if (!LastExtensionIncluded)
+    return;
+
+  // If this extension shows up in the list of extensions not yet included
+  // in the lookup table, there's nothing to do.
+  for (auto notIncluded = LastExtensionIncluded->NextExtension.getPointer();
+       notIncluded;
+       notIncluded = notIncluded->NextExtension.getPointer()) {
+    if (notIncluded == ext)
+      return;
+  }
+
+  // Add the new members to the lookup table.
+  addMembers(members);
+}
+
+void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
+  // If the last extension we included is the same as the last known extension,
+  // we're already up-to-date.
+  if (LastExtensionIncluded == nominal->LastExtension)
+    return;
+
+  // Add members from each of the extensions that we have not yet visited.
+  for (auto next = LastExtensionIncluded
+                     ? LastExtensionIncluded->NextExtension.getPointer()
+                     : nominal->FirstExtension;
+       next;
+       LastExtensionIncluded = next, next = next->NextExtension.getPointer()) {
+    addMembers(next->getMembers());
+  }
+}
+
+void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
+  // If we have already constructed a lookup table and we are adding members,
+  // add them to the lookup table.
+  if (LookupTable && M.size() > Members.size()) {
+    // Make sure we have the complete list of extensions.
+    (void)getExtensions();
+    
+    LookupTable->addMembers(M.slice(Members.size()));
+  }
+
+  Members = M;
+  Braces = B;
+}
+
+ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
+  // Make sure we have the complete list of extensions.
+  (void)getExtensions();
+
+  if (!LookupTable) {
+    // Create the lookup table.
+    auto &ctx = getASTContext();
+    void *mem = ctx.Allocate(sizeof(MemberLookupTable),
+                             alignof(MemberLookupTable));
+    LookupTable = new (mem) MemberLookupTable(this);
+
+    // Register a cleanup with the ASTContext to call the lookup table
+    // destructor.
+    ctx.addCleanup([this]() {
+      this->LookupTable->~MemberLookupTable();
+    });
+  } else {
+    // Update the lookup table, if any new extension have come into existence.
+    LookupTable->updateLookupTable(this);
+  }
+
+  // Look for the declarations with this name.
+  auto known = LookupTable->find(name);
+  if (known == LookupTable->end())
+    return { };
+
+  // We found something; return it.
+  return { known->second.begin(), known->second.size() };
+}
+
+void ExtensionDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
+  // If this is a resolved extension and we're adding members to it,
+  // we may have to update the extended type's lookup table.
+  if (NextExtension.getInt() && M.size() > Members.size()) {
+    auto nominal = getExtendedType()->getAnyNominal();
+    if (nominal->LookupTable) {
+      // Make sure we have the complete list of extensions.
+      (void)nominal->getExtensions();
+
+      nominal->LookupTable->addExtensionMembers(nominal, this,
+                                                M.slice(Members.size()));
+    }
+  }
+
+  Members = M;
+  Braces = B;
+}
+

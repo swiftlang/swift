@@ -483,8 +483,9 @@ ExtensionRange NominalTypeDecl::getExtensions() {
 }
 
 void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
-  assert(!extension->NextExtension && "Already added extension");
-
+  assert(!extension->NextExtension.getInt() && "Already added extension");
+  extension->NextExtension.setInt(true);
+  
   // First extension; set both first and last.
   if (!FirstExtension) {
     FirstExtension = extension;
@@ -493,7 +494,7 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   }
 
   // Add to the end of the list.
-  LastExtension->NextExtension = extension;
+  LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
 }
 

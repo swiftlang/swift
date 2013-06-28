@@ -35,6 +35,10 @@ struct ASTContext::Implementation {
   ~Implementation();
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
+
+  /// The set of cleanups to be called when the ASTContext is destroyed.
+  std::vector<std::function<void(void)>> Cleanups;
+
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
   /// \brief The various module loaders that import external modules into this
@@ -119,8 +123,10 @@ struct ASTContext::Implementation {
 
 ASTContext::Implementation::Implementation()
  : IdentifierTable(Allocator) {}
-ASTContext::Implementation::~Implementation() {}
-
+ASTContext::Implementation::~Implementation() {
+  for (auto &cleanup : Cleanups)
+    cleanup();
+}
 
 ConstraintCheckerArenaRAII::
 ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
@@ -215,6 +221,10 @@ void ASTContext::addedExternalDecl(Decl *decl) {
 void ASTContext::addedExternalType(Type type) {
   for (auto listener : Impl.MutationListeners)
     listener->addedExternalType(type);
+}
+
+void ASTContext::addCleanup(std::function<void(void)> cleanup) {
+  Impl.Cleanups.push_back(std::move(cleanup));
 }
 
 bool ASTContext::hadError() const {
