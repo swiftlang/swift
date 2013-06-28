@@ -23,32 +23,42 @@ using namespace swift;
 LookupResult TypeChecker::lookupMember(Type type, Identifier name,
                                        bool isTypeLookup) {
   LookupResult result;
+  bool VisitSuperclasses = true;
   
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
-  // Constructor lookup is special (and simpler than normal member lookup).
+  // Constructor lookup is special.
   // FIXME: string comparison here is lame.
   if (name.str().equals("constructor")) {
-    // If we're looking for a constructor in a struct that needs an
-    // implicit default constructor to be defined, define it now.
-    if (auto nominalDecl = type->getNominalOrBoundGenericNominal()) {
-      if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
-        if (structsNeedingImplicitDefaultConstructor.count(structDecl)) {
-          defineDefaultConstructor(structDecl);
-        }
+    // We only have constructors for nominal declarations.
+    auto nominalDecl = type->getAnyNominal();
+    if (!nominalDecl)
+      return result;
+
+    // Define implicit default constructor for a struct.
+    if (auto structDecl = dyn_cast<StructDecl>(nominalDecl)) {
+      if (structsNeedingImplicitDefaultConstructor.count(structDecl)) {
+        defineDefaultConstructor(structDecl);
       }
     }
 
-    ConstructorLookup lookup(type, TU);
-    for (auto res : lookup.Results) {
-      result.addResult(res);
+    // If we're looking for constructors in a oneof, return the oneof
+    // elements.
+    // FIXME: This feels like a hack.
+    if (auto oneofDecl = dyn_cast<OneOfDecl>(nominalDecl)) {
+      for (auto member : oneofDecl->getMembers()) {
+        if (auto element = dyn_cast<OneOfElementDecl>(member))
+          result.addResult(element);
+      }
     }
-    return result;
+
+    // Fall through to look for constructors via the normal means.
+    VisitSuperclasses = false;
   }
 
   // Look for the member.
-  MemberLookup lookup(type, name, TU, isTypeLookup);
+  MemberLookup lookup(type, name, TU, isTypeLookup, VisitSuperclasses);
   for (const auto &res : lookup.Results) {
     if (res.D)
       result.addResult(res.D);

@@ -131,7 +131,7 @@ public:
   /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
   /// operation is only valid after name binding.
   MemberLookup(Type BaseTy, Identifier Name, Module &M,
-               bool IsTypeLookup = false);
+               bool IsTypeLookup = false, bool VisitSuperclasses = true);
 
   /// Results - The constructor fills this vector in with all of the results.
   /// If name lookup failed, this is empty.
@@ -146,28 +146,11 @@ public:
 private:
   Identifier MemberName;
   bool IsTypeLookup;
+  bool VisitSuperclasses;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
   void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
   void lookupMembers(Type BaseType, Module &M,
                      SmallVectorImpl<ValueDecl*> &Result);
-};
-
-/// ConstructorLookup - This class implements and represents the result of
-/// looking up a constructor for a type.
-class ConstructorLookup {
-  ConstructorLookup(const ConstructorLookup&) = delete;
-  void operator=(const ConstructorLookup&) = delete;
-public:
-  /// ConstructorLookup ctor - Lookup constructors for the given type in the
-  /// given module.
-  ConstructorLookup(Type BaseTy, Module &M);
-
-  /// Results - The constructor fills this vector in with all of the results.
-  /// If name lookup failed, this is empty.
-  llvm::SmallVector<ValueDecl*, 4> Results;
-  
-  /// isSuccess - Return true if anything was found by the name lookup.
-  bool isSuccess() const { return !Results.empty(); }
 };
 
 /// UnqualifiedLookupResult - One result of unqualified lookup.
