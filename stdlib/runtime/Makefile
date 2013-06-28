@@ -10,7 +10,7 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ..
+SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 LIBRARYNAME := swift_runtime

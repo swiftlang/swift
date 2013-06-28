@@ -561,7 +561,6 @@ include_directories(BEFORE
 add_subdirectory(lib)
 add_subdirectory(tools)
 add_subdirectory(test)
-add_subdirectory(runtime)
 add_subdirectory(stdlib)
 add_subdirectory(utils)
 add_subdirectory(examples)
