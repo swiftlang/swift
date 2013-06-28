@@ -172,18 +172,14 @@ MemberLookup::MemberLookup(Type BaseTy, Identifier Name, Module &M,
   MemberName = Name;
   IsTypeLookup = TypeLookup;
   VisitedSet Visited;
-  doIt(BaseTy, M, /*OnlyInstanceMembers=*/!TypeLookup, Visited);
+  doIt(BaseTy, M, Visited);
 }
 
 /// doIt - Lookup a member 'Name' in 'BaseTy' within the context
 /// of a given module 'M'.  This operation corresponds to a standard "dot" 
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
-///
-/// \param OnlyInstanceMembers Only instance members should be found by
-/// name lookup.
-void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
-                        VisitedSet &Visited) {
+void MemberLookup::doIt(Type BaseTy, Module &M, VisitedSet &Visited) {
   typedef MemberLookupResult Result;
   
   // Just look through l-valueness.  It doesn't affect name lookup.
@@ -200,7 +196,7 @@ void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
     // member name to see if we find extensions or anything else.  For example,
     // type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
-    doIt(Ty, M, /*OnlyInstanceMembers=*/false, Visited);
+    doIt(Ty, M, Visited);
     return;
   }
   
@@ -223,15 +219,12 @@ void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
       return;
       
     for (auto Inherited : PT->getDecl()->getInherited())
-      doIt(Inherited.getType(), M, OnlyInstanceMembers, Visited);
+      doIt(Inherited.getType(), M, Visited);
     
     for (auto Member : PT->getDecl()->getMembers()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
         if (VD->getName() != MemberName) continue;
         if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) || isa<FuncDecl>(VD)) {
-          if (OnlyInstanceMembers && !VD->isInstanceMember())
-            continue;
-
           Results.push_back(Result::getExistentialMember(VD));
         } else {
           assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
@@ -246,17 +239,17 @@ void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
   // declared protocol member in any of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      doIt(Proto, M, OnlyInstanceMembers, Visited);
+      doIt(Proto, M, Visited);
     return;
   }
 
   // Check to see if any of an archetype's requirements have the member.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      doIt(Proto->getDeclaredType(), M, OnlyInstanceMembers, Visited);
+      doIt(Proto->getDeclaredType(), M, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
-      doIt(superclass, M, OnlyInstanceMembers, Visited);
+      doIt(superclass, M, Visited);
 
     // Change existential and metatype members to archetype members, since
     // we're in an archetype.
@@ -298,9 +291,6 @@ void MemberLookup::doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
           Results.push_back(Result::getMetatypeMember(TD));
         continue;
       }
-
-      if (OnlyInstanceMembers && !VD->isInstanceMember())
-        continue;
 
       if (FuncDecl *FD = dyn_cast<FuncDecl>(VD)) {
         if (FD->isStatic())
@@ -699,15 +689,21 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
           Results.push_back(Result::getMemberProperty(BaseDecl, Result.D));
           break;
         case MemberLookupResult::MemberFunction:
-          Results.push_back(Result::getMemberFunction(BaseDecl, Result.D));
+          if (ExtendedType->is<MetaTypeType>() ||
+              Result.D->isInstanceMember())
+            Results.push_back(Result::getMemberFunction(BaseDecl, Result.D));
           break;
         case MemberLookupResult::MetatypeMember:
           // For results that can only be accessed via the metatype (e.g.,
           // type aliases), we need to use the metatype declaration as the
           // base.
-          Results.push_back(Result::getMetatypeMember(isa<FuncDecl>(Result.D)?
-                                                        BaseDecl : MetaBaseDecl,
-                                                      Result.D));
+          if (ExtendedType->is<MetaTypeType>() ||
+              !isa<FuncDecl>(Result.D) ||
+              Result.D->isInstanceMember())
+            Results.push_back(Result::getMetatypeMember(isa<FuncDecl>(Result.D)
+                                                          ? BaseDecl
+                                                          : MetaBaseDecl,
+                                                        Result.D));
           break;
         case MemberLookupResult::ExistentialMember:
           Results.push_back(Result::getExistentialMember(BaseDecl, Result.D));

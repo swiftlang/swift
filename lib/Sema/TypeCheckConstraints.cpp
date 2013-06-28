@@ -2274,6 +2274,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       continue;
     }
 
+    // If we aren't looking in a metatype, ignore static functions.
+    if (!isMetatype && !baseObjTy->is<ModuleType>() &&
+        isa<FuncDecl>(result) && !result->isInstanceMember())
+      continue;
+
     choices.push_back(OverloadChoice(baseTy, result));
   }
 

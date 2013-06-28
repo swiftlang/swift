@@ -147,8 +147,7 @@ private:
   Identifier MemberName;
   bool IsTypeLookup;
   typedef llvm::SmallPtrSet<TypeDecl *, 8> VisitedSet;
-  void doIt(Type BaseTy, Module &M, bool OnlyInstanceMembers,
-            VisitedSet &Visited);
+  void doIt(Type BaseTy, Module &M, VisitedSet &Visited);
   void lookupMembers(Type BaseType, Module &M,
                      SmallVectorImpl<ValueDecl*> &Result);
 };
