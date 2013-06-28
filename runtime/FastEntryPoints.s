@@ -152,14 +152,19 @@ BEGIN_FUNC _swift_release
   xaddl %r11d, RC_OFFSET(%rdi)
   sub   $RC_INTERVAL, %r11d
   jc    3f
-  andl  $RC_MASK, %r11d
+  andl  $(RC_MASK + RC_DEALLOCATING_BIT), %r11d
   jz    4f
   ret
 3:
   int3
 4:
   SaveRegisters
+  xor   %eax, %eax
+  movl  $RC_DEALLOCATING_BIT, %edx
+  lock cmpxchgl %edx, RC_OFFSET(%rdi)
+  jne   5f
   call  __swift_release_slow
+5:
   RestoreRegisters
   ret
 END_FUNC
@@ -214,6 +219,54 @@ ALLOC_FUNC _swift_alloc, SWIFT_TSD_ALLOC_BASE, 0
 ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_ALLOC_BASE, SWIFT_TRYALLOC
 ALLOC_FUNC _swift_rawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_RAWALLOC
 ALLOC_FUNC _swift_tryRawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYRAWALLOC
+
+BEGIN_FUNC _swift_tryRetain
+  test  %rdi, %rdi
+  jz    2f
+  movl  $RC_INTERVAL, %eax
+  lock xaddl %eax, RC_OFFSET(%rdi)
+  jc    3f
+  testb $RC_DEALLOCATING_BIT, %al
+  jnz   1f
+  movq  %rdi, %rax
+  ret
+1:
+  lock subl $RC_INTERVAL, RC_OFFSET(%rdi)
+2:
+  xor   %eax, %eax
+  ret
+3:
+  int3
+END_FUNC
+
+BEGIN_FUNC _swift_weakRetain
+  test  %rdi, %rdi
+  jz    1f
+  lock addl  $WRC_INTERVAL, WRC_OFFSET(%rdi)
+  jc    2f
+1:
+  ret
+2:
+  int3
+END_FUNC
+
+BEGIN_FUNC _swift_weakRelease
+  test  %rdi, %rdi
+  jz    1f
+  lock subl  $WRC_INTERVAL, WRC_OFFSET(%rdi)
+  jz    3f
+  jc    2f
+1:
+  ret
+2:
+  int3
+3:
+  SaveRegisters
+  xor   %esi, %esi
+  call  _swift_slowRawDealloc
+  RestoreRegisters
+  ret
+END_FUNC
 
 #endif
 

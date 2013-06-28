@@ -26,6 +26,10 @@
 
 using namespace swift;
 
+extern "C" HeapObject *swift_tryRetain(HeapObject *object);
+extern "C" void swift_weakRetain(HeapObject *object);
+extern "C" void swift_weakRelease(HeapObject *object);
+
 struct AllocCacheEntry {
   struct AllocCacheEntry *next;
 };
@@ -64,6 +68,7 @@ swift::swift_allocObject(HeapMetadata const *metadata,
   }
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
+  object->weakRefCount = WRC_INTERVAL;
   return object;
 }
 
@@ -211,7 +216,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
   memset_pattern8(object, "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
                   allocatedSize);
 #endif
-  free(object);
+  swift_weakRelease(object);
 }
 
 
@@ -425,3 +430,57 @@ extern "C" bool swift_isUniquelyReferenced(HeapObject *object) {
   return result;
 }
 
+void swift::swift_weakInit(HeapObject **object) {
+  *object = nullptr;
+}
+
+void swift::swift_weakDestroy(HeapObject **object) {
+  auto tmp = *object;
+  *object = nullptr;
+  swift_weakRelease(tmp);
+}
+
+void swift::swift_weakCopyInit(HeapObject **dest, HeapObject **source) {
+  if ((*source)->refCount & RC_DEALLOCATING_BIT) {
+    auto tmp = *source;
+    *source = nullptr;
+    *dest = nullptr;
+    swift_weakRelease(tmp);
+  } else {
+    *dest = *source;
+    swift_weakRetain(*dest);
+  }
+}
+
+void swift::swift_weakTakeInit(HeapObject **dest, HeapObject **source) {
+  *dest = *source;
+  if ((*dest)->refCount & RC_DEALLOCATING_BIT) {
+    auto tmp = *dest;
+    *dest = nullptr;
+    swift_weakRelease(tmp);
+  }
+}
+
+void swift::swift_weakCopyAssign(HeapObject **dest, HeapObject **source) {
+  if (*dest) {
+    swift_weakRelease(*dest);
+  }
+  swift_weakCopyInit(dest, source);
+}
+
+void swift::swift_weakTakeAssign(HeapObject **dest, HeapObject **source) {
+  if (*dest) {
+    swift_weakRelease(*dest);
+  }
+  swift_weakTakeInit(dest, source);
+}
+
+HeapObject *swift::swift_weakTryRetain(HeapObject **object) {
+  if (*object == nullptr) return nullptr;
+  if ((*object)->refCount & RC_DEALLOCATING_BIT) {
+    swift_weakRelease(*object);
+    *object = nullptr;
+    return nullptr;
+  }
+  return swift_tryRetain(*object);
+}

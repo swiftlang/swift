@@ -33,9 +33,9 @@ struct HeapObject {
   HeapMetadata const *metadata;
 
   uint32_t refCount;
-  /// The compiler assumes one "word" of runtime metadata
-#ifdef __LP64__
-  uint32_t runtimePrivateData;
+  uint32_t weakRefCount;
+#ifndef __LP64__
+#error "FIXME -- allocate two words of metadata on 32-bit platforms"
 #endif
 };
 
@@ -248,6 +248,45 @@ public:
 
   HeapObject *operator *() const { return object; }
 };
+
+/// Initialize a weak reference.
+///
+/// \param object - never null
+extern "C" void swift_weakInit(HeapObject **object);
+
+/// Destroy a weak reference.
+///
+/// \param object - never null
+extern "C" void swift_weakDestroy(HeapObject **object);
+
+/// Copy initialize a weak reference.
+///
+/// \param dest - never null
+/// \param source - never null
+extern "C" void swift_weakCopyInit(HeapObject **dest, HeapObject **source);
+
+/// Take initialize a weak reference.
+///
+/// \param dest - never null
+/// \param source - never null
+extern "C" void swift_weakTakeInit(HeapObject **dest, HeapObject **source);
+
+/// Copy assign a weak reference.
+///
+/// \param dest - never null
+/// \param source - never null
+extern "C" void swift_weakCopyAssign(HeapObject **dest, HeapObject **source);
+
+/// Take assign a weak reference.
+///
+/// \param dest - never null
+/// \param source - never null
+extern "C" void swift_weakTakeAssign(HeapObject **dest, HeapObject **source);
+
+/// Try to retain a weak reference
+///
+/// \param object - never null
+extern "C" HeapObject *swift_weakTryRetain(HeapObject **object);
 
 } // end namespace swift
 
