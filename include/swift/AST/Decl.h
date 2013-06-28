@@ -1092,7 +1092,7 @@ public:
   /// Find all of the declarations with the given name within this nominal type
   /// and its extensions.
   ///
-  /// This routine does not look into base classes, nor does it consider
+  /// This routine does not look into superclasses, nor does it consider
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.

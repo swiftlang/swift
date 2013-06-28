@@ -142,6 +142,25 @@ public:
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
+/// Constants used to customize name lookup.
+enum NameLookupOptions {
+  /// Visit supertypes (such as superclasses or inherited protocols)
+  /// and their extensions as well as the current extension.
+  NL_VisitSupertypes = 0x01,
+
+  /// Remove non-visible declarations from the set of results.
+  NL_RemoveNonVisible = 0x02,
+
+  /// Remove overridden declarations from the set of results.
+  NL_RemoveOverridden = 0x04,
+
+  /// \brief The default set of options used for normal name lookup.
+  NL_Default = NL_VisitSupertypes | NL_RemoveNonVisible | NL_RemoveOverridden,
+
+  /// \brief The default set of options used for constructor lookup.
+  NL_Constructor = NL_RemoveNonVisible
+};
+
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
@@ -154,7 +173,6 @@ public:
   
   friend class ConstraintCheckerArenaRAII;
 public:
-  
   ASTContext(LangOptions &langOpts, llvm::SourceMgr &SourceMgr,
              DiagnosticEngine &Diags);
   ~ASTContext();
@@ -387,6 +405,32 @@ public:
   /// \brief Retrieve the set of nominal types and extensions thereof that
   /// conform to the given protocol.
   ArrayRef<Decl *> getTypesThatConformTo(ProtocolDecl *protocol);
+
+  /// Look for the set of declarations with the given name within a type,
+  /// its extensions and, optionally, its supertypes.
+  ///
+  /// This routine performs name lookup within a given type, itse xtensions
+  /// and, optionally, its supertypes and their extensions. It can eliminate
+  /// non-visible, hidden, and overridden declarations from the result set.
+  /// It does not, however, perform any filtering based on the semantic
+  /// usefulness of the results.
+  ///
+  /// \param type The type to look into.
+  ///
+  /// \param name The name to search for.
+  ///
+  /// \param fromModule The module from which name lookup should be
+  /// performed.
+  ///
+  /// \param options Options that control name lookup, based on the
+  /// \c NL_* constants in \c NameLookupOptions.
+  ///
+  /// \param decls Will be populated with the declarations found by name
+  /// lookup.
+  ///
+  /// \returns true if anything was found.
+  bool lookup(Type type, Identifier name, Module *fromModule,
+              unsigned options, SmallVectorImpl<ValueDecl *> &decls);
 
 private:
   friend class Decl;

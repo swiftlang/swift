@@ -96,6 +96,8 @@ class LookupResult {
   /// The set of results found.
   SmallVector<ValueDecl *, 4> Results;
 
+  friend class TypeChecker;
+  
 public:
   typedef SmallVector<ValueDecl *, 4>::iterator iterator;
   iterator begin() { return Results.begin(); }

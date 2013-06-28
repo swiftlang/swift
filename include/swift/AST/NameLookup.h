@@ -344,10 +344,8 @@ public:
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.
-/// \param isTypeLookup Whether the declarations are the result of type lookup.
 /// \param curModule The current module.
 void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         bool isTypeLookup,
                          Module *curModule);
 
 /// Finds decls visible in the given context and feeds them to the given

@@ -55,7 +55,7 @@ static void DoGlobalExtensionLookup(Type BaseType,
   }
 
   // Handle shadowing.
-  removeShadowedDecls(found, IsTypeLookup, CurModule);
+  removeShadowedDecls(found, CurModule);
 
   // Report the declarations we found to the consumer.
   for (auto decl : found)

@@ -17,13 +17,14 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/AST/NameLookup.h"
+#include <algorithm>
 
 using namespace swift;
 
 LookupResult TypeChecker::lookupMember(Type type, Identifier name,
                                        bool isTypeLookup) {
   LookupResult result;
-  bool VisitSuperclasses = true;
+  unsigned options = NL_Default;
   
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
@@ -54,15 +55,24 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
     }
 
     // Fall through to look for constructors via the normal means.
-    VisitSuperclasses = false;
+    options = NL_Constructor;
   }
 
   // Look for the member.
-  MemberLookup lookup(type, name, TU, isTypeLookup, VisitSuperclasses);
-  for (const auto &res : lookup.Results) {
-    if (res.D)
-      result.addResult(res.D);
+  if (!Context.lookup(type, name, &TU, options, result.Results))
+    return result;
+
+  // If we only want types, filter out non-types.
+  // FIXME: Introduce a filter abstraction into LookupResult, as in Clang?
+  if (isTypeLookup) {
+    result.Results.erase(std::remove_if(result.Results.begin(),
+                                        result.Results.end(),
+                                        [&](ValueDecl *decl) -> bool {
+                                          return !isa<TypeDecl>(decl);
+                                        }),
+                         result.Results.end());
   }
+
   return result;
 }
 

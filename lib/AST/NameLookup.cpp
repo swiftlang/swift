@@ -25,7 +25,6 @@
 using namespace swift;
 
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                bool isTypeLookup,
                                 Module *curModule) {
   // Category declarations by their signatures.
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>>
@@ -37,7 +36,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // canonicalize away default arguments and don't canonicalize polymorphic
     // types well.
     CanType signature;
-    if (isTypeLookup && isa<TypeDecl>(decl))
+    if (isa<TypeDecl>(decl))
       signature = cast<TypeDecl>(decl)->getDeclaredType()->getCanonicalType();
     else
       signature = decl->getType()->getCanonicalType();
@@ -329,7 +328,7 @@ void MemberLookup::lookupMembers(Type BaseType, Module &M,
   Result.append(DirectMembers.begin(), DirectMembers.end());
 
   // Handle shadowing.
-  removeShadowedDecls(Result, IsTypeLookup, &M);
+  removeShadowedDecls(Result, &M);
 }
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
@@ -901,6 +900,142 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
 
   // We found something; return it.
   return { known->second.begin(), known->second.size() };
+}
+
+bool ASTContext::lookup(Type type,
+                        Identifier name,
+                        Module *fromModule,
+                        unsigned options,
+                        SmallVectorImpl<ValueDecl *> &decls) {
+  if (type->is<ErrorType>()) {
+    return false;
+  }
+
+  // Look through lvalue types.
+  if (auto lvalueTy = type->getAs<LValueType>()) {
+    return lookup(lvalueTy->getObjectType(), name, fromModule, options, decls);
+  }
+
+  // Look through metatypes.
+  if (auto metaTy = type->getAs<MetaTypeType>()) {
+    return lookup(metaTy->getInstanceType(), name, fromModule, options, decls);
+  }
+
+  // Look for module references.
+  if (auto moduleTy = type->getAs<ModuleType>()) {
+    moduleTy->getModule()->lookupValue(Module::AccessPathTy(), name,
+                                       NLKind::QualifiedLookup, decls);
+    return !decls.empty();
+  }
+
+  // The set of nominal type declarations we should (and have) visited.
+  llvm::SmallVector<NominalTypeDecl *, 4> stack;
+  llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
+
+  // Handle nominal types.
+  if (auto nominal = type->getAnyNominal()) {
+    visited.insert(nominal);
+    stack.push_back(nominal);
+  }
+  // Handle archetypes
+  else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    // Look in the protocols to which the archetype conforms (always).
+    for (auto proto : archetypeTy->getConformsTo())
+      if (visited.insert(proto))
+        stack.push_back(proto);
+
+    // If requested, look into the superclasses of this archetype.
+    if (options & NL_VisitSupertypes) {
+      if (auto superclassTy = archetypeTy->getSuperclass()) {
+        if (auto superclassDecl = superclassTy->getAnyNominal())
+          if (visited.insert(superclassDecl))
+            stack.push_back(superclassDecl);
+      }
+    }
+  }
+  // Handle protocol compositions.
+  else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    if (compositionTy->isExistentialType(protocols)) {
+      for (auto proto : protocols) {
+        if (visited.insert(proto))
+          stack.push_back(proto);
+      }
+    }
+  }
+
+  // Visit all of the nominal types we know about, discovering any others
+  // we need along the way.
+  while (!stack.empty()) {
+    auto current = stack.back();
+    stack.pop_back();
+
+    // Look for results within the current nominal type and its extensions.
+    for (auto results : current->lookupDirect(name))
+      decls.push_back(results);
+
+    // If we're not supposed to visit our supertypes, we're done.
+    if ((options & NL_VisitSupertypes) == 0)
+      continue;
+
+    // Visit superclass.
+    if (auto classDecl = dyn_cast<ClassDecl>(current)) {
+      if (auto superclassType = classDecl->getBaseClass())
+        if (auto superclassDecl = superclassType->getAnyNominal())
+          if (visited.insert(superclassDecl))
+            stack.push_back(superclassDecl);
+      continue;
+    }
+
+    // Visit inherited protocols.
+    if (auto proto = dyn_cast<ProtocolDecl>(current)) {
+      SmallVector<ProtocolDecl *, 4> inherited;
+      for (auto inheritedType : proto->getInherited()) {
+        if (inheritedType.getType()->isExistentialType(inherited)) {
+          for (auto inheritedProto : inherited) {
+            if (visited.insert(inheritedProto))
+              stack.push_back(inheritedProto);
+          }
+        }
+      }
+    }
+  }
+
+  // If we're supposed to remove overridden declarations, do so now.
+  if (options & NL_RemoveOverridden) {
+    // Find all of the overridden declarations.
+    llvm::SmallPtrSet<ValueDecl*, 8> overridden;
+    for (auto decl : decls) {
+      // FIXME: Generalize this.
+      if (auto fd = dyn_cast<FuncDecl>(decl)) {
+        if (fd->getOverriddenDecl())
+          overridden.insert(fd->getOverriddenDecl());
+      } else if (auto vd = dyn_cast<VarDecl>(decl)) {
+        if (vd->getOverriddenDecl())
+          overridden.insert(vd->getOverriddenDecl());
+      } else if (auto sd = dyn_cast<SubscriptDecl>(decl)) {
+        if (sd->getOverriddenDecl())
+          overridden.insert(sd->getOverriddenDecl());
+      }
+    }
+
+    // If any methods were overridden, remove them from the results.
+    if (!overridden.empty()) {
+      decls.erase(std::remove_if(decls.begin(), decls.end(),
+                                 [&](ValueDecl *decl) -> bool {
+                                   return overridden.count(decl);
+                                 }),
+                  decls.end());
+    }
+  }
+
+  // If we're supposed to remove shadowed/hidden declarations, do so now.
+  if (options & NL_RemoveNonVisible) {
+    removeShadowedDecls(decls, fromModule);
+  }
+
+  // We're done. Report success/failure.
+  return !decls.empty();
 }
 
 void ExtensionDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
