@@ -251,6 +251,18 @@ public:
     return res;
   }
 
+  /// Allocate a copy of the specified object.
+  template <typename T>
+  typename std::remove_reference<T>::type *AllocateObjectCopy(T &&t,
+              AllocationArena arena = AllocationArena::Permanent) {
+    // This function can not be named AllocateCopy because it would always win
+    // overload resolution over the AllocateCopy(ArrayRef<T>).
+    using TNoRef = typename std::remove_reference<T>::type;
+    TNoRef *res = (TNoRef*)Allocate(sizeof(TNoRef), __alignof__(TNoRef), arena);
+    new (res) TNoRef(std::forward<T>(t));
+    return res;
+  }
+
   template <typename T, typename It>
   T *AllocateCopy(It start, It end,
                   AllocationArena arena = AllocationArena::Permanent) {

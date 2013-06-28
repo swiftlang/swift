@@ -28,10 +28,14 @@ namespace swift {
     /// This option enables verbose debugging output from the constraint
     /// solver.
     bool DebugConstraintSolver = false;
-    
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
+
+    /// \brief If true, the parser will not parse function bodies.  Tokens for
+    /// the function body will be saved in the AST node.
+    bool DelayFunctionBodyParsing = false;
   };
 }
 

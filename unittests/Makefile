@@ -16,7 +16,7 @@ ifndef SWIFT_LEVEL
 
 IS_UNITTEST_LEVEL := 1
 SWIFT_LEVEL := ..
-PARALLEL_DIRS = runtime
+PARALLEL_DIRS = Basic runtime
 
 endif  # SWIFT_LEVEL
 

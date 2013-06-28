@@ -22,6 +22,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -1126,6 +1127,44 @@ Pattern *Parser::buildImplicitThisParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
+ParserTokenRange Parser::consumeFunctionBody(unsigned Flags) {
+  auto BeginParserPosition = getParserPosition();
+
+  // Consume the '{', and find the matching '}'.
+  consumeToken(tok::l_brace);
+  unsigned OpenBraces = 1;
+  while (OpenBraces != 0 && Tok.isNot(tok::eof)) {
+    if (consumeIf(tok::l_brace)) {
+      OpenBraces++;
+      continue;
+    }
+    if (consumeIf(tok::r_brace)) {
+      OpenBraces--;
+      continue;
+    }
+    consumeToken();
+  }
+  if (OpenBraces != 0) {
+    assert(Tok.is(tok::eof));
+    // We hit EOF, and not every brace has a pair.  Recover by searching
+    // for the next decl except variable decls and cutting off before
+    // that point.
+    backtrackToPosition(BeginParserPosition);
+    consumeToken(tok::l_brace);
+    while (Tok.isNot(tok::kw_var) && !isStartOfDecl(Tok, peekToken())) {
+      consumeToken();
+    }
+  }
+
+  auto EndLexerState = L->getStateForBeginningOfToken(Tok);
+  return ParserTokenRange(
+            Context.AllocateObjectCopy(
+                FunctionBodyParserState(BeginParserPosition,
+                                        ScopeInfo.saveCurrentScope(),
+                                        Flags)),
+            Context.AllocateObjectCopy(EndLexerState));
+}
+
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
 /// caller handles this case and does recovery as appropriate.
 ///
@@ -1242,12 +1281,17 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
         return 0;
       }
     } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
-      NullablePtr<BraceStmt> Body =
-        parseBraceItemList(diag::func_decl_without_brace);
-      if (Body.isNull()) {
-        // FIXME: Should do some sort of error recovery here?
+      if (!Context.LangOpts.DelayFunctionBodyParsing ||
+          IsDelayedParsingSecondPass) {
+        NullablePtr<BraceStmt> Body =
+            parseBraceItemList(diag::func_decl_without_brace);
+        if (Body.isNull()) {
+          // FIXME: Should do some sort of error recovery here?
+        } else {
+          FE->setBody(Body.get());
+        }
       } else {
-        FE->setBody(Body.get());
+        FE->setBodyTokenRange(consumeFunctionBody(Flags));
       }
     }
   }
@@ -1264,6 +1308,47 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
   ScopeInfo.addToScope(FD);
   return FD;
+}
+
+bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
+  auto FE = FD->getBody();
+  assert(!FE->getBody() && "function should not have a parsed body");
+
+  auto TokenRange = FE->getBodyTokenRange();
+  auto FunctionParserState =
+      TokenRange.getBeginParserState<FunctionBodyParserState>();
+  if (!FunctionParserState)
+    return false;
+
+  auto EndLexerState = TokenRange.getEndLexerState<Lexer::State>();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that can not go past the end state.
+  Lexer LocalLex(FunctionParserState->BeginParserPosition.LS,
+                 *EndLexerState, SourceMgr, &Diags, nullptr /*not SIL*/);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to '{' of the function body.
+  restoreParserPosition(FunctionParserState->BeginParserPosition);
+
+  // Re-enter the lexical scope.
+  Scope S(this, FunctionParserState->takeScope());
+  ContextChange CC(*this, FE);
+
+  NullablePtr<BraceStmt> Body =
+      parseBraceItemList(diag::func_decl_without_brace);
+  if (Body.isNull()) {
+    // FIXME: Should do some sort of error recovery here?
+    return true;
+  } else {
+    FE->setBody(Body.get());
+  }
+
+  return false;
 }
 
 /// parseDeclOneOf - Parse a 'oneof' declaration, returning true (and doing no

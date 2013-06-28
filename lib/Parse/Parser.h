@@ -77,6 +77,14 @@ public:
   unsigned VarPatternDepth = 0;
   bool IsMainModule;
 
+  /// \brief True if we are doing a second pass over the AST during delayed
+  /// parsing.  We should not delay anything in this case.
+  bool IsDelayedParsingSecondPass = false;
+
+  void setDelayedParsingSecondPass() {
+    IsDelayedParsingSecondPass = true;
+  }
+
   /// \brief Whether the '|' character is currently a delimiter character,
   /// as in a closure.
   bool PipeIsDelimiter = false;
@@ -141,17 +149,26 @@ public:
   void restoreParserPosition(ParserPosition PP) {
     L->restoreState(PP.LS);
     PreviousLoc = PP.PreviousLoc;
+
+    // We might be at tok::eof now, so ensure that consumeToken() does not
+    // assert about lexing past eof.
+    Tok.setKind(tok::unknown);
     consumeToken();
   }
 
   void backtrackToPosition(ParserPosition PP) {
     L->backtrackToState(PP.LS);
     PreviousLoc = PP.PreviousLoc;
+
+    // We might be at tok::eof now, so ensure that consumeToken() does not
+    // assert about lexing past eof.
+    Tok.setKind(tok::unknown);
     consumeToken();
   }
 
   /// RAII object that, when it is destructed, restores the parser and lexer to
-  /// their positions at the time the object was constructed.
+  /// their positions at the time the object was constructed.  Will not jump
+  /// forward in the token stream.
   class BacktrackingScope {
     Parser &P;
     ParserPosition PP;
@@ -172,6 +189,37 @@ public:
   public:
     VarPatternScope(Parser &P) : P(P) { ++P.VarPatternDepth; }
     ~VarPatternScope() { --P.VarPatternDepth; }
+  };
+
+  /// RAII object that, when it is destructed, restores the parser and lexer to
+  /// their positions at the time the object was constructed.
+  struct ParserPositionRAII {
+  private:
+    Parser &P;
+    ParserPosition PP;
+
+  public:
+    ParserPositionRAII(Parser &P) : P(P), PP(P.getParserPosition()) {}
+
+    ~ParserPositionRAII() {
+      P.restoreParserPosition(PP);
+    }
+  };
+
+  class FunctionBodyParserState {
+    FunctionBodyParserState(ParserPosition BeginParserPosition,
+                            SavedScope &&Scope, unsigned Flags):
+        BeginParserPosition(BeginParserPosition), Scope(std::move(Scope)),
+        Flags(Flags)
+    {}
+    ParserPosition BeginParserPosition;
+    SavedScope Scope;
+    unsigned Flags;
+    friend class Parser;
+
+    SavedScope takeScope() {
+      return std::move(Scope);
+    }
   };
 
   //===--------------------------------------------------------------------===//
@@ -380,7 +428,9 @@ public:
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   Pattern *buildImplicitThisParameter();
+  ParserTokenRange consumeFunctionBody(unsigned Flags);
   FuncDecl *parseDeclFunc(unsigned Flags);
+  bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   Decl *parseDeclProtocol(unsigned Flags);
   
   bool parseDeclSubscript(bool HasContainerType,

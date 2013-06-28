@@ -47,16 +47,29 @@ static bool isResolvableScope(ScopeKind SK) {
 
 Scope::Scope(Parser *P, ScopeKind SC):
     SI(P->ScopeInfo),
-    ValueHTScope(SI.ValueScopeHT),
+    HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
     Kind(SC) {
+  assert(PrevScope || Kind == ScopeKind::TopLevel);
   if (SI.CurScope)
-    Depth = SI.CurScope->Depth+1;
+    Depth = SI.CurScope->Depth + 1;
   else
     Depth = 0;
   SI.CurScope = this;
-  if (!isResolvableScope(SC))
+  if (!isResolvableScope(Kind))
+    SI.ResolvableDepth = Depth + 1;
+}
+
+Scope::Scope(Parser *P, SavedScope &&SS):
+    SI(P->ScopeInfo),
+    HTScope(std::move(SS.HTDetachedScope)),
+    PrevScope(SI.CurScope),
+    PrevResolvableDepth(SI.ResolvableDepth),
+    Depth(SI.CurScope ? SI.CurScope->Depth + 1 : 0),
+    Kind(SS.Kind) {
+  SI.CurScope = this;
+  if (!isResolvableScope(Kind))
     SI.ResolvableDepth = Depth + 1;
 }
 
@@ -90,10 +103,10 @@ void ScopeInfo::addToScope(ValueDecl *D) {
 
   // If we have a shadowed variable definition, check to see if we have a
   // redefinition: two definitions in the same scope with the same name.
-  ValueScopeHTTy::iterator EntryI = ValueScopeHT.begin(D->getName());
-  
+  ScopedHTTy::iterator EntryI = HT.begin(CurScope->HTScope, D->getName());
+
   // A redefinition is a hit in the scoped table at the same depth.
-  if (EntryI != ValueScopeHT.end() && EntryI->first == CurScope->getDepth()) {
+  if (EntryI != HT.end() && EntryI->first == CurScope->getDepth()) {
     ValueDecl *PrevDecl = EntryI->second;
     
     // If this is in a resolvable scope, diagnose redefinitions.  Later
@@ -111,6 +124,8 @@ void ScopeInfo::addToScope(ValueDecl *D) {
     // Note: we don't check whether all of the elements of the overload set have
     // different argument types.  This is checked later.
   }
-  
-  ValueScopeHT.insert(D->getName(), std::make_pair(CurScope->getDepth(), D));
+
+  HT.insertIntoScope(CurScope->HTScope,
+                     D->getName(),
+                     std::make_pair(CurScope->getDepth(), D));
 }

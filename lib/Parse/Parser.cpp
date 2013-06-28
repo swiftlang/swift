@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "Parser.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
+
 using namespace swift;
 
 namespace {
@@ -40,8 +42,27 @@ namespace {
       out << '\n';
     }
   };
-}
-  
+
+/// A visitor that does delayed parsing of function bodies.
+class ParseDelayedFunctionBodies : public ASTWalker {
+  Parser &P;
+
+public:
+  ParseDelayedFunctionBodies(Parser &P) : P(P) {}
+
+  virtual bool walkToDeclPre(Decl *D) {
+    if (auto FD = dyn_cast<FuncDecl>(D)) {
+      if (auto FE = FD->getBody()) {
+        if (FE->getBody())
+          return false;
+        P.parseDeclFuncBodyDelayed(FD);
+      }
+    }
+    return true;
+  }
+};
+} // unnamed namespace
+
 /// parseIntoTranslationUnit - Entrypoint for the parser.
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
@@ -56,6 +77,12 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
   if (BufferOffset)
     *BufferOffset = P.Tok.getLoc().Value.getPointer() -
                     P.Buffer->getBuffer().begin();
+
+  P.setDelayedParsingSecondPass();
+  ParseDelayedFunctionBodies Walker(P);
+  for (Decl *D : TU->Decls) {
+    D->walk(Walker);
+  }
 
   return FoundSideEffects;
 }

@@ -61,6 +61,21 @@ public:
         DiagnosticEngine *Diags, bool InSILMode)
     : Lexer(Buffer, SourceMgr, Diags, Buffer.begin(), InSILMode) { }
 
+  /// \brief Lexer state can be saved/restored to/from objects of this class.
+  class State {
+    State(const char *CurPtr): CurPtr(CurPtr) {}
+    const char *CurPtr;
+    friend class Lexer;
+  };
+
+  Lexer(State BeginState, State EndState, llvm::SourceMgr &SourceMgr,
+        DiagnosticEngine *Diags, bool InSILMode)
+    : Lexer(llvm::StringRef(BeginState.CurPtr,
+                            EndState.CurPtr - BeginState.CurPtr),
+            SourceMgr, Diags, BeginState.CurPtr, InSILMode) {
+    assert(BeginState.CurPtr < EndState.CurPtr);
+  }
+
   const char *getBufferEnd() const { return BufferEnd; }
 
   void lex(Token &Result) {
@@ -72,13 +87,6 @@ public:
   /// peekNextToken - Return the next token to be returned by Lex without
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
-
-  /// \brief Lexer state can be saved/restored to/from objects of this class.
-  class State {
-    State(const char *CurPtr): CurPtr(CurPtr) {}
-    const char *CurPtr;
-    friend class Lexer;
-  };
 
   /// \brief Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from

@@ -19,6 +19,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ParserTokenRange.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -1539,6 +1540,9 @@ class FuncExpr : public CapturingExpr {
   
   BraceStmt *Body;
 
+  /// Tokens of the function body saved for delayed parsing.
+  ParserTokenRange BodyTokenRange;
+
   FuncDecl *TheFuncDecl;
 
   TypeLoc FnRetType;
@@ -1632,6 +1636,9 @@ public:
 
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *S) { Body = S; }
+
+  ParserTokenRange getBodyTokenRange() { return BodyTokenRange; }
+  void setBodyTokenRange(ParserTokenRange R) { BodyTokenRange = R; }
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 
