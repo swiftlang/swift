@@ -40,6 +40,7 @@
 #include "GenObjC.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "GenHeap.h"
@@ -433,6 +434,8 @@ void irgen::emitDeallocatingDestructor(IRGenModule &IGM,
                                        llvm::Function *deallocator,
                                        llvm::Function *destroyer) {
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, deallocator);
+  if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, deallocator);
 
   Type thisType = theClass->getDeclaredTypeInContext();
   const ClassTypeInfo &info =

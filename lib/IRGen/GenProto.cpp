@@ -1447,6 +1447,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   assert(isValueWitnessFunction(index));
 
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(IGF, fn);
 
   auto argv = fn->arg_begin();
   switch (index) {
@@ -1621,6 +1623,9 @@ static llvm::Constant *getAssignExistentialsFunction(IRGenModule &IGM,
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
+
     auto it = def->arg_begin();
     Address dest(it++, getFixedBufferAlignment(IGM));
     Address src(it++, getFixedBufferAlignment(IGM));
@@ -1731,7 +1736,11 @@ static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     llvm::BasicBlock *entry =
       llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
-    llvm::ReturnInst::Create(IGM.getLLVMContext(), entry);
+    IRBuilder B(IGM.getLLVMContext());
+    B.SetInsertPoint(entry);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(*IGM.SILMod, B, def);
+    B.CreateRetVoid();
   }
   return fn;
 }
@@ -1748,8 +1757,11 @@ static llvm::Constant *getReturnSelfFunction(IRGenModule &IGM) {
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     llvm::BasicBlock *entry =
       llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", def);
-    llvm::ReturnInst::Create(IGM.getLLVMContext(),
-                             def->arg_begin(), entry);
+    IRBuilder B(IGM.getLLVMContext());
+    B.SetInsertPoint(entry);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(*IGM.SILMod, B, def);
+    B.CreateRet(def->arg_begin());
   }
   return fn;
 }
@@ -1768,6 +1780,8 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1797,6 +1811,9 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
+
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1824,6 +1841,8 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
     auto it = def->arg_begin();
     Address dest(it++, IGM.getPointerAlignment());
     Address src(it++, IGM.getPointerAlignment());
@@ -1848,6 +1867,8 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
 
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
     Address arg(def->arg_begin(), IGM.getPointerAlignment());
     IGF.emitRelease(IGF.Builder.CreateLoad(arg));
     IGF.Builder.CreateRetVoid();

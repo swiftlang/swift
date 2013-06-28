@@ -34,6 +34,7 @@
 #include "FixedTypeInfo.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 
@@ -466,6 +467,9 @@ static void emitInjectionFunction(IRGenModule &IGM,
                                   OneOfElementDecl *elt) {
   ExplosionKind explosionKind = ExplosionKind::Minimal;
   IRGenFunction IGF(IGM, explosionKind, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(IGF, fn);
+
   if (elt->hasArgumentType()) {
     // FIXME: Implement!
     IGF.Builder.CreateUnreachable();
