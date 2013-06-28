@@ -378,6 +378,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("apply", ValueKind::ApplyInst)
+    .Case("branch", ValueKind::BranchInst)
+    .Case("condbranch", ValueKind::CondBranchInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
@@ -603,6 +605,38 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ReturnInst: {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createReturn(SILLocation(), Val);
+    break;
+  }
+  case ValueKind::BranchInst: {
+    Identifier BBName;
+    SourceLoc NameLoc;
+    if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
+      return true;
+    ResultVal = B.createBranch(SILLocation(),
+                               getBBForReference(BBName, NameLoc));
+    break;
+  }
+  case ValueKind::CondBranchInst: {
+    SourceLoc CondNameLoc;
+    StringRef CondName = P.Tok.getText();
+    Identifier BBName, BBName2;
+    SourceLoc NameLoc, NameLoc2;
+    if (P.parseToken(tok::sil_local_name, CondNameLoc,
+                     diag::expected_sil_value_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseIdentifier(BBName2, NameLoc2, diag::expected_sil_block_name))
+      return true;
+   
+    SILValue CondVal =
+      getLocalValue(CondName,
+                    SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext()),
+                    CondNameLoc);
+
+    ResultVal = B.createCondBranch(SILLocation(), CondVal,
+                                   getBBForReference(BBName, NameLoc),
+                                   getBBForReference(BBName2, NameLoc2));
     break;
   }
   }

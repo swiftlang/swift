@@ -82,4 +82,53 @@ bb0:                                         // CHECK: bb0:
   %5 = return %4 : $Int64
 }
 
+// Parse SIL generated from the following swift program:
+// func x(a : Bool) -> Int { if a { return 4 } else {return 5} }
+sil @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
 
+// CHECK: @_T4test1xFT1aSb_Si
+sil @_T4test1xFT1aSb_Si : $[thin] (a : Bool) -> Int64 {
+// CHECK: bb0(%0 : $Bool):
+bb0(%0 : $Bool):
+  // CHECK: alloc_var stack $Bool
+  %1 = alloc_var stack $Bool
+  // CHECK: store
+  %2 = store %0 to %1 : $*Bool
+  // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  // CHECK: apply
+  %4 = apply %3(%1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  // CHECK: condbranch
+  %5 = condbranch %4, bb1, bb2
+
+// CHECK: bb1:
+bb1:
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %6 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: metatype $Int64.metatype
+  %7 = metatype $Int64.metatype
+  // CHECK: integer_literal $Builtin.Int128, 4
+  %8 = integer_literal $Builtin.Int128, 4
+  // CHECK: apply
+  %9 = apply %6(%8, %7) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: dealloc_var
+  %10 = dealloc_var stack %1 : $*Bool
+  // CHECK: return
+  %11 = return %9 : $Int64
+
+// CHECK: bb2:
+bb2:
+  // CHECK: function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %12 = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: metatype $Int64.metatype
+  %13 = metatype $Int64.metatype
+  // CHECK: integer_literal $Builtin.Int128, 5
+  %14 = integer_literal $Builtin.Int128, 5
+  // CHECK: apply
+  %15 = apply %12(%14, %13) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  // CHECK: dealloc_var
+  %16 = dealloc_var stack %1 : $*Bool
+  // CHECK: return
+  %17 = return %15 : $Int64
+}
