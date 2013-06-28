@@ -288,17 +288,6 @@ swift_file_read(int fd, char* buf, size_t nb)
 
 extern "C"
 size_t
-swift_file_size(const char* filename)
-{
-  struct stat buf;
-  int err = stat(filename, &buf);
-  assert(err == 0);
-  (void) err;
-  return buf.st_size;
-}
-
-extern "C"
-size_t
 swift_fd_size(int fd)
 {
   struct stat buf;
