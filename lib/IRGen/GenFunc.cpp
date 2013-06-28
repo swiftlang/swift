@@ -80,6 +80,7 @@
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
@@ -1679,6 +1680,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setAttributes(attrs);
 
   IRGenFunction subIGF(IGM, explosionLevel, fwd);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(subIGF, fwd);
   
   Explosion params = subIGF.collectParameters();
 
@@ -1819,6 +1822,8 @@ llvm::Function *irgen::emitFunctionSpecialization(IRGenModule &IGM,
   spec->setAttributes(attrs);
   
   IRGenFunction subIGF(IGM, explosionLevel, spec);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(subIGF, spec);
 
   Explosion params = subIGF.collectParameters();
   

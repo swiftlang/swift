@@ -1,4 +1,4 @@
-//===--- DebugInfo.h - Debug Info Support------------------------*- C++ -*-===//
+//===--- IRGenDebugInfo.h - Debug Info Support-------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -27,6 +27,8 @@
 #include "swift/AST/Stmt.h"
 
 #include "IRBuilder.h"
+#include "IRGenFunction.h"
+#include "IrGenModule.h"
 
 namespace llvm {
 class DIBuilder;
@@ -35,6 +37,7 @@ class DIBuilder;
 namespace swift {
 
 class SILDebugScope;
+class SILModule;
 
 namespace irgen {
 
@@ -52,21 +55,30 @@ class IRGenDebugInfo {
   StringRef CWDName;
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
-  const Options& Opts;
+  const Options &Opts;
 public:
-  IRGenDebugInfo(const Options& Opts,
+  IRGenDebugInfo(const Options &Opts,
                  llvm::SourceMgr &SM, llvm::Module &M);
 
   /// Finalize the DIBuilder.
-  void Finalize();
+  void finalize();
 
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
-  void setCurrentLoc(IRBuilder& Builder, SILDebugScope *DS,
+  void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                      SILLocation Loc = SILLocation());
 
   /// Create debug info for the given funtion.
   void createFunction(SILDebugScope *DS, llvm::Function *Fn);
+
+  /// Convenience function useful for functions without any source
+  /// location. Internally calls createFunction, creates a debug
+  /// scope, and finally sets it using setCurrentLoc.
+  inline void createArtificialFunction(IRGenFunction &IGF, llvm::Function *Fn) {
+    createArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn);
+  }
+  void createArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
+                                llvm::Function *Fn);
 
 private:
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);

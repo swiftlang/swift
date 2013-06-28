@@ -26,6 +26,7 @@
 #include "Explosion.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "HeapTypeInfo.h"
@@ -77,6 +78,8 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
                            "objectdestroy", &IGM.Module);
 
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(IGF, fn);
 
   Address structAddr = layout.emitCastTo(IGF, fn->arg_begin());
 
@@ -105,6 +108,8 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
                            "objectsize", &IGM.Module);
 
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(IGF, fn);
 
   // Ignore the object pointer; we aren't a dynamically-sized array,
   // so it's pointless.
@@ -299,6 +304,8 @@ createArrayDtorFn(IRGenModule &IGM,
                            "arraydestroy", &IGM.Module);
 
   IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(IGF, fn);
 
   // Bind the necessary archetypes.  This is required before we can
   // lay out the array in this IGF.

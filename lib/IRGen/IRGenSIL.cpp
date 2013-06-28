@@ -348,7 +348,6 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 
-  // Set up a (debug-info-)lexical scope for the function body.
   // Emit the function body.
   for (SILBasicBlock &bb : *CurSILFn)
     visitSILBasicBlock(&bb);
@@ -365,9 +364,14 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Generate the body.
   for (auto &I : *BB) {
     // Set the debug info location for I, if applicable.
-    if (IGM.DebugInfo)
-      IGM.DebugInfo->setCurrentLoc(Builder, I.getDebugScope(), I.getLoc());
-
+    if (IGM.DebugInfo) {
+      if (SILDebugScope* DS = I.getDebugScope())
+        IGM.DebugInfo->setCurrentLoc(Builder, I.getDebugScope(), I.getLoc());
+      else {
+        assert( CurSILFn->getDebugScope() && "function without a debug scope");
+        IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
+      }
+    }
     visit(&I);
   }
   

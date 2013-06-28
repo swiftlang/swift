@@ -50,6 +50,7 @@
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "NecessaryBindings.h"
@@ -1884,6 +1885,9 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
   if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
     IRGenFunction IGF(IGM, ExplosionKind::Minimal, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->createArtificialFunction(IGF, def);
+
     auto it = def->arg_begin();
     Address dest(it++, fixedTI->getFixedAlignment());
     Address src(it++, fixedTI->getFixedAlignment());
@@ -2145,6 +2149,9 @@ namespace {
 
       // Start building it.
       IRGenFunction IGF(IGM, ExplosionKind::Minimal, fn);
+      if (IGM.DebugInfo)
+        IGM.DebugInfo->createArtificialFunction(IGF, fn);
+
       emitThunk(IGF);
 
       return asOpaquePtr(IGM, fn);

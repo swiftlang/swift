@@ -70,6 +70,8 @@ static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
                            "_swift_initObjCClasses", &IGM.Module);
 
   IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(initIGF, initFn);
 
   llvm::Constant *loadSelRef = IGM.getAddrOfObjCSelectorRef("load");
   llvm::Value *loadSel =
@@ -131,11 +133,14 @@ public:
                               class_replaceMethod_params,
                               false);
     class_replaceMethod = IGF.IGM.Module.getFunction("class_replaceMethod");
-    if (!class_replaceMethod)
+    if (!class_replaceMethod) {
       class_replaceMethod = llvm::Function::Create(class_replaceMethod_ty,
                                              llvm::GlobalValue::ExternalLinkage,
                                              "class_replaceMethod",
                                              &IGF.IGM.Module);
+      if (IGF.IGM.DebugInfo)
+        IGF.IGM.DebugInfo->createArtificialFunction(IGF, class_replaceMethod);
+    }
     
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
     classMetadata = tryEmitConstantHeapMetadataRef(IGF.IGM, origTy);
@@ -212,6 +217,8 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
                            "_swift_initObjCCategories", &IGM.Module);
   
   IRGenFunction initIGF(IGM, ExplosionKind::Minimal, initFn);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->createArtificialFunction(initIGF, initFn);
   
   for (ExtensionDecl *ext : categories) {
     CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
@@ -254,6 +261,9 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
     
     // Insert a call to the top_level_code symbol from the SIL module.
     IRGenFunction initIGF(*this, ExplosionKind::Minimal, initFn);
+    if (DebugInfo)
+      DebugInfo->createArtificialFunction(initIGF, initFn);
+
     initIGF.Builder.CreateCall(topLevelCodeFn);
     initIGF.Builder.CreateRetVoid();
   }
@@ -309,11 +319,8 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
           llvm::GlobalValue::ExternalLinkage, "main", &Module);
 
     IRGenFunction mainIGF(*this, ExplosionKind::Minimal, mainFn);
-    if (DebugInfo) {
-      SILDebugScope *mainScope = new (*SILMod) SILDebugScope();
-      DebugInfo->createFunction(mainScope, mainFn);
-      DebugInfo->setCurrentLoc(mainIGF.Builder, mainScope);
-    }
+    if (DebugInfo)
+      DebugInfo->createArtificialFunction(mainIGF, mainFn);
 
     // Poke argc and argv into variables declared in the Swift stdlib
     auto args = mainFn->arg_begin();
@@ -394,7 +401,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
 
   // Fix up the DICompileUnit.
   if (DebugInfo)
-    DebugInfo->Finalize();
+    DebugInfo->finalize();
 }
 
 /// Add the given global value to @llvm.used.

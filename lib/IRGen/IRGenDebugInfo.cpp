@@ -1,4 +1,4 @@
-//===--- IRGenModule.cpp - Swift Global LLVM IR Generation ----------------===//
+//===--- IRGenDebugInfo.h - Debug Info Support-----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements IR generation for global declarations in Swift.
+//  This file implements IR debug info generatio for Swift.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,6 +18,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/config/config.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -29,7 +30,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
-
 
 namespace swift {
 namespace irgen {
@@ -246,7 +246,15 @@ void IRGenDebugInfo::createFunction(SILDebugScope* DS,
   ScopeMap[DS] = SP;
 }
 
-void IRGenDebugInfo::Finalize() {
+void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
+                                              IRBuilder &Builder,
+                                              llvm::Function *Fn) {
+  SILDebugScope *Scope = new (SILMod) SILDebugScope();
+  createFunction(Scope, Fn);
+  setCurrentLoc(Builder, Scope);
+}
+
+void IRGenDebugInfo::finalize() {
   DBuilder.finalize();
 }
 
