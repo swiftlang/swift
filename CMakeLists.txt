@@ -259,7 +259,7 @@ function(compile_swift_files)
   set(stdlib_dep)
   # Make sure that standard library does not depend on itself.
   if(NOT SWIFTFILE_IS_STDLIB)
-    set(stdlib_dep swift_stdlib)
+    set(stdlib_dep swift_stdlib_core)
   endif()
 
   add_custom_command(
@@ -361,8 +361,8 @@ function(handle_swift_sources sourcesvar externalvar target)
 
   if(swift_sources)
 
-    # Special-case hack to create swift.o for the swift_stdlib target
-    if(target STREQUAL swift_stdlib)
+    # Special-case hack to create swift.o for the swift_stdlib_* targets
+    if(target STREQUAL swift_stdlib_core)
       set(swift_obj_base "swift")
     elseif(target STREQUAL swift_stdlib_posix)
       set(swift_obj_base "POSIX")

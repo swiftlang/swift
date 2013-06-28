@@ -37,30 +37,30 @@ string(REGEX REPLACE ";;+" ";" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 
 
 set(SHARED_LIBRARY ON)
-add_swift_library(swift_stdlib INSTALL IS_STDLIB
+add_swift_library(swift_stdlib_core INSTALL IS_STDLIB
   ${SWIFTLIB_SOURCES}
   DEPENDS swift_runtime)
-add_dependencies(swift_stdlib swift)
+add_dependencies(swift_stdlib_core swift)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swift_stdlib PROPERTIES
-                                      COMPILE_FLAGS "-momit-leaf-frame-pointer")
+   set_target_properties(swift_stdlib_core PROPERTIES
+                                           COMPILE_FLAGS "-momit-leaf-frame-pointer")
   elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swift_stdlib PROPERTIES
-                                      COMPILE_FLAGS "-momit-leaf-frame-pointer")
+   set_target_properties(swift_stdlib_core PROPERTIES
+                                           COMPILE_FLAGS "-momit-leaf-frame-pointer")
  endif()
 endif()
 
 # Link against Foundation, for ObjC bridging.
-set_target_properties(swift_stdlib PROPERTIES
-                                   LINK_FLAGS "-framework Foundation")
-add_dependencies(swift_stdlib swift)
+set_target_properties(swift_stdlib_core PROPERTIES
+                                        LINK_FLAGS "-framework Foundation")
+add_dependencies(swift_stdlib_core swift)
 
 
 # Create the symlinks necessary to get the compiler to find the
 # swift runtime during development with Xcode.
-add_custom_command(TARGET swift_stdlib PRE_BUILD
+add_custom_command(TARGET swift_stdlib_core PRE_BUILD
   COMMAND ln "-fhs" "${SWIFTLIB_DIR}" "${CMAKE_BINARY_DIR}/bin/lib"
   COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
   COMMAND ln "-fhs" "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang" "${SWIFTLIB_DIR}/swift/clang")

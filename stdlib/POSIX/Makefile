@@ -46,7 +46,7 @@ endif
 SWIFT_OPTFLAG := -O3
 
 LDFLAGS += -framework Foundation \
-	   -lswift_runtime -lswift_stdlib -Wl,-force_load,$(LibDir)/libswift_runtime.a
+	   -lswift_runtime -lswift_stdlib_core -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_POSIX_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(POSIX_SOURCES))
 

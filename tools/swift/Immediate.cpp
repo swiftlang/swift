@@ -173,7 +173,7 @@ static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLin
 }
 
 static void loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
-  loadRuntimeLib("libswift_stdlib.dylib", CmdLine);
+  loadRuntimeLib("libswift_stdlib_core.dylib", CmdLine);
 }
 
 static bool IRGenImportedModules(TranslationUnit *TU,

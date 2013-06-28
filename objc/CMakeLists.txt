@@ -2,7 +2,7 @@
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftObjectiveC INSTALL
   ObjectiveC.swift
-  DEPENDS swift_stdlib)
+  DEPENDS swift_stdlib_core)
 
 # Link against the system dylib.
 target_link_libraries(swiftObjectiveC

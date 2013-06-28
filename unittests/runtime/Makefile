@@ -16,6 +16,6 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := $(TARGETS_TO_BUILD)
 
 # This is almost certainly not the right way of doing this.
-ProjLibsOptions += -lswift_stdlib
+ProjLibsOptions += -lswift_stdlib_core
 
 include $(SWIFT_LEVEL)/unittests/Makefile

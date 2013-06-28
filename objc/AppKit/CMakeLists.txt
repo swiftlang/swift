@@ -1,7 +1,7 @@
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftAppKit INSTALL
   AppKit.swift
-  DEPENDS swift_stdlib swiftObjectiveC swiftFoundation)
+  DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")

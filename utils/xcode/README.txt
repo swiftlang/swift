@@ -8,7 +8,7 @@ Once you've installed it, Xcode will recognize Swift source files as source
 files and add them to the appropriate part of your project. You will also be
 able to use the following build settings:
   SWIFT_EXEC - Path to the Swift compiler.
-  SWIFT_LIBRARY_PATH - Path to the directory containing libswift_stdlib.
+  SWIFT_LIBRARY_PATH - Path to the directory containing libswift_stdlib_core.
   SWIFT_LIBRARIES_ONLY - Assume all inputs are libraries rather than scripts,
     i.e. automatically pass -parse-as-library to the Swift compiler. This is
     fine for applications with no main.swift, but will need to be turned off

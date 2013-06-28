@@ -91,7 +91,7 @@ then
 elif ! "$TOOLCHAIN/usr/bin/clang" "$TMPDIR/test_compile_$$.o" \
   -o "$TMPDIR/test_compile_$$" \
   -L/usr/lib/swift \
-  -framework Cocoa -lswift_stdlib -lswiftFoundation -lswiftObjectiveC \
+  -framework Cocoa -lswift_stdlib_core -lswiftFoundation -lswiftObjectiveC \
   -lswiftAppKit
 then
   echo "Failed to link Swift program!"
@@ -104,7 +104,7 @@ elif ! "$TOOLCHAIN/usr/bin/clang" "$TMPDIR/test_compile_$$.o" \
   -isysroot "$SYSROOT" \
   -o "$TMPDIR/test_compile_2_$$" \
   -L/usr/lib/swift \
-  -framework Cocoa -lswift_stdlib -lswiftFoundation -lswiftObjectiveC \
+  -framework Cocoa -lswift_stdlib_core -lswiftFoundation -lswiftObjectiveC \
   -lswiftAppKit
 then
   echo "Failed to link Swift program with -isysroot!"

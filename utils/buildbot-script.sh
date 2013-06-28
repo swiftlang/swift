@@ -169,11 +169,11 @@ Run Swift programs using the '-i' flag:
         swift -i /usr/share/swift/examples/hello.swift
 
 Compile Swift programs to .o files using the '-c' flag. Currently they must
-then be linked manually to the swift_stdlib library in /usr/lib/swift using
-Clang:
+then be linked manually to the swift_stdlib_core library in /usr/lib/swift
+using Clang:
 
         swift -c /usr/share/swift/examples/hello.swift -o hello.o
-        clang -o hello hello.o -L/usr/lib/swift -lswift_stdlib
+        clang -o hello hello.o -L/usr/lib/swift -lswift_stdlib_core
         ./hello
 
 Language documentation and examples are installed under /usr/share/swift.

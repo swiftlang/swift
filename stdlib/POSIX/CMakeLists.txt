@@ -15,11 +15,11 @@ string(REGEX REPLACE ";;+" ";" POSIXLIB_SOURCES "${POSIXLIB_SOURCES}")
 set(SHARED_LIBRARY ON)
 add_swift_library(swift_stdlib_posix INSTALL
   ${POSIXLIB_SOURCES}
-  DEPENDS swift_runtime swift_stdlib)
+  DEPENDS swift_runtime swift_stdlib_core)
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_stdlib_posix PROPERTIES
                                          LINK_FLAGS "-framework Foundation")
-add_dependencies(swift_stdlib_posix swift_stdlib)
+add_dependencies(swift_stdlib_posix swift_stdlib_core)
 
 if(SWIFT_OPTIMIZED)
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")

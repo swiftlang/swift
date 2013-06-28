@@ -28,7 +28,7 @@ include $(SWIFT_LEVEL)/Makefile
 SWIFT_OPTFLAG := -O3
 
 LDFLAGS += -lobjc  \
-	   -lswift_stdlib -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
+	   -lswift_stdlib_core -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 $(SWIFT_HEADER_DIR)/ObjectiveC.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)/.dir
