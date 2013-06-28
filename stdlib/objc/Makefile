@@ -1,4 +1,4 @@
-##===- objc/Makefile -------------------------------------*- Makefile -*-===##
+##===- stdlib/objc/Makefile --------------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -14,7 +14,7 @@
 SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
 ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
 
-SWIFT_LEVEL := ..
+SWIFT_LEVEL := ../..
 LIBRARYNAME := swiftObjectiveC
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1

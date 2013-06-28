@@ -1,4 +1,4 @@
-##===- objc/AppKit/Makefile --------------------------------*- Makefile -*-===##
+##===- stdlib/objc/Foundation/Makefile ---------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -10,14 +10,14 @@
 #
 ##===----------------------------------------------------------------------===##
 
-SWIFT_LEVEL := ../..
+SWIFT_LEVEL := ../../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-LIBRARYNAME := swiftAppKit
+LIBRARYNAME := swiftFoundation
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := AppKit.swift
-SOURCES := AppKit.swift
+SWIFT_SOURCES := Foundation.swift
+SOURCES := Foundation.swift BridgeNSString.mm
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
@@ -38,17 +38,17 @@ endif
 
 SWIFT_OPTFLAG := -O3
 
-LDFLAGS += -framework AppKit \
-	   -lswift_stdlib_core -lswift_runtime -lswiftObjectiveC -lswiftFoundation -Wl,-force_load,$(LibDir)/libswift_runtime.a
+LDFLAGS += -framework Foundation \
+	   -lswift_stdlib_core -lswift_runtime -lswiftObjectiveC -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
-$(SWIFT_HEADER_DIR)/AppKit.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)
+$(SWIFT_HEADER_DIR)/Foundation.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DIR)/.dir
 	$(Echo) FIXME -- HACK -- Concatenating $(SWIFT_SOURCES) to build dir
 	$(Verb) cat $(PATH_TO_SWIFT_SOURCES) > $@
 
 SWIFT_COMPILER := $(LLVMToolDir)/swift$(EXEEXT)
-$(ObjDir)/AppKit.o: $(SWIFT_HEADER_DIR)/AppKit.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/Foundation.o: $(SWIFT_HEADER_DIR)/Foundation.swift $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $<) for $(BuildMode) build"
 	$(Verb) $(SWIFT_COMPILER) $(SWIFT_SDKFLAG) -o $@ -parse-as-library $(SWIFT_OPTFLAG) $(PATH_TO_SWIFT_SOURCES)
 
-all-local:: $(SWIFT_HEADER_DIR)/AppKit.swift
+all-local:: $(SWIFT_HEADER_DIR)/Foundation.swift

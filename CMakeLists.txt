@@ -564,11 +564,6 @@ add_subdirectory(test)
 add_subdirectory(runtime)
 add_subdirectory(stdlib)
 add_subdirectory(utils)
-
-if(HAVE_MODULES_SDK)
-  add_subdirectory(objc)
-endif()
-
 add_subdirectory(examples)
 add_subdirectory(unittests)
 add_subdirectory(docs)

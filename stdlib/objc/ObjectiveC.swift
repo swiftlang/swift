@@ -1,3 +1,4 @@
+import swift
 import ObjectiveC
 
 //===----------------------------------------------------------------------===//
@@ -8,25 +9,30 @@ import ObjectiveC
 
 /// \brief The Objective-C BOOL type.
 ///
-/// The Objective-C BOOL type is typically a typedef of "signed char". However,
-/// the Clang importer treats it as a distinct type.
+/// The Objective-C BOOL type is typically a typedef of "signed char".  Clang
+/// importer imports it as ObjCBool.
 ///
 /// Note: When BOOL is a typedef of C's _Bool/C++'s bool, this struct goes away
 /// and simply becomes a typealias for CBool.
+///
+/// The compiler has special knowledge of this type.
 struct ObjCBool {
-  // FIXME: Ambiguity between ObjC and swift modules. Ugh.
-  var value : swift.UInt8
+  var value : UInt8
 
   /// \brief Allow use in a Boolean context.
   func getLogicValue() -> Bool {
-    if value == 0 { return false }
-    return true
+    return value != 0
   }
 
   /// \brief Implicit conversion from C Boolean type to Swift Boolean
   /// type.
   func [conversion] __conversion() -> Bool {
-    return this  
+    return this.getLogicValue()
+  }
+
+  func replPrint() {
+    // Dispatch to Bool.
+    this.getLogicValue().replPrint()
   }
 }
 
@@ -34,10 +40,7 @@ extension Bool {
   /// \brief Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
   func [conversion] __conversion() -> ObjCBool {
-    var result : ObjCBool
-    if this { result.value = 1 }
-    else { result.value = 0 }
-    return result
+    return ObjCBool(this ? 1 : 0)
   }
 }
 
@@ -46,13 +49,19 @@ extension Bool {
 /// The Objective-C SEL type is typically an opaque pointer. Swift
 /// treats it as a distinct struct type, with operations to
 /// convert between C strings and selectors.
-struct ObjCSel {
+///
+/// The compiler has special knowledge of this type.
+struct ObjCSel : StringLiteralConvertible {
   var ptr : COpaquePointer
 
   /// \brief Create a selector from a string.
   constructor(str : String) {
-    ptr = sel_registerName(CString(str)).ptr
+    var LM = LifetimeManager()
+    ptr = sel_registerName(LM.getCString(str)).ptr
+    LM.release()
   }
+
+  typealias StringLiteralType = CString
 
   /// \brief Construct a selector from a string literal.
   ///
@@ -61,18 +70,34 @@ struct ObjCSel {
   static func convertFromStringLiteral(str : CString) -> ObjCSel {
     return sel_registerName(str)
   }
- 
+
   func replPrint() {
     print(String(this))
+  }
+}
+
+extension ObjCSel : Equatable, Hashable {
+  func __equal__ (rhs : ObjCSel) -> Bool {
+    return sel_isEqual(this, rhs)
+  }
+  func hashValue() -> Int {
+    return ptr.hashValue()
   }
 }
 
 extension String {
   /// \brief Construct the C string representation of an Objective-C selector.
   constructor(sel : ObjCSel) {
-    // FIXME: This is crazy. Adopting a C string as a Swift string should be
-    // simpler. This even misses the ASCII optimization.
-    var name = sel_getName(sel)
-    this = String.convertFromStringLiteral(name.cstr.value, strlen(name).value)
+    // FIXME: This misses the ASCII optimization.
+    this = String.fromCString(sel_getName(sel))
   }
+}
+
+// Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
+
+func convertBoolToObjCBool(x:Bool) -> ObjCBool {
+  return x
+}
+func convertObjCBoolToBool(x:ObjCBool) -> Bool {
+  return x
 }
