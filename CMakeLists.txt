@@ -167,13 +167,13 @@ endif ()
 # Usage:
 #   compile_swift_files(OUTPUT objfile  # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
-#     [IS_MAIN]                         # This is an executable, not a library 
-#     [IS_STDLIB])                      # This is the standard library
+#     [IS_MAIN]                         # This is an executable, not a library
+#     [IS_STDLIB_CORE])                 # This is the core standard library
 function(compile_swift_files)	
-  parse_arguments(SWIFTFILE "OUTPUT;SOURCES" "IS_MAIN;IS_STDLIB" ${ARGN})
+  parse_arguments(SWIFTFILE "OUTPUT;SOURCES" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
   
-  if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB)
-    error(SEND_ERROR "Cannot set both IS_MAIN and IS_STDLIB")
+  if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
+    error(SEND_ERROR "Cannot set both IS_MAIN and IS_STDLIB_CORE")
   endif()
   
   set(swift_flags)
@@ -212,7 +212,7 @@ function(compile_swift_files)
   if(NOT SWIFTFILE_IS_MAIN)
     list(APPEND swift_flags -parse-as-library)
   endif()
-  if(SWIFTFILE_IS_STDLIB)
+  if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags -parse-stdlib)
   endif()
 
@@ -258,7 +258,7 @@ function(compile_swift_files)
 
   set(stdlib_dep)
   # Make sure that standard library does not depend on itself.
-  if(NOT SWIFTFILE_IS_STDLIB)
+  if(NOT SWIFTFILE_IS_STDLIB_CORE)
     set(stdlib_dep swift_stdlib_core)
   endif()
 
@@ -331,7 +331,7 @@ endfunction()
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar target)
 function(handle_swift_sources sourcesvar externalvar target)
-  parse_arguments(SWIFTSOURCES  "" "IS_MAIN;IS_STDLIB" ${ARGN})
+  parse_arguments(SWIFTSOURCES  "" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
 
   set(result)
   set(swift_sources)
@@ -354,9 +354,9 @@ function(handle_swift_sources sourcesvar externalvar target)
   if (SWIFTSOURCES_IS_MAIN)
     set(IS_MAIN_arg IS_MAIN)
   endif()
-  set(IS_STDLIB_arg)
-  if(SWIFTSOURCES_IS_STDLIB)
-    set(IS_STDLIB_arg IS_STDLIB)
+  set(IS_STDLIB_CORE_arg)
+  if(SWIFTSOURCES_IS_STDLIB_CORE)
+    set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
 
   if(swift_sources)
@@ -375,7 +375,7 @@ function(handle_swift_sources sourcesvar externalvar target)
 
     set(swift_obj "${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
     compile_swift_files(OUTPUT ${swift_obj} SOURCES ${swift_sources}
-      ${IS_MAIN_arg} ${IS_STDLIB_arg})
+      ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
     list(APPEND result ${swift_obj})
   endif()
 
@@ -396,10 +396,10 @@ set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/lib/${CMAKE_CFG_INTDIR}")
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [INSTALL]                      # Install library to lib/swift
-#     [IS_STDLIB]                    # Compile as the standard library
+#     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB"
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
@@ -421,13 +421,13 @@ macro(add_swift_library name)
     set(libkind)
   endif()
 
-  set(IS_STDLIB_arg)
-  if(SWIFTLIB_IS_STDLIB)
-    set(IS_STDLIB_arg IS_STDLIB)
+  set(IS_STDLIB_CORE_arg)
+  if(SWIFTLIB_IS_STDLIB_CORE)
+    set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
   endif()
   
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
-    ${IS_STDLIB_arg})
+    ${IS_STDLIB_CORE_arg})
   add_library( ${name} ${libkind} ${SWIFTLIB_SOURCES} )
 
   if( LLVM_COMMON_DEPENDS )

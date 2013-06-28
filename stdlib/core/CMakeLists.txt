@@ -37,7 +37,7 @@ string(REGEX REPLACE ";;+" ";" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 
 
 set(SHARED_LIBRARY ON)
-add_swift_library(swift_stdlib_core INSTALL IS_STDLIB
+add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   DEPENDS swift_runtime)
 add_dependencies(swift_stdlib_core swift)
