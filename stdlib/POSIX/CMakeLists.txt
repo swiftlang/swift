@@ -15,7 +15,7 @@ string(REGEX REPLACE ";;+" ";" POSIXLIB_SOURCES "${POSIXLIB_SOURCES}")
 set(SHARED_LIBRARY ON)
 add_swift_library(swift_stdlib_posix INSTALL
   ${POSIXLIB_SOURCES}
-  DEPENDS swift_runtime swift_stdlib_core)
+  DEPENDS swift_stdlib_core)
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_stdlib_posix PROPERTIES
                                          LINK_FLAGS "-framework Foundation")
