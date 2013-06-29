@@ -508,6 +508,8 @@ public:
   NullablePtr<Pattern> parsePatternAtom();
   NullablePtr<Pattern> parsePatternIdentifier();
   
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name);
+  
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 

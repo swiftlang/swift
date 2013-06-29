@@ -717,6 +717,7 @@ void Parser::addVarsToScope(Pattern *Pat,
   case PatternKind::Any:
   case PatternKind::Isa:
   case PatternKind::Expr:
+    // FIXME: Recur into exprs to look for unresolved patterns.
     return;
   }
   llvm_unreachable("bad pattern kind!");

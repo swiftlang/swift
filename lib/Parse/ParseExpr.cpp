@@ -192,6 +192,32 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   NullablePtr<Expr> expr = parseExprSequence(Message);
   if (expr.isNull())
     return nullptr;
+  
+  // If we got a bare identifier inside a 'var' pattern, it forms a variable
+  // binding pattern. Raise an error if the identifier shadows an existing
+  // binding.
+  //
+  // TODO: We could check for a bare identifier followed by a non-postfix
+  // token first thing with a lookahead.
+  if (VarPatternDepth > 0) {
+    if (auto *declRef = dyn_cast<DeclRefExpr>(expr.get())) {
+      diagnose(declRef->getLoc(),
+               diag::pattern_binding_shadows_var,
+               declRef->getDecl()->getName().str());
+      diagnose(declRef->getDecl()->getLoc(),
+               diag::decl_declared_here,
+               declRef->getDecl()->getName());
+      
+      auto pattern = createBindingFromPattern(declRef->getLoc(),
+                                              declRef->getDecl()->getName());
+      return new (Context) UnresolvedPatternExpr(pattern);
+    }
+    if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
+      auto pattern = createBindingFromPattern(udre->getLoc(),
+                                              udre->getName());
+      return new (Context) UnresolvedPatternExpr(pattern);
+    }
+  }
 
   // Parse trailing closure, if we're allowed to.
   while (!isExprBasic && Tok.is(tok::l_brace)) {

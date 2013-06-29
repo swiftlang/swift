@@ -274,6 +274,12 @@ bool Parser::isStartOfBindingName(Token tok) {
   return tok.is(tok::kw__) || tok.is(tok::identifier);
 }
 
+Pattern *Parser::createBindingFromPattern(SourceLoc loc,
+                                          Identifier name) {
+  VarDecl *var = new (Context) VarDecl(loc, name, Type(), nullptr);
+  return new (Context) NamedPattern(var);
+}
+
 /// Parse an identifier as a pattern.
 NullablePtr<Pattern> Parser::parsePatternIdentifier() {
   SourceLoc loc = Tok.getLoc();
@@ -284,8 +290,7 @@ NullablePtr<Pattern> Parser::parsePatternIdentifier() {
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {
     Identifier ident = Context.getIdentifier(text);
-    VarDecl *var = new (Context) VarDecl(loc, ident, Type(), nullptr);
-    return new (Context) NamedPattern(var);
+    return createBindingFromPattern(loc, ident);
   }
   return nullptr;
 }

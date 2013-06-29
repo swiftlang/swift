@@ -468,6 +468,9 @@ ERROR(missing_comma_in_pattern,pattern_parsing,none,
       "missing comma between patterns", ())
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'var' cannot appear nested inside another 'var' pattern", ())
+ERROR(pattern_binding_shadows_var,pattern_parsing,none,
+      "variable '%0' in pattern cannot shadow an existing variable name",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
