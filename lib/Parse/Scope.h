@@ -74,6 +74,7 @@ enum class ScopeKind {
   TopLevel,
   ForVars,
   ForeachVars,
+  CaseVars,
 
   ClosureParams,
 };

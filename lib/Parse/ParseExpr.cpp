@@ -201,13 +201,8 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
   // token first thing with a lookahead.
   if (VarPatternDepth > 0) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(expr.get())) {
-      diagnose(declRef->getLoc(),
-               diag::pattern_binding_shadows_var,
-               declRef->getDecl()->getName().str());
-      diagnose(declRef->getDecl()->getLoc(),
-               diag::decl_declared_here,
-               declRef->getDecl()->getName());
-      
+      // This is ill-formed, but the problem will be caught later by scope
+      // resolution.
       auto pattern = createBindingFromPattern(declRef->getLoc(),
                                               declRef->getDecl()->getName());
       return new (Context) UnresolvedPatternExpr(pattern);

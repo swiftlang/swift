@@ -296,7 +296,7 @@ private:
 
   TreeScopedHashTable(const TreeScopedHashTable &) LLVM_DELETED_FUNCTION;
   void operator=(const TreeScopedHashTable &) LLVM_DELETED_FUNCTION;
-  friend struct TreeScopedHashTableScopeImpl<K, V, AllocatorTy>;
+  friend class TreeScopedHashTableScopeImpl<K, V, AllocatorTy>;
 
 public:
   TreeScopedHashTable() : NextScopeID(0) {}

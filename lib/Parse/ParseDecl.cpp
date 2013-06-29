@@ -17,6 +17,7 @@
 #include "swift/Parse/Lexer.h"
 #include "Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/Fallthrough.h"
@@ -663,64 +664,62 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   return TAD;
 }
 
+namespace {
+  class AddVarsToScope : public ASTWalker {
+  public:
+    swift::ScopeInfo &ScopeInfo;
+    ASTContext &Context;
+    DeclContext *CurDeclContext;
+    SmallVectorImpl<Decl*> &Decls;
+    DeclAttributes &Attributes;
+    
+    AddVarsToScope(swift::ScopeInfo &ScopeInfo,
+                   ASTContext &Context,
+                   DeclContext *CurDeclContext,
+                   SmallVectorImpl<Decl*> &Decls,
+                   DeclAttributes &Attributes)
+      : ScopeInfo(ScopeInfo),
+        Context(Context),
+        CurDeclContext(CurDeclContext),
+        Decls(Decls),
+        Attributes(Attributes)
+    {}
+    
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P)) {
+        VarDecl *VD = Named->getDecl();
+        VD->setDeclContext(CurDeclContext);
+        if (!VD->hasType())
+          VD->setType(UnstructuredUnresolvedType::get(Context));
+        if (Attributes.isValid())
+          VD->getMutableAttrs() = Attributes;
+        
+        if (VD->isProperty()) {
+          // FIXME: Order of get/set not preserved.
+          if (FuncDecl *Get = VD->getGetter()) {
+            Get->setDeclContext(CurDeclContext);
+            Decls.push_back(Get);
+          }
+          if (FuncDecl *Set = VD->getSetter()) {
+            Set->setDeclContext(CurDeclContext);
+            Decls.push_back(Set);
+          }
+        }
+        
+        Decls.push_back(VD);
+        ScopeInfo.addToScope(VD);
+      }
+      return P;
+    }
+  };
+}
+
 void Parser::addVarsToScope(Pattern *Pat,
                             SmallVectorImpl<Decl*> &Decls,
                             DeclAttributes &Attributes) {
-  switch (Pat->getKind()) {
-  // Recur into patterns.
-  case PatternKind::Tuple:
-    for (auto &field : cast<TuplePattern>(Pat)->getFields())
-      addVarsToScope(field.getPattern(), Decls, Attributes);
-    return;
-  case PatternKind::Paren:
-    return addVarsToScope(cast<ParenPattern>(Pat)->getSubPattern(), Decls,
-                          Attributes);
-  case PatternKind::Typed:
-    return addVarsToScope(cast<TypedPattern>(Pat)->getSubPattern(), Decls,
-                          Attributes);
-
-  case PatternKind::NominalType:
-    return addVarsToScope(cast<NominalTypePattern>(Pat)->getSubPattern(),
-                          Decls, Attributes);
-
-  case PatternKind::Var:
-    return addVarsToScope(cast<VarPattern>(Pat)->getSubPattern(),
-                          Decls, Attributes);
-      
-  // Handle vars.
-  case PatternKind::Named: {
-    VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
-    VD->setDeclContext(CurDeclContext);
-    if (!VD->hasType())
-      VD->setType(UnstructuredUnresolvedType::get(Context));
-    if (Attributes.isValid())
-      VD->getMutableAttrs() = Attributes;
-
-    if (VD->isProperty()) {
-      // FIXME: Order of get/set not preserved.
-      if (FuncDecl *Get = VD->getGetter()) {
-        Get->setDeclContext(CurDeclContext);
-        Decls.push_back(Get);
-      }
-      if (FuncDecl *Set = VD->getSetter()) {
-        Set->setDeclContext(CurDeclContext);
-        Decls.push_back(Set);
-      }
-    }
-    
-    Decls.push_back(VD);
-    ScopeInfo.addToScope(VD);
-    return;
-  }
-      
-  // Handle non-vars.
-  case PatternKind::Any:
-  case PatternKind::Isa:
-  case PatternKind::Expr:
-    // FIXME: Recur into exprs to look for unresolved patterns.
-    return;
-  }
-  llvm_unreachable("bad pattern kind!");
+  Pat->walk(AddVarsToScope(ScopeInfo, Context, CurDeclContext,
+                           Decls, Attributes));
 }
 
 /// parseSetGet - Parse a get-set clause, containing a getter and (optionally)

@@ -122,6 +122,10 @@ public:
   
   void print(llvm::raw_ostream &OS) const;
   void dump() const;
+  
+  /// walk - This recursively walks the AST rooted at this pattern.
+  Pattern *walk(ASTWalker &walker);
+  Pattern *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
 /// A pattern consisting solely of grouping parentheses around a

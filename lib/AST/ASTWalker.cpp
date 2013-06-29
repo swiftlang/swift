@@ -803,6 +803,10 @@ Stmt *Stmt::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }
 
+Pattern *Pattern::walk(ASTWalker &walker) {
+  return Traversal(walker).doIt(this);
+}
+
 bool Decl::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

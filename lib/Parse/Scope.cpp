@@ -41,6 +41,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ForVars:
   case ScopeKind::ForeachVars:
   case ScopeKind::ClosureParams:
+  case ScopeKind::CaseVars:
     return true;
   }
 }

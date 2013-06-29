@@ -628,6 +628,10 @@ bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels) {
         NullablePtr<Pattern> pattern = parseMatchingPattern();
         if (pattern.isNull())
           return true;
+        // Add variable bindings from the pattern to the case scope.
+        SmallVector<Decl*, 4> tmpDecls;
+        DeclAttributes defaultAttributes;
+        addVarsToScope(pattern.get(), tmpDecls, defaultAttributes);
         patterns.push_back(pattern.get());
       } while (consumeIf(tok::comma));
       
@@ -697,6 +701,9 @@ bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels) {
 
 // stmt-case ::= case-label+ brace-item*
 NullablePtr<CaseStmt> Parser::parseStmtCase() {
+  // A case block has its own scope for variables bound out of the pattern.
+  Scope scope(this, ScopeKind::CaseVars);
+  
   llvm::SmallVector<CaseLabel*, 2> labels;
   if (parseStmtCaseLabels(labels))
     return nullptr;
