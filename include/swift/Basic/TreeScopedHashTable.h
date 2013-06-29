@@ -68,7 +68,8 @@ public:
 /// \brief A reference-counted scope that actually owns the data in the
 /// hashtable.
 template <typename K, typename V, typename AllocatorTy = llvm::MallocAllocator>
-struct TreeScopedHashTableScopeImpl {
+class TreeScopedHashTableScopeImpl {
+public:
   typedef TreeScopedHashTable<K, V, AllocatorTy> HTTy;
 
   /// The hashtable that we are active for.
