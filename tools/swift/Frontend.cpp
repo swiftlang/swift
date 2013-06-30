@@ -82,23 +82,44 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   // If we're in SIL mode, don't auto import any libraries.
   if (Kind != TranslationUnit::SIL)
     performAutoImport(TU);
+  
+  // If we have multiple source files, we must be building a module.  Parse each
+  // file before type checking the union of them.
+  if (BufferIDs.size() > 1) {
+    assert(Kind != TranslationUnit::SIL &&
+           Kind != TranslationUnit::Main &&
+           "Multiple file mode can't handle early returns from the parser");
 
-  unsigned CurTUElem = 0;
-  for (auto &BufferID : BufferIDs) {
-    unsigned BufferOffset = 0;
-    const llvm::MemoryBuffer *Buffer =
-      Context.SourceMgr.getMemoryBuffer(BufferID);
-    do {
+    for (auto &BufferID : BufferIDs) {
+      auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
+
+      unsigned BufferOffset = 0;
       parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
-      if (!ParseOnly && BufferIDs.size() == 1) {
-        performTypeChecking(TU, CurTUElem);
-        CurTUElem = TU->Decls.size();
-      }
-    } while (BufferOffset != Buffer->getBufferSize());
-  }
+      assert(BufferOffset == Buffer->getBufferSize() &&
+             "Parser returned early?");
+    }
+    
+    if (!ParseOnly)
+      performTypeChecking(TU);
+    
+  } else {
+    // If there is only a single input file, it may be SIL or a main module,
+    // which requires pumping the parser.
+    assert(BufferIDs.size() == 1 && "SIL parser only allows one input");
+    unsigned BufferID = BufferIDs[0];
 
-  if (!ParseOnly && BufferIDs.size() > 1) {
-    performTypeChecking(TU);
+    unsigned CurTUElem = 0;
+    unsigned BufferOffset = 0;
+    auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
+    do {
+      // Pump the parser multiple times if necessary.  It will return early
+      // after parsing any top level code in a main module, or in SIL mode when
+      // there are chunks of swift decls (e.g. imports and types) interspersed
+      // with 'sil' definitions.
+      parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
+      performTypeChecking(TU, CurTUElem);
+      CurTUElem = TU->Decls.size();
+    } while (BufferOffset != Buffer->getBufferSize());
   }
 
   return TU;
