@@ -111,7 +111,7 @@ public:
       if (!pattern)
         pattern = new (C) ExprPattern(E->getElement(i),
                                       /*isResolved*/ true,
-                                      /*matchFn*/ false);
+                                      /*matchFn*/ nullptr);
       patternElts.push_back(TuplePatternElt(pattern));
     }
     
