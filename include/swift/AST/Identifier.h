@@ -56,7 +56,7 @@ class Identifier {
   /// Constructor, only accessible by ASTContext, which handles the uniquing.
   explicit Identifier(const char *Ptr) : Pointer(Ptr) {}
 public:
-  explicit Identifier() : Pointer(0) {}
+  explicit Identifier() : Pointer(nullptr) {}
   
   const char *get() const { return Pointer; }
   

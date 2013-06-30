@@ -408,7 +408,27 @@ public:
   }
   
   Stmt *visitSwitchStmt(SwitchStmt *S) {
+    // TODO: Type-check the subject expression.
+
+    // Type-check the case blocks.
+    for (auto *caseBlock : S->getCases()) {
+      for (auto *caseLabel : caseBlock->getCaseLabels()) {
+        // Resolve the patterns in the label.
+        for (auto *&pattern : caseLabel->getPatterns()) {
+          if (auto *newPattern = TC.resolvePattern(pattern))
+            pattern = newPattern;
+          else
+            return nullptr;
+        }
+        // TODO: Type-check the pattern using the subject type.
+        // TODO: Type-check the guard expression as a condition.
+      }
+      
+      // TODO: Type-check the body statements.
+    }
+    
     TC.diagnose(S->getLoc(), diag::not_implemented);
+    S->dump();
     return nullptr;
   }
 

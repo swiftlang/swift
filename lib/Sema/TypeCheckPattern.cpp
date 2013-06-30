@@ -18,7 +18,134 @@
 #include "TypeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
+#include "swift/AST/ASTVisitor.h"
 using namespace swift;
+
+namespace {
+
+class ResolvePattern : public ASTVisitor<ResolvePattern,
+                                         /*ExprRetTy=*/Pattern*,
+                                         /*StmtRetTy=*/void,
+                                         /*DeclRetTy=*/void,
+                                         /*PatternRetTy=*/Pattern*>
+{
+public:
+  ASTContext &C;
+  
+  ResolvePattern(ASTContext &C) : C(C) {}
+  
+  // Handle productions that are always leaf patterns or are already resolved.
+#define ALWAYS_RESOLVED_PATTERN(Id) \
+  Pattern *visit##Id##Pattern(Id##Pattern *P) { return P; }
+  ALWAYS_RESOLVED_PATTERN(Named)
+  ALWAYS_RESOLVED_PATTERN(Any)
+  ALWAYS_RESOLVED_PATTERN(Isa)
+  ALWAYS_RESOLVED_PATTERN(Paren)
+  ALWAYS_RESOLVED_PATTERN(Tuple)
+  ALWAYS_RESOLVED_PATTERN(NominalType)
+  ALWAYS_RESOLVED_PATTERN(Typed)
+#undef ALWAYS_RESOLVED_PATTERN
+
+  Pattern *visitVarPattern(VarPattern *P) {
+    Pattern *newSub = visit(P->getSubPattern());
+    P->setSubPattern(newSub);
+    return P;
+  }
+  
+  Pattern *visitExprPattern(ExprPattern *P) {
+    if (P->isResolved())
+      return P;
+    
+    // Try to convert to a pattern.
+    Pattern *exprAsPattern = visit(P->getSubExpr());
+    // If we failed, keep the ExprPattern as is.
+    if (!exprAsPattern) {
+      P->setResolved(true);
+      return P;
+    }
+    return exprAsPattern;
+  }
+  
+  // Most exprs remain exprs and should be wrapped in ExprPatterns.
+  Pattern *visitExpr(Expr *E) {
+    return nullptr;
+  }
+  
+  // Unwrap UnresolvedPatternExprs.
+  Pattern *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
+    return visit(E->getSubPattern());
+  }
+  
+  // Parens and tuples have to become patterns if they contain any patterns. If
+  // they have only exprs as children, a tuple pattern or expr would be
+  // equivalent, but it avoids some destructuring if we leave them as leaf
+  // exprs.
+  Pattern *visitParenExpr(ParenExpr *E) {
+    if (Pattern *subPattern = visit(E->getSubExpr()))
+      return new (C) ParenPattern(E->getLParenLoc(), subPattern,
+                                  E->getRParenLoc());
+    return nullptr;
+  }
+  
+  Pattern *visitTupleExpr(TupleExpr *E) {
+    SmallVector<Pattern*, 4> patterns;
+    bool hasPattern = false;
+    
+    for (auto *subExpr : E->getElements()) {
+      Pattern *pattern = visit(subExpr);
+      hasPattern |= bool(pattern);
+      patterns.push_back(pattern);
+    }
+    
+    // If there were no subpatterns, leave the entire tuple as a leaf
+    // expression.
+    if (!hasPattern)
+      return nullptr;
+    
+    // Otherwise, construct a TuplePattern.
+    // FIXME: Carry over field labels.
+    SmallVector<TuplePatternElt, 4> patternElts;
+    
+    for (unsigned i = 0, e = E->getNumElements(); i < e; ++i) {
+      Pattern *pattern = patterns[i];
+      if (!pattern)
+        pattern = new (C) ExprPattern(E->getElement(i),
+                                      /*isResolved*/ true,
+                                      /*matchFn*/ false);
+      patternElts.push_back(TuplePatternElt(pattern));
+    }
+    
+    return TuplePattern::create(C, E->getLoc(),
+                                patternElts, E->getRParenLoc());
+  }
+  
+  // TODO: Call syntax 'T(x...)' forms a pattern if 'T' is a type and '(x...)' is a
+  // TuplePattern with labeled fields.
+  /*
+  Pattern *visitCallExpr(CallExpr *E) {
+    // The arguments must form a tuple with all named keys.
+    auto *argTuple = dyn_cast<TupleExpr>(E->getArg());
+    if (!argTuple)
+      return nullptr;
+    if (!argTuple->getElementNames())
+      return nullptr;
+    for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i)
+      if (!argTuple->getElementName(i).get())
+        return nullptr;
+    ...;
+  }
+   */
+};
+
+} // end anonymous namespace
+
+/// Perform top-down syntactic disambiguation of a pattern. Where ambiguous
+/// expr/pattern productions occur (tuples, function calls, etc.), favor the
+/// pattern interpretation if it forms a valid pattern; otherwise, leave it as
+/// an expression.
+Pattern *TypeChecker::resolvePattern(Pattern *P) {
+  return ResolvePattern(Context).visit(P);
+}
 
 /// Perform bottom-up type-checking on a pattern.  If this returns
 /// false, the type of the pattern will have been set.  If allowUnknownTypes is

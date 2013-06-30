@@ -319,7 +319,7 @@ public:
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
-
+  
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -361,6 +361,10 @@ public:
   /// place to return a builtin integral value (e.g., builtin i64).
   bool typeCheckArrayBound(Expr *&expr, bool requireConstant, DeclContext *dc);
 
+  /// \brief Resolve ambiguous pattern/expr productions inside a pattern using
+  /// name lookup information. Must be done before type-checking the pattern.
+  Pattern *resolvePattern(Pattern *P);
+  
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);

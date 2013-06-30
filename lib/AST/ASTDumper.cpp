@@ -591,7 +591,7 @@ public:
       }
       if (Expr *guard = label->getGuardExpr()) {
         OS << '\n';
-        printRec(guard);
+        guard->print(OS, Indent+4);
       }
       OS << ')';
     }
@@ -1080,10 +1080,9 @@ public:
     OS << ')';
   }
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
-    OS.indent(Indent) << "(unresolved_pattern_expr\n";
-    OS << '\n';
-    OS.indent(Indent+2);
+    OS.indent(Indent) << "(unresolved_pattern_expr ";
     E->getSubPattern()->print(OS);
+    OS << ')';
   }
 };
 
