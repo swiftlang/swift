@@ -49,8 +49,18 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  unsigned LoopNestLevel, SwitchLevel;
+  // Scope information for control flow statements
+  // (break, continue, fallthrough).
   
+  /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
+  /// where this is greater than one.
+  unsigned LoopNestLevel;
+  /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
+  /// this is greater than one.
+  unsigned SwitchLevel;
+  /// The destination block for a 'fallthrough' statement. Null if the switch
+  /// scope depth is zero or if we are checking the final 'case' of the current
+  /// switch.
   CaseStmt /*nullable*/ *FallthroughDest;
 
   struct AddLoopNest {
@@ -60,6 +70,22 @@ public:
     }
     ~AddLoopNest() {
       --SC.LoopNestLevel;
+    }
+  };
+  
+  struct AddSwitchNest {
+    StmtChecker &SC;
+    CaseStmt *OuterFallthroughDest;
+    AddSwitchNest(StmtChecker &SC)
+      : SC(SC),
+        OuterFallthroughDest(SC.FallthroughDest)
+    {
+      ++SC.SwitchLevel;
+    }
+    
+    ~AddSwitchNest() {
+      --SC.SwitchLevel;
+      SC.FallthroughDest = OuterFallthroughDest;
     }
   };
 
@@ -403,8 +429,10 @@ public:
       TC.diagnose(S->getLoc(), diag::fallthrough_from_last_case);
       return nullptr;
     }
+    if (FallthroughDest->hasBoundDecls())
+      TC.diagnose(S->getLoc(), diag::fallthrough_into_case_with_var_binding);
     S->setFallthroughDest(FallthroughDest);
-    return nullptr;
+    return S;
   }
   
   Stmt *visitSwitchStmt(SwitchStmt *S) {
@@ -420,11 +448,12 @@ public:
     S->getSubjectDecl()->setType(subjectType);
 
     // Type-check the case blocks.
-    ++SwitchLevel;
+    AddSwitchNest switchNest(*this);
     bool hadTypeError = false;
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];
-      // Fallthrough transfers control to the next case block.
+      // Fallthrough transfers control to the next case block. In the
+      // final case block, it is invalid.
       FallthroughDest = i+1 == e ? nullptr : S->getCases()[i+1];
 
       for (auto *caseLabel : caseBlock->getCaseLabels()) {
@@ -456,13 +485,12 @@ public:
         hadTypeError = true;
       caseBlock->setBody(body);
     }
-    --SwitchLevel;
     
     return hadTypeError ? nullptr : S;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
-    // Cases are handled in typeCheckCaseStmt.
+    // Cases are handled in visitSwitchStmt.
     llvm_unreachable("case stmt outside of switch?!");
   }
 };

@@ -569,6 +569,9 @@ ERROR(default_with_other_labels,stmt_parsing,none,
 ERROR(default_with_where,stmt_parsing,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
+ERROR(var_binding_with_multiple_case_patterns,stmt_parsing,none,
+      "'case' labels with multiple patterns cannot declare variables",
+      ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
@@ -1375,7 +1378,9 @@ ERROR(fallthrough_outside_switch,sema_tcs,none,
       "'fallthrough' is only allowed inside a switch", ())
 ERROR(fallthrough_from_last_case,sema_tcs,none,
       "'fallthrough' without a following 'case' or 'default' block", ())
-
+ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
+      "'fallthrough' cannot transfer control to a case label that declares variables",
+      ())
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------

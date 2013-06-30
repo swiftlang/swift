@@ -154,8 +154,9 @@ CaseLabel *CaseLabel::create(ASTContext &C, bool isDefault,
                                whereLoc, guardExpr, colonLoc);
 }
 
-CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body)
-  : Stmt(StmtKind::Case), Body(Body), NumCaseLabels(Labels.size())
+CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, bool HasBoundDecls, Stmt *Body)
+  : Stmt(StmtKind::Case), BodyAndHasBoundDecls(Body, HasBoundDecls),
+    NumCaseLabels(Labels.size())
 {
   assert(NumCaseLabels > 0 && "case block must have at least one label");
   MutableArrayRef<CaseLabel*> buf{getCaseLabelsBuffer(), NumCaseLabels};
@@ -167,10 +168,11 @@ CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body)
 
 CaseStmt *CaseStmt::create(ASTContext &C,
                            ArrayRef<CaseLabel*> Labels,
+                           bool HasBoundDecls,
                            Stmt *Body) {
   void *p = C.Allocate(sizeof(CaseStmt) + Labels.size() * sizeof(CaseLabel*),
                        alignof(CaseStmt));
-  return ::new (p) CaseStmt(Labels, Body);
+  return ::new (p) CaseStmt(Labels, HasBoundDecls, Body);
 }
 
 SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,

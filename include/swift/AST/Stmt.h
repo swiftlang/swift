@@ -419,7 +419,7 @@ public:
 /// substatement of a SwitchStmt. A case block begins either with one or more
 /// CaseLabels or a single 'default' label.
 class CaseStmt : public Stmt {
-  Stmt *Body;
+  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
   unsigned NumCaseLabels;
 
   CaseLabel * const *getCaseLabelsBuffer() const {
@@ -429,19 +429,23 @@ class CaseStmt : public Stmt {
     return reinterpret_cast<CaseLabel **>(this + 1);
   }
   
-  CaseStmt(ArrayRef<CaseLabel*> Labels, Stmt *Body);
+  CaseStmt(ArrayRef<CaseLabel*> Labels, bool hasBoundDecls, Stmt *Body);
   
 public:
   static CaseStmt *create(ASTContext &C,
                           ArrayRef<CaseLabel*> Labels,
+                          bool hasBoundDecls,
                           Stmt *Body);
   
   ArrayRef<CaseLabel *> getCaseLabels() const {
     return {getCaseLabelsBuffer(), NumCaseLabels};
   }
   
-  Stmt *getBody() const { return Body; }
-  void setBody(Stmt *body) { Body = body; }
+  Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
+  void setBody(Stmt *body) { BodyAndHasBoundDecls.setPointer(body); }
+  
+  /// True if the case block declares any patterns with local variable bindings.
+  bool hasBoundDecls() const { return BodyAndHasBoundDecls.getInt(); }
   
   /// Get the source location of the 'case' or 'default' of the first label.
   SourceLoc getLoc() const {
@@ -449,7 +453,7 @@ public:
   }
   
   SourceRange getSourceRange() const {
-    return {getLoc(), Body->getEndLoc()};
+    return {getLoc(), getBody()->getEndLoc()};
   }
   
   bool isDefault() {

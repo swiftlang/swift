@@ -604,7 +604,8 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
                             Context);
 }
 
-bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels) {
+bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels,
+                                 llvm::SmallVectorImpl<Decl *> &boundDecls) {
   // We must have at least one case label.
   assert(Tok.is(tok::kw_case) || Tok.is(tok::kw_default));
   
@@ -629,9 +630,9 @@ bool Parser::parseStmtCaseLabels(llvm::SmallVectorImpl<CaseLabel *> &labels) {
         if (pattern.isNull())
           return true;
         // Add variable bindings from the pattern to the case scope.
-        SmallVector<Decl*, 4> tmpDecls;
         DeclAttributes defaultAttributes;
-        addVarsToScope(pattern.get(), tmpDecls, defaultAttributes);
+        addVarsToScope(pattern.get(), boundDecls, defaultAttributes);
+        
         patterns.push_back(pattern.get());
       } while (consumeIf(tok::comma));
       
@@ -705,9 +706,16 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
   Scope scope(this, ScopeKind::CaseVars);
   
   llvm::SmallVector<CaseLabel*, 2> labels;
-  if (parseStmtCaseLabels(labels))
+  llvm::SmallVector<Decl*, 4> boundDecls;
+  if (parseStmtCaseLabels(labels, boundDecls))
     return nullptr;
   assert(!labels.empty() && "did not parse any labels?!");
+  
+  // Case blocks with multiple patterns cannot bind variables.
+  if (!boundDecls.empty()
+      && (labels.size() > 1 || labels[0]->getPatterns().size() > 1))
+    diagnose(boundDecls[0]->getLoc(),
+             diag::var_binding_with_multiple_case_patterns);
   
   llvm::SmallVector<ExprStmtOrDecl, 8> bodyItems;
 
@@ -716,5 +724,5 @@ NullablePtr<CaseStmt> Parser::parseStmtCase() {
   BraceStmt *body = BraceStmt::create(Context,
                                       startOfBody, bodyItems, Tok.getLoc());
 
-  return CaseStmt::create(Context, labels, body);
+  return CaseStmt::create(Context, labels, !boundDecls.empty(), body);
 }
