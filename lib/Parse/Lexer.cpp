@@ -454,7 +454,7 @@ void Lexer::lexIdentifier() {
     .Default(tok::identifier);
 
   // "sil" is only a keyword in SIL mode.
-  if (!InSILMode && Kind == tok::kw_sil)
+  if (Kind == tok::kw_sil && !InSILMode)
     Kind = tok::identifier;
   
   return formToken(Kind, TokStart);
