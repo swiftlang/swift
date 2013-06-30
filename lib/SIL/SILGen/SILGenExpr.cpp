@@ -23,6 +23,8 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -1783,11 +1785,44 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   B.createReturn(fe, toClosure);
 }
 
-RValue SILGenFunction::visitInterpolatedStringLiteralExpr(
-                                              InterpolatedStringLiteralExpr *E,
-                                              SGFContext C)
-{
+RValue SILGenFunction::
+visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
+                                   SGFContext C) {
   return visit(E->getSemanticExpr());
+}
+
+RValue SILGenFunction::
+visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
+  ASTContext &Ctx = SGM.M.getASTContext();
+  SILType Ty = getLoweredLoadableType(E->getType());
+  llvm::SMLoc Loc = E->getStartLoc().Value;
+  
+  switch (E->getKind()) {
+  case MagicIdentifierLiteralExpr::File: {
+    int BufferID = Ctx.SourceMgr.FindBufferContainingLoc(Loc);
+    assert(BufferID != -1 && "MagicIdentifierLiteral has invalid location");
+    
+    StringRef Value =
+      Ctx.SourceMgr.getMemoryBuffer(BufferID)->getBufferIdentifier();
+    
+    return RValue(*this, ManagedValue(B.createStringLiteral(E, Ty, Value),
+                                      ManagedValue::Unmanaged));
+  }
+  case MagicIdentifierLiteralExpr::Line: {
+    unsigned Value =
+      Ctx.SourceMgr.getLineAndColumn(Loc).first;
+      return RValue(*this,
+                    ManagedValue(B.createIntegerLiteral(E, Ty, Value),
+                                 ManagedValue::Unmanaged));
+  }
+  case MagicIdentifierLiteralExpr::Column: {
+    unsigned Value =
+      Ctx.SourceMgr.getLineAndColumn(Loc).second;
+    return RValue(*this,
+                  ManagedValue(B.createIntegerLiteral(E, Ty, Value),
+                               ManagedValue::Unmanaged));
+  }
+  }
 }
 
 RValue SILGenFunction::visitCollectionExpr(CollectionExpr *E, SGFContext C) {

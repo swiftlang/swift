@@ -673,7 +673,7 @@ namespace {
       return expr;
     }
 
-    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+    Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
         = tc.getProtocol(expr->getLoc(),
@@ -724,6 +724,10 @@ namespace {
                nullptr,
                diag::integer_literal_broken_proto,
                diag::builtin_integer_literal_broken_proto);
+    }
+    
+    Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
+      return handleIntegerLiteralExpr(expr);
     }
 
     Expr *visitFloatLiteralExpr(FloatLiteralExpr *expr) {
@@ -808,15 +812,15 @@ namespace {
                diag::builtin_character_literal_broken_proto);
     }
 
-    Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
+    Expr *handleStringLiteralExpr(LiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringLiteralConvertible);
+      = tc.getProtocol(expr->getLoc(),
+                       KnownProtocolKind::StringLiteralConvertible);
       ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinStringLiteralConvertible);
-
+      = tc.getProtocol(expr->getLoc(),
+                       KnownProtocolKind::BuiltinStringLiteralConvertible);
+      
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
@@ -824,26 +828,29 @@ namespace {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-
+      
       // FIXME: 32-bit platforms should use 32-bit size here?
       TupleTypeElt elements[3] = {
         TupleTypeElt(tc.Context.TheRawPointerType),
         TupleTypeElt(BuiltinIntegerType::get(64, tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
-      return convertLiteral(
-               expr,
-               type,
-               expr->getType(),
-               protocol,
-               tc.Context.getIdentifier("StringLiteralType"),
-               tc.Context.getIdentifier("convertFromStringLiteral"),
-               builtinProtocol,
-               TupleType::get(elements, tc.Context),
-               tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
-               nullptr,
-               diag::string_literal_broken_proto,
-               diag::builtin_string_literal_broken_proto);
+      return convertLiteral(expr,
+                            type,
+                            expr->getType(),
+                            protocol,
+                            tc.Context.getIdentifier("StringLiteralType"),
+                            tc.Context.getIdentifier("convertFromStringLiteral"),
+                            builtinProtocol,
+                            TupleType::get(elements, tc.Context),
+                            tc.Context.getIdentifier("_convertFromBuiltinStringLiteral"),
+                            nullptr,
+                            diag::string_literal_broken_proto,
+                            diag::builtin_string_literal_broken_proto);
+    }
+    
+    Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
+      return handleStringLiteralExpr(expr);
     }
 
     Expr *
@@ -911,6 +918,17 @@ namespace {
       ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, argument);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
+    }
+    
+    Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
+      switch (expr->getKind()) {
+      case MagicIdentifierLiteralExpr::File:
+        return handleStringLiteralExpr(expr);
+
+      case MagicIdentifierLiteralExpr::Line:
+      case MagicIdentifierLiteralExpr::Column:
+        return handleIntegerLiteralExpr(expr);
+      }
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {

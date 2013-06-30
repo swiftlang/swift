@@ -281,6 +281,34 @@ public:
     return E->getKind() == ExprKind::InterpolatedStringLiteral;
   }
 };
+  
+/// MagicIdentifierLiteralExpr - A magic identifier like __FILE__ which expands
+/// out to a literal at SILGen time.
+class MagicIdentifierLiteralExpr : public LiteralExpr {
+public:
+  enum KindTy {
+    File, Line, Column
+  };
+private:
+  KindTy Kind;
+  SourceLoc Loc;
+  
+public:
+  MagicIdentifierLiteralExpr(KindTy Kind, SourceLoc Loc)
+    : LiteralExpr(ExprKind::MagicIdentifierLiteral), Kind(Kind), Loc(Loc) {}
+  
+  KindTy getKind() const { return Kind; }
+  bool isFile() const { return Kind == File; }
+  bool isLine() const { return Kind == Line; }
+  bool isColumn() const { return Kind == Column; }
+  
+  SourceRange getSourceRange() const { return Loc; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MagicIdentifierLiteral;
+  }
+};
+
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {

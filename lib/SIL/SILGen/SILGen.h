@@ -587,6 +587,8 @@ public:
   RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
   RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                             SGFContext C);
+  RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
+                                         SGFContext C);
   RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
   RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
                                                 SGFContext C);

@@ -153,35 +153,47 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
 }
 
 ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
-  if (isa<ArrayExpr>(expr)) {
+  if (isa<ArrayExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::ArrayLiteralConvertible);
-  }
-  if (isa<DictionaryExpr>(expr)) {
+
+  if (isa<DictionaryExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::DictionaryLiteralConvertible);
-  }
+
   if (!isa<LiteralExpr>(expr))
     return nullptr;
-  if (isa<IntegerLiteralExpr>(expr)) {
+  
+  if (isa<IntegerLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::IntegerLiteralConvertible);
-  }
-  if (isa<FloatLiteralExpr>(expr)) {
+
+  if (isa<FloatLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::FloatLiteralConvertible);
-  }
-  if (isa<CharacterLiteralExpr>(expr)) {
+
+  if (isa<CharacterLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::CharacterLiteralConvertible);
-  }
-  if (isa<StringLiteralExpr>(expr)) {
+
+  if (isa<StringLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::StringLiteralConvertible);
-  }
-  if (isa<InterpolatedStringLiteralExpr>(expr)) {
+
+  if (isa<InterpolatedStringLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::StringInterpolationConvertible);
+  if (auto E = dyn_cast<MagicIdentifierLiteralExpr>(expr)) {
+    switch (E->getKind()) {
+    case MagicIdentifierLiteralExpr::File:
+      return getProtocol(expr->getLoc(),
+                         KnownProtocolKind::StringLiteralConvertible);
+
+    case MagicIdentifierLiteralExpr::Line:
+    case MagicIdentifierLiteralExpr::Column:
+      return getProtocol(expr->getLoc(),
+                         KnownProtocolKind::IntegerLiteralConvertible);
+    }
   }
   
   llvm_unreachable("Unhandled literal kind");

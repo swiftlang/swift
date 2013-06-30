@@ -680,6 +680,16 @@ public:
     }
     OS << ')';
   }
+  void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
+    printCommon(E, "magic_identifier_literal_expr") << " kind=";
+    switch (E->getKind()) {
+    case MagicIdentifierLiteralExpr::File:  OS << "__FILE__"; break;
+    case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
+    case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
+    }
+    OS << ')';
+  }
+
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
       << " decl=" << E->getDecl()->getName() << ')';

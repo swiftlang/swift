@@ -282,6 +282,9 @@
     keyword ::= 'new'
     keyword ::= 'as'
     keyword ::= 'is'
+    keyword ::= '__FILE__'
+    keyword ::= '__LINE__'
+    keyword ::= '__COLUMN__'
 
     // Identifier-Like Keywords
     keyword ::= 'metatype'
@@ -2297,6 +2300,9 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-literal ::= <a href="#floating_literal">floating_literal</a>
     expr-literal ::= <a href="#character_literal">character_literal</a>
     expr-literal ::= <a href="#string_literal">string_literal</a>
+    expr-literal ::= '__FILE__'
+    expr-literal ::= '__LINE__'
+    expr-literal ::= '__COLUMN__'
   </pre>
 
   <p>Numeric literals are either integer, floating point, character, or string
@@ -2312,9 +2318,13 @@ ill-formed if the type does not conform to the protocol.</p>
      informal protocol required by literals.  This informal protocol requires
      that the type have an unambiguous "static" function defined whose
      result type is the same as the inferred type, and that takes a single
-     argument that is either itself literal compatible, or is a <a 
-     href="#builtin">builtin</a> integer type.
-  </p>
+     argument that is either itself literal compatible, or is a <a
+     href="#builtin">builtin</a> integer type.</p>
+
+  <p>The '<tt>__FILE__</tt>', '<tt>__LINE__</tt>', and '<tt>__COLUMN__</tt>'
+     magic identifiers expand to a literal based on where they are defined.
+     '<tt>__FILE__</tt>' expands to a string literal, the others expand to an
+     integer literal.
 
   <!-- ===================================================================== -->
   <h3 id="expr-identifier">Identifiers</h3>

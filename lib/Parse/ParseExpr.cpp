@@ -115,8 +115,9 @@ static bool isExprPostfix(Expr *expr) {
   case ExprKind::PipeClosure:
   case ExprKind::RebindThisInConstructor:
   case ExprKind::IntegerLiteral:
-  case ExprKind::InterpolatedStringLiteral:
   case ExprKind::StringLiteral:
+  case ExprKind::MagicIdentifierLiteral:
+  case ExprKind::InterpolatedStringLiteral:
   case ExprKind::Subscript:
   case ExprKind::SuperRef:
   case ExprKind::Tuple:
@@ -685,6 +686,9 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     floating_literal
 ///     string_literal
 ///     character_literal
+///     ___FILE__
+///     ___LINE__
+///     ___COLUMN__
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -697,7 +701,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     expr-super
 ///
 ///   expr-delayed-identifier:
-///     ':' identifier
+///     '.' identifier
 ///
 ///   expr-dot:
 ///     expr-postfix '.' identifier generic-args?
@@ -741,6 +745,26 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   case tok::string_literal:  // "foo"
     Result = parseExprStringLiteral();
     break;
+  case tok::kw___FILE__: {  // __FILE__
+    auto Kind = MagicIdentifierLiteralExpr::File;
+    SourceLoc Loc = consumeToken(tok::kw___FILE__);
+    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    break;
+  }
+  case tok::kw___LINE__: {  // __LINE__
+    auto Kind = MagicIdentifierLiteralExpr::Line;
+    SourceLoc Loc = consumeToken(tok::kw___LINE__);
+    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    break;
+  }
+
+  case tok::kw___COLUMN__: { // __COLUMN__
+    auto Kind = MagicIdentifierLiteralExpr::Column;
+    SourceLoc Loc = consumeToken(tok::kw___COLUMN__);
+    Result = new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
+    break;
+  }
+      
   case tok::kw_this:     // this
   case tok::identifier:  // foo
     Result = parseExprIdentifier();
