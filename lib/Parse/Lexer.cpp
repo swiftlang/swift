@@ -448,53 +448,14 @@ void Lexer::lexIdentifier() {
 
   tok Kind =
   llvm::StringSwitch<tok>(StringRef(TokStart, CurPtr-TokStart))
-    // Declarations and Type Keywords
-    .Case("class", tok::kw_class)
-    .Case("constructor", tok::kw_constructor)
-    .Case("destructor", tok::kw_destructor)
-    .Case("extension", tok::kw_extension)
-    .Case("func", tok::kw_func)
-    .Case("import", tok::kw_import)
-    .Case("oneof", tok::kw_oneof)
-    .Case("protocol", tok::kw_protocol)
-    .Case("requires", tok::kw_requires)
-    .Case("struct", tok::kw_struct)
-    .Case("typealias", tok::kw_typealias)
-    .Case("var", tok::kw_var)
-    .Case("static", tok::kw_static) // inside-out attribute that implies a decl
-    .Case("subscript", tok::kw_subscript)
-
-    // Statements
-    .Case("if", tok::kw_if)
-    .Case("else", tok::kw_else)
-    .Case("for", tok::kw_for)
-    .Case("do", tok::kw_do)
-    .Case("while", tok::kw_while)
-    .Case("return", tok::kw_return)
-    .Case("break", tok::kw_break)
-    .Case("continue", tok::kw_continue)
-    .Case("fallthrough", tok::kw_fallthrough)
-    .Case("switch", tok::kw_switch)
-    .Case("case", tok::kw_case)
-    .Case("default", tok::kw_default)
-    .Case("where", tok::kw_where)
-
-    // Expressions
-    .Case("new", tok::kw_new)
-    .Case("as", tok::kw_as)
-    .Case("is", tok::kw_is)
-
-    // Reserved Identifiers
-    .Case("metatype", tok::kw_metatype)
-    .Case("super", tok::kw_super)
-    .Case("this", tok::kw_this)
-    .Case("This", tok::kw_This)
-    .Case("_", tok::kw__)
-
+#define KEYWORD(kw) \
+    .Case(#kw, tok::kw_##kw)
+#include "swift/Parse/Tokens.def"
     .Default(tok::identifier);
 
-  if (InSILMode && StringRef(TokStart, CurPtr-TokStart) == "sil")
-    Kind = tok::kw_sil;
+  // "sil" is only a keyword in SIL mode.
+  if (!InSILMode && Kind == tok::kw_sil)
+    Kind = tok::identifier;
   
   return formToken(Kind, TokStart);
 }
