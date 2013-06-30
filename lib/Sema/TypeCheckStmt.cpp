@@ -420,15 +420,22 @@ public:
     S->getSubjectDecl()->setType(subjectType);
 
     // Type-check the case blocks.
+    ++SwitchLevel;
     bool hadTypeError = false;
-    for (auto *caseBlock : S->getCases()) {
+    for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
+      auto *caseBlock = S->getCases()[i];
+      // Fallthrough transfers control to the next case block.
+      FallthroughDest = i+1 == e ? nullptr : S->getCases()[i+1];
+
       for (auto *caseLabel : caseBlock->getCaseLabels()) {
         // Resolve the patterns in the label.
         for (auto *&pattern : caseLabel->getPatterns()) {
-          if (auto *newPattern = TC.resolvePattern(pattern))
+          if (auto *newPattern = TC.resolvePattern(pattern)) {
             pattern = newPattern;
-          else
-            return nullptr;
+          } else {
+            hadTypeError = true;
+            continue;
+          }
 
           // Coerce the pattern to the subject's type.
           hadTypeError |= TC.coerceToType(pattern, DC, subjectType);
@@ -449,6 +456,7 @@ public:
         hadTypeError = true;
       caseBlock->setBody(body);
     }
+    --SwitchLevel;
     
     return hadTypeError ? nullptr : S;
   }
