@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -845,6 +846,12 @@ RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // If the shuffle index is DefaultInitialize, we're supposed to use the
     // default value.
     if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
+      // If magic identifiers like __FILE__ are expanded in this default
+      // argument, have them use the location of this expression, not their
+      // location.
+      llvm::SaveAndRestore<SourceLoc> Save(overrideLocationForMagicIdentifiers);
+      overrideLocationForMagicIdentifiers = E->getStartLoc();
+      
       assert(field.hasInit() && "no default initializer for field!");
       result.addElement(visit(field.getInit()->getExpr()));
       continue;
@@ -1795,7 +1802,14 @@ RValue SILGenFunction::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   ASTContext &Ctx = SGM.M.getASTContext();
   SILType Ty = getLoweredLoadableType(E->getType());
-  llvm::SMLoc Loc = E->getStartLoc().Value;
+  llvm::SMLoc Loc;
+  
+  // If "overrideLocationForMagicIdentifiers" is set, then we use it as the
+  // location point for these magic identifiers.
+  if (overrideLocationForMagicIdentifiers.isValid())
+    Loc = overrideLocationForMagicIdentifiers.Value;
+  else
+    Loc = E->getStartLoc().Value;
   
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File: {

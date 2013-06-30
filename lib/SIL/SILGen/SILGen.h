@@ -342,6 +342,12 @@ public:
   /// can return normally from the function.
   SILBasicBlock *epilogBB;
 
+  /// This location, when set, is used as an override location for magic
+  /// identifier expansion (e.g. __FILE__).  This allows default argument
+  /// expansion to report the location of the call, instead of the location
+  /// of the original expr.
+  SourceLoc overrideLocationForMagicIdentifiers;
+  
 public:
   SILGenFunction(SILGenModule &SGM, SILFunction &F, bool hasVoidReturn);
   ~SILGenFunction();
