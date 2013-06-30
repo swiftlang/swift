@@ -68,7 +68,7 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      unsigned *BufferOffset,
                                      unsigned BufferEndOffset,
-                                     SILModule *SIL) {
+                                     SILParserState *SIL) {
   Parser P(BufferID, TU, BufferOffset ? *BufferOffset : 0, BufferEndOffset,
            TU->Kind == TranslationUnit::Main ||
            TU->Kind == TranslationUnit::REPL, SIL);
@@ -129,7 +129,7 @@ static StringRef ComputeLexStart(StringRef File, unsigned Offset,
 
 Parser::Parser(unsigned BufferID, TranslationUnit *TU,
                unsigned Offset, unsigned EndOffset, bool IsMainModule,
-               SILModule *SIL)
+               SILParserState *SIL)
   : SourceMgr(TU->getASTContext().SourceMgr),
     Diags(TU->getASTContext().Diags),
     TU(TU),
@@ -145,7 +145,8 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
 }
 
 Parser::Parser(TranslationUnit *TU,
-               llvm::StringRef fragment, DiagnosticEngine &Diags,SILModule *SIL)
+               llvm::StringRef fragment, DiagnosticEngine &Diags,
+               SILParserState *SIL)
   : SourceMgr(TU->getASTContext().SourceMgr),
     Diags(Diags),
     TU(TU),

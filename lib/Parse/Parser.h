@@ -36,7 +36,7 @@ namespace swift {
   class ScopeInfo;
   struct TypeLoc;
   class TupleType;
-  class SILModule;
+  class SILParserState;
   
   struct OneOfElementInfo;
   
@@ -67,7 +67,7 @@ public:
   TranslationUnit *TU;
   const llvm::MemoryBuffer *Buffer;
   Lexer *L;
-  SILModule *SIL;    // Non-null when parsing a .sil file.
+  SILParserState *SIL;    // Non-null when parsing a .sil file.
   DeclContext *CurDeclContext;
   swift::Component *Component;
   ASTContext &Context;
@@ -122,9 +122,9 @@ public:
 
   Parser(unsigned BufferID, TranslationUnit *TU,
          unsigned Offset, unsigned EndOffset, bool IsMainModule,
-         SILModule *SIL);
+         SILParserState *SIL);
   Parser(TranslationUnit *TU, llvm::StringRef fragment, DiagnosticEngine &Diags,
-         SILModule *SIL);
+         SILParserState *SIL);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }

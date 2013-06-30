@@ -34,10 +34,23 @@ namespace swift {
   class SILModule;
   class LangOptions;
   struct TypeLoc;
+  class SILParserTUState;
 
   namespace irgen {
     class Options;
   }
+  
+  /// SILParserState - This is a context object used to optionally maintain SIL
+  /// parsing context for the parser.
+  class SILParserState {
+  public:
+    SILModule *M;
+    SILParserTUState *S;
+
+    explicit SILParserState(SILModule *M);
+    ~SILParserState();
+  };
+  
 
   /// verify - Check that the translation unit is well formed (i.e. following
   /// the invariants of the AST, not that the code written by the user makes
@@ -52,7 +65,7 @@ namespace swift {
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 unsigned *BufferOffset = 0,
                                 unsigned BufferEndOffset = 0,
-                                SILModule *SIL = 0);
+                                SILParserState *SIL = 0);
 
   /// Attempt to parse a StringRef as a code completion context expression.
   /// Returns the parsed expression if successful, or null if an expression

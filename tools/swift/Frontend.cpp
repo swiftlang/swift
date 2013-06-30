@@ -110,6 +110,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   assert(BufferIDs.size() == 1 && "This mode only allows one input");
   unsigned BufferID = BufferIDs[0];
 
+  SILParserState SILContext(SIL);
+  
   unsigned CurTUElem = 0;
   unsigned BufferOffset = 0;
   auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
@@ -118,7 +120,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
     // after parsing any top level code in a main module, or in SIL mode when
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
-    parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
+    parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0,
+                             SIL ? &SILContext : nullptr);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (BufferOffset != Buffer->getBufferSize());

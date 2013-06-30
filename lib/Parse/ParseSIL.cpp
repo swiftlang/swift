@@ -21,6 +21,24 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+// SILParserState implementation
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+  class SILParserTUState {
+  public:
+    SILParserTUState() {}
+  };
+}
+
+SILParserState::SILParserState(SILModule *M) : M(M) {
+  S = M ? new SILParserTUState() : nullptr;
+}
+SILParserState::~SILParserState() {
+  delete S;
+}
+
+//===----------------------------------------------------------------------===//
 // SILParser
 //===----------------------------------------------------------------------===//
 
@@ -29,6 +47,7 @@ namespace {
   public:
     Parser &P;
     SILModule &SILMod;
+    SILParserTUState &TUState;
     SILFunction *F;
   private:
     /// HadError - Have we seen an error parsing this function?
@@ -44,7 +63,7 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
   public:
 
-    SILParser(Parser &P) : P(P), SILMod(*P.SIL) {}
+    SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
 
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
@@ -792,6 +811,8 @@ bool SILParser::parseSILBasicBlock() {
 ///   decl-sil-body:
 ///     '{' sil-basic-block+ '}'
 bool Parser::parseDeclSIL() {
+  SILModule &SILMod = *SIL->M;
+  
   // Inform the lexer that we're lexing the body of the SIL declaration.  Do
   // this before we consume the 'sil' token so that all later tokens are
   // properly handled.
@@ -813,8 +834,8 @@ bool Parser::parseDeclSIL() {
     return true;
 
   // TODO: Verify it is a function type.
-  FunctionState.F = new (*SIL) SILFunction(*SIL, FnLinkage,
-                                           FnName.str(), FnType);
+  FunctionState.F = new (SILMod) SILFunction(SILMod, FnLinkage,
+                                             FnName.str(), FnType);
 
 
   // Now that we have a SILFunction parse the body, if present.
