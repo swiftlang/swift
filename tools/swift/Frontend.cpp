@@ -91,7 +91,6 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
     do {
       parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
       if (!ParseOnly && BufferIDs.size() == 1) {
-        performNameBinding(TU, CurTUElem);
         performTypeChecking(TU, CurTUElem);
         CurTUElem = TU->Decls.size();
       }
@@ -99,7 +98,6 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   }
 
   if (!ParseOnly && BufferIDs.size() > 1) {
-    performNameBinding(TU);
     performTypeChecking(TU);
   }
 
@@ -122,7 +120,6 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
     FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.CurBufferID,
                                                     &BufferOffset,
                                                     BufferEndOffset);
-    performNameBinding(TU, CurTUElem);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (BufferOffset != BufferEndOffset);

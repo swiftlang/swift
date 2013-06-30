@@ -692,6 +692,12 @@ namespace {
 ///
 /// FIXME: This should be moved out to somewhere else.
 void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
+
+  
+  // Make sure that name binding has been completed before doing any type
+  // checking.
+  performNameBinding(TU, StartElem);
+  
   TypeChecker TC(*TU);
 
   ExprPrePassWalker prePass(TC);

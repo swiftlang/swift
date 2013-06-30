@@ -116,11 +116,10 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   parseIntoTranslationUnit(importTU, bufferID);
 
-  // We have to do name binding on it to ensure that types are fully resolved.
+  // We have to do type checking on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary
   // dumps of the code instead of reparsing though.
   // FIXME: We also need to deal with circular imports!
-  performNameBinding(importTU);
   performTypeChecking(importTU);
 
   return importTU;

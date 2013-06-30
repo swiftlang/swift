@@ -125,7 +125,6 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
     } while (BufferOffset != Buffer->getBufferSize());
   }
 
-  performNameBinding(TU);
   performTypeChecking(TU);
 
   return TU;
