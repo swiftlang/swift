@@ -86,41 +86,42 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   // If we have multiple source files, we must be building a module.  Parse each
   // file before type checking the union of them.
   if (BufferIDs.size() > 1) {
-    assert(Kind != TranslationUnit::SIL &&
-           Kind != TranslationUnit::Main &&
+    assert(Kind == TranslationUnit::Library &&
            "Multiple file mode can't handle early returns from the parser");
 
+    // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
       auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
 
       unsigned BufferOffset = 0;
-      parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
+      parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
       assert(BufferOffset == Buffer->getBufferSize() &&
              "Parser returned early?");
     }
     
+    // Finally, if enabled, type check the whole thing in one go.
     if (!ParseOnly)
       performTypeChecking(TU);
-    
-  } else {
-    // If there is only a single input file, it may be SIL or a main module,
-    // which requires pumping the parser.
-    assert(BufferIDs.size() == 1 && "SIL parser only allows one input");
-    unsigned BufferID = BufferIDs[0];
-
-    unsigned CurTUElem = 0;
-    unsigned BufferOffset = 0;
-    auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
-    do {
-      // Pump the parser multiple times if necessary.  It will return early
-      // after parsing any top level code in a main module, or in SIL mode when
-      // there are chunks of swift decls (e.g. imports and types) interspersed
-      // with 'sil' definitions.
-      parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
-      performTypeChecking(TU, CurTUElem);
-      CurTUElem = TU->Decls.size();
-    } while (BufferOffset != Buffer->getBufferSize());
+    return TU;
   }
+  
+  // If there is only a single input file, it may be SIL or a main module,
+  // which requires pumping the parser.
+  assert(BufferIDs.size() == 1 && "This mode only allows one input");
+  unsigned BufferID = BufferIDs[0];
+
+  unsigned CurTUElem = 0;
+  unsigned BufferOffset = 0;
+  auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
+  do {
+    // Pump the parser multiple times if necessary.  It will return early
+    // after parsing any top level code in a main module, or in SIL mode when
+    // there are chunks of swift decls (e.g. imports and types) interspersed
+    // with 'sil' definitions.
+    parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, SIL);
+    performTypeChecking(TU, CurTUElem);
+    CurTUElem = TU->Decls.size();
+  } while (BufferOffset != Buffer->getBufferSize());
 
   return TU;
 }
