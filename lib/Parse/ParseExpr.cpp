@@ -435,24 +435,27 @@ done:
 ///     expr-postfix
 ///     expr-new
 ///     operator-prefix expr-unary
+///     '&' expr-unary
+///
 NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
-  // If the next token is the keyword 'new', this must be expr-new.
-  if (Tok.is(tok::kw_new))
-    return parseExprNew();
-  
-  if (Tok.is(tok::amp_prefix)) {
-    SourceLoc Loc = consumeToken(tok::amp_prefix);
-
-    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
-      return new (Context) AddressOfExpr(Loc, SubExpr, Type());
-    return 0;
-  }
-
   Expr *Operator;
   switch (Tok.getKind()) {
   default:
     // If the next token is not an operator, just parse this as expr-postfix.
     return parseExprPostfix(Message);
+      
+  // If the next token is the keyword 'new', this must be expr-new.
+  case tok::kw_new:
+    return parseExprNew();
+    
+  case tok::amp_prefix: {
+    SourceLoc Loc = consumeToken(tok::amp_prefix);
+    
+    if (Expr *SubExpr = parseExprUnary(Message).getPtrOrNull())
+      return new (Context) AddressOfExpr(Loc, SubExpr, Type());
+    return 0;
+  }
+      
   case tok::oper_prefix:
     Operator = parseExprOperator();
     break;
