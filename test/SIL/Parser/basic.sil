@@ -63,8 +63,6 @@ bb0(%0 : $() -> Int64):
   %9 = return %5 : $Int64                  // CHECK: return %5 : $Int64
 }
 
-sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
-
 sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant
 bb0:                                         // CHECK: bb0:
   // CHECK: function_ref @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
@@ -81,6 +79,8 @@ bb0:                                         // CHECK: bb0:
   // CHECK: return
   %5 = return %4 : $Int64
 }
+
+sil @_TSi25convertFromIntegerLiteralfMSiFT3valBi64__Si : $[thin] ((val : Builtin.Int64), Int64.metatype) -> Int64
 
 // Parse SIL generated from the following swift program:
 // func x(a : Bool) -> Int { if a { return 4 } else {return 5} }

@@ -93,6 +93,7 @@ public:
   
   /// Get this function's linkage attribute.
   SILLinkage getLinkage() const { return ModuleAndLinkage.getInt(); }
+  void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
 
   /// Initialize the source location of the function.
   void setDebugScope(SILDebugScope *DS) { DebugScope = DS; }

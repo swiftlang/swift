@@ -28,6 +28,14 @@ namespace swift {
   class SILParserTUState {
   public:
     SILParserTUState() {}
+    ~SILParserTUState();
+    
+    /// ForwardRefFns - This is all of the forward referenced functions with
+    /// the location for where the reference is.
+    llvm::DenseMap<Identifier,
+                   std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+    
+    DiagnosticEngine *Diags = nullptr;
   };
 }
 
@@ -37,6 +45,14 @@ SILParserState::SILParserState(SILModule *M) : M(M) {
 SILParserState::~SILParserState() {
   delete S;
 }
+
+SILParserTUState::~SILParserTUState() {
+  if (!ForwardRefFns.empty())
+    for (auto Entry : ForwardRefFns)
+      Diags->diagnose(Entry.second.second, diag::sil_use_of_undefined_value,
+                      Entry.first.str());
+}
+
 
 //===----------------------------------------------------------------------===//
 // SILParser
@@ -68,7 +84,16 @@ namespace {
     /// diagnoseProblems - After a function is fully parse, emit any diagnostics
     /// for errors and return true if there were any.
     bool diagnoseProblems();
-    
+
+    /// getGlobalNameForReference - Given a reference to a global name, look it
+    /// up and return an appropriate SIL function.
+    SILFunction *getGlobalNameForReference(Identifier Name, SILType Ty,
+                                           SourceLoc Loc);
+    /// getGlobalNameForDefinition - Given a definition of a global name, look
+    /// it up and return an appropriate SIL function.
+    SILFunction *getGlobalNameForDefinition(Identifier Name, SILType Ty,
+                                            SourceLoc Loc);
+
     /// getBBForDefinition - Return the SILBasicBlock for a definition of the
     /// specified block.
     SILBasicBlock *getBBForDefinition(Identifier Name, SourceLoc Loc);
@@ -147,10 +172,71 @@ bool SILParser::diagnoseProblems() {
   return HadError;
 }
 
+/// getGlobalNameForDefinition - Given a definition of a global name, look
+/// it up and return an appropriate SIL function.
+SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name, SILType Ty,
+                                                   SourceLoc Loc) {
+  // Check to see if a function of this name has been forward referenced.  If so
+  // complete the forward reference.
+  auto It = TUState.ForwardRefFns.find(Name);
+  if (It != TUState.ForwardRefFns.end()) {
+    SILFunction *Fn = It->second.first;
+    
+    // Verify that the types match up.
+    if (Fn->getLoweredType() != Ty) {
+      P.diagnose(Loc, diag::sil_value_use_type_mismatch,
+                 Ty.getAsString(), Fn->getLoweredType().getAsString());
+      P.diagnose(It->second.second, diag::sil_prior_reference);
+      Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+    }
+    
+    assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
+    TUState.ForwardRefFns.erase(It);
+    return Fn;
+  }
+  
+  // If we don't have a forward reference, make sure the function hasn't been
+  // defined already.
+  if (SILMod.lookup(Name.str()) != nullptr) {
+    P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
+    return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+  }
+
+  // Otherwise, this definition is the first use of this name.
+  return new (SILMod) SILFunction(SILMod, SILLinkage::Internal, Name.str(), Ty);
+}
+
+
+
+/// getGlobalNameForReference - Given a reference to a global name, look it
+/// up and return an appropriate SIL function.
+SILFunction *SILParser::getGlobalNameForReference(Identifier Name, SILType Ty,
+                                                  SourceLoc Loc) {
+  
+  // Check to see if we have a function by this name already.
+  if (SILFunction *FnRef = SILMod.lookup(Name.str())) {
+    // If so, check for matching types.
+    if (FnRef->getLoweredType() != Ty) {
+      P.diagnose(Loc, diag::sil_value_use_type_mismatch,
+                 Ty.getAsString(), FnRef->getLoweredType().getAsString());
+      FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
+    }
+    return FnRef;
+  }
+  
+  // If we didn't find a function, create a new one - it must be a forward
+  // reference.
+  auto Fn = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
+                                     Name.str(), Ty);
+  TUState.ForwardRefFns[Name] = { Fn, Loc };
+  TUState.Diags = &P.Diags;
+  return Fn;
+}
+
+
 /// getBBForDefinition - Return the SILBasicBlock for a definition of the
 /// specified block.
-SILBasicBlock *SILParser::getBBForDefinition(Identifier Name,
-                                                          SourceLoc Loc) {
+SILBasicBlock *SILParser::getBBForDefinition(Identifier Name, SourceLoc Loc) {
   // If there was no name specified for this block, just create a new one.
   if (Name.empty())
     return new (SILMod) SILBasicBlock(F);
@@ -648,10 +734,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseIdentifier(BBName2, NameLoc2, diag::expected_sil_block_name))
       return true;
    
+    auto I1Ty =
+      SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
     SILValue CondVal =
-      getLocalValue(CondName,
-                    SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext()),
-                    CondNameLoc);
+      getLocalValue(CondName, I1Ty, CondNameLoc);
 
     ResultVal = B.createCondBranch(SILLocation(), CondVal,
                                    getBBForReference(BBName, NameLoc),
@@ -733,25 +819,8 @@ bool SILParser::parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal) {
       parseSILType(Ty))
     return true;
   
-  // Scan the SIL module to find the function being referenced.
-  SILFunction *FnRef = SILMod.lookup(Name.str());
-  
-  // Check for matching types.
-  if (FnRef && FnRef->getLoweredType() != Ty) {
-    P.diagnose(Loc, diag::sil_value_use_type_mismatch,
-               Ty.getAsString(), FnRef->getLoweredType().getAsString());
-    FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal, "", Ty);
-  }
-
-  // If we didn't find a function, create a new one - it must be a forward
-  // reference.
-  if (FnRef == nullptr) {
-    FnRef = new (SILMod) SILFunction(SILMod, SILLinkage::Internal,
-                                     Name.str(), Ty);
-    // FIXME: Diagnose redefinitions etc.
-  }
-
-  ResultVal = B.createFunctionRef(SILLocation(), FnRef);
+  ResultVal = B.createFunctionRef(SILLocation(),
+                                  getGlobalNameForReference(Name, Ty, Loc));
   return false;
 }
 
@@ -811,8 +880,6 @@ bool SILParser::parseSILBasicBlock() {
 ///   decl-sil-body:
 ///     '{' sil-basic-block+ '}'
 bool Parser::parseDeclSIL() {
-  SILModule &SILMod = *SIL->M;
-  
   // Inform the lexer that we're lexing the body of the SIL declaration.  Do
   // this before we consume the 'sil' token so that all later tokens are
   // properly handled.
@@ -825,18 +892,20 @@ bool Parser::parseDeclSIL() {
   SILLinkage FnLinkage;
   Identifier FnName;
   SILType FnType;
+  SourceLoc FnNameLoc;
 
   if (parseSILLinkage(FnLinkage, *this) ||
       parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
-      parseIdentifier(FnName, diag::expected_sil_function_name) ||
+      parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type) ||
       FunctionState.parseSILType(FnType))
     return true;
 
   // TODO: Verify it is a function type.
-  FunctionState.F = new (SILMod) SILFunction(SILMod, FnLinkage,
-                                             FnName.str(), FnType);
-
+  
+  FunctionState.F =
+    FunctionState.getGlobalNameForDefinition(FnName, FnType, FnNameLoc);
+  FunctionState.F->setLinkage(FnLinkage);
 
   // Now that we have a SILFunction parse the body, if present.
 
