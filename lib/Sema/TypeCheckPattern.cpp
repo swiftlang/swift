@@ -242,10 +242,13 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 /// Perform top-down type coercion on the given pattern.
 bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
   switch (P->getKind()) {
-  // For parens, just set the type annotation and propagate inwards.
+  // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
     P->setType(type);
     return coerceToType(cast<ParenPattern>(P)->getSubPattern(), dc, type);
+  case PatternKind::Var:
+    P->setType(type);
+    return coerceToType(cast<VarPattern>(P)->getSubPattern(), dc, type);
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
@@ -337,11 +340,29 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
 
     return hadError;
   }
+
+  // Coerce expressions to the type.
+  // TODO: Look up a match operator to resolve the type of the expression.
+  case PatternKind::Expr: {
+    ExprPattern *EP = dyn_cast<ExprPattern>(P);
+    Expr *subExpr = EP->getSubExpr();
+    if (typeCheckExpression(subExpr, dc, type))
+      return true;
+    EP->setSubExpr(subExpr);
+    EP->setType(type);
+    return false;
+  }
       
-  // TODO
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
+  // Coerce an 'is' pattern by determining the cast kind.
+  case PatternKind::Isa: {
+    // TODO: Resolve the cast kind.
+    P->setType(type);
+    return false;
+  }
+      
+  case PatternKind::NominalType:
+    // TODO: Check the type against the coerced type, then coerce the
+    // subpatterns to the field types.
     llvm_unreachable("not implemented");
   }
   llvm_unreachable("bad pattern kind!");

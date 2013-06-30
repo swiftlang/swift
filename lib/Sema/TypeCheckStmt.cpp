@@ -408,9 +408,19 @@ public:
   }
   
   Stmt *visitSwitchStmt(SwitchStmt *S) {
-    // TODO: Type-check the subject expression.
+    // Type-check the subject expression.
+    Expr *subjectExpr = S->getSubjectExpr();
+    if (typeCheckExpr(subjectExpr))
+      return nullptr;
+    subjectExpr = TC.coerceToMaterializable(subjectExpr);
+    if (!subjectExpr)
+      return nullptr;
+    S->setSubjectExpr(subjectExpr);
+    Type subjectType = subjectExpr->getType();
+    S->getSubjectDecl()->setType(subjectType);
 
     // Type-check the case blocks.
+    bool hadTypeError = false;
     for (auto *caseBlock : S->getCases()) {
       for (auto *caseLabel : caseBlock->getCaseLabels()) {
         // Resolve the patterns in the label.
@@ -419,17 +429,28 @@ public:
             pattern = newPattern;
           else
             return nullptr;
+
+          // Coerce the pattern to the subject's type.
+          hadTypeError |= TC.coerceToType(pattern, DC, subjectType);
         }
-        // TODO: Type-check the pattern using the subject type.
-        // TODO: Type-check the guard expression as a condition.
+        
+        // Check the guard expression, if present.
+        if (auto *guard = caseLabel->getGuardExpr()) {
+          if (TC.typeCheckCondition(guard, DC))
+            hadTypeError = true;
+          else
+            caseLabel->setGuardExpr(guard);
+        }
       }
       
-      // TODO: Type-check the body statements.
+      // Type-check the body statements.
+      Stmt *body = caseBlock->getBody();
+      if (typeCheckStmt(body))
+        hadTypeError = true;
+      caseBlock->setBody(body);
     }
     
-    TC.diagnose(S->getLoc(), diag::not_implemented);
-    S->dump();
-    return nullptr;
+    return hadTypeError ? nullptr : S;
   }
 
   Stmt *visitCaseStmt(CaseStmt *S) {
