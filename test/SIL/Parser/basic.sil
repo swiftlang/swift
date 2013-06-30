@@ -25,7 +25,9 @@ sil @type_ref1 : $(a : Class1, b : Int) -> ()  // CHECK: $(a : Class1, b : Int64
 sil @test1 : $() -> () {              // CHECK: sil @test1 : $() -> ()
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
-  %1 = return %0 : $()                // CHECK:   %1 = return %0 : $()
+  %a = br bb1                         // CHECK: br bb1
+bb1:
+  %1 = return %0 : $()                // CHECK:   %2 = return %0 : $()
 }
 
 // Forward referenced values.

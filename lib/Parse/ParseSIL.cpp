@@ -483,7 +483,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("apply", ValueKind::ApplyInst)
-    .Case("branch", ValueKind::BranchInst)
+    .Case("br", ValueKind::BranchInst)
     .Case("condbranch", ValueKind::CondBranchInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)

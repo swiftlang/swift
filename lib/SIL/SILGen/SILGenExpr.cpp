@@ -1823,15 +1823,13 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
                                       ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Line: {
-    unsigned Value =
-      Ctx.SourceMgr.getLineAndColumn(Loc).first;
-      return RValue(*this,
-                    ManagedValue(B.createIntegerLiteral(E, Ty, Value),
-                                 ManagedValue::Unmanaged));
+    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
+    return RValue(*this,
+                  ManagedValue(B.createIntegerLiteral(E, Ty, Value),
+                               ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Column: {
-    unsigned Value =
-      Ctx.SourceMgr.getLineAndColumn(Loc).second;
+    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
     return RValue(*this,
                   ManagedValue(B.createIntegerLiteral(E, Ty, Value),
                                ManagedValue::Unmanaged));
