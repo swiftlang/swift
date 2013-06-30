@@ -865,6 +865,11 @@ bool SILParser::parseSILBasicBlock() {
     if (P.parseToken(tok::colon, diag::expected_sil_block_colon))
       return true;
   }
+  
+  // Make sure the block is at the end of the function so that forward
+  // references don't affect block layout.
+  F->getBlocks().remove(BB);
+  F->getBlocks().push_back(BB);
 
   do {
     if (parseSILInstruction(BB))

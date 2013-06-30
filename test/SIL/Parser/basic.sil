@@ -31,10 +31,14 @@ bb1:
 }
 
 // Forward referenced values.
-// TODO: Use control flow to avoid building incorrect SSA.
 sil @test2 : $() -> () {              // CHECK: sil @test2 : $() -> ()
-  %b = return %a : $()                // CHECK:   %0 = return %1 : $()
-  %a = tuple ()                       // CHECK:   %1 = tuple ()
+bb0:
+  %0 = br bb2
+bb1:
+  %b = return %a : $()                // CHECK:   %1 = return %2 : $()
+bb2:
+  %a = tuple ()                       // CHECK:   %2 = tuple ()
+  %1 = br bb1                         // CHECK:   %3 = br bb1
 }
 
 sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
