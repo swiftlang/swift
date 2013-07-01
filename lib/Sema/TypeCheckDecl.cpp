@@ -476,14 +476,10 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
-      if (CD->hasBaseClass())
-        TC.validateType(CD->getBaseClassLoc());
-
-      checkInherited(CD, CD->getInherited());
-
+      // Check our generic parameters first.
       if (auto gp = CD->getGenericParams()) {
         gp->setOuterParameters(
-                             CD->getDeclContext()->getGenericParamsOfContext());
+          CD->getDeclContext()->getGenericParamsOfContext());
         checkGenericParams(gp);
       }
 
@@ -492,6 +488,36 @@ public:
       CD->overwriteType(CD->getType()->getCanonicalType());
       CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
       TC.validateTypeSimple(CD->getDeclaredTypeInContext());
+
+      // Check the types we inherited from.
+      auto inherited = CD->getInherited();
+      for (unsigned i = 0, n = inherited.size(); i != n; ++i) {
+        // Validate the inherited type.
+        if (TC.validateType(inherited[i])) {
+          inherited[i].setInvalidType(TC.Context);
+          continue;
+        }
+
+        // Check the actual type we're inheriting from.
+        auto inheritedTy = inherited[i].getType();
+
+        // Protocol types and compositions thereof are fine; we'll check
+        // conformance separately.
+        if (inheritedTy->isExistentialType())
+          continue;
+
+        // Inheritance from classes.
+        if (inheritedTy->getClassOrBoundGenericClass()) {
+          // FIXME: Complain about multiple inheritance.
+          CD->setBaseClassLoc(inherited[i]);
+          continue;
+        }
+
+        // FIXME: Crummy diagnostic.
+        TC.diagnose(CD->getStartLoc(), diag::nonprotocol_inherit,
+                    inheritedTy);
+        inherited[i].setInvalidType(TC.Context);
+      }
 
       validateAttributes(CD);
       
@@ -684,10 +710,15 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    bool IsInvalid = false;
-    if (!IsSecondPass) {
-      IsInvalid = TC.validateType(ED->getExtendedTypeLoc());
+    if (ED->isInvalid()) {
+      // Mark children as invalid.
+      // FIXME: This is awful.
+      for (auto member : ED->getMembers())
+        member->setInvalid();
+      return;
+    }
 
+    if (!IsSecondPass) {
       Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
       if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
           !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&

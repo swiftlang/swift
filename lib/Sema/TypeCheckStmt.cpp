@@ -542,6 +542,9 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
 void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
+  if (FE->getDecl() && FE->getDecl()->isInvalid())
+    return;
+
   // If this was a func() expression whose context did not fully infer types for
   // the arguments, mark the argument types as error type.
   if (FE->getType()->isUnresolvedType()) {

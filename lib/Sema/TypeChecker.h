@@ -500,7 +500,7 @@ public:
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc());
 
-  /// \brief Given a set of archetype substitutions, verify and recird all of
+  /// \brief Given a set of archetype substitutions, verify and record all of
   /// the required protocol-conformance relationships.
   bool checkSubstitutions(TypeSubstitutionMap &Substitutions,
                           ConformanceMap &Conformance,

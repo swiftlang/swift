@@ -72,28 +72,11 @@ namespace {
     
     void addImport(ImportDecl *ID, SmallVectorImpl<ImportedModule> &Result);
 
-    /// resolveIdentifierType - Perform name binding for a IdentifierType,
-    /// resolving it or diagnosing the error as appropriate and return true on
-    /// failure.  On failure, this fills the components in with ErrorType.
-    bool resolveIdentifierType(IdentifierType *DNT) {
-      if (!resolveIdentifierTypeImpl(DNT))
-        return false;
-      
-      // Handle the error case by filling components with ErrorType.
-      for (auto &C : DNT->Components)
-        if (!C.isBound())
-          C.setValue(Context.TheErrorType);
-      return true;
-    }
-
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
     Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID,
                       bool isStdlibImport);
-    
-  private:
-    bool resolveIdentifierTypeImpl(IdentifierType *DNT);
   };
 }
 
@@ -193,123 +176,6 @@ void swift::performAutoImport(TranslationUnit *TU) {
   TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
 }
 
-/// resolveIdentifierType - Perform name binding for a IdentifierType,
-/// resolving it or diagnosing the error as appropriate and return true on
-/// failure.  On success, this fills in the Components of the IdentifierType.
-bool NameBinder::resolveIdentifierTypeImpl(IdentifierType *DNT) {
-  MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
-
-  // If name lookup for the base of the type didn't get resolved in the
-  // parsing phase, perform lookup on it.
-  if (!Components[0].isBound()) {
-    Identifier Name = Components[0].Id;
-    SourceLoc Loc = Components[0].Loc;
-
-    // Perform an unqualified lookup.
-    UnqualifiedLookup Globals(Name, Components[0].Value.get<DeclContext*>(),
-                              SourceLoc(), /*IsTypeLookup*/true);
-
-    if (Globals.Results.size() > 1) {
-      diagnose(Loc, diag::ambiguous_type_base, Name)
-        .highlight(SourceRange(Loc, Components.back().Loc));
-      for (auto Result : Globals.Results) {
-        if (Globals.Results[0].hasValueDecl())
-          diagnose(Result.getValueDecl(), diag::found_candidate);
-        else
-          diagnose(Loc, diag::found_candidate);
-      }
-      return true;
-    }
-
-    if (Globals.Results.empty()) {
-      diagnose(Loc, Components.size() == 1 ?
-                 diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-        .highlight(SourceRange(Loc, Components.back().Loc));
-      return true;
-    }
-
-    switch (Globals.Results[0].Kind) {
-    case UnqualifiedLookupResult::ModuleMember:
-    case UnqualifiedLookupResult::LocalDecl:
-    case UnqualifiedLookupResult::MemberProperty:
-    case UnqualifiedLookupResult::MemberFunction:
-    case UnqualifiedLookupResult::MetatypeMember:
-    case UnqualifiedLookupResult::ExistentialMember:
-    case UnqualifiedLookupResult::ArchetypeMember:
-      Components[0].setValue(Globals.Results[0].getValueDecl());
-      break;
-    case UnqualifiedLookupResult::ModuleName:
-      Components[0].setValue(Globals.Results[0].getNamedModule());
-      break;
-
-    case UnqualifiedLookupResult::MetaArchetypeMember:
-      // FIXME: This is actually possible in protocols.
-      llvm_unreachable("meta-archetype member in unqualified name lookup");
-      break;
-    }
-  }
-
-  assert(Components[0].isBound() && "Failed to get a base");
-
-  // Now that we have a base, iteratively resolve subsequent member entries.
-  auto LastOne = Components[0];
-  for (auto &C : Components.slice(1, Components.size()-1)) {
-    if (auto M = LastOne.Value.dyn_cast<Module*>()) {
-      // Lookup into a named module.
-      SmallVector<ValueDecl*, 8> Decls;
-      M->lookupValue(Module::AccessPathTy(), C.Id, 
-                     NLKind::QualifiedLookup, Decls);
-      if (Decls.size() == 1 && isa<TypeDecl>(Decls.back()))
-        C.setValue(cast<TypeDecl>(Decls.back()));
-    } else if (LastOne.Value.is<ValueDecl*>()) {
-      diagnose(C.Loc, diag::cannot_resolve_extension_dot)
-        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-      return true;
-    } else {
-      diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
-        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-      return true;
-    }
-
-    if (!C.isBound()) {
-      diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-      return true;
-    }
-
-    LastOne = C;
-  }
-
-  // Finally, sanity check that the last value is a type.
-  if (Components.back().Value.dyn_cast<Type>())
-    return false;
-  
-  if (ValueDecl *Last = Components.back().Value.dyn_cast<ValueDecl*>()) {
-    auto GenericArgs = Components.back().GenericArgs;
-    if (!GenericArgs.empty()) {
-      if (auto NTD = dyn_cast<NominalTypeDecl>(Last)) {
-        SmallVector<Type, 4> GenericArgTypes;
-        for (TypeLoc T : GenericArgs)
-          GenericArgTypes.push_back(T.getType());
-        Components.back().setValue(BoundGenericType::get(NTD, Type(),
-                                                         GenericArgTypes));
-        return false;
-      }
-      // FIXME: Need better diagnostic here
-    } else if (auto TD = dyn_cast<TypeDecl>(Last)) {
-      Components.back().setValue(TD->getDeclaredType());
-      return false;
-    }
-  }
-
-  diagnose(Components.back().Loc,
-           Components.size() == 1 ? diag::named_definition_isnt_type :
-             diag::dotted_reference_not_type, Components.back().Id)
-    .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-  return true;
-}
-
-
 //===----------------------------------------------------------------------===//
 // performNameBinding
 //===----------------------------------------------------------------------===//
@@ -355,41 +221,6 @@ static void insertOperatorDecl(NameBinder &Binder,
   Operators[OpDecl->getName().get()] = OpDecl;
 }
 
-static void bindFuncDeclToOperator(NameBinder &Binder,
-                                   TranslationUnit *TU,
-                                   FuncDecl *FD) {
-  OperatorDecl *op;
-  if (FD->isUnaryOperator()) {
-    if (FD->getAttrs().isPrefix()) {
-      if (auto maybeOp = TU->lookupPrefixOperator(FD->getName(), FD->getLoc()))
-        op = *maybeOp;
-      else
-        return;
-    } else if (FD->getAttrs().isPostfix()) {
-      if (auto maybeOp = TU->lookupPostfixOperator(FD->getName(), FD->getLoc()))
-        op = *maybeOp;
-      else
-        return;
-    } else {
-      Binder.diagnose(FD->getLoc(), diag::declared_unary_op_without_attribute);
-      return;
-    }
-  } else if (FD->isBinaryOperator()) {
-    if (auto maybeOp = TU->lookupInfixOperator(FD->getName(), FD->getLoc()))
-      op = *maybeOp;
-    else
-      return;
-  } else {
-    Binder.diagnose(FD->getLoc(), diag::invalid_arg_count_for_operator);
-    return;
-  }
-  
-  if (!op)
-    Binder.diagnose(FD->getLoc(), diag::declared_operator_without_operator_decl);
-  else
-    FD->setOperatorDecl(op);
-}
-
 namespace {
   /// \brief AST mutation listener that captures any added declarations and
   /// types, then adds them to the translation unit.
@@ -400,7 +231,7 @@ namespace {
 
     CaptureExternalsListener &
     operator=(const CaptureExternalsListener &) = delete;
-    
+
   public:
     explicit CaptureExternalsListener(TranslationUnit *TU) : TU(TU) {
       TU->getASTContext().addMutationListener(*this);
@@ -420,121 +251,6 @@ namespace {
       TU->getASTContext().ExternalTypes.push_back(type);
     }
 };
-}
-
-static void bindExtensionDecl(ExtensionDecl *ED, NameBinder &Binder) {
-  auto DNT = cast<IdentifierType>(ED->getExtendedType().getPointer());
-  while (true) {
-    if (Binder.resolveIdentifierType(DNT))
-      return;
-
-    // We need to make sure the extended type is canonical. There are
-    // three possibilities here:
-    // 1. The type is already canonical, because it's either a NominalType
-    // or comes from an imported module.
-    // 2. The type is a NameAliasType, which
-    // we need to resolve immediately because we can't leave a
-    // non-canonical type here in the AST.
-    // 3. The type is a BoundGenericType; it's illegal to extend
-    // such a type.
-    Type FoundType = DNT->getMappedType();
-    if (FoundType->hasCanonicalTypeComputed())
-      break;
-
-    if (isa<BoundGenericType>(FoundType.getPointer())) {
-      Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
-                      false, ED->getExtendedType());
-      ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
-      break;
-    }
-
-    TypeAliasDecl *TAD =
-    cast<NameAliasType>(FoundType.getPointer())->getDecl();
-    TypeBase *underlying;
-
-    do {
-      underlying = TAD->getUnderlyingType().getPointer();
-
-      if (auto *underlyingAlias = dyn_cast<NameAliasType>(underlying)) {
-        TAD = underlyingAlias->getDecl();
-        continue;
-      }
-      break;
-    } while (true);
-
-    if (isa<NominalType>(underlying))
-      break;
-
-    DNT = dyn_cast<IdentifierType>(underlying);
-
-    if (!DNT) {
-      Binder.diagnose(ED->getLoc(), diag::non_nominal_extension,
-                      false, ED->getExtendedType());
-      ED->getExtendedTypeLoc().setInvalidType(Binder.Context);
-      break;
-    }
-  }
-}
-
-static void bindClassDecl(ClassDecl *CD, NameBinder &Binder) {
-  auto inherited = CD->getInherited();
-  if (inherited.empty()) return;
-
-  auto DNT = cast<IdentifierType>(inherited[0].getType().getPointer());
-  Type foundType;
-  while (true) {
-    if (Binder.resolveIdentifierType(DNT))
-      return;
-
-    // We need to make sure the extended type is canonical. There are
-    // three possibilities here:
-    // 1. The type is already canonical, because it's either a NominalType
-    // or comes from an imported module.
-    // 2. The type is a NameAliasType from the current module, which
-    // we need to resolve immediately because we can't leave a
-    // non-canonical type here in the AST.
-    // 3. The type is a BoundGenericType; such a type isn't going to be
-    // canonical, but name lookup doesn't actually care about generic
-    // arguments, so we can ignore the fact that they're unresolved.
-    foundType = DNT->getMappedType();
-    if (foundType->hasCanonicalTypeComputed())
-      break;
-
-    if (isa<BoundGenericType>(foundType.getPointer()))
-      break;
-
-    TypeAliasDecl *TAD =
-    cast<NameAliasType>(foundType.getPointer())->getDecl();
-    Type curUnderlying = TAD->getUnderlyingType();
-    DNT = dyn_cast<IdentifierType>(curUnderlying.getPointer());
-
-    if (!DNT) {
-      if (isa<ProtocolCompositionType>(curUnderlying.getPointer())) {
-        // We don't need to resolve ProtocolCompositionTypes here; it's
-        // enough to know that the type in question isn't a class type.
-        foundType = Type();
-        break;
-      }
-      // FIXME: Handling for other types?
-      Binder.diagnose(CD->getLoc(), diag::non_nominal_extension,
-                      false, inherited[0].getType());
-      inherited[0].setInvalidType(Binder.Context);
-      return;
-    }
-  }
-
-  assert(foundType);
-
-  // Check that the base type is a class.
-  TypeLoc baseClass;
-  if (foundType->getClassOrBoundGenericClass())
-    baseClass = inherited[0];
-
-  if (baseClass.getType()) {
-    CD->setBaseClassLoc(baseClass);
-    inherited = inherited.slice(1);
-    CD->setInherited(inherited);
-  }
 }
 
 /// performNameBinding - Once parsing is complete, this walks the AST to
@@ -658,7 +374,8 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(TU->Decls[i])) {
       // Check for declarations with the same name which aren't overloaded
       // vars/funcs.
-      // FIXME: I'm not sure this check is really correct.
+      // FIXME: We don't have enough information to do this properly here,
+      // because we need resolved types to find duplicates.
       if (VD->getName().empty())
         continue;
       ValueDecl *&LookupD = CheckTypes[VD->getName()];
@@ -674,37 +391,6 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       }
     }
   }
-
-  // FIXME:
-  // The rule we want:
-  // If a type is defined in an extension in the current module, and you're
-  // trying to refer to it from an extension declaration, and the number of
-  // dots you're using to refer to it is greater than its natural nesting depth,
-  // it is an error.
-  //
-  // The current rule:
-  // If you're trying to refer to a type from an extension declaration, and you
-  // need to resolve any dots to find the type, it's an error.
-  //
-  // The really tricky part about making everything work correctly is
-  // shadowing: if an extension defines a type which shadows a type in an
-  // imported module, we have to make sure we don't choose a type which
-  // shouldn't be visible.
-  //
-  // After this loop finishes, we can perform normal member lookup.
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
-    if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(TU->Decls[i])) {
-      bindExtensionDecl(ED, Binder);
-    } else if (ClassDecl *CD = dyn_cast<ClassDecl>(TU->Decls[i])) {
-      bindClassDecl(CD, Binder);
-    } else if (FuncDecl *FD = dyn_cast<FuncDecl>(TU->Decls[i])) {
-      // If this is an operator implementation, bind it to an operator decl.
-      if (FD->isOperator())
-        bindFuncDeclToOperator(Binder, TU, FD);
-    }
-  }
-
-  // FIXME: Check for cycles in class inheritance here?
 
   TU->ASTStage = TranslationUnit::NameBound;
   verify(TU);

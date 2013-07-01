@@ -674,8 +674,12 @@ Type FuncDecl::getExtensionType() const {
 
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(DC)->getDeclaredType();
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(DC)->getExtendedType();
+  case DeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(DC);
+    if (ext->isInvalid())
+      return ErrorType::get(getASTContext());
+    return ext->getExtendedType();
+  }
   }
   llvm_unreachable("bad context kind");
 }
