@@ -27,6 +27,55 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief Retrieve the fixed type for the given type variable.
+Type Solution::getFixedType(TypeVariableType *typeVar) const {
+  auto knownBinding = typeBindings.find(typeVar);
+  assert(knownBinding != typeBindings.end());
+  return knownBinding->second;
+}
+
+Expr *Solution::specialize(Expr *expr,
+                           PolymorphicFunctionType *polyFn,
+                           Type openedType) const {
+  auto &tc = getConstraintSystem().getTypeChecker();
+  
+  // Gather the substitutions from archetypes to concrete types, found
+  // by identifying all of the type variables in the original type
+  TypeSubstitutionMap substitutions;
+  auto type
+    = tc.transformType(openedType,
+        [&](Type type) -> Type {
+          if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+            auto archetype = tv->getImpl().getArchetype();
+            auto simplified = getFixedType(tv);
+            substitutions[archetype] = simplified;
+             
+            return SubstitutedType::get(archetype, simplified,
+                                        tc.Context);
+          }
+          
+          return type;
+        });
+  
+  // Validate the generated type, now that we've substituted in for
+  // type variables.
+  tc.validateTypeSimple(type);
+  
+  // Check that the substitutions we've produced actually work.
+  // FIXME: We'd like the type checker to ensure that this always
+  // succeeds.
+  ConformanceMap conformances;
+  if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
+                            &substitutions))
+    return nullptr;
+  
+  // Build the specialization expression.
+  auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
+                                            substitutions, conformances,
+                                            /*OnlyInnermostParams=*/true);
+  return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
+}
+
 /// \brief Find a particular named function witness for a type that conforms to
 /// the given protocol.
 ///
@@ -152,45 +201,6 @@ namespace {
     Expr *coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                               int toScalarIdx,
                               ConstraintLocatorBuilder locator);
-
-    Expr *specialize(Expr *expr, PolymorphicFunctionType *polyFn,
-                     Type openedType) {
-      // Gather the substitutions from archetypes to concrete types, found
-      // by identifying all of the type variables in the original type
-      TypeSubstitutionMap substitutions;
-      auto &tc = cs.getTypeChecker();
-      auto type
-        = tc.transformType(openedType,
-            [&](Type type) -> Type {
-              if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-                auto archetype = tv->getImpl().getArchetype();
-                auto simplified = getFixedType(tv);
-                substitutions[archetype] = simplified;
-
-                return SubstitutedType::get(archetype, simplified, tc.Context);
-              }
-
-              return type;
-            });
-
-      // Validate the generated type, now that we've substituted in for
-      // type variables.
-      tc.validateTypeSimple(type);
-
-      // Check that the substitutions we've produced actually work.
-      // FIXME: We'd like the type checker to ensure that this always
-      // succeeds.
-      ConformanceMap conformances;
-      if (tc.checkSubstitutions(substitutions, conformances, expr->getLoc(),
-                                &substitutions))
-        return nullptr;
-
-      // Build the specialization expression.
-      auto encodedSubs = tc.encodeSubstitutions(&polyFn->getGenericParams(),
-                                                substitutions, conformances,
-                                                /*OnlyInnermostParams=*/true);
-      return new (tc.Context) SpecializeExpr(expr, type, encodedSubs);
-    }
 
   public:
     /// \brief Build a new member reference with the given base and member.
@@ -369,7 +379,7 @@ namespace {
       // Build a reference where the base is ignored.
       Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
-        return specialize(result, polyFn, openedType);
+        return solution.specialize(result, polyFn, openedType);
       }
 
       return result;
@@ -452,13 +462,6 @@ namespace {
                       ConstraintLocatorBuilder locator);
 
   private:
-    /// \brief Retrieve the fixed type for the given type variable.
-    Type getFixedType(TypeVariableType *typeVar) {
-      auto knownBinding = solution.typeBindings.find(typeVar);
-      assert(knownBinding != solution.typeBindings.end());
-      return knownBinding->second;
-    }
-
     /// \brief Retrieve the overload choice associated with the given
     /// locator.
     std::pair<OverloadChoice, Type>
@@ -635,7 +638,7 @@ namespace {
       cs.getTypeChecker().transformType(openedType, [&](Type type) -> Type {
         if (auto typeVar = dyn_cast<TypeVariableType>(type.getPointer())) {
           if (typeVar->getImpl().getArchetype() == thisArchetype) {
-            baseTy = getFixedType(typeVar);
+            baseTy = solution.getFixedType(typeVar);
             return nullptr;
           }
         }
@@ -954,7 +957,7 @@ namespace {
       // Check whether this is a polymorphic function type, which needs to
       // be specialized.
       if (auto polyFn = expr->getType()->getAs<PolymorphicFunctionType>()) {
-        return specialize(expr, polyFn, fromType);
+        return solution.specialize(expr, polyFn, fromType);
       }
 
       simplifyExprType(expr);
@@ -1003,7 +1006,7 @@ namespace {
                                      expr->getConstructorLoc(),
                                      ctor->getInitializerType());
       if (auto polyFn = ctorRef->getType()->getAs<PolymorphicFunctionType>()) {
-        ctorRef = specialize(ctorRef, polyFn, selected.second);
+        ctorRef = solution.specialize(ctorRef, polyFn, selected.second);
       }
 
       auto *call
@@ -1040,7 +1043,7 @@ namespace {
 
       // For a polymorphic function type, we have to specialize our reference.
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {
-        return specialize(result, polyFn, selected.second);
+        return solution.specialize(result, polyFn, selected.second);
       }
 
       return result;
@@ -2365,7 +2368,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setIsSuper(isSuper);
 
     if (auto polyFn = apply->getType()->getAs<PolymorphicFunctionType>()) {
-      return specialize(apply, polyFn, openedType);
+      return solution.specialize(apply, polyFn, openedType);
     }
 
     return tc.substituteInputSugarTypeForResult(apply);

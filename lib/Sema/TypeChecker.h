@@ -320,6 +320,10 @@ public:
   /// tree.
   Expr *foldSequence(SequenceExpr *expr);
   
+  /// Pre-check an expression, validating any types that occur in the
+  /// expression and folding sequence expressions.
+  bool preCheckExpression(Expr *&expr, DeclContext *dc);
+  
   /// \brief Type check the given expression.
   ///
   /// \param expr The expression to type-check, which will be modified in
@@ -368,6 +372,8 @@ public:
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool isFirstPass, bool allowUnknownTypes);
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);
+  bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
+                            Type type);
   
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(CapturingExpr *capturing);
@@ -389,7 +395,7 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool convertToType(Expr *&expr, Type type, DeclContext *dc);
-
+  
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
   Expr *coerceToRValue(Expr *expr);
   

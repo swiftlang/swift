@@ -3012,13 +3012,19 @@ namespace {
   };
 }
 
+/// Pre-check the expression, validating any types that occur in the
+/// expression and folding sequence expressions.
+bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
+  expr = expr->walk(PreCheckExpression(*this, dc));
+  return !expr;
+}
+
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType){
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this, dc));
-  if (!expr)
+  if (preCheckExpression(expr, dc))
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
@@ -3258,10 +3264,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // First, pre-check the expression, validating any types that occur in the
-  // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this, dc));
-  if (!expr)
+  if (preCheckExpression(expr, dc))
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
@@ -3388,8 +3391,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  expr = expr->walk(PreCheckExpression(*this, dc));
-  if (!expr)
+  if (preCheckExpression(expr, dc))
     return true;
 
   llvm::raw_ostream &log = llvm::errs();
@@ -3482,6 +3484,145 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   }
   
   expr = result;
+  cleanup.disable();
+  return false;
+}
+
+/// Find the '~=` operator that can compare an expression inside a pattern to a
+/// value of a given type.
+bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
+                                       Type rhsType) {
+  // First, pre-check the expression, validating any types that occur in the
+  // expression and folding sequence expressions.
+  Expr *lhsExpr = EP->getSubExpr();
+  if (preCheckExpression(lhsExpr, DC))
+    return true;
+  
+  llvm::raw_ostream &log = llvm::errs();
+  
+  // Construct a constraint system and generate constraints from the LHS.
+  ConstraintSystem cs(*this, DC);
+  CleanupIllFormedExpressionRAII cleanup(cs, lhsExpr);
+  lhsExpr = cs.generateConstraints(lhsExpr);
+  if (!lhsExpr)
+    return true;
+  
+  // Open an overload set for the match operator '~='.
+  UnqualifiedLookup matchLookup(Context.getIdentifier("~="), DC);
+  if (!matchLookup.isSuccess()) {
+    diagnose(EP->getLoc(), diag::no_match_operator);
+    return true;
+  }
+  
+  SmallVector<OverloadChoice, 4> choices;
+  for (auto &result : matchLookup.Results) {
+    if (!result.hasValueDecl())
+      continue;
+    choices.push_back(OverloadChoice(Type(), result.getValueDecl()));
+  }
+  
+  if (choices.empty()) {
+    diagnose(EP->getLoc(), diag::no_match_operator);
+    return true;
+  }
+  
+  // FIXME: Does this locator conflict if the top node of lhsExpr also opens an
+  // overload set?
+  auto locator = cs.getConstraintLocator(lhsExpr, {});
+  auto matchArgsTV = cs.createTypeVariable(locator);
+  auto matchResultTV = cs.createTypeVariable(locator);
+  auto matchFnTy = FunctionType::get(matchArgsTV, matchResultTV,
+                                     Context);
+  cs.addOverloadSet(OverloadSet::getNew(cs, matchFnTy, locator, choices));
+  
+  // The matching overload must take the pattern expression on the LHS and the
+  // matched type on the RHS.
+  TupleTypeElt argTys[] = {lhsExpr->getType(), rhsType};
+  auto argTuple = TupleType::get(argTys, Context);
+  cs.addConstraint(ConstraintKind::Conversion, argTuple, matchArgsTV,
+                   locator);
+  
+  // The match function result must conform to LogicValue.
+  auto logicValueProto = getProtocol(lhsExpr->getLoc(),
+                                     KnownProtocolKind::LogicValue);
+  if (!logicValueProto)
+    return true;
+  cs.addConstraint(ConstraintKind::ConformsTo, matchResultTV,
+                   logicValueProto->getDeclaredType(),
+                   locator);
+
+  // Try to solve the system.
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Initial constraints for the given pattern---\n";
+    lhsExpr->print(log);
+    log << "\n";
+    cs.dump();
+  }
+  SmallVector<Solution, 4> viable;
+  if (cs.solve(viable)) {
+    // Try to provide a decent diagnostic.
+    if (cs.diagnose()) {
+      return true;
+    }
+    
+    // FIXME: Dumping constraints by default due to crummy diagnostics.
+    if (getLangOpts().DebugConstraintSolver || true) {
+      log << "---Solved constraints---\n";
+      cs.dump();
+      
+      if (!viable.empty()) {
+        unsigned idx = 0;
+        for (auto &solution : viable) {
+          log << "---Solution #" << ++idx << "---\n";
+          solution.dump(&Context.SourceMgr);
+        }
+      }
+      
+      if (viable.size() == 0)
+        log << "No solution found.\n";
+      else if (viable.size() == 1)
+        log << "Unique solution found.\n";
+      else {
+        log << "Found " << viable.size() << " potential solutions.\n";
+      }
+    }
+    
+    // FIXME: Crappy diagnostic.
+    diagnose(EP->getLoc(), diag::constraint_type_check_fail)
+      .highlight(EP->getSourceRange());
+    
+    return true;
+  }
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    log << "---Solution---\n";
+    solution.dump(&Context.SourceMgr);
+  }
+
+  // Apply the solution to the pattern expression.
+  auto result = cs.applySolution(solution, lhsExpr);
+  if (!result)
+    return true;
+  EP->setSubExpr(result);
+
+  // Save the '~=' operator we found to solve the system.
+  auto solvedOverloadIter = solution.overloadChoices.find(locator);
+  assert(solvedOverloadIter != solution.overloadChoices.end() &&
+         "no '~=' overload found in solved system?!");
+  auto solvedMatchPair = solvedOverloadIter->second;
+  OverloadChoice &solvedMatchChoice = solvedMatchPair.first;
+  Type solvedMatchType = solvedMatchPair.second;
+  
+  Expr *matchRef = new (Context) DeclRefExpr(solvedMatchChoice.getDecl(),
+                             EP->getLoc(),
+                             solvedMatchChoice.getDecl()->getTypeOfReference());
+  if (auto polyFn = matchRef->getType()->getAs<PolymorphicFunctionType>()) {
+    matchRef = solution.specialize(matchRef, polyFn, solvedMatchType);
+  }
+  EP->setMatchFnExpr(matchRef);
+  
+  // Set the type on the pattern.
+  EP->setType(rhsType);
   cleanup.disable();
   return false;
 }

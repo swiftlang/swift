@@ -1326,9 +1326,24 @@ public:
   /// type).
   Expr *convertToArrayBound(Expr *expr, ConstraintLocator *locator) const;
 
+  /// \brief Generate a specialized instance of a polymorphic expression.
+  ///
+  /// \param expr        The polymorphic expression.
+  /// \param polyFn      The unopened polymorphic type of the expression.
+  /// \param openedType  The opened specialized type to instantiate.
+  ///
+  /// \returns A SpecializeExpr containing the expression specialized to the
+  /// opened type.
+  Expr *specialize(Expr *expr,
+                   PolymorphicFunctionType *polyFn,
+                   Type openedType) const;
+  
   /// \brief Retrieve the fixed score of this solution, which considers
   /// the number of user-defined conversions.
   int getFixedScore() const;
+  
+  /// \brief Retrieve the fixed type for the given type variable.
+  Type getFixedType(TypeVariableType *typeVar) const;
 
   /// \brief Dump this solution to standard error.
   void dump(llvm::SourceMgr *sm) const LLVM_ATTRIBUTE_USED;

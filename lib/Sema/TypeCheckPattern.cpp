@@ -341,16 +341,12 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
     return hadError;
   }
 
-  // Coerce expressions to the type.
-  // TODO: Look up a match operator to resolve the type of the expression.
+  // Coerce expressions by finding a '~=' operator that can compare the
+  // expression to a value of the coerced type.
   case PatternKind::Expr: {
-    ExprPattern *EP = dyn_cast<ExprPattern>(P);
-    Expr *subExpr = EP->getSubExpr();
-    if (typeCheckExpression(subExpr, dc, type))
-      return true;
-    EP->setSubExpr(subExpr);
-    EP->setType(type);
-    return false;
+    assert(cast<ExprPattern>(P)->isResolved()
+           && "coercing unresolved expr pattern!");
+    return typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
   }
       
   // Coerce an 'is' pattern by determining the cast kind.
