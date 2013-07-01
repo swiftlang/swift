@@ -28,7 +28,7 @@
 
 #include "IRBuilder.h"
 #include "IRGenFunction.h"
-#include "IrGenModule.h"
+#include "IRGenModule.h"
 
 namespace llvm {
 class DIBuilder;
