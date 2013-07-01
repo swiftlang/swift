@@ -62,18 +62,51 @@ class alignas(8) Expr {
   Expr(const Expr&) = delete;
   void operator=(const Expr&) = delete;
 
-  /// Kind - The subclass of Expr that this is.
-  const ExprKind Kind;
+  class ExprBitfields {
+    friend class Expr;
+    /// The subclass of Expr that this is.
+    unsigned Kind : 8;
+  };
+  enum { NumExprBits = 8 };
+  static_assert(NumExprBits <= 32, "fits in an unsigned");
 
+  class CapturingExprBitfields {
+    friend class CapturingExpr;
+    unsigned : NumExprBits;
+
+    unsigned IsNotCaptured : 1;
+  };
+  enum { NumCapturingExprBits = NumExprBits + 1 };
+  static_assert(NumCapturingExprBits <= 32, "fits in an unsigned");
+
+  class FuncExprBitfields {
+    friend class FuncExpr;
+    unsigned : NumCapturingExprBits;
+
+    unsigned BodyKind : 2;
+  };
+  enum { NumFuncExprBits = NumCapturingExprBits + 2 };
+  static_assert(NumFuncExprBits <= 32, "fits in an unsigned");
+
+protected:
+  union {
+    ExprBitfields ExprBits;
+    CapturingExprBitfields CapturingExprBits;
+    FuncExprBitfields FuncExprBits;
+  };
+
+private:
   /// Ty - This is the type of the expression.
   Type Ty;
 
 protected:
-  Expr(ExprKind Kind, Type Ty = Type()) : Kind(Kind), Ty(Ty) {}
+  Expr(ExprKind Kind, Type Ty = Type()) : Ty(Ty) {
+    ExprBits.Kind = unsigned(Kind);
+  }
 
 public:
-  /// getKind - Return the kind of this expression.
-  ExprKind getKind() const { return Kind; }
+  /// Return the kind of this expression.
+  ExprKind getKind() const { return ExprKind(ExprBits.Kind); }
 
   /// \brief Retrieve the name of the given expression kind.
   ///
@@ -1529,18 +1562,18 @@ public:
 /// of function type, and can capture variables from an enclosing scope.
 class CapturingExpr : public Expr, public DeclContext {
   ArrayRef<ValueDecl*> Captures;
-  bool IsNotCaptured;
 
 public:
   CapturingExpr(ExprKind Kind, Type FnType, DeclContext *Parent)
-    : Expr(Kind, FnType), DeclContext(DeclContextKind::CapturingExpr, Parent),
-      IsNotCaptured(false) {}
+    : Expr(Kind, FnType), DeclContext(DeclContextKind::CapturingExpr, Parent) {
+    CapturingExprBits.IsNotCaptured = false;
+  }
 
   ArrayRef<ValueDecl*> getCaptures() { return Captures; }
   void setCaptures(ArrayRef<ValueDecl*> C) { Captures = C; }
 
-  bool isNotCaptured() { return IsNotCaptured; }
-  void setIsNotCaptured(bool v) { IsNotCaptured = v; }
+  bool isNotCaptured() { return CapturingExprBits.IsNotCaptured; }
+  void setIsNotCaptured(bool v) { CapturingExprBits.IsNotCaptured = v; }
   
   /// Returns the parameter patterns of the function, using
   /// FuncExpr::getArgParamPatterns or ClosureExpr::getParamPatterns.
@@ -1564,11 +1597,17 @@ public:
 class FuncExpr : public CapturingExpr {
   SourceLoc FuncLoc;
   unsigned NumPatterns;
-  
-  BraceStmt *Body;
 
-  /// Tokens of the function body saved for delayed parsing.
-  ParserTokenRange BodyTokenRange;
+  // If a function has a body at all, we have either a parsed body AST node or
+  // we have saved tokens for it.
+  union {
+    /// This union member is active if getBodyKind() == BodyKind::Parsed.
+    BraceStmt *Body;
+
+    /// Tokens of the function body saved for delayed parsing.
+    /// This union member is active if getBodyKind() == BodyKind::Unparsed.
+    ParserTokenRange BodyTokenRange;
+  };
 
   FuncDecl *TheFuncDecl;
 
@@ -1580,12 +1619,29 @@ class FuncExpr : public CapturingExpr {
   Pattern * const *getParamsBuffer() const {
     return reinterpret_cast<Pattern*const*>(this+1);
   }
-  
+
+public:
+  enum class BodyKind {
+    None, Unparsed, Parsed
+  };
+
+  BodyKind getBodyKind() const {
+    return BodyKind(FuncExprBits.BodyKind);
+  }
+
+private:
+  void setBodyKind(BodyKind K) {
+    FuncExprBits.BodyKind = unsigned(K);
+  }
+
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, TypeLoc FnRetType,
            BraceStmt *Body, DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
       FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
-      TheFuncDecl(nullptr), FnRetType(FnRetType) {}
+      TheFuncDecl(nullptr), FnRetType(FnRetType) {
+    setBodyKind(Body ? BodyKind::Parsed : BodyKind::None);
+  }
+
 public:
   static FuncExpr *create(ASTContext &Context, SourceLoc FuncLoc,
                           ArrayRef<Pattern*> ArgParams,
@@ -1661,11 +1717,28 @@ public:
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
-  BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *S) { Body = S; }
+  bool hasBody() const {
+    return getBodyKind() != BodyKind::None;
+  }
+
+  BraceStmt *getBody() const {
+    if (getBodyKind() == BodyKind::Parsed)
+      return Body;
+    return nullptr;
+  }
+  void setBody(BraceStmt *S) {
+    assert(S && "assigning a null body");
+    assert(getBodyKind() != BodyKind::Parsed || Body == S);
+    Body = S;
+    setBodyKind(BodyKind::Parsed);
+  }
 
   ParserTokenRange getBodyTokenRange() { return BodyTokenRange; }
-  void setBodyTokenRange(ParserTokenRange R) { BodyTokenRange = R; }
+  void setBodyTokenRange(ParserTokenRange R) {
+    assert(getBodyKind() == BodyKind::None);
+    BodyTokenRange = R;
+    setBodyKind(BodyKind::Unparsed);
+  }
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
 

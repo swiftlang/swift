@@ -51,7 +51,7 @@ inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Expr::*)() const);
 
 SourceRange Expr::getSourceRange() const {
-  switch (Kind) {
+  switch (getKind()) {
 #define EXPR(ID, PARENT) \
 case ExprKind::ID: \
 static_assert(sizeof(checkSourceRangeType(&ID##Expr::getSourceRange)) == 1, \
@@ -65,7 +65,7 @@ return cast<ID##Expr>(this)->getSourceRange();
 
 /// getLoc - Return the caret location of the expression.
 SourceLoc Expr::getLoc() const {
-  switch (Kind) {
+  switch (getKind()) {
 #define EXPR(ID, PARENT) \
   case ExprKind::ID: \
     if (&Expr::getLoc != &ID##Expr::getLoc) \
@@ -347,8 +347,8 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
 }
 
 SourceRange FuncExpr::getSourceRange() const {
-  if (Body)
-    return { FuncLoc, Body->getEndLoc() };
+  if (auto *B = getBody())
+    return { FuncLoc, B->getEndLoc() };
   if (FnRetType.hasLocation())
     return { FuncLoc, FnRetType.getSourceRange().End };
   const Pattern *LastPat = getArgParamPatterns().back();
