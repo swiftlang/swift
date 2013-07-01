@@ -488,6 +488,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("condbranch", ValueKind::CondBranchInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
+    .Case("downcast", ValueKind::DowncastInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
@@ -600,7 +601,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(SILLocation(), Val);
     break;
-      
+
+    // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst: {
     SILType Ty;
@@ -627,6 +629,44 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
+    // Checked Conversion instructions.
+  case ValueKind::DowncastInst: {
+    SILType Ty;
+    Identifier CheckedToken, ToToken;
+    SourceLoc CheckedLoc, ToLoc;
+    if (P.parseIdentifier(CheckedToken, CheckedLoc,
+                          diag::expected_tok_in_sil_instr,
+                          "conditional or unconditional") ||
+        parseTypedValueRef(Val) ||
+        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr, "to")||
+        parseSILType(Ty))
+      return true;
+
+    CheckedCastMode Mode;
+    if (CheckedToken.str() == "conditional")
+      Mode = CheckedCastMode::Conditional;
+    else if (CheckedToken.str() == "unconditional")
+      Mode = CheckedCastMode::Unconditional;
+    else {
+      P.diagnose(CheckedLoc, diag::expected_tok_in_sil_instr,
+                 "conditional or unconditional");
+      return true;
+    }
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    switch (Opcode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::DowncastInst:
+      ResultVal = B.createDowncast(SILLocation(), Val, Ty, Mode);
+      break;
+    }
+    break;
+  }
+
   case ValueKind::StoreInst: {
     SourceLoc FromNameLoc, ToLoc, AddrLoc;
     StringRef FromName = P.Tok.getText();
