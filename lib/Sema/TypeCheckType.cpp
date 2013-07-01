@@ -48,27 +48,8 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
     }
   }
 
-  // As a fallback until IRGen for generic types works, try looking for
-  // SliceX, where the base type is the nominal type X.
-  Identifier name;
-  if (NominalType *Nominal = baseTy->getAs<NominalType>()) {
-    name = Nominal->getDecl()->getName();
-  } else {
-    TC.diagnose(loc, diag::base_of_array_slice_not_nominal, baseTy);
-    return true;
-  }
-
-  llvm::SmallString<32> nameBuffer("Slice");
-  nameBuffer.append(name.str());
-
-  UnqualifiedLookup sliceLookup(TC.Context.getIdentifier(nameBuffer), &TC.TU);
-  TypeDecl *implementationType = sliceLookup.getSingleTypeResult();
-  if (!implementationType) {
-    TC.diagnose(loc, diag::slice_type_not_found, nameBuffer);
-    return true;
-  }
-  sliceTy->setImplementationType(implementationType->getDeclaredType());
-  return false;
+  TC.diagnose(loc, diag::slice_type_not_found);
+  return true;
 }
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {

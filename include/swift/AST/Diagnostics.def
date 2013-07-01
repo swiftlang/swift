@@ -1399,10 +1399,8 @@ ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(base_of_array_slice_not_nominal,sema_tct,none,
-      "base type of array slice must be a nominal type", (Type))
 ERROR(slice_type_not_found,sema_tct,none,
-      "cannot find slice implementation type '%0'", (StringRef))
+      "broken standard library: cannot find Slice type", ())
 ERROR(tuple_default_local_ref,sema_tct,none,
       "cannot refer to local declaration from default value of"
       " tuple element", ())
