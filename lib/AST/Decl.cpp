@@ -272,39 +272,6 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 
-/// \brief Gather all of the protocols from the set of inherited types.
-static void gatherProtocols(ArrayRef<TypeLoc> inherited,
-                            SmallVectorImpl<ProtocolDecl *> &allProtocols) {
-  llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-
-  for (auto inherited : inherited) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (knownProtocols.insert(proto))
-          allProtocols.push_back(proto);
-      }
-    }
-  }
-}
-
-ArrayRef<ProtocolDecl *> ExtensionDecl::getProtocols() {
-  if (!Protocols.empty())
-    return Protocols;
-
-  // Gather the complete set of protocols.
-  // FIXME: Would be nice to also gather the protocol from extensions of this
-  // type...
-  SmallVector<ProtocolDecl *, 4> foundProtocols;
-  gatherProtocols(Inherited, foundProtocols);
-  if (foundProtocols.empty())
-    return Protocols;
-
-  // Copy the set of protocols to the heap so we don't compute it again.
-  Protocols = getASTContext().AllocateCopy(foundProtocols);
-  return Protocols;
-}
-
 SourceRange PatternBindingDecl::getSourceRange() const {
   if (Init && !Init->isImplicit())
     return { VarLoc, Init->getSourceRange().End };
@@ -431,23 +398,6 @@ Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();
   return cast<NominalTypeDecl>(this)->getDeclaredType();
-}
-
-ArrayRef<ProtocolDecl *> TypeDecl::getProtocols() {
-  if (!Protocols.empty())
-    return Protocols;
-
-  // Gather the complete set of protocols.
-  // FIXME: Would be nice to also gather the protocol from extensions of this
-  // type...
-  SmallVector<ProtocolDecl *, 4> foundProtocols;
-  gatherProtocols(Inherited, foundProtocols);
-  if (foundProtocols.empty())
-    return Protocols;
-
-  // Copy the set of protocols to the heap so we don't compute it again.
-  Protocols = getASTContext().AllocateCopy(foundProtocols);
-  return Protocols;
 }
 
 Type NominalTypeDecl::getDeclaredTypeInContext() {

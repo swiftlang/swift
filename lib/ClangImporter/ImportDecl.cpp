@@ -1810,6 +1810,29 @@ namespace {
       return Impl.SwiftContext.AllocateCopy(protocols);
     }
 
+    // Set the list of protocols on the given declaration based on the
+    // list of types it "inherits".
+    //
+    // FIXME: This whole thing is a bit of a hack. Should we set only the
+    // protocols, and not bother with the 'inherited' list?
+    template<typename DeclType>
+    void setProtocolsFromInherited(DeclType *D) {
+      llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+      SmallVector<ProtocolDecl *, 4> allProtocols;
+      for (auto inherited : D->getInherited()) {
+        SmallVector<ProtocolDecl *, 4> protocols;
+        if (inherited.getType()->isExistentialType(protocols)) {
+          for (auto proto : protocols) {
+            if (knownProtocols.insert(proto))
+              allProtocols.push_back(proto);
+          }
+        }
+      }
+
+      D->setProtocols(D->getASTContext().AllocateCopy(allProtocols));
+      // FIXME: We should be synthesizing protocol conformances as well.
+    }
+
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the the method was not already
@@ -1930,7 +1953,8 @@ namespace {
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
-
+      setProtocolsFromInherited(result);
+      
       // Import each of the members.
       SmallVector<Decl *, 4> members;
       for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
@@ -2008,6 +2032,7 @@ namespace {
 
       // Import protocols this protocol conforms to.
       result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
+      setProtocolsFromInherited(result);
 
       // Note that this is an Objective-C and class protocol.
       result->getMutableAttrs().ObjC = true;
@@ -2119,6 +2144,7 @@ namespace {
 
       // Import protocols this class conforms to.
       result->setInherited(importObjCProtocols(decl->getReferencedProtocols()));
+      setProtocolsFromInherited(result);
 
       // Note that this is an Objective-C class.
       result->getMutableAttrs().ObjC = true;

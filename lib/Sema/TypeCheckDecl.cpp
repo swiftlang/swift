@@ -87,33 +87,42 @@ public:
     }
   }
 
-  void gatherExplicitConformances(Decl *D, Type T,
-                          ArrayRef<ProtocolDecl *> Protocols,
-                          SmallVectorImpl<ProtocolConformance *> &Conformances) {
-    
-    for (auto Proto : Protocols) {
-      ProtocolConformance *Conformance = nullptr;
-      if (TC.conformsToProtocol(T, Proto, &Conformance, D->getStartLoc())) {
-        // For nominal types and extensions thereof, record conformance.
-        if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
-          TC.Context.recordConformance(Proto, D);
+
+  template<typename DeclType>
+  void gatherExplicitConformances(DeclType *D, Type T) {
+    llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+    SmallVector<ProtocolDecl *, 4> allProtocols;
+    SmallVector<ProtocolConformance *, 4> allConformances;
+    for (auto inherited : D->getInherited()) {
+      SmallVector<ProtocolDecl *, 4> protocols;
+      if (inherited.getType()->isExistentialType(protocols)) {
+        for (auto proto : protocols) {
+          if (knownProtocols.insert(proto)) {
+            ProtocolConformance *conformance = nullptr;
+            if (TC.conformsToProtocol(T, proto, &conformance,
+                                      D->getStartLoc())) {
+              // For nominal types and extensions thereof, record conformance.
+              if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
+                TC.Context.recordConformance(proto, D);
+            }
+            allProtocols.push_back(proto);
+            allConformances.push_back(conformance);
+          }
+        }
       }
-      Conformances.push_back(Conformance);
     }
+
+    // Set the protocols and conformances.
+    D->setProtocols(D->getASTContext().AllocateCopy(allProtocols));
+    D->setConformances(D->getASTContext().AllocateCopy(allConformances));
   }
   
   void checkExplicitConformance(TypeDecl *D, Type T) {
-    SmallVector<ProtocolConformance *, 2> Conformances;
-    gatherExplicitConformances(D, T, D->getProtocols(),
-                               Conformances);
-    D->setConformances(D->getASTContext().AllocateCopy(Conformances));
+    gatherExplicitConformances(D, T);
   }
   
   void checkExplicitConformance(ExtensionDecl *D, Type T) {
-    SmallVector<ProtocolConformance *, 2> Conformances;
-    gatherExplicitConformances(D, T, D->getProtocols(),
-                               Conformances);
-    D->setConformances(D->getASTContext().AllocateCopy(Conformances));
+    gatherExplicitConformances(D, T);
   }
 
   void checkGenericParams(GenericParamList *GenericParams) {

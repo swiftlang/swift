@@ -651,7 +651,7 @@ class ExtensionDecl : public Decl, public DeclContext {
 
 public:
   using Decl::getASTContext;
-
+  
   ExtensionDecl(SourceLoc ExtensionLoc, TypeLoc ExtendedType,
                 MutableArrayRef<TypeLoc> Inherited,
                 DeclContext *Parent)
@@ -676,8 +676,12 @@ public:
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> getProtocols();
-  
+  ArrayRef<ProtocolDecl *> getProtocols() { return Protocols; }
+
+  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    Protocols = protocols;
+  }
+
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
@@ -951,8 +955,12 @@ public:
   ///
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols();
-  
+  ArrayRef<ProtocolDecl *> getProtocols() { return Protocols; }
+
+  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    Protocols = protocols;
+  }
+
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
@@ -1106,7 +1114,9 @@ public:
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::NominalTypeDecl;
   }
-  
+  static bool classof(const NominalTypeDecl *D) { return true; }
+  static bool classof(const ExtensionDecl *D) { return false; }
+
   using DeclContext::operator new;
 };
 
