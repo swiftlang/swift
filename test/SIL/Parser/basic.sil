@@ -146,13 +146,22 @@ protocol P {
 
 sil @existentials : $[thin] (n : P) -> () {
 bb0(%0 : $*P):
-  %1 = project_existential %0 : $*P               // user: %3
+  %1 = project_existential %0 : $*P   // CHECK: project_existential %0
+
 //  %2 = protocol_method %0, @doIt.1
 //  %3 = apply %2(%1) : $[cc(method)] ((), Builtin.OpaquePointer) -> ()
-  %4 = tuple ()                                   // user: %6
-  %5 = destroy_addr %0 : $*P
-  %6 = return %4 : $()
+  %4 = tuple ()                       // CHECK: tuple ()
+  %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
+  %6 = return %4 : $()                // CHECK: return 
 }
 
 
+class C {
+  func doIt() {}
+}
 
+sil @classes : $[thin] () -> () {
+bb0:
+  %0 = alloc_ref heap $C                                      // CHECK: %0 = alloc_ref heap $C
+  %1 = ref_to_object_pointer %0 : $C, $Builtin.ObjectPointer  // CHECK: ref_to_object_pointer %0 : $C, $Builtin.ObjectPointer
+}

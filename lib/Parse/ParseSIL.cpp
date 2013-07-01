@@ -482,6 +482,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_var", ValueKind::AllocVarInst)
+    .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
     .Case("condbranch", ValueKind::CondBranchInst)
@@ -493,6 +494,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
+    .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("release", ValueKind::ReleaseInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
@@ -566,6 +568,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     P.consumeToken(tok::integer_literal);
     break;
   }
+      
   case ValueKind::FunctionRefInst:
     if (parseSILFunctionRef(B, ResultVal))
       return true;
@@ -596,6 +599,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(SILLocation(), Val);
     break;
+      
+  case ValueKind::RefToObjectPointerInst: {
+    SILType Ty;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(Ty))
+      return true;
+
+    ResultVal = B.createRefToObjectPointer(SILLocation(), Val, Ty);
+    break;
+  }
   case ValueKind::StoreInst: {
     SourceLoc FromNameLoc, ToLoc, AddrLoc;
     StringRef FromName = P.Tok.getText();
@@ -623,14 +637,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createStore(SILLocation(), FromVal, AddrVal);
     break;
   }
-  case ValueKind::AllocVarInst: {
+  case ValueKind::AllocVarInst:
+  case ValueKind::AllocRefInst: {
     AllocKind Kind;
     SILType Ty;
     if (parseAllocKind(Kind) ||
         parseSILType(Ty))
       return true;
     
-    ResultVal = B.createAllocVar(SILLocation(), Kind, Ty);
+    if (Opcode == ValueKind::AllocVarInst)
+      ResultVal = B.createAllocVar(SILLocation(), Kind, Ty);
+    else {
+      assert(Opcode == ValueKind::AllocRefInst);
+      ResultVal = B.createAllocRef(SILLocation(), Kind, Ty);
+    }
     break;
   }
   case ValueKind::DeallocVarInst: {
