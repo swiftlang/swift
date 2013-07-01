@@ -90,6 +90,168 @@ allAssociatedTypes(SmallVectorImpl<ValueDecl *> &Results) {
   return true;
 }
 
+/// \brief Validate the given identifier type.
+static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
+                                   TypeLoc &Loc) {
+  MutableArrayRef<IdentifierType::Component> Components = IdType->Components;
+
+  // Iteratively resolve the components.
+  IdentifierType::Component LastOne = Components[0];
+  for (auto &C : Components) {
+    TypeDecl *TD = nullptr;
+    Type BaseTy;
+    if (C.isBound()) {
+      // If there is a value, it must be a ValueDecl; resolve it.
+      TD = dyn_cast<TypeDecl>(C.Value.get<ValueDecl*>());
+    } else if (!LastOne.isBound()) {
+      // We haven't resolved anything yet; use an unqualified lookup.
+      Identifier Name = C.Id;
+      SourceLoc Loc = C.Loc;
+
+      DeclContext *DC = C.Value.get<DeclContext*>();
+      assert(DC);
+
+      // Perform an unqualified lookup.
+      UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
+
+      // FIXME: We need to centralize ambiguity checking
+      if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
+        TC.diagnose(Loc, diag::ambiguous_type_base, Name)
+          .highlight(SourceRange(Loc, Components.back().Loc));
+        for (auto Result : Globals.Results) {
+          if (Globals.Results[0].hasValueDecl())
+            TC.diagnose(Result.getValueDecl(), diag::found_candidate);
+          else
+            TC.diagnose(Loc, diag::found_candidate);
+        }
+        return true;
+      }
+
+      if (Globals.Results.empty()) {
+        TC.diagnose(Loc, Components.size() == 1 ?
+                 diag::use_undeclared_type : diag::unknown_name_in_type, Name)
+          .highlight(SourceRange(Loc, Components.back().Loc));
+        return true;
+      }
+
+      switch (Globals.Results[0].Kind) {
+        case UnqualifiedLookupResult::ModuleMember:
+        case UnqualifiedLookupResult::LocalDecl:
+        case UnqualifiedLookupResult::MemberProperty:
+        case UnqualifiedLookupResult::MemberFunction:
+        case UnqualifiedLookupResult::MetatypeMember:
+        case UnqualifiedLookupResult::ExistentialMember:
+        case UnqualifiedLookupResult::ArchetypeMember:
+          TD = dyn_cast<TypeDecl>(Globals.Results[0].getValueDecl());
+          if (TD)
+            BaseTy = TD->getDeclContext()->getDeclaredTypeInContext();
+          break;
+        case UnqualifiedLookupResult::ModuleName:
+          C.setValue(Globals.Results[0].getNamedModule());
+          break;
+
+        case UnqualifiedLookupResult::MetaArchetypeMember:
+          // FIXME: This is actually possible in protocols.
+          llvm_unreachable("meta-archetype member in unqualified name lookup");
+          break;
+      }
+
+      // If we found an associated type in an inherited protocol, the base
+      // for our reference to this associated type is our own 'This'.
+      // FIXME: We'll need to turn this into a more general 'implicit base'
+      // projection, so that any time we find something in an outer context
+      // we make sure to map to that context.
+      if (TD && isa<TypeAliasDecl>(TD) &&
+          isa<ProtocolDecl>(TD->getDeclContext()) &&
+          TD->getDeclContext() != DC) {
+        if (auto Proto = dyn_cast<ProtocolDecl>(DC)) {
+          BaseTy = Proto->getThis()->getDeclaredType();
+        }
+      }
+    } else if (auto M = LastOne.Value.dyn_cast<Module*>()) {
+      // Lookup into a named module.
+      SmallVector<ValueDecl*, 8> Decls;
+      M->lookupValue(Module::AccessPathTy(), C.Id,
+                     NLKind::QualifiedLookup, Decls);
+      if (Decls.size() == 1 ||
+          (Decls.size() > 1 && !allAssociatedTypes(Decls)))
+        TD = dyn_cast<TypeDecl>(Decls.front());
+      // FIXME: Diagnostic if not found or ambiguous?
+    } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
+      // Lookup into a type.
+      BaseTy = T;
+      // FIXME: Diagnostic if not found or ambiguous?
+      auto MemberTypes = TC.lookupMemberType(T, C.Id);
+      if (MemberTypes.size() == 1)
+        TD = MemberTypes.back().first;
+    } else {
+      TC.diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
+        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
+      return true;
+    }
+
+    if (TD) {
+      Type Ty;
+      if (!C.GenericArgs.empty()) {
+        if (auto NTD = dyn_cast<NominalTypeDecl>(TD)) {
+          if (auto Params = NTD->getGenericParams()) {
+            if (Params->size() == C.GenericArgs.size()) {
+              SmallVector<Type, 4> GenericArgTypes;
+              for (TypeLoc T : C.GenericArgs)
+                GenericArgTypes.push_back(T.getType());
+              Ty = BoundGenericType::get(NTD, BaseTy, GenericArgTypes);
+            }
+
+          }
+        }
+
+        // FIXME: Diagnostic if applying the arguments fails?
+      } else {
+        Ty = TD->getDeclaredType();
+
+        // If we're referencing a nominal type that is in a generic context,
+        // we need to consider our base type a well.
+        // FIXME: NameAliasTypes need to be substituted through as well.
+        // FIXME: Also deal with unbound and bound generic types.
+        if (auto nominalD = dyn_cast<NominalTypeDecl>(TD)) {
+          if (BaseTy &&
+              !nominalD->getGenericParams() &&
+              nominalD->getDeclContext()->getGenericParamsOfContext()) {
+            Ty = NominalType::get(nominalD, BaseTy, TC.Context);
+          }
+        }
+      }
+      if (Ty) {
+        // FIXME: Refactor this to avoid fake TypeLoc
+        TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
+        if (TC.validateType(TempLoc)) {
+          return true;
+        }
+
+        if (BaseTy)
+          Ty = TC.substMemberTypeWithBase(Ty, TD, BaseTy);
+        C.setValue(Ty);
+      }
+    }
+
+    if (!C.isBound()) {
+      if (!LastOne.isBound())
+        TC.diagnose(C.Loc, Components.size() == 1 ?
+                    diag::named_definition_isnt_type :
+                    diag::dotted_reference_not_type, C.Id)
+          .highlight(SourceRange(C.Loc, Components.back().Loc));
+      else
+        TC.diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
+          .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
+      return true;
+    }
+
+    LastOne = C;
+  }
+
+  return false;
+}
+
 /// validateType - Types can contain expressions (in the default values for
 /// tuple elements), and thus need semantic analysis to ensure that these
 /// expressions are valid and that they have the appropriate conversions etc.
@@ -167,161 +329,8 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       IsInvalid = validateType(TempLoc);
       break;
     }
-    MutableArrayRef<IdentifierType::Component> Components = DNT->Components;
-
-    // Iteratively resolve the components.
-    IdentifierType::Component LastOne = Components[0];
-    for (auto &C : Components) {
-      TypeDecl *TD = nullptr;
-      Type BaseTy;
-      if (C.isBound()) {
-        // If there is a value, it must be a ValueDecl; resolve it.
-        TD = dyn_cast<TypeDecl>(C.Value.get<ValueDecl*>());
-      } else if (!LastOne.isBound()) {
-        // We haven't resolved anything yet; use an unqualified lookup.
-        Identifier Name = C.Id;
-        SourceLoc Loc = C.Loc;
-
-        DeclContext *DC = C.Value.get<DeclContext*>();
-        assert(DC);
-
-        // Perform an unqualified lookup.
-        UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
-
-        // FIXME: We need to centralize ambiguity checking
-        if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
-          diagnose(Loc, diag::ambiguous_type_base, Name)
-            .highlight(SourceRange(Loc, Components.back().Loc));
-          for (auto Result : Globals.Results) {
-            if (Globals.Results[0].hasValueDecl())
-              diagnose(Result.getValueDecl(), diag::found_candidate);
-            else
-              diagnose(Loc, diag::found_candidate);
-          }
-          return IsInvalid = true;
-        }
-
-        if (Globals.Results.empty()) {
-          diagnose(Loc, Components.size() == 1 ? 
-                   diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-            .highlight(SourceRange(Loc, Components.back().Loc));
-          return IsInvalid = true;
-        }
-
-        switch (Globals.Results[0].Kind) {
-        case UnqualifiedLookupResult::ModuleMember:
-        case UnqualifiedLookupResult::LocalDecl:
-        case UnqualifiedLookupResult::MemberProperty:
-        case UnqualifiedLookupResult::MemberFunction:
-        case UnqualifiedLookupResult::MetatypeMember:
-        case UnqualifiedLookupResult::ExistentialMember:
-        case UnqualifiedLookupResult::ArchetypeMember:
-          TD = dyn_cast<TypeDecl>(Globals.Results[0].getValueDecl());
-          if (TD)
-            BaseTy = TD->getDeclContext()->getDeclaredTypeInContext();
-          break;
-        case UnqualifiedLookupResult::ModuleName:
-          C.setValue(Globals.Results[0].getNamedModule());
-          break;
-
-        case UnqualifiedLookupResult::MetaArchetypeMember:
-          // FIXME: This is actually possible in protocols.
-          llvm_unreachable("meta-archetype member in unqualified name lookup");
-          break;
-        }
-
-        // If we found an associated type in an inherited protocol, the base
-        // for our reference to this associated type is our own 'This'.
-        // FIXME: We'll need to turn this into a more general 'implicit base'
-        // projection, so that any time we find something in an outer context
-        // we make sure to map to that context.
-        if (TD && isa<TypeAliasDecl>(TD) &&
-            isa<ProtocolDecl>(TD->getDeclContext()) &&
-            TD->getDeclContext() != DC) {
-          if (auto Proto = dyn_cast<ProtocolDecl>(DC)) {
-            BaseTy = Proto->getThis()->getDeclaredType();
-          }
-        }
-      } else if (auto M = LastOne.Value.dyn_cast<Module*>()) {
-        // Lookup into a named module.
-        SmallVector<ValueDecl*, 8> Decls;
-        M->lookupValue(Module::AccessPathTy(), C.Id, 
-                       NLKind::QualifiedLookup, Decls);
-        if (Decls.size() == 1 ||
-            (Decls.size() > 1 && !allAssociatedTypes(Decls)))
-          TD = dyn_cast<TypeDecl>(Decls.front());
-        // FIXME: Diagnostic if not found or ambiguous?
-      } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
-        // Lookup into a type.
-        BaseTy = T;
-        // FIXME: Diagnostic if not found or ambiguous?
-        auto MemberTypes = lookupMemberType(T, C.Id);
-        if (MemberTypes.size() == 1)
-          TD = MemberTypes.back().first;
-      } else {
-        diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
-          .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-        return IsInvalid = true;
-      }
-
-      if (TD) {
-        Type Ty;
-        if (!C.GenericArgs.empty()) {
-          if (auto NTD = dyn_cast<NominalTypeDecl>(TD)) {
-            if (auto Params = NTD->getGenericParams()) {
-              if (Params->size() == C.GenericArgs.size()) {
-                SmallVector<Type, 4> GenericArgTypes;
-                for (TypeLoc T : C.GenericArgs)
-                  GenericArgTypes.push_back(T.getType());
-                Ty = BoundGenericType::get(NTD, BaseTy, GenericArgTypes);
-              }
-                
-            }
-          }
-
-          // FIXME: Diagnostic if applying the arguments fails?
-        } else {
-          Ty = TD->getDeclaredType();
-
-          // If we're referencing a nominal type that is in a generic context,
-          // we need to consider our base type a well.
-          // FIXME: NameAliasTypes need to be substituted through as well.
-          // FIXME: Also deal with unbound and bound generic types.
-          if (auto nominalD = dyn_cast<NominalTypeDecl>(TD)) {
-            if (BaseTy &&
-                !nominalD->getGenericParams() &&
-                nominalD->getDeclContext()->getGenericParamsOfContext()) {
-              Ty = NominalType::get(nominalD, BaseTy, Context);
-            }
-          }
-        }
-        if (Ty) {
-          // FIXME: Refactor this to avoid fake TypeLoc
-          TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
-          if (validateType(TempLoc)) {
-            return IsInvalid = true;
-          }
-
-          if (BaseTy)
-            Ty = substMemberTypeWithBase(Ty, TD, BaseTy);
-          C.setValue(Ty);
-        }
-      }
-
-      if (!C.isBound()) {
-        if (!LastOne.isBound())
-          diagnose(C.Loc, Components.size() == 1 ? 
-                   diag::named_definition_isnt_type :
-                   diag::dotted_reference_not_type, C.Id)
-            .highlight(SourceRange(C.Loc, Components.back().Loc));
-        else
-          diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-            .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-        return IsInvalid = true;
-      }
-
-      LastOne = C;
-    }
+    if (!IsInvalid && validateIdentifierType(*this, DNT, Loc))
+      IsInvalid = true;
     break;
   }
   case TypeKind::Paren: {
