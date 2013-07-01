@@ -1,3 +1,3 @@
-add_swift_unittest(BasicTests
+add_swift_unittest(SwiftBasicTests
   TreeScopedHashTableTests.cpp
   )
