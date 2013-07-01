@@ -58,6 +58,13 @@ if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
   get_filename_component(PATH_TO_CLANG_BUILD ${SWIFT_PATH_TO_CLANG_BUILD}
     ABSOLUTE)
 
+  # MSVC has a gazillion warnings with this.
+  if( MSVC )
+    set(LLVM_ENABLE_WARNINGS "Enable compiler warnings." OFF)
+  else( MSVC )
+    set(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
+  endif()
+
   include(AddLLVM)
   include(LLVMParseArguments)
   include(TableGen)
