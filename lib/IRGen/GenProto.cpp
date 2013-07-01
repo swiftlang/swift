@@ -2116,6 +2116,7 @@ namespace {
       if (auto *archetype = sigFnTy->getInput()->getAs<ArchetypeType>()) {
         assert(archetype->requiresClass() &&
                "non-lvalue this argument for non-class This?!");
+        (void)archetype;
         NeedsExtraMetatype = false;
       } else {
         NeedsExtraMetatype = true;
@@ -3455,6 +3456,8 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
     = destType.getSwiftRValueType()->isExistentialType(destProtocols);
   
   assert(isExistential);
+  (void)isExistential;
+
   SmallVector<ProtocolConformance*, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");

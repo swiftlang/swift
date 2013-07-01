@@ -141,14 +141,17 @@ static InfixData getInfixData(TypeChecker &TC, Expr *E) {
   if (auto *ifExpr = dyn_cast<IfExpr>(E)) {
     // Ternary has fixed precedence.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
+    (void)ifExpr;
     return InfixData(100, Associativity::Right);
   } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
+    (void)assign;
     return InfixData(90, Associativity::Right);
   } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
+    (void)as;
     return InfixData(95, Associativity::None);
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (Optional<InfixOperatorDecl*> maybeOp

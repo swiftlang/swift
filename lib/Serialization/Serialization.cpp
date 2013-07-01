@@ -1006,6 +1006,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
     DeclID id = DeclIDs[next];
     assert(id != 0 && "decl or type not referenced properly");
+    (void)id;
 
     auto &offsets = next.isDecl() ? DeclOffsets : TypeOffsets;
     assert((id - 1) == offsets.size());

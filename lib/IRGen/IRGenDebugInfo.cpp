@@ -187,6 +187,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
   // Basically ignore any error.
   assert(ec == llvm::errc::success);
+  (void)ec; // Silence the unused variable warning
   // remove any trailing path separator
   llvm::sys::path::remove_filename(Path);
   llvm::DIFile F = DBuilder.createFile(File, Path);

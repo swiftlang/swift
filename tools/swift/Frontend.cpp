@@ -97,6 +97,7 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
       parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
       assert(BufferOffset == Buffer->getBufferSize() &&
              "Parser returned early?");
+      (void)Buffer;
     }
     
     // Finally, if enabled, type check the whole thing in one go.

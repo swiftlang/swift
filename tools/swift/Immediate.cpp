@@ -988,7 +988,8 @@ public:
       RC{
         /*BufferID*/ ~0U,
         /*CurTUElem*/ 0,
-        /*CurIRGenElem*/ 0
+        /*CurIRGenElem*/ 0,
+        /*RanREPLApplicationMain*/ false
       }
   {
     loadSwiftRuntime(CmdLine);

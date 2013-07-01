@@ -587,6 +587,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     for (CaseStmt *aCase : S->getCases()) {
       if (Stmt *aStmt = doIt(aCase)) {
         assert(aCase == aStmt && "switch case remap not supported");
+        (void)aStmt;
       } else
         return nullptr;
     }
