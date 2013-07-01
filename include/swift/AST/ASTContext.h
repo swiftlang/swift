@@ -142,25 +142,6 @@ public:
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
-/// Constants used to customize name lookup.
-enum NameLookupOptions {
-  /// Visit supertypes (such as superclasses or inherited protocols)
-  /// and their extensions as well as the current extension.
-  NL_VisitSupertypes = 0x01,
-
-  /// Remove non-visible declarations from the set of results.
-  NL_RemoveNonVisible = 0x02,
-
-  /// Remove overridden declarations from the set of results.
-  NL_RemoveOverridden = 0x04,
-
-  /// \brief The default set of options used for normal name lookup.
-  NL_Default = NL_VisitSupertypes | NL_RemoveNonVisible | NL_RemoveOverridden,
-
-  /// \brief The default set of options used for constructor lookup.
-  NL_Constructor = NL_RemoveNonVisible
-};
-
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
