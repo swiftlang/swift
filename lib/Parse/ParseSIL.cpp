@@ -489,11 +489,16 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
+    .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
+    .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
+    .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
+    .Case("project_downcast_existential_addr",
+          ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("release", ValueKind::ReleaseInst)
@@ -501,10 +506,11 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
+    .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Default(ValueKind::SILArgument);
-  
+
   if (Opcode != ValueKind::SILArgument) {
     P.consumeToken();
     return false;
@@ -630,7 +636,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
     // Checked Conversion instructions.
-  case ValueKind::DowncastInst: {
+  case ValueKind::DowncastInst:
+  case ValueKind::SuperToArchetypeRefInst:
+  case ValueKind::DowncastArchetypeAddrInst:
+  case ValueKind::DowncastArchetypeRefInst:
+  case ValueKind::ProjectDowncastExistentialAddrInst:
+  case ValueKind::DowncastExistentialRefInst: {
     SILType Ty;
     Identifier CheckedToken, ToToken;
     SourceLoc CheckedLoc, ToLoc;
