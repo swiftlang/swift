@@ -100,6 +100,9 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
   TranslationUnit *TU = new (ctx) TranslationUnit(moduleID.first, comp, ctx,
                                                   TranslationUnit::Library);
 
+  TU->HasBuiltinModuleAccess = (moduleID.first.str() == "swift");
+  performAutoImport(TU);
+
   ctx.LoadedModules[moduleID.first.str()] = TU;
 
   std::vector<unsigned> BufferIDs;
