@@ -59,7 +59,7 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   }
 
   // Look for the member.
-  if (!Context.lookup(type, name, &TU, options, result.Results))
+  if (!TU.lookupQualified(type, name, options, result.Results))
     return result;
 
   // If we only want types, filter out non-types.

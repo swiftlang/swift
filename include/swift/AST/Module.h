@@ -116,6 +116,29 @@ public:
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind);
 
+  /// Look for the set of declarations with the given name within a type,
+  /// its extensions and, optionally, its supertypes.
+  ///
+  /// This routine performs name lookup within a given type, its extensions
+  /// and, optionally, its supertypes and their extensions. It can eliminate
+  /// non-visible, hidden, and overridden declarations from the result set.
+  /// It does not, however, perform any filtering based on the semantic
+  /// usefulness of the results.
+  ///
+  /// \param type The type to look into.
+  ///
+  /// \param name The name to search for.
+  ///
+  /// \param options Options that control name lookup, based on the
+  /// \c NL_* constants in \c NameLookupOptions.
+  ///
+  /// \param decls Will be populated with the declarations found by name
+  /// lookup.
+  ///
+  /// \returns true if anything was found.
+  bool lookupQualified(Type type, Identifier name, unsigned options,
+                       SmallVectorImpl<ValueDecl *> &decls);
+
   /// Look up an InfixOperatorDecl for the given operator
   /// name in this module (which must be NameBound) and return it, or return
   /// null if there is no operator decl. Returns Nothing if there was an error

@@ -385,7 +385,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
     if (BaseDecl) {
       SmallVector<ValueDecl *, 4> Lookup;
-      DC->getASTContext().lookup(ExtendedType, Name, &M, NL_Default, Lookup);
+      M.lookupQualified(ExtendedType, Name, NL_Default, Lookup);
       bool isMetatypeType = ExtendedType->is<MetaTypeType>();
       bool FoundAny = false;
       for (auto Result : Lookup) {
@@ -716,23 +716,22 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
   return { known->second.begin(), known->second.size() };
 }
 
-bool ASTContext::lookup(Type type,
-                        Identifier name,
-                        Module *fromModule,
-                        unsigned options,
-                        SmallVectorImpl<ValueDecl *> &decls) {
+bool Module::lookupQualified(Type type,
+                             Identifier name,
+                             unsigned options,
+                             SmallVectorImpl<ValueDecl *> &decls) {
   if (type->is<ErrorType>()) {
     return false;
   }
 
   // Look through lvalue types.
   if (auto lvalueTy = type->getAs<LValueType>()) {
-    return lookup(lvalueTy->getObjectType(), name, fromModule, options, decls);
+    return lookupQualified(lvalueTy->getObjectType(), name, options, decls);
   }
 
   // Look through metatypes.
   if (auto metaTy = type->getAs<MetaTypeType>()) {
-    return lookup(metaTy->getInstanceType(), name, fromModule, options, decls);
+    return lookupQualified(metaTy->getInstanceType(), name, options, decls);
   }
 
   // Look for module references.
@@ -845,7 +844,7 @@ bool ASTContext::lookup(Type type,
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   if (options & NL_RemoveNonVisible) {
-    removeShadowedDecls(decls, fromModule);
+    removeShadowedDecls(decls, this);
   }
 
   // We're done. Report success/failure.

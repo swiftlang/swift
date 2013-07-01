@@ -1739,8 +1739,8 @@ namespace {
       // reasons. Fix it.
       auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
-      context.lookup(containerTy, name, Impl.firstClangModule, NL_Default,
-                     lookup);
+      Impl.firstClangModule->lookupQualified(containerTy, name, NL_Default,
+                                             lookup);
       Type unlabeledIndices;
       for (auto result : lookup) {
         auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -2234,8 +2234,8 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
-      Impl.SwiftContext.lookup(containerTy, name, Impl.firstClangModule,
-                               NL_Default, lookup);
+      Impl.firstClangModule->lookupQualified(containerTy, name, NL_Default,
+                                             lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result))
           return nullptr;
