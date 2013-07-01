@@ -32,13 +32,13 @@ namespace {
 
   class Serializer {
     SmallVector<char, 0> Buffer;
-    llvm::BitstreamWriter Out;
+    llvm::BitstreamWriter Out{Buffer};
 
     /// A reusable buffer for emitting records.
     SmallVector<uint64_t, 64> ScratchRecord;
 
     /// The TranslationUnit currently being serialized.
-    const TranslationUnit *TU;
+    const TranslationUnit *TU = nullptr;
 
   public:    
     /// Stores a declaration or a type to be written to the AST file.
@@ -89,6 +89,10 @@ namespace {
     /// All identifiers that need to be serialized.
     std::vector<Identifier> IdentifiersToWrite;
 
+    /// The abbreviation code for each record in the "decls-and-types" block.
+    ///
+    /// These are registered up front when entering the block, so they can be
+    /// reused.
     std::array<unsigned, 256> DeclTypeAbbrCodes;
 
     /// The offset of each Decl in the bitstream, indexed by DeclID.
@@ -102,18 +106,18 @@ namespace {
     std::vector<CharOffset> IdentifierOffsets;
 
     /// The last assigned DeclID for decls from this module.
-    DeclID LastDeclID;
+    DeclID LastDeclID = 0;
 
     /// The last assigned DeclID for types from this module.
-    TypeID LastTypeID;
+    TypeID LastTypeID = 0;
 
     /// The last assigned IdentifierID for types from this module.
-    IdentifierID LastIdentifierID;
+    IdentifierID LastIdentifierID = 0;
 
     /// True if this module does not fully represent the original source file.
     ///
     /// This is a bring-up hack and will eventually go away.
-    bool ShouldFallBackToTranslationUnit;
+    bool ShouldFallBackToTranslationUnit = false;
 
     /// Returns the record code for serializing the given vector of offsets.
     ///
@@ -211,10 +215,7 @@ namespace {
     void writeTranslationUnit(const TranslationUnit *TU);
 
   public:
-    Serializer()
-      : Out(Buffer), TU(nullptr), LastDeclID(0), LastTypeID(0),
-        ShouldFallBackToTranslationUnit(false) {
-    }
+    Serializer() = default;
 
     /// Serialize a translation unit to the given stream.
     void writeToStream(raw_ostream &os, const TranslationUnit *TU,
