@@ -1374,7 +1374,8 @@ public:
     FuncDeclBits.Static = Static;
   }
 
-  FuncExpr *getBody() const { return Body; }
+  FuncExpr *getBody() { return Body; }
+  const FuncExpr *getBody() const { return Body; }
   void setBody(FuncExpr *NewBody) { Body = NewBody; }
   
   /// getCaptures - If this is a local function declaration with captured
