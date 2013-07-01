@@ -18,6 +18,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SourceMgr.h"
 #include "swift/Basic/Interleave.h"
@@ -913,6 +914,10 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
 }
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
+  // TODO: When we have "checked"/"unchecked" mode support, drop the trap.
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
+                                                    llvm::Intrinsic::ID::trap);
+  Builder.CreateCall(trapIntrinsic);
   Builder.CreateUnreachable();
 }
 
