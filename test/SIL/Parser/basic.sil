@@ -160,10 +160,22 @@ class C {
   func doIt() {}
 }
 
+class D : C {
+  func doIt() {
+    super.doIt()
+  }
+}
+
+
 sil @classes : $[thin] () -> () {
 bb0:
-  %0 = alloc_ref heap $C                                      // CHECK: %0 = alloc_ref heap $C
-  %1 = ref_to_object_pointer %0 : $C, $Builtin.ObjectPointer  // CHECK: ref_to_object_pointer %0 : $C, $Builtin.ObjectPointer
+  %C = alloc_ref heap $C                                      // CHECK: %0 = alloc_ref heap $C
+  %1 = ref_to_object_pointer %C : $C, $Builtin.ObjectPointer  // CHECK: ref_to_object_pointer %0 : $C, $Builtin.ObjectPointer
 
-  //%2 = class_method %0 : $C, @doIt.1
+  //%2 = class_method %C : $C, @doIt.1
+  
+  %D = alloc_ref heap $D                                      // CHECK: alloc_ref heap $D
+  %a = upcast %D : $D, $C                                     // CHECK: upcast {{.*}} : $D, $C
 }
+
+

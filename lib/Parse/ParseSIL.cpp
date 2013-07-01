@@ -501,6 +501,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
     .Case("tuple", ValueKind::TupleInst)
+    .Case("upcast", ValueKind::UpcastInst)
     .Default(ValueKind::SILArgument);
   
   if (Opcode != ValueKind::SILArgument) {
@@ -600,14 +601,23 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createLoad(SILLocation(), Val);
     break;
       
-  case ValueKind::RefToObjectPointerInst: {
+  case ValueKind::RefToObjectPointerInst:
+  case ValueKind::UpcastInst: {
     SILType Ty;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(Ty))
       return true;
 
-    ResultVal = B.createRefToObjectPointer(SILLocation(), Val, Ty);
+    switch (Opcode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::RefToObjectPointerInst:
+      ResultVal = B.createRefToObjectPointer(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::UpcastInst:
+      ResultVal = B.createUpcast(SILLocation(), Val, Ty);
+      break;
+    }
     break;
   }
   case ValueKind::StoreInst: {
