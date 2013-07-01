@@ -278,7 +278,7 @@ implement.
 For full control we provide ``Formattable``, a thing that can write
 into a ``FormattedOutputStream`` while responding to width, precision,
 and alignment.  Every ``Formattable`` is also a ``Printable``,
-naturally.
+naturally. ::
 
   protocol Formattable: Printable {
     func write(
