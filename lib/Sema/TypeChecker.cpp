@@ -470,8 +470,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
                                                std::vector<ValueDecl*>() });
     auto& CurDecls = FoundDeclResult.first->second;
     if (FoundDeclResult.second) {
-      for (auto BaseMember : TC.lookupMember(BaseMetaTy, MemberVD->getName(),
-                                             /*isTypeLookup=*/false))
+      for (auto BaseMember : TC.lookupMember(BaseMetaTy, MemberVD->getName()))
         CurDecls.push_back(BaseMember);
     }
     if (!CurDecls.empty()) {

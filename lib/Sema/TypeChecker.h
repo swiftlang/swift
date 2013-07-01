@@ -107,10 +107,46 @@ public:
   ValueDecl *operator[](unsigned index) const { return Results[index]; }
 
   ValueDecl *front() const { return Results.front(); }
-  ValueDecl *back() const { return Results.front(); }
+  ValueDecl *back() const { return Results.back(); }
 
   /// Add a result to the set of results.
   void addResult(ValueDecl *result) { Results.push_back(result); }
+
+  /// Determine whether the result set is nonempty.
+  explicit operator bool() const {
+    return !Results.empty();
+  }
+};
+
+/// The result of name lookup for types.
+class LookupTypeResult {
+  /// The set of results found.
+  SmallVector<std::pair<TypeDecl *, Type>, 4> Results;
+
+  friend class TypeChecker;
+
+public:
+  typedef SmallVector<std::pair<TypeDecl *, Type>, 4>::iterator iterator;
+  iterator begin() { return Results.begin(); }
+  iterator end() { return Results.end(); }
+  unsigned size() const { return Results.size(); }
+
+  std::pair<TypeDecl *, Type> operator[](unsigned index) const {
+    return Results[index];
+  }
+
+  std::pair<TypeDecl *, Type> front() const { return Results.front(); }
+  std::pair<TypeDecl *, Type> back() const { return Results.back(); }
+
+  /// Add a result to the set of results.
+  void addResult(std::pair<TypeDecl *, Type> result) {
+    Results.push_back(result);
+  }
+
+  /// \brief Determine whether this result set is ambiguous.
+  bool isAmbiguous() const {
+    return Results.size() > 1;
+  }
 
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
@@ -475,11 +511,21 @@ public:
   ///
   /// \param type The type in which we will look for a member.
   /// \param name The name of the member to look for.
-  /// \param isTypeLookup Whether we're looking for a type only (vs. a value).
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(Type type, Identifier name,
-                            bool isTypeLookup);
+  LookupResult lookupMember(Type type, Identifier name);
+
+  /// \brief Lookup a member type within the given type.
+  ///
+  /// This routine looks for member types with the given name within the
+  /// given type. 
+  ///
+  /// \param type The type in which we will look for a member type.
+  ///
+  /// \param name The name of the member to look for.
+  ///
+  /// \returns The result of name lookup.
+  LookupTypeResult lookupMemberType(Type type, Identifier name);
 
   /// \brief Lookup the constructors of the given type.
   ///

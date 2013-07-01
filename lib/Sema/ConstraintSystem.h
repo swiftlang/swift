@@ -1412,10 +1412,6 @@ private:
   llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
     MemberLookups;
 
-  /// \brief Cached member type lookups.
-  llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
-    MemberTypeLookups;
-
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
   llvm::FoldingSet<ConstraintLocator> ConstraintLocators;
@@ -1578,7 +1574,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, Identifier name, bool isTypeLookup);
+  LookupResult &lookupMember(Type base, Identifier name);
 
   /// \brief Retrieve an unresolved overload set.
   OverloadSet *getUnresolvedOverloadSet(unsigned Idx) const {

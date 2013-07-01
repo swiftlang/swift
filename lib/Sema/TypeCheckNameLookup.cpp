@@ -21,8 +21,7 @@
 
 using namespace swift;
 
-LookupResult TypeChecker::lookupMember(Type type, Identifier name,
-                                       bool isTypeLookup) {
+LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
   LookupResult result;
   unsigned options = NL_Default;
   
@@ -62,15 +61,41 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   if (!TU.lookupQualified(type, name, options, result.Results))
     return result;
 
-  // If we only want types, filter out non-types.
-  // FIXME: Introduce a filter abstraction into LookupResult, as in Clang?
-  if (isTypeLookup) {
-    result.Results.erase(std::remove_if(result.Results.begin(),
-                                        result.Results.end(),
-                                        [&](ValueDecl *decl) -> bool {
-                                          return !isa<TypeDecl>(decl);
-                                        }),
-                         result.Results.end());
+  return result;
+}
+
+LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
+  LookupTypeResult result;
+
+  // Look for members with the given name.
+  SmallVector<ValueDecl *, 4> decls;
+  if (!TU.lookupQualified(type, name, NL_Default, decls))
+    return result;
+
+  // Look through the declarations, keeping only the unique type declarations.
+  llvm::SmallPtrSet<CanType, 4> types;
+  for (auto decl : decls){
+    // Ignore non-types found by name lookup.
+    auto typeDecl = dyn_cast<TypeDecl>(decl);
+    if (!typeDecl)
+      continue;
+
+    // If there are any type variables in the base type, don't substitute.
+    // FIXME: This feels like a hack.
+    if (type->hasTypeVariable()) {
+      result.Results.push_back({typeDecl, typeDecl->getDeclaredType()});
+      continue;
+    }
+
+    // Substitute the the base into the member's type.
+    auto memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),
+                                              typeDecl, type);
+    if (!memberType)
+      continue;
+
+    // If we haven't seen this type result yet, add it to the result set.
+    if (types.insert(memberType->getCanonicalType()))
+      result.Results.push_back({typeDecl, memberType});
   }
 
   return result;
@@ -78,5 +103,5 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
 
 LookupResult TypeChecker::lookupConstructors(Type type) {
   // FIXME: Use of string literal here is lame.
-  return lookupMember(type, Context.getIdentifier("constructor"), false);
+  return lookupMember(type, Context.getIdentifier("constructor"));
 }

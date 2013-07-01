@@ -273,10 +273,10 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
         // Lookup into a type.
         BaseTy = T;
-        auto Members = lookupMember(T, C.Id, /*isTypeLookup=*/true);
         // FIXME: Diagnostic if not found or ambiguous?
-        if (Members.size() == 1)
-          TD = dyn_cast<TypeDecl>(Members.back());
+        auto MemberTypes = lookupMemberType(T, C.Id);
+        if (MemberTypes.size() == 1)
+          TD = MemberTypes.back().first;
       } else {
         diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
           .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
@@ -876,18 +876,22 @@ Type TypeChecker::substType(Type origType, TypeSubstitutionMap &Substitutions,
     }
      
     // Retrieve the type with the given name.
+
+    // Tuples don't have member types.
+    // FIXME: Feels like a hack.
+     if (SubstParent->is<TupleType>()) {
+       assert(IgnoreMissing && "Expect member type within tuple type");
+       return type;
+     }
+
     // FIXME: Shouldn't we be using protocol-conformance information here?
-    LookupResult Members;
-    if (!SubstParent->is<TupleType>())
-      Members = lookupMember(SubstParent, substOrig->getName(),
-                             /*isTypeLookup=*/true);
-    if (!Members && IgnoreMissing)
+    LookupTypeResult MemberTypes
+      = lookupMemberType(SubstParent, substOrig->getName());
+    if (!MemberTypes && IgnoreMissing)
       return type;
 
     // FIXME: Detect ambiguities here?
-    assert(Members && "No type lookup results?");
-    TypeDecl *TD = cast<TypeDecl>(Members.back());
-    return substMemberTypeWithBase(TD->getDeclaredType(), TD, SubstParent);
+    return MemberTypes.back().second;
   });
 }
 

@@ -2678,8 +2678,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
-  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName,
-                                   /*isTypeLookup=*/false);
+  auto witnesses = tc.lookupMember(type->getRValueType(), builtinName);
   if (!witnesses) {
     // Find the witness we need to use.
     auto witness = findNamedWitness(tc, type->getRValueType(), protocol,
@@ -2705,8 +2704,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
 
     // At this point, we must have a type with the builtin member.
     type = expr->getType();
-    witnesses = tc.lookupMember(type->getRValueType(), builtinName,
-                                /*isTypeLookup=*/false);
+    witnesses = tc.lookupMember(type->getRValueType(), builtinName);
     if (!witnesses) {
       tc.diagnose(protocol->getLoc(), brokenProtocolDiag);
       return nullptr;

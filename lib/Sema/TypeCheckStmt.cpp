@@ -671,7 +671,7 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
             // Look for the member within this type.
             auto memberDecls
               = lookupMember(nominalDecl->getDeclaredTypeInContext(),
-                             memberRef->getName(), /*isTypeLookup=*/false);
+                             memberRef->getName());
             if (memberDecls.size() == 1)
               member = dyn_cast<VarDecl>(memberDecls[0]);
           }

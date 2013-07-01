@@ -134,7 +134,7 @@ PrintClass(TypeChecker &TC, VarDecl *Arg,
   bool showedDynamicType = false;
   Identifier MemberName = Context.getIdentifier("className");
   Type MetaT = MetaTypeType::get(SugarT, Context);
-  if (TC.lookupMember(MetaT,MemberName,/*isTypeLookup=*/false)){
+  if (TC.lookupMember(MetaT,MemberName)){
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     MetatypeExpr *Meta = new (Context) MetatypeExpr(ArgRef,
                                                     Loc,
@@ -340,7 +340,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
   }
 
   Identifier MemberName = Context.getIdentifier("replPrint");
-  if (TC.lookupMember(T, MemberName, /*isTypeLookup=*/false)) {
+  if (TC.lookupMember(T, MemberName)) {
     Expr *ArgRef = getArgRefExpr(TC, Arg, MemberIndexes, Loc);
     Expr *Res = new (TC.Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                    EndLoc);

@@ -302,13 +302,11 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   return false;
 }
 
-LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name,
-                                             bool isTypeLookup) {
+LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   base = base->getCanonicalType();
-  auto &result = isTypeLookup? MemberTypeLookups[{base, name}]
-                             : MemberLookups[{base, name}];
+  auto &result = MemberLookups[{base, name}];
   if (!result) {
-    result = TC.lookupMember(base, name, isTypeLookup);
+    result = TC.lookupMember(base, name);
   }
   return *result;
 }
@@ -740,11 +738,10 @@ getTypeForArchetype(ConstraintSystem &cs, ArchetypeType *archetype,
 
   // Look for this member type.
   // FIXME: Ambiguity check.
-  LookupResult &lookup = cs.lookupMember(parentTy, archetype->getName(),
-                                         /*isTypeLookup=*/true);
-  auto member = cast<TypeDecl>(lookup[0]);
-  auto type = member->getDeclaredType();
-  type = cs.getTypeChecker().substMemberTypeWithBase(type, member, parentTy);
+  auto &tc = cs.getTypeChecker();
+  LookupTypeResult lookup = tc.lookupMemberType(parentTy,archetype->getName());
+  assert(lookup.size() == 1 && "Couldn't find archetype for member lookup");
+  auto type = lookup.front().second;
   mappedTypes[archetype] = type;
   return type;
 }
@@ -1789,7 +1786,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     auto &context = getASTContext();
     // FIXME: lame name!
     auto name = context.getIdentifier("__conversion");
-    if (lookupMember(type1, name, /*isTypeLookup=*/false)) {
+    if (lookupMember(type1, name)) {
       auto memberLocator = getConstraintLocator(
                               locator.withPathElement(
                                 ConstraintLocator::ConversionMember));
@@ -2241,18 +2238,35 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
   }
 
+  // If we want member types only, use member type lookup.
+  if (constraint.getKind() == ConstraintKind::TypeMember) {
+    auto lookup = TC.lookupMemberType(baseObjTy, name);
+    if (!lookup) {
+      // FIXME: Customize diagnostic to mention types.
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+
+      return SolutionKind::Error;
+    }
+
+    // Form the overload set.
+    SmallVector<OverloadChoice, 4> choices;
+    for (auto result : lookup) {
+      choices.push_back(OverloadChoice(baseTy, result.first));
+    }
+    auto locator = getConstraintLocator(constraint.getLocator());
+    addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
+    return SolutionKind::Solved;
+  }
+
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(baseObjTy, name,
-                                      /*isTypeLookup=*/constraint.getKind()
-                                        == ConstraintKind::TypeMember);
+  LookupResult &lookup = lookupMember(baseObjTy, name);
   if (!lookup) {
     recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                   baseObjTy, name);
 
     return SolutionKind::Error;
   }
-
-  // FIXME: If we expect a type member, make sure we actually got type members.
 
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;

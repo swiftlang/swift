@@ -477,8 +477,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       continue;
     }
 
-    auto candidates = TC.lookupMember(metaT, AssociatedType->getName(),
-                                      /*isTypeLookup=*/true);
+    auto candidates = TC.lookupMemberType(metaT, AssociatedType->getName());
 
     // If we didn't find any matches, consider this associated type to be
     // unresolved.
@@ -490,16 +489,9 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     SmallVector<std::pair<TypeDecl *, Type>, 2> Viable;
     SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> NonViable;
 
-    for (auto Candidate : candidates) {
-      auto TypeD = dyn_cast<TypeDecl>(Candidate);
-      if (!TypeD)
-        continue;
-
+    for (auto candidate : candidates) {
       // Check this type against the protocol requirements.
       bool SatisfiesRequirements = true;
-
-      Type WitnessTy
-        = TC.substMemberTypeWithBase(TypeD->getDeclaredType(), TypeD, T);
 
       for (auto Req : AssociatedType->getInherited()) {
         SmallVector<ProtocolDecl *, 4> ReqProtos;
@@ -507,10 +499,10 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           return nullptr;
 
         for (auto ReqProto : ReqProtos) {
-          if (!TC.conformsToProtocol(WitnessTy, ReqProto)) {
+          if (!TC.conformsToProtocol(candidate.second, ReqProto)) {
             SatisfiesRequirements = false;
 
-            NonViable.push_back({TypeD, ReqProto});
+            NonViable.push_back({candidate.first, ReqProto});
             break;
           }
         }
@@ -520,7 +512,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
 
       if (SatisfiesRequirements)
-        Viable.push_back({TypeD, WitnessTy});
+        Viable.push_back(candidate);
     }
     
     if (Viable.size() == 1) {
@@ -583,7 +575,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       TC.diagnose(AssociatedType, diag::no_witnesses_type,
                   AssociatedType->getName());
       for (auto candidate : candidates)
-        TC.diagnose(candidate, diag::protocol_witness_type);
+        TC.diagnose(candidate.first, diag::protocol_witness_type);
       
       TypeMapping[archetype] = ErrorType::get(TC.Context);
     } else {
@@ -630,8 +622,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       }
     } else {
       // Variable/function/subscript requirements.
-      for (auto candidate : TC.lookupMember(metaT, Requirement->getName(),
-                                            /*isTypeLookup=*/false)) {
+      for (auto candidate : TC.lookupMember(metaT, Requirement->getName())) {
           witnesses.push_back(candidate);
       }
     }
