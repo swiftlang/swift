@@ -517,7 +517,7 @@ public:
     if (I->isVolatile())
       OS << "[volatile] ";
     
-    OS << getID(Operand) << ", @";
+    OS << getIDAndType(Operand) << ", @";
     I->getMember().print(OS);
   }
   
