@@ -896,8 +896,6 @@ ERROR(use_unresolved_identifier,sema_nb,none,
       "use of unresolved identifier %0", (Identifier))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
-ERROR(cannot_resolve_extension_dot,sema_nb,none,
-      "cannot lookup members of types while resolving extension declarations", ())
 
 // Operator decls
 ERROR(ambiguous_operator_decls,sema_nb,none,
