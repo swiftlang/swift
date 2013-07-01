@@ -38,7 +38,7 @@ static bool requiresHeapHeader(LayoutKind kind) {
 
 /// Return the size of the standard heap header.
 Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
-  return IGM.getPointerSize() * 2;
+  return IGM.getPointerSize() + Size(8);
 }
 
 /// Add the fields for the standard heap header to the given layout.

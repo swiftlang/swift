@@ -133,7 +133,7 @@ IRGenModule::IRGenModule(ASTContext &Context,
   });
   FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(DefaultAS);
 
-  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, SizeTy };
+  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, Int32Ty, Int32Ty };
   RefCountedStructTy->setBody(refCountedElts);
 
   PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
