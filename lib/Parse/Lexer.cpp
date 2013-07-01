@@ -166,6 +166,7 @@ Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
   : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
+  ArtificialEOF = BufferEnd;
   CurPtr = CurrentPosition;
   assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
          "Current position is out-of-range");
@@ -195,6 +196,13 @@ tok Lexer::getTokenKind(StringRef Text) {
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
+  // When we are lexing a subrange from the middle of a file buffer, we will
+  // run past the end of the range, but will stay within the file.  Check if
+  // we are past the imaginary EOF, and synthesize a tok::eof in this case.
+  if (Kind != tok::eof && TokStart >= ArtificialEOF) {
+    formToken(tok::eof, TokStart);
+    return;
+  }
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 

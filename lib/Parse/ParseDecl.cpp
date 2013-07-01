@@ -1326,7 +1326,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   ParserPositionRAII PPR(*this);
 
   // Create a lexer that can not go past the end state.
-  Lexer LocalLex(FunctionParserState->BeginParserPosition.LS,
+  Lexer LocalLex(*L, FunctionParserState->BeginParserPosition.LS,
                  *EndLexerState, SourceMgr, &Diags, nullptr /*not SIL*/);
 
   // Temporarily swap out the parser's current lexer with our new one.

@@ -35,9 +35,19 @@ namespace swift {
 class Lexer {
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine *Diags;
-  
+
+  /// Pointer to the first character of the buffer.
   const char *BufferStart;
+
+  /// Pointer to one past the end character of the buffer.  Because the buffer
+  /// is always NUL-terminated, this points to the NUL terminator.
   const char *BufferEnd;
+
+  /// Pointer to the artificial EOF that is located before BufferEnd.  Useful
+  /// for lexing subranges of a buffer.
+  const char *ArtificialEOF;
+
+  /// Pointer to the next not consumed character.
   const char *CurPtr;
 
   Token NextToken;
@@ -68,12 +78,20 @@ public:
     friend class Lexer;
   };
 
-  Lexer(State BeginState, State EndState, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags, bool InSILMode)
-    : Lexer(llvm::StringRef(BeginState.CurPtr,
-                            EndState.CurPtr - BeginState.CurPtr),
+  /// \brief Create a sub-lexer that lexes from the same buffer, but scans
+  /// a subrange of the buffer.
+  ///
+  /// \param Parent the parent lexer that scans the whole buffer
+  /// \param BeginState start of the subrange
+  /// \param EndState end of the subrange
+  Lexer(Lexer &Parent, State BeginState, State EndState,
+        llvm::SourceMgr &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
+    : Lexer(StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
             SourceMgr, Diags, BeginState.CurPtr, InSILMode) {
-    assert(BeginState.CurPtr < EndState.CurPtr);
+    assert(BeginState.CurPtr >= Parent.BufferStart &&
+           BeginState.CurPtr <= Parent.BufferEnd &&
+           "Begin position out of range");
+    ArtificialEOF = EndState.CurPtr;
   }
 
   const char *getBufferEnd() const { return BufferEnd; }
