@@ -349,7 +349,6 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(input_block, IMPORTED_MODULE);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
-  RECORD(decls_block, BUILTIN_TYPE);
   RECORD(decls_block, NAME_ALIAS_TYPE);
   RECORD(decls_block, STRUCT_TYPE);
   RECORD(decls_block, PAREN_TYPE);
@@ -578,7 +577,11 @@ bool Serializer::writeCrossReference(const Decl *D) {
     accessPath.push_back(addIdentifierRef(value->getName()));
   }
 
-  accessPath.push_back(addIdentifierRef(cast<Module>(DC)->Name));
+  if (DC == TU->Ctx.TheBuiltinModule)
+    accessPath.push_back(0);
+  else
+    accessPath.push_back(addIdentifierRef(cast<Module>(DC)->Name));
+
   // Store the access path in forward order.
   std::reverse(accessPath.begin(), accessPath.end());
 
@@ -839,16 +842,6 @@ bool Serializer::writeType(Type ty) {
     auto nameAlias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = nameAlias->getDecl();
 
-    // Short-circuit builtin typealiases by just serializing their names; we'll
-    // look them up in the Builtin module upon deserialization.
-    if (isa<BuiltinModule>(typeAlias->getModuleContext())) {
-      // FIXME: Come up with a compact code for common builtins.
-      unsigned abbrCode = DeclTypeAbbrCodes[BuiltinTypeLayout::Code];
-      BuiltinTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    typeAlias->getName().str());
-      return true;
-    }
-
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                     addDeclRef(typeAlias));
@@ -978,7 +971,6 @@ void Serializer::writeAllDeclsAndTypes() {
 
   {
     using namespace decls_block;
-    registerDeclTypeAbbr<BuiltinTypeLayout>();
     registerDeclTypeAbbr<NameAliasTypeLayout>();
     registerDeclTypeAbbr<StructTypeLayout>();
     registerDeclTypeAbbr<ParenTypeLayout>();

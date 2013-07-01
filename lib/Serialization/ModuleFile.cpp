@@ -558,8 +558,14 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     // First, find the module this reference is referring to.
     Identifier moduleName = getIdentifier(rawAccessPath.front());
     rawAccessPath = rawAccessPath.slice(1);
-    // FIXME: provide a real source location.
-    Module *M = ctx.getModule(std::make_pair(moduleName, SourceLoc()), false);
+
+    Module *M;
+    if (moduleName.empty()) {
+      M = ctx.TheBuiltinModule;
+    } else {
+      // FIXME: provide a real source location.
+      M = ctx.getModule(std::make_pair(moduleName, SourceLoc()), false);
+    }
     assert(M && "missing dependency");
 
     switch (kind) {
@@ -717,22 +723,6 @@ Type ModuleFile::getType(TypeID TID) {
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
 
   switch (recordID) {
-  case decls_block::BUILTIN_TYPE: {
-    assert(!blobData.empty() && "missing name in BUILTIN_TYPE record");
-
-    SmallVector<ValueDecl *, 1> lookupResult;
-    ctx.TheBuiltinModule->lookupValue({}, ctx.getIdentifier(blobData),
-                                      NLKind::QualifiedLookup, lookupResult);
-    if (lookupResult.empty()) {
-      // This builtin is not supported.
-      error();
-      return nullptr;
-    }
-    assert(lookupResult.size() == 1 && "multiple types for the same name");
-    typeOrOffset = cast<TypeDecl>(lookupResult.front())->getDeclaredType();
-    break;
-  }
-
   case decls_block::NAME_ALIAS_TYPE: {
     DeclID underlyingID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID);

@@ -180,8 +180,7 @@ namespace decls_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum : uint8_t {
-    BUILTIN_TYPE = 1,
-    NAME_ALIAS_TYPE,
+    NAME_ALIAS_TYPE = 1,
     STRUCT_TYPE,
     PAREN_TYPE,
     TUPLE_TYPE,
@@ -211,11 +210,6 @@ namespace decls_block {
     XREF = 254,
     DECL_CONTEXT = 255
   };
-
-  using BuiltinTypeLayout = BCRecordLayout<
-    BUILTIN_TYPE,
-    BCBlob // name of the builtin type
-  >;
 
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
