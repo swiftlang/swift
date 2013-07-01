@@ -365,15 +365,14 @@ public:
                [&] { OS << ", "; });
   }
   
-  void printConversionInst(ConversionInst *CI,
-                           SILValue operand,
-                           llvm::StringRef name) {
+  void printUncheckedConversionInst(ConversionInst *CI,
+                                    SILValue operand,
+                                    llvm::StringRef name) {
     OS << name << " " << getIDAndType(operand) << " to " << CI->getType();
   }
 
-  void printConversionInst(CheckedConversionInst *CI,
-                           SILValue operand,
-                           llvm::StringRef name) {
+  void printCheckedConversionInst(CheckedConversionInst *CI, SILValue operand,
+                                  llvm::StringRef name) {
     OS << name;
     switch (CI->getMode()) {
     case CheckedCastMode::Conditional:
@@ -387,61 +386,67 @@ public:
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "convert_function");
+    printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");
   }
   void visitCoerceInst(CoerceInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "coerce");
+    printUncheckedConversionInst(CI, CI->getOperand(), "coerce");
   }
   void visitUpcastInst(UpcastInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "upcast");
+    printUncheckedConversionInst(CI, CI->getOperand(), "upcast");
   }
   void visitDowncastInst(DowncastInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "downcast");
+    printCheckedConversionInst(CI, CI->getOperand(), "downcast");
   }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "address_to_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "pointer_to_address");
+    printUncheckedConversionInst(CI, CI->getOperand(), "pointer_to_address");
   }
   void visitRefToObjectPointerInst(RefToObjectPointerInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "ref_to_object_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_object_pointer");
   }
   void visitObjectPointerToRefInst(ObjectPointerToRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "object_pointer_to_ref");
+    printUncheckedConversionInst(CI, CI->getOperand(), "object_pointer_to_ref");
   }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
+    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
   }
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
+    printUncheckedConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
   }
   void visitConvertCCInst(ConvertCCInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "convert_cc");
+    printUncheckedConversionInst(CI, CI->getOperand(), "convert_cc");
   }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "thin_to_thick_function");
+    printUncheckedConversionInst(CI, CI->getOperand(),"thin_to_thick_function");
   }
   void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "bridge_to_block");
+    printUncheckedConversionInst(CI, CI->getOperand(), "bridge_to_block");
   }
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "archetype_ref_to_super");
+    printUncheckedConversionInst(CI, CI->getOperand(),"archetype_ref_to_super");
+  }
+  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }
   void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "super_to_archetype_ref");
+    printCheckedConversionInst(CI, CI->getOperand(),
+                               "super_to_archetype_ref");
   }
   void visitDowncastArchetypeAddrInst(DowncastArchetypeAddrInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "downcast_archetype_addr");
+    printCheckedConversionInst(CI, CI->getOperand(), "downcast_archetype_addr");
   }
   void visitDowncastArchetypeRefInst(DowncastArchetypeRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "downcast_archetype_ref");
+    printCheckedConversionInst(CI, CI->getOperand(), "downcast_archetype_ref");
   }
-  void visitProjectDowncastExistentialAddrInst(ProjectDowncastExistentialAddrInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "project_downcast_existential_addr");
+  void visitProjectDowncastExistentialAddrInst(
+                                      ProjectDowncastExistentialAddrInst *CI) {
+    printCheckedConversionInst(CI, CI->getOperand(),
+                               "project_downcast_existential_addr");
   }
   void visitDowncastExistentialRefInst(DowncastExistentialRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
+    printCheckedConversionInst(CI, CI->getOperand(), "downcast_existential_ref");
   }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
@@ -559,9 +564,6 @@ public:
       OS << "[take] ";
     OS << getID(UEI->getSrcExistential())
        << " to " << getID(UEI->getDestExistential());
-  }
-  void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
-    printConversionInst(CI, CI->getOperand(), "upcast_existential_ref");
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getID(DEI->getOperand());
