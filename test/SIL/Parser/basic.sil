@@ -138,3 +138,21 @@ bb2:
   // CHECK: return
   %17 = return %15 : $Int64
 }
+
+
+protocol P {
+  func doIt()
+}
+
+sil @existentials : $[thin] (n : P) -> () {
+bb0(%0 : $*P):
+  %1 = project_existential %0 : $*P               // user: %3
+//  %2 = protocol_method %0, @doIt.1
+//  %3 = apply %2(%1) : $[cc(method)] ((), Builtin.OpaquePointer) -> ()
+  %4 = tuple ()                                   // user: %6
+  %5 = destroy_addr %0 : $*P
+  %6 = return %4 : $()
+}
+
+
+

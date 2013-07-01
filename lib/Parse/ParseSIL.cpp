@@ -486,11 +486,13 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("br", ValueKind::BranchInst)
     .Case("condbranch", ValueKind::CondBranchInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
+    .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
+    .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("release", ValueKind::ReleaseInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
@@ -568,9 +570,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILFunctionRef(B, ResultVal))
       return true;
     break;
+  case ValueKind::ProjectExistentialInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createProjectExistential(SILLocation(), Val);
+    break;
+      
   case ValueKind::RetainInst:
     if (parseTypedValueRef(Val)) return true;
-    B.createRetainInst(SILLocation(), Val);
+    ResultVal = B.createRetainInst(SILLocation(), Val);
     break;
   case ValueKind::ReleaseInst:
     if (parseTypedValueRef(Val)) return true;
@@ -580,6 +587,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createRetainAutoreleased(SILLocation(), Val);
     break;
+  case ValueKind::DestroyAddrInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createDestroyAddr(SILLocation(), Val);
+    break;
+
   case ValueKind::LoadInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createLoad(SILLocation(), Val);
