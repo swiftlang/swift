@@ -245,7 +245,12 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
 
 template<typename INST>
 static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
-  return F.getModule().allocate(sizeof(INST) + length, alignof(INST));
+  size_t totalSize = sizeof(INST) + length;
+  void *buf = F.getModule().allocate(totalSize + 1, alignof(INST));
+  // FIXME: Null-terminate to guard against StringRef-uncleanness in APFloat
+  // parsing. <rdar://problem/14323230>
+  reinterpret_cast<char*>(buf)[totalSize] = '\0';
+  return buf;
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,

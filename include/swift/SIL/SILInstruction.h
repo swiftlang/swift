@@ -484,7 +484,7 @@ public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+  ArrayRef<Operand> getAllOperands() const { return {}; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::FloatLiteralInst;
