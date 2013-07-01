@@ -368,7 +368,7 @@ public:
   void printConversionInst(ConversionInst *CI,
                            SILValue operand,
                            llvm::StringRef name) {
-    OS << name << " " << getIDAndType(operand) << ", " << CI->getType();
+    OS << name << " " << getIDAndType(operand) << " to " << CI->getType();
   }
 
   void printConversionInst(CheckedConversionInst *CI,
@@ -383,7 +383,7 @@ public:
       OS << " unconditional ";
       break;
     }
-    OS << getID(operand) << ", " << CI->getType();
+    OS << getID(operand) << " to " << CI->getType();
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {

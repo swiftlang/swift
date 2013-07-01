@@ -604,10 +604,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst: {
     SILType Ty;
+    Identifier ToToken;
+    SourceLoc ToLoc;
     if (parseTypedValueRef(Val) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr, "to")||
         parseSILType(Ty))
       return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
 
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
