@@ -1085,6 +1085,8 @@ static bool isNeverAllocated(FixedPacking packing) {
 namespace {
   /// An operation to be peformed for various kinds of packing.
   struct DynamicPackingOperation {
+    virtual ~DynamicPackingOperation() = default;
+
     /// Emit the operation at a concrete packing kind.
     ///
     /// Immediately after this call, there will be an unconditional

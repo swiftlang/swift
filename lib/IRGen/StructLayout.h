@@ -65,7 +65,7 @@ typedef Optional<NonFixedOffsetsImpl*> NonFixedOffsets;
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
 protected:
-  ~NonFixedOffsetsImpl() = default;
+  virtual ~NonFixedOffsetsImpl() = default;
 public:
   /// Return the offset (in bytes, as a size_t) of the element with
   /// the given index.
