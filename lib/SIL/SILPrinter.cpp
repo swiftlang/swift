@@ -383,7 +383,7 @@ public:
       OS << " unconditional ";
       break;
     }
-    OS << getID(operand) << " to " << CI->getType();
+    OS << getIDAndType(operand) << " to " << CI->getType();
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
