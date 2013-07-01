@@ -481,11 +481,17 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+    .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
+    .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
+    .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
+    .Case("coerce", ValueKind::CoerceInst)
     .Case("condbranch", ValueKind::CondBranchInst)
+    .Case("convert_cc", ValueKind::ConvertCCInst)
+    .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
@@ -496,19 +502,25 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("metatype", ValueKind::MetatypeInst)
+    .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
+    .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("project_downcast_existential_addr",
           ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
+    .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
+    .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("release", ValueKind::ReleaseInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
+    .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("upcast", ValueKind::UpcastInst)
+    .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
     .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
@@ -610,7 +622,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
-  case ValueKind::UpcastInst: {
+  case ValueKind::UpcastInst:
+  case ValueKind::CoerceInst:
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::ObjectPointerToRefInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::ConvertCCInst:
+  case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::BridgeToBlockInst:
+  case ValueKind::ArchetypeRefToSuperInst:
+  case ValueKind::ConvertFunctionInst:
+  case ValueKind::UpcastExistentialRefInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -631,6 +655,42 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UpcastInst:
       ResultVal = B.createUpcast(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::ConvertFunctionInst:
+      ResultVal = B.createConvertFunction(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::CoerceInst:
+      ResultVal = B.createCoerce(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::AddressToPointerInst:
+      ResultVal = B.createAddressToPointer(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::PointerToAddressInst:
+      ResultVal = B.createPointerToAddress(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::ObjectPointerToRefInst:
+      ResultVal = B.createObjectPointerToRef(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::RefToRawPointerInst:
+      ResultVal = B.createRefToRawPointer(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::RawPointerToRefInst:
+      ResultVal = B.createRawPointerToRef(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::ConvertCCInst:
+      ResultVal = B.createConvertCC(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::ThinToThickFunctionInst:
+      ResultVal = B.createThinToThickFunction(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::BridgeToBlockInst:
+      ResultVal = B.createBridgeToBlock(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::ArchetypeRefToSuperInst:
+      ResultVal = B.createArchetypeRefToSuper(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::UpcastExistentialRefInst:
+      ResultVal = B.createUpcastExistentialRef(SILLocation(), Val, Ty);
       break;
     }
     break;

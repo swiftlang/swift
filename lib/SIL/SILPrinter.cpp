@@ -394,9 +394,6 @@ public:
   void visitUpcastInst(UpcastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "upcast");
   }
-  void visitDowncastInst(DowncastInst *CI) {
-    printCheckedConversionInst(CI, CI->getOperand(), "downcast");
-  }
   void visitAddressToPointerInst(AddressToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
@@ -429,6 +426,9 @@ public:
   }
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
+  }
+  void visitDowncastInst(DowncastInst *CI) {
+    printCheckedConversionInst(CI, CI->getOperand(), "downcast");
   }
   void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *CI) {
     printCheckedConversionInst(CI, CI->getOperand(),
