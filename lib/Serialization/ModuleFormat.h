@@ -191,6 +191,7 @@ namespace decls_block {
     LVALUE_TYPE,
     PROTOCOL_TYPE,
     ARCHETYPE_TYPE,
+    PROTOCOL_COMPOSITION_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -281,6 +282,11 @@ namespace decls_block {
     TypeIDField,         // index if primary, parent if non-primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
+  >;
+
+  using ProtocolCompositionTypeLayout = BCRecordLayout<
+    PROTOCOL_COMPOSITION_TYPE,
+    BCArray<TypeIDField> // protocols
   >;
 
 

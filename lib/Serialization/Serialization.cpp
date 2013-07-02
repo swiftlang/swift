@@ -364,6 +364,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, LVALUE_TYPE);
   RECORD(decls_block, PROTOCOL_TYPE);
   RECORD(decls_block, ARCHETYPE_TYPE);
+  RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -1008,8 +1009,19 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::ArraySlice:
     return false;
 
-  case TypeKind::ProtocolComposition:
-    return false;
+  case TypeKind::ProtocolComposition: {
+    auto composition = cast<ProtocolCompositionType>(ty.getPointer());
+
+    SmallVector<TypeID, 4> protocols;
+    for (auto proto : composition->getProtocols())
+      protocols.push_back(addTypeRef(proto));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
+    ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              protocols);
+
+    return true;
+  }
 
   case TypeKind::LValue: {
     auto lValueTy = cast<LValueType>(ty.getPointer());
@@ -1051,6 +1063,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<LValueTypeLayout>();
     registerDeclTypeAbbr<ProtocolTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
+    registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();

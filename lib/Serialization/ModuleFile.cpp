@@ -923,6 +923,20 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::PROTOCOL_COMPOSITION_TYPE: {
+    ArrayRef<uint64_t> rawProtocolIDs;
+
+    decls_block::ProtocolCompositionTypeLayout::readRecord(scratch,
+                                                           rawProtocolIDs);
+    SmallVector<Type, 4> protocols;
+    for (TypeID protoID : rawProtocolIDs)
+      protocols.push_back(getType(protoID));
+
+    auto composition = ProtocolCompositionType::get(ctx, protocols);
+    typeOrOffset = composition;
+    break;
+  }
+
   default:
     // We don't know how to deserialize this kind of type.
     error();
