@@ -1053,6 +1053,7 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
+  SourceLoc BeginLoc = getSourceLoc(BytesPtr);
   while (BytesPtr != Bytes.end()) {
     char CurChar = *BytesPtr++;
     if (CurChar != '\\') {
@@ -1081,9 +1082,11 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
     case '(': {
       // Flush the current string.
       if (!TempString.empty()) {
-        auto Res = Ctx.AllocateCopy(TempString);
-        Segments.push_back(StringSegment::getLiteral(StringRef(Res.data(),
-                                                               Res.size())));
+        SourceLoc EndLoc = getSourceLoc(BytesPtr);
+        Segments.push_back(
+            StringSegment::getLiteral(
+                Ctx.AllocateCopy(StringRef(TempString)),
+                SourceRange(BeginLoc, EndLoc)));
         TempString.clear();
       }
       
@@ -1095,11 +1098,14 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       
       // Add an expression segment.
       Segments.push_back(
-                 StringSegment::getExpr(StringRef(BytesPtr, End-BytesPtr-1)));
+          StringSegment::getExpr(
+              StringRef(BytesPtr, End-BytesPtr-1),
+              SourceRange(getSourceLoc(BytesPtr), getSourceLoc(End))));
       
       // Reset the input bytes to the string that remains to be consumed.
       Bytes = StringRef(End, Bytes.end() - End);
       BytesPtr = End;
+      BeginLoc = getSourceLoc(BytesPtr);
       continue;
     }
         
@@ -1142,11 +1148,14 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
   // is safe because unescaped strings are always shorter than their escaped
   // forms (in a valid string).
   if (Segments.empty() && TempString.size() == Bytes.size())
-    Segments.push_back(StringSegment::getLiteral(Bytes));
+    Segments.push_back(
+        StringSegment::getLiteral(Bytes,
+        SourceRange(BeginLoc, getSourceLoc(Bytes.end()))));
   else if (Segments.empty() || !TempString.empty()) {
-    auto Res = Ctx.AllocateCopy(TempString);
-    Segments.push_back(StringSegment::getLiteral(StringRef(Res.data(),
-                                                           Res.size())));
+    Segments.push_back(
+        StringSegment::getLiteral(
+            Ctx.AllocateCopy(StringRef(TempString)),
+            SourceRange(BeginLoc, getSourceLoc(Bytes.end()))));
   }
 }
 

@@ -268,14 +268,14 @@ public:
 /// BuiltinRawPointerType.
 class StringLiteralExpr : public LiteralExpr {
   StringRef Val;
-  SourceLoc Loc;
+  SourceRange Range;
   
 public:
-  StringLiteralExpr(StringRef Val, SourceLoc Loc)
-    : LiteralExpr(ExprKind::StringLiteral), Val(Val), Loc(Loc) {}
+  StringLiteralExpr(StringRef Val, SourceRange Range)
+    : LiteralExpr(ExprKind::StringLiteral), Val(Val), Range(Range) {}
   
   StringRef getValue() const { return Val; }
-  SourceRange getSourceRange() const { return Loc; }
+  SourceRange getSourceRange() const { return Range; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::StringLiteral;

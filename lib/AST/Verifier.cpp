@@ -827,18 +827,22 @@ namespace {
       abort();
     }
 
+    bool isGoodSourceRange(SourceRange SR) {
+      return SR.isValid() &&
+             Ctx.SourceMgr.FindBufferContainingLoc(SR.Start.Value) != -1 &&
+             Ctx.SourceMgr.FindBufferContainingLoc(SR.End.Value) != -1;
+    }
+
     void checkSourceRanges(FuncExpr *FE) {
       for (auto P : FE->getArgParamPatterns()) {
-        if (!P->getSourceRange().isValid()) {
-          if (P->isImplicit())
-            continue;
-
-          Out << "invalid source range for arg param pattern: ";
+        if (!P->isImplicit() && !isGoodSourceRange(P->getSourceRange())) {
+          Out << "bad source range for arg param pattern: ";
           P->print(Out);
           Out << "\n";
           abort();
         }
       }
+      checkSourceRanges(cast<Expr>(FE));
     }
 
     void checkSourceRanges(Expr *E) {
@@ -849,6 +853,12 @@ namespace {
           return;
         
         Out << "invalid source range for expression: ";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (!isGoodSourceRange(E->getSourceRange())) {
+        Out << "bad source range for expression: ";
         E->print(Out);
         Out << "\n";
         abort();

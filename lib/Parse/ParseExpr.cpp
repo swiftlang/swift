@@ -914,8 +914,8 @@ Expr *Parser::parseExprStringLiteral() {
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
-      SourceLoc Loc(llvm::SMLoc::getFromPointer(Segment.Data.data()));
-      Exprs.push_back(new (Context) StringLiteralExpr(Segment.Data, Loc));
+      Exprs.push_back(
+          new (Context) StringLiteralExpr(Segment.Data, Segment.Range));
       break;
     }
         

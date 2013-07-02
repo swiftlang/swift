@@ -282,7 +282,12 @@ public:
     return AllocateCopy(MutableArrayRef<T>(vec), arena);
   }
 
-  
+  StringRef AllocateCopy(StringRef Str,
+                         AllocationArena arena = AllocationArena::Permanent) {
+    ArrayRef<char> Result =
+        AllocateCopy(llvm::makeArrayRef(Str.data(), Str.size()), arena);
+    return StringRef(Result.data(), Result.size());
+  }
 
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.

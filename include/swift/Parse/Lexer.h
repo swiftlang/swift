@@ -19,6 +19,7 @@
 
 #include "Token.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace llvm {
   class SourceMgr;
@@ -162,19 +163,24 @@ public:
   /// StringSegment - A segment of a (potentially interpolated) string.
   struct StringSegment {
     enum : char { Literal, Expr } Kind;
+    /// String data (not quoted).  It might not point into the original source
+    /// buffer.
     StringRef Data;
+    SourceRange Range;
     
-    static StringSegment getLiteral(StringRef Str) {
+    static StringSegment getLiteral(StringRef Str, SourceRange Range) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Data = Str;
+      Result.Range = Range;
       return Result;
     }
     
-    static StringSegment getExpr(StringRef Str) {
+    static StringSegment getExpr(StringRef Str, SourceRange Range) {
       StringSegment Result;
       Result.Kind = Expr;
       Result.Data = Str;
+      Result.Range = Range;
       return Result;
     }
   };
