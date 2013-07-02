@@ -179,6 +179,7 @@ public:
   SourceLoc TrailingSemiLoc;
 
   void dump() const;
+  void dump(unsigned Indent) const;
 
   /// \brief Pretty-print the given declaration.
   ///

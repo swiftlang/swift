@@ -17,7 +17,7 @@
 using namespace swift;
 
 void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM,
-                      int &LastBuffer, int &LastLine) const {
+                      int &LastBuffer) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
@@ -27,20 +27,17 @@ void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM,
     OS << "<malformed loc>";
     return;
   }
-
-  auto LineAndCol = SM.getLineAndColumn(Value, BufferIndex);
-
+  
   if (BufferIndex != LastBuffer) {
     OS << SM.getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
     LastBuffer = BufferIndex;
-    LastLine = LineAndCol.first;
-    OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
-  } else if (LineAndCol.first != unsigned(LastLine)) {
-    LastLine = LineAndCol.first;
-    OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
   } else {
-    OS << "col:" << LineAndCol.second;
+    OS << "line";
   }
+
+  auto LineAndCol = SM.getLineAndColumn(Value, BufferIndex);
+
+  OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
 }
 
 void SourceLoc::dump(const llvm::SourceMgr &SM) const {
@@ -48,22 +45,20 @@ void SourceLoc::dump(const llvm::SourceMgr &SM) const {
 }
 
 void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM,
-                        int &LastBuffer, int &LastLine, bool PrintText) const {
+                        int &LastBuffer) const {
   OS << '[';
-  Start.print(OS, SM, LastBuffer, LastLine);
+  Start.print(OS, SM, LastBuffer);
   OS << " - ";
-  End.print(OS, SM, LastBuffer, LastLine);
+  End.print(OS, SM, LastBuffer);
   OS << ']';
   
   if (Start.isInvalid() || End.isInvalid())
     return;
   
-  if (PrintText) {
-    OS << " RangeText=\""
-       << StringRef(Start.Value.getPointer(),
-                    End.Value.getPointer() - Start.Value.getPointer()+1)
-       << '"';
-  }
+  OS << " RangeText=\""
+     << StringRef(Start.Value.getPointer(),
+                  End.Value.getPointer() - Start.Value.getPointer()+1)
+     << '"';
 }
 
 void SourceRange::dump(const llvm::SourceMgr &SM) const {

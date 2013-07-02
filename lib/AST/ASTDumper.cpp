@@ -28,7 +28,6 @@ static const llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
 
 DEF_COLOR(Func, YELLOW)
 DEF_COLOR(Extension, MAGENTA)
-DEF_COLOR(SourceRange, CYAN)
 
 #undef DEF_COLOR
 
@@ -94,23 +93,16 @@ namespace {
     raw_ostream &OS;
     unsigned Indent;
     bool ShowColors;
-    int &LastBuffer;
-    int &LastLine;
-    const llvm::SourceMgr &SourceMgr;
 
-    PrintDecl(raw_ostream &os, unsigned indent, int &lastBuffer, int &lastLine,
-              const llvm::SourceMgr &SM)
-      : OS(os), Indent(indent), ShowColors(false),
-        LastBuffer(lastBuffer), LastLine(lastLine), SourceMgr(SM) {
+    PrintDecl(raw_ostream &os, unsigned indent)
+      : OS(os), Indent(indent), ShowColors(false) {
       if (&os == &llvm::errs() || &os == &llvm::outs())
     ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
     
-    void printRec(Decl *D) {
-      PrintDecl(OS, Indent+2, LastBuffer, LastLine, SourceMgr).visit(D);
-    }
-    void printRec(Expr *E, bool NoIndent = false);
-    void printRec(Stmt *S);
+    void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
+    void printRec(Expr *E) { E->print(OS, Indent+2); }
+    void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
     void printGenericParameters(GenericParamList *Params) {
       if (!Params)
@@ -156,18 +148,6 @@ namespace {
           OS << " \"" << value->getName().str() << "\"";
         }
       }
-
-      OS << ' ';
-      if (ShowColors) {
-        if (const char *CStr =
-            llvm::sys::Process::OutputColor(SourceRangeColor, false, false)) {
-          OS << CStr;
-        }
-      }
-      D->getSourceRange().print(OS, SourceMgr, LastBuffer, LastLine,
-                                /*PrintText=*/false);
-      if (ShowColors)
-        OS << llvm::sys::Process::ResetColor();
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
@@ -391,7 +371,7 @@ namespace {
         OS << "\n";
         OS.indent(Indent+2);
         OS << "this = ";
-        printRec(CD->getAllocThisExpr(), /*NoIndent=*/true);
+        CD->getAllocThisExpr()->print(OS, 0);
       }
       if (CD->getBody()) {
         OS << '\n';
@@ -443,16 +423,18 @@ namespace {
 
 void Decl::dump() const {
   print(llvm::errs());
-  int TmpBuf = -1, TmpLine = -1;
-  PrintDecl(llvm::errs(), 0, TmpBuf, TmpLine,
-            getASTContext().SourceMgr).visit(const_cast<Decl *>(this));
+  PrintDecl(llvm::errs(), 0).visit(const_cast<Decl *>(this));
+  llvm::errs() << '\n';
+}
+
+void Decl::dump(unsigned Indent) const {
+  print(llvm::errs());
+  PrintDecl(llvm::errs(), Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
 
 void TranslationUnit::dump() const {
-  int TmpBuf = -1, TmpLine = -1;
-  PrintDecl(llvm::errs(), 0, TmpBuf, TmpLine,
-            getASTContext().SourceMgr).visitTranslationUnit(this);
+  PrintDecl(llvm::errs(), 0).visitTranslationUnit(this);
   llvm::errs() << '\n';
 }
 
@@ -475,16 +457,8 @@ class PrintStmt : public StmtVisitor<PrintStmt> {
 public:
   raw_ostream &OS;
   unsigned Indent;
-  int &LastBuffer;
-  int &LastLine;
-  const llvm::SourceMgr *SourceMgr;
-  bool ShowColors;
 
-  PrintStmt(raw_ostream &os, unsigned indent, int &lastBuffer, int &lastLine,
-            const llvm::SourceMgr *SM)
-    : OS(os), Indent(indent), LastBuffer(lastBuffer), LastLine(lastLine),
-      SourceMgr(SM) {
-    ShowColors = OS.has_colors();
+  PrintStmt(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
 
   void printRec(Stmt *S) {
@@ -496,33 +470,12 @@ public:
     Indent -= 2;
   }
 
-  void printRec(Decl *D) {
-    PrintDecl(OS, Indent+2, LastBuffer, LastLine,
-              D->getASTContext().SourceMgr).visit(D);
-  }
-  void printRec(Expr *E);
+  void printRec(Decl *D) { D->dump(Indent+2); }
+  void printRec(Expr *E) { E->print(OS, Indent+2); }
   void printRec(Pattern *P) { P->print(OS); }
 
-  raw_ostream &printCommon(Stmt *S, const char *C) {
-    OS.indent(Indent) << '(' << C;
-    if (SourceMgr) {
-      OS << ' ';
-      if (ShowColors) {
-        if (const char *CStr =
-            llvm::sys::Process::OutputColor(SourceRangeColor, false, false)) {
-          OS << CStr;
-        }
-      }
-      S->getSourceRange().print(OS, *SourceMgr, LastBuffer, LastLine,
-                                /*PrintText=*/false);
-      if (ShowColors)
-        OS << llvm::sys::Process::ResetColor();
-    }
-    return OS;
-  }
-
   void visitBraceStmt(BraceStmt *S) {
-    printCommon(S, "brace_stmt");
+    OS.indent(Indent) << "(brace_stmt";
     for (auto Elt : S->getElements()) {
       OS << '\n';
       if (Expr *SubExpr = Elt.dyn_cast<Expr*>())
@@ -536,7 +489,7 @@ public:
   }
 
   void visitReturnStmt(ReturnStmt *S) {
-    printCommon(S, "return_stmt");
+    OS.indent(Indent) << "(return_stmt";
     if (S->hasResult()) {
       OS << '\n';
       printRec(S->getResult());
@@ -545,7 +498,7 @@ public:
   }
 
   void visitIfStmt(IfStmt *S) {
-    printCommon(S, "if_stmt") << '\n';
+    OS.indent(Indent) << "(if_stmt\n";
     printRec(S->getCond());
     OS << '\n';
     printRec(S->getThenStmt());
@@ -556,7 +509,7 @@ public:
     OS << ')';
   }
   void visitWhileStmt(WhileStmt *S) {
-    printCommon(S, "while_stmt") << '\n';
+    OS.indent(Indent) << "(while_stmt\n";
     printRec(S->getCond());
     OS << '\n';
     printRec(S->getBody());
@@ -564,14 +517,14 @@ public:
   }
 
   void visitDoWhileStmt(DoWhileStmt *S) {
-    printCommon(S, "do_while_stmt") << '\n';
+    OS.indent(Indent) << "(do_while_stmt\n";
     printRec(S->getBody());
     OS << '\n';
     printRec(S->getCond());
     OS << ')';
   }
   void visitForStmt(ForStmt *S) {
-    printCommon(S, "for_stmt") << '\n';
+    OS.indent(Indent) << "(for_stmt\n";
     if (!S->getInitializerVarDecls().empty()) {
       for (auto D : S->getInitializerVarDecls()) {
         printRec(D);
@@ -600,7 +553,7 @@ public:
     OS << ')';
   }
   void visitForEachStmt(ForEachStmt *S) {
-    printCommon(S, "for_each_stmt") << '\n';
+    OS.indent(Indent) << "(for_each_stmt\n";
     printRec(S->getPattern());
     OS << '\n';
     printRec(S->getContainer());
@@ -609,16 +562,16 @@ public:
     OS << ')';
   }
   void visitBreakStmt(BreakStmt *S) {
-    printCommon(S, "break_stmt") << ')';
+    OS.indent(Indent) << "(break_stmt)";
   }
   void visitContinueStmt(ContinueStmt *S) {
-    printCommon(S, "continue_stmt") << ')';
+    OS.indent(Indent) << "(continue_stmt)";
   }
   void visitFallthroughStmt(FallthroughStmt *S) {
-    printCommon(S, "fallthrough_stmt") << ')';
+    OS.indent(Indent) << "(fallthrough_stmt)";
   }
   void visitSwitchStmt(SwitchStmt *S) {
-    printCommon(S, "switch_stmt") << '\n';
+    OS.indent(Indent) << "(switch_stmt\n";
     printRec(S->getSubjectExpr());
     for (CaseStmt *C : S->getCases()) {
       OS << '\n';
@@ -627,7 +580,7 @@ public:
     OS << ')';
   }
   void visitCaseStmt(CaseStmt *S) {
-    printCommon(S, "case_stmt");
+    OS.indent(Indent) << "(case_stmt";
     for (CaseLabel *label : S->getCaseLabels()) {
       OS << '\n';
       OS.indent(Indent+2) << "(case_label";
@@ -638,7 +591,7 @@ public:
       }
       if (Expr *guard = label->getGuardExpr()) {
         OS << '\n';
-        printRec(guard);
+        guard->print(OS, Indent+4);
       }
       OS << ')';
     }
@@ -656,8 +609,7 @@ void Stmt::dump() const {
 }
 
 void Stmt::print(raw_ostream &OS, unsigned Indent) const {
-  int TmpBuf = -1, TmpLine = -1;
-  PrintStmt(OS, Indent, TmpBuf, TmpLine, nullptr).visit(const_cast<Stmt*>(this));
+  PrintStmt(OS, Indent).visit(const_cast<Stmt*>(this));
 }
 
 //===----------------------------------------------------------------------===//
@@ -670,16 +622,8 @@ class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
   unsigned Indent;
-  int &LastBuffer;
-  int &LastLine;
-  const llvm::SourceMgr *SourceMgr;
-  bool ShowColors;
 
-  PrintExpr(raw_ostream &os, unsigned indent, int &lastBuffer, int &lastLine,
-            const llvm::SourceMgr *SM)
-    : OS(os), Indent(indent), LastBuffer(lastBuffer), LastLine(lastLine),
-      SourceMgr(SM) {
-    ShowColors = OS.has_colors();
+  PrintExpr(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
 
   void printRec(Expr *E) {
@@ -693,13 +637,8 @@ public:
 
   /// FIXME: This should use ExprWalker to print children.
 
-  void printRec(Decl *D) {
-    PrintDecl(OS, Indent+2, LastBuffer, LastLine,
-              D->getASTContext().SourceMgr).visit(D);
-  }
-  void printRec(Stmt *S) {
-    PrintStmt(OS, Indent+2, LastBuffer, LastLine, SourceMgr).visit(S);
-  }
+  void printRec(Decl *D) { D->dump(Indent+2); }
+  void printRec(Stmt *S) { S->print(OS, Indent+2); }
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
     for (auto S : Substitutions) {
@@ -709,21 +648,7 @@ public:
   }
 
   raw_ostream &printCommon(Expr *E, const char *C) {
-    OS.indent(Indent) << '(' << C;
-    if (SourceMgr) {
-      OS << ' ';
-      if (ShowColors) {
-        if (const char *CStr =
-            llvm::sys::Process::OutputColor(SourceRangeColor, false, false)) {
-          OS << CStr;
-        }
-      }
-      E->getSourceRange().print(OS, *SourceMgr, LastBuffer, LastLine,
-                                /*PrintText=*/false);
-      if (ShowColors)
-        OS << llvm::sys::Process::ResetColor();
-    }
-    return OS << " type='" << E->getType() << '\'';
+    return OS.indent(Indent) << '(' << C << " type='" << E->getType() << '\'';
   }
 
   void visitErrorExpr(ErrorExpr *E) {
@@ -1173,17 +1098,6 @@ public:
 
 } // end anonymous namespace.
 
-void PrintDecl::printRec(Expr *E, bool NoIndent) {
-  PrintExpr(OS, NoIndent ? 0 : Indent+2,
-            LastBuffer, LastLine, &SourceMgr).visit(E);
-}
-void PrintDecl::printRec(Stmt *S) {
-  PrintStmt(OS, Indent+2, LastBuffer, LastLine, &SourceMgr).visit(S);
-}
-
-void PrintStmt::printRec(Expr *E) {
-  PrintExpr(OS, Indent+2, LastBuffer, LastLine, SourceMgr).visit(E);
-}
 
 void Expr::dump() const {
   print(llvm::errs());
@@ -1191,6 +1105,5 @@ void Expr::dump() const {
 }
 
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
-  int TmpBuf = -1, TmpLine = -1;
-  PrintExpr(OS, Indent, TmpBuf, TmpLine, nullptr).visit(const_cast<Expr*>(this));
+  PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
 }

@@ -54,11 +54,11 @@ public:
   /// do print the filename, and then update LastBuffer with the BufferID
   /// printed.
   void print(raw_ostream &OS, const llvm::SourceMgr &SM,
-             int &LastBuffer, int &LastLine) const;
+             int &LastBuffer) const;
 
   void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
-    int TmpBuf = -1, TmpLine = -1;
-    print(OS, SM, TmpBuf, TmpLine);
+    int Tmp = -1;
+    print(OS, SM, Tmp);
   }
   void dump(const llvm::SourceMgr &SM) const;
 };
@@ -86,11 +86,11 @@ public:
   /// do print the filename, and then update LastBuffer with the BufferID
   /// printed.
   void print(raw_ostream &OS, const llvm::SourceMgr &SM,
-             int &LastBuffer, int &LastLine, bool PrintText) const;
+             int &LastBuffer) const;
 
   void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
-    int TmpBuf = -1, TmpLine = -1;
-    print(OS, SM, TmpBuf, TmpLine, /*PrintText=*/true);
+    int Tmp = -1;
+    print(OS, SM, Tmp);
   }
   void dump(const llvm::SourceMgr &SM) const;
 };
