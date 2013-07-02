@@ -1553,7 +1553,7 @@ FuncExpr *Parser::actOnFuncExprStart(SourceLoc FuncLoc, TypeLoc FuncRetTy,
                                      ArrayRef<Pattern*> BodyParams) {
   FuncExpr *FE = FuncExpr::create(Context, FuncLoc,
                                   ArgParams, BodyParams, FuncRetTy,
-                                  nullptr, CurDeclContext);
+                                  CurDeclContext);
 
   for (Pattern *P : BodyParams)
     AddFuncArgumentsToScope(P, FE, *this);

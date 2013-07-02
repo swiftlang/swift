@@ -511,7 +511,7 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     auto body = FuncExpr::create(ctx, SourceLoc(),
                                  argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()),
-                                 /*body=*/nullptr, DC);
+                                 DC);
     fn->setBody(body);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));

@@ -753,8 +753,7 @@ namespace {
       // FIXME: Poor location info.
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc(resultTy, loc),
-                                       nullptr, dc);
+                                       TypeLoc(resultTy, loc), dc);
       funcExpr->setType(type);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
@@ -924,8 +923,7 @@ namespace {
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc(resultTy, loc),
-                                       nullptr, dc);
+                                       TypeLoc(resultTy, loc), dc);
       funcExpr->setType(type);
 
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
@@ -1402,7 +1400,6 @@ namespace {
                                        getterArgs,
                                        getterArgs,
                                        TypeLoc(elementTy, loc),
-                                       nullptr,
                                        getter->getDeclContext());
       funcExpr->setType(getterType);
       setVarDeclContexts(getterArgs, funcExpr);
@@ -1528,7 +1525,6 @@ namespace {
                                        setterArgs,
                                        TypeLoc(TupleType::getEmpty(context),
                                                loc),
-                                       nullptr,
                                        setter->getDeclContext());
       funcExpr->setType(setterType);
       setVarDeclContexts(setterArgs, funcExpr);
@@ -2504,7 +2500,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                    getterArgs,
                                    getterArgs,
                                    TypeLoc::withoutLoc(type),
-                                   nullptr,
                                    dc);
   funcExpr->setType(getterType);
   setVarDeclContexts(getterArgs, funcExpr);

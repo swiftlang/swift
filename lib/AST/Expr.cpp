@@ -332,13 +332,12 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
                            ArrayRef<Pattern*> argParams,
                            ArrayRef<Pattern*> bodyParams,
                            TypeLoc fnRetType,
-                           BraceStmt *body, DeclContext *parent) {
+                           DeclContext *parent) {
   assert(argParams.size() == bodyParams.size());
   unsigned nParams = argParams.size();
   void *buf = C.Allocate(sizeof(FuncExpr) + 2 * nParams * sizeof(Pattern*),
                          alignof(FuncExpr));
-  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType,
-                                      body, parent);
+  FuncExpr *fn = ::new (buf) FuncExpr(funcLoc, nParams, fnRetType, parent);
   for (unsigned i = 0; i != nParams; ++i)
     fn->getParamsBuffer()[i] = argParams[i];
   for (unsigned i = 0; i != nParams; ++i)

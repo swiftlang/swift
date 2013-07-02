@@ -1635,11 +1635,11 @@ private:
   }
 
   FuncExpr(SourceLoc FuncLoc, unsigned NumPatterns, TypeLoc FnRetType,
-           BraceStmt *Body, DeclContext *Parent)
+           DeclContext *Parent)
     : CapturingExpr(ExprKind::Func, Type(), Parent),
-      FuncLoc(FuncLoc), NumPatterns(NumPatterns), Body(Body),
+      FuncLoc(FuncLoc), NumPatterns(NumPatterns),
       TheFuncDecl(nullptr), FnRetType(FnRetType) {
-    setBodyKind(Body ? BodyKind::Parsed : BodyKind::None);
+    setBodyKind(BodyKind::None);
   }
 
 public:
@@ -1647,7 +1647,7 @@ public:
                           ArrayRef<Pattern*> ArgParams,
                           ArrayRef<Pattern*> BodyParams,
                           TypeLoc FnRetType,
-                          BraceStmt *Body, DeclContext *Parent);
+                          DeclContext *Parent);
 
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const { return FuncLoc; }
