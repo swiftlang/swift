@@ -168,6 +168,9 @@ namespace {
     /// Writes the given pattern, recursively.
     void writePattern(const Pattern *pattern);
 
+    /// Writes the members of a simple nominal decl.
+    void writeMembers(const NominalTypeDecl *D);
+
     /// Writes a reference to a decl in another module.
     ///
     /// Returns false if the decl cannot be serialized without losing
@@ -359,13 +362,16 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, FUNCTION_TYPE);
   RECORD(decls_block, METATYPE_TYPE);
   RECORD(decls_block, LVALUE_TYPE);
-  
+  RECORD(decls_block, PROTOCOL_TYPE);
+  RECORD(decls_block, ARCHETYPE_TYPE);
+
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
   RECORD(decls_block, CONSTRUCTOR_DECL);
   RECORD(decls_block, VAR_DECL);
   RECORD(decls_block, FUNC_DECL);
   RECORD(decls_block, PATTERN_BINDING_DECL);
+  RECORD(decls_block, PROTOCOL_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -529,6 +535,16 @@ void Serializer::writePattern(const Pattern *pattern) {
   }
 }
 
+void Serializer::writeMembers(const NominalTypeDecl *D) {
+  using namespace decls_block;
+  
+  unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
+  SmallVector<DeclID, 16> memberIDs;
+  for (auto member : D->getMembers())
+    memberIDs.push_back(addDeclRef(member));
+  DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
+}
+
 bool Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
@@ -690,19 +706,38 @@ bool Serializer::writeDecl(const Decl *D) {
                              theStruct->isImplicit(),
                              inherited);
 
-    abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
-    SmallVector<DeclID, 16> memberIDs;
-    for (auto member : theStruct->getMembers())
-      memberIDs.push_back(addDeclRef(member));
-    DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
-
+    writeMembers(theStruct);
     return true;
   }
 
   case DeclKind::OneOf:
   case DeclKind::Class:
-  case DeclKind::Protocol:
     return false;
+
+  case DeclKind::Protocol: {
+    auto proto = cast<ProtocolDecl>(D);
+    
+    // FIXME: Handle attributes.
+    if (!proto->getAttrs().empty())
+      return false;
+
+    assert(!proto->getGenericParams() && "protocols can't be generic");
+    const Decl *DC = getDeclForContext(proto->getDeclContext());
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : proto->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
+    ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                               addIdentifierRef(proto->getName()),
+                               addDeclRef(DC),
+                               proto->isImplicit(),
+                               inherited);
+
+    writeMembers(proto);
+    return true;
+  }
 
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
@@ -712,6 +747,7 @@ bool Serializer::writeDecl(const Decl *D) {
       return false;
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
+    Type type = var->hasType() ? var->getType() : nullptr;
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -719,7 +755,7 @@ bool Serializer::writeDecl(const Decl *D) {
                           addDeclRef(DC),
                           var->isImplicit(),
                           var->isNeverUsedAsLValue(),
-                          addTypeRef(var->getType()),
+                          addTypeRef(type),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
                           addDeclRef(var->getOverriddenDecl()));
@@ -897,8 +933,16 @@ bool Serializer::writeType(Type ty) {
 
   case TypeKind::OneOf:
   case TypeKind::Class:
-  case TypeKind::Protocol:
     return false;
+
+  case TypeKind::Protocol: {
+    auto protocolTy = cast<ProtocolType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolTypeLayout::Code];
+    ProtocolTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addDeclRef(protocolTy->getDecl()));
+    return true;
+  }
 
   case TypeKind::MetaType: {
     auto metatypeTy = cast<MetaTypeType>(ty.getPointer());
@@ -912,8 +956,32 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Module:
     return false;
 
-  case TypeKind::Archetype:
-    return false;
+  case TypeKind::Archetype: {
+    auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
+
+    // FIXME: Handle associated types.
+    if (!archetypeTy->getNestedTypes().empty())
+      return false;
+
+    TypeID indexOrParentID;
+    if (archetypeTy->isPrimary())
+      indexOrParentID = archetypeTy->getPrimaryIndex();
+    else
+      indexOrParentID = addTypeRef(archetypeTy->getParent());
+
+    SmallVector<DeclID, 4> conformances;
+    for (auto proto : archetypeTy->getConformsTo())
+      conformances.push_back(addDeclRef(proto));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ArchetypeTypeLayout::Code];
+    ArchetypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    addIdentifierRef(archetypeTy->getName()),
+                                    archetypeTy->isPrimary(),
+                                    indexOrParentID,
+                                    addTypeRef(archetypeTy->getSuperclass()),
+                                    conformances);
+    return true;
+  }
 
   case TypeKind::Substituted:
     return false;
@@ -981,6 +1049,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetaTypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
+    registerDeclTypeAbbr<ProtocolTypeLayout>();
+    registerDeclTypeAbbr<ArchetypeTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
@@ -988,6 +1058,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<VarLayout>();
     registerDeclTypeAbbr<FuncLayout>();
     registerDeclTypeAbbr<PatternBindingLayout>();
+    registerDeclTypeAbbr<ProtocolLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();

@@ -15,7 +15,7 @@
 
 #include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -140,6 +140,21 @@ private:
   ///
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
+
+  /// Creates an array of types from the given IDs.
+  ///
+  /// The returned array is owned by the ASTContext.
+  MutableArrayRef<TypeLoc> getTypes(ArrayRef<uint64_t> rawTypeIDs);
+
+  /// Reads members of a DeclContext from \c DeclTypeCursor.
+  ///
+  /// The returned array is owned by the ASTContext.
+  /// Returns Nothing if there is an error.
+  ///
+  /// Note: this destroys the cursor's position in the stream. Furthermore,
+  /// because it reads from the cursor, it is not possible to reset the cursor
+  /// after reading. Nothing should ever follow a DECL_CONTEXT block.
+  Optional<MutableArrayRef<Decl *>> readMembers();
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);

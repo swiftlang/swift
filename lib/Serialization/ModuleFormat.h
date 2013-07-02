@@ -189,6 +189,8 @@ namespace decls_block {
     FUNCTION_TYPE,
     METATYPE_TYPE,
     LVALUE_TYPE,
+    PROTOCOL_TYPE,
+    ARCHETYPE_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -196,6 +198,7 @@ namespace decls_block {
     VAR_DECL,
     FUNC_DECL,
     PATTERN_BINDING_DECL,
+    PROTOCOL_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -266,6 +269,21 @@ namespace decls_block {
     BCFixed<1>   // non-settable?
   >;
 
+  using ProtocolTypeLayout = BCRecordLayout<
+    PROTOCOL_TYPE,
+    DeclIDField  // protocol decl
+  >;
+
+  using ArchetypeTypeLayout = BCRecordLayout<
+    ARCHETYPE_TYPE,
+    IdentifierIDField,   // name
+    BCFixed<1>,          // primary?
+    TypeIDField,         // index if primary, parent if non-primary
+    TypeIDField,         // superclass
+    BCArray<DeclIDField> // conformances
+  >;
+
+
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
     IdentifierIDField, // name
@@ -322,6 +340,15 @@ namespace decls_block {
     BCFixed<1>   // implicit flag
     // The pattern trails the record.
   >;
+
+  using ProtocolLayout = BCRecordLayout<
+    PROTOCOL_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    BCArray<TypeIDField> // inherited types
+  >;
+
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN

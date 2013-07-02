@@ -129,7 +129,8 @@ Pattern *ModuleFile::maybeReadPattern() {
 
     auto var = cast<VarDecl>(getDecl(varID));
     auto result = new (ModuleContext->Ctx) NamedPattern(var);
-    result->setType(var->getType());
+    if (var->hasType())
+      result->setType(var->getType());
     return result;
   }
   case decls_block::ANY_PATTERN: {
@@ -161,6 +162,53 @@ Pattern *ModuleFile::maybeReadPattern() {
   default:
     return nullptr;
   }
+}
+
+MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs) {
+  ASTContext &ctx = ModuleContext->Ctx;
+  auto result =
+    MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(rawTypeIDs.size()),
+                             rawTypeIDs.size());
+
+  TypeLoc *nextType = result.data();
+  for (TypeID rawID : rawTypeIDs) {
+    auto type = getType(rawID);
+    new (nextType) auto(TypeLoc::withoutLoc(type));
+    ++nextType;
+  }
+
+  return result;
+}
+
+Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
+  using namespace decls_block;
+
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return Nothing;
+
+  SmallVector<uint64_t, 16> memberIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
+  if (kind != DECL_CONTEXT)
+    return Nothing;
+
+  ArrayRef<uint64_t> rawMemberIDs;
+  decls_block::DeclContextLayout::readRecord(memberIDBuffer, rawMemberIDs);
+
+  if (rawMemberIDs.empty())
+    return MutableArrayRef<Decl *>();
+
+  ASTContext &ctx = ModuleContext->Ctx;
+  MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(rawMemberIDs.size()),
+                                  rawMemberIDs.size());
+  auto nextMember = members.begin();
+  for (DeclID rawID : rawMemberIDs) {
+    *nextMember = getDecl(rawID);
+    ++nextMember;
+  }
+
+  return members;
 }
 
 Identifier ModuleFile::getIdentifier(IdentifierID IID) {
@@ -327,32 +375,11 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
                                           isImplicit, inheritedIDs);
 
-    auto inherited =
-      MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
-                               inheritedIDs.size());
-
-    TypeLoc *nextInheritedType = inherited.data();
-    for (TypeID TID : inheritedIDs) {
-      auto type = getType(TID);
-      new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
-      ++nextInheritedType;
+    MutableArrayRef<TypeLoc> inherited;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      inherited = getTypes(inheritedIDs);
     }
-
-    ArrayRef<uint64_t> memberIDs;
-
-    auto entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      return {};
-
-    StringRef blobData;
-    SmallVector<uint64_t, 16> memberIDBuffer;
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer,
-                                                  &blobData);
-    if (recordID != decls_block::DECL_CONTEXT) {
-      error();
-      return nullptr;
-    }
-    decls_block::DeclContextLayout::readRecord(memberIDBuffer, memberIDs);
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), inherited,
@@ -363,17 +390,10 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     if (isImplicit)
       theStruct->setImplicit();
 
-    if (!memberIDs.empty()) {
-      MutableArrayRef<Decl *> members(ctx.Allocate<Decl *>(memberIDs.size()),
-                                      memberIDs.size());
-      auto nextMember = members.begin();
-      for (auto rawID : memberIDBuffer) {
-        *nextMember = getDecl(rawID);
-        ++nextMember;
-      }
+    auto members = readMembers();
+    assert(members.hasValue() && "could not read struct members");
+    theStruct->setMembers(members.getValue(), SourceRange());
 
-      theStruct->setMembers(members, SourceRange());
-    }
     break;
   }
 
@@ -543,6 +563,35 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
 
     if (isImplicit)
       binding->setImplicit();
+
+    break;
+  }
+
+  case decls_block::PROTOCOL_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    bool isImplicit;
+    ArrayRef<uint64_t> inheritedIDs;
+
+    decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
+                                            isImplicit, inheritedIDs);
+
+    MutableArrayRef<TypeLoc> inherited;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      inherited = getTypes(inheritedIDs);
+    }
+    auto proto = new (ctx) ProtocolDecl(getDeclContext(contextID), SourceLoc(),
+                                        SourceLoc(), getIdentifier(nameID),
+                                        inherited);
+    declOrOffset = proto;
+
+    if (isImplicit)
+      proto->setImplicit();
+
+    auto members = readMembers();
+    assert(members.hasValue() && "could not read struct members");
+    proto->setMembers(members.getValue(), SourceRange());
 
     break;
   }
@@ -834,6 +883,43 @@ Type ModuleFile::getType(TypeID TID) {
       quals |= LValueType::Qual::NonSettable;
 
     typeOrOffset = LValueType::get(getType(objectTypeID), quals, ctx);
+    break;
+  }
+
+  case decls_block::PROTOCOL_TYPE: {
+    DeclID declID;
+    decls_block::ProtocolTypeLayout::readRecord(scratch, declID);
+    auto proto = cast<ProtocolDecl>(getDecl(declID));
+    typeOrOffset = proto->getDeclaredType();
+    break;
+  }
+
+  case decls_block::ARCHETYPE_TYPE: {
+    IdentifierID nameID;
+    bool isPrimary;
+    TypeID parentOrIndex;
+    TypeID superclassID;
+    ArrayRef<uint64_t> rawConformanceIDs;
+
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, nameID, isPrimary,
+                                                 parentOrIndex, superclassID,
+                                                 rawConformanceIDs);
+
+    ArchetypeType *parent = nullptr;
+    Optional<unsigned> index;
+    if (isPrimary)
+      index = parentOrIndex;
+    else
+      parent = getType(parentOrIndex)->castTo<ArchetypeType>();
+
+    SmallVector<ProtocolDecl *, 4> conformances;
+    for (DeclID protoID : rawConformanceIDs)
+      conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
+
+    auto archetype = ArchetypeType::getNew(ctx, parent, getIdentifier(nameID),
+                                           conformances, getType(superclassID),
+                                           index);
+    typeOrOffset = archetype;
     break;
   }
 
