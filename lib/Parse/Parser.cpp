@@ -53,7 +53,7 @@ public:
   virtual bool walkToDeclPre(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
       if (auto FE = FD->getBody()) {
-        if (FE->getBody())
+        if (FE->getBodyKind() != FuncExpr::BodyKind::Unparsed)
           return false;
         P.parseDeclFuncBodyDelayed(FD);
       }

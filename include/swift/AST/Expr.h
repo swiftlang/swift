@@ -1733,7 +1733,10 @@ public:
     setBodyKind(BodyKind::Parsed);
   }
 
-  ParserTokenRange getBodyTokenRange() { return BodyTokenRange; }
+  ParserTokenRange getBodyTokenRange() {
+    assert(getBodyKind() == BodyKind::Unparsed);
+    return BodyTokenRange;
+  }
   void setBodyTokenRange(ParserTokenRange R) {
     assert(getBodyKind() == BodyKind::None);
     BodyTokenRange = R;
