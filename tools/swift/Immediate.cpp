@@ -1011,6 +1011,7 @@ public:
     Options.OptLevel = 0;
     Options.OutputKind = irgen::OutputKind::Module;
     Options.UseJIT = true;
+    Options.DebugInfo = false;
 
     // Force swift.swift to be parsed/type-checked immediately.  This forces
     // any errors to appear upfront, and helps eliminate some nasty lag after
