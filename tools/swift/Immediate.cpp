@@ -169,7 +169,10 @@ static void loadRuntimeLib(StringRef sharedLibName, const ProcessCmdLine &CmdLin
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift", sharedLibName);
-  dlopen(LibPath.c_str(), 0);
+  if (!dlopen(LibPath.c_str(), 0)) {
+    // FIXME: Use diagnostics machinery.
+    fprintf(stderr, "Could not load shared library '%s'.\n", LibPath.c_str());
+  }
 }
 
 static void loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
