@@ -202,11 +202,13 @@ static StringRef getName(SILLocation L) {
   if (Expr* E = L.dyn_cast<Expr*>())
     if (FuncExpr* FE = dyn_cast<FuncExpr>(E))
       if (FuncDecl* FD = FE->getDecl())
-        return FD->getName().str();
+        if (!FD->getName().empty())
+          return FD->getName().str();
 
   if (Decl* D = L.dyn_cast<Decl*>())
     if (FuncDecl* FD = dyn_cast<FuncDecl>(D))
-      return FD->getName().str();
+      if (!FD->getName().empty())
+        return FD->getName().str();
 
   return StringRef();
 }
