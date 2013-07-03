@@ -205,7 +205,7 @@ function(compile_swift_files)
   endif()
   
   # If we have a modules SDK, use it for building.
-  if (HAVE_MODULES_SDK)
+  if (HAVE_DARWIN_MODULES_SDK)
     list(APPEND swift_flags "-sdk=${MODULES_SDK}")
   endif()
 
@@ -550,12 +550,13 @@ macro(add_swift_executable name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
 endmacro(add_swift_executable)
 
-set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk" CACHE PATH
-  "Path to the modules-enabled SDK to use")
-if(EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
-  set(HAVE_MODULES_SDK YES)
-else()
-  message(STATUS "warning: modules-enabled SDK is not available")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk" CACHE PATH
+      "Path to the modules-enabled SDK to use")
+  if(NOT EXISTS "${MODULES_SDK}/System/Library/Frameworks/module.map")
+    message(FATAL_ERROR "A modules-enabled SDK is required for Swift on OS X.")
+  endif()
+  set(HAVE_DARWIN_MODULES_SDK YES)
 endif()
 
 # We'll need this once we have generated headers

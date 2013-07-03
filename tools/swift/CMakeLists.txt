@@ -14,7 +14,7 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(swift edit ${CORE_FOUNDATION})
 
-if(HAVE_MODULES_SDK)
+if(HAVE_DARWIN_MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
 endif()
 
