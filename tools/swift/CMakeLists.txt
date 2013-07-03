@@ -6,7 +6,7 @@ add_swift_executable(swift
   SerializedDiagnosticConsumer.cpp
   swift.cpp
   DEPENDS swiftIRGen swiftParse swiftSema swiftClangImporter swiftAST swiftSIL
-          swiftSILGen swiftSerialization
+          swiftSILGen swiftSerialization swiftFrontend
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
                     irreader selectiondag ${LLVM_TARGETS_TO_BUILD})
 
