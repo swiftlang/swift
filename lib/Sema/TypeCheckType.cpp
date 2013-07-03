@@ -61,33 +61,94 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return sliceTy;
 }
 
-/// \brief Determine whether all of the lookup results are associated types.
-static bool
-allAssociatedTypes(SmallVectorImpl<UnqualifiedLookupResult> &Results) {
-  for (auto &Result : Results) {
-    if (Result.hasValueDecl() &&
-        isa<TypeAliasDecl>(Result.getValueDecl()) &&
-        isa<ProtocolDecl>(Result.getValueDecl()->getDeclContext()))
-      continue;
-
-    return false;
+/// Resolve a reference to the given type declaration within a particular
+/// context.
+///
+/// This routine aids unqualified name lookup for types by performing the
+/// resolution necessary to rectify the declaration found by name lookup with
+/// the declaration context from which name lookup started.
+static Type resolveTypeInContext(TypeChecker &tc, TypeDecl *typeDecl,
+                                 DeclContext *fromDC) {
+  // If the type declaration itself is in a non-type context, no type
+  // substitution is needed.
+  DeclContext *ownerDC = typeDecl->getDeclContext();
+  if (!ownerDC->isTypeContext()) {
+    return typeDecl->getDeclaredType();
   }
 
-  return true;
+  // Find the nearest enclosing type context around the context from which
+  // we started our search.
+  while (!fromDC->isTypeContext()) {
+    fromDC = fromDC->getParent();
+    assert(!fromDC->isModuleContext());
+  }
+
+  // If we found an associated type in an inherited protocol, the base
+  // for our reference to this associated type is our own 'This'.
+  // FIXME: We'll need to turn this into a more general 'implicit base'
+  // projection, so that any time we find something in an outer context
+  // we make sure to map to that context.
+  if (isa<TypeAliasDecl>(typeDecl) &&
+      isa<ProtocolDecl>(ownerDC) &&
+      typeDecl->getDeclContext() != fromDC) {
+    if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
+      return tc.substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
+                                        fromProto->getThis()->getDeclaredType());
+    }
+  }
+
+  return typeDecl->getDeclaredType();
 }
 
-/// \brief Determine whether all of the lookup results are associated types.
-static bool
-allAssociatedTypes(SmallVectorImpl<ValueDecl *> &Results) {
-  for (auto VD : Results) {
-    if (isa<TypeAliasDecl>(VD) &&
-        isa<ProtocolDecl>(VD->getDeclContext()))
-      continue;
+/// Apply generic arguments to the given type.
+static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
+                                  ArrayRef<TypeLoc> genericArgs) {
+  auto unbound = type->getAs<UnboundGenericType>();
+  if (!unbound) {
+    // FIXME: Highlight generic arguments and introduce a Fix-It to remove
+    // them.
+    TC.diagnose(loc, diag::not_a_generic_type, type);
 
-    return false;
+    // Just return the type; this provides better recovery anyway.
+    return type;
   }
 
-  return true;
+  // Make sure we have the right number of generic arguments.
+  auto genericParams = unbound->getDecl()->getGenericParams();
+  if (genericParams->size() != genericArgs.size()) {
+    // FIXME: Show the type name here.
+    // FIXME: Point at the actual declaration of the underlying type.
+    TC.diagnose(loc, diag::type_parameter_count_mismatch,
+                genericArgs.size(), genericParams->size());
+    return nullptr;
+  }
+
+  // Validate the generic arguments and capture just the types.
+  SmallVector<Type, 4> genericArgTypes;
+  for (auto &genericArg : genericArgs) {
+    // Validate the generic argument.
+    // FIXME: Totally broken. We need GenericArgs to be mutable!
+    TypeLoc genericArgCopy = genericArg;
+    if (TC.validateType(genericArgCopy)) {
+      genericArgCopy.setInvalidType(TC.Context);
+      return nullptr;
+    }
+
+    genericArgTypes.push_back(genericArgCopy.getType());
+  }
+
+  // Form the bound generic type
+  type = BoundGenericType::get(unbound->getDecl(), unbound->getParent(),
+                               genericArgTypes);
+
+  // FIXME: Total hack. We should do the checking of the arguments right
+  // here.
+  TypeLoc tl{type, loc};
+  if (TC.validateType(tl)) {
+    return nullptr;
+  }
+
+  return type;
 }
 
 /// \brief Validate the given identifier type.
@@ -95,158 +156,238 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
                                    TypeLoc &Loc) {
   MutableArrayRef<IdentifierType::Component> Components = IdType->Components;
 
-  // Iteratively resolve the components.
-  IdentifierType::Component LastOne = Components[0];
-  for (auto &C : Components) {
-    TypeDecl *TD = nullptr;
-    Type BaseTy;
-    if (C.isBound()) {
-      // If there is a value, it must be a ValueDecl; resolve it.
-      TD = dyn_cast<TypeDecl>(C.Value.get<ValueDecl*>());
-    } else if (!LastOne.isBound()) {
-      // We haven't resolved anything yet; use an unqualified lookup.
-      Identifier Name = C.Id;
-      SourceLoc Loc = C.Loc;
+  // The currently-resolved result, which captures the result of name lookup
+  // for all components that have been considered thus far.
+  llvm::PointerUnion<Type, Module *> current;
 
-      DeclContext *DC = C.Value.get<DeclContext*>();
-      assert(DC);
+  if (Components[0].Value.is<DeclContext *>()) {
+    // Resolve the first component, which is the only one that requires
+    // unqualified name lookup.
+    DeclContext *dc = Components[0].Value.get<DeclContext*>();
+    assert(dc);
 
-      // Perform an unqualified lookup.
-      UnqualifiedLookup Globals(Name, DC, SourceLoc(), /*TypeLookup*/true);
+    // Perform an unqualified lookup.
+    UnqualifiedLookup Globals(Components[0].Id, dc, Components[0].Loc,
+                              /*TypeLookup*/true);
 
-      // FIXME: We need to centralize ambiguity checking
-      if (Globals.Results.size() > 1 && !allAssociatedTypes(Globals.Results)){
-        TC.diagnose(Loc, diag::ambiguous_type_base, Name)
-          .highlight(SourceRange(Loc, Components.back().Loc));
-        for (auto Result : Globals.Results) {
-          if (Globals.Results[0].hasValueDecl())
-            TC.diagnose(Result.getValueDecl(), diag::found_candidate);
-          else
-            TC.diagnose(Loc, diag::found_candidate);
+    // Process the names we found.
+    bool isAmbiguous = false;
+    for (const auto &result : Globals.Results) {
+      // If we found a module, record it.
+      if (result.Kind == UnqualifiedLookupResult::ModuleName) {
+        // If we already found a name of some sort, it's ambiguous.
+        if (!current.isNull()) {
+          isAmbiguous = true;
+          break;
         }
-        return true;
+
+        // Save this result.
+        current = result.getNamedModule();
+        Components[0].setValue(result.getNamedModule());
+        continue;
       }
 
-      if (Globals.Results.empty()) {
-        TC.diagnose(Loc, Components.size() == 1 ?
-                 diag::use_undeclared_type : diag::unknown_name_in_type, Name)
-          .highlight(SourceRange(Loc, Components.back().Loc));
-        return true;
-      }
+      // Ignore non-type declarations.
+      auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
+      if (!typeDecl)
+        continue;
 
-      switch (Globals.Results[0].Kind) {
-        case UnqualifiedLookupResult::ModuleMember:
-        case UnqualifiedLookupResult::LocalDecl:
-        case UnqualifiedLookupResult::MemberProperty:
-        case UnqualifiedLookupResult::MemberFunction:
-        case UnqualifiedLookupResult::MetatypeMember:
-        case UnqualifiedLookupResult::ExistentialMember:
-        case UnqualifiedLookupResult::ArchetypeMember:
-          TD = dyn_cast<TypeDecl>(Globals.Results[0].getValueDecl());
-          if (TD)
-            BaseTy = TD->getDeclContext()->getDeclaredTypeInContext();
-          break;
-        case UnqualifiedLookupResult::ModuleName:
-          C.setValue(Globals.Results[0].getNamedModule());
-          break;
+      // Resolve the type declaration to a specific type. How this occurs
+      // depends on the current context and where the type was found.
+      auto type = resolveTypeInContext(TC, typeDecl, dc);
+      if (!type)
+        continue;
 
-        case UnqualifiedLookupResult::MetaArchetypeMember:
-          // FIXME: This is actually possible in protocols.
-          llvm_unreachable("meta-archetype member in unqualified name lookup");
-          break;
-      }
-
-      // If we found an associated type in an inherited protocol, the base
-      // for our reference to this associated type is our own 'This'.
-      // FIXME: We'll need to turn this into a more general 'implicit base'
-      // projection, so that any time we find something in an outer context
-      // we make sure to map to that context.
-      if (TD && isa<TypeAliasDecl>(TD) &&
-          isa<ProtocolDecl>(TD->getDeclContext()) &&
-          TD->getDeclContext() != DC) {
-        if (auto Proto = dyn_cast<ProtocolDecl>(DC)) {
-          BaseTy = Proto->getThis()->getDeclaredType();
+      // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
+      // above.
+      {
+        TypeLoc tempLoc(type, SourceRange(typeDecl->getStartLoc()));
+        if (TC.validateType(tempLoc)) {
+          return true;
         }
+        type = tempLoc.getType();
       }
-    } else if (auto M = LastOne.Value.dyn_cast<Module*>()) {
-      // Lookup into a named module.
-      SmallVector<ValueDecl*, 8> Decls;
-      M->lookupValue(Module::AccessPathTy(), C.Id,
-                     NLKind::QualifiedLookup, Decls);
-      if (Decls.size() == 1 ||
-          (Decls.size() > 1 && !allAssociatedTypes(Decls)))
-        TD = dyn_cast<TypeDecl>(Decls.front());
-      // FIXME: Diagnostic if not found or ambiguous?
-    } else if (auto T = LastOne.Value.dyn_cast<Type>()) {
-      // Lookup into a type.
-      BaseTy = T;
-      // FIXME: Diagnostic if not found or ambiguous?
-      auto MemberTypes = TC.lookupMemberType(T, C.Id);
-      if (MemberTypes.size() == 1)
-        TD = MemberTypes.back().first;
-    } else {
-      TC.diagnose(C.Loc, diag::unknown_dotted_type_base, LastOne.Id)
+
+      // If this is the first result we found, record it.
+      if (current.isNull()) {
+        current = type;
+        Components[0].setValue(type);
+        continue;
+      }
+
+      // Otherwise, check for an ambiguity.
+      if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
+        isAmbiguous = true;
+        break;
+      }
+
+      // We have a found multiple type aliases that refer to the sam thing.
+      // Ignore the duplicate.
+    }
+
+    // If we found nothing, complain and fail.
+    if (current.isNull()) {
+      TC.diagnose(Components[0].Loc, Components.size() == 1 ?
+                  diag::use_undeclared_type : diag::unknown_name_in_type,
+                  Components[0].Id)
         .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
       return true;
     }
 
-    if (TD) {
-      Type Ty;
-      if (!C.GenericArgs.empty()) {
-        if (auto NTD = dyn_cast<NominalTypeDecl>(TD)) {
-          if (auto Params = NTD->getGenericParams()) {
-            if (Params->size() == C.GenericArgs.size()) {
-              SmallVector<Type, 4> GenericArgTypes;
-              for (TypeLoc T : C.GenericArgs)
-                GenericArgTypes.push_back(T.getType());
-              Ty = BoundGenericType::get(NTD, BaseTy, GenericArgTypes);
-            }
-
-          }
-        }
-
-        // FIXME: Diagnostic if applying the arguments fails?
-      } else {
-        Ty = TD->getDeclaredType();
-
-        // If we're referencing a nominal type that is in a generic context,
-        // we need to consider our base type a well.
-        // FIXME: NameAliasTypes need to be substituted through as well.
-        // FIXME: Also deal with unbound and bound generic types.
-        if (auto nominalD = dyn_cast<NominalTypeDecl>(TD)) {
-          if (BaseTy &&
-              !nominalD->getGenericParams() &&
-              nominalD->getDeclContext()->getGenericParamsOfContext()) {
-            Ty = NominalType::get(nominalD, BaseTy, TC.Context);
-          }
-        }
+    // Complain about any ambiguities we detected.
+    // FIXME: We could recover by looking at later components.
+    if (isAmbiguous) {
+      TC.diagnose(Components[0].Loc, diag::ambiguous_type_base, Components[0].Id)
+        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
+      for (auto Result : Globals.Results) {
+        if (Globals.Results[0].hasValueDecl())
+          TC.diagnose(Result.getValueDecl(), diag::found_candidate);
+        else
+          TC.diagnose(Components[0].Loc, diag::found_candidate);
       }
-      if (Ty) {
-        // FIXME: Refactor this to avoid fake TypeLoc
-        TypeLoc TempLoc{ Ty, Loc.getSourceRange() };
-        if (TC.validateType(TempLoc)) {
-          return true;
-        }
+      return true;
+    }
+  } else {
+    auto typeDecl = cast<TypeDecl>(Components[0].Value.get<ValueDecl *>());
+    auto type = typeDecl->getDeclaredType();
 
-        if (BaseTy)
-          Ty = TC.substMemberTypeWithBase(Ty, TD, BaseTy);
-        C.setValue(Ty);
+    // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
+    // above.
+    {
+      TypeLoc tempLoc(type, SourceRange(typeDecl->getStartLoc()));
+      if (TC.validateType(tempLoc)) {
+        return true;
+      }
+      type = tempLoc.getType();
+    }
+
+    // If this is the first result we found, record it.
+    Components[0].setValue(type);
+    current = type;
+  }
+
+  // If the first component has generic arguments, apply them.
+  if (!Components[0].GenericArgs.empty()) {
+    if (current.is<Module *>()) {
+      // FIXME: Diagnose this and drop the arguments.
+    } else {
+      // Apply the generic arguments to the type.
+      auto type = applyGenericArguments(TC, current.get<Type>(),
+                                        Components[0].Loc,
+                                        Components[0].GenericArgs);
+      if (!type)
+        return true;
+
+      current = type;
+      Components[0].setValue(type);
+    }
+  }
+
+  // Resolve the remaining components.
+  for (auto &comp : Components.slice(1)) {
+    // If the last resolved component is a type, perform member type lookup.
+    if (current.is<Type>()) {
+      // Look for member types with the given name.
+      auto memberTypes = TC.lookupMemberType(current.get<Type>(), comp.Id);
+
+      // If we didn't find anything, complain.
+      // FIXME: Typo correction!
+      if (!memberTypes) {
+        // FIXME: Highlight base range.
+        TC.diagnose(comp.Loc, diag::invalid_member_type, comp.Id,
+                    current.get<Type>());
+        return true;
+      }
+
+      // Name lookup was ambiguous. Complain.
+      // FIXME: Could try to apply generic arguments first, and see whether
+      // that resolves things. But do we really want that to succeed?
+      if (memberTypes.size() > 1) {
+        TC.diagnose(comp.Loc, diag::ambiguous_member_type, comp.Id,
+                    current.get<Type>());
+        for (const auto &member : memberTypes) {
+          TC.diagnose(member.first, diag::found_candidate_type,
+                      member.second);
+        }
+        return true;
+      }
+
+      auto memberType = memberTypes.back().second;
+
+      // If there are generic arguments, apply them now.
+      if (!comp.GenericArgs.empty()) {
+        memberType = applyGenericArguments(TC, memberType, comp.Loc,
+                                           comp.GenericArgs);
+        if (!memberType)
+          return true;
+      }
+
+      // Update our position with the type we just determined.
+      current = memberType;
+      comp.setValue(memberType);
+      continue;
+    }
+
+    // Lookup into a module.
+    // FIXME: The use of AccessPathTy() is weird here.
+    auto module = current.get<Module *>();
+    SmallVector<ValueDecl*, 4> decls;
+    module->lookupValue(Module::AccessPathTy(), comp.Id,
+                        NLKind::QualifiedLookup, decls);
+
+    bool isAmbiguous = false;
+    Type foundType;
+    for (auto decl : decls) {
+      // Only consider type declarations.
+      auto typeDecl = dyn_cast<TypeDecl>(decl);
+      if (!typeDecl)
+        continue;
+
+      auto type = typeDecl->getDeclaredType();
+      if (!foundType) {
+        foundType = type;
+        continue;
+      }
+
+      if (!foundType->isEqual(type)) {
+        isAmbiguous = true;
+        break;
       }
     }
 
-    if (!C.isBound()) {
-      if (!LastOne.isBound())
-        TC.diagnose(C.Loc, Components.size() == 1 ?
-                    diag::named_definition_isnt_type :
-                    diag::dotted_reference_not_type, C.Id)
-          .highlight(SourceRange(C.Loc, Components.back().Loc));
-      else
-        TC.diagnose(C.Loc, diag::invalid_member_type, C.Id, LastOne.Id)
-          .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
+    // If we didn't find a type, complain.
+    if (!foundType) {
+      // FIXME: Fully-qualified module name?
+      TC.diagnose(comp.Loc, diag::no_module_type, comp.Id, module->Name);
       return true;
     }
 
-    LastOne = C;
+    // If lookup was ambiguous, complain.
+    if (isAmbiguous) {
+      TC.diagnose(comp.Loc, diag::ambiguous_module_type, comp.Id, module->Name);
+      for (auto decl : decls) {
+        // Only consider type declarations.
+        auto typeDecl = dyn_cast<TypeDecl>(decl);
+        if (!typeDecl)
+          continue;
+
+        TC.diagnose(typeDecl, diag::found_candidate_type,
+                    typeDecl->getDeclaredType());
+      }
+      return true;
+    }
+
+    // If there are generic arguments, apply them now.
+    if (!comp.GenericArgs.empty()) {
+      foundType = applyGenericArguments(TC, foundType, comp.Loc,
+                                        comp.GenericArgs);
+      if (!foundType)
+        return true;
+    }
+
+    // Update our position with the type we just determined.
+    current = foundType;
+    comp.setValue(foundType);
   }
 
   return false;

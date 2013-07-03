@@ -874,10 +874,6 @@ ERROR(serialization_missing_dependencies,sema,none,
 
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))
-ERROR(unknown_dotted_type_base,sema_nb,none,
-      "type references cannot access elements of %0", (Identifier))
-ERROR(dotted_reference_not_type,sema_nb,none,
-      "dotted reference to %0 does not resolve to a type", (Identifier))
 
 ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration",())
 NOTE(invalid_redecl_prev,sema_nb,none,
@@ -888,7 +884,13 @@ ERROR(no_module_or_type,sema_nb,none,
 ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type look up in this context", (Identifier))
 ERROR(invalid_member_type,sema_nb,none,
-      "%0 is not a member type of %1", (Identifier, Identifier))
+      "%0 is not a member type of %1", (Identifier, Type))
+ERROR(ambiguous_member_type,sema_nb,none,
+      "ambiguous type name %0 in %1", (Identifier, Type))
+ERROR(no_module_type,sema_nb,none,
+      "no type named %0 in module %1", (Identifier, Identifier))
+ERROR(ambiguous_module_type,sema_nb,none,
+      "ambiguous type name %0 in module %1", (Identifier, Identifier))
 ERROR(use_nonmatching_operator,sema_nb,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (Identifier, unsigned))
@@ -1163,6 +1165,8 @@ ERROR(requires_constraint_checker,sema_tce,none,
 
 NOTE(found_candidate,sema_tce,none,
      "found this candidate", ())
+NOTE(found_candidate_type,sema_tce,none,
+     "found candidate with type %0", (Type))
 NOTE(first_declaration,sema_tce,none,
      "first declaration", ())
 NOTE(second_declaration,sema_tce,none,
@@ -1330,7 +1334,7 @@ ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
 ERROR(not_a_generic_definition,tce_sema,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,tce_sema,none,
-      "cannot specialize a non-generic type", ())
+      "cannot specialize non-generic type %0", (Type))
 ERROR(type_parameter_count_mismatch,tce_sema,none,
       "generic type specialized with wrong number of type parameters "
       "(got %1, but expected %0)",

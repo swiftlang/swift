@@ -84,21 +84,21 @@ public:
     ModuleName
   } Kind;
 
-  bool hasValueDecl() {
+  bool hasValueDecl() const {
     return Kind != ModuleName;
   }
 
-  ValueDecl *getValueDecl() {
+  ValueDecl *getValueDecl() const {
     assert(hasValueDecl());
     return Value;
   }
 
-  Module *getNamedModule() {
+  Module *getNamedModule() const {
     assert(Kind == ModuleName);
     return NamedModule;
   }
 
-  ValueDecl *getBaseDecl() {
+  ValueDecl *getBaseDecl() const {
     return Base;
   }
 

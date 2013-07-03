@@ -390,7 +390,8 @@ namespace {
           
           return baseTy;
         } else {
-          tc.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type);
+          tc.diagnose(expr->getSubExpr()->getLoc(), diag::not_a_generic_type,
+                      meta->getInstanceType());
           tc.diagnose(expr->getLAngleLoc(),
                       diag::while_parsing_as_left_angle_bracket);
           return Type();
