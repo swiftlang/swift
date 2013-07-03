@@ -1142,12 +1142,23 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   case AllocKind::Pseudo:
     llvm_unreachable("pseudo allocation not implemented");
   }
-  
-  OwnedAddress addr = type.allocate(*this,
-                                    isOnHeap,
-                                    // FIXME: derive name from SIL location
-                                    "");
-  
+
+  // Derive name from SIL location.
+  VarDecl *Decl = i->getDecl();
+  StringRef dbgname =
+# ifndef NDEBUG
+    // If this is a DEBUG build, use pretty names for the LLVM IR.
+    Decl ? Decl->getName().str() :
+# endif
+    "";
+
+  OwnedAddress addr = type.allocate(*this, isOnHeap, dbgname);
+  if (IGM.DebugInfo && Decl)
+    IGM.DebugInfo->emitStackVariableDeclaration(Builder,
+                                                addr.getAddressPointer(),
+                                                DebugTypeInfo(*Decl, type),
+                                                Decl->getName().str());
+
   newLoweredAddress(v, addr.getAddress());
 }
 

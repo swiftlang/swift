@@ -25,6 +25,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/GlobalValue.h"
+#include "DebugTypeInfo.h"
 #include "FunctionRef.h"
 #include "IRGen.h"
 #include "ValueWitness.h"
@@ -36,13 +37,14 @@ namespace llvm {
 }
 
 namespace swift {
-  
+
 namespace Mangle {
   enum class ExplosionKind : unsigned;
 }
   
 namespace irgen {
-  class IRGenModule;
+class TypeInfo;
+class IRGenModule;
 
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
@@ -430,7 +432,9 @@ public:
 
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,
-                                       llvm::Type *objectType);
+                                       llvm::Type *objectType,
+                                       DebugTypeInfo DebugType=DebugTypeInfo(),
+                                       SILLocation DebugLoc = SILLocation());
 };
 
 } // end namespace irgen

@@ -34,6 +34,11 @@
 namespace swift {
 namespace irgen {
 
+// DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
+// But for now, we need to use a constant in
+// DW_LANG_lo_user..DW_LANG_hi_user, because LLVM will assert on that.
+static const unsigned DW_LANG_Swift = 0x9999 /*llvm::dwarf::DW_LANG_Swift*/;
+
 /// Strdup S using the bump pointer.
 static
 StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
@@ -51,10 +56,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
     MainFileName = "<unknown>";
 
   StringRef Filename = BumpAllocatedString(MainFileName, DebugInfoNames);
-  // DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
-  // But for now, we need to use a constant in
-  // DW_LANG_lo_user..DW_LANG_hi_user, because LLVM will assert on that.
-  unsigned Lang = 0x9999 /*llvm::dwarf::DW_LANG_Swift*/;
+  unsigned Lang = DW_LANG_Swift;
   StringRef Dir = getCurrentDirname();
 
   std::string buf;
@@ -76,6 +78,10 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                              IsOptimized, Flags, RuntimeVersion,
                              SplitName);
   TheCU = llvm::DICompileUnit(DBuilder.getCU());
+}
+
+void IRGenDebugInfo::finalize() {
+  DBuilder.finalize();
 }
 
 
@@ -132,8 +138,8 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
 
   // Try to find it in the cache first.
   llvm::DenseMap<SILDebugScope*, llvm::DIDescriptor>::iterator
-    CachedScope = ScopeMap.find(DS);
-  if (CachedScope != ScopeMap.end()) {
+    CachedScope = ScopeCache.find(DS);
+  if (CachedScope != ScopeCache.end()) {
     return CachedScope->second;
   }
 
@@ -148,15 +154,14 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
   // Cache it.
-  ScopeMap[DS] = DScope;
+  ScopeCache[DS] = DScope;
   return DScope;
 }
 
 /// getCurrentDirname - Return the current working directory.
 StringRef IRGenDebugInfo::getCurrentDirname() {
-  // FIXME.
-  //if (!CGM.getCodeGenOpts().DebugCompilationDir.empty())
-  //  return CGM.getCodeGenOpts().DebugCompilationDir;
+  // FIXME: Clang has a global option to set the compilation
+  // directory. Do we have something similar for swift?
 
   if (!CWDName.empty())
     return CWDName;
@@ -188,8 +193,6 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   // Basically ignore any error.
   assert(ec == llvm::errc::success);
   (void)ec; // Silence the unused variable warning
-  // remove any trailing path separator
-  llvm::sys::path::remove_filename(Path);
   llvm::DIFile F = DBuilder.createFile(File, Path);
 
   // Cache it.
@@ -246,7 +249,7 @@ void IRGenDebugInfo::createFunction(SILDebugScope* DS,
                             FnType, isLocalToUnit, isDefinition,
                             /*ScopeLine =*/Line,
                             Flags, isOptimized, Fn, TParams, Decl);
-  ScopeMap[DS] = SP;
+  ScopeCache[DS] = SP;
 }
 
 void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
@@ -257,8 +260,177 @@ void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
   setCurrentLoc(Builder, Scope);
 }
 
-void IRGenDebugInfo::finalize() {
-  DBuilder.finalize();
+void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
+                                                  llvm::Value *Storage,
+                                                  DebugTypeInfo Ty,
+                                                  const llvm::Twine &Name) {
+  emitVariableDeclaration(Builder, Storage, Ty, Name,
+                          llvm::dwarf::DW_TAG_auto_variable);
+}
+
+/// Return the DIFile that is the ancestor of Scope.
+static llvm::DIFile getFile(llvm::DIDescriptor Scope) {
+  while (!Scope.isFile()) {
+    switch (Scope.getTag()) {
+    case llvm::dwarf::DW_TAG_lexical_block:
+      Scope = llvm::DILexicalBlock(Scope).getContext();
+      break;
+    case llvm::dwarf::DW_TAG_subprogram:
+      Scope = llvm::DISubprogram(Scope).getContext();
+      break;
+    default:
+      return llvm::DIFile();
+      //llvm_unreachable("unhandled node");
+    }
+    //assert(Scope.Verify());
+    if (Scope.Verify())
+      return llvm::DIFile();
+  }
+  llvm::DIFile File(Scope);
+  assert(File.Verify());
+  return File;
+}
+
+void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
+                                             llvm::Value *Storage,
+                                             DebugTypeInfo Ty,
+                                             const llvm::Twine &Name,
+                                             unsigned Tag,
+                                             unsigned ArgNo) {
+  llvm::DebugLoc DL = Builder.getCurrentDebugLocation();
+  llvm::DIDescriptor Scope(DL.getScope(Builder.getContext()));
+  if (!Scope.Verify())
+    return;
+
+  llvm::DIFile Unit = getFile(Scope);
+  llvm::DIType DTy = getOrCreateType(Ty, Scope);
+
+  // If there is no debug info for this type then do not emit debug info
+  // for this variable.
+  if (!DTy)
+    return;
+
+  unsigned Line = DL.getLine();
+  unsigned Flags = 0;
+
+  // Create the descriptor for the variable.
+  llvm::DIVariable D =
+    DBuilder.createLocalVariable(Tag, Scope, Name.str(), Unit, Line, DTy,
+                                 Opts.OptLevel > 0, Flags, ArgNo);
+
+  // Insert an llvm.dbg.declare into the current block.
+  llvm::Instruction *Call =
+    DBuilder.insertDeclare(Storage, D, Builder.GetInsertBlock());
+  Call->setDebugLoc(llvm::DebugLoc::get(Line, DL.getCol(), Scope));
+}
+
+void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
+                                                   StringRef Name,
+                                                   StringRef LinkageName,
+                                                   DebugTypeInfo DebugType,
+                                                   SILLocation Loc) {
+  Location L = getStartLoc(SM, Loc);
+  llvm::DIFile Unit = getOrCreateFile(L.Filename);
+
+  // FIXME: Can there be nested types?
+  llvm::DIDescriptor DContext = Unit;
+  DBuilder.createStaticVariable(DContext, Name, LinkageName, Unit,
+                                L.Line, getOrCreateType(DebugType, Unit),
+                                Var->hasInternalLinkage(), Var, nullptr);
+}
+
+/// Construct a DIType from a DebugTypeInfo object.
+///
+/// At this point we do not plan to emit full DWARF for all swift
+/// types, the goal is to emit only the name and provenance of the
+/// type, where possible. A consumer would then load the type
+/// definition directly from the "module" the type is specified in.
+llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
+                                        llvm::DIDescriptor Scope,
+                                        llvm::DIFile File) {
+  TypeBase* BaseTy = Ty.CanTy.getPointer();
+  if (!BaseTy)
+    return llvm::DIType();
+
+  StringRef Name;
+  uint64_t Size = Ty.SizeInBits;
+  uint64_t Align = Ty.AlignmentInBits;
+  unsigned Encoding = 0;
+  unsigned Flags = 0;
+  BaseTy->getString();
+
+  switch (BaseTy->getKind()) {
+  case TypeKind::BuiltinInteger: {
+    BuiltinIntegerType *IntTy = BaseTy->castTo<BuiltinIntegerType>();
+    Size = IntTy->getBitWidth();
+    break;
+  }
+
+  case TypeKind::BuiltinFloat: {
+    BuiltinFloatType *FloatTy = BaseTy->castTo<BuiltinFloatType>();
+    Size = FloatTy->getBitWidth();
+    break;
+  }
+
+  // Even builtin swift types usually come boxed in a struct.
+  case TypeKind::Struct: {
+    StructType *StructTy = BaseTy->castTo<StructType>();
+    if (StructDecl *Decl = StructTy->getDecl()) {
+      Name = Decl->getName().str();
+      Location L = getStartLoc(SM, Decl);
+      return DBuilder.createStructType(Scope,
+                                       Name,
+                                       getOrCreateFile(L.Filename),
+                                       L.Line,
+                                       Size, Align, Flags,
+                                       llvm::DIType(),  // DerivedFrom
+                                       llvm::DIArray(), // Elements
+                                       DW_LANG_Swift,   // RunTimeLang
+                                       0                // *VTableHolder
+                                       );
+    }
+    return llvm::DIType();
+  }
+
+  // Handle everything else based off NominalType.
+  case TypeKind::OneOf:
+  case TypeKind::Class:
+  case TypeKind::Protocol: {
+    NominalType *NominalTy = BaseTy->castTo<NominalType>();
+    if (NominalTypeDecl *Decl = NominalTy->getDecl()) {
+      Name = Decl->getName().str();
+      break;
+    }
+  }
+  default:
+    return llvm::DIType();
+  }
+
+  return DBuilder.createBasicType(Name, Size, Align, Encoding);
+}
+
+/// Get the DIType corresponding to this DebugTypeInfo from the cache,
+/// or build a fresh DIType otherwise.
+llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
+                                             llvm::DIDescriptor Scope) {
+  // Is this an empty type?
+  if (Ty.CanTy.isNull())
+    return llvm::DIType();
+
+  // Look in the cache first.
+  llvm::DenseMap<DebugTypeInfo, llvm::WeakVH>::iterator it =
+    DITypeCache.find(Ty);
+
+  if (it != DITypeCache.end()) {
+    // Verify that the information still exists.
+    if (llvm::Value *DITy = it->second)
+      return llvm::DIType(cast<llvm::MDNode>(DITy));
+  }
+
+  llvm::DIType DITy = createType(Ty, Scope, getFile(Scope));
+
+  DITypeCache[Ty] = DITy;
+  return DITy;
 }
 
 } // irgen
