@@ -115,7 +115,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
     // with 'sil' definitions.
     parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0,
                              SIL ? &SILContext : nullptr);
-    performTypeChecking(TU, CurTUElem);
+    if (!ParseOnly)
+      performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (BufferOffset != Buffer->getBufferSize());
 
