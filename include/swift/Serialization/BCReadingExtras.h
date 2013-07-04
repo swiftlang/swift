@@ -20,15 +20,25 @@ namespace serialization {
 
 /// Saves and restores a BitstreamCursor's bit offset in its stream.
 class BCOffsetRAII {
-  llvm::BitstreamCursor &Cursor;
-  decltype(Cursor.GetCurrentBitNo()) Offset;
+  llvm::BitstreamCursor *Cursor;
+  decltype(Cursor->GetCurrentBitNo()) Offset;
 
 public:
   explicit BCOffsetRAII(llvm::BitstreamCursor &cursor)
-    : Cursor(cursor), Offset(cursor.GetCurrentBitNo()) {}
+    : Cursor(&cursor), Offset(cursor.GetCurrentBitNo()) {}
+
+  void reset() {
+    if (Cursor)
+      Offset = Cursor->GetCurrentBitNo();
+  }
+
+  void cancel() {
+    Cursor = nullptr;
+  }
 
   ~BCOffsetRAII() {
-    Cursor.JumpToBit(Offset);
+    if (Cursor)
+      Cursor->JumpToBit(Offset);
   };
 };
 

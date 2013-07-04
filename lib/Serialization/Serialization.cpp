@@ -168,6 +168,9 @@ namespace {
     /// Writes the given pattern, recursively.
     void writePattern(const Pattern *pattern);
 
+    /// Writes a generic parameter list.
+    bool writeGenericParams(const GenericParamList *genericParams);
+
     /// Writes the members of a simple nominal decl.
     void writeMembers(const NominalTypeDecl *D);
 
@@ -381,6 +384,9 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, ANY_PATTERN);
   RECORD(decls_block, TYPED_PATTERN);
 
+  RECORD(decls_block, GENERIC_PARAM_LIST);
+  RECORD(decls_block, GENERIC_PARAM);
+
   RECORD(decls_block, XREF);
   RECORD(decls_block, DECL_CONTEXT);
 
@@ -534,6 +540,34 @@ void Serializer::writePattern(const Pattern *pattern) {
     break;
   }
   }
+}
+
+bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
+  using namespace decls_block;
+
+  // Don't write anything if there are no generic params.
+  if (!genericParams)
+    return true;
+
+  // FIXME: Handle generic requirements.
+  if (!genericParams->getRequirements().empty())
+    return false;
+
+  SmallVector<TypeID, 8> archetypeIDs;
+  for (auto archetype : genericParams->getAllArchetypes())
+    archetypeIDs.push_back(addTypeRef(archetype));
+
+  unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
+  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     archetypeIDs);
+
+  abbrCode = DeclTypeAbbrCodes[GenericParamLayout::Code];
+  for (auto next : genericParams->getParams()) {
+    GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addDeclRef(next.getDecl()));
+  }
+
+  return true;
 }
 
 void Serializer::writeMembers(const NominalTypeDecl *D) {
@@ -771,10 +805,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!fn->getAttrs().empty())
       return false;
 
-    // FIXME: Handle generics.
-    if (fn->getGenericParams())
-      return false;
-
     const Decl *DC = getDeclForContext(fn->getDeclContext());
     const Decl *associated = fn->getGetterOrSetterDecl();
     if (!associated)
@@ -790,6 +820,8 @@ bool Serializer::writeDecl(const Decl *D) {
                            fn->isStatic(),
                            addDeclRef(associated),
                            addDeclRef(fn->getOverriddenDecl()));
+
+    writeGenericParams(fn->getGenericParams());
 
     // Write both argument and body parameters. This is important for proper
     // error messages with selector-style declarations.
@@ -987,8 +1019,9 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Substituted:
     return false;
 
-  case TypeKind::Function: {
-    auto fnTy = cast<FunctionType>(ty.getPointer());
+  case TypeKind::Function:
+  case TypeKind::PolymorphicFunction: {
+    auto fnTy = cast<AnyFunctionType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1001,9 +1034,6 @@ bool Serializer::writeType(Type ty) {
 
     return true;
   }
-
-  case TypeKind::PolymorphicFunction:
-    return false;
 
   case TypeKind::Array:
   case TypeKind::ArraySlice:
@@ -1080,6 +1110,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<AnyPatternLayout>();
     registerDeclTypeAbbr<TypedPatternLayout>();
 
+    registerDeclTypeAbbr<GenericParamListLayout>();
+    registerDeclTypeAbbr<GenericParamLayout>();
     registerDeclTypeAbbr<XRefLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
   }

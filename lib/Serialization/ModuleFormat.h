@@ -211,6 +211,10 @@ namespace decls_block {
     NOMINAL_TYPE_PATTERN,
     VAR_PATTERN,
 
+    GENERIC_PARAM_LIST = 240,
+    GENERIC_PARAM,
+    GENERIC_REQUIREMENT,
+
     XREF = 254,
     DECL_CONTEXT = 255
   };
@@ -338,6 +342,8 @@ namespace decls_block {
     BCFixed<1>,   // class method
     DeclIDField,  // associated decl (for get/set or operators)
     DeclIDField   // overridden function
+    // The record is trailed by its generic parameters, if any, followed by its
+    // argument and body parameter patterns.
   >;
 
   using PatternBindingLayout = BCRecordLayout<
@@ -405,6 +411,18 @@ namespace decls_block {
   using VarPatternLayout = BCRecordLayout<
     VAR_PATTERN
     // The sub-pattern trails the record.
+  >;
+
+
+  using GenericParamListLayout = BCRecordLayout<
+    GENERIC_PARAM_LIST,
+    BCArray<TypeIDField> // Archetypes
+    // The actual parameters and requirements trail the record.
+  >;
+
+  using GenericParamLayout = BCRecordLayout<
+    GENERIC_PARAM,
+    DeclIDField // Typealias
   >;
 
   using XRefLayout = BCRecordLayout<

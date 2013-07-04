@@ -32,6 +32,7 @@ namespace llvm {
 namespace swift {
 class Decl;
 class DeclContext;
+class GenericParamList;
 class Module;
 class Pattern;
 class ValueDecl;
@@ -141,6 +142,12 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  /// Reads a generic param list from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a generic param list, returns null
+  /// without moving the cursor.
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+
   /// Creates an array of types from the given IDs.
   ///
   /// The returned array is owned by the ASTContext.
@@ -159,18 +166,9 @@ private:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
-  /// Controls how a Decl is deserialized.
-  enum DeclDeserializationOptions {
-    /// Don't set the decl's context. It will be set by the caller instead.
-    ///
-    /// This is useful for declarations that reference each other at
-    /// construction time.
-    SkipContext = 0x1
-  };
-
   /// Returns the decl with the given ID, deserializing it if needed.
   Decl *getDecl(serialization::DeclID DID,
-                DeclDeserializationOptions opts = {});
+                Optional<DeclContext *> ForcedContext = {});
 
   /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);

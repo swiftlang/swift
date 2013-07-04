@@ -164,6 +164,76 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
+GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
+  using namespace decls_block;
+
+  assert(DC && "need a context for the decls in the list");
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  auto next = DeclTypeCursor.advance();
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+
+  if (kind != GENERIC_PARAM_LIST)
+    return nullptr;
+
+  ArrayRef<uint64_t> rawArchetypeIDs;
+  GenericParamListLayout::readRecord(scratch, rawArchetypeIDs);
+
+  SmallVector<ArchetypeType *, 8> archetypes;
+  {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    for (TypeID next : rawArchetypeIDs)
+      archetypes.push_back(getType(next)->castTo<ArchetypeType>());
+  }
+
+  SmallVector<GenericParam, 8> params;
+  SmallVector<Requirement, 8> requirements;
+  while (true) {
+    lastRecordOffset.reset();
+    bool shouldContinue = true;
+
+    auto entry = DeclTypeCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                  &blobData);
+    switch (recordID) {
+    case GENERIC_PARAM: {
+      DeclID paramDeclID;
+      GenericParamLayout::readRecord(scratch, paramDeclID);
+      {
+        BCOffsetRAII restoreInnerOffset(DeclTypeCursor);
+        auto typeAlias = cast<TypeAliasDecl>(getDecl(paramDeclID, DC));
+        params.push_back(GenericParam(typeAlias));
+      }
+      break;
+    }
+    default:
+      shouldContinue = false;
+      break;
+    }
+
+    if (!shouldContinue)
+      break;
+  }
+
+  auto paramList = GenericParamList::create(ModuleContext->Ctx, SourceLoc(),
+                                            params, SourceLoc(), requirements,
+                                            SourceLoc());
+  paramList->setAllArchetypes(ModuleContext->Ctx.AllocateCopy(archetypes));
+  paramList->setOuterParameters(DC->getGenericParamsOfContext());
+
+  return paramList;
+}
+
 MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs) {
   ASTContext &ctx = ModuleContext->Ctx;
   auto result =
@@ -293,8 +363,20 @@ static void lookupImmediateDecls(DeclContext *DC, Identifier name,
   }
 }
 
+/// Creates a polymorphic function type based on the given (monomorphic) type.
+PolymorphicFunctionType *
+getPolymorphicFunctionType(ASTContext &Ctx, FunctionType *originalTy,
+                           GenericParamList *paramList) {
+  assert(paramList && "cannot have a polymorphic function type without params");
+  return PolymorphicFunctionType::get(originalTy->getInput(),
+                                      originalTy->getResult(),
+                                      paramList,
+                                      originalTy->isThin(),
+                                      originalTy->getAbstractCC(),
+                                      Ctx);
+}
 
-Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
+Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
 
@@ -351,12 +433,10 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     }
 
     TypeLoc underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-    auto alias = new (ctx) TypeAliasDecl(SourceLoc(),
-                                         getIdentifier(nameID),
-                                         SourceLoc(),
-                                         underlyingType,
-                                         getDeclContext(contextID),
-                                         inherited);
+    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
+                                         SourceLoc(), underlyingType,
+                                         DC, inherited);
     declOrOffset = alias;
 
     if (isImplicit)
@@ -376,15 +456,16 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
                                           isImplicit, inheritedIDs);
 
     MutableArrayRef<TypeLoc> inherited;
+    DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       inherited = getTypes(inheritedIDs);
+      DC = getDeclContext(contextID);
     }
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), inherited,
-                                          /*generic params=*/nullptr,
-                                          getDeclContext(contextID));
+                                          /*generic params=*/nullptr, DC);
     declOrOffset = theStruct;
 
     if (isImplicit)
@@ -409,7 +490,7 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
     NominalTypeDecl *parent;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      thisDecl = cast<VarDecl>(getDecl(implicitThisID, SkipContext));
+      thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
       parent = cast<NominalTypeDecl>(getDeclContext(parentID));
     }
 
@@ -443,7 +524,7 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
                                        isNeverLValue, typeID, getterID,
                                        setterID, overriddenID);
 
-    auto DC = (opts & SkipContext) ? nullptr : getDeclContext(contextID);
+    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), DC);
 
@@ -482,16 +563,29 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
                                         overriddenID);
 
     DeclContext *DC;
-    FunctionType *signature;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       DC = getDeclContext(contextID);
-      signature = cast<FunctionType>(getType(signatureID).getPointer());
+    }
+
+    // Read generic params before reading the type, because the type may
+    // reference generic parameters, and we want them to have a dummy
+    // DeclContext for now.
+    GenericParamList *genericParams = maybeReadGenericParams(DC);
+
+    AnyFunctionType *signature;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      signature = getType(signatureID)->castTo<FunctionType>();
+      if (genericParams)
+        signature = getPolymorphicFunctionType(ctx,
+                                               cast<FunctionType>(signature),
+                                               genericParams);
     }
 
     auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
                                  getIdentifier(nameID), SourceLoc(),
-                                 /*generic params=*/nullptr, signature,
+                                 genericParams, signature,
                                  /*body=*/nullptr, DC);
     declOrOffset = fn;
 
@@ -513,6 +607,10 @@ Decl *ModuleFile::getDecl(DeclID DID, DeclDeserializationOptions opts) {
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  DC);
     fn->setBody(body);
+
+    if (genericParams)
+      for (auto &genericParam : *fn->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(body);
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 
