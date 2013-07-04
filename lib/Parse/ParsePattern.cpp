@@ -456,9 +456,7 @@ NullablePtr<Pattern> Parser::parseMatchingPattern() {
   if (subExpr.isNull())
     return nullptr;
   
-  return new (Context) ExprPattern(subExpr.get(),
-                                   /*isResolved*/ false,
-                                   /*matchExpr*/ nullptr);
+  return new (Context) ExprPattern(subExpr.get());
 }
 
 NullablePtr<Pattern> Parser::parseMatchingPatternVar() {

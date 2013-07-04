@@ -211,7 +211,8 @@ Pattern *Pattern::clone(ASTContext &context) const {
     auto expr = cast<ExprPattern>(this);
     result = new(context) ExprPattern(expr->getSubExpr(),
                                       expr->isResolved(),
-                                      expr->getMatchFnExpr());
+                                      expr->getMatchExpr(),
+                                      expr->getMatchVar());
     break;
   }
       

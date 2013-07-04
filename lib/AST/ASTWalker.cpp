@@ -666,6 +666,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Pattern *visitExprPattern(ExprPattern *P) {
+    // If the pattern has been type-checked, walk the match expression, which
+    // includes the explicit subexpression.
+    if (P->getMatchExpr()) {
+      if (Expr *newMatch = doIt(P->getMatchExpr()))
+        P->setMatchExpr(newMatch);
+      else
+        return nullptr;
+      return P;
+    }
+    
     if (Expr *newSub = doIt(P->getSubExpr()))
       P->setSubExpr(newSub);
     else

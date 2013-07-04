@@ -110,8 +110,8 @@ public:
       Pattern *pattern = patterns[i];
       if (!pattern)
         pattern = new (C) ExprPattern(E->getElement(i),
-                                      /*isResolved*/ true,
-                                      /*matchFn*/ nullptr);
+                                      /*matchFn*/ nullptr,
+                                      /*matchVar*/ nullptr);
       patternElts.push_back(TuplePatternElt(pattern));
     }
     

@@ -405,26 +405,47 @@ public:
 class ExprPattern : public Pattern {
   llvm::PointerIntPair<Expr *, 1, bool> SubExprAndIsResolved;
   
-  /// An expression constructed during type-checking that produces a reference
-  /// to the '~=' operator resolved for the match.
-  Expr *MatchFnExpr;
+  /// An expression constructed during type-checking that produces a call to the
+  /// '~=' operator comparing the match expression on the left to the matched
+  /// value on the right.
+  Expr *MatchExpr;
+  
+  /// An implicit variable used to represent the RHS value of the match.
+  VarDecl *MatchVar;
   
 public:
-  ExprPattern(Expr *e, bool isResolved, Expr *match)
+  /// Construct an ExprPattern.
+  ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar)
     : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
-      MatchFnExpr(match) {
-    assert(!match || e->isImplicit() == match->isImplicit());
+      MatchExpr(matchExpr), MatchVar(matchVar) {
+    assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
     if (e->isImplicit())
       setImplicit();
   }
   
+  /// Construct an unresolved ExprPattern.
+  ExprPattern(Expr *e)
+    : ExprPattern(e, false, nullptr, nullptr)
+  {}
+  
+  /// Construct a resolved ExprPattern.
+  ExprPattern(Expr *e, Expr *matchExpr, VarDecl *matchVar)
+    : ExprPattern(e, true, matchExpr, matchVar)
+  {}
+  
   Expr *getSubExpr() const { return SubExprAndIsResolved.getPointer(); }
   void setSubExpr(Expr *e) { SubExprAndIsResolved.setPointer(e); }
   
-  Expr *getMatchFnExpr() const { return MatchFnExpr; }
-  void setMatchFnExpr(Expr *e) {
+  Expr *getMatchExpr() const { return MatchExpr; }
+  void setMatchExpr(Expr *e) {
     assert(isResolved() && "cannot set match fn for unresolved expr patter");
-    MatchFnExpr = e;
+    MatchExpr = e;
+  }
+  
+  VarDecl *getMatchVar() const { return MatchVar; }
+  void setMatchVar(VarDecl *v) {
+    assert(isResolved() && "cannot set match var for unresolved expr patter");
+    MatchVar = v;
   }
   
   SourceLoc getLoc() const { return getSubExpr()->getLoc(); }
