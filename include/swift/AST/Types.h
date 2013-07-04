@@ -1753,7 +1753,7 @@ public:
   static SubstitutedType *get(Type Original, Type Replacement, ASTContext &C);
   
   /// \brief Retrieve the original type that is being replaced.
-  Type getOriginal() const { return Replacement; }
+  Type getOriginal() const { return Original; }
   
   /// \brief Retrieve the replacement type.
   Type getReplacementType() const { return Replacement; }
