@@ -164,6 +164,62 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
+ProtocolConformance *ModuleFile::maybeReadConformance() {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  SmallVector<uint64_t, 8> scratch;
+
+  auto next = DeclTypeCursor.advance();
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
+  if (kind != PROTOCOL_CONFORMANCE)
+    return nullptr;
+
+  lastRecordOffset.reset();
+  unsigned valueCount, typeCount, inheritedCount;
+  ArrayRef<uint64_t> rawIDs;
+
+  ProtocolConformanceLayout::readRecord(scratch, valueCount, typeCount,
+                                        inheritedCount, rawIDs);
+
+  ProtocolConformance *conformance =
+    ModuleContext->Ctx.Allocate<ProtocolConformance>(1);
+
+  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+  {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    while (valueCount--) {
+      auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
+      auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
+      conformance->Mapping.insert(std::make_pair(first, second));
+    }
+    while (typeCount--) {
+      auto first = getType(*rawIDIter++)->castTo<SubstitutableType>();
+      auto second = getType(*rawIDIter++);
+      conformance->TypeMapping.insert(std::make_pair(first, second));
+    }
+  }
+
+  while (inheritedCount--) {
+    ProtocolDecl *proto;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      proto = cast<ProtocolDecl>(getDecl(*rawIDIter++));
+    }
+
+    ProtocolConformance *inherited = maybeReadConformance();
+    assert(inherited);
+    lastRecordOffset.reset();
+
+    conformance->InheritedMapping.insert(std::make_pair(proto, inherited));
+  }
+
+  return conformance;
+}
+
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   using namespace decls_block;
 
@@ -513,6 +569,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       theStruct->setImplicit();
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (ProtocolConformance *conformance = maybeReadConformance())
+      conformanceBuf.push_back(conformance);
+    theStruct->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");

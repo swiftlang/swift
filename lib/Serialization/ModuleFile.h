@@ -35,6 +35,7 @@ class DeclContext;
 class GenericParamList;
 class Module;
 class Pattern;
+class ProtocolConformance;
 class ValueDecl;
 
 /// Describes whether a loaded module can be used.
@@ -141,6 +142,11 @@ private:
   ///
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
+
+  /// Recursively reads a protocol conformance from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a protocol conformance, returns null.
+  ProtocolConformance *maybeReadConformance();
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///

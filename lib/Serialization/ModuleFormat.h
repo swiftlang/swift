@@ -225,8 +225,9 @@ namespace decls_block {
     GENERIC_PARAM,
     GENERIC_REQUIREMENT,
 
-    XREF = 254,
-    DECL_CONTEXT = 255
+    PROTOCOL_CONFORMANCE = 253,
+    DECL_CONTEXT = 254,
+    XREF = 255
   };
 
   using NameAliasTypeLayout = BCRecordLayout<
@@ -452,16 +453,26 @@ namespace decls_block {
     BCArray<TypeIDField>         // types involved (currently always two)
   >;
 
-  using XRefLayout = BCRecordLayout<
-    XREF,
-    XRefKindField, // reference kind
-    TypeIDField,   // type if value, operator kind if operator
-    BCArray<IdentifierIDField> // access path
+  using ProtocolConformanceLayout = BCRecordLayout<
+    PROTOCOL_CONFORMANCE,
+    BCVBR<5>, // value mapping count
+    BCVBR<5>, // type mapping count
+    BCVBR<5>, // inherited conformances count
+    BCArray<DeclIDField>
+    // The array contains value-value pairs, then type-type pairs,
+    // then protocol IDs. The additional conformances trail the record.
   >;
 
   using DeclContextLayout = BCRecordLayout<
     DECL_CONTEXT,
     BCArray<DeclIDField>
+  >;
+
+  using XRefLayout = BCRecordLayout<
+    XREF,
+    XRefKindField, // reference kind
+    TypeIDField,   // type if value, operator kind if operator
+    BCArray<IdentifierIDField> // access path
   >;
 }
 

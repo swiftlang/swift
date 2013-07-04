@@ -171,6 +171,9 @@ namespace {
     /// Writes a generic parameter list.
     bool writeGenericParams(const GenericParamList *genericParams);
 
+    /// Writes a generic parameter list.
+    void writeConformances(ArrayRef<ProtocolConformance *> conformances);
+
     /// Writes the members of a simple nominal decl.
     void writeMembers(const NominalTypeDecl *D);
 
@@ -390,8 +393,9 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, GENERIC_PARAM);
   RECORD(decls_block, GENERIC_REQUIREMENT);
 
-  RECORD(decls_block, XREF);
+  RECORD(decls_block, PROTOCOL_CONFORMANCE);
   RECORD(decls_block, DECL_CONTEXT);
+  RECORD(decls_block, XREF);
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
   RECORD(identifier_block, IDENTIFIER_DATA);
@@ -587,6 +591,37 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   return true;
 }
 
+void
+Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
+  using namespace decls_block;
+
+  unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
+  for (auto conformance : conformances) {
+    SmallVector<DeclID, 16> data;
+    SmallVector<ProtocolConformance *, 8> inherited;
+    for (auto valueMapping : conformance->Mapping) {
+      data.push_back(addDeclRef(valueMapping.first));
+      data.push_back(addDeclRef(valueMapping.second));
+    }
+    for (auto typeMapping : conformance->TypeMapping) {
+      data.push_back(addTypeRef(typeMapping.first));
+      data.push_back(addTypeRef(typeMapping.second));
+    }
+    for (auto inheritedMapping : conformance->InheritedMapping) {
+      data.push_back(addDeclRef(inheritedMapping.first));
+      inherited.push_back(inheritedMapping.second);
+    }
+
+    ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          conformance->Mapping.size(),
+                                          conformance->TypeMapping.size(),
+                                          conformance->InheritedMapping.size(),
+                                          data);
+    writeConformances(inherited);
+  }
+}
+
+
 void Serializer::writeMembers(const NominalTypeDecl *D) {
   using namespace decls_block;
   
@@ -713,6 +748,10 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!typeAlias->getAttrs().empty())
       return false;
 
+    // FIXME: Handle protocol conformances.
+    if (!typeAlias->getConformances().empty())
+      return false;
+
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
     Type underlying;
@@ -758,6 +797,7 @@ bool Serializer::writeDecl(const Decl *D) {
                              theStruct->isImplicit(),
                              inherited);
 
+    writeConformances(theStruct->getConformances());
     writeMembers(theStruct);
     return true;
   }
@@ -771,6 +811,11 @@ bool Serializer::writeDecl(const Decl *D) {
     
     // FIXME: Handle attributes.
     if (!proto->getAttrs().empty())
+      return false;
+
+    // FIXME: Handle protocol conformances. (We don't have these now but we
+    // could with default implementations.)
+    if (!proto->getConformances().empty())
       return false;
 
     assert(!proto->getGenericParams() && "protocols can't be generic");
@@ -1148,8 +1193,10 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<GenericParamListLayout>();
     registerDeclTypeAbbr<GenericParamLayout>();
     registerDeclTypeAbbr<GenericRequirementLayout>();
-    registerDeclTypeAbbr<XRefLayout>();
+
+    registerDeclTypeAbbr<ProtocolConformanceLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
+    registerDeclTypeAbbr<XRefLayout>();
   }
 
   while (!DeclsAndTypesToWrite.empty()) {
