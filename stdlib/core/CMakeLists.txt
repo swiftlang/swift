@@ -54,7 +54,7 @@ endif()
 
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_stdlib_core PROPERTIES
-                                        LINK_FLAGS "-framework Foundation")
+                                        LINK_FLAGS "-Xlinker -reexport-lobjc")
 add_dependencies(swift_stdlib_core swift)
 
 

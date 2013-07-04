@@ -70,7 +70,7 @@ endif
 
 SWIFT_OPTFLAG := -O3
 
-LDFLAGS += -framework Foundation \
+LDFLAGS += -Xlinker -reexport-lobjc \
 	   -lswift_runtime -Wl,-force_load,$(LibDir)/libswift_runtime.a
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
