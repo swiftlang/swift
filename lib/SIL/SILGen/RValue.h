@@ -91,6 +91,18 @@ public:
     return gen.emitManagedRValueWithCleanup(getValue());
   }
   
+  /// Store a copy of this value with independent ownership into the given
+  /// uninitialized address.
+  void copyInto(SILGenFunction &gen, SILValue dest) {
+    if (getType().isAddressOnly(gen.SGM.M)) {
+      gen.B.createCopyAddr(SILLocation(), getValue(), dest,
+                           /*isTake*/ false, /*isInitialize*/ true);
+      return;
+    }
+    gen.emitRetainRValue(SILLocation(), getValue());
+    gen.B.createStore(SILLocation(), getValue(), dest);
+  }
+  
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupsDepth getCleanup() const { return cleanup; }
 

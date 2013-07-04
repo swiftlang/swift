@@ -72,11 +72,10 @@ public:
     switch (p->getKind()) {
     // Wildcard patterns don't destructure.
     case PatternKind::Any:
-      return PatternConstructor::forWildcard();
-    // TODO These are wildcards, but we don't implement variable binding or
-    // expr pattern matching yet.
-    case PatternKind::Named:
     case PatternKind::Expr:
+      return PatternConstructor::forWildcard();
+    // TODO These are wildcards, but we don't implement variable binding yet.
+    case PatternKind::Named:
       llvm_unreachable("not implemented");
       // return PatternConstructor::forWildcard();
     
@@ -202,6 +201,20 @@ static bool isWildcardPattern(const Pattern *p) {
     == PatternConstructor::Kind::Wildcard;
 }
 
+/// A pair of an ExprPattern node and the SILValue it will test.
+struct ExprGuard {
+  const ExprPattern *pattern;
+  SILValue value;
+  
+  bool operator==(ExprGuard o) const {
+    return pattern == o.pattern && value == o.value;
+  }
+  
+  bool operator!=(ExprGuard o) const {
+    return pattern != o.pattern || value != o.value;
+  }
+};
+
 /// A handle to a row in a clause matrix. Does not own memory; use of the
 /// ClauseRow must be dominated by its originating ClauseMatrix.
 class ClauseRow {
@@ -215,14 +228,17 @@ class ClauseRow {
     SILBasicBlock *dest;
     /// The guard expression for the row, or null if there is no guard.
     Expr *guardExpr;
+    /// The ExprPatterns within the pattern and their matching values.
+    unsigned firstExprGuard, lastExprGuard;
   };
   
   Prefix *row;
   unsigned columnCount;
+  ArrayRef<ExprGuard> exprGuards;
   
   // ClauseRows should only be vended by ClauseMatrix::operator[].
-  ClauseRow(Prefix *row, unsigned columnCount)
-    : row(row), columnCount(columnCount)
+  ClauseRow(Prefix *row, unsigned columnCount, ArrayRef<ExprGuard> guards)
+    : row(row), columnCount(columnCount), exprGuards(guards)
   {}
   
 public:
@@ -238,8 +254,11 @@ public:
     return row->guardExpr;
   }
   bool hasGuard() const {
-    // TODO: ExprPatterns also need to be treated as guards.
     return row->guardExpr;
+  }
+  
+  ArrayRef<ExprGuard> getExprGuards() const {
+    return exprGuards;
   }
   
   /// Emit dispatch to the row's destination. If the row has no guard, the
@@ -248,29 +267,79 @@ public:
   /// the insertion branch on the not-taken path, and returns false.
   bool emitDispatch(SILGenFunction &gen) const {
     // If there is no guard, branch unconditionally.
-    if (!hasGuard()) {
+    if (!hasGuard() && exprGuards.empty()) {
       gen.B.createBranch(getLoc(), getDest());
       return true;
     }
 
     // Create a new BB for the guard-failed case.
     SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-
-    SILValue guardBool;
-    {
-      FullExpr scope(gen.Cleanups);
+    
+    if (!exprGuards.empty()) {
+      // If we have a guard, we'll jump to it if all the expr patterns check
+      // out. Otherwise we can jump directly to the destination.
+      SILBasicBlock *guardBB = getDest();
+      if (hasGuard())
+        guardBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      // Test ExprPatterns from the row in an "and" chain.
+      for (unsigned i = 0, e = exprGuards.size(); i < e; ++i) {
+        ExprGuard eg = exprGuards[i];
         
-      // TODO: Include ExprPattern tests in the guard condition computation.
+        // The last pattern test jumps to the guard.
+        SILBasicBlock *nextBB = guardBB;
+        if (i < e - 1)
+          nextBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+        
+        SILValue testBool;
+        {
+          FullExpr scope(gen.Cleanups);
 
-      // Emit the guard.
-      // TODO: Emit ExprPattern tests here.
-      // TODO: We should emit every guard once and share code if it covers
-      // multiple patterns.
-      guardBool = gen.visit(getGuard()).getUnmanagedSingleValue(gen);
+          // TODO: We should emit every guard once and share code if it covers
+          // multiple patterns.
+          // TODO: It'd be nice not to need the temp var here.
+          
+          // Allocate the temporary match variable.
+          auto init = gen.emitLocalVariableWithCleanup(eg.pattern->getMatchVar());
+          init->getAddress();
+          // Copy the tested value into the variable.
+          ManagedValue(eg.value, ManagedValue::Unmanaged).copyInto(gen,
+                                                             init->getAddress());
+          init->finishInitialization(gen);
+          
+          // Emit the match test.
+          testBool = gen.visit(eg.pattern->getMatchExpr())
+            .getUnmanagedSingleValue(gen);
+          
+        }
+        // We don't need the variable after this.
+        gen.VarLocs.erase(eg.pattern->getMatchVar());
+
+        // If the test succeeds, we move on to the next test; otherwise, we
+        // fail and move to the next pattern.
+        gen.B.createCondBranch(getLoc(), testBool, nextBB, falseBB);
+        if (i < e - 1)
+          gen.B.emitBlock(nextBB);
+      }
+      
+      if (hasGuard())
+        gen.B.emitBlock(guardBB);
     }
     
-    // Branch either to the row destination or the new BB.
-    gen.B.createCondBranch(getLoc(), guardBool, getDest(), falseBB);
+    if (hasGuard()) {
+      SILValue guardBool;
+      {
+        FullExpr scope(gen.Cleanups);
+          
+        // Emit the guard.
+        // TODO: We should emit every guard once and share code if it covers
+        // multiple patterns.
+        guardBool = gen.visit(getGuard()).getUnmanagedSingleValue(gen);
+      }
+      
+      // Branch either to the row destination or the new BB.
+      gen.B.createCondBranch(getLoc(), guardBool, getDest(), falseBB);
+    }
+    
     // Continue codegen on the false branch.
     gen.B.emitBlock(falseBB);
     return false;
@@ -294,6 +363,32 @@ public:
   }
 };
 
+/// Get a pattern as an ExprPattern, unwrapping semantically transparent
+/// pattern nodes.
+const ExprPattern *getAsExprPattern(const Pattern *p) {
+  if (!p) return nullptr;
+
+  switch (p->getKind()) {
+  case PatternKind::Expr:
+    return cast<ExprPattern>(p);
+  
+  case PatternKind::Tuple:
+  case PatternKind::Named:
+  case PatternKind::Any:
+  case PatternKind::Isa:
+  case PatternKind::NominalType:
+    return nullptr;
+
+  // Recur into simple wrapping patterns.
+  case PatternKind::Paren:
+    return getAsExprPattern(cast<ParenPattern>(p)->getSubPattern());
+  case PatternKind::Typed:
+    return getAsExprPattern(cast<TypedPattern>(p)->getSubPattern());
+  case PatternKind::Var:
+    return getAsExprPattern(cast<VarPattern>(p)->getSubPattern());
+  }
+}
+
 /// A clause matrix. This matrix associates subpattern rows to their
 /// corresponding guard expressions, and associates destination basic block
 /// and columns to their associated subject value.
@@ -304,6 +399,10 @@ class ClauseMatrix {
   unsigned rowCount, columnCount;
   /// The memory buffer containing the matrix data.
   void *data;
+  /// A list of ExprPatterns and the associated SILValue they test. Rows
+  /// reference into slices of this vector to indicate which ExprPatterns form
+  /// part of their guard.
+  std::vector<ExprGuard> exprGuards;
   
   // The memory layout of data is as follows:
   
@@ -373,7 +472,8 @@ public:
 
   /// Append a row to the matrix.
   void addRow(SILLocation loc, SILBasicBlock *dest, Expr *guardExpr,
-              ArrayRef<const Pattern*> cols) {
+              ArrayRef<const Pattern*> cols,
+              ArrayRef<ExprGuard> parentExprGuards = {}) {
     assert(cols.size() == columnCount && "new row has wrong number of columns");
 
     // Grow storage if necessary.
@@ -383,9 +483,25 @@ public:
       assert(data);
     }
     
+    // Collect guards introduced by ExprPatterns in this row.
+    unsigned exprGuardStart = exprGuards.size();
+    exprGuards.insert(exprGuards.end(),
+                      parentExprGuards.begin(), parentExprGuards.end());
+    for (unsigned i = 0, e = cols.size(); i < e; ++i) {
+      auto *ep = getAsExprPattern(cols[i]);
+      if (!ep)
+        continue;
+      ExprGuard eg{ep, getOccurrences()[i]};
+      if (std::find(parentExprGuards.begin(), parentExprGuards.end(), eg)
+           == parentExprGuards.end())
+        exprGuards.push_back(eg);
+    }
+    unsigned exprGuardEnd = exprGuards.size();
+    
     // Initialize the next row.
     ClauseRow::Prefix *row = getMutableRowPrefix(rowCount++);
-    ::new (row) ClauseRow::Prefix{loc, dest, guardExpr};
+    ::new (row) ClauseRow::Prefix{loc, dest, guardExpr,
+                                  exprGuardStart, exprGuardEnd};
     MutableArrayRef<const Pattern*> columnsBuf{
       reinterpret_cast<const Pattern**>(row+1),
       columnCount
@@ -408,7 +524,10 @@ public:
   }
   
   ClauseRow operator[](unsigned row) {
-    return {getMutableRowPrefix(row), columnCount};
+    auto *prefix = getMutableRowPrefix(row);
+    return {getMutableRowPrefix(row), columnCount,
+            {&exprGuards[prefix->firstExprGuard],
+             prefix->lastExprGuard - prefix->firstExprGuard}};
   }
   const ClauseRow operator[](unsigned row) const {
     return const_cast<ClauseMatrix&>(*this)[row];
@@ -429,7 +548,7 @@ public:
   /// remove the column.
   ///
   /// The first skipRows rows are removed prior to the transformation.
-  /// TODO: We treat ExprPatterns as wildcards with a guard.
+  /// We treat ExprPatterns as wildcards with a guard.
   ///
   /// Returns a pair of the
   /// specialized clause matrix and the false branch for the constructor test.
@@ -476,7 +595,7 @@ public:
       
       // Append the new row.
       specialized.addRow(row.getLoc(), row.getDest(), row.getGuard(),
-                         newPatterns);
+                         newPatterns, row.getExprGuards());
     }
     
     return result;
@@ -495,7 +614,7 @@ public:
   /// one specialized matrix.
   ///
   /// The first skipRows rows are removed prior to the transformation.
-  /// TODO: We treat ExprPatterns as wildcards with a guard.
+  /// We treat ExprPatterns as wildcards with a guard.
   void reduceToDefault(unsigned skipRows) {
     assert(columnCount >= 1 && "can't default a matrix with no columns");
     assert(skipRows < rowCount && "can't skip more rows than we have");
@@ -578,7 +697,7 @@ static void emitDecisionTree(SILGenFunction &gen,
   }
   
   // If the first rows are all wildcards (or empty), then try their
-  // guards. (TODO: ExprPatterns are treated as wildcards with guards.)
+  // guards. ExprPatterns are treated as wildcards with guards.
   unsigned r = 0, rows = clauses.rows();
   for (; r < rows; ++r) {
     ClauseRow row = clauses[r];
