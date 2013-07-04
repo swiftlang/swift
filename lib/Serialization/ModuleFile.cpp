@@ -220,6 +220,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
       uint8_t rawKind;
       ArrayRef<uint64_t> rawTypeIDs;
       GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
         assert(rawTypeIDs.size() == 2);
@@ -254,6 +255,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
         // an error so that we don't actually try to generate code.
         error();
       }
+
+      break;
     }
     default:
       // This record is not part of the GenericParamList.
@@ -1044,20 +1047,57 @@ Type ModuleFile::getType(TypeID TID) {
                                                  rawConformanceIDs);
 
     ArchetypeType *parent = nullptr;
+    Type superclass;
     Optional<unsigned> index;
-    if (isPrimary)
-      index = parentOrIndex;
-    else
-      parent = getType(parentOrIndex)->castTo<ArchetypeType>();
-
     SmallVector<ProtocolDecl *, 4> conformances;
-    for (DeclID protoID : rawConformanceIDs)
-      conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
+
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+      if (isPrimary)
+        index = parentOrIndex;
+      else
+        parent = getType(parentOrIndex)->castTo<ArchetypeType>();
+
+      superclass = getType(superclassID);
+
+      for (DeclID protoID : rawConformanceIDs)
+        conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
+    }
 
     auto archetype = ArchetypeType::getNew(ctx, parent, getIdentifier(nameID),
-                                           conformances, getType(superclassID),
-                                           index);
+                                           conformances, superclass, index);
     typeOrOffset = archetype;
+
+    auto entry = DeclTypeCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      error();
+      break;
+    }
+
+    scratch.clear();
+    unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
+    if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
+      error();
+      break;
+    }
+
+    ArrayRef<uint64_t> rawTypeIDs;
+    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch, rawTypeIDs);
+
+    SmallVector<std::pair<Identifier, ArchetypeType *>, 4> nestedTypes;
+    for (TypeID nestedID : rawTypeIDs) {
+      if (nestedID == TID) {
+        nestedTypes.push_back(std::make_pair(ctx.getIdentifier("This"),
+                                             archetype));
+      } else {
+        auto nested = getType(nestedID)->castTo<ArchetypeType>();
+        nestedTypes.push_back(std::make_pair(nested->getName(),
+                                             nested));
+      }
+    }
+    archetype->setNestedTypes(ctx, nestedTypes);
+
     break;
   }
 
@@ -1072,6 +1112,17 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto composition = ProtocolCompositionType::get(ctx, protocols);
     typeOrOffset = composition;
+    break;
+  }
+
+  case decls_block::SUBSTITUTED_TYPE: {
+    TypeID originalID, replacementID;
+
+    decls_block::SubstitutedTypeLayout::readRecord(scratch, originalID,
+                                                   replacementID);
+    typeOrOffset = SubstitutedType::get(getType(originalID),
+                                        getType(replacementID),
+                                        ctx);
     break;
   }
 

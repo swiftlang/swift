@@ -199,7 +199,9 @@ namespace decls_block {
     LVALUE_TYPE,
     PROTOCOL_TYPE,
     ARCHETYPE_TYPE,
+    ARCHETYPE_NESTED_TYPES,
     PROTOCOL_COMPOSITION_TYPE,
+    SUBSTITUTED_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -296,9 +298,20 @@ namespace decls_block {
     BCArray<DeclIDField> // conformances
   >;
 
+  using ArchetypeNestedTypesLayout = BCRecordLayout<
+    ARCHETYPE_NESTED_TYPES,
+    BCArray<TypeIDField>
+  >;
+
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCArray<TypeIDField> // protocols
+  >;
+
+  using SubstitutedTypeLayout = BCRecordLayout<
+    SUBSTITUTED_TYPE,
+    TypeIDField, // original
+    TypeIDField  // substitution
   >;
 
 

@@ -367,7 +367,9 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, LVALUE_TYPE);
   RECORD(decls_block, PROTOCOL_TYPE);
   RECORD(decls_block, ARCHETYPE_TYPE);
+  RECORD(decls_block, ARCHETYPE_NESTED_TYPES);
   RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
+  RECORD(decls_block, SUBSTITUTED_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -1007,10 +1009,6 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
 
-    // FIXME: Handle associated types.
-    if (!archetypeTy->getNestedTypes().empty())
-      return false;
-
     TypeID indexOrParentID;
     if (archetypeTy->isPrimary())
       indexOrParentID = archetypeTy->getPrimaryIndex();
@@ -1028,11 +1026,31 @@ bool Serializer::writeType(Type ty) {
                                     indexOrParentID,
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
+
+    SmallVector<TypeID, 4> nestedTypes;
+    for (auto next : archetypeTy->getNestedTypes()) {
+      assert(next.first == next.second->getName() ||
+             (next.second == archetypeTy &&
+              next.first == TU->Ctx.getIdentifier("This")));
+      nestedTypes.push_back(addTypeRef(next.second));
+    }
+
+    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
+    ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           nestedTypes);
+
     return true;
   }
 
-  case TypeKind::Substituted:
-    return false;
+  case TypeKind::Substituted: {
+    auto subTy = cast<SubstitutedType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[SubstitutedTypeLayout::Code];
+    SubstitutedTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addTypeRef(subTy->getOriginal()),
+                                      addTypeRef(subTy->getReplacementType()));
+    return true;
+  }
 
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
@@ -1108,7 +1126,9 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<LValueTypeLayout>();
     registerDeclTypeAbbr<ProtocolTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
+    registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
     registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
+    registerDeclTypeAbbr<SubstitutedTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
