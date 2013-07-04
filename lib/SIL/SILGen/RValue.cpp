@@ -83,7 +83,7 @@ public:
       // Extract the elements from loadable tuples.
       for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
         auto &field = t->getFields()[i];
-        SILType fieldTy = gen.getLoweredType(field.getType());
+        SILType fieldTy = gen.getLoweredLoadableType(field.getType());
         SILValue member = gen.B.createTupleExtract(SILLocation(),
                                                    v, i,
                                                    fieldTy);

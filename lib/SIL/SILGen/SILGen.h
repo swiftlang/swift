@@ -531,6 +531,12 @@ public:
   void visitCaseStmt(CaseStmt *S, SGFContext C);
   
   //===--------------------------------------------------------------------===//
+  // Patterns
+  //===--------------------------------------------------------------------===//
+
+  void emitSwitchStmt(SwitchStmt *S);
+  
+  //===--------------------------------------------------------------------===//
   // Expressions
   //===--------------------------------------------------------------------===//
   
@@ -544,7 +550,7 @@ public:
   RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
   RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
   RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
-                                                SGFContext C);
+                                          SGFContext C);
   
   RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
   RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);

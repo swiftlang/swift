@@ -347,7 +347,8 @@ void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
 }
 
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
-  SGM.diagnose(S->getLoc(), diag::not_implemented);
+  // Implemented in SILGenPattern.cpp.
+  emitSwitchStmt(S);
 }
 
 void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
