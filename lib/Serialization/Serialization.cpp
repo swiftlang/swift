@@ -373,6 +373,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, ARCHETYPE_NESTED_TYPES);
   RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
   RECORD(decls_block, SUBSTITUTED_TYPE);
+  RECORD(decls_block, BOUND_GENERIC_TYPE);
+  RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -778,10 +780,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!theStruct->getAttrs().empty())
       return false;
 
-    // FIXME: Handle generics.
-    if (theStruct->getGenericParams())
-      return false;
-
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
     SmallVector<TypeID, 4> inherited;
@@ -795,6 +793,7 @@ bool Serializer::writeDecl(const Decl *D) {
                              theStruct->isImplicit(),
                              inherited);
 
+    writeGenericParams(theStruct->getGenericParams());
     writeConformances(theStruct->getConformances());
     writeMembers(theStruct);
     return true;
@@ -920,6 +919,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                   addTypeRef(ctor->getType()),
                                   addDeclRef(implicitThis));
 
+    writeGenericParams(ctor->getGenericParams());
     writePattern(ctor->getArguments());
 
     return true;
@@ -1141,8 +1141,34 @@ bool Serializer::writeType(Type ty) {
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
-  case TypeKind::BoundGenericStruct:
-    return false;
+  case TypeKind::BoundGenericStruct: {
+    auto generic = cast<BoundGenericType>(ty.getPointer());
+
+    SmallVector<TypeID, 8> genericArgIDs;
+    for (auto next : generic->getGenericArgs())
+      genericArgIDs.push_back(addTypeRef(next));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
+    BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(generic->getDecl()),
+                                       addTypeRef(generic->getParent()),
+                                       genericArgIDs);
+
+    if (generic->hasSubstitutions()) {
+      abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
+      for (auto &sub : generic->getSubstitutions()) {
+        if (!sub.Conformance.empty())
+          return false;
+          
+        BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                   addTypeRef(sub.Archetype),
+                                                   addTypeRef(sub.Replacement));
+        writeConformances(sub.Conformance);
+      }
+    }
+
+    return true;
+  }
 
   case TypeKind::TypeVariable:
     return false;
@@ -1168,6 +1194,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
     registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
     registerDeclTypeAbbr<SubstitutedTypeLayout>();
+    registerDeclTypeAbbr<BoundGenericTypeLayout>();
+    registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();

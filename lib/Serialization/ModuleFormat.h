@@ -202,6 +202,8 @@ namespace decls_block {
     ARCHETYPE_NESTED_TYPES,
     PROTOCOL_COMPOSITION_TYPE,
     SUBSTITUTED_TYPE,
+    BOUND_GENERIC_TYPE,
+    BOUND_GENERIC_SUBSTITUTION,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -316,6 +318,21 @@ namespace decls_block {
     TypeIDField  // substitution
   >;
 
+  using BoundGenericTypeLayout = BCRecordLayout<
+    BOUND_GENERIC_TYPE,
+    DeclIDField, // generic decl
+    TypeIDField, // parent
+    BCArray<TypeIDField> // generic arguments
+    // The substitutions trail this record.
+  >;
+
+  using BoundGenericSubstitutionLayout = BCRecordLayout<
+    BOUND_GENERIC_SUBSTITUTION,
+    TypeIDField, // archetype
+    TypeIDField // replacement
+    // Trailed by the protocol conformance info (if any)
+  >;
+
 
   using TypeAliasLayout = BCRecordLayout<
     TYPE_ALIAS_DECL,
@@ -326,6 +343,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
     // Trailed by the conformance info (if any).
+    // FIXME: protocols?
   >;
 
   using StructLayout = BCRecordLayout<
@@ -336,6 +354,7 @@ namespace decls_block {
     BCArray<TypeIDField> // inherited types
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.
+    // FIXME: protocols?
   >;
 
   using ConstructorLayout = BCRecordLayout<
@@ -387,6 +406,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
     // Trailed by conformance info (if any) followed by the decl context record.
+    // FIXME: protocols?
   >;
 
 

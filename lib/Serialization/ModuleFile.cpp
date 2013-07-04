@@ -568,13 +568,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       DC = getDeclContext(contextID);
     }
 
+    auto genericParams = maybeReadGenericParams(DC);
+
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), inherited,
-                                          /*generic params=*/nullptr, DC);
+                                          genericParams, DC);
     declOrOffset = theStruct;
 
     if (isImplicit)
       theStruct->setImplicit();
+    if (genericParams)
+      for (auto &genericParam : *theStruct->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(theStruct);
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
     while (ProtocolConformance *conformance = maybeReadConformance())
@@ -604,10 +609,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       parent = cast<NominalTypeDecl>(getDeclContext(parentID));
     }
 
+    auto genericParams = maybeReadGenericParams(parent);
+
     auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("constructor"),
                                           SourceLoc(), /*args=*/nullptr,
-                                          thisDecl, /*generic params=*/nullptr,
-                                          parent);
+                                          thisDecl, genericParams, parent);
     declOrOffset = ctor;
     thisDecl->setDeclContext(ctor);
 
@@ -615,10 +621,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(args && "missing arguments for constructor");
     ctor->setArguments(args);
 
-    ctor->setType(getType(signatureID));
+    Type signature = getType(signatureID);
+    if (auto contextGenericParams = ctor->getGenericParamsOfContext()) {
+      signature = getPolymorphicFunctionType(ctx,
+                                             signature->castTo<FunctionType>(),
+                                             contextGenericParams);
+    }
+    ctor->setType(signature);
 
     if (isImplicit)
       ctor->setImplicit();
+
+    if (genericParams)
+      for (auto &genericParam : *ctor->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(ctor);
+
     break;
   }
 
@@ -687,10 +704,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       signature = getType(signatureID)->castTo<FunctionType>();
-      if (genericParams)
+
+      auto contextGenericParams = genericParams;
+      if (!genericParams)
+        genericParams = DC->getGenericParamsOfContext();
+
+      if (contextGenericParams)
         signature = getPolymorphicFunctionType(ctx,
                                                cast<FunctionType>(signature),
-                                               genericParams);
+                                               contextGenericParams);
     }
 
     auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
@@ -1195,6 +1217,54 @@ Type ModuleFile::getType(TypeID TID) {
     typeOrOffset = SubstitutedType::get(getType(originalID),
                                         getType(replacementID),
                                         ctx);
+    break;
+  }
+
+  case decls_block::BOUND_GENERIC_TYPE: {
+    DeclID declID;
+    TypeID parentID;
+    ArrayRef<uint64_t> rawArgumentIDs;
+
+    decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
+                                                    rawArgumentIDs);
+    SmallVector<Type, 8> genericArgs;
+    for (TypeID type : rawArgumentIDs)
+      genericArgs.push_back(getType(type));
+
+    auto boundTy = BoundGenericType::get(cast<NominalTypeDecl>(getDecl(declID)),
+                                         getType(parentID), genericArgs);
+    typeOrOffset = boundTy;
+
+    SmallVector<Substitution, 8> substitutions;
+    while (true) {
+      auto entry = DeclTypeCursor.advance();
+      if (entry.Kind != llvm::BitstreamEntry::Record)
+        break;
+
+      scratch.clear();
+      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                    &blobData);
+      if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
+        break;
+
+      TypeID archetypeID, replacementID;
+      decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
+                                                              archetypeID,
+                                                              replacementID);
+
+      SmallVector<ProtocolConformance *, 16> conformanceBuf;
+      while (ProtocolConformance *conformance = maybeReadConformance())
+        conformanceBuf.push_back(conformance);
+
+      {
+        BCOffsetRAII restoreOffset(DeclTypeCursor);
+        substitutions.push_back({getType(archetypeID)->castTo<ArchetypeType>(),
+                                 getType(replacementID),
+                                 ctx.AllocateCopy(conformanceBuf)});
+      }
+    }
+
+    boundTy->setSubstitutions(substitutions);
     break;
   }
 
