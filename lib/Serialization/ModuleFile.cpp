@@ -216,7 +216,47 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
       }
       break;
     }
+    case GENERIC_REQUIREMENT: {
+      uint8_t rawKind;
+      ArrayRef<uint64_t> rawTypeIDs;
+      GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+      switch (rawKind) {
+      case GenericRequirementKind::Conformance: {
+        assert(rawTypeIDs.size() == 2);
+        TypeLoc subject, constraint;
+        {
+          BCOffsetRAII restoreInnerOffset(DeclTypeCursor);
+          subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
+          constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
+        }
+
+        requirements.push_back(Requirement::getConformance(subject,
+                                                           SourceLoc(),
+                                                           constraint));
+        break;
+      }
+      case GenericRequirementKind::SameType: {
+        assert(rawTypeIDs.size() == 2);
+        TypeLoc first, second;
+        {
+          BCOffsetRAII restoreInnerOffset(DeclTypeCursor);
+          first = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
+          second = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
+        }
+
+        requirements.push_back(Requirement::getSameType(first,
+                                                        SourceLoc(),
+                                                        second));
+        break;
+      }
+      default:
+        // Unknown requirement kind. Drop the requirement and continue, but log
+        // an error so that we don't actually try to generate code.
+        error();
+      }
+    }
     default:
+      // This record is not part of the GenericParamList.
       shouldContinue = false;
       break;
     }

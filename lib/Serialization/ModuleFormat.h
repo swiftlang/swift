@@ -86,6 +86,14 @@ enum OperatorKind : uint8_t {
 static_assert(sizeof(OperatorKind) <= sizeof(TypeID),
               "too many operator kinds");
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum GenericRequirementKind : uint8_t {
+  Conformance = 0,
+  SameType
+};
+using GenericRequirementKindField = BCFixed<1>;
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -423,6 +431,12 @@ namespace decls_block {
   using GenericParamLayout = BCRecordLayout<
     GENERIC_PARAM,
     DeclIDField // Typealias
+  >;
+
+  using GenericRequirementLayout = BCRecordLayout<
+    GENERIC_REQUIREMENT,
+    GenericRequirementKindField, // requirement kind
+    BCArray<TypeIDField>         // types involved (currently always two)
   >;
 
   using XRefLayout = BCRecordLayout<

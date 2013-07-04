@@ -298,6 +298,17 @@ namespace impl {
       out.EmitRecordWithAbbrev(abbrCode, buffer);
     }
 
+    template <typename BufferTy, typename FirstData, typename ...RestData>
+    static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
+                     unsigned abbrCode, FirstData firstData,
+                     RestData... restData) {
+      std::array<FirstData, 1+sizeof...(restData)> arrayData{ {
+        firstData,
+        restData...
+      } };
+      emit(out, buffer, abbrCode, arrayData);
+    }
+
     template <typename BufferTy>
     static void emit(llvm::BitstreamWriter &out, BufferTy &buffer,
                      unsigned abbrCode, Nothing_t) {
@@ -344,11 +355,47 @@ namespace impl {
     template <typename ElementTy, typename DataTy>
     static void read(ArrayRef<ElementTy> buffer, DataTy &data) = delete;
   };
+
+  /// A type trait whose \c type field is the last of its template parameters.
+  template<typename First, typename ...Rest>
+  struct last_type {
+    using type = typename last_type<Rest...>::type;
+  };
+
+  template<typename Last>
+  struct last_type<Last> {
+    using type = Last;
+  };
+
+  /// A type trait whose \c value field is \c true if the last type is BCBlob.
+  template<typename ...Types>
+  using has_blob = std::is_same<BCBlob, typename last_type<int, Types...>::type>;
+
+  /// A type trait whose \c value field is \c true if the given type is a
+  /// BCArray (of any element kind).
+  template <typename T>
+  struct is_array {
+  private:
+    template <typename E>
+    static bool check(BCArray<E> *);
+    static int check(...);
+
+  public:
+    typedef bool value_type;
+    static constexpr bool value =
+      !std::is_same<decltype(check((T*)nullptr)),
+                    decltype(check(false))>::value;
+  };
+
+  /// A type trait whose \c value field is \c true if the last type is a
+  /// BCArray (of any element kind).
+  template<typename ...Types>
+  using has_array = is_array<typename last_type<int, Types...>::type>;
 } // end namespace impl
 
 /// Represents a single bitcode record type.
 ///
-/// This class template is meant to be instantiated and then given a name,
+/// This class template is meant to be instantiated and then given a name,
 /// so that from then on that name can be used 
 template<typename IDField, typename... Fields>
 class BCGenericRecordLayout {
@@ -386,12 +433,15 @@ public:
   /// Emit a record identified by \p abbrCode to bitstream reader \p out, using
   /// \p buffer for scratch space.
   ///
-  /// Note that even fixed arguments must be specified here. Currently, arrays
-  /// and blobs can only be passed as StringRefs.
+  /// Note that even fixed arguments must be specified here. Blobs are passed
+  /// as StringRefs, while arrays can be passed inline, as aggregates, or as
+  /// pre-encoded StringRef data. Skipped values and empty arrays should use
+  /// the special Nothing value.
   template <typename BufferTy, typename... Data>
   static void emitRecord(llvm::BitstreamWriter &out, BufferTy &buffer,
                          unsigned abbrCode, unsigned recordID, Data... data) {
-    static_assert(sizeof...(data) <= sizeof...(Fields),
+    static_assert(sizeof...(data) <= sizeof...(Fields) ||
+                  impl::has_array<Fields...>::value,
                   "Too many record elements");
     static_assert(sizeof...(data) >= sizeof...(Fields),
                   "Too few record elements");
@@ -407,11 +457,10 @@ public:
   /// in the buffer and should be handled separately by the caller.
   template <typename BufferTy, typename... Data>
   static void readRecord(BufferTy buffer, Data &... data) {
-    // Weaker bounds checks here: a trailing blob is not decoded through the
-    // layout.
     static_assert(sizeof...(data) <= sizeof...(Fields),
                   "Too many record elements");
-    static_assert(sizeof...(data)+1 >= sizeof...(Fields),
+    static_assert(sizeof...(Fields) <=
+                  sizeof...(data) + impl::has_blob<Fields...>::value,
                   "Too few record elements");
     return impl::BCRecordCoding<Fields...>::read(llvm::makeArrayRef(buffer),
                                                  data...);

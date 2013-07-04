@@ -386,6 +386,7 @@ void Serializer::writeBlockInfoBlock() {
 
   RECORD(decls_block, GENERIC_PARAM_LIST);
   RECORD(decls_block, GENERIC_PARAM);
+  RECORD(decls_block, GENERIC_REQUIREMENT);
 
   RECORD(decls_block, XREF);
   RECORD(decls_block, DECL_CONTEXT);
@@ -549,10 +550,6 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   if (!genericParams)
     return true;
 
-  // FIXME: Handle generic requirements.
-  if (!genericParams->getRequirements().empty())
-    return false;
-
   SmallVector<TypeID, 8> archetypeIDs;
   for (auto archetype : genericParams->getAllArchetypes())
     archetypeIDs.push_back(addTypeRef(archetype));
@@ -565,6 +562,24 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   for (auto next : genericParams->getParams()) {
     GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addDeclRef(next.getDecl()));
+  }
+
+  abbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
+  for (auto next : genericParams->getRequirements()) {
+    switch (next.getKind()) {
+    case RequirementKind::Conformance:
+      GenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           GenericRequirementKind::Conformance,
+                                           addTypeRef(next.getSubject()),
+                                           addTypeRef(next.getConstraint()));
+      break;
+    case RequirementKind::SameType:
+      GenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           GenericRequirementKind::SameType,
+                                           addTypeRef(next.getFirstType()),
+                                           addTypeRef(next.getSecondType()));
+      break;
+    }
   }
 
   return true;
@@ -1112,6 +1127,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
     registerDeclTypeAbbr<GenericParamListLayout>();
     registerDeclTypeAbbr<GenericParamLayout>();
+    registerDeclTypeAbbr<GenericRequirementLayout>();
     registerDeclTypeAbbr<XRefLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
   }
