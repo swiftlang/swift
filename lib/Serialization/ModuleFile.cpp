@@ -542,6 +542,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       alias->setImplicit();
     if (isGeneric)
       alias->setGenericParameter();
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (ProtocolConformance *conformance = maybeReadConformance())
+      conformanceBuf.push_back(conformance);
+    alias->setConformances(ctx.AllocateCopy(conformanceBuf));
+
     break;
   }
 
@@ -790,6 +796,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       proto->setImplicit();
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (ProtocolConformance *conformance = maybeReadConformance())
+      conformanceBuf.push_back(conformance);
+    proto->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");

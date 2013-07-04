@@ -297,6 +297,7 @@ namespace decls_block {
     TypeIDField,         // index if primary, parent if non-primary
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
+    // Trailed by the nested types record.
   >;
 
   using ArchetypeNestedTypesLayout = BCRecordLayout<
@@ -324,6 +325,7 @@ namespace decls_block {
     BCFixed<1>,  // generic flag
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
+    // Trailed by the conformance info (if any).
   >;
 
   using StructLayout = BCRecordLayout<
@@ -332,6 +334,8 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
+    // Trailed by the generic parameters (if any), conformance info (if any),
+    // and finally the decl context record.
   >;
 
   using ConstructorLayout = BCRecordLayout<
@@ -340,6 +344,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
+    // Trailed by its generic parameters, if any.
   >;
 
   using VarLayout = BCRecordLayout<
@@ -381,6 +386,7 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
+    // Trailed by conformance info (if any) followed by the decl context record.
   >;
 
 

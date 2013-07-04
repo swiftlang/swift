@@ -748,10 +748,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!typeAlias->getAttrs().empty())
       return false;
 
-    // FIXME: Handle protocol conformances.
-    if (!typeAlias->getConformances().empty())
-      return false;
-
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
     Type underlying;
@@ -770,6 +766,8 @@ bool Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isGenericParameter(),
                                 typeAlias->isImplicit(),
                                 inherited);
+
+    writeConformances(typeAlias->getConformances());
     return true;
   }
 
@@ -813,11 +811,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!proto->getAttrs().empty())
       return false;
 
-    // FIXME: Handle protocol conformances. (We don't have these now but we
-    // could with default implementations.)
-    if (!proto->getConformances().empty())
-      return false;
-
     assert(!proto->getGenericParams() && "protocols can't be generic");
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
@@ -832,6 +825,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                proto->isImplicit(),
                                inherited);
 
+    writeConformances(proto->getConformances());
     writeMembers(proto);
     return true;
   }
