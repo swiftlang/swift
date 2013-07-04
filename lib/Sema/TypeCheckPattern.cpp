@@ -97,12 +97,7 @@ public:
       patterns.push_back(pattern);
     }
     
-    // If there were no subpatterns, leave the entire tuple as a leaf
-    // expression.
-    if (!hasPattern)
-      return nullptr;
-    
-    // Otherwise, construct a TuplePattern.
+    // Construct a TuplePattern.
     // FIXME: Carry over field labels.
     SmallVector<TuplePatternElt, 4> patternElts;
     
