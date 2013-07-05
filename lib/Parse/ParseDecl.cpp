@@ -1679,6 +1679,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
         new (Context) ConstructorDecl(Context.getIdentifier("constructor"),
                                      SourceLoc(), Arguments, ThisDecl,
                                      nullptr, CD);
+    Constructor->setImplicit();
     ThisDecl->setDeclContext(Constructor);
     MemberDecls.push_back(Constructor);
   }
