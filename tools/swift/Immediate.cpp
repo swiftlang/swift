@@ -294,7 +294,6 @@ void swift::RunImmediately(irgen::Options &Options,
   // IRGen the main module.
   llvm::LLVMContext LLVMContext;
   llvm::Module Module(TU->Name.str(), LLVMContext);
-  performCaptureAnalysis(TU);
   performIRGeneration(Options, &Module, TU, SILMod);
 
   if (Context.hadError())
