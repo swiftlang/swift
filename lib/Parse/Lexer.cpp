@@ -160,7 +160,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(StringRef Buffer, llvm::SourceMgr &SourceMgr,
+Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
              bool InSILMode)
   : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode) {
@@ -188,7 +188,7 @@ InFlightDiagnostic Lexer::diagnose(const char *Loc, Diag<> ID) {
 tok Lexer::getTokenKind(StringRef Text) {
   assert(Text.data() >= BufferStart && Text.data() <= BufferEnd &&
          "Text string does not fall within lexer's buffer");
-  Lexer L(StringRef(BufferStart, BufferEnd - BufferStart), SourceMgr, Diags,
+  Lexer L(SourceMgr, StringRef(BufferStart, BufferEnd - BufferStart), Diags,
           Text.data(), /*not SIL mode*/ false);
   Token Result;
   L.lex(Result);
@@ -1316,7 +1316,7 @@ SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
   if (!Buffer)
     return SourceLoc();
   
-  Lexer L(Buffer->getBuffer(), SM, nullptr, Loc.Value.getPointer(), false);
+  Lexer L(SM, Buffer->getBuffer(), nullptr, Loc.Value.getPointer(), false);
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
 }

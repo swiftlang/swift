@@ -64,13 +64,13 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
-  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
+  Lexer(llvm::SourceMgr &SourceMgr, llvm::StringRef Buffer,
         DiagnosticEngine *Diags, const char *CurrentPosition, bool InSILMode);
 
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
         DiagnosticEngine *Diags, bool InSILMode)
-    : Lexer(Buffer, SourceMgr, Diags, Buffer.begin(), InSILMode) { }
+    : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode) { }
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -87,8 +87,9 @@ public:
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState,
         llvm::SourceMgr &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
-    : Lexer(StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
-            SourceMgr, Diags, BeginState.CurPtr, InSILMode) {
+    : Lexer(SourceMgr,
+            StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
+            Diags, BeginState.CurPtr, InSILMode) {
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
