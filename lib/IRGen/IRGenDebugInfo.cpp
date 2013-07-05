@@ -34,10 +34,16 @@
 using namespace swift;
 using namespace irgen;
 
-// DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
-// But for now, we need to use a constant in
-// DW_LANG_lo_user..DW_LANG_hi_user, because LLVM will assert on that.
-static const unsigned DW_LANG_Swift = 0x9999 /*llvm::dwarf::DW_LANG_Swift*/;
+// DW_LANG_Haskell+1 = 0x19 is the first unused language value in
+// DWARF 5.  We can't use it, because LLVM asserts that there are no
+// languages >DW_LANG_Python=0x14.  Wouldn't it would be much more
+// appropriate to use a constant in DW_LANG_lo_user..DW_LANG_hi_user
+// anyway, you may ask? Well, CompileUnit::constructTypeDIE() will
+// always use a DW_FORM_data1, which is too small for that range!  And
+// by fixing that in LLVM we would hint at developing a new language.
+// So instead, let's hijack a language with a very low potential for
+// accidental conflicts for now.
+static const unsigned DW_LANG_Swift = 0xf; /*llvm::dwarf::DW_LANG_Swift*/;
 
 /// Strdup S using the bump pointer.
 static
