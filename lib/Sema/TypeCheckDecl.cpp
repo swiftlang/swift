@@ -100,7 +100,7 @@ public:
           if (knownProtocols.insert(proto)) {
             ProtocolConformance *conformance = nullptr;
             if (TC.conformsToProtocol(T, proto, &conformance,
-                                      D->getStartLoc())) {
+                                      D->getStartLoc(), /*Explicit=*/true)) {
               // For nominal types and extensions thereof, record conformance.
               if (isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D))
                 TC.Context.recordConformance(proto, D);

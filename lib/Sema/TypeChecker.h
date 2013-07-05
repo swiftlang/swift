@@ -533,7 +533,8 @@ public:
   /// \returns true if T conforms to the protocol Proto, false otherwise.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto,
                           ProtocolConformance **Conformance = 0,
-                          SourceLoc ComplainLoc = SourceLoc());
+                          SourceLoc ComplainLoc = SourceLoc(),
+                          bool Explicit = false);
 
   /// \brief Given a set of archetype substitutions, verify and record all of
   /// the required protocol-conformance relationships.

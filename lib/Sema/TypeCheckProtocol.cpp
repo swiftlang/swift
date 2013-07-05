@@ -779,7 +779,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      ProtocolConformance **Conformance,
-                                     SourceLoc ComplainLoc) {
+                                     SourceLoc ComplainLoc, 
+                                     bool Explicit) {
   if (Conformance)
     *Conformance = nullptr;
 
@@ -811,10 +812,15 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known != Context.ConformsTo.end()) {
-    if (Conformance)
-      *Conformance = Known->second;
+    if (!Explicit) {
+      if (Conformance)
+        *Conformance = Known->second;
     
-    return Known->second != nullptr;
+      return Known->second != nullptr;
+    }
+
+    // For explicit conformance, force the check again.
+    Context.ConformsTo.erase(Known);
   }
   
   // Assume that the type does not conform to this protocol while checking
