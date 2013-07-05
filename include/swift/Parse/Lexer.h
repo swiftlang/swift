@@ -61,16 +61,20 @@ class Lexer {
   /// in a SIL file.  This enables some context-sensitive lexing.
   bool InSILBody = false;
   
+  /// \brief Set to true to return comment tokens, instead of skipping them.
+  bool KeepComments = false;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
   Lexer(llvm::SourceMgr &SourceMgr, llvm::StringRef Buffer,
-        DiagnosticEngine *Diags, const char *CurrentPosition, bool InSILMode);
+        DiagnosticEngine *Diags, const char *CurrentPosition,
+        bool InSILMode, bool KeepComments);
 
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags, bool InSILMode)
-    : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode) { }
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
+    : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode, KeepComments){}
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -89,12 +93,14 @@ public:
         llvm::SourceMgr &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
     : Lexer(SourceMgr,
             StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
-            Diags, BeginState.CurPtr, InSILMode) {
+            Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments()) {
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
     ArtificialEOF = EndState.CurPtr;
   }
+
+  bool isKeepingComments() const { return KeepComments; }
 
   const char *getBufferEnd() const { return BufferEnd; }
 

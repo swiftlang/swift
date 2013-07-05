@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
+  class SourceMgr;
   class MemoryBuffer;
   class Module;
   class FunctionPass;
@@ -35,6 +36,7 @@ namespace swift {
   class LangOptions;
   struct TypeLoc;
   class SILParserTUState;
+  class Token;
 
   namespace irgen {
     class Options;
@@ -66,6 +68,11 @@ namespace swift {
                                 unsigned *BufferOffset = 0,
                                 unsigned BufferEndOffset = 0,
                                 SILParserState *SIL = 0);
+
+  /// \brief Lex and return a vector of tokens for the given buffer.
+  std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,
+                              unsigned Offset = 0, unsigned EndOffset = 0,
+                              bool KeepComments = true);
 
   /// Attempt to parse a StringRef as a code completion context expression.
   /// Returns the parsed expression if successful, or null if an expression

@@ -29,6 +29,9 @@
 
 using namespace swift;
 
+static StringRef ComputeLexStart(StringRef File, unsigned Offset,
+                                 unsigned EndOffset, bool IsMainModule);
+
 namespace {
   /// To assist debugging parser crashes, tell us the location of the
   /// current token.
@@ -85,6 +88,25 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
   }
 
   return FoundSideEffects;
+}
+
+std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
+                                   unsigned Offset, unsigned EndOffset,
+                                   bool KeepComments) {
+  // This is mainly to check for "#!" at the beginning.
+  bool IsMainModule = (Offset == 0);
+  const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
+  std::unique_ptr<Lexer> L(
+      new Lexer(ComputeLexStart(Buffer->getBuffer(),
+                                Offset, EndOffset, IsMainModule),
+                SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments));
+  std::vector<Token> Tokens;
+  do {
+    Tokens.emplace_back();
+    L->lex(Tokens.back());
+  } while (Tokens.back().isNot(tok::eof));
+  Tokens.pop_back(); // Remove EOF.
+  return Tokens;
 }
 
 Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
