@@ -24,7 +24,6 @@
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenTuple.h"
-#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "FixedTypeInfo.h"

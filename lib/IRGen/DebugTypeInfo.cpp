@@ -19,8 +19,8 @@
 #include "IRGen.h"
 #include "FixedTypeInfo.h"
 
-namespace swift {
-namespace irgen {
+using namespace swift;
+using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align)
   : CanTy(CTy), SizeInBits(Size), AlignmentInBits(Align) {
@@ -58,7 +58,4 @@ bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
   return !operator==(T);
-}
-
-}
 }

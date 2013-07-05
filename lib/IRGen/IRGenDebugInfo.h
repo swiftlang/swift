@@ -32,7 +32,7 @@
 #include "IRGenModule.h"
 
 namespace llvm {
-class DIBuilder;
+  class DIBuilder;
 }
 
 namespace swift {

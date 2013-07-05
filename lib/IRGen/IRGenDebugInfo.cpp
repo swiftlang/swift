@@ -31,8 +31,8 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
 
-namespace swift {
-namespace irgen {
+using namespace swift;
+using namespace irgen;
 
 // DW_LANG_Haskell+1 = 0x19 is the first unused language value in DWARF 5.
 // But for now, we need to use a constant in
@@ -137,8 +137,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     return llvm::DIDescriptor();
 
   // Try to find it in the cache first.
-  llvm::DenseMap<SILDebugScope*, llvm::DIDescriptor>::iterator
-    CachedScope = ScopeCache.find(DS);
+  auto CachedScope = ScopeCache.find(DS);
   if (CachedScope != ScopeCache.end()) {
     return CachedScope->second;
   }
@@ -176,12 +175,12 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
     return llvm::DIFile();
 
   // Look in the cache first.
-  llvm::DenseMap<const char *, llvm::WeakVH>::iterator it =
+  auto CachedFile =
     DIFileCache.find(Filename);
 
-  if (it != DIFileCache.end()) {
+  if (CachedFile != DIFileCache.end()) {
     // Verify that the information still exists.
-    if (llvm::Value *V = it->second)
+    if (llvm::Value *V = CachedFile->second)
       return llvm::DIFile(cast<llvm::MDNode>(V));
   }
 
@@ -280,9 +279,7 @@ static llvm::DIFile getFile(llvm::DIDescriptor Scope) {
       break;
     default:
       return llvm::DIFile();
-      //llvm_unreachable("unhandled node");
     }
-    //assert(Scope.Verify());
     if (Scope.Verify())
       return llvm::DIFile();
   }
@@ -361,21 +358,23 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
-    BuiltinIntegerType *IntTy = BaseTy->castTo<BuiltinIntegerType>();
+    auto IntTy = BaseTy->castTo<BuiltinIntegerType>();
     Size = IntTy->getBitWidth();
+    Name = "Int";
     break;
   }
 
   case TypeKind::BuiltinFloat: {
-    BuiltinFloatType *FloatTy = BaseTy->castTo<BuiltinFloatType>();
+    auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     Size = FloatTy->getBitWidth();
+    Name = "Float";
     break;
   }
 
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
-    StructType *StructTy = BaseTy->castTo<StructType>();
-    if (StructDecl *Decl = StructTy->getDecl()) {
+    auto StructTy = BaseTy->castTo<StructType>();
+    if (auto Decl = StructTy->getDecl()) {
       Name = Decl->getName().str();
       Location L = getStartLoc(SM, Decl);
       return DBuilder.createStructType(Scope,
@@ -392,15 +391,16 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     return llvm::DIType();
   }
 
-  // Handle everything else based off NominalType.
+  // Handle everything else that is based off NominalType.
   case TypeKind::OneOf:
   case TypeKind::Class:
   case TypeKind::Protocol: {
-    NominalType *NominalTy = BaseTy->castTo<NominalType>();
-    if (NominalTypeDecl *Decl = NominalTy->getDecl()) {
+    auto NominalTy = BaseTy->castTo<NominalType>();
+    if (auto Decl = NominalTy->getDecl()) {
       Name = Decl->getName().str();
       break;
     }
+    return llvm::DIType();
   }
   default:
     return llvm::DIType();
@@ -418,12 +418,11 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
     return llvm::DIType();
 
   // Look in the cache first.
-  llvm::DenseMap<DebugTypeInfo, llvm::WeakVH>::iterator it =
-    DITypeCache.find(Ty);
+  auto CachedType = DITypeCache.find(Ty);
 
-  if (it != DITypeCache.end()) {
+  if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
-    if (llvm::Value *DITy = it->second)
+    if (llvm::Value *DITy = CachedType->second)
       return llvm::DIType(cast<llvm::MDNode>(DITy));
   }
 
@@ -432,6 +431,3 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
   DITypeCache[Ty] = DITy;
   return DITy;
 }
-
-} // irgen
-} // swift
