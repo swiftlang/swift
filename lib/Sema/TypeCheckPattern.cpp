@@ -346,8 +346,38 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
       
   // Coerce an 'is' pattern by determining the cast kind.
   case PatternKind::Isa: {
+    auto IP = cast<IsaPattern>(P);
+
+    // Type-check the type parameter.
+    if (validateType(IP->getCastTypeLoc()))
+      return nullptr;
+    
+    CheckedCastKind castKind
+      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
+                             IP->getLoc(),
+                             IP->getLoc(),IP->getCastTypeLoc().getSourceRange(),
+                             [](Type) { return false; });
+    switch (castKind) {
+    case CheckedCastKind::Unresolved:
+      return nullptr;
+    case CheckedCastKind::InvalidCoercible:
+      diagnose(IP->getLoc(), diag::isa_is_always_true,
+               type,
+               IP->getCastTypeLoc().getType());
+      return nullptr;
+    // Valid checks.
+    case CheckedCastKind::Downcast:
+    case CheckedCastKind::SuperToArchetype:
+    case CheckedCastKind::ArchetypeToArchetype:
+    case CheckedCastKind::ArchetypeToConcrete:
+    case CheckedCastKind::ExistentialToArchetype:
+    case CheckedCastKind::ExistentialToConcrete:
+      IP->setCastKind(castKind);
+      break;
+    }
+    
     // TODO: Resolve the cast kind.
-    P->setType(type);
+    IP->setType(type);
     return false;
   }
       

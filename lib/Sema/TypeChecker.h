@@ -394,6 +394,26 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
+  /// \brief Determine the semantics of a checked cast operation.
+  ///
+  /// \param fromType       The source type of the cast.
+  /// \param toType         The destination type of the cast.
+  /// \param diagLoc        The location at which to report diagnostics.
+  /// \param diagFromRange  The source range of the input operand of the cast.
+  /// \param diagToRange    The source range of the destination type.
+  /// \param convertToType  A callback called when an implicit conversion
+  ///                       to an intermediate type is needed.
+  ///
+  /// \returns a CheckedCastKind indicating the semantics of the cast. If the
+  /// cast is invald, Unresolved is returned. If the cast represents an implicit
+  /// conversion, InvalidCoercible is returned.
+  CheckedCastKind typeCheckCheckedCast(Type fromType,
+                                       Type toType,
+                                       SourceLoc diagLoc,
+                                       SourceRange diagFromRange,
+                                       SourceRange diagToRange,
+                                       std::function<bool(Type)> convertToType);
+  
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.
   ///

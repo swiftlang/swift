@@ -76,6 +76,10 @@ public:
   bool isImplicit() const { return PatternBits.isImplicit; }
   void setImplicit() { PatternBits.isImplicit = true; }
 
+  /// Find the smallest subpattern which obeys the property that matching it is
+  /// equivalent to matching this pattern.
+  ///
+  /// Looks through ParenPattern, VarPattern, and TypedPattern.
   Pattern *getSemanticsProvidingPattern();
   const Pattern *getSemanticsProvidingPattern() const {
     return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
@@ -125,7 +129,7 @@ public:
   
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
-  Pattern *walk(ASTWalker &&walker) { return walk(walker); }
+  Pattern *walk(ASTWalker &&walker) { return walk(walker); }  
 };
 
 /// A pattern consisting solely of grouping parentheses around a
@@ -312,14 +316,6 @@ public:
   }
 };
 
-inline Pattern *Pattern::getSemanticsProvidingPattern() {
-  if (ParenPattern *pp = dyn_cast<ParenPattern>(this))
-    return pp->getSubPattern()->getSemanticsProvidingPattern();
-  if (TypedPattern *tp = dyn_cast<TypedPattern>(this))
-    return tp->getSubPattern()->getSemanticsProvidingPattern();
-  return this;
-}
-  
 /// A pattern which performs a dynamic type check. The match succeeds if the
 /// class, archetype, or existential value is dynamically of the given type.
 ///
@@ -488,6 +484,16 @@ public:
     return P->getKind() == PatternKind::Var;
   }
 };
+  
+inline Pattern *Pattern::getSemanticsProvidingPattern() {
+  if (ParenPattern *pp = dyn_cast<ParenPattern>(this))
+    return pp->getSubPattern()->getSemanticsProvidingPattern();
+  if (TypedPattern *tp = dyn_cast<TypedPattern>(this))
+    return tp->getSubPattern()->getSemanticsProvidingPattern();
+  if (VarPattern *vp = dyn_cast<VarPattern>(this))
+    return vp->getSubPattern()->getSemanticsProvidingPattern();
+  return this;
+}
   
 } // end namespace swift
 

@@ -3896,3 +3896,97 @@ void ConstraintSystem::dump() {
     out << "\n";
   }
 }
+
+/// Determine the semantics of a checked cast operation.
+CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
+                                 Type toType,
+                                 SourceLoc diagLoc,
+                                 SourceRange diagFromRange,
+                                 SourceRange diagToRange,
+                                 std::function<bool (Type)> convertToType) {
+  Type origFromType = fromType;
+  bool toArchetype = toType->is<ArchetypeType>();
+  bool fromArchetype = fromType->is<ArchetypeType>();
+  bool toExistential = toType->isExistentialType();
+  bool fromExistential = fromType->isExistentialType();
+  
+  // If the from/to types are equivalent or implicitly convertible,
+  // this should have been a coercion expression (b as A) rather than a
+  // checked cast (a as! B). Complain.
+  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType)) {
+    return CheckedCastKind::InvalidCoercible;
+  }
+  
+  // We can't downcast to an existential.
+  if (toExistential) {
+    diagnose(diagLoc, diag::downcast_to_existential,
+             origFromType, toType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+    return CheckedCastKind::Unresolved;
+  }
+  
+  // A downcast can:
+  //   - convert an archetype to a (different) archetype type.
+  if (fromArchetype && toArchetype) {
+    return CheckedCastKind::ArchetypeToArchetype;
+  }
+
+  //   - convert from an existential to an archetype or conforming concrete
+  //     type.
+  if (fromExistential) {
+    if (toArchetype) {
+      return CheckedCastKind::ExistentialToArchetype;
+    } else if (isConvertibleTo(toType, fromType)) {
+      return CheckedCastKind::ExistentialToConcrete;
+    } else {
+      diagnose(diagLoc,
+               diag::downcast_from_existential_to_unrelated,
+               origFromType, toType)
+        .highlight(diagFromRange)
+        .highlight(diagToRange);
+      return CheckedCastKind::Unresolved;
+    }
+  }
+  
+  //   - convert an archetype to a concrete type fulfilling its constraints.
+  if (fromArchetype) {
+    if (!isSubstitutableFor(toType, fromType->castTo<ArchetypeType>())) {
+      diagnose(diagLoc,
+               diag::downcast_from_archetype_to_unrelated,
+               origFromType, toType)
+        .highlight(diagFromRange)
+        .highlight(diagToRange);
+      return CheckedCastKind::Unresolved;
+    }
+    return CheckedCastKind::ArchetypeToConcrete;
+  }
+  
+  //   - convert from a superclass to an archetype.
+  if (toArchetype) {
+    auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
+
+    // Coerce to the supertype of the archetype.
+    if (convertToType(toSuperType))
+      return CheckedCastKind::Unresolved;
+    
+    return CheckedCastKind::SuperToArchetype;
+  }
+
+  // The remaining case is a class downcast.
+
+  assert(!fromArchetype && "archetypes should have been handled above");
+  assert(!toArchetype && "archetypes should have been handled above");
+  assert(!fromExistential && "existentials should have been handled above");
+  assert(!toExistential && "existentials should have been handled above");
+
+  // The destination type must be a subtype of the source type.
+  if (!isSubtypeOf(toType, fromType)) {
+    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, toType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+    return CheckedCastKind::Unresolved;
+  }
+
+  return CheckedCastKind::Downcast;
+}

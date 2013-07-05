@@ -1502,92 +1502,14 @@ namespace {
       expr->setSubExpr(sub);
 
       Type fromType = sub->getType();
-      Type origFromType = fromType;
-      bool toArchetype = toType->is<ArchetypeType>();
-      bool fromArchetype = fromType->is<ArchetypeType>();
-      bool toExistential = toType->isExistentialType();
-      bool fromExistential = fromType->isExistentialType();
       
-      // If the from/to types are equivalent or implicitly convertible,
-      // this should have been a coercion expression (b as A) rather than a
-      // checked cast (a as! B). Complain.
-      if (fromType->isEqual(toType) || tc.isConvertibleTo(fromType, toType)) {
-        return CheckedCastKind::InvalidCoercible;
-      }
-      
-      // We can't downcast to an existential.
-      if (toExistential) {
-        tc.diagnose(expr->getLoc(), diag::downcast_to_existential,
-                    origFromType, toType)
-          .highlight(sub->getSourceRange())
-          .highlight(expr->getCastTypeLoc().getSourceRange());
-        return CheckedCastKind::Unresolved;
-      }
-      
-      // A downcast can:
-      //   - convert an archetype to a (different) archetype type.
-      if (fromArchetype && toArchetype) {
-        return CheckedCastKind::ArchetypeToArchetype;
-      }
-
-      //   - convert from an existential to an archetype or conforming concrete
-      //     type.
-      if (fromExistential) {
-        if (toArchetype) {
-          return CheckedCastKind::ExistentialToArchetype;
-        } else if (tc.isConvertibleTo(toType, fromType)) {
-          return CheckedCastKind::ExistentialToConcrete;
-        } else {
-          tc.diagnose(expr->getLoc(),
-                      diag::downcast_from_existential_to_unrelated,
-                      origFromType, toType)
-            .highlight(sub->getSourceRange())
-            .highlight(expr->getCastTypeLoc().getSourceRange());
-          return CheckedCastKind::Unresolved;
-        }
-      }
-      
-      //   - convert an archetype to a concrete type fulfilling its constraints.
-      if (fromArchetype) {
-        if (!tc.isSubstitutableFor(toType, fromType->castTo<ArchetypeType>())) {
-          tc.diagnose(expr->getLoc(),
-                      diag::downcast_from_archetype_to_unrelated,
-                      origFromType, toType)
-            .highlight(sub->getSourceRange())
-            .highlight(expr->getCastTypeLoc().getSourceRange());
-          return CheckedCastKind::Unresolved;
-        }
-        return CheckedCastKind::ArchetypeToConcrete;
-      }
-      
-      //   - convert from a superclass to an archetype.
-      if (toArchetype) {
-        auto toSuperType = toType->castTo<ArchetypeType>()->getSuperclass();
-
-        // Coerce to the supertype of the archetype.
-        if (tc.convertToType(sub, toSuperType, cs.DC))
-          return CheckedCastKind::Unresolved;
-        
-        return CheckedCastKind::SuperToArchetype;
-      }
-
-      // The remaining case is a class downcast.
-
-      assert(!fromArchetype && "archetypes should have been handled above");
-      assert(!toArchetype && "archetypes should have been handled above");
-      assert(!fromExistential && "existentials should have been handled above");
-      assert(!toExistential && "existentials should have been handled above");
-
-      // The destination type must be a subtype of the source type.
-      if (!tc.isSubtypeOf(toType, fromType)) {
-        tc.diagnose(expr->getLoc(), diag::downcast_to_unrelated,
-                    origFromType, toType)
-          .highlight(sub->getSourceRange())
-          .highlight(expr->getCastTypeLoc().getSourceRange());
-        return CheckedCastKind::Unresolved;
-      }
-
-      return CheckedCastKind::Downcast;
+      return tc.typeCheckCheckedCast(fromType, toType,
+                              expr->getLoc(),
+                              sub->getSourceRange(),
+                              expr->getCastTypeLoc().getSourceRange(),
+                              [&](Type commonTy) -> bool {
+                                return tc.convertToType(sub, commonTy, cs.DC);
+                              });
     }
     
     Expr *visitIsaExpr(IsaExpr *expr) {
