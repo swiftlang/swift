@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DebugTypeInfo.h"
-#include "IrGen.h"
+#include "IRGen.h"
 #include "FixedTypeInfo.h"
 
 namespace swift {
