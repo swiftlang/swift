@@ -11,7 +11,12 @@ The code is designed to be completely rewritten when someone has some free time.
 Installation
 ============
 
-In order to be made available to Pygments for use when e.g, building RST with Sphinx, you need to copy the included `swift.py` file and run the Pygments `_mapping.py` config script.
+**You don't need to install this file to use it with Sphinx** provided
+you use a monkeypatch like the one in this project's docs/conf.py
+
+Otherwise, in order to be made available to Pygments, you need to copy
+the included `swift.py` file and run the Pygments `_mapping.py` config
+script.
 
 You'll need to find out the path to your Pygments install. For me, this was:
 /Library/Python/2.7/site-packages/Pygments-1.6rc1-py2.7.egg/pygments/lexers
@@ -26,8 +31,6 @@ Copy the `swift.py` file to this directory.
 Execute the Pygments config script:
 
     $ python _mapping.py
-
-
 
 Usage
 =====

@@ -249,3 +249,31 @@ intersphinx_mapping = {}
 
 # Enable this if you want TODOs to show up in the generated documentation.
 todo_include_todos = True
+
+#
+# Monkeypatch pygments so it will know about the Swift lexers
+#
+
+# Pull in the Swift lexers
+from os.path import dirname, abspath, join as join_paths
+sys.path = [
+    join_paths(dirname(dirname(abspath(__file__))), 'utils', 'pygments')
+] + sys.path
+
+import swift as swift_pygments_lexers
+
+sys.path.pop(0)
+
+# Monkeypatch pygments.lexers.get_lexer_by_name to return our lexers
+from pygments.lexers import get_lexer_by_name as original_get_lexer_by_name
+
+def swift_get_lexer_by_name(_alias, *args, **kw):
+    if _alias == 'swift':
+        return swift_pygments_lexers.SwiftLexer()
+    elif _alias == 'swift-console':
+        return swift_pygments_lexers.SwiftConsoleLexer()
+    else:
+        return original_get_lexer_by_name(_alias, *args, **kw)
+
+import pygments.lexers
+pygments.lexers.get_lexer_by_name = swift_get_lexer_by_name
