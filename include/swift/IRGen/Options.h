@@ -65,7 +65,7 @@ public:
   unsigned UseJIT : 1;
 
   Options() : OutputKind(OutputKind::LLVMAssembly), Verify(true), OptLevel(0),
-              UseJIT(false) {}
+              DebugInfo(false), UseJIT(false) {}
 };
 
 } // end namespace irgen
