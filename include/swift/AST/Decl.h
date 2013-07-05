@@ -667,6 +667,8 @@ public:
     return { ExtensionLoc, Braces.End };
   }
 
+  SourceRange getBraces() const { return Braces; }
+
   Type getExtendedType() const { return ExtendedType.getType(); }
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
 
