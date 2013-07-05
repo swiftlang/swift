@@ -1,4 +1,4 @@
-// RUN: %swift -sil-i %s | FileCheck %s
+// RUN: %swift -i %s | FileCheck %s
 
 var foo : Int {
 get:

@@ -1,0 +1,28 @@
+// RUN: %swift -i %s | FileCheck %s
+
+func double(x:Int) -> Int {
+  return x+x
+}
+
+func curriedSubtract(x:Int)(y:Int) -> Int {
+  return x-y
+}
+
+func twice(f:(Int) -> Int, x:Int) -> Int {
+  return f(f(x))
+}
+
+// CHECK: 4
+println(double(2))
+// CHECK: 8
+println(double(4))
+
+// CHECK: 12
+println(curriedSubtract(16)(4))
+
+// CHECK: 20
+println(twice(double, 5))
+// CHECK: 7
+println(twice({ $0 + 1 }, 5))
+// CHECK: 3
+println(twice({ |x| x - 1 }, 5))

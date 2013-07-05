@@ -1,4 +1,4 @@
-// RUN: %swift -sil-i %s | FileCheck %s
+// RUN: %swift -i %s | FileCheck %s
 
 protocol RollCallable {
   func rollCall() -> String
@@ -29,13 +29,6 @@ func printRollCall(x:RollCallable) {
 func printRollCallWithSnark(x:protocol<RollCallable, Snarker>) {
   printRollCall(x)
   println("(\(x.snark()))")
-}
-
-func uninitializedProto() -> RollCallable {
-  // This just checks that zero_addr on an uninitialized protocol variable
-  // works
-  var x:RollCallable
-  return x
 }
 
 // CHECK: Cambot!

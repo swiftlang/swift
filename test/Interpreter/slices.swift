@@ -1,4 +1,4 @@
-// RUN: %swift -i -sil-irgen %s | FileCheck %s
+// RUN: %swift -i %s | FileCheck %s
 
 protocol Showable {
   func show()

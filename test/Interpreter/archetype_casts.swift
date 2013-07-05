@@ -16,7 +16,15 @@ func up<T:C>(x:T) -> C {
   return x
 }
 
+func isa<T:C>(x:C, _:T.metatype) -> Bool {
+  return x is T
+}
+
 // CHECK: foo
-down(new D, D).foo()
+down(D(), D).foo()
 // CHECK: bar
-up(new D).bar()
+up(D()).bar()
+// CHECK: true
+println(isa(D(), D))
+// CHECK: false
+println(isa(C(), D))

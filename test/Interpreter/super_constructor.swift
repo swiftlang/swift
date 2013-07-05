@@ -1,9 +1,11 @@
-// RUN: %swift -sil-i %s | FileCheck %s
-// XFAIL: *
-// need to reimplement super lookup in SIL -Joe
+// RUN: %swift -i %s | FileCheck %s
 
 struct S {
   var a, b : Int
+  constructor(a : Int, b : Int) {
+    this.a = a
+    this.b = b
+  }
   constructor(x:Char) {
     a = 219
     b = 912
@@ -43,9 +45,9 @@ println(S('x'))
 
 // CHECK: constructed y
 // CHECK: C(a=20721, b=12702)
-println(new C('y'))
+println(C('y'))
 
 // CHECK: constructed z
 // CHECK: ...in bed
 // CHECK: C(a=20721, b=12702)
-println(new D())
+println(D())
