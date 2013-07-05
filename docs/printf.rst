@@ -339,6 +339,7 @@ We've proposed an interface that:
 * Turns potential runtime errors into compile-time errors.
 * Makes simple cases simple and uncommon cases more explicit
 * Offers major bang for the buck:
+
  - handles an important element of the internationalization picture
  - the common case uses the same number of characters
  - the case where you want to do formatting costs one extra character

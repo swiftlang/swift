@@ -369,7 +369,7 @@ Other uses of patterns
 ----------------------
 
 Patterns come up (or could potentially come up) in a few other places
-in the grammar::
+in the grammar:
 
 Var bindings
 ............

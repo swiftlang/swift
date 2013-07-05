@@ -1,4 +1,5 @@
 .. @raise litre.TestsAreMissing
+
 This document summarizes a few email and meeting discussions we have had. Thanks
 goes to Jordan for the intial thorough email summary.
 
@@ -24,12 +25,16 @@ Summary of Solutions And Alternatives
 Foo<T>, Foo<K, V>
 -----------------
 
-Pros:
+Pros
+....
+
 - Extremely familiar and valuable syntax to C++, Java, and C# programmers.
 - Could be backported to Objective-C if you require using object pointer types
   (e.g. ``NSArray<NSString *>``).
 
-Cons:
+Cons
+....
+
 - Ambiguous in the case of ``x<y>(z)`` and similar, because ``<`` and ``>`` are
   operator characters. This can result in trivial operator related parse errors
   given our operator grammar (for example: ``f(x< y >(z))`` is three expressions
@@ -44,19 +49,24 @@ Cons:
 Foo(T), Foo(K,V)
 ----------------
 
-Pros:
+Pros
+....
+
 - All generic expressions parse as function calls to be later fixed during
   semantic analysis.
 
-Cons:
+Cons
+....
+
 - Function declarations grammar would need to change to disambiguate curried
   functions from generic functions. For example, to borrow from our variable
-  declaration syntax:
-  ::
+  declaration syntax::
+
     var  x : Int { return 42 }
     func y : Int { return 42 }
     func z : (arg : Int) -> Int { return arg }
     func g(T : Equatable) : (a : T, b : T) -> Bool { return a == b }
+
 - Potentially confusing. For example: ``f(Int)()`` -- is ``f`` a generic
   function or a higher-order function?
 - Difficult with tuple types. (DaveZ: why?)
@@ -66,13 +76,17 @@ Cons:
 Foo[T], Foo[K,V]
 ----------------
 
-Pros:
+Pros
+....
+
 - Could be backported to Objective-C; types can never be subscripted there.
 - Acceptably ambiguous at parse time. Single argument generics may parse as a
   subscript operation, rather than a generic type. This can be fixed during
   semantic analysis.
 
-Cons:
+Cons
+....
+
 - Chris strongly wants ``[]`` to always means "array".
 - Ambiguous in the case of 'Int[3]' for sized array shorthand. Easy to
   disambiguate unless you want to make arrays of a deduced generic type.
@@ -87,17 +101,21 @@ Cons:
 Foo{T}, Foo{K, V}
 -----------------
 
-Pros:
+Pros
+....
+
 - Can be made trivially unambiguous at parse time.
 - Could be backported to Objective-C, may have some problems for interface
-  variables:
-  ::
+  variables::
+
     @interface Foo{T} {
       NSArray{T} *Content;
     }
     @end
 
-Cons:
+Cons
+....
+
 - Parse time disambiguation requires white space sensitivity similar to our
   existing ``[]`` and ``()`` rules.
 - Strong and negative reactions by many to the way this looks.
@@ -106,10 +124,14 @@ Cons:
 Foo[[T]], Foo[[K,V]]
 --------------------
 
-Pros:
+Pros
+....
+
 - Could be backported to Objective-C
 
-Cons:
+Cons
+....
+
 - A bit long to type and to read in monospace.
 - Ambiguous with array literals: ``f[[Int]]`` parses as ``f[ [Int] ]``
 - Possibly ambiguous with C++11 attributes.
@@ -118,13 +140,19 @@ Cons:
 Foo^T, Foo^(K,V), Foo!T, Foo!<K,V>, Foo'T, Foo'[K,V], Foo\T, Foo\(K,V), etc
 ---------------------------------------------------------------------------
 
-Pros:
+Pros
+....
+
 - Can be trivially unambiguous.
 - Allows for shorter syntax in the one generic argument case.
 
-Cons:
+Cons
+....
+
 - Not at all familiar, not particularly readable (i.e. "punctuation soup").
+
 - Various characters have various problems:
+
   - Traditional unary operators -- requires stealing another operator from
     swift's otherwise separate and self-consitent operator rules. Not easy for
     Objective-C because most of these already appear as operators.

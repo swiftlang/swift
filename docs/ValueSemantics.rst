@@ -128,7 +128,7 @@ In fact, the fundamental difference between reference and value
 semantics is that **value semantics never creates multiple paths to
 the same mutable state**. [#cow]_
 
-.. Admontion:: `struct` vs `class`
+.. Admonition:: `struct` vs `class`
 
    Although `struct`\ s were designed to support value semantics and
    `class`\ es were designed to support reference semantics, it would
@@ -272,9 +272,9 @@ We can measure the length of a cycle in these nodes as follows::
 
  cycle_length( someNode, (x: [byref] Node){ x = x.next } )
 
-This is why so many generic algorithms seem to work on both ``class``\
-es and non-``class``\ es: ``class` *identities* work just fine as
-values.
+This is why so many generic algorithms seem to work on both 
+``class``\ es and non-``class``\ es: ``class`` *identities* 
+work just fine as values.
 
 The Role of Moves
 =================

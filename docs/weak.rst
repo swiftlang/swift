@@ -540,7 +540,7 @@ reference is not a safe default, because it permits the object to be
 destroyed while a reference is still outstanding.
 
 In addition, any implementation model which permits the safety checks
-on :code:`backref`s to be disabled will require all code to agree about
+on :code:`backref`\ s to be disabled will require all code to agree about
 whether or not the checks are enabled.  When this information is tied
 to a declaration, this is easy, because declarations are ultimately
 owned by a particular component, and we can ask how that component is
@@ -934,7 +934,7 @@ original variable is mutable (or anything along the path is, if it
 involves properties) or the capture adds ``[backref]``.
 
 This rule will effectively force programmers to use extra variables or
-``capture``s as a way of promising validity of the internal
+``capture``\ s as a way of promising validity of the internal
 captures.
 
 The motivation for this prohibition is that the intent of such

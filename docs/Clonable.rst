@@ -1,4 +1,5 @@
 .. @raise litre.TestsAreMissing
+
 ==========
  Clonable
 ==========
@@ -24,7 +25,7 @@ runtime-polymorphic value types.  Instead of merely writing::
 
   val x : MyClass
 
-one has to engage in some kind of wrapping and forwarding:
+one has to engage in some kind of wrapping and forwarding::
 
   struct MyClassVal {
     var [clone] value : MyClass

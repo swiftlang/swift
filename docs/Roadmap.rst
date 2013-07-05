@@ -41,7 +41,7 @@ Language Features
 |- Namespaces/packages         |        |              |          |             |
 +------------------------------+--------+--------------+----------+-------------+
 |- Serialization/              |        |              |          |             |
-|deserialization ASTs          |        |              |          |             |
+|  deserialization ASTs        |        |              |          |             |
 +------------------------------+--------+--------------+----------+-------------+
 |- Inline functions            |        |              |          |SIL          |
 +------------------------------+--------+--------------+----------+-------------+
@@ -196,6 +196,7 @@ Compiler Engineering Tasks
     return, etc.)
 
 * SIL Optimizations
+
   * Constant folding (integer overflow warnings, dead code
     elimination, etc.)
   * Inlining
@@ -218,7 +219,7 @@ Compiler Engineering Tasks
   * Parsing <> in an expression context
   * Constrained extensions, e.g.: extension <T:Printable, U:Printable> (T, U) : Printable
   * Variadic type variables, e.g.: extension <T...:Printable> (T...) : Printable
-  * Kind polymorphism for protocols
+  * Kind polymorphism for protocols ::
 
         struct Foo : Fooable { func foo(x:Int) }
         struct Bar : Fooable { func foo<T>(x:T) }

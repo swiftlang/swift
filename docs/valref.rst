@@ -426,7 +426,7 @@ How This Design Improves Swift
    to, and arguably into, the “easy” zone.
 
 How This Design Beats Rust/C++/C#/etc.
-===================================
+======================================
 
 * Simple programs stay simple.  Rust has a great low-level memory safety
   story, but it comes at the expense of ease-of-use.  You can't learn
