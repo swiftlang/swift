@@ -735,6 +735,7 @@ static void emitDecisionTree(SILGenFunction &gen,
   // left-to-right specialization.
   llvm::DenseSet<PatternConstructor> specialized;
   unsigned skipRows = r;
+
   for (; r < rows; ++r) {
     auto c = PatternConstructor::forPattern(clauses[r][0]);
     if (!c) continue;
@@ -743,7 +744,7 @@ static void emitDecisionTree(SILGenFunction &gen,
       continue;
     specialized.insert(c);
     
-    auto specialization = clauses.emitSpecializedBranch(gen, c, skipRows);
+    auto specialization = clauses.emitSpecializedBranch(gen, c, r);
     ClauseMatrix &submatrix = specialization.first;
     SILBasicBlock *nextBB = specialization.second;
     // If the constructor is irrefutable, tail call.
