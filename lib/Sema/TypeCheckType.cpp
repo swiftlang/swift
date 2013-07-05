@@ -151,9 +151,19 @@ static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
   return type;
 }
 
+/// \brief Diagnose a use of an unbound generic type.
+static void diagnoseUnboundGenericType(TypeChecker &tc, TypeLoc tl) {
+  tc.diagnose(tl.getSourceRange().Start,
+              diag::generic_type_requires_arguments,
+              tl.getType());
+  auto unbound = tl.getType()->castTo<UnboundGenericType>();
+  tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
+              unbound->getDecl()->getName());
+}
+
 /// \brief Validate the given identifier type.
 static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
-                                   TypeLoc &Loc) {
+                                   TypeLoc &Loc, bool allowUnboundGenerics) {
   MutableArrayRef<IdentifierType::Component> Components = IdType->Components;
 
   // The currently-resolved result, which captures the result of name lookup
@@ -201,8 +211,10 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
       // above.
       {
-        TypeLoc tempLoc(type, SourceRange(typeDecl->getStartLoc()));
-        if (TC.validateType(tempLoc)) {
+        TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start));
+        if (TC.validateType(
+              tempLoc,
+              (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
           return true;
         }
         type = tempLoc.getType();
@@ -254,8 +266,10 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
     // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
     // above.
     {
-      TypeLoc tempLoc(type, SourceRange(typeDecl->getStartLoc()));
-      if (TC.validateType(tempLoc)) {
+      TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start));
+      if (TC.validateType(
+            tempLoc,
+            (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
         return true;
       }
       type = tempLoc.getType();
@@ -284,9 +298,18 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
   }
 
   // Resolve the remaining components.
+  SourceLoc previousLoc = Components[0].Loc;
+
   for (auto &comp : Components.slice(1)) {
     // If the last resolved component is a type, perform member type lookup.
     if (current.is<Type>()) {
+      if (current.get<Type>()->is<UnboundGenericType>()) {
+        // FIXME: Awful source-location info, unsurprisingly.
+        diagnoseUnboundGenericType(TC, TypeLoc(current.get<Type>(),
+                                               SourceRange(previousLoc)));
+        return true;
+      }
+
       // Look for member types with the given name.
       auto memberTypes = TC.lookupMemberType(current.get<Type>(), comp.Id);
 
@@ -325,6 +348,7 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       // Update our position with the type we just determined.
       current = memberType;
       comp.setValue(memberType);
+      previousLoc = comp.Loc;
       continue;
     }
 
@@ -388,17 +412,13 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
     // Update our position with the type we just determined.
     current = foundType;
     comp.setValue(foundType);
+    previousLoc = comp.Loc;
   }
 
   return false;
 }
 
-/// validateType - Types can contain expressions (in the default values for
-/// tuple elements), and thus need semantic analysis to ensure that these
-/// expressions are valid and that they have the appropriate conversions etc.
-///
-/// This returns true if the type is invalid.
-bool TypeChecker::validateType(TypeLoc &Loc) {
+bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   Type InTy = Loc.getType();
   assert(InTy && "Cannot validate null types!");
 
@@ -406,7 +426,14 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
-  if (T->wasValidated()) return !T->isValid();
+  if (T->wasValidated()) {
+    if (!allowUnboundGenerics && T->is<UnboundGenericType>() && T->isValid()) {
+      diagnoseUnboundGenericType(*this, Loc);
+      return true;
+    }
+
+    return !T->isValid();
+  }
 
   bool IsInvalid = false;
   
@@ -452,7 +479,7 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
   case TypeKind::Substituted: {
     TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
                Loc.getSourceRange());
-    return IsInvalid = validateType(TL);
+    return IsInvalid = validateType(TL, allowUnboundGenerics);
   }
 
   case TypeKind::NameAlias: {
@@ -470,7 +497,8 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
       IsInvalid = validateType(TempLoc);
       break;
     }
-    if (!IsInvalid && validateIdentifierType(*this, DNT, Loc))
+    if (!IsInvalid &&
+        validateIdentifierType(*this, DNT, Loc, allowUnboundGenerics))
       IsInvalid = true;
     break;
   }
@@ -650,6 +678,13 @@ bool TypeChecker::validateType(TypeLoc &Loc) {
     }
     break;
   }
+  }
+
+  // If we have an unbound generic type but aren't allowed to, complain.
+  if (!allowUnboundGenerics && !IsInvalid && T->is<UnboundGenericType>()) {
+    diagnoseUnboundGenericType(*this, Loc);
+    IsInvalid = true;
+    return true;
   }
 
   // If we determined that this type is invalid, erase it in the caller.

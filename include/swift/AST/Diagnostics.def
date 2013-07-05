@@ -1339,6 +1339,10 @@ ERROR(type_parameter_count_mismatch,tce_sema,none,
       "generic type specialized with wrong number of type parameters "
       "(got %1, but expected %0)",
       (unsigned, unsigned))
+ERROR(generic_type_requires_arguments,tce_sema,none,
+      "reference to generic type %0 requires arguments in <...>", (Type))
+NOTE(generic_type_declared_here,tce_sema,none,
+     "generic type %0 declared here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Statements

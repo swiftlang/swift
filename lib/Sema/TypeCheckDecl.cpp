@@ -384,8 +384,10 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
       // FIXME: Need to fix the validateType API for typealias.
-      TypeLoc FakeTypeLoc = TypeLoc::withoutLoc(TAD->getDeclaredType());
-      TC.validateType(FakeTypeLoc);
+      if (!TC.validateType(TAD->getUnderlyingTypeLoc())) {
+        TypeLoc FakeTypeLoc(TAD->getDeclaredType(), TAD->getLoc());
+        TC.validateType(FakeTypeLoc);
+      }
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }

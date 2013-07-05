@@ -699,7 +699,8 @@ namespace {
 } // end anonymous namespace
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
-  if (TC.validateType(ED->getExtendedTypeLoc())) {
+  // FIXME: Should allow bound generics here as well.
+  if (TC.validateType(ED->getExtendedTypeLoc(), /*allowUnboundGenerics=*/true)) {
     ED->setInvalid();
     return;
   }

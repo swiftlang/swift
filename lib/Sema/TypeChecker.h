@@ -201,14 +201,29 @@ public:
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
 
-  bool validateType(TypeLoc &Loc);
+  /// \brief Validate the given type.
+  ///
+  /// Type validation performs name binding, checking of generic arguments,
+  /// and so on to determine whether the given type is well-formed and can
+  /// be used as a type.
+  ///
+  /// \param Loc The type (with source location information) to validate.
+  /// If the type has already been validated, returns immediately.
+  ///
+  /// \param allowUnboundGenerics Whether the allow unbound generics at the
+  /// top level of the type. Defaults to 'false', and should only be enabled
+  /// in places where the generic arguments will be deduced, e.g., within an
+  /// expression.
+  ///
+  /// \returns true if type validation failed, or false otherwise.
+  bool validateType(TypeLoc &Loc, bool allowUnboundGenerics = false);
 
   /// \brief Validate the given type, which has no location information
   /// and shall not fail.
   /// FIXME: This concept seems a bit broken.
-  void validateTypeSimple(Type T) {
+  void validateTypeSimple(Type T, bool allowUnboundGenerics = false) {
     TypeLoc TL(T, SourceRange());
-    bool result = validateType(TL);
+    bool result = validateType(TL, allowUnboundGenerics);
     assert(!result && "Validation cannot fail!");
     (void)result;
   }

@@ -2084,7 +2084,7 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
     return SolutionKind::Unsolved;
 
   TypeLoc typeLoc = TypeLoc::withoutLoc(type);
-  if (TC.validateType(typeLoc)) {
+  if (TC.validateType(typeLoc, /*allowUnboundGenerics=*/true)) {
     // FIXME: record failure.
     return SolutionKind::Error;
   }
@@ -2895,7 +2895,8 @@ namespace {
       if (auto newArray = dyn_cast<NewArrayExpr>(expr)) {
         // FIXME: Check that the element type has a default constructor.
         
-        if (TC.validateType(newArray->getElementTypeLoc()))
+        if (TC.validateType(newArray->getElementTypeLoc(),
+                            /*allowUnboundGenerics=*/true))
           return nullptr;
 
         // Check array bounds. They are subproblems that don't interact with

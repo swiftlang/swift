@@ -185,7 +185,7 @@ public:
 /// performing unqualified lookup (i.e. lookup for a plain identifier).
 class UnqualifiedLookup {
 public:
-  /// UnqualifiedLookup ctor - Lookup an unqualfied identifier 'Name' in the
+  /// UnqualifiedLookup ctor - Lookup an unqualified identifier 'Name' in the
   /// context.  If the current DeclContext is nested in a FuncExpr, the
   /// SourceLoc is used to determine which declarations in that FuncExpr's
   /// context are visible.
