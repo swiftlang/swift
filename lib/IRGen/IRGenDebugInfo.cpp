@@ -45,25 +45,47 @@ using namespace irgen;
 // accidental conflicts for now.
 static const unsigned DW_LANG_Swift = 0xf; /*llvm::dwarf::DW_LANG_Swift*/;
 
-/// Strdup S using the bump pointer.
+/// Strdup a raw char array using the bump pointer.
+static
+StringRef BumpAllocatedString(const char* Data, size_t Length,
+                              llvm::BumpPtrAllocator &BP) {
+  char *Ptr = BP.Allocate<char>(Length);
+  memcpy(Ptr, Data, Length);
+  return StringRef(Ptr, Length);
+}
+
+/// Strdup std::string S using the bump pointer.
 static
 StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
-  char *Ptr = BP.Allocate<char>(S.length());
-  memcpy(Ptr, S.c_str(), S.length());
-  return StringRef(Ptr, S.length());
+  return BumpAllocatedString(S.c_str(), S.length(), BP);
+}
+
+/// Strdup StringRef S using the bump pointer.
+static
+StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
+  return BumpAllocatedString(S.data(), S.size(), BP);
 }
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                                llvm::Module &M)
   : SM(SM), DBuilder(M), Opts(Opts) {
   assert(Opts.DebugInfo);
-  std::string MainFileName = Opts.MainInputFilename;
-  if (MainFileName.empty())
-    MainFileName = "<unknown>";
+  StringRef Dir, Filename;
+  std::string MainFilename = Opts.MainInputFilename;
+  if (MainFilename.empty()) {
+    Filename = "<unknown>";
+    Dir = getCurrentDirname();
+  } else {
+    // Separate path and filename.
+    llvm::SmallString<64>  File = llvm::sys::path::filename(MainFilename);
+    llvm::SmallString<512> Path(MainFilename);
+    llvm::sys::path::remove_filename(Path);
+    llvm::sys::fs::make_absolute(Path);
+    Filename = BumpAllocatedString(File, DebugInfoNames);
+    Dir = BumpAllocatedString(Path, DebugInfoNames);
+  }
 
-  StringRef Filename = BumpAllocatedString(MainFileName, DebugInfoNames);
   unsigned Lang = DW_LANG_Swift;
-  StringRef Dir = getCurrentDirname();
 
   std::string buf;
   llvm::raw_string_ostream OS(buf);
