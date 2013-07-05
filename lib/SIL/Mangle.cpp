@@ -172,6 +172,13 @@ void Mangler::mangleContextOf(ValueDecl *decl) {
     return; 
   }
 
+  // Declarations provided by a C module have a special context mangling.
+  //   known-context ::= 'SC'
+  if (isa<ClangModule>(decl->getDeclContext())) {
+    Buffer << "SC";
+    return;
+  }
+
   // Otherwise, just mangle the decl's DC.
   mangleDeclContext(decl->getDeclContext());
 }
@@ -203,12 +210,7 @@ void Mangler::mangleDeclContext(DeclContext *ctx) {
 
     // This should work, because the language should be restricting
     // the name of a module to be a valid language identifier.
-    // FIXME: As a short-term hack, all Clang modules are mangled as '__C__'.
-    if (ctx->getContextKind() == DeclContextKind::ClangModule) {
-      Buffer << "5__C__";
-    } else {
-      mangleIdentifier(module->Name);
-    }
+    mangleIdentifier(module->Name);
     addSubstitution(module);
     return;
   }
