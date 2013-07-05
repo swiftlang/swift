@@ -72,6 +72,8 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   TU->HasBuiltinModuleAccess = AllowBuiltinModule;
 
   // If we're in SIL mode, don't auto import any libraries.
+  // Also don't perform auto import if we are not going to do semantic
+  // analysis.
   if (Kind != TranslationUnit::SIL && !ParseOnly)
     performAutoImport(TU);
 
