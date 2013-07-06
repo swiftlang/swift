@@ -158,7 +158,7 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   SmallVector<GenericParam, 4> genericParams;
   SmallVector<Requirement, 4> requirements;
   SmallVector<ArchetypeType *, 4> allArchetypes;
-  GenericParamList *outerParameters = nullptr, *lastOuterParameters = nullptr;
+  GenericParamList *outerParameters = nullptr;
 
   // Merge inputs and generic parameters from the uncurry levels.
   for (;;) {
@@ -170,9 +170,6 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
       if (GenericParamList *outer = params.getOuterParameters()) {
         if (!outerParameters)
           outerParameters = outer;
-        assert((!lastOuterParameters || lastOuterParameters == outer)
-               && "outer parameters do not nest");
-        lastOuterParameters = outer;
       }
       
       genericParams.append(params.getParams().begin(),
