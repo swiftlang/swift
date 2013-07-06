@@ -123,7 +123,7 @@ private:
   llvm::DIType getOrCreateType(DebugTypeInfo Ty, llvm::DIDescriptor Scope);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   StringRef getCurrentDirname();
-  llvm::DIFile getOrCreateFile(const char *filename);
+  llvm::DIFile getOrCreateFile(const char *Filename);
 };
 
 } // irgen

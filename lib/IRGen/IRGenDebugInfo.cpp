@@ -23,6 +23,7 @@
 #include "llvm/DebugInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/Dwarf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -146,10 +147,19 @@ static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    SILLocation Loc) {
+  Location L = getStartLoc(SM, Loc);
+
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
 
-  Location L = getStartLoc(SM, Loc);
+  if (L.Filename != getStartLoc(SM, DS->Loc).Filename) {
+    // We changed files in the middle of a scope. This happens, for
+    // example, when constructors are inlined. Create a new scope to
+    // reflect this.
+    Scope = DBuilder.createLexicalBlockFile(Scope, getOrCreateFile(L.Filename));
+  }
+
+
   if (L.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
@@ -175,7 +185,6 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     return CachedScope->second;
   }
 
-  // Create a new location.
   Location L = getStartLoc(SM, DS->Loc);
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
