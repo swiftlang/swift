@@ -1,4 +1,4 @@
-##===- tools/swift-index-test/Makefile ---------------------*- Makefile -*-===##
+##===- tools/swift-ide-test/Makefile -----------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #
@@ -12,7 +12,7 @@
 
 SWIFT_LEVEL := ../..
 
-TOOLNAME = swift-index-test
+TOOLNAME = swift-ide-test
 
 # Include this here so we can get the configuration of the targets that have
 # been configured for construction. We have to do this early so we can set up

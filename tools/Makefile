@@ -11,7 +11,7 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
-DIRS := swift swift-index-test
+DIRS := swift swift-ide-test
 
 include $(SWIFT_LEVEL)/../../Makefile.config
 
