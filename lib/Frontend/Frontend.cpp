@@ -20,7 +20,10 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -28,44 +31,18 @@
 
 using namespace swift;
 
-static Identifier getModuleIdentifier(StringRef OutputName,
-                                      ASTContext &Context,
-                                      TranslationUnit::TUKind moduleKind) {
-  StringRef moduleName = OutputName;
-
-  // As a special case, recognize <stdin>.
-  if (moduleName == "<stdin>")
-    return Context.getIdentifier("stdin");
-
-  // Find the stem of the filename.
-  moduleName = llvm::sys::path::stem(moduleName);
-
-  // Complain about non-identifier characters in the module name.
-  if (!Lexer::isIdentifier(moduleName)) {
-    if (moduleKind == TranslationUnit::Main) {
-      moduleName = "main";
-    } else {
-      SourceLoc Loc;
-      Context.Diags.diagnose(Loc, diag::bad_module_name, moduleName);
-      moduleName = "bad";
-    }
-  }
-
-  return Context.getIdentifier(moduleName);
-}
-
 /// \param SIL is non-null when we're parsing a .sil file instead of a .swift
 /// file.
 TranslationUnit*
 swift::buildSingleTranslationUnit(ASTContext &Context,
-                                  StringRef OutputName,
+                                  StringRef ModuleName,
                                   ArrayRef<unsigned> BufferIDs,
                                   bool ParseOnly,
                                   bool AllowBuiltinModule,
                                   TranslationUnit::TUKind Kind,
                                   SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
-  Identifier ID = getModuleIdentifier(OutputName, Context, Kind);
+  Identifier ID = Context.getIdentifier(ModuleName);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context, Kind);
   Context.LoadedModules[ID.str()] = TU;
 
@@ -123,5 +100,66 @@ swift::buildSingleTranslationUnit(ASTContext &Context,
   } while (BufferOffset != Buffer->getBufferSize());
 
   return TU;
+}
+
+swift::CompilerInvocation::CompilerInvocation()
+    : DriverDiagnostics(DriverDiagsSourceMgr) {
+  TargetTriple = llvm::sys::getDefaultTargetTriple();
+}
+
+std::string swift::CompilerInvocation::getRuntimeIncludePath() const {
+  llvm::SmallString<128> LibPath(MainExecutablePath);
+  llvm::sys::path::remove_filename(LibPath); // Remove /swift
+  llvm::sys::path::remove_filename(LibPath); // Remove /bin
+  llvm::sys::path::append(LibPath, "lib", "swift");
+  return LibPath.str();
+}
+
+void swift::CompilerInstance::createSILModule() {
+  TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
+}
+
+void swift::CompilerInstance::setup() {
+  for (auto DC : Invocation->getDiagnosticConsumers())
+    Diagnostics.addConsumer(*DC);
+
+  Context.reset(new ASTContext(Invocation->getLangOptions(), SourceMgr, Diagnostics));
+
+  // Give the context the list of search paths to use for modules.
+  Context->ImportSearchPaths = Invocation->getImportSearchPaths();
+  Context->addModuleLoader(SourceLoader::create(*Context));
+  Context->addModuleLoader(SerializedModuleLoader::create(*Context));
+
+  // If the user has specified an SDK, wire up the Clang module importer
+  // and point it at that SDK.
+  if (!Invocation->getSDKPath().empty()) {
+    auto clangImporter =
+        ClangImporter::create(*Context, Invocation->getSDKPath(),
+                              Invocation->getTargetTriple(),
+                              Invocation->getClangModuleCachePath(),
+                              Invocation->getImportSearchPaths());
+    if (!clangImporter)
+      return; // FIXME: error reporting
+
+    Context->addModuleLoader(clangImporter, /*isClang*/true);
+  }
+
+  // Add the runtime include path (which contains swift.swift)
+  Context->ImportSearchPaths.push_back(Invocation->getRuntimeIncludePath());
+
+  assert(Lexer::isIdentifier(Invocation->getModuleName()));
+
+  if (Invocation->getTUKind() == TranslationUnit::SIL)
+    createSILModule();
+}
+
+void swift::CompilerInstance::doIt() {
+  TU = buildSingleTranslationUnit(*Context,
+                                  Invocation->getModuleName(),
+                                  BufferIDs,
+                                  Invocation->getParseOnly(),
+                                  Invocation->getParseStdlib(),
+                                  Invocation->getTUKind(),
+                                  TheSILModule.get());
 }
 

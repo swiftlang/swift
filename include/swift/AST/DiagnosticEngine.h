@@ -307,11 +307,8 @@ namespace swift {
     friend class InFlightDiagnostic;
     
   public:
-    explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr, 
-                              DiagnosticConsumer &Consumer)
-      : SourceMgr(SourceMgr), HadAnyError(false),
-        ActiveDiagnostic() {
-      Consumers.push_back(&Consumer);
+    explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr)
+      : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() {
     }
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.

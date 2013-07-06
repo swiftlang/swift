@@ -1149,8 +1149,7 @@ bool swift::performTypeLocChecking(TranslationUnit *TU, TypeLoc &T) {
 bool swift::typeCheckCompletionContextExpr(TranslationUnit *TU,
                                            Expr *&parsedExpr) {
   // Set up a diagnostics engine that swallows diagnostics.
-  NullDiagnosticConsumer completionConsumer;
-  DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
+  DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
   TypeChecker TC(*TU, diags);
   

@@ -1,4 +1,5 @@
 add_swift_library(swiftFrontend
   Frontend.cpp
-  DEPENDS swiftAST swiftParse swiftSema)
+  DEPENDS swiftAST swiftParse swiftSema swiftSerialization swiftClangImporter
+          swiftSIL)
 

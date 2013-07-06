@@ -112,8 +112,7 @@ std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
 Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
                                         llvm::StringRef expr) {
   // Set up a DiagnosticEngine to swallow errors.
-  NullDiagnosticConsumer completionConsumer;
-  DiagnosticEngine diags(TU->Ctx.SourceMgr, completionConsumer);
+  DiagnosticEngine diags(TU->Ctx.SourceMgr);
   
   TU->ASTStage = TranslationUnit::Parsing;
   Parser P(TU, expr, diags, nullptr);
