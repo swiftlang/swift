@@ -360,7 +360,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
   RECORD(decls_block, NAME_ALIAS_TYPE);
-  RECORD(decls_block, STRUCT_TYPE);
+  RECORD(decls_block, NOMINAL_TYPE);
   RECORD(decls_block, PAREN_TYPE);
   RECORD(decls_block, TUPLE_TYPE);
   RECORD(decls_block, TUPLE_TYPE_ELT);
@@ -368,7 +368,6 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, FUNCTION_TYPE);
   RECORD(decls_block, METATYPE_TYPE);
   RECORD(decls_block, LVALUE_TYPE);
-  RECORD(decls_block, PROTOCOL_TYPE);
   RECORD(decls_block, ARCHETYPE_TYPE);
   RECORD(decls_block, ARCHETYPE_NESTED_TYPES);
   RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
@@ -1010,26 +1009,16 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::Struct: {
-    auto structTy = cast<StructType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[StructTypeLayout::Code];
-    StructTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addDeclRef(structTy->getDecl()),
-                                 addTypeRef(structTy->getParent()));
-    return true;
-  }
-
+  case TypeKind::Struct:
   case TypeKind::OneOf:
   case TypeKind::Class:
-    return false;
-
   case TypeKind::Protocol: {
-    auto protocolTy = cast<ProtocolType>(ty.getPointer());
+    auto nominalTy = cast<NominalType>(ty.getPointer());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolTypeLayout::Code];
-    ProtocolTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addDeclRef(protocolTy->getDecl()));
+    unsigned abbrCode = DeclTypeAbbrCodes[NominalTypeLayout::Code];
+    NominalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                  addDeclRef(nominalTy->getDecl()),
+                                  addTypeRef(nominalTy->getParent()));
     return true;
   }
 
@@ -1181,7 +1170,7 @@ void Serializer::writeAllDeclsAndTypes() {
   {
     using namespace decls_block;
     registerDeclTypeAbbr<NameAliasTypeLayout>();
-    registerDeclTypeAbbr<StructTypeLayout>();
+    registerDeclTypeAbbr<NominalTypeLayout>();
     registerDeclTypeAbbr<ParenTypeLayout>();
     registerDeclTypeAbbr<TupleTypeLayout>();
     registerDeclTypeAbbr<TupleTypeEltLayout>();
@@ -1189,7 +1178,6 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetaTypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
-    registerDeclTypeAbbr<ProtocolTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
     registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
     registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();

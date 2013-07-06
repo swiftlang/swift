@@ -189,7 +189,7 @@ namespace decls_block {
   // VERSION_MAJOR.
   enum : uint8_t {
     NAME_ALIAS_TYPE = 1,
-    STRUCT_TYPE,
+    NOMINAL_TYPE,
     PAREN_TYPE,
     TUPLE_TYPE,
     TUPLE_TYPE_ELT,
@@ -197,7 +197,6 @@ namespace decls_block {
     FUNCTION_TYPE,
     METATYPE_TYPE,
     LVALUE_TYPE,
-    PROTOCOL_TYPE,
     ARCHETYPE_TYPE,
     ARCHETYPE_NESTED_TYPES,
     PROTOCOL_COMPOSITION_TYPE,
@@ -237,9 +236,9 @@ namespace decls_block {
     DeclIDField // typealias decl
   >;
 
-  using StructTypeLayout = BCRecordLayout<
-    STRUCT_TYPE,
-    DeclIDField, // struct decl
+  using NominalTypeLayout = BCRecordLayout<
+    NOMINAL_TYPE,
+    DeclIDField, // decl
     TypeIDField  // parent
   >;
 
@@ -285,11 +284,6 @@ namespace decls_block {
     TypeIDField, // object type
     BCFixed<1>,  // implicit?
     BCFixed<1>   // non-settable?
-  >;
-
-  using ProtocolTypeLayout = BCRecordLayout<
-    PROTOCOL_TYPE,
-    DeclIDField  // protocol decl
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<

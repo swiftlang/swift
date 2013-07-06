@@ -1019,12 +1019,12 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::STRUCT_TYPE: {
-    DeclID structID;
+  case decls_block::NOMINAL_TYPE: {
+    DeclID declID;
     TypeID parentID;
-    decls_block::StructTypeLayout::readRecord(scratch, structID, parentID);
-    typeOrOffset = StructType::get(cast<StructDecl>(getDecl(structID)),
-                                   getType(parentID), ctx);
+    decls_block::NominalTypeLayout::readRecord(scratch, declID, parentID);
+    typeOrOffset = NominalType::get(cast<NominalTypeDecl>(getDecl(declID)),
+                                    getType(parentID), ctx);
     break;
   }
 
@@ -1118,14 +1118,6 @@ Type ModuleFile::getType(TypeID TID) {
       quals |= LValueType::Qual::NonSettable;
 
     typeOrOffset = LValueType::get(getType(objectTypeID), quals, ctx);
-    break;
-  }
-
-  case decls_block::PROTOCOL_TYPE: {
-    DeclID declID;
-    decls_block::ProtocolTypeLayout::readRecord(scratch, declID);
-    auto proto = cast<ProtocolDecl>(getDecl(declID));
-    typeOrOffset = proto->getDeclaredType();
     break;
   }
 
