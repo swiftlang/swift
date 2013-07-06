@@ -203,6 +203,7 @@ namespace decls_block {
     SUBSTITUTED_TYPE,
     BOUND_GENERIC_TYPE,
     BOUND_GENERIC_SUBSTITUTION,
+    POLYMORPHIC_FUNCTION_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -325,6 +326,15 @@ namespace decls_block {
     TypeIDField, // archetype
     TypeIDField // replacement
     // Trailed by the protocol conformance info (if any)
+  >;
+
+  using PolymorphicFunctionTypeLayout = BCRecordLayout<
+    POLYMORPHIC_FUNCTION_TYPE,
+    TypeIDField, // input
+    TypeIDField, // output
+    DeclIDField, // decl that owns the generic params
+    AbstractCCField, // calling convention
+    BCFixed<1>   // thin?
   >;
 
 

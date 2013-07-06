@@ -462,19 +462,6 @@ static void lookupImmediateDecls(DeclContext *DC, Identifier name,
   }
 }
 
-/// Creates a polymorphic function type based on the given (monomorphic) type.
-PolymorphicFunctionType *
-getPolymorphicFunctionType(ASTContext &Ctx, FunctionType *originalTy,
-                           GenericParamList *paramList) {
-  assert(paramList && "cannot have a polymorphic function type without params");
-  return PolymorphicFunctionType::get(originalTy->getInput(),
-                                      originalTy->getResult(),
-                                      paramList,
-                                      originalTy->isThin(),
-                                      originalTy->getAbstractCC(),
-                                      Ctx);
-}
-
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -621,13 +608,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     assert(args && "missing arguments for constructor");
     ctor->setArguments(args);
 
-    Type signature = getType(signatureID);
-    if (auto contextGenericParams = ctor->getGenericParamsOfContext()) {
-      signature = getPolymorphicFunctionType(ctx,
-                                             signature->castTo<FunctionType>(),
-                                             contextGenericParams);
-    }
-    ctor->setType(signature);
+    // This must be set after recording the constructor in the map.
+    // A polymorphic constructor type needs to refer to the constructor to get
+    // its generic parameters.
+    ctor->setType(getType(signatureID));
 
     if (isImplicit)
       ctor->setImplicit();
@@ -700,26 +684,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
+    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
+                                 getIdentifier(nameID), SourceLoc(),
+                                 genericParams, /*type=*/nullptr,
+                                 /*body=*/nullptr, DC);
+    declOrOffset = fn;
+
     AnyFunctionType *signature;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      signature = getType(signatureID)->castTo<FunctionType>();
+      signature = getType(signatureID)->castTo<AnyFunctionType>();
 
-      auto contextGenericParams = genericParams;
-      if (!genericParams)
-        genericParams = DC->getGenericParamsOfContext();
-
-      if (contextGenericParams)
-        signature = getPolymorphicFunctionType(ctx,
-                                               cast<FunctionType>(signature),
-                                               contextGenericParams);
+      // This must be set after recording the constructor in the map.
+      // A polymorphic constructor type needs to refer to the constructor to get
+      // its generic parameters.
+      fn->setType(signature);
     }
-
-    auto fn = new (ctx) FuncDecl(SourceLoc(), SourceLoc(),
-                                 getIdentifier(nameID), SourceLoc(),
-                                 genericParams, signature,
-                                 /*body=*/nullptr, DC);
-    declOrOffset = fn;
 
     SmallVector<Pattern *, 16> patternBuf;
     while (Pattern *pattern = maybeReadPattern())
@@ -1257,6 +1237,55 @@ Type ModuleFile::getType(TypeID TID) {
     }
 
     boundTy->setSubstitutions(substitutions);
+    break;
+  }
+
+  case decls_block::POLYMORPHIC_FUNCTION_TYPE: {
+    TypeID inputID;
+    TypeID resultID;
+    DeclID genericContextID;
+    uint8_t rawCallingConvention;
+    bool thin;
+
+    decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
+                                                           inputID,
+                                                           resultID,
+                                                           genericContextID,
+                                                           rawCallingConvention,
+                                                           thin);
+    auto callingConvention = getActualCC(rawCallingConvention);
+    if (!callingConvention.hasValue()) {
+      error();
+      return nullptr;
+    }
+
+    Decl *genericContext = getDecl(genericContextID);
+    assert(genericContext && "loading PolymorphicFunctionType before its decl");
+
+    GenericParamList *paramList = nullptr;
+    switch (genericContext->getKind()) {
+    case DeclKind::Constructor:
+      paramList = cast<ConstructorDecl>(genericContext)->getGenericParams();
+      break;
+    case DeclKind::Func:
+      paramList = cast<FuncDecl>(genericContext)->getGenericParams();
+      break;
+    case DeclKind::Class:
+    case DeclKind::Struct:
+    case DeclKind::OneOf:
+      paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
+      break;
+    default:
+      break;
+    }
+    assert(paramList && "missing generic params for polymorphic function");
+
+    typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
+                                                getType(resultID),
+                                                paramList,
+                                                thin,
+                                                callingConvention.getValue(),
+                                                ctx);
     break;
   }
 

@@ -80,6 +80,9 @@ namespace {
     /// A map from Identifiers to their serialized IDs.
     llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
 
+    /// A map from generic parameter lists to the decls they come from.
+    llvm::DenseMap<const GenericParamList *, const Decl *> GenericContexts;
+
     /// The queue of types and decls that need to be serialized.
     ///
     /// This is a queue and not simply a vector because serializing one
@@ -153,6 +156,10 @@ namespace {
     ///
     /// \returns The ID for the given Identifier in this module.
     IdentifierID addIdentifierRef(Identifier ident);
+
+    /// Returns the declaration the given generic parameter list is associated
+    /// with.
+    const Decl *getGenericContext(const GenericParamList *paramList);
 
     /// Writes the BLOCKINFO block.
     void writeBlockInfoBlock();
@@ -286,6 +293,27 @@ DeclID Serializer::addDeclRef(const Decl *D) {
   if (id != 0)
     return id;
 
+  // Record any generic parameters that come from this decl, so that we can use
+  // the decl to refer to the parameters later.
+  const GenericParamList *paramList = nullptr;
+  switch (D->getKind()) {
+  case DeclKind::Constructor:
+    paramList = cast<ConstructorDecl>(D)->getGenericParams();
+    break;
+  case DeclKind::Func:
+    paramList = cast<FuncDecl>(D)->getGenericParams();
+    break;
+  case DeclKind::Class:
+  case DeclKind::Struct:
+  case DeclKind::OneOf:
+    paramList = cast<NominalTypeDecl>(D)->getGenericParams();
+    break;
+  default:
+    break;
+  }
+  if (paramList)
+    GenericContexts[paramList] = D;
+
   id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
   return id;
@@ -315,6 +343,12 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   id = ++LastIdentifierID;
   IdentifiersToWrite.push_back(ident);
   return id;
+}
+
+const Decl *Serializer::getGenericContext(const GenericParamList *paramList) {
+  auto contextDecl = GenericContexts.lookup(paramList);
+  assert(contextDecl && "Generic parameters not registered yet!");
+  return contextDecl;
 }
 
 /// Record the name of a block.
@@ -374,6 +408,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, SUBSTITUTED_TYPE);
   RECORD(decls_block, BOUND_GENERIC_TYPE);
   RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
+  RECORD(decls_block, POLYMORPHIC_FUNCTION_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -898,10 +933,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (!ctor->getAttrs().empty())
       return false;
 
-    // FIXME: Handle generics.
-    if (ctor->isGeneric())
-      return false;
-
     // FIXME: Handle allocating constructors.
     // FIXME: Does this ever occur in Swift modules? If it's only used by the
     // importer, perhaps we don't need to worry about it here.
@@ -1080,9 +1111,8 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction: {
-    auto fnTy = cast<AnyFunctionType>(ty.getPointer());
+  case TypeKind::Function: {
+    auto fnTy = cast<FunctionType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1092,6 +1122,22 @@ bool Serializer::writeType(Type ty) {
                                    fnTy->isAutoClosure(),
                                    fnTy->isThin(),
                                    fnTy->isBlock());
+
+    return true;
+  }
+
+  case TypeKind::PolymorphicFunction: {
+    auto fnTy = cast<PolymorphicFunctionType>(ty.getPointer());
+    const Decl *genericContext = getGenericContext(&fnTy->getGenericParams());
+    auto callingConvention = fnTy->getAbstractCC();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
+    PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              addTypeRef(fnTy->getInput()),
+                                              addTypeRef(fnTy->getResult()),
+                                              addDeclRef(genericContext),
+                                              getRawStableCC(callingConvention),
+                                              fnTy->isThin());
 
     return true;
   }
@@ -1184,6 +1230,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<SubstitutedTypeLayout>();
     registerDeclTypeAbbr<BoundGenericTypeLayout>();
     registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
+    registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
