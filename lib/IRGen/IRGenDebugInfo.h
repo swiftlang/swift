@@ -44,20 +44,31 @@ namespace irgen {
 
 class Options;
 
+typedef struct {
+  unsigned Line, Col;
+  const char* Filename;
+} Location;
+
 /// IRGenDebugInfo - Helper object that keeps track of the current
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
 class IRGenDebugInfo {
   llvm::SourceMgr &SM;
   llvm::DIBuilder DBuilder;
+
+  // Various caches.
   llvm::DenseMap<SILDebugScope*, llvm::DIDescriptor> ScopeCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<DebugTypeInfo, llvm::WeakVH> DITypeCache;
-  /// The current working directory.
-  StringRef CWDName;
+
+  StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
   const Options &Opts;
+
+  Location LastLoc; /// The last location that was emitted.
+  SILDebugScope *LastScope; /// The scope of that last location.
+
 public:
   IRGenDebugInfo(const Options &Opts,
                  llvm::SourceMgr &SM, llvm::Module &M);

@@ -68,7 +68,7 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
 
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
                                llvm::Module &M)
-  : SM(SM), DBuilder(M), Opts(Opts) {
+  : SM(SM), DBuilder(M), Opts(Opts), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
   std::string MainFilename = Opts.MainInputFilename;
@@ -112,12 +112,6 @@ void IRGenDebugInfo::finalize() {
   DBuilder.finalize();
 }
 
-
-typedef struct {
-  unsigned Line, Col;
-  const char* Filename;
-} Location;
-
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
 Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
@@ -152,10 +146,21 @@ static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    SILLocation Loc) {
-  Location L = getStartLoc(SM, Loc);
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
+  if (!Scope.Verify()) return;
+
+  Location L = getStartLoc(SM, Loc);
+  if (L.Line == 0 && DS == LastScope) {
+    // Reuse the last source location if we are still in the same
+    // scope to get a more contiguous line table.
+    L.Line = LastLoc.Line;
+    L.Col = LastLoc.Col;
+  }
+  LastLoc = L;
+  LastScope = DS;
+
   llvm::MDNode *InlinedAt = 0;
-  llvm::DebugLoc DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
+  auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
   Builder.SetCurrentDebugLocation(DL);
 }
 
