@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
 #include "ModuleFormat.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Fixnum.h"
@@ -30,13 +31,9 @@ namespace llvm {
 }
 
 namespace swift {
-class Decl;
-class DeclContext;
-class GenericParamList;
 class Module;
 class Pattern;
 class ProtocolConformance;
-class ValueDecl;
 
 /// Describes whether a loaded module can be used.
 enum class ModuleStatus {
@@ -115,15 +112,26 @@ private:
       : Offset(rawOffset) {}
   };
 
-  /// Types referenced by this module.
+  /// Identifiers referenced by this module.
   std::vector<SerializedIdentifier> Identifiers;
 
   /// All top-level decls in this module.
   // FIXME: A single identifier may refer to multiple decls.
   llvm::DenseMap<Identifier, serialization::DeclID> TopLevelIDs;
 
-  /// FIXME: HACK: an array of the top-level decl IDs.
+  /// An array of the top-level decl IDs.
+  // FIXME: We don't really want to deserialize all of these at once.
   std::vector<serialization::DeclID> RawTopLevelIDs;
+
+  using OperatorKey = std::pair<Identifier, serialization::OperatorKind>;
+  friend struct llvm::DenseMapInfo<OperatorKey>;
+
+  /// All the operators in the module.
+  llvm::DenseMap<OperatorKey, OperatorDecl *> Operators;
+
+  /// An array of the top-level decl IDs.
+  // FIXME: We don't really want to deserialize all of these at once.
+  std::vector<serialization::DeclID> RawOperatorIDs;
 
   /// Whether this module file can be used.
   ModuleStatus Status;
@@ -222,8 +230,34 @@ public:
 
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(Identifier name, SmallVectorImpl<ValueDecl*> &results);
+
+  /// Searches the module's operators for one with the given name and fixity.
+  ///
+  /// If none is found, returns null.
+  OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
 };
 
 } // end namespace swift
+
+namespace llvm {
+  template<> struct DenseMapInfo<swift::ModuleFile::OperatorKey> {
+    using OperatorKey = swift::ModuleFile::OperatorKey;
+    using Identifier = swift::Identifier;
+    
+    static OperatorKey getEmptyKey() {
+      return OperatorKey(Identifier(), swift::serialization::Prefix);
+    }
+    static OperatorKey getTombstoneKey() {
+      return OperatorKey(Identifier(), swift::serialization::Postfix);
+    }
+    static unsigned getHashValue(OperatorKey Val) {
+      using RawPair = std::pair<Identifier, unsigned>;
+      return DenseMapInfo<RawPair>::getHashValue(RawPair(Val));
+    }
+    static bool isEqual(OperatorKey LHS, OperatorKey RHS) {
+      return LHS == RHS;
+    }
+  };
+}
 
 #endif

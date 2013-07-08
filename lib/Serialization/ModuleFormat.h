@@ -94,6 +94,7 @@ enum GenericRequirementKind : uint8_t {
 };
 using GenericRequirementKindField = BCFixed<1>;
 
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -213,6 +214,8 @@ namespace decls_block {
     FUNC_DECL,
     PATTERN_BINDING_DECL,
     PROTOCOL_DECL,
+    PREFIX_OPERATOR_DECL,
+    POSTFIX_OPERATOR_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -420,6 +423,16 @@ namespace decls_block {
     // FIXME: protocols?
   >;
 
+  template <unsigned Code>
+  using UnaryOperatorLayout = BCRecordLayout<
+    Code, // ID field
+    IdentifierIDField, // name
+    DeclIDField // context decl
+  >;
+
+  using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
+  using PostfixOperatorLayout = UnaryOperatorLayout<POSTFIX_OPERATOR_DECL>;
+
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN
@@ -534,16 +547,17 @@ namespace index_block {
     TYPE_OFFSETS = 1,
     DECL_OFFSETS,
     IDENTIFIER_OFFSETS,
-    TOP_LEVEL_DECLS
+    TOP_LEVEL_DECLS,
+    OPERATORS
   };
 
   using OffsetsLayout = BCGenericRecordLayout<
-    BCFixed<2>,  // record ID
+    BCFixed<3>,  // record ID
     BCArray<BitOffsetField>
   >;
 
-  using TopLevelDeclsLayout = BCRecordLayout<
-    TOP_LEVEL_DECLS,
+  using DeclListLayout = BCGenericRecordLayout<
+    BCFixed<3>,  // record ID
     BCArray<DeclIDField>
   >;
 }

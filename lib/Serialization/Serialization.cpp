@@ -418,6 +418,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, FUNC_DECL);
   RECORD(decls_block, PATTERN_BINDING_DECL);
   RECORD(decls_block, PROTOCOL_DECL);
+  RECORD(decls_block, PREFIX_OPERATOR_DECL);
+  RECORD(decls_block, POSTFIX_OPERATOR_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -442,6 +444,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(index_block, DECL_OFFSETS);
   RECORD(index_block, IDENTIFIER_OFFSETS);
   RECORD(index_block, TOP_LEVEL_DECLS);
+  RECORD(index_block, OPERATORS);
 
   BLOCK(FALL_BACK_TO_TRANSLATION_UNIT);
 
@@ -772,9 +775,31 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
 
   case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
     return false;
+
+  case DeclKind::PrefixOperator: {
+    auto op = cast<PrefixOperatorDecl>(D);
+
+    const Decl *DC = getDeclForContext(op->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
+    PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addIdentifierRef(op->getName()),
+                                     addDeclRef(DC));
+    return true;
+  }
+    
+  case DeclKind::PostfixOperator: {
+    auto op = cast<PostfixOperatorDecl>(D);
+
+    const Decl *DC = getDeclForContext(op->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
+    PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addIdentifierRef(op->getName()),
+                                      addDeclRef(DC));
+    return true;
+  }
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
@@ -1252,6 +1277,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<FuncLayout>();
     registerDeclTypeAbbr<PatternBindingLayout>();
     registerDeclTypeAbbr<ProtocolLayout>();
+    registerDeclTypeAbbr<PrefixOperatorLayout>();
+    registerDeclTypeAbbr<PostfixOperatorLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();
@@ -1319,10 +1346,14 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
   this->TU = TU;
 
   SmallVector<DeclID, 32> topLevelIDs;
+  SmallVector<DeclID, 8> operatorIDs;
   for (auto D : TU->Decls) {
     if (isa<ImportDecl>(D))
       continue;
-    topLevelIDs.push_back(addDeclRef(D));
+    else if (isa<ValueDecl>(D))
+      topLevelIDs.push_back(addDeclRef(D));
+    else if (isa<OperatorDecl>(D))
+      operatorIDs.push_back(addDeclRef(D));
   }
 
   writeAllDeclsAndTypes();
@@ -1336,8 +1367,9 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     writeOffsets(Offsets, TypeOffsets);
     writeOffsets(Offsets, IdentifierOffsets);
 
-    index_block::TopLevelDeclsLayout TopLevelDecls(Out);
-    TopLevelDecls.emit(ScratchRecord, topLevelIDs);
+    index_block::DeclListLayout DeclList(Out);
+    DeclList.emit(ScratchRecord, index_block::TOP_LEVEL_DECLS, topLevelIDs);
+    DeclList.emit(ScratchRecord, index_block::OPERATORS, operatorIDs);
   }
 
 #ifndef NDEBUG

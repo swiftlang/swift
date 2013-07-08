@@ -236,6 +236,15 @@ void SerializedModuleLoader::lookupValue(Module *module,
   moduleFile->lookupValue(name, results);
 }
 
+OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
+                                                     Identifier name,
+                                                     DeclKind fixity) {
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return nullptr;
+
+  return moduleFile->lookupOperator(name, fixity);
+}
 
 void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
                                             unsigned previousGeneration) {

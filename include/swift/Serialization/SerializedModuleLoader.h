@@ -84,6 +84,13 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
+
+  /// \brief Look for a declaration of the given operator.
+  ///
+  /// \returns The operator decl, or null if this module does not define the
+  /// operator in question.
+  virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
+                                       DeclKind fixity);
 };
 
 } // end namespace swift

@@ -811,6 +811,32 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::PREFIX_OPERATOR_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+
+    decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID);
+    declOrOffset = new (ctx) PrefixOperatorDecl(getDeclContext(contextID),
+                                                SourceLoc(), SourceLoc(),
+                                                getIdentifier(nameID),
+                                                SourceLoc(), SourceLoc(),
+                                                SourceLoc());
+    break;
+  }
+
+  case decls_block::POSTFIX_OPERATOR_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+
+    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID);
+    declOrOffset = new (ctx) PostfixOperatorDecl(getDeclContext(contextID),
+                                                 SourceLoc(), SourceLoc(),
+                                                 getIdentifier(nameID),
+                                                 SourceLoc(), SourceLoc(),
+                                                 SourceLoc());
+    break;
+  }
+
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;
@@ -1468,6 +1494,10 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
           assert(blobData.empty());
           RawTopLevelIDs.assign(scratch.begin(), scratch.end());
           break;
+        case index_block::OPERATORS:
+          assert(blobData.empty());
+          RawOperatorIDs.assign(scratch.begin(), scratch.end());
+          break;
         default:
           // Unknown index kind, which this version of the compiler won't use.
           break;
@@ -1543,4 +1573,31 @@ void ModuleFile::lookupValue(Identifier name,
 
   if (DeclID ID = TopLevelIDs.lookup(name))
     results.push_back(cast<ValueDecl>(getDecl(ID)));
+}
+
+OperatorKind getOperatorKind(DeclKind kind) {
+  switch (kind) {
+  case DeclKind::PrefixOperator:
+    return Prefix;
+  case DeclKind::PostfixOperator:
+    return Postfix;
+  case DeclKind::InfixOperator:
+    return Infix;
+  default:
+    llvm_unreachable("unknown operator fixity");
+  }
+}
+
+OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
+  if (!RawOperatorIDs.empty()) {
+    for (DeclID ID : RawOperatorIDs) {
+      auto op = cast<OperatorDecl>(getDecl(ID));
+      OperatorKey key(op->getName(), getOperatorKind(op->getKind()));
+      Operators[key] = op;
+    }
+
+    RawOperatorIDs = {};
+  }
+
+  return Operators.lookup(OperatorKey(name, getOperatorKind(fixity)));
 }
