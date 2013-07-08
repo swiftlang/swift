@@ -681,6 +681,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
+    .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
     .Case("condbranch", ValueKind::CondBranchInst)
     .Case("convert_cc", ValueKind::ConvertCCInst)
@@ -1111,6 +1112,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
        )
       return true;
     ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy);
+    break;
+  }
+  case ValueKind::ClassMethodInst: {
+    SILConstant Member;
+    SILType MethodTy;
+    SourceLoc TyLoc;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILConstant(Member) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(MethodTy, TyLoc)
+       )
+      return true;
+    ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy);
     break;
   }
   }
