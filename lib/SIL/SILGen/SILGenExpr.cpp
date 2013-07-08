@@ -597,7 +597,7 @@ RValue SILGenFunction::visitIsaExpr(IsaExpr *E, SGFContext C) {
                                   E->getSubExpr()->getType(),
                                   E->getCastTypeLoc().getType(),
                                   E->getCastKind(),
-                                  CheckedCastMode::Unconditional,
+                                  CheckedCastMode::Conditional,
                                   /*useCastValue*/ false);
   // Check the result.
   SILValue is = B.createIsNonnull(E, cast,
