@@ -131,6 +131,32 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     }
   }
 
+  // Walk up through the type scopes to find the context where the type
+  // declaration was found. When we find it, substitute the appropriate base
+  // type.
+  Type ownerType = ownerDC->getDeclaredTypeInContext();
+  auto ownerNominal = ownerType->getAnyNominal();
+  assert(ownerNominal && "Owner must be a nominal type");
+  for (; !fromDC->isModuleContext(); fromDC = fromDC->getParent()) {
+    // Skip non-type contexts.
+    if (!fromDC->isTypeContext())
+      continue;
+
+    // Search the type of this context and its supertypes.
+    for (auto fromType = fromDC->getDeclaredTypeInContext();
+         fromType;
+         fromType = getSuperClassOf(fromType)) {
+      // If the nominal type declaration of the context type we're looking at
+      // matches the owner's nominal type declaration, this is how we found
+      // the member type declaration. Substitute the type we're coming from as
+      // the base of the member type to produce the projected type result.
+      if (fromType->getAnyNominal() == ownerNominal) {
+        return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
+                                       fromType);
+      }
+    }
+  }
+
   return typeDecl->getDeclaredType();
 }
 
