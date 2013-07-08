@@ -400,13 +400,13 @@ namespace {
       OS << IOD->getName() << "\n";
       OS.indent(Indent+2);
       OS << "associativity ";
-      switch (IOD->getInfixData().getAssociativity()) {
+      switch (IOD->getAssociativity()) {
       case Associativity::None: OS << "none\n"; break;
       case Associativity::Left: OS << "left\n"; break;
       case Associativity::Right: OS << "right\n"; break;
       }
       OS.indent(Indent+2);
-      OS << "precedence " << IOD->getInfixData().getPrecedence() << ')';
+      OS << "precedence " << IOD->getPrecedence() << ')';
     }
     
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {

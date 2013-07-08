@@ -598,7 +598,7 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     if (decl->getAssociativityLoc().isValid()) {
       indent();
       OS << "associativity ";
-      switch (decl->getInfixData().getAssociativity()) {
+      switch (decl->getAssociativity()) {
       case Associativity::None:
         OS << "none\n";
         break;
@@ -612,7 +612,7 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     }
     if (decl->getPrecedenceLoc().isValid()) {
       indent();
-      OS << "precedence " << decl->getInfixData().getPrecedence() << '\n';
+      OS << "precedence " << decl->getPrecedence() << '\n';
     }
   }
   indent();

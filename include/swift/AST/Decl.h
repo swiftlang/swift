@@ -132,12 +132,23 @@ class alignas(8) Decl {
   enum { NumTypeAliasDeclBits = NumTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
 
+  class InfixOperatorDeclBitFields {
+    friend class InfixOperatorDecl;
+    unsigned : NumDeclBits;
+
+    unsigned Associativity : 2;
+    unsigned Precedence : 8;
+  };
+  enum { NumInfixOperatorDeclBits = NumDeclBits + 10 };
+  static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
     ValueDeclBitfields ValueDeclBits;
     FuncDeclBitFields FuncDeclBits;
     TypeAliasDeclBitFields TypeAliasDeclBits;
+    InfixOperatorDeclBitFields InfixOperatorDeclBits;
   };
 
 private:
@@ -1806,8 +1817,7 @@ class InfixOperatorDecl : public OperatorDecl {
   SourceLoc InfixLoc,
     AssociativityLoc, AssociativityValueLoc,
     PrecedenceLoc, PrecedenceValueLoc;
-  
-  InfixData infixData;
+
 public:
   InfixOperatorDecl(DeclContext *DC,
                     SourceLoc OperatorLoc,
@@ -1831,21 +1841,40 @@ public:
       AssociativityLoc(AssociativityLoc),
       AssociativityValueLoc(AssociativityValueLoc),
       PrecedenceLoc(PrecedenceLoc),
-      PrecedenceValueLoc(PrecedenceValueLoc),
-      infixData(InfixData) {}
+      PrecedenceValueLoc(PrecedenceValueLoc) {
+    if (!InfixData.isValid()) {
+      setInvalid();
+    } else {
+      InfixOperatorDeclBits.Precedence = InfixData.getPrecedence();
+      InfixOperatorDeclBits.Associativity =
+        static_cast<unsigned>(InfixData.getAssociativity());
+    }
+  }
   
   SourceLoc getInfixLoc() const { return InfixLoc; }
   SourceLoc getAssociativityLoc() const { return AssociativityLoc; }
   SourceLoc getAssociativityValueLoc() const { return AssociativityValueLoc; }
   SourceLoc getPrecedenceLoc() const { return PrecedenceLoc; }
   SourceLoc getPrecedenceValueLoc() const { return PrecedenceValueLoc; }
-  
-  InfixData getInfixData() const { return infixData; }
+
+  unsigned getPrecedence() const {
+    return InfixOperatorDeclBits.Precedence;
+  }
+
+  Associativity getAssociativity() const {
+    return Associativity(InfixOperatorDeclBits.Associativity);
+  }
+
+  InfixData getInfixData() const {
+    if (isInvalid())
+      return InfixData();
+    return InfixData(getPrecedence(), getAssociativity());
+  }
   
   /// True if this decl's attributes conflict with those declared by another
-  /// PrefixOperatorDecl.
+  /// operator.
   bool conflictsWith(InfixOperatorDecl *other) {
-    return infixData != other->infixData;
+    return getInfixData() != other->getInfixData();
   }
   
   static bool classof(const Decl *D) {
