@@ -1207,6 +1207,11 @@ Type ModuleFile::getType(TypeID TID) {
                                          getType(parentID), genericArgs);
     typeOrOffset = boundTy;
 
+    // BoundGenericTypes get uniqued in the ASTContext, so it's possible this
+    // type already has its substitutions. In that case, ignore the module's.
+    if (boundTy->hasSubstitutions())
+      break;
+
     SmallVector<Substitution, 8> substitutions;
     while (true) {
       auto entry = DeclTypeCursor.advance();
@@ -1286,6 +1291,20 @@ Type ModuleFile::getType(TypeID TID) {
                                                 thin,
                                                 callingConvention.getValue(),
                                                 ctx);
+    break;
+  }
+
+  case decls_block::ARRAY_SLICE_TYPE: {
+    TypeID baseID, implID;
+    decls_block::ArraySliceTypeLayout::readRecord(scratch, baseID, implID);
+
+    auto sliceTy = ArraySliceType::get(getType(baseID), ctx);
+    typeOrOffset = sliceTy;
+
+    // Slice types are uniqued by the ASTContext, so they may already have
+    // type information. If so, ignore the information in the module.
+    if (!sliceTy->hasImplementationType())
+      sliceTy->setImplementationType(getType(implID));
     break;
   }
 

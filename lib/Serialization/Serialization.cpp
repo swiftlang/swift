@@ -409,6 +409,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, BOUND_GENERIC_TYPE);
   RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
   RECORD(decls_block, POLYMORPHIC_FUNCTION_TYPE);
+  RECORD(decls_block, ARRAY_SLICE_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -1143,8 +1144,19 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::Array:
-  case TypeKind::ArraySlice:
     return false;
+
+  case TypeKind::ArraySlice: {
+    auto sliceTy = cast<ArraySliceType>(ty.getPointer());
+
+    Type base = sliceTy->getBaseType();
+    Type impl = sliceTy->getImplementationType();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ArraySliceTypeLayout::Code];
+    ArraySliceTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addTypeRef(base), addTypeRef(impl));
+    return true;
+  }
 
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
@@ -1231,6 +1243,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<BoundGenericTypeLayout>();
     registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
+    registerDeclTypeAbbr<ArraySliceTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();

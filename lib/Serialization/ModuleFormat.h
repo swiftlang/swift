@@ -204,6 +204,7 @@ namespace decls_block {
     BOUND_GENERIC_TYPE,
     BOUND_GENERIC_SUBSTITUTION,
     POLYMORPHIC_FUNCTION_TYPE,
+    ARRAY_SLICE_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -335,6 +336,12 @@ namespace decls_block {
     DeclIDField, // decl that owns the generic params
     AbstractCCField, // calling convention
     BCFixed<1>   // thin?
+  >;
+
+  using ArraySliceTypeLayout = BCRecordLayout<
+    ARRAY_SLICE_TYPE,
+    TypeIDField, // element type
+    TypeIDField  // implementation type
   >;
 
 
