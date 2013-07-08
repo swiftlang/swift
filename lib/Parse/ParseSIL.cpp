@@ -128,6 +128,7 @@ namespace {
       return parseSILType(Result);
     }
 
+    bool parseSILConstant(SILConstant &Result);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
     bool parseValueRef(SILValue &Result, SILType Ty);
@@ -469,6 +470,112 @@ bool SILParser::parseSILType(SILType &Result) {
   return false;
 }
 
+/// sil-constant:
+///   '#' sil-dotted-path sil-constant-kind-and-uncurry-level?
+/// sil-dotted-path:
+///   identifier ('.' identifier)*
+/// sil-constant-kind-and-uncurry-level:
+///   '!' sil-constant-kind ('.' sil-constant-uncurry-level)? ('.objc')?
+///   '!' sil-constant-uncurry-level ('.objc')?
+///   '!objc'
+/// sil-constant-kind:
+///   'func' | 'getter' | 'setter' | 'allocator' | 'initializer' | 'oneofelt' \
+///   | 'destroyer' | 'globalaccessor'
+bool SILParser::parseSILConstant(SILConstant &Result) {
+  if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
+    return true;
+
+  // Handle sil-dotted-path.
+  Identifier Id;
+  SmallVector<Identifier, 4> FullName;
+  do {
+    if (P.parseIdentifier(Id, diag::expected_sil_constant))
+      return true;
+    FullName.push_back(Id);
+  } while (P.consumeIf(tok::period));
+
+  // Look up ValueDecl from FullName.
+  ValueDecl *VD;
+  llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
+  // Perform a module level lookup on the first component of the fully-qualified
+  // name.
+  P.TU->lookupValue(Module::AccessPathTy(), FullName[0],
+                    NLKind::UnqualifiedLookup, CurModuleResults);
+  assert(CurModuleResults.size() == 1);
+  VD = CurModuleResults[0];
+  for (unsigned I = 1, E = FullName.size(); I < E; I++) {
+    // Look up members of VD for FullName[i].
+    SmallVector<ValueDecl *, 4> Lookup;
+    P.TU->lookupQualified(VD->getType(), FullName[I], NL_Default, Lookup);
+    assert(Lookup.size() == 1);
+    VD = Lookup[0];
+  }
+
+  // Initialize Kind, uncurryLevel and IsObjC.
+  SILConstant::Kind Kind = SILConstant::Kind::Func;
+  unsigned uncurryLevel = 0;
+  bool IsObjC = false;
+
+  if (!P.consumeIf(tok::sil_exclamation)) {
+    // Construct SILConstant.
+    Result = SILConstant(VD, Kind, uncurryLevel, IsObjC);
+    return false;
+  }
+
+  // Handle sil-constant-kind-and-uncurry-level.
+  // ParseState indicates the value we just handled.
+  // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
+  // We accept func|getter|setter|...|objc or an integer when ParseState is 0;
+  // accept objc or an integer when ParseState is 1; accept objc when ParseState
+  // is 2.
+  unsigned ParseState = 0;
+  do {
+    if (P.Tok.is(tok::identifier)) {
+      if (P.parseIdentifier(Id, diag::expected_sil_constant))
+        return true;
+      if (!ParseState && Id.str() == "func") {
+        Kind = SILConstant::Kind::Func;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "getter") {
+        Kind = SILConstant::Kind::Getter;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "setter") {
+        Kind = SILConstant::Kind::Setter;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "allocator") {
+        Kind = SILConstant::Kind::Allocator;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "initializer") {
+        Kind = SILConstant::Kind::Initializer;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "oneofelt") {
+        Kind = SILConstant::Kind::OneOfElement;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "destroyer") {
+        Kind = SILConstant::Kind::Destroyer;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "globalaccessor") {
+        Kind = SILConstant::Kind::GlobalAccessor;
+        ParseState = 1;
+      } else if (Id.str() == "objc") {
+        IsObjC = true;
+        break;
+      } else
+        break;
+    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
+      P.Tok.getText().getAsInteger(0, uncurryLevel);
+      P.consumeToken(tok::integer_literal);
+      ParseState = 2;
+    } else
+      break;
+
+  } while (P.consumeIf(tok::period));
+
+  // Construct SILConstant.
+  Result = SILConstant(VD, Kind, uncurryLevel, IsObjC);
+  return false;
+}
+
 /// parseValueName - Parse a value name without a type available yet.
 ///
 ///     sil-value-name:
@@ -594,6 +701,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("project_downcast_existential_addr",
           ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
+    .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
@@ -989,6 +1097,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createCondBranch(SILLocation(), CondVal,
                                    getBBForReference(BBName, NameLoc),
                                    getBBForReference(BBName2, NameLoc2));
+    break;
+  }
+  case ValueKind::ProtocolMethodInst: {
+    SILConstant Member;
+    SILType MethodTy;
+    SourceLoc TyLoc;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILConstant(Member) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(MethodTy, TyLoc)
+       )
+      return true;
+    ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy);
     break;
   }
   }

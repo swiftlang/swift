@@ -63,48 +63,105 @@ static raw_ostream &operator<<(raw_ostream &OS, IDAndType i) {
   return OS << i.id << " : " << i.Ty;
 }
 
+/// Return the fully qualified dotted path for DeclContext.
+static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
+  if (!Context)
+    return;
+  switch (Context->getContextKind()) {
+  case DeclContextKind::BuiltinModule:
+  case DeclContextKind::ClangModule:
+  case DeclContextKind::TranslationUnit:
+  case DeclContextKind::SerializedModule:
+    return;
 
+  case DeclContextKind::CapturingExpr:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::ConstructorDecl:
+  case DeclContextKind::DestructorDecl:
+    llvm_unreachable("unhandled context type in SILPrint!");
+
+  case DeclContextKind::ExtensionDecl: {
+    Type Ty = cast<ExtensionDecl>(Context)->getExtendedType();
+    TypeBase *Base = Ty->getCanonicalType().getPointer();
+    const NominalTypeDecl *ExtNominal = 0;
+    switch (Base->getKind()) {
+      default:
+        llvm_unreachable("unhandled context type in SILPrint!");
+      case TypeKind::OneOf:
+        ExtNominal = cast<OneOfType>(Base)->getDecl();
+        break;
+      case TypeKind::Struct:
+        ExtNominal = cast<StructType>(Base)->getDecl();
+        break;
+      case TypeKind::Class:
+        ExtNominal = cast<ClassType>(Base)->getDecl();
+        break;
+    }
+    printFullContext(ExtNominal->getDeclContext(), Buffer);
+    Buffer << ExtNominal->getName() << ".";
+    return;
+  }
+
+  case DeclContextKind::NominalTypeDecl: {
+    const NominalTypeDecl *Nominal = cast<NominalTypeDecl>(Context);
+    printFullContext(Nominal->getDeclContext(), Buffer);
+    Buffer << Nominal->getName() << ".";
+    return;
+  }
+  }
+  llvm_unreachable("bad decl context");
+}
+
+/// SILConstant uses sigil "#" and prints the fully qualified dotted path.
 void SILConstant::print(raw_ostream &OS) const {
+  OS << "#";
   if (isNull()) {
     OS << "<null>";
     return;
   }
   
   if (hasDecl()) {
+    printFullContext(getDecl()->getDeclContext(), OS);
     OS << getDecl()->getName();
   } else {
     OS << "<anonymous function>";
   }
+  OS << "!";
   switch (kind) {
   case SILConstant::Kind::Func:
     break;
   case SILConstant::Kind::Getter:
-    OS << ".getter";
+    OS << "getter";
     break;
   case SILConstant::Kind::Setter:
-    OS << ".setter";
+    OS << "setter";
     break;
   case SILConstant::Kind::Allocator:
-    OS << ".allocator";
+    OS << "allocator";
     break;
   case SILConstant::Kind::Initializer:
-    OS << ".initializer";
+    OS << "initializer";
     break;
   case SILConstant::Kind::OneOfElement:
-    OS << ".oneofelt";
+    OS << "oneofelt";
     break;
   case SILConstant::Kind::Destroyer:
-    OS << ".destroyer";
+    OS << "destroyer";
     break;
   case SILConstant::Kind::GlobalAccessor:
-    OS << ".globalaccessor";
+    OS << "globalaccessor";
     break;
   }
   if (uncurryLevel != 0) {
-    OS << "." << uncurryLevel;
+    if (kind != SILConstant::Kind::Func)
+      OS << ".";
+    OS << uncurryLevel;
   }
-  if (isObjC)
-    OS << ".objc";
+  if (isObjC) {
+    if (uncurryLevel != 0 || kind != SILConstant::Kind::Func)
+      OS << ".";
+    OS << "objc";
+  }
 }
 
 void SILConstant::dump() const {
@@ -522,15 +579,17 @@ public:
     if (I->isVolatile())
       OS << "[volatile] ";
     
-    OS << getIDAndType(Operand) << ", @";
+    OS << getIDAndType(Operand) << ", ";
     I->getMember().print(OS);
   }
   
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printDynamicMethodInst(AMI, AMI->getOperand(), "class_method");
+    OS << " : " << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printDynamicMethodInst(AMI, AMI->getOperand(), "super_method");
+    OS << " : " << AMI->getType();
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     OS << "archetype_method ";
@@ -538,11 +597,12 @@ public:
       OS << "[volatile] ";
     OS << "$";
     AMI->getLookupArchetype().print(OS);
-    OS << ", @";
+    OS << ", ";
     AMI->getMember().print(OS);
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
     printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");
+    OS << " : " << AMI->getType();
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getIDAndType(PI->getOperand());

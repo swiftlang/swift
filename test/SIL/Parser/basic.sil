@@ -154,8 +154,10 @@ sil @existentials : $[thin] (n : P) -> () {
 bb0(%0 : $*P):
   %1 = project_existential %0 : $*P   // CHECK: project_existential %0
 
-//  %2 = protocol_method %0 : $*P, @doIt.1
-//  %3 = apply %2(%1) : $[cc(method)] ((), Builtin.OpaquePointer) -> ()
+  // CHECK: protocol_method {{.*}} : $*P, #P.doIt!1
+  %2 = protocol_method %0 : $*P, #P.doIt!1 : $[cc(method)] ((), Builtin.OpaquePointer) -> ()
+  // CHECK: apply
+  %3 = apply %2(%1) : $[cc(method)] ((), Builtin.OpaquePointer) -> ()
   %4 = tuple ()                       // CHECK: tuple ()
   %5 = destroy_addr %0 : $*P          // CHECK: destroy_addr %0 : $*P
   %6 = return %4 : $()                // CHECK: return 

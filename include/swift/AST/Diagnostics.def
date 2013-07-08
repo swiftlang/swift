@@ -325,6 +325,8 @@ ERROR(invalid_sil_value_name_result_number,decl_parsing,none,
       "invalid result number in SIL value", ())
 ERROR(expected_sil_type_kind, decl_parsing,none,
       "expected SIL type to %0", (StringRef))
+ERROR(expected_sil_constant, decl_parsing,none,
+      "expected constant in SIL code", ())
 
 // SIL Values
 ERROR(sil_value_redefinition, decl_parsing,none,
