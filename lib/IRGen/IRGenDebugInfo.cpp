@@ -152,7 +152,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
 
-  if (L.Filename != getStartLoc(SM, DS->Loc).Filename) {
+  if (L.Filename && L.Filename != getStartLoc(SM, DS->Loc).Filename) {
     // We changed files in the middle of a scope. This happens, for
     // example, when constructors are inlined. Create a new scope to
     // reflect this.
