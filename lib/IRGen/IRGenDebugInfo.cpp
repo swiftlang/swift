@@ -447,7 +447,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   default:
     return llvm::DIType();
   }
-
+  // FIXME: For Size, clang uses the actual size of the type on the
+  // target machine instead of the storage size that is alloca'd in
+  // the LLVM IR. To look up the size of the type on the target, clang
+  // keeps a Basic/TargetInfo object around.
   return DBuilder.createBasicType(Name, Size, Align, Encoding);
 }
 
