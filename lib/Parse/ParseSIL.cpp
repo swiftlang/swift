@@ -506,7 +506,8 @@ bool SILParser::parseSILConstant(SILConstant &Result) {
   for (unsigned I = 1, E = FullName.size(); I < E; I++) {
     // Look up members of VD for FullName[i].
     SmallVector<ValueDecl *, 4> Lookup;
-    P.TU->lookupQualified(VD->getType(), FullName[I], NL_Default, Lookup);
+    P.TU->lookupQualified(VD->getType(), FullName[I], NL_QualifiedDefault,
+                          Lookup);
     assert(Lookup.size() == 1);
     VD = Lookup[0];
   }
