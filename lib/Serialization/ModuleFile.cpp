@@ -374,6 +374,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   auto nextMember = members.begin();
   for (DeclID rawID : rawMemberIDs) {
     *nextMember = getDecl(rawID);
+    assert(*nextMember && "unable to deserialize next member");
     ++nextMember;
   }
 
@@ -420,47 +421,6 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
-
-/// Finds all value decls with the given name in the given context,
-/// visible or not.
-static void lookupImmediateDecls(DeclContext *DC, Identifier name,
-                                 SmallVectorImpl<ValueDecl *> &results) {
-  ArrayRef<Decl *> members;
-
-  switch (DC->getContextKind()) {
-  case DeclContextKind::TranslationUnit:
-  case DeclContextKind::BuiltinModule:
-  case DeclContextKind::SerializedModule:
-  case DeclContextKind::ClangModule:
-    llvm_unreachable("should not be used for module contexts");
-
-  case DeclContextKind::CapturingExpr:
-  case DeclContextKind::ConstructorDecl:
-  case DeclContextKind::DestructorDecl:
-    // Don't look at params or local variables.
-    return;
-
-  case DeclContextKind::NominalTypeDecl: {
-    members = cast<NominalTypeDecl>(DC)->getMembers();
-    break;
-  }
-
-  case DeclContextKind::ExtensionDecl: {
-    members = cast<ExtensionDecl>(DC)->getMembers();
-    break;
-  }
-
-  case DeclContextKind::TopLevelCodeDecl:
-    llvm_unreachable("libraries do not expose their top-level code");
-  }
-
-  for (Decl *member : members) {
-    if (auto value = dyn_cast<ValueDecl>(member)) {
-      if (value->getName() == name)
-        results.push_back(value);
-    }
-  }
-}
 
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
@@ -510,16 +470,24 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto inherited =
       MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
                                inheritedIDs.size());
+    TypeLoc underlyingType;
+    DeclContext *DC;
 
-    TypeLoc *nextInheritedType = inherited.data();
-    for (TypeID TID : inheritedIDs) {
-      auto type = getType(TID);
-      new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
-      ++nextInheritedType;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+      TypeLoc *nextInheritedType = inherited.data();
+      for (TypeID TID : inheritedIDs) {
+        auto type = getType(TID);
+        new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
+        ++nextInheritedType;
+      }
+
+      underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
+      DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     }
 
-    TypeLoc underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType,
                                          DC, inherited);
@@ -876,10 +844,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         values.clear();
         for (auto base : baseValues) {
           // FIXME: extensions?
-          if (auto nominal = dyn_cast<NominalTypeDecl>(base))
-            lookupImmediateDecls(nominal,
-                                 getIdentifier(rawAccessPath.front()),
-                                 values);
+          if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
+            Identifier memberName = getIdentifier(rawAccessPath.front());
+            auto members = nominal->lookupDirect(memberName);
+            values.append(members.begin(), members.end());
+          }
         }
         rawAccessPath = rawAccessPath.slice(1);
       }
