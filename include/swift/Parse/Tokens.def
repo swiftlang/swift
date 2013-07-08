@@ -108,6 +108,8 @@ PUNCTUATOR(question,      "?")
 
 PUNCTUATOR(sil_at_sign,   "@")    // Only in SIL mode.
 PUNCTUATOR(sil_dollar,    "$")    // Only in SIL mode.
+PUNCTUATOR(sil_pound,     "#")    // Only in SIL mode.
+PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 
 
 #undef KEYWORD

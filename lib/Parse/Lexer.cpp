@@ -1246,6 +1246,12 @@ Restart:
       return formToken(tok::sil_at_sign, TokStart);
     return formToken(tok::unknown, TokStart);
 
+  case '#':
+    // @ is only a token in SIL mode.
+    if (InSILMode)
+      return formToken(tok::sil_pound, TokStart);
+    return formToken(tok::unknown, TokStart);
+
   // Operator characters.
   case '/':
     if (CurPtr[0] == '/') {  // "//"
@@ -1271,9 +1277,14 @@ Restart:
       return formToken(tok::sil_local_name, TokStart);
     }
     return lexOperatorIdentifier();
+
+  case '!':
+    if (InSILBody)
+      return formToken(tok::sil_exclamation, TokStart);
+    return lexOperatorIdentifier();
       
   case '=': case '-': case '+': case '*': case '<': case '>':
-  case '!': case '&': case '|': case '^': case '~':
+  case '&': case '|': case '^': case '~':
     return lexOperatorIdentifier();
   
   case '.':
