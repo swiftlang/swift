@@ -746,12 +746,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
 
   case ValueKind::StoreInst: {
-    SourceLoc FromNameLoc, ToLoc, AddrLoc;
-    StringRef FromName = P.Tok.getText();
+    UnresolvedValueName From;
+
+    SourceLoc ToLoc, AddrLoc;
     Identifier ToToken;
     SILValue AddrVal;
-    if (P.parseToken(tok::sil_local_name, FromNameLoc,
-                     diag::expected_sil_value_name) ||
+    if (parseValueName(From) ||
         P.parseIdentifier(ToToken, ToLoc,
                           diag::expected_tok_in_sil_instr, "to") ||
         parseTypedValueRef(AddrVal, AddrLoc))
@@ -766,9 +766,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(AddrLoc, diag::sil_invalid_instr_operands);
       return true;
     }
-    
-    SILValue FromVal =
-      getLocalValue(FromName, AddrVal.getType().getObjectType(), FromNameLoc);
+
+    SILValue FromVal = getLocalValue(From, AddrVal.getType().getObjectType());
     ResultVal = B.createStore(SILLocation(), FromVal, AddrVal);
     break;
   }
@@ -889,12 +888,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::CondBranchInst: {
-    SourceLoc CondNameLoc;
-    StringRef CondName = P.Tok.getText();
+    UnresolvedValueName Cond;
     Identifier BBName, BBName2;
     SourceLoc NameLoc, NameLoc2;
-    if (P.parseToken(tok::sil_local_name, CondNameLoc,
-                     diag::expected_sil_value_name) ||
+    if (parseValueName(Cond) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -903,9 +900,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
    
     auto I1Ty =
       SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
-    SILValue CondVal =
-      getLocalValue(CondName, I1Ty, CondNameLoc);
-
+    SILValue CondVal = getLocalValue(Cond, I1Ty);
     ResultVal = B.createCondBranch(SILLocation(), CondVal,
                                    getBBForReference(BBName, NameLoc),
                                    getBBForReference(BBName2, NameLoc2));
