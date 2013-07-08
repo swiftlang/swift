@@ -124,6 +124,8 @@ private:
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
+  StringRef getName(const FuncDecl& FD);
+  StringRef getName(SILLocation L);
 };
 
 } // irgen

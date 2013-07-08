@@ -241,18 +241,38 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   return F;
 }
 
+
 /// Attempt to figure out the unmangled name of a function.
-static StringRef getName(SILLocation L) {
+StringRef IRGenDebugInfo::getName(const FuncDecl& FD) {
+  // Getters and Setters are anonymous functions, so we forge a name
+  // using its parent declaration.
+  if (FD.isGetterOrSetter())
+    if (Decl* D = FD.getGetterOrSetterDecl()) {
+      if (ValueDecl* VD = dyn_cast<ValueDecl>(D)) {
+        bool IsGetter = FD.getGetterDecl();
+        llvm::SmallVector<char, 64> Buf;
+        StringRef Name = (VD->getName().str() +
+                          Twine(IsGetter ? ".get" : ".set")).toStringRef(Buf);
+        return BumpAllocatedString(Name, DebugInfoNames);
+      }
+    }
+
+  if (!FD.getName().empty())
+    return FD.getName().str();
+
+  return StringRef();
+}
+
+/// Attempt to figure out the unmangled name of a function.
+StringRef IRGenDebugInfo::getName(SILLocation L) {
   if (Expr* E = L.dyn_cast<Expr*>())
     if (FuncExpr* FE = dyn_cast<FuncExpr>(E))
       if (FuncDecl* FD = FE->getDecl())
-        if (!FD->getName().empty())
-          return FD->getName().str();
+        return getName(*FD);
 
   if (Decl* D = L.dyn_cast<Decl*>())
     if (FuncDecl* FD = dyn_cast<FuncDecl>(D))
-      if (!FD->getName().empty())
-        return FD->getName().str();
+      return getName(*FD);
 
   return StringRef();
 }
