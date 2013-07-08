@@ -201,13 +201,12 @@ namespace impl {
   /// This is the recursive case for \c emitOps.
   ///
   /// \sa BCRecordLayout::emitAbbrev
-  template<typename First, typename... Rest>
-  static typename std::enable_if<sizeof...(Rest) != 0, void>::type
-  emitOps(llvm::BitCodeAbbrev &abbrev) {
+  template<typename First, typename Next, typename ...Rest>
+  static void emitOps(llvm::BitCodeAbbrev &abbrev) {
     static_assert(!First::IS_COMPOUND,
                   "arrays and blobs may not appear in the middle of a record");
     First::emitOp(abbrev);
-    emitOps<Rest...>(abbrev);
+    emitOps<Next, Rest...>(abbrev);
   }
 
 
