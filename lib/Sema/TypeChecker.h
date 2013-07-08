@@ -228,6 +228,22 @@ public:
     (void)result;
   }
 
+  /// Resolve a reference to the given type declaration within a particular
+  /// context.
+  ///
+  /// This routine aids unqualified name lookup for types by performing the
+  /// resolution necessary to rectify the declaration found by name lookup with
+  /// the declaration context from which name lookup started.
+  ///
+  /// \param typeDecl The type declaration found by name lookup.
+  /// \param fromDC The declaration context in which the name lookup occurred.
+  /// \param isSpecialized Whether this type is immediately specialized.
+  ///
+  /// \returns the resolved type, or emits a diagnostic and returns null if the
+  /// type cannot be resolved.
+  Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
+                            bool isSpecialized);
+
   /// \brief Transform the given type by applying the given function to
   /// each type node. If the function returns null, the transformation aborts.
   /// If it leaves the given type unchanged, then the transformation will be
@@ -623,7 +639,8 @@ public:
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
-  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc);
+  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
+                     bool isSpecialized = false);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.

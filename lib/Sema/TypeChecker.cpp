@@ -317,13 +317,6 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SmallVector<ValueDecl*, 4> ResultValues;
   for (auto Result : Lookup.Results) {
     switch (Result.Kind) {
-    case UnqualifiedLookupResult::ModuleMember:
-    case UnqualifiedLookupResult::LocalDecl: {
-      ValueDecl *D = Result.getValueDecl();
-      if (matchesDeclRefKind(D, UDRE->getRefKind()))
-        ResultValues.push_back(D);
-      break;
-    }
     case UnqualifiedLookupResult::MemberProperty:
     case UnqualifiedLookupResult::MemberFunction:
     case UnqualifiedLookupResult::MetatypeMember:
@@ -331,8 +324,21 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     case UnqualifiedLookupResult::ArchetypeMember:
     case UnqualifiedLookupResult::MetaArchetypeMember:
     case UnqualifiedLookupResult::ModuleName:
-      AllDeclRefs = false;
+      // Types are never referenced with an implicit 'this'.
+      if (!isa<TypeDecl>(Result.getValueDecl())) {
+        AllDeclRefs = false;
+        break;
+      }
+
+      SWIFT_FALLTHROUGH;
+
+    case UnqualifiedLookupResult::ModuleMember:
+    case UnqualifiedLookupResult::LocalDecl: {
+      ValueDecl *D = Result.getValueDecl();
+      if (matchesDeclRefKind(D, UDRE->getRefKind()))
+        ResultValues.push_back(D);
       break;
+    }
     }
   }
   if (AllDeclRefs) {
@@ -345,7 +351,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       return new (TC.Context) ErrorExpr(Loc);
     }
 
-    return TC.buildRefExpr(ResultValues, Loc);
+    return TC.buildRefExpr(ResultValues, Loc, UDRE->isSpecialized());
   }
 
   ResultValues.clear();

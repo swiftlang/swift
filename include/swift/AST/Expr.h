@@ -345,14 +345,22 @@ public:
 
 /// DeclRefExpr - A reference to a value, "x".
 class DeclRefExpr : public Expr {
-  ValueDecl *D;
+  /// \brief The declaration pointer and a bit specifying whether it was
+  /// explicitly specialized with <...>.
+  llvm::PointerIntPair<ValueDecl *, 1, bool> DAndSpecialized;
   SourceLoc Loc;
 
 public:
   DeclRefExpr(ValueDecl *D, SourceLoc Loc, Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Ty), D(D), Loc(Loc) {}
+    : Expr(ExprKind::DeclRef, Ty), DAndSpecialized(D, false), Loc(Loc) {}
 
-  ValueDecl *getDecl() const { return D; }
+  ValueDecl *getDecl() const { return DAndSpecialized.getPointer(); }
+
+  void setSpecialized(bool specialized) { DAndSpecialized.setInt(specialized); }
+
+  /// \brief Determine whether this declaration reference was immediately
+  /// specialized by <...>.
+  bool isSpecialized() const { return DAndSpecialized.getInt(); }
 
   SourceRange getSourceRange() const { return Loc; }
   
@@ -471,6 +479,7 @@ public:
 /// eventually be resolved (by overload resolution) to a value reference.
 class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   SourceLoc Loc;
+  bool IsSpecialized = false;
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc, Type Ty)
@@ -478,6 +487,12 @@ public:
   
   SourceLoc getLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
+
+  void setSpecialized(bool specialized) { IsSpecialized = specialized; }
+
+  /// \brief Determine whether this declaration reference was immediately
+  /// specialized by <...>.
+  bool isSpecialized() const { return IsSpecialized; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
@@ -527,6 +542,7 @@ class UnresolvedDeclRefExpr : public Expr {
   Identifier Name;
   SourceLoc Loc;
   DeclRefKind RefKind;
+  bool IsSpecialized = false;
 
 public:
   UnresolvedDeclRefExpr(Identifier name, DeclRefKind refKind, SourceLoc loc)
@@ -536,6 +552,12 @@ public:
   
   Identifier getName() const { return Name; }
   DeclRefKind getRefKind() const { return RefKind; }
+
+  void setSpecialized(bool specialized) { IsSpecialized = specialized; }
+
+  /// \brief Determine whether this declaration reference was immediately
+  /// specialized by <...>.
+  bool isSpecialized() const { return IsSpecialized; }
 
   SourceRange getSourceRange() const { return Loc; }
   

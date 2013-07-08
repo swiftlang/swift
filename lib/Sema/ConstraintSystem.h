@@ -1054,29 +1054,33 @@ enum class OverloadChoiceKind : int {
 ///
 /// 
 class OverloadChoice {
-  /// \brief The base type to be used when referencing the declaration.
-  Type Base;
+  /// \brief The base type to be used when referencing the declaration
+  /// along with a bit indicating whether this overload was immediately
+  /// specialized.
+  llvm::PointerIntPair<Type, 1, bool> BaseAndSpecialized;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
 public:
-  OverloadChoice() : Base(), DeclOrKind() { }
+  OverloadChoice() : BaseAndSpecialized(nullptr, false), DeclOrKind() { }
 
-  OverloadChoice(Type base, ValueDecl *value) : Base(base) {
+  OverloadChoice(Type base, ValueDecl *value, bool isSpecialized)
+    : BaseAndSpecialized(base, isSpecialized) {
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
     assert((DeclOrKind & (uintptr_t)0x01) == 0 && "Badly aligned decl");
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
-    : Base(base), DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01) {
+    : BaseAndSpecialized(base, false),
+      DeclOrKind((uintptr_t)kind << 1 | (uintptr_t)0x01) {
     assert(base && "Must have a base type for overload choice");
     assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
   }
 
   OverloadChoice(Type base, unsigned index)
-    : Base(base),
+    : BaseAndSpecialized(base, false),
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 1
                  | (uintptr_t)0x01) {
@@ -1084,8 +1088,14 @@ public:
   }
 
   /// \brief Retrieve the base type used to refer to the declaration.
-  Type getBaseType() const { return Base; }
+  Type getBaseType() const { return BaseAndSpecialized.getPointer(); }
 
+  /// \brief Determine whether the referenced declaration was immediately
+  /// specialized with <...>.
+  ///
+  /// This value only has meaning when there is no base type.
+  bool isSpecialized() const { return BaseAndSpecialized.getInt(); }
+  
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     if (DeclOrKind & 0x01) {
@@ -1853,7 +1863,10 @@ public:
   /// For references to polymorphic function types, this routine "opens up"
   /// the type by replacing each instance of an archetype with a fresh type
   /// variable.
-  Type getTypeOfReference(ValueDecl *decl);
+  ///
+  /// \param decl The declarations whose type is being computed.
+  /// \param isSpecialized Whether this declaration is immediately specialized.
+  Type getTypeOfReference(ValueDecl *decl, bool isSpecialized);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.

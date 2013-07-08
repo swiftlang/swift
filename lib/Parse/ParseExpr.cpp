@@ -1236,9 +1236,13 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   Expr *E;
   if (D == 0) {
     auto refKind = DeclRefKind::Ordinary;
-    E = new (Context) UnresolvedDeclRefExpr(text, refKind, loc);
+    auto unresolved = new (Context) UnresolvedDeclRefExpr(text, refKind, loc);
+    unresolved->setSpecialized(hasGenericArgumentList);
+    E = unresolved;
   } else {
-    E = new (Context) DeclRefExpr(D, loc);
+    auto declRef = new (Context) DeclRefExpr(D, loc);
+    declRef->setSpecialized(hasGenericArgumentList);
+    E = declRef;
   }
   
   if (hasGenericArgumentList) {

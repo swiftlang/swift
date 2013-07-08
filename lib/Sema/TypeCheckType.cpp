@@ -61,14 +61,48 @@ Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
   return sliceTy;
 }
 
-/// Resolve a reference to the given type declaration within a particular
-/// context.
-///
-/// This routine aids unqualified name lookup for types by performing the
-/// resolution necessary to rectify the declaration found by name lookup with
-/// the declaration context from which name lookup started.
-static Type resolveTypeInContext(TypeChecker &tc, TypeDecl *typeDecl,
-                                 DeclContext *fromDC) {
+Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
+                                       DeclContext *fromDC,
+                                       bool isSpecialized) {
+  // If we're referring to a generic type and no generic arguments have been
+  // provided, and we are in the context of that generic type or one of its
+  // extensions, imply the generic arguments
+  if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+    if (nominal->getGenericParams() && !isSpecialized) {
+      for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
+        switch (dc->getContextKind()) {
+        case DeclContextKind::BuiltinModule:
+        case DeclContextKind::ClangModule:
+        case DeclContextKind::SerializedModule:
+        case DeclContextKind::TopLevelCodeDecl:
+        case DeclContextKind::TranslationUnit:
+          break;
+
+        case DeclContextKind::NominalTypeDecl:
+          // If this is our nominal type, return its type within its context.
+          if (cast<NominalTypeDecl>(dc) == nominal)
+            return nominal->getDeclaredTypeInContext();
+          continue;
+            
+        case DeclContextKind::ExtensionDecl:
+          // If this is an extension of our nominal type, return the type
+          // within the context of its extension.
+          if (cast<ExtensionDecl>(dc)->getExtendedType()->getAnyNominal()
+                == nominal)
+            return dc->getDeclaredTypeInContext();
+          continue;
+
+        case DeclContextKind::CapturingExpr:
+        case DeclContextKind::ConstructorDecl:
+        case DeclContextKind::DestructorDecl:
+          continue;
+        }
+
+        break;
+      }
+    }
+  }
+
   // If the type declaration itself is in a non-type context, no type
   // substitution is needed.
   DeclContext *ownerDC = typeDecl->getDeclContext();
@@ -92,8 +126,8 @@ static Type resolveTypeInContext(TypeChecker &tc, TypeDecl *typeDecl,
       isa<ProtocolDecl>(ownerDC) &&
       typeDecl->getDeclContext() != fromDC) {
     if (auto fromProto = dyn_cast<ProtocolDecl>(fromDC)) {
-      return tc.substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
-                                        fromProto->getThis()->getDeclaredType());
+      return substMemberTypeWithBase(typeDecl->getDeclaredType(), typeDecl,
+                                     fromProto->getThis()->getDeclaredType());
     }
   }
 
@@ -204,7 +238,8 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
 
       // Resolve the type declaration to a specific type. How this occurs
       // depends on the current context and where the type was found.
-      auto type = resolveTypeInContext(TC, typeDecl, dc);
+      auto type = TC.resolveTypeInContext(typeDecl, dc,
+                                          !Components[0].GenericArgs.empty());
       if (!type)
         continue;
 

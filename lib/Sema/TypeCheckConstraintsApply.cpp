@@ -934,6 +934,22 @@ namespace {
       }
     }
 
+    /// \brief Retrieve the type of a reference to the given declaration.
+    Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
+      if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+        // Resolve the reference to this type declaration in our current context.
+        auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, cs.DC,
+                                                             isSpecialized);
+        if (!type)
+          return nullptr;
+
+        // Refer to the metatype of this type.
+        return MetaTypeType::get(type, cs.getASTContext());
+      }
+
+      return decl->getTypeOfReference();
+    }
+
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
       auto fromType = expr->getType();
 
@@ -947,7 +963,8 @@ namespace {
       }
 
       // Set the type of this expression to the actual type of the reference.
-      expr->setType(expr->getDecl()->getTypeOfReference());
+      expr->setType(getTypeOfDeclReference(expr->getDecl(),
+                                           expr->isSpecialized()));
 
       // If there is no type variable in the original expression type, we're
       // done.
@@ -1038,8 +1055,8 @@ namespace {
       }
 
       // Normal path: build a declaration reference.
-      auto result = new (context) DeclRefExpr(decl, expr->getLoc(),
-                                              decl->getTypeOfReference());
+      auto type = getTypeOfDeclReference(decl, expr->isSpecialized());
+      auto result = new (context) DeclRefExpr(decl, expr->getLoc(), type);
 
       // For a polymorphic function type, we have to specialize our reference.
       if (auto polyFn = result->getType()->getAs<PolymorphicFunctionType>()) {

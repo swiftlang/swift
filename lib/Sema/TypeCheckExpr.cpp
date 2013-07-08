@@ -327,17 +327,22 @@ static Expr *foldSequence(TypeChecker &TC,
   return makeBinOp(TC, Op1.op, LHS, RHS);
 }
 
-Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc) {
+Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
+                                bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    return new (Context) DeclRefExpr(Decls[0], NameLoc,
-                                     Decls[0]->getTypeOfReference());
+    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc,
+                                            Decls[0]->getTypeOfReference());
+    result->setSpecialized(isSpecialized);
+    return result;
   }
 
   Decls = Context.AllocateCopy(Decls);
-  return new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
-                         UnstructuredUnresolvedType::get(Context));
+  auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc,
+                                UnstructuredUnresolvedType::get(Context));
+  result->setSpecialized(isSpecialized);
+  return result;
 }
 
 static Type lookupGlobalType(TypeChecker &TC, StringRef name) {

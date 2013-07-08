@@ -98,7 +98,7 @@ namespace {
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member));
-      OverloadChoice choice(base->getType(), decl);
+      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addOverloadSet(OverloadSet::getNew(CS, tv, locator, { &choice, 1 }));
       return tv;
@@ -205,7 +205,8 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      return adjustLValueForReference(CS.getTypeOfReference(E->getDecl()),
+      return adjustLValueForReference(CS.getTypeOfReference(E->getDecl(),
+                                                            E->isSpecialized()),
                                       E->getDecl()->getAttrs().isAssignment(),
                                       CS.getASTContext());
     }
@@ -264,7 +265,8 @@ namespace {
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-        choices.push_back(OverloadChoice(Type(), decls[i]));
+        choices.push_back(OverloadChoice(Type(), decls[i],
+                                         expr->isSpecialized()));
       }
 
       // Record this overload set.
@@ -281,7 +283,8 @@ namespace {
       SmallVector<OverloadChoice, 4> choices;
       auto baseTy = expr->getBase()->getType();
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-        choices.push_back(OverloadChoice(baseTy, decls[i]));
+        choices.push_back(OverloadChoice(baseTy, decls[i],
+                                         /*isSpecialized=*/false));
       }
       
       // Record this overload set.

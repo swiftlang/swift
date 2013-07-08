@@ -692,7 +692,8 @@ public:
 
   void visitDeclRefExpr(DeclRefExpr *E) {
     printCommon(E, "declref_expr")
-      << " decl=" << E->getDecl()->getName() << ')';
+      << " decl=" << E->getDecl()->getName()
+      << " specialized=" << (E->isSpecialized()? "yes" : "no") << ")";
   }
   void visitSuperRefExpr(SuperRefExpr *E) {
     printCommon(E, "super_ref_expr") << ')';
@@ -708,7 +709,8 @@ public:
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
     printCommon(E, "overloaded_decl_ref_expr")
       << " name=" << E->getDecls()[0]->getName().str()
-      << " #decls=" << E->getDecls().size();
+      << " #decls=" << E->getDecls().size()
+      << " specialized=" << (E->isSpecialized()? "yes" : "no");
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);
@@ -730,7 +732,8 @@ public:
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     printCommon(E, "unresolved_decl_ref_expr")
-      << " name=" << E->getName() << ')';
+      << " name=" << E->getName()
+      << " specialized=" << (E->isSpecialized()? "yes" : "no") << ')';
   }
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E) {
     printCommon(E, "unresolved_specialize_expr") << '\n';

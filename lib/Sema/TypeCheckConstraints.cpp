@@ -684,7 +684,8 @@ static Type getTypeOfValueDeclReference(Type baseType,
   return decl->getType();
 }
 
-Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
+Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
+                                          bool isSpecialized) {
   if (auto proto = dyn_cast<ProtocolDecl>(value->getDeclContext())) {
     // Unqualified lookup can find operator names within protocols.
     auto func = cast<FuncDecl>(value);
@@ -712,13 +713,25 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value) {
     return type;
   }
 
+  // If we have a type declaration, resolve it within the current context.
+  if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
+    // Resolve the reference to this type declaration in our current context.
+    auto type = getTypeChecker().resolveTypeInContext(typeDecl, DC,
+                                                      isSpecialized);
+    if (!type)
+      return nullptr;
+
+    // Refer to the metatype of this type.
+    return MetaTypeType::get(openType(type), getASTContext());
+  }
+
   // Determine the type of the value, opening up that type if necessary.
   Type valueType = getTypeOfValueDeclReference(nullptr,
                                                value,
                                                TC.Context);
   valueType = adjustLValueForReference(openType(valueType),
-                                  value->getAttrs().isAssignment(),
-                                  TC.Context);
+                                       value->getAttrs().isAssignment(),
+                                       TC.Context);
   return valueType;
 }
 
@@ -807,7 +820,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>())
-    return getTypeOfReference(value);
+    return getTypeOfReference(value, /*isSpecialized=*/false);
 
   // The archetypes that have been opened up and replaced with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
@@ -1883,7 +1896,7 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
                                          choice.getDecl(),
                                          /*FIXME:*/false);
     else
-      refType = getTypeOfReference(choice.getDecl());
+      refType = getTypeOfReference(choice.getDecl(), choice.isSpecialized());
 
     bool isAssignment = choice.getDecl()->getAttrs().isAssignment();
     refType = adjustLValueForReference(refType, isAssignment,
@@ -2216,7 +2229,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
           involvesAssociatedTypes(getTypeChecker(), constructor))
         continue;
 
-      choices.push_back(OverloadChoice(baseTy, constructor));
+      choices.push_back(OverloadChoice(baseTy, constructor,
+                                       /*isSpecialized=*/false));
     }
 
     // If we need an "identity" constructor, then add an entry in the
@@ -2252,7 +2266,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Form the overload set.
     SmallVector<OverloadChoice, 4> choices;
     for (auto result : lookup) {
-      choices.push_back(OverloadChoice(baseTy, result.first));
+      choices.push_back(OverloadChoice(baseTy, result.first,
+                                       /*isSpecialized=*/false));
     }
     auto locator = getConstraintLocator(constraint.getLocator());
     addOverloadSet(OverloadSet::getNew(*this, memberTy, locator, choices));
@@ -2293,7 +2308,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         isa<FuncDecl>(result) && !result->isInstanceMember())
       continue;
 
-    choices.push_back(OverloadChoice(baseTy, result));
+    choices.push_back(OverloadChoice(baseTy, result, /*isSpecialized=*/false));
   }
 
   if (choices.empty()) {
