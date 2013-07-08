@@ -52,11 +52,7 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-Optional<Solution> ConstraintSystem::finalize() {
-  // If any free type variables remain, we're done.
-  if (hasFreeTypeVariables())
-    return Nothing;
-
+Solution ConstraintSystem::finalize() {
   // Create the solution.
   Solution solution(*this);
 
@@ -545,7 +541,8 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
                                     unsigned depth,
                                     TypeVariableConstraints &tvc,
                                     ArrayRef<std::pair<Type, bool>> bindings,
-                                    SmallVectorImpl<Solution> &solutions) {
+                                    SmallVectorImpl<Solution> &solutions,
+                                    bool allowFreeTypeVariables) {
   auto typeVar = tvc.TypeVar;
   bool anySolved = false;
   llvm::SmallPtrSet<CanType, 4> exploredTypes;
@@ -578,7 +575,7 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
 
       // FIXME: Use a 'bind' constraint here.
       cs.addConstraint(ConstraintKind::Equal, typeVar, type);
-      if (!cs.solve(solutions))
+      if (!cs.solve(solutions, allowFreeTypeVariables))
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
@@ -660,7 +657,8 @@ static bool tryTypeVariableBindings(ConstraintSystem &cs,
   return !anySolved;
 }
 
-bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
+bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
+                             bool allowFreeTypeVariables) {
   // If there is no solver state, this is the top-level call. Create solver
   // state and begin recursion.
   if (!solverState) {
@@ -669,7 +667,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     this->solverState = &state;
 
     // Solve the system.
-    solve(solutions);
+    solve(solutions, allowFreeTypeVariables);
 
     // If there is more than one viable system, attempt to pick the best
     // solution.
@@ -693,15 +691,18 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
 
   // If there are no constraints remaining, we're done. Save this solution.
   if (Constraints.empty() && UnresolvedOverloadSets.empty()) {
-    if (auto solution = finalize()) {
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
-      }
+    // If any free type variables remain and we're not allowed to have them,
+    // fail.
+    if (!allowFreeTypeVariables && hasFreeTypeVariables())
+      return true;
 
-      solutions.push_back(std::move(*solution));
-      return false;
+    auto solution = finalize();
+    if (TC.getLangOpts().DebugConstraintSolver) {
+      llvm::errs().indent(solverState->depth * 2) << "(found solution)\n";
     }
-    return true;
+
+    solutions.push_back(std::move(solution));
+    return false;
   }
 
   // Collect the type variable constraints.
@@ -748,7 +749,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
                                      solverState->depth,
                                      typeVarConstraints[bestTypeVarIndex],
                                      bestBindings,
-                                     solutions);
+                                     solutions,
+                                     allowFreeTypeVariables);
     }
 
     // Fall through to resolve an overload set.
@@ -787,7 +789,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
     // Try to solve the system with this overload choice.
     SolverScope scope(*this);
     resolveOverload(bestOvl, i);
-    if (!solve(solutions))
+    if (!solve(solutions, allowFreeTypeVariables))
       anySolved = true;
   }
 

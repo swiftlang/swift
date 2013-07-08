@@ -548,7 +548,7 @@ public:
     // FIXME: Revisit this restriction.
     if (PD->getAttrs().isObjC()) {
       bool isObjC = true;
-      
+
       SmallVector<ProtocolDecl*, 2> inheritedProtocols;
       for (auto inherited : PD->getInherited()) {
         if (!inherited.getType()->isExistentialType(inheritedProtocols))
@@ -1185,6 +1185,22 @@ void TypeChecker::definePendingImplicitDecls() {
 void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
   DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
   checker.checkInherited(D, D->getInherited());
+
+  // Compute the set of all of the protocols this protocol inherits.
+  llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+  SmallVector<ProtocolDecl *, 4> allProtocols;
+  for (auto inherited : D->getInherited()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    if (inherited.getType()->isExistentialType(protocols)) {
+      for (auto proto : protocols) {
+        if (knownProtocols.insert(proto)) {
+          allProtocols.push_back(proto);
+        }
+      }
+    }
+  }
+  D->setProtocols(Context.AllocateCopy(allProtocols));
+
   for (auto member : D->getMembers()) {
     if (auto assocType = dyn_cast<TypeAliasDecl>(member))
       checker.checkInherited(assocType, assocType->getInherited());

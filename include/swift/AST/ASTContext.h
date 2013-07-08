@@ -89,6 +89,10 @@ public:
   /// protocol conformance structures that indicate how the given type meets
   /// the requirements of those protocols.
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
+
+  /// The set of requirements for which we have used default definitions or
+  /// otherwise deduced the result.
+  llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 };
 
 /// \brief The arena in which a particular ASTContext allocation will go.

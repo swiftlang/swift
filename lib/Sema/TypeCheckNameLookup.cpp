@@ -23,7 +23,7 @@ using namespace swift;
 
 LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
   LookupResult result;
-  unsigned options = NL_Default;
+  unsigned options = NL_QualifiedDefault;
   
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
@@ -67,14 +67,18 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
 LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
   LookupTypeResult result;
 
+  // Look through the metatype.
+  if (auto metaT = type->getAs<MetaTypeType>())
+    type = metaT->getInstanceType();
+
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
-  if (!TU.lookupQualified(type, name, NL_Default, decls))
+  if (!TU.lookupQualified(type, name, NL_QualifiedDefault, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
   llvm::SmallPtrSet<CanType, 4> types;
-  for (auto decl : decls){
+  for (auto decl : decls) {
     // Ignore non-types found by name lookup.
     auto typeDecl = dyn_cast<TypeDecl>(decl);
     if (!typeDecl)
@@ -87,9 +91,25 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
       continue;
     }
 
-    // Substitute the the base into the member's type.
-    auto memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),
-                                              typeDecl, type);
+    Type memberType;
+
+    // If we found an associated type when looking into a non-protocol,
+    // non-archetype type, get the corresponding witness type. This makes
+    // deduced/defaulted associated types visible.
+    if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
+        !type->is<ArchetypeType>() && !type->isExistentialType()) {
+      auto protocol = cast<ProtocolDecl>(typeDecl->getDeclContext());
+      ProtocolConformance *conformance = nullptr;
+      if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
+        continue;
+
+      memberType = conformance->TypeMapping[typeDecl->getDeclaredType()
+                                              ->castTo<ArchetypeType>()];
+    } else {
+      // Substitute the the base into the member's type.
+      memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),
+                                           typeDecl, type);
+    }
     if (!memberType)
       continue;
 

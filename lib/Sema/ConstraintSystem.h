@@ -1556,8 +1556,8 @@ private:
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
-  /// \returns an empty solution if this constraint system is unsolvable.
-  Optional<Solution> finalize();
+  /// \returns the solution.
+  Solution finalize();
 
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
@@ -2130,9 +2130,12 @@ public:
   /// \brief Solve the system of constraints.
   ///
   /// \param solutions The set of solutions to this system of constraints.
+  /// \param allowFreeTypeVariables Whether to allow free type variables in
+  /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solve(SmallVectorImpl<Solution> &solutions);
+  bool solve(SmallVectorImpl<Solution> &solutions,
+             bool allowFreeTypeVariables = false);
 
 private:
   // \brief Compare two solutions to the same set of constraints.

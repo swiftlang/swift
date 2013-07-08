@@ -292,7 +292,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
   // Try to solve the system.
   SmallVector<constraints::Solution, 1> solutions;
-  if (cs.solve(solutions)) {
+  if (cs.solve(solutions, /*allowFreeTypeVariables=*/true)) {
     return RequirementMatch(witness, MatchKind::TypeConflict,
                             witnessType->getUnlabeledType(tc.Context));
   }
@@ -314,6 +314,10 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
       auto replacement = solution.simplifyType(tc, known->second);
       assert(replacement && "Couldn't simplify type variable?");
+
+      // If the replacement still contains a type variable, we didn't deduce it.
+      if (replacement->hasTypeVariable())
+        continue;
 
       result.AssociatedTypeDeductions.push_back({assocType, replacement});
     }
@@ -623,7 +627,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     } else {
       // Variable/function/subscript requirements.
       for (auto candidate : TC.lookupMember(metaT, Requirement->getName())) {
-          witnesses.push_back(candidate);
+        witnesses.push_back(candidate);
       }
     }
 
@@ -774,6 +778,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   Result->Mapping = std::move(Mapping);
   Result->TypeMapping = std::move(TypeMapping);
   Result->InheritedMapping = std::move(InheritedMapping);
+
+  // Record each of the deduced associated types.
+  for (auto deduced : deducedAssocTypes) {
+    Result->DefaultedDefinitions.insert(deduced.first);
+  }
   return Result;
 }
 

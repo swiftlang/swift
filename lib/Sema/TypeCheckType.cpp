@@ -119,9 +119,6 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found an associated type in an inherited protocol, the base
   // for our reference to this associated type is our own 'This'.
-  // FIXME: We'll need to turn this into a more general 'implicit base'
-  // projection, so that any time we find something in an outer context
-  // we make sure to map to that context.
   if (isa<TypeAliasDecl>(typeDecl) &&
       isa<ProtocolDecl>(ownerDC) &&
       typeDecl->getDeclContext() != fromDC) {
@@ -157,7 +154,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     }
   }
 
-  return typeDecl->getDeclaredType();
+  llvm_unreachable("Shouldn't have found this type");
 }
 
 /// Apply generic arguments to the given type.
