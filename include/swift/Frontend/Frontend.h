@@ -36,14 +36,6 @@ namespace swift {
   class ASTContext;
   class SILModule;
 
-  TranslationUnit *buildSingleTranslationUnit(ASTContext &Context,
-                                              StringRef OutputName,
-                                              ArrayRef<unsigned> BufferIDs,
-                                              bool ParseOnly,
-                                              bool AllowBuiltinModule,
-                                              TranslationUnit::TUKind Kind,
-                                              SILModule *SIL);
-
 class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
   std::string TargetTriple;
   std::string ClangModuleCachePath;

@@ -33,14 +33,14 @@ using namespace swift;
 
 /// \param SIL is non-null when we're parsing a .sil file instead of a .swift
 /// file.
-TranslationUnit*
-swift::buildSingleTranslationUnit(ASTContext &Context,
-                                  StringRef ModuleName,
-                                  ArrayRef<unsigned> BufferIDs,
-                                  bool ParseOnly,
-                                  bool AllowBuiltinModule,
-                                  TranslationUnit::TUKind Kind,
-                                  SILModule *SIL) {
+static TranslationUnit*
+buildSingleTranslationUnit(ASTContext &Context,
+                           StringRef ModuleName,
+                           ArrayRef<unsigned> BufferIDs,
+                           bool ParseOnly,
+                           bool AllowBuiltinModule,
+                           TranslationUnit::TUKind Kind,
+                           SILModule *SIL) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = Context.getIdentifier(ModuleName);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context, Kind);
