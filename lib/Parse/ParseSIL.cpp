@@ -75,7 +75,8 @@ namespace {
                    std::pair<SourceLoc, Identifier>> UndefinedBlocks;
 
     /// Data structures used to perform name lookup for local values.
-    llvm::StringMap<SILValue> LocalValues;
+    llvm::StringMap<ValueBase*> LocalValues;
+    llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
   public:
 
@@ -103,13 +104,21 @@ namespace {
     /// being defined.
     SILBasicBlock *getBBForReference(Identifier Name, SourceLoc Loc);
 
+    struct UnresolvedValueName {
+      StringRef Name;
+      SourceLoc NameLoc;
+      unsigned ResultVal;
+
+      bool isMRV() const { return ResultVal != ~0U; }
+    };
+
     /// getLocalValue - Get a reference to a local value with the specified name
     /// and type.
-    SILValue getLocalValue(StringRef Name, SILType Type, SourceLoc NameLoc);
-    
+    SILValue getLocalValue(UnresolvedValueName Name, SILType Type);
+
     /// setLocalValue - When an instruction or block argument is defined, this
     /// method is used to register it and update our symbol table.
-    void setLocalValue(SILValue Value, StringRef Name, SourceLoc NameLoc);
+    void setLocalValue(ValueBase *Value, StringRef Name, SourceLoc NameLoc);
     
   public:
     // Parsing logic.
@@ -120,16 +129,7 @@ namespace {
     }
 
     bool parseGlobalName(Identifier &Name);
-
-    struct UnresolvedValueName {
-      StringRef Name;
-      SourceLoc NameLoc;
-    };
-
     bool parseValueName(UnresolvedValueName &Name);
-    SILValue getLocalValue(UnresolvedValueName Name, SILType Type) {
-      return getLocalValue(Name.Name, Type, Name.NameLoc);
-    }
     bool parseValueRef(SILValue &Result, SILType Ty);
     bool parseTypedValueRef(SILValue &Result, SourceLoc &Loc);
     bool parseTypedValueRef(SILValue &Result) {
@@ -141,8 +141,8 @@ namespace {
                         StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseCallInstruction(ValueKind Opcode, SILBuilder &B,
-                              SILValue &ResultVal);
-    bool parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal);
+                              ValueBase *&ResultVal);
+    bool parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal);
 
     bool parseSILBasicBlock();
   };
@@ -286,58 +286,125 @@ bool SILParser::parseGlobalName(Identifier &Name) {
 
 /// getLocalValue - Get a reference to a local value with the specified name
 /// and type.
-SILValue SILParser::getLocalValue(StringRef Name, SILType Type,
-                                  SourceLoc NameLoc) {
-  SILValue &Entry = LocalValues[Name];
+SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type) {
+  // Check to see if this is already defined.
+  ValueBase *&Entry = LocalValues[Name.Name];
+
+  if (Entry) {
+    // If this value is already defined, check it to make sure types match.
+    SILType EntryTy;
+
+    // If this is a reference to something with multiple results, get the right
+    // one.
+    if (Name.isMRV()) {
+      if (Name.ResultVal >= Entry->getTypes().size()) {
+        HadError = true;
+        P.diagnose(Name.NameLoc, diag::invalid_sil_value_name_result_number);
+        // Make sure to return something of the requested type.
+        return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+      }
+    }
+
+    EntryTy = Entry->getType(Name.isMRV() ? Name.ResultVal : 0);
+
+    if (EntryTy != Type) {
+      HadError = true;
+      P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
+                 EntryTy.getAsString());
+      // Make sure to return something of the requested type.
+      return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+    }
+
+    return SILValue(Entry, Name.isMRV() ? Name.ResultVal : 0);
+  }
   
-  // This is a forward reference.  Create a dummy node to represent
+  // Otherwise, this is a forward reference.  Create a dummy node to represent
   // it until we see a real definition.
-  if (!Entry) {
-    ForwardRefLocalValues[Name] = NameLoc;
+  ForwardRefLocalValues[Name.Name] = Name.NameLoc;
+
+  if (Name.ResultVal == ~0U) {
     Entry = new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
     return Entry;
   }
-  
-  // If this value is already defined, check it.
-  if (Entry.getType() != Type) {
-    HadError = true;
-    P.diagnose(NameLoc, diag::sil_value_use_type_mismatch, Name,
-               Entry.getType().getAsString());
-    // Make sure to return something of the requested type.
-    return new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
-  }
 
-  return Entry;
+  // If we have multiple results, track them through ForwardMRVLocalValues.
+  std::vector<SILValue> &Placeholders = ForwardMRVLocalValues[Name.Name];
+  if (Placeholders.size() <= Name.ResultVal)
+    Placeholders.resize(Name.ResultVal+1);
+
+  if (!Placeholders[Name.ResultVal])
+    Placeholders[Name.ResultVal] =
+      new (SILMod) GlobalAddrInst(SILLocation(), nullptr, Type);
+  return Placeholders[Name.ResultVal];
 }
 
 /// setLocalValue - When an instruction or block argument is defined, this
 /// method is used to register it and update our symbol table.
-void SILParser::setLocalValue(SILValue Value, StringRef Name,
+void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
                               SourceLoc NameLoc) {
-  SILValue &Entry = LocalValues[Name];
+  ValueBase *&Entry = LocalValues[Name];
 
-  if (!Entry) {
+  // If this value was already defined, it is either a redefinition, or a
+  // specification for a forward referenced value.
+  if (Entry) {
+    if (!ForwardRefLocalValues.erase(Name)) {
+      P.diagnose(NameLoc, diag::sil_value_redefinition, Name);
+      HadError = true;
+      return;
+    }
+
+    // If the forward reference was of the wrong type, diagnose this now.
+    if (Entry->getTypes() != Value->getTypes()) {
+      P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
+                 Entry->getType(0).getAsString());
+      HadError = true;
+    } else {
+      // Forward references only live here if they have a single result.
+      SILValue(Entry).replaceAllUsesWith(SILValue(Value));
+    }
     Entry = Value;
     return;
   }
-  
-  // If this value was already defined, it is either a redefinition, or a
-  // specification for a forward referenced value.
-  if (!ForwardRefLocalValues.erase(Name)) {
-    P.diagnose(NameLoc, diag::sil_value_redefinition, Name);
-    HadError = true;
-    return;
-  }
-  
-  // If the forward reference was of the wrong type, diagnose this now.
-  if (Entry.getType() != Value.getType()) {
-    P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-               Entry.getType().getAsString());
-    HadError = true;
-  } else {
-    Entry.replaceAllUsesWith(Value);
-  }
+
+  // Otherwise, just store it in our map.
   Entry = Value;
+
+  // If Entry has multiple values, it may be forward referenced.
+  if (Entry->getTypes().size() > 1) {
+    auto It = ForwardMRVLocalValues.find(Name);
+    if (It != ForwardMRVLocalValues.end()) {
+      // Take the information about the forward ref out of the maps.
+      std::vector<SILValue> Entries(std::move(It->second));
+      SourceLoc Loc = ForwardRefLocalValues[Name];
+
+      // Remove the entries from the maps.
+      ForwardRefLocalValues.erase(Name);
+      ForwardMRVLocalValues.erase(It);
+
+      // Verify that any forward-referenced values line up.
+      if (Entries.size() > Value->getTypes().size()) {
+        P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
+                   Entry->getType(0).getAsString());
+        HadError = true;
+        return;
+      }
+
+      // Validate that any forward-referenced elements have the right type, and
+      // RAUW them.
+      for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
+        if (!Entries[i]) continue;
+
+        if (Entries[i]->getType(0) != Value->getType(i)) {
+          P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
+                     Entry->getType(0).getAsString());
+          HadError = true;
+          return;
+        }
+
+        Entries[i].replaceAllUsesWith(SILValue(Value, i));
+      }
+    }
+  }
 }
 
 
@@ -405,13 +472,32 @@ bool SILParser::parseSILType(SILType &Result) {
 /// parseValueName - Parse a value name without a type available yet.
 ///
 ///     sil-value-name:
-///       sil-local-name
+///       sil-local-name ('#' integer_literal)?
 ///
 bool SILParser::parseValueName(UnresolvedValueName &Result) {
   Result.Name = P.Tok.getText();
 
-  return P.parseToken(tok::sil_local_name, Result.NameLoc,
-                      diag::expected_sil_value_name);
+  // Parse the local-name.
+  if (P.parseToken(tok::sil_local_name, Result.NameLoc,
+                   diag::expected_sil_value_name))
+    return true;
+
+  // If the result value specifier is present, parse it.
+  if (P.consumeIf(tok::sil_pound)) {
+    unsigned Value = 0;
+    if (P.Tok.isNot(tok::integer_literal) ||
+        P.Tok.getText().getAsInteger(10, Value)) {
+      P.diagnose(P.Tok, diag::expected_sil_value_name_result_number);
+      return true;
+    }
+
+    P.consumeToken(tok::integer_literal);
+    Result.ResultVal = Value;
+  } else {
+    Result.ResultVal = ~0U;
+  }
+
+  return false;
 }
 
 /// parseValueRef - Parse a value, given a contextual type.
@@ -420,12 +506,9 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
 ///       sil-local-name
 ///
 bool SILParser::parseValueRef(SILValue &Result, SILType Ty) {
-  SourceLoc NameLoc;
-  StringRef Name = P.Tok.getText();
-  if (P.parseToken(tok::sil_local_name, NameLoc,diag::expected_sil_value_name))
-    return true;
-  
-  Result = getLocalValue(Name, Ty, NameLoc);
+  UnresolvedValueName Name;
+  if (parseValueName(Name)) return true;
+  Result = getLocalValue(Name, Ty);
   return false;
 }
 
@@ -435,14 +518,16 @@ bool SILParser::parseValueRef(SILValue &Result, SILType Ty) {
 ///       sil-value-ref ':' sil-type
 ///
 bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc) {
+  Loc = P.Tok.getLoc();
+
+  UnresolvedValueName Name;
   SILType Ty;
-  StringRef Name = P.Tok.getText();
-  if (P.parseToken(tok::sil_local_name, Loc, diag::expected_sil_value_name)||
+  if (parseValueName(Name) ||
       P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
       parseSILType(Ty))
     return true;
   
-  Result = getLocalValue(Name, Ty, Loc);
+  Result = getLocalValue(Name, Ty);
   return false;
 }
 
@@ -566,7 +651,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
-  SILValue ResultVal;
+  ValueBase *ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
   case ValueKind::AllocBoxInst: {
@@ -913,7 +998,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 }
 
 bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
-                                     SILValue &ResultVal) {
+                                     ValueBase *&ResultVal) {
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
@@ -972,7 +1057,7 @@ bool SILParser::parseCallInstruction(ValueKind Opcode, SILBuilder &B,
   return false;
 }
 
-bool SILParser::parseSILFunctionRef(SILBuilder &B, SILValue &ResultVal) {
+bool SILParser::parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal) {
   Identifier Name;
   SILType Ty;
   SourceLoc Loc = P.Tok.getLoc();
