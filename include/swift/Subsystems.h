@@ -65,9 +65,9 @@ namespace swift {
   /// present, then we're parsing a .sil file instead of a .swift file.
   ///
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
-                                unsigned *BufferOffset = 0,
+                                unsigned *BufferOffset = nullptr,
                                 unsigned BufferEndOffset = 0,
-                                SILParserState *SIL = 0);
+                                SILParserState *SIL = nullptr);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,
