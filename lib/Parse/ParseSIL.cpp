@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Parser.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"

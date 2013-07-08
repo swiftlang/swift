@@ -17,11 +17,11 @@
 #ifndef SWIFT_PARSER_H
 #define SWIFT_PARSER_H
 
-#include "Scope.h"
-#include "swift/Parse/Token.h"
-#include "swift/Parse/Lexer.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Parse/Scope.h"
+#include "swift/Parse/Token.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {

@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"

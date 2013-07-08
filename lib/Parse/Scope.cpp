@@ -14,10 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Parse/Scope.h"
 #include "swift/AST/Attr.h"
-#include "Scope.h"
-#include "Parser.h"
+#include "swift/Parse/Parser.h"
 #include "llvm/ADT/Twine.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//

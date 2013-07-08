@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
-#include "Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
