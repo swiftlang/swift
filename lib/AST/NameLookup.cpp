@@ -383,6 +383,17 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       DC = DC->getParent();
     }
 
+    // Check the generic parameters for something with the given name.
+    if (GenericParams) {
+      FindLocalVal localVal(Loc, Name);
+      localVal.checkGenericParams(GenericParams);
+
+      if (localVal.MatchingValue) {
+        Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+        return;
+      }
+    }
+
     if (BaseDecl) {
       SmallVector<ValueDecl *, 4> Lookup;
       M.lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault, Lookup);
@@ -442,16 +453,20 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
       if (FoundAny)
         return;
-    }
 
-    // Check the generic parameters for something with the given name.
-    if (GenericParams) {
-      FindLocalVal localVal(Loc, Name);
-      localVal.checkGenericParams(GenericParams);
+      // Check the generic parameters for something with the given name.
+      auto nominal = isMetatypeType
+                       ? ExtendedType->castTo<MetaTypeType>()
+                           ->getInstanceType()->getAnyNominal()
+                       : ExtendedType->getAnyNominal();
+      if (nominal && nominal->getGenericParams()) {
+        FindLocalVal localVal(Loc, Name);
+        localVal.checkGenericParams(nominal->getGenericParams());
 
-      if (localVal.MatchingValue) {
-        Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
-        return;
+        if (localVal.MatchingValue) {
+          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+          return;
+        }
       }
     }
 
@@ -608,13 +623,6 @@ public:
 MemberLookupTable::MemberLookupTable(NominalTypeDecl *nominal) {
   // Add the members of the nominal declaration to the table.
   addMembers(nominal->getMembers());
-
-  // If this type has generic parameters, add them.
-  // FIXME: This feels wrong. Shouldn't these only be available for
-  // unqualified name lookup?
-  if (nominal->getGenericParams())
-    for (auto gp : *nominal->getGenericParams())
-      addMembers(gp.getDecl());
 
   // Update the lookup table to introduce members from extensions.
   updateLookupTable(nominal);
