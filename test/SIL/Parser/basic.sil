@@ -27,7 +27,8 @@ bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
   %a = br bb1                         // CHECK: br bb1
 bb1:
-  %1 = return %0 : $()                // CHECK:   %2 = return %0 : $()
+  %b = alloc_box $Int64               // CHECK:   %2 = alloc_box $Int64
+  %1 = return %0 : $()                // CHECK:   %3 = return %0 : $()
 }
 
 // Forward referenced values.

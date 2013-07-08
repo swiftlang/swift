@@ -481,6 +481,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   // Parse this textually to avoid Swift keywords (like 'return') from
   // interfering with opcode recognition.
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
+    .Case("alloc_box", ValueKind::AllocBoxInst)
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
@@ -568,6 +569,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   SILValue ResultVal;
   switch (Opcode) {
   default: assert(0 && "Unreachable");
+  case ValueKind::AllocBoxInst: {
+    SILType Ty;
+    if (parseSILType(Ty)) return true;
+    ResultVal = B.createAllocBox(SILLocation(), Ty);
+    break;
+  }
   case ValueKind::ApplyInst:
   case ValueKind::PartialApplyInst:
     if (parseCallInstruction(Opcode, B, ResultVal))
