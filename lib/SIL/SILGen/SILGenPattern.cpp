@@ -16,6 +16,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/FormattedStream.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -32,9 +33,10 @@ public:
   enum class Kind : uint8_t {
     /// This pattern is a wildcard and doesn't match a constructor.
     Wildcard,
-    /// This pattern destructures a tuple. Tuple constructors are irrefutable
-    /// and always form a signature.
+    /// This pattern destructures a tuple. Tuple constructors are irrefutable.
     Tuple,
+    /// This pattern performs a dynamic type check.
+    Is,
   };
 
 private:
@@ -43,6 +45,10 @@ private:
     struct {
       unsigned arity;
     } tuple;
+    struct {
+      TypeBase *castType;
+      CheckedCastKind kind;
+    } is;
   };
 
   /// Constructor used by DenseMapInfo.
@@ -51,6 +57,9 @@ private:
 
   explicit PatternConstructor(unsigned tupleArity)
     : kind(Kind::Tuple), tuple{tupleArity}
+  {}
+  explicit PatternConstructor(CanType castType, CheckedCastKind kind)
+    : kind(Kind::Is), is{castType.getPointer(), kind}
   {}
 public:
   PatternConstructor() : kind(Kind::Wildcard) {}
@@ -61,6 +70,10 @@ public:
 
   static PatternConstructor forTuple(unsigned arity) {
     return PatternConstructor(arity);
+  }
+  
+  static PatternConstructor forIs(CanType castType, CheckedCastKind kind) {
+    return PatternConstructor(castType, kind);
   }
 
   /// Get the PatternConstructor value for a pattern.
@@ -74,7 +87,7 @@ public:
     case PatternKind::Any:
     case PatternKind::Expr:
       return PatternConstructor::forWildcard();
-    // TODO These are wildcards, but we don't implement variable binding yet.
+    // TODO We don't implement variable binding yet.
     case PatternKind::Named:
       llvm_unreachable("not implemented");
       // return PatternConstructor::forWildcard();
@@ -82,9 +95,16 @@ public:
     case PatternKind::Tuple:
       return PatternConstructor::forTuple(
                         p->getType()->getAs<TupleType>()->getFields().size());
+        
+    case PatternKind::Isa: {
+      auto *ip = cast<IsaPattern>(p);
+      return PatternConstructor::forIs(
+                            ip->getCastTypeLoc().getType()->getCanonicalType(),
+                            ip->getCastKind());
+    }
+        
     // TODO
     case PatternKind::NominalType:
-    case PatternKind::Isa:
       llvm_unreachable("not implemented");
     
     // Recur into simple wrapping patterns.
@@ -102,6 +122,15 @@ public:
   unsigned getTupleArity() const {
     assert(kind == Kind::Tuple);
     return tuple.arity;
+  }
+  
+  CanType getIsType() const {
+    assert(kind == Kind::Is);
+    return CanType(is.castType);
+  }
+  CheckedCastKind getIsCastKind() const {
+    assert(kind == Kind::Is);
+    return is.kind;
   }
   
   /// Emit a conditional branch testing if a value matches this constructor.
@@ -124,8 +153,7 @@ public:
           auto &field = tupleTy->getFields()[i];
           SILType fieldTy = gen.getLoweredType(field.getType());
           SILValue member = gen.B.createTupleElementAddr(SILLocation(),
-                                                         v, i,
-                                                         fieldTy);
+                                               v, i, fieldTy.getAddressType());
           if (!fieldTy.isAddressOnly(gen.F.getModule()))
             member = gen.B.createLoad(SILLocation(), member);
           destructured.push_back(member);
@@ -135,19 +163,51 @@ public:
           auto &field = tupleTy->getFields()[i];
           SILType fieldTy = gen.getLoweredLoadableType(field.getType());
           SILValue member = gen.B.createTupleExtract(SILLocation(),
-                                                     v, i,
-                                                     fieldTy);
+                                                     v, i, fieldTy);
           destructured.push_back(member);
         }
       }
       return nullptr;
+    }
+      
+    case Kind::Is: {
+      // Perform a conditional cast and branch on whether it succeeded.
+      SILValue cast = gen.emitCheckedCast(SILLocation(),
+                                      ManagedValue(v, ManagedValue::Unmanaged),
+                                      v.getType().getSwiftRValueType(),
+                                      getIsType(),
+                                      getIsCastKind(),
+                                      CheckedCastMode::Conditional,
+                                      /*useCastValue*/ false);
+      SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast,
+                      SILType::getBuiltinIntegerType(1, gen.F.getASTContext()));
+      
+      // On the true branch, we can use the cast value.
+      // If the cast result is loadable and we cast a value address, load it.
+      if (cast.getType().isAddress()
+          && !cast.getType().isAddressOnly(gen.F.getModule()))
+        cast = gen.B.createLoad(SILLocation(), cast);
+      destructured.push_back(cast);
+      
+      // Emit the branch.
+      SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      
+      gen.B.createCondBranch(SILLocation(), didMatch,
+                             trueBB, falseBB);
+      
+      // Continue codegen into the true block, and return the false block.
+      gen.B.emitBlock(trueBB);
+      return falseBB;
     }
     }
   }
   
   /// Destructure a pattern that has this pattern constructor.
   /// Destructured wildcards are represented with null Pattern* pointers.
-  void destructurePattern(const Pattern *p,
+  /// p must be non-orthogonal to this pattern constructor.
+  void destructurePattern(SILGenFunction &gen,
+                          const Pattern *p,
                           SmallVectorImpl<const Pattern *> &destructured) {
     switch (getKind()) {
     case Kind::Wildcard:
@@ -170,6 +230,67 @@ public:
                      });
       return;
     }
+        
+    case Kind::Is: {
+      // Wildcards remain wildcards.
+      if (isWildcardPattern(p)) {
+        destructured.push_back(nullptr);
+        return;
+      }
+      
+      auto *ip = cast<IsaPattern>(p);
+      CanType newFromType = getIsType();
+      CanType newToType = ip->getCastTypeLoc().getType()->getCanonicalType();
+      
+      // If a cast pattern casts to the same type, it reduces to a wildcard.
+      // FIXME: 'is' patterns should have a subpattern, in which case they
+      // destructure to that pattern in this case.
+      if (newFromType == newToType) {
+        destructured.push_back(nullptr);
+        return;
+      }
+
+      // If a cast pattern is non-orthogonal and not to the same type, then
+      // we have a cast to a superclass, subclass, or archetype. Produce a
+      // new checked cast pattern from the destructured type.
+      
+      CheckedCastKind newKind;
+      // Determine the new cast kind.
+      bool fromArchetype = isa<ArchetypeType>(newFromType),
+           toArchetype = isa<ArchetypeType>(newToType);
+      if (fromArchetype && toArchetype) {
+        newKind = CheckedCastKind::ArchetypeToArchetype;
+      } else if (fromArchetype) {
+        newKind = CheckedCastKind::ArchetypeToConcrete;
+      } else if (toArchetype) {
+        if (newFromType->isExistentialType()) {
+          newKind = CheckedCastKind::ExistentialToArchetype;
+        } else {
+          // FIXME: concrete-to-archetype
+          assert(newFromType->getClassOrBoundGenericClass());
+          newKind = CheckedCastKind::SuperToArchetype;
+        }
+      } else {
+        // TODO: For now, we conservatively treat all class-to-class
+        // destructurings as downcasts. When SILGen gains the ability to query
+        // super/subclass relationships, then superclass patterns should be
+        // destructured, and subclass patterns should be turned into downcast
+        // patterns as below.
+        assert(newFromType->getClassOrBoundGenericClass() &&
+               newToType->getClassOrBoundGenericClass() &&
+               "non-class, non-archetype cast patterns should be orthogonal!");
+        newKind = CheckedCastKind::Downcast;
+      }
+      
+      // Create the new cast pattern.
+      auto *newIsa
+        = new (gen.F.getASTContext()) IsaPattern(p->getLoc(),
+                                                 ip->getCastTypeLoc());
+      newIsa->setType(newFromType);
+      
+      destructured.push_back(newIsa);
+      return;
+    }
     }
   }
 
@@ -187,12 +308,67 @@ public:
       return true;
     case Kind::Tuple:
       return getTupleArity() == c.getTupleArity();
+    case Kind::Is:
+      return getIsType() == c.getIsType();
     }
   }
   
   bool operator!=(PatternConstructor c) {
     return !(*this == c);
-  }  
+  }
+
+  /// True if two constructors are orthogonal, that is, they never both match
+  /// the same value.
+  bool isOrthogonalTo(PatternConstructor c) {
+    // Wildcards are never orthogonal.
+    if (!c) return false;
+    
+    switch (getKind()) {
+    case Kind::Wildcard:
+      return false;
+        
+    case Kind::Tuple:
+      // Tuples should only match wildcard or same-shaped tuple patterns, to
+      // which they are never orthogonal.
+      assert(*this == c
+             && "tuples should only be matched by tuple constructors");
+      assert(getTupleArity() == c.getTupleArity()
+             && "tuples should only be matched to same-shape tuple constructors");
+      return false;
+        
+    case Kind::Is:
+      // Casts are orthogonal to non-cast patterns.
+      if (c.getKind() != Kind::Is)
+        return true;
+      
+      // Casts to the same type are not orthogonal.
+      if (getIsType() == c.getIsType())
+        return false;
+        
+      // Archetype casts are never orthogonal; the archetype could substitute
+      // for any other type.
+      // TODO: Casts to archetypes with unrelated superclass constraints could
+      // be orthogonal. We could also treat casts to types that don't fit the
+      // archetype's constraints as orthogonal.
+      if (isa<ArchetypeType>(getIsType()))
+        return false;
+      if (isa<ArchetypeType>(c.getIsType()))
+        return false;
+      
+      // Class casts are orthogonal to non-class casts.
+      bool thisClass = getIsType()->getClassOrBoundGenericClass();
+      bool cClass = c.getIsType()->getClassOrBoundGenericClass();
+        
+      if (!thisClass || !cClass)
+        return true;
+        
+      // Class casts are orthogonal to casts to a class without a subtype or
+      // supertype relationship.
+      // TODO: We can't check super/subclass relationships in SILGen yet.
+      // For now we conservatively assume all class casts may overlap.
+      return false;
+    }
+  }
 };
 
 /// True if the pattern is a wildcard.
@@ -350,6 +526,20 @@ public:
   }
   MutableArrayRef<const Pattern *> getColumns() {
     return {reinterpret_cast<const Pattern **>(row + 1), columnCount};
+  }
+  
+  const Pattern * const *begin() const {
+    return getColumns().begin();
+  }
+  const Pattern * const *end() const {
+    return getColumns().end();
+  }
+  
+  const Pattern **begin() {
+    return getColumns().begin();
+  }
+  const Pattern **end() {
+    return getColumns().end();
   }
   
   const Pattern *operator[](unsigned column) const {
@@ -579,15 +769,15 @@ public:
     for (unsigned r = skipRows; r < rowCount; ++r) {
       auto row = (*this)[r];
       auto columns = (*this)[r].getColumns();
-      // If the pattern in this row isn't a wildcard and matches a different
+      // If the pattern in this row isn't a wildcard and matches an orthogonal
       // constructor, it is removed from the specialized matrix.
       auto c1 = PatternConstructor::forPattern(columns[0]);
-      if (c1 && c != c1)
+      if (c.isOrthogonalTo(c1))
         continue;
       
       // Destructure matching constructors and wildcards.
       SmallVector<const Pattern*, 4> newPatterns;
-      c.destructurePattern(columns[0], newPatterns);
+      c.destructurePattern(gen, columns[0], newPatterns);
       
       // Forward the remaining pattern columns from the row.
       std::copy(columns.begin() + 1, columns.end(),
@@ -620,7 +810,7 @@ public:
     assert(skipRows < rowCount && "can't skip more rows than we have");
 
     // Drop the first occurrence.
-    memmove(&getMutableOccurrences()[0], &getMutableOccurrences()[1],
+    memmove(getMutableOccurrences().begin(), getMutableOccurrences().begin()+1,
             sizeof(SILValue) * (columnCount - 1));
     
     // Discard the skipped rows.
@@ -638,7 +828,7 @@ public:
       
       // Discard the head wildcard of wildcard rows.
       auto row = (*this)[r];
-      memmove(&row[0], &row[1], sizeof(Pattern*) * (columnCount - 1));
+      memmove(row.begin(), row.begin()+1, sizeof(Pattern*) * (columnCount - 1));
       ++r;
     }
     
@@ -663,6 +853,8 @@ namespace llvm {
         return 0;
       case PatternConstructor::Kind::Tuple:
         return DenseMapInfo<unsigned>::getHashValue(c.getTupleArity());
+      case PatternConstructor::Kind::Is:
+        return DenseMapInfo<void*>::getHashValue(c.getIsType().getPointer());
       }
     }
     static bool isEqual(PatternConstructor a, PatternConstructor b) {
@@ -676,14 +868,24 @@ static bool
 constructorsFormSignature(const llvm::DenseSet<PatternConstructor> &set) {
   if (set.empty())
     return false;
-  switch (set.begin()->getKind()) {
-  // Tuple constructors trivially form a signature.
-  case PatternConstructor::Kind::Tuple:
-    return true;
+  
+  for (PatternConstructor ctor : set) {
+    switch (ctor.getKind()) {
+    // Tuple constructors trivially form a signature.
+    case PatternConstructor::Kind::Tuple:
+      return true;
+    
+    // 'is' constructors never affect signature-ness; there can always be
+    // new types we don't know about.
+    case PatternConstructor::Kind::Is:
+      continue;
       
-  case PatternConstructor::Kind::Wildcard:
-    llvm_unreachable("shouldn't have specialized on a wildcard");
+    case PatternConstructor::Kind::Wildcard:
+      llvm_unreachable("shouldn't have specialized on a wildcard");
+    }
   }
+  
+  return false;
 }
 
 /// Recursively emit a decision tree from the given pattern matrix.
@@ -696,8 +898,8 @@ static void emitDecisionTree(SILGenFunction &gen,
     return;
   }
   
-  // If the first rows are all wildcards (or empty), then try their
-  // guards. ExprPatterns are treated as wildcards with guards.
+  // If the first rows are all wildcards (or there are no columns), then
+  // try guards. ExprPatterns are treated as wildcards with guards.
   unsigned r = 0, rows = clauses.rows();
   for (; r < rows; ++r) {
     ClauseRow row = clauses[r];

@@ -709,6 +709,27 @@ public:
                          OwnershipConventions const &Ownership,
                          SGFContext C = SGFContext());
 
+  /// \brief Emit the cast instruction appropriate to the kind of checked cast.
+  ///
+  /// \param loc          The AST location associated with the operation.
+  /// \param originalMV   The value to cast.
+  /// \param origTy       The original AST-level type.
+  /// \param castTy       The destination type.
+  /// \param kind         The semantics of the cast.
+  /// \param mode         Whether to emit an unconditional or conditional cast.
+  /// \param useCastValue If true, the cleanup on the original value will be
+  ///                     disabled, and the callee will be expected to take
+  ///                     ownership of the returned value. If false, the original
+  ///                     value's cleanup is left intact, and an unowned reference
+  ///                     or address is returned.
+  SILValue emitCheckedCast(SILLocation loc,
+                           ManagedValue originalMV,
+                           Type origTy,
+                           Type castTy,
+                           CheckedCastKind kind,
+                           CheckedCastMode mode,
+                           bool useCastValue);
+
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//
