@@ -1088,15 +1088,20 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
   } while (consumeIf(tok::comma));
 
   if (HasGetSet) {
+    if (PBDs.size() > 1) {
+      diagnose(VarLoc, diag::disallowed_property_multiple_getset);
+      isInvalid = true;
+    }
     if (Flags & PD_DisallowProperty) {
       diagnose(VarLoc, diag::disallowed_property_decl);
-      return true;
+      isInvalid = true;
     }
   } else if (Flags & PD_DisallowVar) {
     diagnose(VarLoc, diag::disallowed_var_decl);
     return true;
   }
 
+  if (isInvalid) return true;
 
   // If this is a var in the top-level of script/repl translation unit, then
   // wrap the PatternBindingDecls in TopLevelCodeDecls, since they represents
