@@ -25,7 +25,6 @@
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
-  class MemoryBuffer;
   class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
 }
@@ -65,7 +64,6 @@ public:
   llvm::SourceMgr &SourceMgr;
   DiagnosticEngine &Diags;
   TranslationUnit *TU;
-  const llvm::MemoryBuffer *Buffer;
   Lexer *L;
   SILParserState *SIL;    // Non-null when parsing a .sil file.
   DeclContext *CurDeclContext;

@@ -77,9 +77,11 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
            TU->Kind == TranslationUnit::REPL, SIL);
   PrettyStackTraceParser stackTrace(P);
   bool FoundSideEffects = P.parseTranslationUnit(TU);
-  if (BufferOffset)
+  if (BufferOffset) {
+    const llvm::MemoryBuffer *Buffer = P.SourceMgr.getMemoryBuffer(BufferID);
     *BufferOffset = P.Tok.getLoc().Value.getPointer() -
-                    P.Buffer->getBuffer().begin();
+                    Buffer->getBuffer().begin();
+  }
 
   P.setDelayedParsingSecondPass();
   ParseDelayedFunctionBodies Walker(P);
@@ -154,9 +156,9 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
   : SourceMgr(TU->getASTContext().SourceMgr),
     Diags(TU->getASTContext().Diags),
     TU(TU),
-    Buffer(SourceMgr.getMemoryBuffer(BufferID)),
-    L(new Lexer(ComputeLexStart(Buffer->getBuffer(), Offset, EndOffset,
-                                 IsMainModule),
+    L(new Lexer(ComputeLexStart(
+                    SourceMgr.getMemoryBuffer(BufferID)->getBuffer(),
+                    Offset, EndOffset, IsMainModule),
                  SourceMgr, &Diags, SIL != nullptr)),
     SIL(SIL),
     Component(TU->getComponent()),
@@ -171,8 +173,6 @@ Parser::Parser(TranslationUnit *TU,
   : SourceMgr(TU->getASTContext().SourceMgr),
     Diags(Diags),
     TU(TU),
-    Buffer(llvm::MemoryBuffer::getMemBuffer(fragment, "",
-                                            /*RequiresTerminator*/ false)),
     L(new Lexer(fragment, SourceMgr, &Diags, SIL != nullptr)),
     SIL(SIL),
     Component(TU->getComponent()),
