@@ -7,8 +7,8 @@
 
 **Abstract:** This paper discusses the general concept of weak
 references, including various designs in other languages, and proposes
-a new core language feature and a more sophisticated runtime support
-feature which can be exploited in the standard library.
+several new core language features and a more sophisticated runtime
+support feature which can be exploited in the standard library.
 
 Reference Graphs
 ================
@@ -17,7 +17,7 @@ Let's run through some basic terminology.
 
 Program memory may be seen abstractly as a (not necessarily connected)
 directed graph where the nodes are objects (treating transient
-allocations like stack frames as objects) and the edges are
+allocations like local scopes as objects) and the edges are
 references.  (Multi-edges and self-edges are permitted, of course.)
 
 We may assign a level of strength to each of these edges.  We will
@@ -53,6 +53,16 @@ may lose effectiveness as soon as the variable is no longer needed
 (but before it formally leaves scope).  This is pervasive in GC
 environments but also true in e.g. ObjC ARC.
 
+In some programs, especially event-driven programs like UIs or
+servers, it can be useful to consider the *static* reference graph as
+captured during a notional steady state.  Local scopes may form many
+references to objects in the static graph, but unless the scope
+persists indefinitely or a major restructuring is triggered, these
+references are likely to have no effect on the reference graph, and so
+their strength of reference has no semantic importance.  Understanding
+this helps to explain why many environments provide no direct way to
+form a local weak reference.
+
 Language and Library Precedents
 ===============================
 
@@ -82,16 +92,18 @@ In GC and ARC, variables qualified with :code:`__weak` are
 immediately zeroed out when the referenced object begins
 deallocation.  There is no syntactic difference on use;
 it's just possible that the value read will be :code:`nil`
-instead of whatever was last written there.  There is an
-opt-in warning in ARC for certain uses of values loaded
-from :code:`__weak` ivars.
+instead of whatever was last written there, possibly causing
+the loading code to crash (e.g. on an ivar access) or silently
+do nothing (e.g. on a message send).   There is an opt-in
+warning in ARC for certain uses of values loaded from
+:code:`__weak` ivars.
 
 In GC, it is also possible to construct a dangling
 weak reference by storing an object pointer into (1) unscanned
 heap memory or (2) an instance variable that's not of
 object-pointer type and isn't qualified with :code:`__strong`
 or :code:`__weak`.  Otherwise, object references are strong
-(including all references on the stack).
+(including all references from local scopes).
 
 In ARC, it is possible to construct a dangling weak reference
 by using the :code:`__unsafe_unretained` qualifier or by
@@ -261,10 +273,10 @@ that they should be addressed with the same language feature.
 Back references
 ---------------
 
-Given that Swift is not cycle-collecting, far and away the
-most important use case is that of the *back-reference*:
-a reference *R* to an object which holds a strong reference
-(possibly indirectly) to the object holding *R*.  Examples
+Given that Swift is not cycle-collecting, far and away the most
+important use case in the static reference graph is that of the
+*back-reference*: a reference *R* to an object which holds a strong
+reference (possibly indirectly) to the object holding *R*.  Examples
 include:
 
 - A 'previousNode' pointer in a doubly-linked list.
@@ -275,15 +287,22 @@ include:
 
 These have several properties in common:
 
-- Using strong references will require a lot of explicit
+- Using strong references would require a lot of explicit
   code to tear down the reference cycles.
-
-- In practice, it is very unlikely that the reference will be
-  traversed after the referent is deallocated, and the
-  programmer is likely to see this as a potential bug.
 
 - These references may be accessed very frequently, so
   performance is important.
+
+- It is not always feasible to make these references valid
+  immediately on construction.
+
+- Traversing a reference after the referent is deallocated is likely a
+  sign that something has been kept alive longer than it was meant to
+  be.  However, programmers may reasonably differ about the correct
+  response to this: crashing, and therefore encouraging the programmer
+  to track down a root cause, or simply writing the operation to
+  handle both cases correctly.  Ultimately, this choice comes down to
+  philosophy.
 
 Caches
 ------
@@ -355,66 +374,156 @@ suffer from a number of limitations and problems:
     simply automatically drop the object when it is
     deallocated.
 
-Proposal
-========
+Optimization
+------------
+
+Functions often create a large number of temporary references.  In a
+reference-counting environment like Swift, these references require
+the implementation to implicitly perform operations to incremenet and
+decrement the reference count.  These operations can be quite fast,
+but they are not free, and our experience has been that the
+accumulated cost can be quite significant.  A straightforward local
+static analysis can eliminate many operations, but many others will be
+blocked by abstraction barriers, chiefly dynamically-dispatched calls.
+Therefore, if Swift is to allow precise performance control, it is
+important to be able to allow motivated users to selectively control
+the emission of reference-counting operations.
+
+This sort of control necessarily permits the creation of dangling weak
+references and so is not safe.
+
+Proposal Overview
+=================
 
 Looking at these use-cases, there are two main thrusts:
 
-  - There is a pervasive need for an ability to set up a
-    back-reference to an object.  These references must be
-    designed for convenient use by non-expert users.
+  - There is a general need to set up back references to objects.
+    These references must be designed for convenient use by non-expert
+    users.
 
-  - There are a number of more sophisticated use cases which
-    would be well-served by a general library facility for
-    receiving notifications before an object is finalized,
-    preferably with some ability to interrupt that process.
-    Uses of this facility will generally be encapsulated
-    within higher-level abstractions like a weak cache,
-    and so convenience of use is not a major priority.
+  - There are a number of more sophisticated use cases which require
+    notification or interruption of deallocation; these can be used in
+    the implementation of higher-level abstractions like weak caches.
+    Here it is reasonable to expect more user expertise, such that
+    power and flexibility should take priority over ease of use.
 
-Therefore, I propose adding a :code:`[backref]` attribute to
-accomplish the former and a core runtime facility that is
-capable of accomplishing the latter.  We may then add
-standard-library types designed to exploit the runtime
-facility.
+The second set of use cases should addressed by library types working
+on top of basic runtime support.
 
-:code:`[backref]`
+The first set of use cases will require more direct language support.
+To that end, I propose adding two new variable attributes,
+:code:`[weak]` and :code:`[unowned]`.  I also propose a small slate of
+new features which directly address the problem of capturing a value
+in a closure with a different strength of reference than it had in the
+enclosing context.
+
+Proposed Variable Attributes
+============================
+
+In the following discussion, a "variable-like" declaration is any
+declaration which binds a name to a (possibly mutable) value of
+arbitrary type.  Currently this is just :code:`var`, but this proposal
+also adds :code:`capture`, and we may later add more variants, such as
+:code:`const` or :code:`val` or the like.
+
+:code:`[weak]`
+--------------
+
+:code:`weak` is an attribute which may be applied to any
+variable-like declaration of reference type :code:`T`.  For
+type-system purposes, the variables behaves like a normal
+variable of type :code:`Optional<T>`, except:
+
+  - it does not maintain a +1 reference count invariant and
+
+  - loading from the variable after the current referent (if present)
+    has started destruction will result in a :code:`Nothing` value,
+    indistinguishable from the normal case.
+
+The semantics are quite similar to weak references in other
+environments (particularly Objective-C) except that the change in
+formal type forces the user of the value to check its validity before
+using it.
+
+It doesn't really matter how the compiler would find the type
+:code:`Optional<T>`; compiler-plus-stdlib magic, most likely.  I do
+not think the type should be :code:`Weak<T>` because that would
+effectively make this a type attribute and thus make it too easy to
+accidentally preserve the value as a weak reference.  See the section
+discussing type attributes vs. declaration attributes.
+
+Giving the variable a consistent type of :code:`Optional<T>` permits
+the user to assign :code:`Nothing` into it and therefore removes the
+somewhat odd expressive possibility of a reference that can only be
+missing if the object has been deallocated.  I think this is an
+acceptable cost of making a cleaner feature.
+
+One alternative to using :code:`Optional<T>` would be to simply treat
+the load as a potentially-failing operation, subject to the (not yet
+precisely designed) language rules for error handling.  This would
+require the runtime to potentially synthesize an error event, which
+could then propagate all the way to the end-user if the programmer
+accidentally failed to check the result in a context that permitted
+error propagation outwards.  That's bad.
+
+A slightly different alternative would be to treat it as a form of
+error orthogonal to the standard user-error propagation.  This would
+be cleaner than changing the type of the variable but can't really be
+designed without first having a solid error-handling design.
+
+
+:code:`[unowned]`
 -----------------
 
-In the user model, :code:`backref` is an attribute which
-may be applied to any :code:`var` declaration of
-reference type.  For type-system purposes, the variable
-behaves exactly like a normal variable of that type, except:
+:code:`unowned` is an attribute which may be applied to any
+"variable-like" declaration of reference type :code:`T`.  For
+type-system purposes, the variable behaves exactly like a normal
+variable of type :code:`T`, except:
 
   - it does not maintain a +1 reference count invariant and
 
   - loading from the variable after the referent has started
     destruction causes an assertion failure.
 
-We've considered several different candidates for the name:
+This is a refinement of :code:`weak` focused more narrowly on the case
+of a back reference with relatively tight validity invariants.  This
+is also the case that's potentially optimizable to use dangling weak
+references; see below.
+
+This name isn't really optimal.  We've considered several different
+candidates:
 
   - :code:`weak` is a poor choice because our semantics are very
-    different from weak references in other environments, where it's
-    valid to access a cleared reference.
+    different from weak references in other environments where it's
+    valid to access a cleared reference.  Plus, we need to expose
+    those semantics, so the name is claimed.
 
-  - :code:`backref` is strongly evocative of its primary expected use
-    case, which encourages users to use it for back references and to
-    consider alternatives for other cases, both of which I like.  The
-    latter also makes the husk-leaking implementation (see below) more
-    palatable.  It also contrasts very well with :code:`weak`, which
-    will be important if we choose to pull the feature back into
-    Objective-C (as :code:`__backref`).
+  - :code:`backref` is strongly evocative of the major use case in the
+    static reference graph; this would encourage users to use it for
+    back references and to consider alternatives for other cases, both
+    of which I like.  The latter also makes the husk-leaking
+    implementation (see below) more palatable.  It also contrasts very
+    well with :code:`weak`.  However, its evocativeness makes it
+    unwieldy to use for local reference-counting optimizations.
 
-  - :code:`unowned` was proposed as an alternative to :code:`backref`,
-    but I don't think I like it.  It is somewhat cleaner-looking, but
-    it doesn't suggest its use case and limitations as clearly, and
-    it's harder to justify stealing as a keyword (which we need for
-    closures).
+  - :code:`dangling` is more general than :code:`backref`, but it has
+    such strong negative associations that it wouldn't be unreasonable
+    for users to assume that it's unsafe (with all the pursuant
+    debugging difficulties) based on the name alone.  I don't think
+    we want to discourage a feature that can help users build tighter
+    invariants on their classes.
+
+  - :code:`unowned` is somewhat cleaner-looking, and it isn't as tied
+    to a specific use case, but it does not contrast with :code:`weak`
+    *at all*; only someone with considerable exposure to weak
+    references would understand why we named each one the way we did,
+    and even they are likely to roll their eyes at us.  But it's okay
+    for a working proposal.
 
 Asserting and Uncheckable
 .........................
 
-There should not be a way to check whether a :code:`backref`
+There should not be a way to check whether a :code:`unowned`
 reference is still valid.
 
 - An invalid back-reference is a consistency error that
@@ -473,30 +582,32 @@ However, it's fine for a back-reference, which we expect to typically
 be short-lived after its referent is finalized.
 
 Declaration Attribute or Type Attribute
-.......................................
+---------------------------------------
 
-I have so far described :code:`backref` as a declaration attribute,
-not a type attribute.
+This proposal describes :code:`weak` and :code:`unowned` as
+declaration attributes, not type attributes.
 
-As a declaration attribute, :code:`[backref]` would be permitted on
-any :code:`var` declaration of reference type.  It would be a property
-only of the declaration; it would not change the type, and more
-generally the type-checker would not need to know about it.  The
-implementation would simply use different behavior when loading or
-storing that variable.
+As declaration attributes, :code:`[unowned]` and :code:`weak` would be
+permitted on any :code:`var` declaration of reference type.  Their
+special semantics would be a property only of the declaration; in
+particular, they would not change the type (beyond the shift to
+:code:`Optional<T>` for :code:`weak`) , and more generally the
+type-checker would not need to know about them.  The implementation
+would simply use different behavior when loading or storing that
+variable.
 
-As a type attribute, :code:`[backref]` would be permitted to appear at
-arbitrary nested locations in the type system, such as tuple elements,
-function result types, or generic arguments.  It would be possible to
-have both lvalues and rvalues of :code:`[backref]`-qualified type, and
-the type checker would need to introduce implicit conversions in the
-right places.
+As a type attribute, :code:`weak` and :code:`[unowned]` would be
+permitted to appear at arbitrary nested locations in the type system,
+such as tuple elements, function result types, or generic arguments.
+It would be possible to have both lvalues and rvalues of so-qualified
+type, and the type checker would need to introduce implicit
+conversions in the right places.
 
 These implicit conversions require some thought.  Consider code like
 the following::
 
   func moveToWindow(newWindow : Window) {
-    var oldWindow = this.window   // a back reference
+    var oldWindow = this.window   // an [unowned] back reference
     oldWindow.hide()              // might remove the UI's strong reference
     oldWindow.remove(this)
     newWindow.add(this)
@@ -506,13 +617,13 @@ It would be very unfortunate if the back-reference nature of the
 :code:`window` property were somehow inherited by :code:`oldWindow`!
 Something, be it a general rule on loading back-references or a
 type-inference rule, must introduce an implicit conversion and cause
-the :code:`backref` qualifier to be stripped.
+the :code:`unowned` qualifier to be stripped.
 
 That rule, however, is problematic for generics.  A key goal of
 generics is substitutability: the semantics of generic code should
 match the semantics of the code you'd get from copy-pasting the
 generic code and substituting the arguments wherever they're written.
-But if a generic argument can be :code:`[backref] T`, then this
+But if a generic argument can be :code:`[unowned] T`, then this
 won't be true; consider::
 
   func foo<T>(x : T) {
@@ -522,7 +633,7 @@ won't be true; consider::
 
 In substituted code, :code:`y` would have the qualifier stripped and
 become a strong reference.  But the generic type-checker cannot
-statically recognize that this type is :code:`backref`-qualified, so
+statically recognize that this type is :code:`unowned`-qualified, so
 in order to match semantics, this decision must be deferred until
 runtime, and the type-checker must track the unqualified variant of
 :code:`T`.  This adds a great deal of complexity, both to the
@@ -530,7 +641,7 @@ implementation and to the user model, and removes many static
 optimization opportunities due to potential mismatches of types.
 
 An alternative rule would be to apply an implicit "decay" to a strong
-reference only when a type is known to be a :code:`backref` type.  It
+reference only when a type is known to be a :code:`unowned` type.  It
 could be argued that breaking substitution is not a big deal because
 other language features, like overloading, can already break it.  But
 an overlapping overload set with divergent behavior is a poor design
@@ -540,7 +651,7 @@ reference is not a safe default, because it permits the object to be
 destroyed while a reference is still outstanding.
 
 In addition, any implementation model which permits the safety checks
-on :code:`backref`\ s to be disabled will require all code to agree about
+on :code:`unowned`\ s to be disabled will require all code to agree about
 whether or not the checks are enabled.  When this information is tied
 to a declaration, this is easy, because declarations are ultimately
 owned by a particular component, and we can ask how that component is
@@ -550,9 +661,9 @@ the other hand, would have to be determined by the module which "wrote
 the type", but again this introduces a great deal of complexity which
 one can only imagine settling on the head of some very confused user.
 
-For all these reasons, I feel that making :code:`backref` a type
-attribute is unworkable.  However, there are still costs to making it
-a declaration attribute:
+For all these reasons, I feel that making :code:`weak` and
+:code:`unowned` type attributes would be unworkable.  However, there
+are still costs to making them declaration attributes:
 
 - It forces users to use awkward workarounds if they want to
   make, say, arrays of back-references.
@@ -564,7 +675,7 @@ a declaration attribute:
   physical variable depend on more than just the type of the variable.
 
 - It automatically enables certain things (like passing the address of
-  a :code:`[backref]` variable of type :code:`T` to a :code:`[byref] T`
+  a :code:`[unowned]` variable of type :code:`T` to a :code:`[byref] T`
   parameter) that perhaps ought to be more carefully considered.
 
 The first two points can be partly compensated for by adding library
@@ -576,33 +687,34 @@ extra syntax to access the wrapped reference will leave breadcrumbs
 making it clear when the change-over occurs.  For more on this,
 see the library section.
 
-:code:`backref`-Capable Types
-.............................
+:code:`weak`-Capable Types
+--------------------------
 
 Swift reference types can naturally be made to support any kind of
 semantics, and I'm taking it on faith that we could enhance ObjC
 objects to support whatever extended semantics we want.  There
 are, however, certain Swift value types which have reference-like
-semantics that it could be useful to extend :code:`backref` to:
+semantics that it could be useful to extend :code:`weak` (and/or
+:code:`unowned`) to:
 
 - Being able to conveniently form an optional back-reference seems
-  like a core requirement.  If :code:`backref` were a type attribute,
-  we could just expect users to write :code:`Optional<[backref] T>`;
+  like a core requirement.  If :code:`weak` were a type attribute,
+  we could just expect users to write :code:`Optional<[weak] T>`;
   as a declaration attribute, this is substantially more difficult.  I
   expect this to be common enough that it'll be unreasonable to ask
-  users to use :code:`Optional<BackReference<T>>`.
+  users to use :code:`Optional<WeakReference<T>>`.
 
 - Being able to form a back-reference to a slice or a string seems
   substantially less important.
 
-One complication with extending :code:`backref` to value types is that
+One complication with extending :code:`weak` to value types is that
 generally the implementing type will need to be different from the
 underlying value type.  Probably the best solution would be to hide
 the use of the implementing type from the type system outside of the
 well-formedness checks for the variable; SIL-gen would lower the field
 to its implementing type using the appropriate protocol conformances.
 
-As long as we have conveninent optional back-references, though, we
+As long as we have convenient optional back-references, though, we
 can avoid designing a general feature for 1.0.
 
 
@@ -699,42 +811,155 @@ this queue currently registered with the runtime::
 
      struct Reference *swift_pollReferenceQueue(struct ReferenceQueue *queue);
 
-Captures
---------
 
-Closures make it fairly easy to introduce reference cycles.  The
-current solution in Objective-C is to copy the value into a new
-:code:`__weak` variable and capture that instead.  It's a pure
-solution, but we've gotten a lot of complaints about the syntactic
-overhead.
+Proposed Rules for Captures within Closures
+===========================================
+
+When a variable from an enclosing context is referenced in a closure,
+by default it is captured by reference.  Semantically, this means that
+the variable and the enclosing context(s) will see the variable as a
+single, independent entity; modifications will be seen in all places.
+In terms of the reference graph, each context holds a strong reference
+to the variable itself.  (In practice, most local variables captured
+by reference will not require individual allocation; usually they will
+be allocated as part of the closure object.  But in the formalism,
+they are independent objects.)
+
+Closures therefore make it fairly easy to introduce reference cycles:
+for example, an instance method might install a closure as an event
+listener on a child object, and if that closure refers to
+:code:`this`, a reference cycle will be formed.  This is an
+indisputable drawback of an environment which cannot collect reference
+cycles.
+
+Relatively few languages both support closures and use
+reference-counting.  I'm not aware of any that attempt a language
+solution to the problem; the usual solution is to the change the
+captured variable to use weak-reference semantics, usually by copying
+the original into a new variable used only for this purpose.  This is
+annoyingly verbose, clutters up the enclosing scope, and duplicates
+information across multiple variables.  It's also error-prone: since
+both names are in scope, it's easy to accidentally refer to the wrong
+one, and explicit capture lists only help if you're willing to be very
+explicit.
 
 A better alternative (which we should implement in Objective-C as
 well) is to permit closures to explicitly specify the semantics under
-which a variable is captured.
+which a variable is captured.  In small closures, it makes sense to
+put this near the variable reference; in larger closures, this can
+become laborious and redundant, and a different mechanism is called for.
 
 In the following discussion, a *var-or-member expression* is an
 expression which is semantically constrained to be one of:
 
-   - A reference to a local variable from an enclosing context.
+   - A reference to a local variable-like declaration from an
+     enclosing context.
 
-   - A reference to a :code:`capture` from an enclosing context (see
-     below).
-
-   - A property thereof, possibly recursively.
+   - A member access thereof, possibly recursively.
 
 Such expressions have two useful traits:
 
   - They always end in an identifier which on some level meaningfully
     identifies the object.
 
-  - They are relatively likely (but not guaranteed) to have no
-    interesting side effects, and so we feel less bad about shifting
-    their evaluation around.
+  - Evaluating them is relatively likely (but not guaranteed) to not
+    have interesting side effects, and so we feel less bad about
+    apparently shifting their evaluation around.
+
+Decorated Capture References
+----------------------------
+
+Small closures are just as likely to participate in a reference cycle,
+but they suffer much more from extraneous syntax because they're more
+likely to be center-embedded in interesting expressions.  So if
+there's anything to optimize for in the grammar, it's this.
+
+I propose this fairly obvious syntax::
+
+    button1.setAction { unowned(this).tapOut() }
+    button2.setAction { if (weak(this)) { weak(this).swapIn() } }
+
+The operand is evaluated at the time of closure formation.  Since
+these references can be a long way from the top of the closure, we
+don't want to allow a truly arbitrary expression here, because the
+order of side-effects in the surrounding context could be very
+confusing.  So we require the operand to be an :code:`expr-var-or-member`.
+More complicated expressions really ought to be hoisted out to a
+separate variable for legibility anyway.
+
+I do believe that being able to capture the value of a property
+(particulary of :code:`this`) is very important.  In fact, it's
+important independent of weak references.  It is often possible to
+avoid a reference cycle by simply capturing a specific property value
+instead of the base object.  Capturing by value is also an
+expressivity improvement: the programmer can easily choose between
+working with the property's instantaneous value (at the time the
+closure is created) or its current value (at the time the closure is
+invoked).
+
+Therefore I also suggest a closely-related form of decoration::
+
+    button3.setAction { capture(this.model).addProfitStep() }
+
+This syntax would force :code:`capture` to become a real keyword.
+
+All of these kinds of decorated references are equivalent to adding a
+so-attributed :code:`capture` declaration (see below) with a nonce
+identifier to the top of the closure::
+
+    button1.setAction {
+      capture [unowned] _V1 = this
+      _V1.tapOut()
+    }
+    button2.setAction {
+      capture [weak] _V2 = this
+      if (_V2) { _V2.swapIn() }
+    }
+    button3.setAction {
+      capture _V3 = this.model
+      _V3.addProfitStep()
+    }
+
+If the operand of a decorated capture is a local variable, then that
+variable must not be the subject of an explicit :code:`capture`
+declaration, and all references to that variable within the closure
+must be identically decorated.
+
+The requirement to decorate all references can add redundancy, but
+only if the programmer insists on decorating references instead of
+adding an explicit :code:`capture` declaration.  Meanwhile, that
+redundancy aids both maintainers (by preventing refactors from
+accidentally removing the controlling decoration) and readers (who
+would otherwise need to search the entire closure to understand how
+the variable is captured).
+
+Captures with identical forms (the same sequence of members of the
+same variable) are merged to the same capture declaration.  This
+permits type refinement to work as expected, as seen above with the
+:code:`weak` capture.  It also guarantees the elimination of some
+redundant computation, such as with the :code:`state` property in this
+example::
+
+    resetButton.setAction {
+      log("resetting state to " + capture(this.state))
+      capture(this.model).setState(capture(this.state))
+    }
+
+I don't see any immediate need for other kinds of capture decoration.
+In particular, I think back references are likely to be the right kind
+of weak reference here for basically every use, and I don't think that
+making it easy to capture a value with, say, a zeroable weak reference
+is important.  This is just an intuition deepened by hallway
+discussions and close examination of a great many test cases, so I
+concede it may prove to be misguided, in which case it should be easy
+enough to add a new kind of decoration (if we're willing to burn a
+keyword on it).
 
 :code:`capture` Declarations
-............................
+----------------------------
 
-This feature is useful for more than just weak references.
+This feature generalizes the above, removing some redundancy in large
+closures and adding a small amount of expressive power.
 
 A :code:`capture` declaration can only appear in a closure: an
 anonymous closure expression or :code:`func` declaration that appears
@@ -791,7 +1016,7 @@ declares.
 Let's spell out some examples.  I expect the dominant form to be a
 simple identifier::
 
-  capture [backref] foo
+  capture [unowned] foo
 
 This captures the current value of whatever :code:`foo` resolves to
 (potentially a member of :code:`this`!) and binds it within the
@@ -826,90 +1051,8 @@ It would be nice to have a way to declare that a closure should not
 have any implicit captures.  I don't have a proposal for that right now,
 but it's not important for weak references.
 
-Decorated Capture References
-............................
-
-There are many situations where adding a new declaration to the start
-of a closure would add a lot of syntactic overhead, so we need a way
-to easily declare that a value should be captured as a back-reference.
-
-I propose this fairly obvious syntax::
-
-    button1.setAction { backref(this).tapOut() }
-
-The operand here must be an :code:`expr-var-or-member`: since it gets
-evaluated at the time of closure formation, and since by design these
-references can be quite detached from the start of the closure,
-allowing arbitrarily evaluation to get hoisted to closure formation
-would be a huge obstacle to understanding either the execution of the
-closure or the execution of surrounding context.  Such expressions
-should absolutely be hoisted out as an initializer for a variable that
-then gets captured.
-
-I do think that being able to conveniently capture the value of a
-property rather than just the base is useful enough to risk some
-possibility of surprise.
-
-In fact, this is a useful feature independent of weak references.  It
-is often possible to avoid a reference cycle by simply capturing a
-specific property value instead of the base object.  Capturing by
-value is also an expressivity improvement: the programmer can easily
-choose between working with the property's instantaneous value (at the
-time the closure is created) or its current value (at the time the
-closure is invoked).
-
-Therefore I also suggest a closely-related form of decoration::
-
-    button2.setAction { capture(this.model).addProfitStep() }
-
-This syntax would force :code:`capture` to become a real keyword.
-
-Either kind of decoration is equivalent to adding a capture declaration
-with a nonce identifier to the top of the closure, with or without
-the :code:`[backref]` attribute respectively::
-
-    button1.setAction {
-      capture [backref] _V1 = this
-      _V1.tapOut()
-    }
-    button2.setAction {
-      capture _V2 = this.model
-      _V2.addProfitStep()
-    }
-
-If the operand of a decorated capture is a local variable, then that
-variable must not be the subject of an explicit :code:`capture`
-declaration, and all references to that variable within the closure
-must be identically decorated.  The latter restriction can add
-redundancy, but only if the programmer insists on decorating
-references instead of adding an explicit :code:`capture` declaration.
-Meanwhile, that redundancy aids both maintainers (by preventing
-refactors from accidentally removing the controlling decoration) and
-readers (who would otherwise need to search the entire closure to
-understand how the variable is captured).
-
-The compiler should guarantee to merge captures with identical forms:
-the same properties applied to the same variable.  That is, we should
-guarantee that we'll only evaluate the :code:`state` property in this
-example once::
-
-    resetButton.setAction {
-      log("resetting state to " + capture(this.state))
-      capture(this.model).setState(capture(this.state))
-    }
-
-I don't see any immediate need for other kinds of capture decoration.
-In particular, I think back references are likely to be the right kind
-of weak reference here for basically every use, and I don't think that
-making it easy to capture a value with, say, a zeroable weak reference
-is important.  This is just an intuition deepened by hallway
-discussions and close examination of a great many test cases, so I
-concede it may prove to be misguided, in which case it should be easy
-enough to add a new kind of decoration (if we're willing to burn a
-keyword on it).
-
 Nested Closures
-...............
+---------------
 
 It is important to spell out how these rules affect captures in nested
 closures.
@@ -931,7 +1074,7 @@ I've considered it quite a bit, and I think that a by-value capture of
 a variable from a non-immediately enclosing context must be made
 ill-formed.  At the very least, it must be ill-formed if either the
 original variable is mutable (or anything along the path is, if it
-involves properties) or the capture adds ``[backref]``.
+involves properties) or the capture adds ``[unowned]``.
 
 This rule will effectively force programmers to use extra variables or
 ``capture``\ s as a way of promising validity of the internal
@@ -941,7 +1084,7 @@ The motivation for this prohibition is that the intent of such
 captures is actually quite ambiguous and/or dangerous.  Consider
 the following code::
 
-   async { doSomething(); GUI.sync { backref(view).fireCompleted() } }
+   async { doSomething(); GUI.sync { unowned(view).fireCompleted() } }
 
 The intent of this code is to have captured a back-reference to the
 value of :code:`view`, but it could be to do so at either of two
@@ -980,30 +1123,31 @@ closure levels.
 
 
 Library Directions
-------------------
+==================
 
 The library should definitely provide the following types:
 
-- :code:`BackReference<T>`: a fragile value type with a single
-  public :code:`backref` field of type :code:`T`.  There should be an
+- :code:`UnownedReference<T>`: a fragile value type with a single
+  public :code:`unowned` field of type :code:`T`.  There should be an
   implicit conversion *from* :code:`T` so that obvious initializations
   and assignments succeed.  However, there should not be an implicit
   conversion *to* :code:`T`; this would be dangerous because it could
   hide bugs introduced by the way that e.g. naive copies into locals
   will preserve the weakness of the reference.
 
-  In keeping with our design for :code:`backref`, I think this type
+  In keeping with our design for :code:`unowned`, I think this type
   should should actually be an alias to either
-  :code:`SafeBackReference<T>` or :code:`UnsafeBackReference<T>`
+  :code:`SafeUnownedReference<T>` or :code:`UnsafeUnownedReference<T>`
   depending on the current component's build settings.  The choice
   would be exported in binary modules, but for cleanliness we would
   also require public APIs to visibly commit to one choice or the
   other.
 
-- :code:`WeakReference<T>`: a value type which maintains a reference
-  that is automatically cleared when its referent is finalized.
-  It provides operations to set its referent and to get its referent
-  as an :code:`Optional<T>`.
+- :code:`WeakReference<T>`: a fragile value type with a single public
+  :code:`weak` field of type :code:`T`.  As above, there should be an
+  implicit conversion *from* :code:`T` but no implicit conversion to
+  :code:`T` (or even :code:`Optional<T>`).  There is, however, no
+  need for safe and unsafe variants.
 
 The library should consider providing the following types:
 
