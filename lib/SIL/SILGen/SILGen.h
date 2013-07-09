@@ -279,7 +279,6 @@ public:
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
-  std::vector<FallthroughDest> FallthroughDestStack;
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;

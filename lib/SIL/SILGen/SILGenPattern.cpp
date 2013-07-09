@@ -13,7 +13,7 @@
 #include "SILGen.h"
 #include "Initialization.h"
 #include "RValue.h"
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/FormattedStream.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Types.h"
@@ -393,6 +393,16 @@ struct ExprGuard {
     return pattern != o.pattern || value != o.value;
   }
 };
+  
+/// A CaseMap entry.
+struct CaseBlock {
+  /// The entry BB for the case.
+  SILBasicBlock *entry = nullptr;
+};
+  
+/// Map type used to associate CaseStmts to SILBasicBlocks. Filled in as
+/// dispatch is resolved.
+using CaseMap = llvm::MapVector<CaseStmt*, CaseBlock>;
 
 /// A handle to a row in a clause matrix. Does not own memory; use of the
 /// ClauseRow must be dominated by its originating ClauseMatrix.
@@ -401,10 +411,8 @@ class ClauseRow {
   
   /// The in-memory layout of a clause row prefix.
   struct Prefix {
-    /// The location information for the row.
-    SILLocation loc;
-    /// The destination BB for if the pattern row matches.
-    SILBasicBlock *dest;
+    /// The CaseStmt corresponding to the patterns in the row.
+    CaseStmt *caseBlock;
     /// The guard expression for the row, or null if there is no guard.
     Expr *guardExpr;
     /// The ExprPatterns within the pattern and their matching values.
@@ -423,11 +431,8 @@ class ClauseRow {
 public:
   ClauseRow() = default;
   
-  SILLocation getLoc() const {
-    return row->loc;
-  }
-  SILBasicBlock *getDest() const {
-    return row->dest;
+  CaseStmt *getCaseBlock() const {
+    return row->caseBlock;
   }
   Expr *getGuard() const {
     return row->guardExpr;
@@ -444,20 +449,36 @@ public:
   /// branch is unconditional, and this terminates the current block and
   /// returns true. Otherwise, it dispatches conditionally on the guard, leaves
   /// the insertion branch on the not-taken path, and returns false.
-  bool emitDispatch(SILGenFunction &gen) const {
+  bool emitDispatch(SILGenFunction &gen, CaseMap &caseMap) const {
     // If there is no guard, branch unconditionally.
     if (!hasGuard() && exprGuards.empty()) {
-      gen.B.createBranch(getLoc(), getDest());
+      CaseBlock &dest = caseMap[getCaseBlock()];
+      // If we haven't emitted a block for this case, and our insertion point
+      // BB is empty, we can hijack this BB as the case's BB.
+      if (!dest.entry) {
+        if (gen.B.getInsertionBB()->empty()) {
+          dest.entry = gen.B.getInsertionBB();
+          gen.B.clearInsertionPoint();
+          return true;
+        }
+        dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      }
+      gen.B.createBranch(getCaseBlock(), dest.entry);
       return true;
     }
 
+    // Create an entry BB for the case if we haven't yet.
+    CaseBlock &dest = caseMap[getCaseBlock()];
+    if (!dest.entry)
+      dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+    
     // Create a new BB for the guard-failed case.
     SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     
     if (!exprGuards.empty()) {
       // If we have a guard, we'll jump to it if all the expr patterns check
       // out. Otherwise we can jump directly to the destination.
-      SILBasicBlock *guardBB = getDest();
+      SILBasicBlock *guardBB = dest.entry;
       if (hasGuard())
         guardBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
       // Test ExprPatterns from the row in an "and" chain.
@@ -495,7 +516,7 @@ public:
 
         // If the test succeeds, we move on to the next test; otherwise, we
         // fail and move to the next pattern.
-        gen.B.createCondBranch(getLoc(), testBool, nextBB, falseBB);
+        gen.B.createCondBranch(getCaseBlock(), testBool, nextBB, falseBB);
         if (i < e - 1)
           gen.B.emitBlock(nextBB);
       }
@@ -516,7 +537,7 @@ public:
       }
       
       // Branch either to the row destination or the new BB.
-      gen.B.createCondBranch(getLoc(), guardBool, getDest(), falseBB);
+      gen.B.createCondBranch(getCaseBlock(), guardBool, dest.entry, falseBB);
     }
     
     // Continue codegen on the false branch.
@@ -664,7 +685,7 @@ public:
   unsigned columns() const { return columnCount; }
 
   /// Append a row to the matrix.
-  void addRow(SILLocation loc, SILBasicBlock *dest, Expr *guardExpr,
+  void addRow(CaseStmt *caseBlock, Expr *guardExpr,
               ArrayRef<const Pattern*> cols,
               ArrayRef<ExprGuard> parentExprGuards = {}) {
     assert(cols.size() == columnCount && "new row has wrong number of columns");
@@ -693,7 +714,7 @@ public:
     
     // Initialize the next row.
     ClauseRow::Prefix *row = getMutableRowPrefix(rowCount++);
-    ::new (row) ClauseRow::Prefix{loc, dest, guardExpr,
+    ::new (row) ClauseRow::Prefix{caseBlock, guardExpr,
                                   exprGuardStart, exprGuardEnd};
     MutableArrayRef<const Pattern*> columnsBuf{
       reinterpret_cast<const Pattern**>(row+1),
@@ -786,7 +807,7 @@ public:
                 std::back_inserter(newPatterns));
       
       // Append the new row.
-      specialized.addRow(row.getLoc(), row.getDest(), row.getGuard(),
+      specialized.addRow(row.getCaseBlock(), row.getGuard(),
                          newPatterns, row.getExprGuards());
     }
     
@@ -843,7 +864,8 @@ public:
 
 /// Recursively emit a decision tree from the given pattern matrix.
 static void emitDecisionTree(SILGenFunction &gen,
-                             ClauseMatrix &&clauses) {
+                             ClauseMatrix &&clauses,
+                             CaseMap &caseMap) {
   // If there are no rows, then we fail. This will be a dataflow error if we
   // can reach here.
   if (clauses.rows() == 0) {
@@ -868,7 +890,7 @@ static void emitDecisionTree(SILGenFunction &gen,
       break;
   
     // If the row has a guard, emit it, and try the next row if it fails.
-    if (row.emitDispatch(gen))
+    if (row.emitDispatch(gen, caseMap))
       return;
   }
   
@@ -907,10 +929,10 @@ static void emitDecisionTree(SILGenFunction &gen,
     SILBasicBlock *nextBB = specialization.second;
     // If the constructor is irrefutable, tail call.
     if (!nextBB)
-      return emitDecisionTree(gen, std::move(submatrix));
+      return emitDecisionTree(gen, std::move(submatrix), caseMap);
     // Otherwise, emit the submatrix into the true branch, then continue on the
     // false branch.
-    emitDecisionTree(gen, std::move(submatrix));
+    emitDecisionTree(gen, std::move(submatrix), caseMap);
     assert(!gen.B.hasValidInsertionPoint()
            && "recursive emitDecisionTree did not terminate all its BBs");
     gen.B.emitBlock(nextBB);
@@ -928,7 +950,7 @@ static void emitDecisionTree(SILGenFunction &gen,
   
   // Otherwise, recur into the default matrix.
   clauses.reduceToDefault(skipRows);
-  return emitDecisionTree(gen, std::move(clauses));
+  return emitDecisionTree(gen, std::move(clauses), caseMap);
 }
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
@@ -937,43 +959,46 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // Emit the subject value.
   ManagedValue subject = visit(S->getSubjectExpr()).getAsSingleValue(*this);
   
-  // Emit the skeleton of the switch. Map cases to blocks so we can handle
-  // fallthrough statements.
-  FallthroughDest::Map caseBodyBlocks;
+  // Prepare a case-to-bb mapping for fallthrough to consult.
+  // The bbs for reachable cases will be filled in by emitDecisionTree below.
+  CaseMap caseMap;
 
-  for (auto *C : S->getCases())
-    // Emit the condition for this case.
-    caseBodyBlocks[C] = new (F.getModule()) SILBasicBlock(&F);
-
+  // Create a continuation bb for life after the switch.
   SILBasicBlock *contBB = new (F.getModule()) SILBasicBlock(&F);
   
   // Set up an initial clause matrix.
   ClauseMatrix clauses(subject.getValue(), S->getCases().size());
   
-  for (auto *caseBlock : S->getCases())
+  for (auto *caseBlock : S->getCases()) {
+    caseMap[caseBlock] = {};
     for (auto *label : caseBlock->getCaseLabels())
       for (auto *pattern : label->getPatterns())
-        clauses.addRow(caseBlock, caseBodyBlocks[caseBlock],
-                       label->getGuardExpr(), pattern);
+        clauses.addRow(caseBlock, label->getGuardExpr(), pattern);
+  }
   
   // Emit the decision tree.
-  emitDecisionTree(*this, std::move(clauses));
+  emitDecisionTree(*this, std::move(clauses), caseMap);
   assert(!B.hasValidInsertionPoint() &&
          "emitDecisionTree did not terminate all its BBs");
   
   // Emit the case bodies.
-  FallthroughDestStack.emplace_back(caseBodyBlocks, getCleanupsDepth());
-  for (auto &caseAndBlock : caseBodyBlocks) {
+  for (auto &caseAndBlock : caseMap) {
     CaseStmt *c = caseAndBlock.first;
-    SILBasicBlock *bb = caseAndBlock.second;
+    CaseBlock &block = caseAndBlock.second;
     
-    B.emitBlock(bb);
-    Scope CaseScope(Cleanups);
-    visit(c->getBody());
+    // If the case block wasn't reachable, skip it.
+    // FIXME: What if it's reachable by fallthrough?
+    if (!block.entry)
+      continue;
+    
+    B.emitBlock(block.entry);
+    {
+      Scope CaseScope(Cleanups);
+      visit(c->getBody());
+    }
     if (B.hasValidInsertionPoint())
       B.createBranch(c, contBB);
   }
-  FallthroughDestStack.pop_back();
   
   assert(!B.hasValidInsertionPoint() &&
          "not all case blocks were terminated");
