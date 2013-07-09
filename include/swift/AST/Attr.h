@@ -154,6 +154,8 @@ public:
   bool IBAction = false;
   bool ClassProtocol = false;
   bool Stdlib = false;
+  bool Weak = false;
+  bool Unowned = false;
   Optional<AbstractCC> cc = Nothing;
   
   DeclAttributes() {}
@@ -175,6 +177,9 @@ public:
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
   bool isClassProtocol() const { return ClassProtocol; }
+  bool isWeak() const { return Weak; }
+  bool isUnowned() const { return Unowned; }
+  bool hasOwnership() const { return Weak || Unowned; }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
 
@@ -183,7 +188,12 @@ public:
            !isAutoClosure() && !isThin() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !isClassProtocol() && !hasCC() && !Stdlib;
+           !isClassProtocol() && !hasCC() && !Stdlib &&
+           !hasOwnership();
+  }
+
+  void clearOwnership() {
+    Weak = Unowned = false;
   }
 };
   

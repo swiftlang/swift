@@ -77,8 +77,8 @@ bool TypeBase::hasReferenceSemantics() {
   switch (canonical->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
-    return false;
 #include "swift/AST/TypeNodes.def"
+    return false;
 
   case TypeKind::Error:
   case TypeKind::BuiltinInteger:
@@ -119,6 +119,21 @@ bool TypeBase::hasReferenceSemantics() {
   }
 
   llvm_unreachable("Unhandled type kind!");
+}
+
+/// hasOwnership - Are variables of this type permitted to have
+/// ownership attributes?
+///
+/// This includes:
+///   - class types, generic or not
+///   - archetypes with class or class protocol bounds
+///   - existentials with class or class protocol bounds
+/// But not:
+///   - function types
+bool TypeBase::hasOwnership() {
+  CanType canonical = getCanonicalType();
+  return (!isa<AnyFunctionType>(canonical)
+          && canonical->hasReferenceSemantics());
 }
 
 bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {

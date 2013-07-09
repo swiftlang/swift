@@ -1272,6 +1272,40 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
   }
 
+  // Ownership attributes (weak, unowned).
+  if (Attrs.hasOwnership()) {
+    // Diagnostics expect:
+    //   0 - unowned
+    //   1 - weak
+    assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1);
+    unsigned ownershipKind = (unsigned) Attrs.isWeak();
+
+    // Only 'var' declarations can have ownership.
+    // TODO: captures, consts, etc.
+    if (!isa<VarDecl>(VD)) {
+      TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_decl,
+                  ownershipKind);
+      VD->getMutableAttrs().clearOwnership();
+      return;
+    }
+
+    // Type of declaration must be a reference type.
+    if (!VD->getType()->hasOwnership()) {
+      // If we have an opaque type, suggest the possibility of adding
+      // a class bound.
+      if (VD->getType()->isExistentialType() ||
+          VD->getType()->getAs<ArchetypeType>()) {
+        TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_opaque_type,
+                    ownershipKind, VD->getType());
+      } else {
+        TC.diagnose(VD->getStartLoc(), diag::invalid_ownership_type,
+                    ownershipKind, VD->getType());
+      }
+      VD->getMutableAttrs().clearOwnership();
+      return;
+    }
+  }
+
   if (Attrs.isIBOutlet()) {
     // Only instance properties can be IBOutlets.
     // FIXME: This could do some type validation as well (all IBOutlets refer

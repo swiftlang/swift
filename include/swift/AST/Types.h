@@ -184,6 +184,10 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
   
+  /// hasOwnership() - Are variables of this type permitted to have
+  /// ownership attributes?
+  bool hasOwnership();
+  
   /// isUnresolvedType() - Determines whether this type is an unresolved
   /// type, meaning that part of the type depends on the context in which
   /// the type occurs.

@@ -125,7 +125,29 @@ static Resilience getResilience(AttrName attr) {
 ///     'infix_right' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'
+///     'weak'
+///     'unowned'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
+  if (Tok.is(tok::kw_weak)) {
+    if (Attributes.hasOwnership()) {
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    } else {
+      Attributes.Weak = true;
+    }
+    consumeToken(tok::kw_weak);
+    return false;
+  }
+
+  if (Tok.is(tok::kw_unowned)) {
+    if (Attributes.hasOwnership()) {
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    } else {
+      Attributes.Unowned = true;
+    }
+    consumeToken(tok::kw_unowned);
+    return false;
+  }
+
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::expected_attribute_name);
     skipUntil(tok::r_square);
