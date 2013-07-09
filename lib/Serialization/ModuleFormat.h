@@ -215,6 +215,7 @@ namespace decls_block {
     BOUND_GENERIC_SUBSTITUTION,
     POLYMORPHIC_FUNCTION_TYPE,
     ARRAY_SLICE_TYPE,
+    ARRAY_TYPE,
     REFERENCE_STORAGE_TYPE,
 
     TYPE_ALIAS_DECL = 100,
@@ -356,6 +357,12 @@ namespace decls_block {
     ARRAY_SLICE_TYPE,
     TypeIDField, // element type
     TypeIDField  // implementation type
+  >;
+
+  using ArrayTypeLayout = BCRecordLayout<
+    ARRAY_TYPE,
+    TypeIDField, // element type
+    BCVBR<8>     // size
   >;
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
