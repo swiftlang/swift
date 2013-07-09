@@ -445,7 +445,6 @@ public:
       return nullptr;
     S->setSubjectExpr(subjectExpr);
     Type subjectType = subjectExpr->getType();
-    S->getSubjectDecl()->setType(subjectType);
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);

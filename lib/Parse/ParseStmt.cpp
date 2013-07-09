@@ -589,15 +589,8 @@ NullablePtr<Stmt> Parser::parseStmtSwitch() {
                          diag::expected_rbrace_switch, lBraceLoc))
     return nullptr;
   
-  // Synthesize a VarDecl to bind the subject to.
-  VarDecl *subjectVar = new (Context) VarDecl(SourceLoc(),
-                                              Context.getIdentifier("$switch"),
-                                              Type(),
-                                              CurDeclContext);
-  
   return SwitchStmt::create(switchLoc,
                             subjectExpr.get(),
-                            subjectVar,
                             lBraceLoc,
                             cases,
                             rBraceLoc,

@@ -469,7 +469,6 @@ public:
 class SwitchStmt : public Stmt {
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
   Expr *SubjectExpr;
-  VarDecl *SubjectDecl;
   unsigned CaseCount;
   
   CaseStmt * const *getCaseBuffer() const {
@@ -482,19 +481,18 @@ class SwitchStmt : public Stmt {
   
   SwitchStmt(SourceLoc SwitchLoc,
              Expr *SubjectExpr,
-             VarDecl *SubjectDecl,
              SourceLoc LBraceLoc,
              unsigned CaseCount,
              SourceLoc RBraceLoc)
     : Stmt(StmtKind::Switch),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      SubjectExpr(SubjectExpr), SubjectDecl(SubjectDecl), CaseCount(CaseCount)
+      SubjectExpr(SubjectExpr), CaseCount(CaseCount)
   {}
 
 public:
   /// Allocate a new SwitchStmt in the given ASTContext.
   static SwitchStmt *create(SourceLoc SwitchLoc,
-                            Expr *SubjectExpr, VarDecl *SubjectDecl,
+                            Expr *SubjectExpr,
                             SourceLoc LBraceLoc,
                             ArrayRef<CaseStmt*> Cases,
                             SourceLoc RBraceLoc,
@@ -513,12 +511,6 @@ public:
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
-  
-  /// Get the VarDecl bound to the result of the subject expression. This
-  /// decl cannot be referenced by name lookup; it is only used to synthesize
-  /// the condition exprs of CaseStmts.
-  VarDecl *getSubjectDecl() const { return SubjectDecl; }
-  void setSubjectDecl(VarDecl *d) { SubjectDecl = d; }
   
   /// Get the list of case clauses.
   ArrayRef<CaseStmt*> getCases() const {

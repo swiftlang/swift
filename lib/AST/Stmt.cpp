@@ -177,7 +177,6 @@ CaseStmt *CaseStmt::create(ASTContext &C,
 
 SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
                                Expr *SubjectExpr,
-                               VarDecl *SubjectDecl,
                                SourceLoc LBraceLoc,
                                ArrayRef<CaseStmt *> Cases,
                                SourceLoc RBraceLoc,
@@ -186,7 +185,6 @@ SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(SwitchLoc,
                                                SubjectExpr,
-                                               SubjectDecl,
                                                LBraceLoc,
                                                Cases.size(),
                                                RBraceLoc);
