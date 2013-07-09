@@ -410,6 +410,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, BOUND_GENERIC_SUBSTITUTION);
   RECORD(decls_block, POLYMORPHIC_FUNCTION_TYPE);
   RECORD(decls_block, ARRAY_SLICE_TYPE);
+  RECORD(decls_block, REFERENCE_STORAGE_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
