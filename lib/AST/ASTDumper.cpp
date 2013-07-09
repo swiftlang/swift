@@ -28,6 +28,7 @@ static const llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
 
 DEF_COLOR(Func, YELLOW)
 DEF_COLOR(Extension, MAGENTA)
+DEF_COLOR(Pattern, RED)
 
 #undef DEF_COLOR
 
@@ -39,51 +40,95 @@ namespace {
   class PrintPattern : public PatternVisitor<PrintPattern> {
   public:
     raw_ostream &OS;
-    PrintPattern(raw_ostream &os) : OS(os) {}
+    unsigned Indent;
+    bool ShowColors;
+
+    PrintPattern(raw_ostream &os, unsigned indent)
+      : OS(os), Indent(indent), ShowColors(false) {
+      if (&os == &llvm::errs() || &os == &llvm::outs())
+        ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+    }
+
+    void printRec(Decl *D) { D->dump(Indent+2); }
+    void printRec(Expr *E) { E->print(OS, Indent+2); }
+    void printRec(Stmt *S) { S->print(OS, Indent+2); }
+    void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
+
+    raw_ostream &printCommon(Pattern *P, const char *Name) {
+      OS.indent(Indent) << '(';
+
+      // Support optional color output.
+      if (ShowColors) {
+        if (const char *CStr =
+            llvm::sys::Process::OutputColor(PatternColor, false, false)) {
+          OS << CStr;
+        }
+      }
+
+      OS << Name;
+
+      if (ShowColors)
+        OS << llvm::sys::Process::ResetColor();
+      return OS;
+    }
 
     void visitParenPattern(ParenPattern *P) {
-      OS << '(';
-      visit(P->getSubPattern());
+      printCommon(P, "pattern_paren") << '\n';
+      printRec(P->getSubPattern());
       OS << ')';
     }
     void visitTuplePattern(TuplePattern *P) {
-      OS << '(';
+      printCommon(P, "pattern_tuple");
       for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
-        visit(P->getFields()[i].getPattern());
-        if (i + 1 != e)
-          OS << ", ";
+        OS << '\n';
+        printRec(P->getFields()[i].getPattern());
+        if (P->getFields()[i].getInit()) {
+          OS << '\n';
+          printRec(P->getFields()[i].getInit()->getExpr());
+        }
       }
       OS << ')';
     }
     void visitNamedPattern(NamedPattern *P) {
-      OS << P->getBoundName().str();
+      printCommon(P, "pattern_named")<< " '" << P->getBoundName().str() << "')";
     }
     void visitAnyPattern(AnyPattern *P) {
-      OS << '_';
+      printCommon(P, "pattern_any") << ')';
     }
     void visitTypedPattern(TypedPattern *P) {
-      visit(P->getSubPattern());
-      OS << " : ";
+      printCommon(P, "pattern_typed") << ' ';
       if (!P->hasType())
         OS << "<no type yet>";
       else
         P->getType()->print(OS);
+      OS << '\n';
+      printRec(P->getSubPattern());
+      OS << ')';
     }
     
     void visitIsaPattern(IsaPattern *P) {
-      OS << "is ";
+      printCommon(P, "pattern_isa") << ' ';
       P->getCastTypeLoc().getType()->print(OS);
+      OS << ')';
     }
     void visitNominalTypePattern(NominalTypePattern *P) {
+      printCommon(P, "pattern_nominal") << ' ';
       P->getCastTypeLoc().getType()->print(OS);
+      OS << '\n';
       P->getSubPattern()->print(OS);
+      OS << ')';
     }
     void visitExprPattern(ExprPattern *P) {
+      printCommon(P, "pattern_expr");
+      OS << '\n';
       P->getSubExpr()->print(OS);
+      OS << ')';
     }
     void visitVarPattern(VarPattern *P) {
-      OS << "var ";
+      printCommon(P, "pattern_var");
+      OS << '\n';
       P->getSubPattern()->print(OS);
+      OS << ')';
     }
   };
 
@@ -103,6 +148,7 @@ namespace {
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
+    void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
 
     void printGenericParameters(GenericParamList *Params) {
       if (!Params)
@@ -338,9 +384,8 @@ namespace {
 
     void visitPatternBindingDecl(PatternBindingDecl *PBD) {
       printCommon(PBD, "pattern_binding_decl");
-      OS << " pattern='";
-      PrintPattern(OS).visit(PBD->getPattern());
-      OS << '\'';
+      OS << '\n';
+      printRec(PBD->getPattern());
       if (PBD->getInit()) {
         OS << '\n';
         printRec(PBD->getInit());
@@ -438,8 +483,8 @@ void TranslationUnit::dump() const {
   llvm::errs() << '\n';
 }
 
-void Pattern::print(llvm::raw_ostream &OS) const {
-  PrintPattern(OS).visit(const_cast<Pattern*>(this));
+void Pattern::print(llvm::raw_ostream &OS, unsigned Indent) const {
+  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this));
 }
 
 void Pattern::dump() const {
@@ -639,6 +684,7 @@ public:
 
   void printRec(Decl *D) { D->dump(Indent+2); }
   void printRec(Stmt *S) { S->print(OS, Indent+2); }
+  void printRec(Pattern *P) { P->print(OS, Indent+2); }
 
   void printSubstitutions(ArrayRef<Substitution> Substitutions) {
     for (auto S : Substitutions) {
@@ -956,6 +1002,10 @@ public:
 
   void visitFuncExpr(FuncExpr *E) {
     printCapturing(E, "func_expr");
+    for (auto patt : E->getArgParamPatterns()) {
+      OS << '\n';
+      printRec(patt);
+    }
     if (E->getBody()) {
       OS << '\n';
       printRec(E->getBody());
