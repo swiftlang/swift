@@ -289,7 +289,10 @@ bool arePatternsOrthogonal(const Pattern *a,
            "tuple patterns should match same type");
     assert(ta->getFields().size() == tb->getFields().size() &&
            "tuple patterns have same shape");
-    
+
+    (void)ta;
+    (void)tb;
+
     return false;
   }
       
