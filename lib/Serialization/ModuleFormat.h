@@ -94,6 +94,15 @@ enum GenericRequirementKind : uint8_t {
 };
 using GenericRequirementKindField = BCFixed<1>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum Associativity : uint8_t {
+  NonAssociative = 0,
+  LeftAssociative,
+  RightAssociative
+};
+using AssociativityField = BCFixed<2>;
+
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -216,6 +225,7 @@ namespace decls_block {
     PROTOCOL_DECL,
     PREFIX_OPERATOR_DECL,
     POSTFIX_OPERATOR_DECL,
+    INFIX_OPERATOR_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -432,6 +442,14 @@ namespace decls_block {
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
   using PostfixOperatorLayout = UnaryOperatorLayout<POSTFIX_OPERATOR_DECL>;
+
+  using InfixOperatorLayout = BCRecordLayout<
+    INFIX_OPERATOR_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    AssociativityField,
+    BCFixed<8>   // precedence
+  >;
 
 
   using ParenPatternLayout = BCRecordLayout<

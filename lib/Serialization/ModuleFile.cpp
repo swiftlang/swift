@@ -422,6 +422,24 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
 }
 
 
+/// Translate from the Serialization assocativity enum values to the AST
+/// strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
+  switch (assoc) {
+  case serialization::Associativity::LeftAssociative:
+    return swift::Associativity::Left;
+  case serialization::Associativity::RightAssociative:
+    return swift::Associativity::Right;
+  case serialization::Associativity::NonAssociative:
+    return swift::Associativity::None;
+  default:
+    return Nothing;
+  }
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -805,6 +823,33 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::INFIX_OPERATOR_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    uint8_t rawAssociativity;
+    unsigned precedence;
+
+    decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
+                                                 rawAssociativity, precedence);
+
+    auto associativity = getActualAssociativity(rawAssociativity);
+    if (!associativity.hasValue()) {
+      error();
+      return nullptr;
+    }
+
+    InfixData infixData(precedence, associativity.getValue());
+
+    declOrOffset = new (ctx) InfixOperatorDecl(getDeclContext(contextID),
+                                               SourceLoc(), SourceLoc(),
+                                               getIdentifier(nameID),
+                                               SourceLoc(), SourceLoc(),
+                                               SourceLoc(), SourceLoc(),
+                                               SourceLoc(), SourceLoc(),
+                                               SourceLoc(), infixData);
+    break;
+  }
+      
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;

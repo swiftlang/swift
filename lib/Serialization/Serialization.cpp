@@ -420,6 +420,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, PROTOCOL_DECL);
   RECORD(decls_block, PREFIX_OPERATOR_DECL);
   RECORD(decls_block, POSTFIX_OPERATOR_DECL);
+  RECORD(decls_block, INFIX_OPERATOR_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -736,6 +737,19 @@ bool Serializer::writeCrossReference(const Decl *D) {
   return true;
 }
 
+/// Translate from the AST associativity enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
+  switch (assoc) {
+  case swift::Associativity::Left:
+    return serialization::Associativity::LeftAssociative;
+  case swift::Associativity::Right:
+    return serialization::Associativity::RightAssociative;
+  case swift::Associativity::None:
+    return serialization::Associativity::NonAssociative;
+  }
+}
+
 bool Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -774,9 +788,21 @@ bool Serializer::writeDecl(const Decl *D) {
     // Top-level code is ignored; external clients don't need to know about it.
     return true;
 
-  case DeclKind::InfixOperator:
-    return false;
+  case DeclKind::InfixOperator: {
+    auto op = cast<InfixOperatorDecl>(D);
 
+    const Decl *DC = getDeclForContext(op->getDeclContext());
+    auto associativity = getRawStableAssociativity(op->getAssociativity());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
+    InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    addIdentifierRef(op->getName()),
+                                    addDeclRef(DC),
+                                    associativity,
+                                    op->getPrecedence());
+    return true;
+  }
+      
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
 
@@ -1279,6 +1305,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ProtocolLayout>();
     registerDeclTypeAbbr<PrefixOperatorLayout>();
     registerDeclTypeAbbr<PostfixOperatorLayout>();
+    registerDeclTypeAbbr<InfixOperatorLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();
