@@ -1050,7 +1050,7 @@ bool Serializer::writeType(Type ty) {
     llvm_unreachable("should always be accessed through an implicit typealias");
 
   case TypeKind::UnstructuredUnresolved:
-    return false;
+    llvm_unreachable("should have been resolved before serialization");
 
   case TypeKind::NameAlias: {
     auto nameAlias = cast<NameAliasType>(ty.getPointer());
@@ -1131,7 +1131,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::Module:
-    return false;
+    llvm_unreachable("modules are currently not first-class values");
 
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
@@ -1251,7 +1251,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::UnboundGeneric:
-    return false;
+    llvm_unreachable("should not need to be serialized");
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
@@ -1271,9 +1271,6 @@ bool Serializer::writeType(Type ty) {
     if (generic->hasSubstitutions()) {
       abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
       for (auto &sub : generic->getSubstitutions()) {
-        if (!sub.Conformance.empty())
-          return false;
-          
         BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                    addTypeRef(sub.Archetype),
                                                    addTypeRef(sub.Replacement));
@@ -1285,7 +1282,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::TypeVariable:
-    return false;
+    llvm_unreachable("type variables should not escape the type checker");
   }
 }
 
