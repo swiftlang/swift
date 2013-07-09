@@ -1048,6 +1048,9 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   case TypeKind::Module:
       return false;
 
+  case TypeKind::ReferenceStorage:
+    llvm_unreachable("reference storage type in typechecker");
+
   // Sugar types.
 #define TYPE(Id, Parent)
 #define SUGARED_TYPE(Id, Parent) case TypeKind::Id:

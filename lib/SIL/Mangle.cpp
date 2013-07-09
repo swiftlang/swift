@@ -440,6 +440,8 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= T <tuple-element>* _  # tuple
 /// <type> ::= U <generic-parameter>+ _ <type>
 /// <type> ::= V <decl>              # struct (substitutable)
+/// <type> ::= Xo <type>             # unowned reference type
+/// <type> ::= Xw <type>             # weak reference type
 ///
 /// <index> ::= _                    # 0
 /// <index> ::= <natural> _          # N+1
@@ -509,6 +511,18 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     Buffer << 'R';
     return mangleType(cast<LValueType>(base)->getObjectType(),
                       ExplosionKind::Minimal, 0);
+
+  case TypeKind::ReferenceStorage: {
+    auto ref = cast<ReferenceStorageType>(base);
+    Buffer << 'X';
+    switch (ref->getOwnership()) {
+    case Ownership::Strong: llvm_unreachable("strong reference storage");
+    case Ownership::Unowned: Buffer << 'o'; break;
+    case Ownership::Weak: Buffer << 'w'; break;
+    }
+    return mangleType(ref->getReferentType(),
+                      ExplosionKind::Minimal, 0);
+  }
 
   case TypeKind::Tuple: {
     TupleType *tuple = cast<TupleType>(base);

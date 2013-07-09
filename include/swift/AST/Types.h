@@ -18,6 +18,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Ownership.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Identifier.h"
@@ -1771,6 +1772,35 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Substituted;
+  }
+};
+
+/// \brief The storage type of a variable with non-standard reference
+/// ownership semantics, like a [weak] or [unowned] variable.
+///
+/// The referent type always satisfies hasOwnership().
+///
+/// This type currently does not appear in the AST, but it is
+/// extremely useful in SIL and IR-generation.
+class ReferenceStorageType : public TypeBase {
+  ReferenceStorageType(Type referent, Ownership ownership, ASTContext *C)
+    : TypeBase(TypeKind::ReferenceStorage, C, false, false),
+      Referent(referent), Oship(ownership) {}
+
+  Type Referent;
+  Ownership Oship;
+public:
+  static ReferenceStorageType *get(Type referent, Ownership ownership,
+                                   ASTContext &C);
+
+  Type getReferentType() const { return Referent; }
+  Ownership getOwnership() const { return Oship; }
+
+  void print(raw_ostream &OS) const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ReferenceStorage;
   }
 };
 

@@ -1080,6 +1080,16 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
+  case TypeKind::ReferenceStorage: {
+    auto refTy = cast<ReferenceStorageType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
+    ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           unsigned(refTy->getOwnership()),
+                                  addTypeRef(refTy->getReferentType()));
+    return true;
+  }
+
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(ty.getPointer());
 

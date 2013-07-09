@@ -66,6 +66,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
+    llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
       LValueTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
@@ -671,6 +672,20 @@ ProtocolCompositionType::build(ASTContext &C, ArrayRef<Type> Protocols) {
   return New;
 }
 
+ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
+                                                ASTContext &C) {
+  assert(ownership != Ownership::Strong &&
+         "ReferenceStorageType is unnecessary for strong ownership");
+  assert(!T->hasTypeVariable()); // not meaningful in type-checker
+  auto arena = AllocationArena::Permanent;
+
+  auto key = uintptr_t(T.getPointer()) | unsigned(ownership);
+  auto &entry = C.Impl.getArena(arena).ReferenceStorageTypes[key];
+  if (entry) return entry;
+
+  return entry = new (C, arena) ReferenceStorageType(T, ownership,
+                                                     T->isCanonical() ? &C : 0);
+}
 
 MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
   bool hasTypeVariable = T->hasTypeVariable();

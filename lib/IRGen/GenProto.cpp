@@ -3180,6 +3180,7 @@ namespace {
     void visitMetaTypeType(MetaTypeType *type) {}
     void visitModuleType(ModuleType *type) {}
     void visitProtocolCompositionType(ProtocolCompositionType *type) {}
+    void visitReferenceStorageType(ReferenceStorageType *type) {}
 
     // L-values are impossible.
     void visitLValueType(LValueType *type) {

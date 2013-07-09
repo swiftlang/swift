@@ -1422,6 +1422,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Error:
       return SolutionKind::Error;
 
+    case TypeKind::ReferenceStorage:
+      llvm_unreachable("reference storage type in typechecker");
+
     case TypeKind::UnstructuredUnresolved:
       llvm_unreachable("Unstructured unresolved type");
 
@@ -2003,7 +2006,10 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
     
   case TypeKind::Error:
     return SolutionKind::Error;
-    
+
+  case TypeKind::ReferenceStorage:
+    llvm_unreachable("reference storage type in typechecker");
+
   case TypeKind::UnstructuredUnresolved:
     llvm_unreachable("Unstructured unresolved type");
     

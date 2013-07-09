@@ -448,6 +448,8 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
+  case TypeKind::ReferenceStorage:
+    llvm_unreachable("can't emit reference storage types yet");
   }
   llvm_unreachable("bad type kind");
 }

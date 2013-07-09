@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Ownership.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -180,6 +181,11 @@ public:
   bool isWeak() const { return Weak; }
   bool isUnowned() const { return Unowned; }
   bool hasOwnership() const { return Weak || Unowned; }
+  Ownership getOwnership() const {
+    if (Weak) return Ownership::Weak;
+    if (Unowned) return Ownership::Unowned;
+    return Ownership::Strong;
+  }
   bool hasCC() const { return cc.hasValue(); }
   AbstractCC getAbstractCC() const { return *cc; }
 

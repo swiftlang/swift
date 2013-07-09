@@ -115,9 +115,10 @@ public:
     DISPATCH(BoundGenericOneOf)
     DISPATCH(BoundGenericStruct)
     DISPATCH(Function)
-    DISPATCH(PolymorphicFunction)
     DISPATCH(LValue)
     DISPATCH(MetaType)
+    DISPATCH(PolymorphicFunction)
+    DISPATCH(ReferenceStorage)
     DISPATCH(Tuple)
 #undef DISPATCH
     }

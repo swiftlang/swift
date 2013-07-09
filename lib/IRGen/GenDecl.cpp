@@ -606,6 +606,11 @@ static bool isLocalLinkageType(CanType type) {
            isLocalLinkageType(CanType(fn->getResult()));
   }
 
+  case TypeKind::ReferenceStorage: {
+    auto ref = cast<ReferenceStorageType>(base);
+    return isLocalLinkageType(CanType(ref->getReferentType()));
+  }
+
   case TypeKind::Array:
     return isLocalLinkageType(CanType(cast<ArrayType>(base)->getBaseType()));
 

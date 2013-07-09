@@ -100,6 +100,9 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::BoundGenericStruct:
     return false;
 
+  case TypeKind::ReferenceStorage:
+    return false; // This might seem non-obvious.
+
   case TypeKind::Archetype:
     return cast<ArchetypeType>(canonical)->requiresClass();
   case TypeKind::Protocol:
@@ -206,6 +209,9 @@ bool TypeBase::isSpecialized() {
     return false;
   }
 
+  case TypeKind::ReferenceStorage:
+    return cast<ReferenceStorageType>(this)->getReferentType()->isSpecialized();
+
   case TypeKind::Archetype:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
@@ -260,6 +266,10 @@ bool TypeBase::isUnspecializedGeneric() {
 
   case TypeKind::MetaType:
     return cast<MetaTypeType>(this)->getInstanceType()
+             ->isUnspecializedGeneric();
+
+  case TypeKind::ReferenceStorage:
+    return cast<ReferenceStorageType>(this)->getReferentType()
              ->isUnspecializedGeneric();
 
   case TypeKind::LValue:
@@ -339,6 +349,11 @@ static void gatherTypeVariables(Type wrappedTy,
 
   case TypeKind::MetaType:
     return gatherTypeVariables(cast<MetaTypeType>(ty)->getInstanceType(),
+                               typeVariables);
+
+  case TypeKind::ReferenceStorage:
+    return gatherTypeVariables(
+                             cast<ReferenceStorageType>(ty)->getReferentType(),
                                typeVariables);
 
   case TypeKind::Substituted:
@@ -456,6 +471,7 @@ static Type getStrippedType(ASTContext &context, Type type,
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct:
   case TypeKind::TypeVariable:
+  case TypeKind::ReferenceStorage:
     return type;
 
   case TypeKind::NameAlias:
@@ -785,6 +801,13 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
     
+  case TypeKind::ReferenceStorage: {
+    auto ref = cast<ReferenceStorageType>(this);
+    Type referentType = ref->getReferentType()->getCanonicalType();
+    Result = ReferenceStorageType::get(referentType, ref->getOwnership(),
+                                       referentType->getASTContext());
+    break;
+  }
   case TypeKind::LValue: {
     LValueType *lvalue = cast<LValueType>(this);
     Type objectType = lvalue->getObjectType();
@@ -888,6 +911,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Protocol:
+  case TypeKind::ReferenceStorage:
     // None of these types have sugar at the outer level.
     return this;
   case TypeKind::Paren:
@@ -1072,6 +1096,11 @@ bool TypeBase::isSpelledLike(Type other) {
     auto aMe = cast<ArraySliceType>(me);
     auto aThem = cast<ArraySliceType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
+  }
+  case TypeKind::ReferenceStorage: {
+    auto rMe = cast<ReferenceStorageType>(me);
+    auto rThem = cast<ReferenceStorageType>(them);
+    return rMe->getReferentType()->isSpelledLike(rThem->getReferentType());
   }
   }
 
@@ -1718,3 +1747,11 @@ void SubstitutedType::print(raw_ostream &OS) const {
   getReplacementType()->print(OS);
 }
 
+void ReferenceStorageType::print(raw_ostream &OS) const {
+  switch (getOwnership()) {
+  case Ownership::Strong: llvm_unreachable("strong reference storage");
+  case Ownership::Unowned: OS << "[unowned] "; break;
+  case Ownership::Weak: OS << "[weak] "; break;
+  }
+  getReferentType()->print(OS);
+}

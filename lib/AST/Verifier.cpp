@@ -992,6 +992,9 @@ namespace {
         return checkBoundGenericTypes(
                                cast<MetaTypeType>(typePtr)->getInstanceType());
 
+      case TypeKind::ReferenceStorage:
+        return checkBoundGenericTypes(
+                       cast<ReferenceStorageType>(typePtr)->getReferentType());
 
       case TypeKind::Identifier: {
         auto Id = cast<IdentifierType>(typePtr);

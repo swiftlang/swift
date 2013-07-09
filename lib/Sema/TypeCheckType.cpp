@@ -534,6 +534,9 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
     // Nothing to validate.
     break;
 
+  case TypeKind::ReferenceStorage:
+    llvm_unreachable("reference storage type in typechecker");
+
   case TypeKind::Substituted: {
     TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
                Loc.getSourceRange());
@@ -791,6 +794,9 @@ Type TypeChecker::transformType(Type type,
     }
     return type;
   }
+
+  case TypeKind::ReferenceStorage:
+    llvm_unreachable("reference storage type in typechecker");
 
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(base);

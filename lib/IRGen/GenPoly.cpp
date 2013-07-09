@@ -204,6 +204,13 @@ namespace {
       // The check in visit should make this impossible.
       llvm_unreachable("difference with leaf types");
     }
+
+    // We assume that all reference storage types have equivalent
+    // representation.  This may not be true.
+    bool visitReferenceStorageType(ReferenceStorageType *origTy,
+                                   ReferenceStorageType *substTy) {
+      return false;
+    }
         
     CanType getArchetypeReprType(ArchetypeType *a) {
       if (Type super = a->getSuperclass())
@@ -347,6 +354,9 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitLValueType(LValueType *type) { return false; }
   bool visitProtocolCompositionType(ProtocolCompositionType *type) {
     return false;
+  }
+  bool visitReferenceStorageType(ReferenceStorageType *type) {
+    return visit(CanType(type->getReferentType()));
   }
 
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
@@ -524,6 +534,12 @@ namespace {
               CanType(substTy->getElementType(i)));
       }
     }
+
+    void visitReferenceStorageType(ReferenceStorageType *origTy,
+                                   ReferenceStorageType *substTy) {
+      In.transferInto(Out, IGF.IGM.getExplosionSize(CanType(origTy),
+                                                    Out.getKind()));
+    }
   };
 }
 
@@ -665,6 +681,12 @@ namespace {
         visit(CanType(origTy->getElementType(i)),
               CanType(substTy->getElementType(i)));
       }
+    }
+
+    void visitReferenceStorageType(ReferenceStorageType *origTy,
+                                   ReferenceStorageType *substTy) {
+      In.transferInto(Out, IGF.IGM.getExplosionSize(CanType(origTy),
+                                                    Out.getKind()));
     }
   };
 }
