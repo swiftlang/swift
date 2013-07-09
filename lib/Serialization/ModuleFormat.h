@@ -394,8 +394,7 @@ namespace decls_block {
     VAR_DECL,
     IdentifierIDField, // name
     DeclIDField,  // context decl
-    BCFixed<1>,   // implicit flag
-    BCFixed<1>,   // never lvalue flag
+    BCFixed<1>,   // implicit?
     TypeIDField,  // type
     DeclIDField,  // getter
     DeclIDField,  // setter
@@ -406,10 +405,9 @@ namespace decls_block {
     FUNC_DECL,
     IdentifierIDField, // name
     DeclIDField,  // context decl
-    BCFixed<1>,   // implicit flag
-    BCFixed<1>,   // never lvalue flag
+    BCFixed<1>,   // implicit?
+    BCFixed<1>,   // class method?
     TypeIDField,  // type (signature)
-    BCFixed<1>,   // class method
     DeclIDField,  // associated decl (for get/set or operators)
     DeclIDField   // overridden function
     // The record is trailed by its generic parameters, if any, followed by its

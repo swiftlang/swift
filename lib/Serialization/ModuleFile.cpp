@@ -612,14 +612,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isNeverLValue;
+    bool isImplicit;
     TypeID typeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isNeverLValue, typeID, getterID,
-                                       setterID, overriddenID);
+                                       typeID, getterID, setterID,
+                                       overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
@@ -637,7 +637,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = var;
 
-    var->setNeverUsedAsLValue(isNeverLValue);
     if (isImplicit)
       var->setImplicit();
 
@@ -648,16 +647,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::FUNC_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isNeverLValue;
+    bool isImplicit;
     TypeID signatureID;
     bool isClassMethod;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                        isNeverLValue, signatureID,
-                                        isClassMethod, associatedDeclID,
-                                        overriddenID);
+                                        isClassMethod, signatureID,
+                                        associatedDeclID, overriddenID);
 
     DeclContext *DC;
     {
@@ -712,7 +710,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 
-    fn->setNeverUsedAsLValue(isNeverLValue);
     fn->setStatic(isClassMethod);
     if (isImplicit)
       fn->setImplicit();

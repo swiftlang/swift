@@ -930,7 +930,6 @@ bool Serializer::writeDecl(const Decl *D) {
                           addIdentifierRef(var->getName()),
                           addDeclRef(DC),
                           var->isImplicit(),
-                          var->isNeverUsedAsLValue(),
                           addTypeRef(type),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
@@ -956,9 +955,8 @@ bool Serializer::writeDecl(const Decl *D) {
                            addIdentifierRef(fn->getName()),
                            addDeclRef(DC),
                            fn->isImplicit(),
-                           fn->isNeverUsedAsLValue(),
-                           addTypeRef(fn->getType()),
                            fn->isStatic(),
+                           addTypeRef(fn->getType()),
                            addDeclRef(associated),
                            addDeclRef(fn->getOverriddenDecl()));
 
