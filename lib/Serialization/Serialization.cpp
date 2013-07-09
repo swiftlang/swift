@@ -941,8 +941,15 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!fn->getAttrs().empty())
+    DeclAttributes attrs = fn->getAttrs();
+    // FIXME: We need some representation of these for source fidelity.
+    attrs.ExplicitPrefix = false;
+    attrs.ExplicitPostfix = false;
+    attrs.ExplicitInfix = false;
+    attrs.Assignment = false;
+
+    // FIXME: Handle other attributes.
+    if (!attrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -956,6 +963,7 @@ bool Serializer::writeDecl(const Decl *D) {
                            addDeclRef(DC),
                            fn->isImplicit(),
                            fn->isStatic(),
+                           fn->getAttrs().isAssignment(),
                            addTypeRef(fn->getType()),
                            addDeclRef(associated),
                            addDeclRef(fn->getOverriddenDecl()));

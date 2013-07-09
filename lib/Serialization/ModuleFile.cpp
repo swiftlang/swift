@@ -648,14 +648,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
-    TypeID signatureID;
     bool isClassMethod;
+    bool isAssignment;
+    TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                        isClassMethod, signatureID,
-                                        associatedDeclID, overriddenID);
+                                        isClassMethod, isAssignment,
+                                        signatureID, associatedDeclID,
+                                        overriddenID);
 
     DeclContext *DC;
     {
@@ -713,10 +715,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isClassMethod);
     if (isImplicit)
       fn->setImplicit();
+    if (isAssignment)
+      fn->getMutableAttrs().Assignment = isAssignment;
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
         fn->setOperatorDecl(op);
+
+        DeclAttributes &attrs = fn->getMutableAttrs();
+        if (isa<PrefixOperatorDecl>(op))
+          attrs.ExplicitPrefix = true;
+        else if (isa<PostfixOperatorDecl>(op))
+          attrs.ExplicitPostfix = true;
+        // Note that an explicit [infix] is not required.
       } else {
         bool isGetter = false;
 

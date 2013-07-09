@@ -407,6 +407,7 @@ namespace decls_block {
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // class method?
+    BCFixed<1>,   // assignment?
     TypeIDField,  // type (signature)
     DeclIDField,  // associated decl (for get/set or operators)
     DeclIDField   // overridden function
