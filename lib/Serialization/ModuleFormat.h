@@ -110,7 +110,7 @@ enum Ownership : uint8_t {
   Weak,
   Unowned
 };
-using OwnershipField = BCFixed<4>;
+using OwnershipField = BCFixed<2>;
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
