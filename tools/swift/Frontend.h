@@ -27,8 +27,6 @@ namespace swift {
 
   bool appendToREPLTranslationUnit(TranslationUnit *TU,
                                    REPLContext &RC,
-                                   llvm::MemoryBuffer *Buffer,
-                                   unsigned &BufferOffset,
-                                   unsigned BufferEndOffset);
+                                   llvm::MemoryBuffer *Buffer);
 } // namespace swift
 

@@ -114,7 +114,10 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   performAutoImport(importTU);
 
-  parseIntoTranslationUnit(importTU, bufferID);
+  bool Done;
+  parseIntoTranslationUnit(importTU, bufferID, &Done);
+  assert(Done && "Parser returned early?");
+  (void) Done;
 
   // We have to do type checking on it to ensure that types are fully resolved.
   // This should eventually be eliminated by having actual fully resolved binary

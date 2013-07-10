@@ -36,8 +36,10 @@ using namespace swift;
 bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   TU->ASTStage = TranslationUnit::Parsing;
 
-  // Prime the lexer.
-  consumeToken();
+  if (Tok.is(tok::unknown)) {
+    // Prime the lexer.
+    consumeToken();
+  }
 
   CurDeclContext = TU;
   

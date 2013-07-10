@@ -119,8 +119,7 @@ public:
 
 
   Parser(unsigned BufferID, TranslationUnit *TU,
-         unsigned Offset, unsigned EndOffset, bool IsMainModule,
-         SILParserState *SIL);
+         bool IsMainModule, SILParserState *SIL);
   Parser(TranslationUnit *TU, llvm::StringRef fragment, DiagnosticEngine &Diags,
          SILParserState *SIL);
   ~Parser();

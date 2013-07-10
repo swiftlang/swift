@@ -20,6 +20,8 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 
+#include <memory>
+
 namespace llvm {
   class SourceMgr;
   class MemoryBuffer;
@@ -29,13 +31,12 @@ namespace llvm {
 
 namespace swift {
   class TranslationUnit;
-  class ASTContext;
   class Component;
   class Expr;
   class SILModule;
-  class LangOptions;
   struct TypeLoc;
   class SILParserTUState;
+  class Parser;
   class Token;
 
   namespace irgen {
@@ -59,15 +60,26 @@ namespace swift {
   /// sense), aborting and spewing errors if not.
   void verify(TranslationUnit *TUnit);
 
-  /// parseIntoTranslationUnit - Parse a single buffer into the given
-  /// taranslation unit.  If the translation unit is the main module, stop
-  /// parsing after the next stmt-brace-item with side-effects.  If "SIL" is
-  /// present, then we're parsing a .sil file instead of a .swift file.
+  /// \brief Parse a single buffer into the given taranslation unit.  If the
+  /// translation unit is the main module, stop parsing after the next
+  /// stmt-brace-item with side-effects.
   ///
+  /// \param Done set to \c true if end of the buffer was reached.
+  ///
+  /// \param SIL if non-null, we're parsing a SIL file.
+  ///
+  /// \param PersistentParser if non-null and points to a parser, the routine
+  /// will reuse that parser.  If it does not point to a parser,  a pointer to a
+  /// new parser will be stored there.
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
-                                unsigned *BufferOffset = nullptr,
-                                unsigned BufferEndOffset = 0,
-                                SILParserState *SIL = nullptr);
+                                bool *Done,
+                                SILParserState *SIL = nullptr,
+                                std::unique_ptr<Parser> *PersistentParser =
+                                    nullptr);
+
+  /// \brief Finish the parsing by going over the nodes that were delayed
+  /// during the first parsing pass.
+  void performDelayedParsing(TranslationUnit *TU, Parser *TheParser);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,

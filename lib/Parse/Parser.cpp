@@ -69,27 +69,41 @@ public:
 /// parseIntoTranslationUnit - Entrypoint for the parser.
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
-                                     unsigned *BufferOffset,
-                                     unsigned BufferEndOffset,
-                                     SILParserState *SIL) {
-  Parser P(BufferID, TU, BufferOffset ? *BufferOffset : 0, BufferEndOffset,
-           TU->Kind == TranslationUnit::Main ||
-           TU->Kind == TranslationUnit::REPL, SIL);
-  PrettyStackTraceParser stackTrace(P);
-  bool FoundSideEffects = P.parseTranslationUnit(TU);
-  if (BufferOffset) {
-    const llvm::MemoryBuffer *Buffer = P.SourceMgr.getMemoryBuffer(BufferID);
-    *BufferOffset = P.Tok.getLoc().Value.getPointer() -
-                    Buffer->getBuffer().begin();
-  }
+                                     bool *Done,
+                                     SILParserState *SIL,
+                                     std::unique_ptr<Parser> *PersistentParser) {
+  Parser *P = nullptr;
+  if (PersistentParser)
+    P = PersistentParser->get();
 
-  P.setDelayedParsingSecondPass();
-  ParseDelayedFunctionBodies Walker(P);
+  if (!P)
+    P = new Parser(BufferID, TU,
+                   TU->Kind == TranslationUnit::Main ||
+                   TU->Kind == TranslationUnit::REPL, SIL);
+
+  PrettyStackTraceParser stackTrace(*P);
+  bool FoundSideEffects = P->parseTranslationUnit(TU);
+
+  const llvm::MemoryBuffer *Buffer = P->SourceMgr.getMemoryBuffer(BufferID);
+  *Done = P->Tok.getLoc().Value.getPointer() ==
+          Buffer->getBuffer().end();
+
+  if (PersistentParser && !PersistentParser->get())
+    PersistentParser->reset(P);
+
+  return FoundSideEffects;
+}
+
+void swift::performDelayedParsing(TranslationUnit *TU,
+                                  Parser *TheParser) {
+  if (!TU->Ctx.LangOpts.DelayFunctionBodyParsing)
+    return;
+
+  TheParser->setDelayedParsingSecondPass();
+  ParseDelayedFunctionBodies Walker(*TheParser);
   for (Decl *D : TU->Decls) {
     D->walk(Walker);
   }
-
-  return FoundSideEffects;
 }
 
 std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
@@ -151,14 +165,13 @@ static StringRef ComputeLexStart(StringRef File, unsigned Offset,
 
 
 Parser::Parser(unsigned BufferID, TranslationUnit *TU,
-               unsigned Offset, unsigned EndOffset, bool IsMainModule,
-               SILParserState *SIL)
+               bool IsMainModule, SILParserState *SIL)
   : SourceMgr(TU->getASTContext().SourceMgr),
     Diags(TU->getASTContext().Diags),
     TU(TU),
     L(new Lexer(ComputeLexStart(
                     SourceMgr.getMemoryBuffer(BufferID)->getBuffer(),
-                    Offset, EndOffset, IsMainModule),
+                    0, 0, IsMainModule),
                  SourceMgr, &Diags, SIL != nullptr)),
     SIL(SIL),
     Component(TU->getComponent()),

@@ -20,6 +20,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -153,6 +154,7 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics;
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
+  std::unique_ptr<Parser> TheParser;
 
   TranslationUnit *TU;
 

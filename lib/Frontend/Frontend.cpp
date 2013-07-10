@@ -40,7 +40,8 @@ buildSingleTranslationUnit(ASTContext &Context,
                            bool ParseOnly,
                            bool AllowBuiltinModule,
                            TranslationUnit::TUKind Kind,
-                           SILModule *SIL) {
+                           SILModule *SIL,
+                           std::unique_ptr<Parser> *TheParser) {
   Component *Comp = new (Context.Allocate<Component>(1)) Component();
   Identifier ID = Context.getIdentifier(ModuleName);
   TranslationUnit *TU = new (Context) TranslationUnit(ID, Comp, Context, Kind);
@@ -54,21 +55,15 @@ buildSingleTranslationUnit(ASTContext &Context,
   if (Kind != TranslationUnit::SIL && !ParseOnly)
     performAutoImport(TU);
 
-  // If we have multiple source files, we must be building a module.  Parse each
-  // file before type checking the union of them.
-  if (BufferIDs.size() > 1) {
-    assert(Kind == TranslationUnit::Library &&
-           "Multiple file mode can't handle early returns from the parser");
-
+  if (Kind == TranslationUnit::Library) {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
-      auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
-
-      unsigned BufferOffset = 0;
-      parseIntoTranslationUnit(TU, BufferID, &BufferOffset);
-      assert(BufferOffset == Buffer->getBufferSize() &&
-             "Parser returned early?");
-      (void)Buffer;
+      bool Done;
+      parseIntoTranslationUnit(TU, BufferID, &Done, nullptr, TheParser);
+      assert(Done && "Parser returned early?");
+      (void) Done;
+      //performDelayedParsing(TU, TheParser->get());
+      TheParser->reset(nullptr);
     }
 
     // Finally, if enabled, type check the whole thing in one go.
@@ -77,27 +72,26 @@ buildSingleTranslationUnit(ASTContext &Context,
     return TU;
   }
 
-  // If there is only a single input file, it may be SIL or a main module,
-  // which requires pumping the parser.
+  // This may only be a main module or SIL, which requires pumping the parser.
+  assert(Kind == TranslationUnit::Main || Kind == TranslationUnit::SIL);
   assert(BufferIDs.size() == 1 && "This mode only allows one input");
   unsigned BufferID = BufferIDs[0];
 
   SILParserState SILContext(SIL);
 
   unsigned CurTUElem = 0;
-  unsigned BufferOffset = 0;
-  auto *Buffer = Context.SourceMgr.getMemoryBuffer(BufferID);
+  bool Done;
   do {
     // Pump the parser multiple times if necessary.  It will return early
     // after parsing any top level code in a main module, or in SIL mode when
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
-    parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0,
-                             SIL ? &SILContext : nullptr);
+    parseIntoTranslationUnit(TU, BufferID, &Done,
+                             SIL ? &SILContext : nullptr, TheParser);
     if (!ParseOnly)
       performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
-  } while (BufferOffset != Buffer->getBufferSize());
+  } while (!Done);
 
   return TU;
 }
@@ -160,6 +154,7 @@ void swift::CompilerInstance::doIt() {
                                   Invocation->getParseOnly(),
                                   Invocation->getParseStdlib(),
                                   Invocation->getTUKind(),
-                                  TheSILModule.get());
+                                  TheSILModule.get(),
+                                  &TheParser);
 }
 

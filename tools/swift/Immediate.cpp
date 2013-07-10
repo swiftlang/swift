@@ -889,14 +889,9 @@ class REPLEnvironment {
   REPLContext RC;
 
   bool executeSwiftSource(llvm::StringRef Line, const ProcessCmdLine &CmdLine) {
-    llvm::MemoryBuffer *input
-      = llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
-
     // Parse the current line(s).
-    unsigned BufferOffset = 0;
-    bool ShouldRun =
-      swift::appendToREPLTranslationUnit(TU, RC, input,
-                                         BufferOffset, Line.size());
+    bool ShouldRun = swift::appendToREPLTranslationUnit(
+        TU, RC, llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
     
     if (Context.hadError()) {
       Context.Diags.resetHadAnyError();
@@ -1017,14 +1012,10 @@ public:
     // the first statement is typed into the REPL.
     static const char importstmt[] = "import swift\n";
 
-    llvm::MemoryBuffer *buffer
-      = llvm::MemoryBuffer::getMemBufferCopy(importstmt,
-                                             "<REPL Initialization>");
-    unsigned BufferOffset = 0;
-    
-    swift::appendToREPLTranslationUnit(TU, RC, buffer,
-                                       /*startOffset*/ BufferOffset,
-                                       /*endOffset*/ strlen(importstmt));
+    swift::appendToREPLTranslationUnit(
+        TU, RC,
+        llvm::MemoryBuffer::getMemBufferCopy(importstmt,
+                                             "<REPL Initialization>"));
     if (Context.hadError())
       return;
     

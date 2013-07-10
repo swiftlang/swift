@@ -120,12 +120,10 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
   }
 
   for (auto &BufferID : BufferIDs) {
-    unsigned BufferOffset = 0;
-    const llvm::MemoryBuffer *Buffer =
-      ctx.SourceMgr.getMemoryBuffer(BufferID);
+    bool Done;
     do {
-      parseIntoTranslationUnit(TU, BufferID, &BufferOffset, 0, /*SIL=*/nullptr);
-    } while (BufferOffset != Buffer->getBufferSize());
+      parseIntoTranslationUnit(TU, BufferID, &Done);
+    } while (!Done);
   }
 
   performTypeChecking(TU);

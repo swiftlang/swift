@@ -38,9 +38,7 @@ using namespace swift;
 
 bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
                                         REPLContext &RC,
-                                        llvm::MemoryBuffer *Buffer,
-                                        unsigned &BufferOffset,
-                                        unsigned BufferEndOffset) {
+                                        llvm::MemoryBuffer *Buffer) {
   assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
   
   RC.CurBufferID
@@ -48,12 +46,11 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
   
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;
+  bool Done;
   do {
-    FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.CurBufferID,
-                                                    &BufferOffset,
-                                                    BufferEndOffset);
+    FoundAnySideEffects |= parseIntoTranslationUnit(TU, RC.CurBufferID, &Done);
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
-  } while (BufferOffset != BufferEndOffset);
+  } while (!Done);
   return FoundAnySideEffects;
 }
