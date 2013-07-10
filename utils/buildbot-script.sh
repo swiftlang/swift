@@ -178,7 +178,7 @@ component.
 
     sort(fruits) { $0 > $1 }
 
-* nil can now be used with an explicit cast. Previously, 'nil' had
+* nil can now be used without explicit casting. Previously, 'nil' had
   type NSObject, so one would have to write (e.g.) 'nil as! NSArray'
   to create a nil NSArray. Now, 'nil' picks up the type of its
   context.
