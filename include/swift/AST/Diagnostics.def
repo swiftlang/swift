@@ -825,14 +825,14 @@ ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
 
 // ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,
-      "'%select{unowned|weak}0' attribute only applies to 'var' declarations",
-      (unsigned))
+      "'%select{strong|weak|unowned}0' attribute only applies to 'var' "
+      "declarations", (unsigned))
 ERROR(invalid_ownership_type,attribute_parsing,none,
-      "'%select{unowned|weak}0' attribute cannot be applied to non-class "
-      "type %1", (unsigned, Type))
+      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "non-class type %1", (unsigned, Type))
 ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
-      "'%select{unowned|weak}0' attribute cannot be applied to non-class "
-      "type %1; consider adding a class bound", (unsigned, Type))
+      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "non-class type %1; consider adding a class bound", (unsigned, Type))
 
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics

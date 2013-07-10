@@ -1035,6 +1035,20 @@ static uint8_t getRawStableCC(swift::AbstractCC cc) {
   }
 }
 
+/// Translate from the AST ownership enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableOwnership(swift::Ownership ownership) {
+  switch (ownership) {
+  case swift::Ownership::Strong:
+    return serialization::Ownership::Strong;
+  case swift::Ownership::Weak:
+    return serialization::Ownership::Weak;
+  case swift::Ownership::Unowned:
+    return serialization::Ownership::Unowned;
+  }
+  llvm_unreachable("bad ownership kind");
+}
+
 bool Serializer::writeType(Type ty) {
   using namespace decls_block;
 
@@ -1079,16 +1093,6 @@ bool Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(parenTy->getUnderlyingType()));
-    return true;
-  }
-
-  case TypeKind::ReferenceStorage: {
-    auto refTy = cast<ReferenceStorageType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
-    ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                           unsigned(refTy->getOwnership()),
-                                  addTypeRef(refTy->getReferentType()));
     return true;
   }
 
@@ -1257,6 +1261,17 @@ bool Serializer::writeType(Type ty) {
                                  addTypeRef(lValueTy->getObjectType()),
                                  lValueTy->getQualifiers().isImplicit(),
                                  !lValueTy->getQualifiers().isSettable());
+    return true;
+  }
+
+  case TypeKind::ReferenceStorage: {
+    auto refTy = cast<ReferenceStorageType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
+    auto stableOwnership = getRawStableOwnership(refTy->getOwnership());
+    ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           stableOwnership,
+                                  addTypeRef(refTy->getReferentType()));
     return true;
   }
 

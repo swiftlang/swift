@@ -103,6 +103,14 @@ enum Associativity : uint8_t {
 };
 using AssociativityField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum Ownership : uint8_t {
+  Strong = 0,
+  Weak,
+  Unowned
+};
+using OwnershipField = BCFixed<4>;
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -367,8 +375,8 @@ namespace decls_block {
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,
-    BCFixed<1>,  // ownership
-    TypeIDField  // implementation type
+    OwnershipField,  // ownership
+    TypeIDField      // implementation type
   >;
 
 

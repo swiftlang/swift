@@ -1003,6 +1003,18 @@ static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
   }
 }
 
+/// Translate from the serialization Ownership enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static
+Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
+  switch (raw) {
+  case serialization::Ownership::Strong:  return swift::Ownership::Strong;
+  case serialization::Ownership::Unowned: return swift::Ownership::Unowned;
+  case serialization::Ownership::Weak:    return swift::Ownership::Weak;
+  }
+  return Nothing;
+}
+
 Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -1146,6 +1158,24 @@ Type ModuleFile::getType(TypeID TID) {
       quals |= LValueType::Qual::NonSettable;
 
     typeOrOffset = LValueType::get(getType(objectTypeID), quals, ctx);
+    break;
+  }
+
+  case decls_block::REFERENCE_STORAGE_TYPE: {
+    uint8_t rawOwnership;
+    TypeID referentTypeID;
+    decls_block::ReferenceStorageTypeLayout::readRecord(scratch, rawOwnership,
+                                                        referentTypeID);
+
+    auto ownership =
+      getActualOwnership((serialization::Ownership) rawOwnership);
+    if (!ownership.hasValue()) {
+      error();
+      break;
+    }
+
+    typeOrOffset = ReferenceStorageType::get(getType(referentTypeID),
+                                             ownership.getValue(), ctx);
     break;
   }
 

@@ -23,14 +23,14 @@ namespace swift {
 
 /// Different kinds of reference ownership supported by Swift.
 enum class Ownership {
-  /// \brief an [unowned] reference
-  Unowned,
+  /// \brief a strong reference (the default semantics)
+  Strong,
 
   /// \brief a [weak] reference
   Weak,
 
-  /// \brief a strong reference (the default semantics)
-  Strong
+  /// \brief an [unowned] reference
+  Unowned,
 };
   
 } // end namespace swift
