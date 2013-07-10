@@ -1156,7 +1156,8 @@ Pattern *Parser::buildImplicitThisParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
-ParserTokenRange Parser::consumeFunctionBody(unsigned Flags) {
+Optional<ParserTokenRange>
+Parser::consumeFunctionBody(unsigned Flags) {
   auto BeginParserPosition = getParserPosition();
 
   // Consume the '{', and find the matching '}'.
@@ -1173,7 +1174,7 @@ ParserTokenRange Parser::consumeFunctionBody(unsigned Flags) {
     }
     consumeToken();
   }
-  if (OpenBraces != 0) {
+  if (OpenBraces != 0 && Tok.isNot(tok::code_complete)) {
     assert(Tok.is(tok::eof));
     // We hit EOF, and not every brace has a pair.  Recover by searching
     // for the next decl except variable decls and cutting off before
@@ -1186,6 +1187,16 @@ ParserTokenRange Parser::consumeFunctionBody(unsigned Flags) {
   }
 
   auto EndLexerState = L->getStateForBeginningOfToken(Tok);
+
+  // When doing code completion, skip function bodies that don't contain a code
+  // completion token.
+  if (Context.LangOpts.isCodeCompletion() &&
+      !L->stateRangeHasCodeCompletionToken(
+          BeginParserPosition.LS,
+          EndLexerState,
+          Context.LangOpts.CodeCompletionOffset))
+    return Nothing;
+
   return ParserTokenRange(
             Context.AllocateObjectCopy(
                 FunctionBodyParserState(BeginParserPosition,
@@ -1310,7 +1321,8 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
         return 0;
       }
     } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
-      if (!Context.LangOpts.DelayFunctionBodyParsing ||
+      if ((!Context.LangOpts.DelayFunctionBodyParsing &&
+           !Context.LangOpts.isCodeCompletion()) ||
           IsDelayedParsingSecondPass) {
         NullablePtr<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
@@ -1320,7 +1332,11 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
           FE->setBody(Body.get());
         }
       } else {
-        FE->setBodyTokenRange(consumeFunctionBody(Flags));
+        Optional<ParserTokenRange> TR = consumeFunctionBody(Flags);
+        if (TR.hasValue())
+          FE->setBodyTokenRange(TR.getValue());
+        else
+          FE->setBodySkipped();
       }
     }
   }
@@ -1342,6 +1358,8 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
 bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   auto FE = FD->getBody();
   assert(!FE->getBody() && "function should not have a parsed body");
+  assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed &&
+         "function body should be delayed");
 
   auto TokenRange = FE->getBodyTokenRange();
   auto FunctionParserState =

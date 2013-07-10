@@ -163,11 +163,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
              bool InSILMode, bool KeepComments)
-  : SourceMgr(SourceMgr), Diags(Diags), InSILMode(InSILMode),
-    KeepComments(KeepComments) {
+  : SourceMgr(SourceMgr), Diags(Diags), ArtificialEOF(nullptr),
+    InSILMode(InSILMode), KeepComments(KeepComments) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
-  ArtificialEOF = BufferEnd;
   CurPtr = CurrentPosition;
   assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
          "Current position is out-of-range");
@@ -199,10 +198,13 @@ tok Lexer::getTokenKind(StringRef Text) {
 void Lexer::formToken(tok Kind, const char *TokStart) {
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
-  // we are past the imaginary EOF, and synthesize a tok::eof in this case.
-  if (Kind != tok::eof && TokStart >= ArtificialEOF) {
-    formToken(tok::eof, TokStart);
-    return;
+  // we are past the imaginary EOF, and synthesize a tok::code_complete or
+  // tok::eof in this case.
+  if (Kind != tok::eof && ArtificialEOF && TokStart >= ArtificialEOF) {
+    if (DoingCodeCompletion)
+      Kind = tok::code_complete;
+    else
+      Kind = tok::eof;
   }
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }

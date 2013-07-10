@@ -20,6 +20,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -94,9 +95,23 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
   return FoundSideEffects;
 }
 
-void swift::performDelayedParsing(TranslationUnit *TU,
-                                  Parser *TheParser) {
-  if (!TU->Ctx.LangOpts.DelayFunctionBodyParsing)
+void swift::performDelayedParsing(
+    TranslationUnit *TU, Parser *TheParser,
+    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+  bool NeedSecondPass = false;
+  if (TU->Ctx.LangOpts.DelayFunctionBodyParsing)
+    NeedSecondPass = true;
+
+  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
+  if (TU->Ctx.LangOpts.isCodeCompletion() && CodeCompletionFactory) {
+    CodeCompletion.reset(
+        CodeCompletionFactory->createCodeCompletionCallbacks(*TheParser));
+    TheParser->setCodeCompletion(TU->Ctx.LangOpts.CodeCompletionOffset,
+                                 CodeCompletion.get());
+    NeedSecondPass = true;
+  }
+
+  if (!NeedSecondPass)
     return;
 
   TheParser->setDelayedParsingSecondPass();

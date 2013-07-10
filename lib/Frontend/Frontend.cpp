@@ -104,7 +104,8 @@ void swift::CompilerInstance::doIt() {
       parseIntoTranslationUnit(TU, BufferID, &Done, nullptr, &TheParser);
       assert(Done && "Parser returned early?");
       (void) Done;
-      performDelayedParsing(TU, TheParser.get());
+      performDelayedParsing(TU, TheParser.get(),
+                            Invocation->getCodeCompletionFactory());
       TheParser.reset(nullptr);
     }
 
@@ -135,5 +136,7 @@ void swift::CompilerInstance::doIt() {
       performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (!Done);
+  performDelayedParsing(TU, TheParser.get(),
+                        Invocation->getCodeCompletionFactory());
 }
 

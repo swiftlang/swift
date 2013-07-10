@@ -19,6 +19,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Scope.h"
 #include "swift/Parse/Token.h"
@@ -36,6 +37,7 @@ namespace swift {
   struct TypeLoc;
   class TupleType;
   class SILParserState;
+  class CodeCompletionCallbacks;
   
   struct OneOfElementInfo;
   
@@ -69,6 +71,7 @@ public:
   DeclContext *CurDeclContext;
   swift::Component *Component;
   ASTContext &Context;
+  CodeCompletionCallbacks *CodeCompletion = nullptr;
   ScopeInfo ScopeInfo;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
@@ -81,6 +84,13 @@ public:
 
   void setDelayedParsingSecondPass() {
     IsDelayedParsingSecondPass = true;
+  }
+
+  void setCodeCompletion(unsigned Offset,
+                         CodeCompletionCallbacks *Callbacks) {
+    CodeCompletion = Callbacks;
+    IsDelayedParsingSecondPass = true;
+    L->setCodeCompletion(Offset);
   }
 
   /// Tok - This is the current token being considered by the parser.
@@ -421,7 +431,7 @@ public:
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   Pattern *buildImplicitThisParameter();
-  ParserTokenRange consumeFunctionBody(unsigned Flags);
+  Optional<ParserTokenRange> consumeFunctionBody(unsigned Flags);
   FuncDecl *parseDeclFunc(unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   Decl *parseDeclProtocol(unsigned Flags);

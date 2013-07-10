@@ -1654,7 +1654,17 @@ class FuncExpr : public CapturingExpr {
 
 public:
   enum class BodyKind {
-    None, Unparsed, Parsed
+    /// The function did not have a body in the source code file.
+    None,
+
+    /// Function body is delayed as a token range in \c BodyTokenRange.
+    Unparsed,
+
+    /// Function body is parsed and available as an AST subtree.
+    Parsed,
+
+    /// Function body is not available, although it was written in the source.
+    Skipped
   };
 
   BodyKind getBodyKind() const {
@@ -1759,10 +1769,20 @@ public:
     return nullptr;
   }
   void setBody(BraceStmt *S) {
+    assert(getBodyKind() != BodyKind::Skipped &&
+           "can not set a body if it was skipped");
     assert(S && "assigning a null body");
-    assert(getBodyKind() != BodyKind::Parsed || Body == S);
+    assert(getBodyKind() == BodyKind::None ||
+           getBodyKind() == BodyKind::Unparsed ||
+           Body == S);
     Body = S;
     setBodyKind(BodyKind::Parsed);
+  }
+
+  /// \brief Note that the body was skipped for this function.  Function body
+  /// can not be attached after this call.
+  void setBodySkipped() {
+    setBodyKind(BodyKind::Skipped);
   }
 
   ParserTokenRange getBodyTokenRange() {

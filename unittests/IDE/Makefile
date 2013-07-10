@@ -1,5 +1,5 @@
-##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
-# 
+##===- unittests/IDE/Makefile ----------------------------*- Makefile -*-===##
+#
 # This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -9,9 +9,11 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 ##===----------------------------------------------------------------------===##
-SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL IRGen ClangImporter Serialization IDE Frontend
+SWIFT_LEVEL = ../..
+TESTNAME = Basic
+include $(SWIFT_LEVEL)/../../Makefile.config
+LINK_COMPONENTS := $(TARGETS_TO_BUILD)
+USEDLIBS = swiftIDE.a
 
-include $(SWIFT_LEVEL)/Makefile
-
+include $(SWIFT_LEVEL)/unittests/Makefile

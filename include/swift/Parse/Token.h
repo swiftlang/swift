@@ -26,6 +26,7 @@ namespace swift {
 enum class tok {
   unknown = 0,
   eof,
+  code_complete,
   identifier,
   oper_binary,
   oper_postfix,

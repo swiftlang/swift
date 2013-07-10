@@ -64,6 +64,10 @@ class Lexer {
   /// \brief Set to true to return comment tokens, instead of skipping them.
   bool KeepComments = false;
 
+  /// \brief Set to true if we should produce a code completion token when we
+  /// hit \c ArtificialEOF.
+  bool DoingCodeCompletion = false;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
@@ -97,10 +101,24 @@ public:
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
-    ArtificialEOF = EndState.CurPtr;
+    // If the parent lexer is doing code completion and the completion position
+    // is in this subrange, then we should stop at that point, too.
+    if (Parent.DoingCodeCompletion &&
+        Parent.ArtificialEOF >= BufferStart &&
+        Parent.ArtificialEOF <= BufferEnd) {
+      DoingCodeCompletion = true;
+      ArtificialEOF = Parent.ArtificialEOF;
+    } else
+      ArtificialEOF = EndState.CurPtr;
   }
 
   bool isKeepingComments() const { return KeepComments; }
+
+  void setCodeCompletion(unsigned Offset) {
+    ArtificialEOF = BufferStart + Offset;
+    assert(ArtificialEOF <= BufferEnd);
+    DoingCodeCompletion = true;
+  }
 
   const char *getBufferEnd() const { return BufferEnd; }
 
@@ -139,6 +157,8 @@ public:
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
   void restoreState(State S) {
+    assert(BufferStart <= S.CurPtr && S.CurPtr <= BufferEnd &&
+           "state for the wrong buffer");
     CurPtr = S.CurPtr;
     lexImpl();
   }
@@ -148,6 +168,14 @@ public:
   void backtrackToState(State S) {
     assert(S.CurPtr <= CurPtr && "can't backtrack forward");
     restoreState(S);
+  }
+
+  bool stateRangeHasCodeCompletionToken(State Begin, State End,
+                                        unsigned TokenOffset) {
+    assert(Begin.CurPtr <= End.CurPtr && "states don't form a range");
+    const char *CodeCompletePtr = BufferStart + TokenOffset;
+    return Begin.CurPtr <= CodeCompletePtr &&
+           CodeCompletePtr < End.CurPtr;
   }
 
   /// \brief Retrieve the source location that points just past the

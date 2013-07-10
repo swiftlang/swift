@@ -20,6 +20,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
@@ -55,6 +56,8 @@ class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
   std::vector<DiagnosticConsumer *> DiagnosticConsumers;
 
   std::string ModuleName;
+
+  CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
 public:
   CompilerInvocation();
@@ -144,6 +147,14 @@ public:
 
   StringRef getModuleName() const {
     return ModuleName;
+  }
+
+  void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
+    CodeCompletionFactory = Factory;
+  }
+
+  CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
+    return CodeCompletionFactory;
   }
 };
 

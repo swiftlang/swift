@@ -36,7 +36,17 @@ namespace swift {
     /// \brief If true, the parser will not parse function bodies.  Tokens for
     /// the function body will be saved in the AST node.
     bool DelayFunctionBodyParsing = false;
+
+    /// \brief Code completion offset in bytes from the beginning of the main
+    /// source file.  Valid only if \c isCodeCompletion() == true.
+    unsigned CodeCompletionOffset = ~0U;
+
+    /// \returns true if we are doing code completion.
+    bool isCodeCompletion() const {
+      return CodeCompletionOffset != ~0U;
+    }
   };
 }
 
-#endif
+#endif // LLVM_SWIFT_LANGOPTIONS_H
+

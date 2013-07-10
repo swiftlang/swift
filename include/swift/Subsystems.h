@@ -38,6 +38,7 @@ namespace swift {
   class SILParserTUState;
   class Parser;
   class Token;
+  class CodeCompletionCallbacksFactory;
 
   namespace irgen {
     class Options;
@@ -79,7 +80,9 @@ namespace swift {
 
   /// \brief Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
-  void performDelayedParsing(TranslationUnit *TU, Parser *TheParser);
+  void
+  performDelayedParsing(TranslationUnit *TU, Parser *TheParser,
+                        CodeCompletionCallbacksFactory *CodeCompletionFactory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,
