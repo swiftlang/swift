@@ -200,7 +200,7 @@ static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
 
   // FIXME: Total hack. We should do the checking of the arguments right
   // here.
-  TypeLoc tl{type, loc};
+  TypeLoc tl{type, loc, nullptr};
   if (TC.validateType(tl)) {
     return nullptr;
   }
@@ -269,7 +269,7 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
       // above.
       {
-        TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start));
+        TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start), nullptr);
         if (TC.validateType(
               tempLoc,
               (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
@@ -324,7 +324,7 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
     // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
     // above.
     {
-      TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start));
+      TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start), nullptr);
       if (TC.validateType(
             tempLoc,
             (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
@@ -364,7 +364,7 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       if (current.get<Type>()->is<UnboundGenericType>()) {
         // FIXME: Awful source-location info, unsurprisingly.
         diagnoseUnboundGenericType(TC, TypeLoc(current.get<Type>(),
-                                               SourceRange(previousLoc)));
+                                               SourceRange(previousLoc), nullptr));
         return true;
       }
 
@@ -539,7 +539,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
 
   case TypeKind::Substituted: {
     TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
-               Loc.getSourceRange());
+               Loc.getSourceRange(), nullptr);
     return IsInvalid = validateType(TL, allowUnboundGenerics);
   }
 
@@ -566,7 +566,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::Paren: {
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ cast<ParenType>(T)->getUnderlyingType(),
-                     Loc.getSourceRange() };
+                     Loc.getSourceRange(), nullptr };
     return IsInvalid = validateType(TempLoc);
   }
   case TypeKind::Tuple: {
@@ -579,7 +579,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
       // verifying each individually.
       Type EltTy = TT->getFields()[i].getType();
       // FIXME: Extract real typeloc info
-      TypeLoc TempLoc{ EltTy, Loc.getSourceRange() };
+      TypeLoc TempLoc{ EltTy, Loc.getSourceRange(), nullptr };
       if (EltTy && validateType(TempLoc)) {
         IsInvalid = true;
         break;
@@ -631,7 +631,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::LValue: {
     // FIXME: Extract real typeloc info.
     TypeLoc TempLoc{ cast<LValueType>(T)->getObjectType(),
-                     Loc.getSourceRange() };
+                     Loc.getSourceRange(), nullptr };
     IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of object type!
     break;
@@ -641,10 +641,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::PolymorphicFunction: {
     AnyFunctionType *FT = cast<AnyFunctionType>(T);
     // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ FT->getInput(), Loc.getSourceRange() };
+    TypeLoc TempLoc{ FT->getInput(), Loc.getSourceRange(), nullptr };
     IsInvalid = validateType(TempLoc);
     if (!IsInvalid) {
-      TempLoc = TypeLoc{ FT->getResult(), Loc.getSourceRange() };
+      TempLoc = TypeLoc{ FT->getResult(), Loc.getSourceRange(), nullptr };
       IsInvalid = validateType(TempLoc);
     }
     // FIXME: diagnose non-materializability of result type!
@@ -653,7 +653,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
     // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange() };
+    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange(), nullptr };
     IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of element type!
     // FIXME: We need to check AT->Size! (It also has to be convertible to int).
@@ -662,7 +662,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::ArraySlice: {
     ArraySliceType *AT = cast<ArraySliceType>(T);
     // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange() };
+    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange(), nullptr };
     IsInvalid = validateType(TempLoc);
     // FIXME: diagnose non-materializability of element type?
     if (!IsInvalid && !AT->hasImplementationType()) {
@@ -675,7 +675,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
     ProtocolCompositionType *PC = cast<ProtocolCompositionType>(T);
     for (auto Proto : PC->getProtocols()) {
       // FIXME: Extract real typeloc info.
-      TypeLoc TempLoc{ Proto, Loc.getSourceRange() };
+      TypeLoc TempLoc{ Proto, Loc.getSourceRange(), nullptr };
       if (validateType(TempLoc))
         IsInvalid = true;
       else if (!Proto->isExistentialType()) {
@@ -692,7 +692,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
     MetaTypeType *Meta = cast<MetaTypeType>(T);
     // FIXME: Extract real typeloc info?  Should we be validating this type
     // in the first place?
-    TypeLoc TempLoc{ Meta->getInstanceType(), Loc.getSourceRange() };
+    TypeLoc TempLoc{ Meta->getInstanceType(), Loc.getSourceRange(), nullptr };
     IsInvalid = validateType(TempLoc);
     break;
   }

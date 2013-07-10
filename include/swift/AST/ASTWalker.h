@@ -22,12 +22,14 @@ class Decl;
 class Expr;
 class Stmt;
 class Pattern;
+class TypeRepr;
   
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
 public:
+  typedef llvm::PointerUnion4<Expr *, Stmt *, Pattern *, TypeRepr *> ParentTy;
   /// \brief The parent of the node we are visiting.
-  llvm::PointerUnion3<Expr *, Stmt *, Pattern *> Parent;
+  ParentTy Parent;
 
   /// This method is called when first visiting an expression
   /// before walking into its children.
@@ -106,6 +108,17 @@ public:
   /// decl.  If it returns false, the remaining traversal is terminated and
   /// returns failure.
   virtual bool walkToDeclPost(Decl *D) { return true; }
+
+  /// \brief This method is called when first visiting a TypeRepr, before
+  /// walking into its children.  If it returns false, the subtree is skipped.
+  ///
+  /// \param T The TypeRepr to check.
+  virtual bool walkToTypeReprPre(TypeRepr *T) { return true; }
+
+  /// \brief This method is called after visiting the children of a TypeRepr.
+  /// If it returns false, the remaining traversal is terminated and returns
+  /// failure.
+  virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
 
 protected:
   ASTWalker() = default;

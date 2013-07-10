@@ -17,6 +17,7 @@ add_swift_library(swiftAST
   PrettyStackTrace.cpp
   Stmt.cpp
   Type.cpp
+  TypeRepr.cpp
   Verifier.cpp
   DEPENDS swiftBasic)
 

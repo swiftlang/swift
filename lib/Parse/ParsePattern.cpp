@@ -374,7 +374,8 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
   result.setVarargBaseType(subTy);
   typedPattern->getTypeLoc()
     = TypeLoc(ArraySliceType::get(subTy, Context),
-                                  typedPattern->getTypeLoc().getSourceRange());
+                                  typedPattern->getTypeLoc().getSourceRange(),
+                                  typedPattern->getTypeLoc().getTypeRepr());
   return result;
 }
 

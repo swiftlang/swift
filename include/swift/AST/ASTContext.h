@@ -258,18 +258,10 @@ public:
   }
 
   template<typename T>
-  ArrayRef<T> AllocateCopy(ArrayRef<T> array,
+  MutableArrayRef<T> AllocateCopy(ArrayRef<T> array,
                            AllocationArena arena = AllocationArena::Permanent) {
-    return ArrayRef<T>(AllocateCopy<T>(array.begin(), array.end(), arena),
-                       array.size());
-  }
-  
-  template<typename T>
-  MutableArrayRef<T>
-  AllocateCopy(MutableArrayRef<T> array,
-               AllocationArena arena = AllocationArena::Permanent) {
-    return MutableArrayRef<T>(AllocateCopy<T>(array.begin(), array.end(),arena),
-                       array.size());
+    return MutableArrayRef<T>(AllocateCopy<T>(array.begin(),array.end(), arena),
+                              array.size());
   }
 
 

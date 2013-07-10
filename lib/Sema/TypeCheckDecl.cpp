@@ -385,7 +385,7 @@ public:
     if (!IsSecondPass) {
       // FIXME: Need to fix the validateType API for typealias.
       if (!TC.validateType(TAD->getUnderlyingTypeLoc())) {
-        TypeLoc FakeTypeLoc(TAD->getDeclaredType(), TAD->getLoc());
+        TypeLoc FakeTypeLoc(TAD->getDeclaredType(), TAD->getLoc(), nullptr);
         TC.validateType(FakeTypeLoc);
       }
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))

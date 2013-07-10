@@ -18,6 +18,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -29,6 +30,7 @@ static const llvm::raw_ostream::Colors NAME##Color = llvm::raw_ostream::COLOR;
 DEF_COLOR(Func, YELLOW)
 DEF_COLOR(Extension, MAGENTA)
 DEF_COLOR(Pattern, RED)
+DEF_COLOR(TypeRepr, GREEN)
 
 #undef DEF_COLOR
 
@@ -52,6 +54,7 @@ namespace {
     void printRec(Decl *D) { D->dump(Indent+2); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
+    void printRec(TypeRepr *T) { T->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
 
     raw_ostream &printCommon(Pattern *P, const char *Name) {
@@ -103,6 +106,10 @@ namespace {
         P->getType()->print(OS);
       OS << '\n';
       printRec(P->getSubPattern());
+      if (P->getTypeLoc().getTypeRepr()) {
+        OS << '\n';
+        printRec(P->getTypeLoc().getTypeRepr());
+      }
       OS << ')';
     }
     
@@ -149,6 +156,7 @@ namespace {
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
+    void printRec(TypeRepr *T) { T->print(OS, Indent+2); }
 
     void printGenericParameters(GenericParamList *Params) {
       if (!Params)
@@ -1159,4 +1167,179 @@ void Expr::dump() const {
 
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
   PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
+}
+
+//===----------------------------------------------------------------------===//
+// Printing for TypeRepr and all subclasses.
+//===----------------------------------------------------------------------===//
+
+namespace {
+class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr> {
+public:
+  raw_ostream &OS;
+  unsigned Indent;
+  bool ShowColors;
+
+  PrintTypeRepr(raw_ostream &os, unsigned indent)
+    : OS(os), Indent(indent), ShowColors(false) {
+    if (&os == &llvm::errs() || &os == &llvm::outs())
+      ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
+  }
+
+  void printRec(Decl *D) { D->dump(Indent+2); }
+  void printRec(Expr *E) { E->print(OS, Indent+2); }
+  void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent+2).visit(T); }
+
+  raw_ostream &printCommon(TypeRepr *T, const char *Name) {
+    OS.indent(Indent) << '(';
+
+    // Support optional color output.
+    if (ShowColors) {
+      if (const char *CStr =
+          llvm::sys::Process::OutputColor(TypeReprColor, false, false)) {
+        OS << CStr;
+      }
+    }
+
+    OS << Name;
+
+    if (ShowColors)
+      OS << llvm::sys::Process::ResetColor();
+    return OS;
+  }
+
+  void visitAttributedTypeRepr(AttributedTypeRepr *T) {
+    printCommon(T, "type_attributed") << " attrs=[";
+    const DeclAttributes &Attrs = T->getAttrs();
+    llvm::SmallString<64> AttrStr;
+    llvm::raw_svector_ostream AttrOS(AttrStr);
+    if (Attrs.Resilience.isValid()) {
+      switch (Attrs.Resilience.getResilience()) {
+      case Resilience::InherentlyFragile: AttrOS << "born_fragile,"; break;
+      case Resilience::Fragile: AttrOS << "fragile,"; break;
+      case Resilience::Resilient: AttrOS << "resilient,"; break;
+      }
+    }
+    if (!Attrs.AsmName.empty())
+      AttrOS << "asmname=\"" << Attrs.AsmName << "\",";
+    if (Attrs.isByref()) AttrOS << "byref,";
+    if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
+    if (Attrs.isThin()) AttrOS << "thin,";
+    if (Attrs.isAutoClosure()) AttrOS << "assignment,";
+    if (Attrs.isAutoClosure()) AttrOS << "conversion,";
+    if (Attrs.isAutoClosure()) AttrOS << "force_inline,";
+    if (Attrs.isAutoClosure()) AttrOS << "objc,";
+    if (Attrs.isAutoClosure()) AttrOS << "objc_block,";
+    if (Attrs.isAutoClosure()) AttrOS << "prefix,";
+    if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
+    if (Attrs.isAutoClosure()) AttrOS << "postfix,";
+    if (Attrs.isAutoClosure()) AttrOS << "infix,";
+    if (Attrs.isAutoClosure()) AttrOS << "iboutlet,";
+    if (Attrs.isAutoClosure()) AttrOS << "ibaction,";
+    if (Attrs.isAutoClosure()) AttrOS << "class_protocol,";
+    if (Attrs.isAutoClosure()) AttrOS << "stdlib,";
+    if (Attrs.cc.hasValue()) {
+      AttrOS << "cc(";
+      switch (Attrs.cc.getValue()) {
+      case AbstractCC::C: AttrOS << "cdecl"; break;
+      case AbstractCC::ObjCMethod: AttrOS << "objc_method"; break;
+      case AbstractCC::Freestanding: AttrOS << "freestanding"; break;
+      case AbstractCC::Method: AttrOS << "method"; break;
+      }
+      AttrOS << "),";
+    }
+    AttrOS.flush();
+    AttrStr.pop_back(); // Remove last comma.
+    OS << AttrStr << "])\n";
+    printRec(T->getTypeRepr());
+  }
+
+  void visitIdentTypeRepr(IdentTypeRepr *T) {
+    printCommon(T, "type_ident");
+    Indent += 2;
+    for (auto &comp : T->Components) {
+      OS << '\n';
+      printCommon(nullptr, "component");
+      OS << " id='" << comp.getIdentifier() << '\'';
+      OS << " bind=";
+      if (comp.isBoundDecl()) OS << "decl";
+      else if (comp.isBoundModule()) OS << "module";
+      else if (comp.isBoundType()) OS << "type";
+      else OS << "none";
+      OS << ')';
+      for (auto genArg : comp.getGenericArgs()) {
+        OS << '\n';
+        printRec(genArg);
+      }
+    }
+    OS << ')';
+    Indent -= 2;
+  }
+
+  void visitFunctionTypeRepr(FunctionTypeRepr *T) {
+    printCommon(T, "type_function");
+    OS << '\n'; printRec(T->getArgsTypeRepr());
+    OS << '\n'; printRec(T->getResultTypeRepr());
+    OS << ')';
+  }
+
+  void visitArrayTypeRepr(ArrayTypeRepr *T) {
+    printCommon(T, "type_array") << '\n';
+    printRec(T->getBase());
+    if (T->getSize()) {
+      OS << '\n';
+      printRec(T->getSize()->getExpr());
+    }
+    OS << ')';
+  }
+
+  void visitTupleTypeRepr(TupleTypeRepr *T) {
+    printCommon(T, "type_tuple");
+    for (auto elem : T->getElements()) {
+      OS << '\n';
+      printRec(elem);
+    }
+    OS << ')';
+  }
+
+  void visitNamedTypeRepr(NamedTypeRepr *T) {
+    printCommon(T, "type_named");
+    if (!T->getName().empty())
+      OS << " id='" << T->getName();
+    if (T->getTypeRepr()) {
+      OS << '\n';
+      printRec(T->getTypeRepr());
+    }
+    if (T->getInit()) {
+      OS << '\n';
+      printRec(T->getInit()->getExpr());
+    }
+    OS << ')';
+  }
+
+  void visitCompositeTypeRepr(CompositeTypeRepr *T) {
+    printCommon(T, "type_composite");
+    for (auto elem : T->getProtocols()) {
+      OS << '\n';
+      printRec(elem);
+    }
+    OS << ')';
+  }
+
+  void visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
+    printCommon(T, "type_metatype") << '\n';
+    printRec(T->getBase());
+    OS << ')';
+  }
+};
+
+} // end anonymous namespace.
+
+void TypeRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void TypeRepr::print(raw_ostream &OS, unsigned Indent) const {
+  PrintTypeRepr(OS, Indent).visit(const_cast<TypeRepr*>(this));
 }

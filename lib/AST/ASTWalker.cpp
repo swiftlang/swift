@@ -28,10 +28,10 @@ namespace {
 /// on every node in an AST.
 class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
                                     /*Decl*/ void,
-                                    Pattern *>
+                                    Pattern *, /*TypeRepr*/ bool>
 {
-  friend class ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*>;
-  typedef ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*> inherited;
+  friend class ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*, bool>;
+  typedef ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*, bool> inherited;
 
   ASTWalker &Walker;
   
@@ -68,6 +68,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return inherited::visit(P);
   }
   
+  bool visit(TypeRepr *T) {
+    SetParentRAII SetParent(Walker, T);
+    return inherited::visit(T);
+  }
+
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
   Expr *visitLiteralExpr(LiteralExpr *E) { return E; }
   Expr *visitDeclRefExpr(DeclRefExpr *E) { return E; }
@@ -296,6 +301,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitFuncExpr(FuncExpr *E) {
+    for (auto &patt : E->getArgParamPatterns()) {
+      if (Pattern *P = doIt(patt))
+        patt = P;
+      else
+        return nullptr;
+    }
     if (!E->getBody())
       return E;
     if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
@@ -650,6 +661,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       P->setSubPattern(newSub);
     else
       return nullptr;
+    if (P->getTypeLoc().getTypeRepr())
+      if (doIt(P->getTypeLoc().getTypeRepr()))
+        return nullptr;
     return P;
   }
   
@@ -691,6 +705,66 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
   
+  bool visitAttributedTypeRepr(AttributedTypeRepr *T) {
+    if (doIt(T->getTypeRepr()))
+      return true;
+    return false;
+  }
+
+  bool visitIdentTypeRepr(IdentTypeRepr *T) {
+    for (auto &comp : T->Components) {
+      for (auto genArg : comp.getGenericArgs()) {
+        if (doIt(genArg))
+          return true;
+      }
+    }
+    return false;
+  }
+
+  bool visitFunctionTypeRepr(FunctionTypeRepr *T) {
+    if (doIt(T->getArgsTypeRepr()))
+      return true;
+    if (doIt(T->getResultTypeRepr()))
+      return true;
+    return false;
+  }
+
+  bool visitArrayTypeRepr(ArrayTypeRepr *T) {
+    if (doIt(T->getBase()))
+      return true;
+    return false;
+  }
+
+  bool visitTupleTypeRepr(TupleTypeRepr *T) {
+    for (auto elem : T->getElements()) {
+      if (doIt(elem))
+        return true;
+    }
+    return false;
+  }
+
+  bool visitNamedTypeRepr(NamedTypeRepr *T) {
+    if (T->getTypeRepr()) {
+      if (doIt(T->getTypeRepr()))
+        return true;
+    }
+    return false;
+  }
+
+  bool visitCompositeTypeRepr(CompositeTypeRepr *T) {
+    for (auto elem : T->getProtocols()) {
+      if (doIt(elem))
+        return true;
+    }
+    return false;
+  }
+
+  bool visitMetaTypeTypeRepr(MetaTypeTypeRepr *T) {
+    if (doIt(T->getBase()))
+      return true;
+    return false;
+  }
+
 public:
   Traversal(ASTWalker &walker) : Walker(walker) {}
 
@@ -801,6 +875,21 @@ public:
     if (P) P = Walker.walkToPatternPost(P);
 
     return P;
+  }
+
+  /// Returns true on failure.
+  bool doIt(TypeRepr *T) {
+    // Do the pre-order visitation.  If it returns false, we just
+    // skip entering subnodes of this tree.
+    if (!Walker.walkToTypeReprPre(T))
+      return false;
+
+    // Otherwise, visit the children.
+    if (visit(T))
+      return true;
+
+    // If we didn't bail out, do post-order visitation.
+    return !Walker.walkToTypeReprPost(T);
   }
 };
 

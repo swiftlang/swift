@@ -253,7 +253,8 @@ void TuplePatternElt::revertToNonVariadic() {
   // Fix the pattern.
   auto typedPattern = cast<TypedPattern>(ThePattern);
   typedPattern->getTypeLoc()
-    = TypeLoc(VarargBaseType, typedPattern->getTypeLoc().getSourceRange());
+    = TypeLoc(VarargBaseType, typedPattern->getTypeLoc().getSourceRange(),
+              typedPattern->getTypeLoc().getTypeRepr());
 
   // Clear out the variadic base type.
   VarargBaseType = Type();

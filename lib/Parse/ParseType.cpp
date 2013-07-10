@@ -44,12 +44,15 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
   // Apply those attributes that do apply.
   if (attrs.empty()) return false;
 
+  result = { result.getType(), result.getSourceRange(),
+                new (Context) AttributedTypeRepr(attrs, result.getTypeRepr()) };
+
   if (attrs.isByref()) {
     LValueType::Qual quals;
     Type resultType = LValueType::get(result.getType(), quals, Context);
     SourceRange resultRange = { attrs.LSquareLoc,
                                 result.getSourceRange().End };
-    result = { resultType, resultRange };
+    result = { resultType, resultRange, result.getTypeRepr() };
     attrs.Byref = false; // so that the empty() check below works
   }
 
@@ -91,7 +94,7 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
                                           Context);
       SourceRange resultRange = { attrs.LSquareLoc,
                                   result.getSourceRange().End };
-      result = { resultType, resultRange };
+      result = { resultType, resultRange, result.getTypeRepr() };
     }
     attrs.AutoClosure = false;
     attrs.ObjCBlock = false;
@@ -153,10 +156,12 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
 
     Type metatypeType = MetaTypeType::get(Result.getType(), Context);
+    TypeRepr *metaTyR = new (Context) MetaTypeTypeRepr(Result.getTypeRepr(),
+                                                       metatypeLoc);
 
     SourceRange metatypeTypeRange{ Result.getSourceRange().Start,
                                    metatypeLoc };
-    Result = { metatypeType, metatypeTypeRange };
+    Result = { metatypeType, metatypeTypeRange, metaTyR };
   }
 
   // Handle type-function if we have an arrow.
@@ -167,9 +172,11 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
       return true;
     Type FnType = FunctionType::get(Result.getType(), SecondHalf.getType(),
                                     Context);
+    TypeRepr *FnTyR = new (Context) FunctionTypeRepr(Result.getTypeRepr(),
+                                                     SecondHalf.getTypeRepr());
     SourceRange FnTypeRange{ Result.getSourceRange().Start,
                              SecondHalf.getSourceRange().End };
-    Result = { FnType, FnTypeRange };
+    Result = { FnType, FnTypeRange, FnTyR };
     return false;
   }
 
@@ -233,6 +240,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
   }
 
   SmallVector<IdentifierType::Component, 4> Components;
+  SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
@@ -248,6 +256,13 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs,
                                                    CurDeclContext));
     EndLoc = Loc;
+      
+    SmallVector<TypeRepr *, 4> GenericArgsTyR;
+    for (auto &TyLoc : GenericArgs)
+      GenericArgsTyR.push_back(TyLoc.getTypeRepr());
+    ComponentsR.push_back(IdentTypeRepr::Component(Loc, Name,
+                                           Context.AllocateCopy(GenericArgsTyR),
+                                                   CurDeclContext));
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'metatype'.
@@ -261,11 +276,14 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).
-  if (auto Entry = ScopeInfo.lookupValueName(Components[0].Id))
+  if (auto Entry = ScopeInfo.lookupValueName(Components[0].Id)) {
     Components[0].setValue(Entry);
+    ComponentsR[0].setValue(Entry);
+  }
 
   auto Ty = IdentifierType::getNew(Context, Components);
-  Result = { Ty, SourceRange(StartLoc, EndLoc) };
+  auto TyR = IdentTypeRepr::create(Context, ComponentsR);
+  Result = { Ty, SourceRange(StartLoc, EndLoc), TyR };
   return false;
 }
 
@@ -291,7 +309,11 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
     Type ResultType = ProtocolCompositionType::get(Context, ArrayRef<Type>());
-    Result = { ResultType, SourceRange(ProtocolLoc, RAngleLoc) };
+    auto ResultTyR = new (Context) CompositeTypeRepr(
+                                             MutableArrayRef<IdentTypeRepr *>(),
+                                             ProtocolLoc,
+                                             SourceRange(LAngleLoc, RAngleLoc));
+    Result = { ResultType, SourceRange(ProtocolLoc, RAngleLoc), ResultTyR };
     return false;
   }
   
@@ -326,10 +348,15 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
   }
 
   SmallVector<Type, 4> ProtocolTypes;
-  for (TypeLoc T : Protocols)
+  SmallVector<IdentTypeRepr *, 4> ProtocolTypesR;
+  for (TypeLoc T : Protocols) {
     ProtocolTypes.push_back(T.getType());
+    ProtocolTypesR.push_back(cast<IdentTypeRepr>(T.getTypeRepr()));
+  }
   Result =  { ProtocolCompositionType::get(Context, ProtocolTypes),
-              SourceRange(ProtocolLoc, EndLoc) };
+              SourceRange(ProtocolLoc, EndLoc),
+              CompositeTypeRepr::create(Context, ProtocolTypesR, ProtocolLoc,
+                                        SourceRange(LAngleLoc, EndLoc)) };
   return false;
 }
 
@@ -345,6 +372,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   SmallVector<TupleTypeElt, 8> Elements;
+  SmallVector<TypeRepr *, 8> ElementsR;
   bool HadExpr = false;
   bool HadEllipsis = false;
 
@@ -358,7 +386,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
     if (isStartOfBindingName(Tok) &&
         (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
       Identifier name = Context.getIdentifier(Tok.getText());
-      consumeToken();
+      SourceLoc nameLoc = consumeToken();
 
       NullablePtr<Expr> init;
       TypeLoc type;
@@ -372,12 +400,15 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
       }
       HadExpr |= init.isNonNull();
       Elements.push_back(TupleTypeElt(type.getType(), name, initHandle));
+      ElementsR.push_back(new (Context) NamedTypeRepr(name, type.getTypeRepr(),
+                                                      initHandle, nameLoc));
     } else {
       // Otherwise, this has to be a type.
       TypeLoc type;
       if (parseTypeAnnotation(type))
         return true;
       Elements.push_back(type.getType());
+      ElementsR.push_back(type.getTypeRepr());
     }
     if (Tok.is(tok::ellipsis)) {
       EllipsisLoc = consumeToken(tok::ellipsis);
@@ -396,7 +427,10 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
     assert(!HadExpr && "Only TupleTypes have default values");
     Result = { ParenType::get(Context, Elements.back().getType()),
-               SourceRange(LPLoc, Tok.getLoc()) };
+               SourceRange(LPLoc, Tok.getLoc()),
+               TupleTypeRepr::create(Context, ElementsR,
+                                     SourceRange(LPLoc, Tok.getLoc()),
+                                     SourceLoc()) };
     return Invalid;
   }
 
@@ -420,7 +454,10 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   if (HadExpr)
     TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
 
-  Result = { TT, SourceRange(LPLoc, RPLoc) };
+  Result = { TT, SourceRange(LPLoc, RPLoc),
+             TupleTypeRepr::create(Context, ElementsR,
+                                   SourceRange(LPLoc, Tok.getLoc()),
+                                   EllipsisLoc) };
   return Invalid;
 }
 
@@ -449,7 +486,10 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     // Just build a normal array slice type.
     SourceRange arrayRange{ result.getSourceRange().Start, rsquareLoc };
     result = { ArraySliceType::get(result.getType(), Context),
-               arrayRange };
+               arrayRange,
+               new (Context) ArrayTypeRepr(result.getTypeRepr(),
+                                           nullptr,
+                                         SourceRange(lsquareLoc, rsquareLoc)) };
     return false;
   }
 

@@ -22,6 +22,7 @@
 
 namespace swift {
   class ASTContext;
+  class TypeRepr;
 
 /// TypeLoc - Provides source location information for a parsed type.
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
@@ -32,17 +33,20 @@ private:
   // for more accurate source location information.
   SourceRange Range;
 
+  TypeRepr *TyR = nullptr;
+
 public:
   TypeLoc() {}
-  TypeLoc(Type T, SourceRange Range) : T(T), Range(Range) {}
+  TypeLoc(Type T, SourceRange Range, TypeRepr *TyR)
+    : T(T), Range(Range), TyR(TyR) {}
 
 private:
-  explicit TypeLoc(Type T) : T(T) {}
+  explicit TypeLoc(Type T, TypeRepr *TyR) : T(T), TyR(TyR) {}
 
 public:
   // FIXME: We generally shouldn't need to build TypeLocs without a location.
   static TypeLoc withoutLoc(Type T) {
-    return TypeLoc(T);
+    return TypeLoc(T, nullptr);
   }
 
   SourceRange getSourceRange() const {
@@ -55,6 +59,8 @@ public:
     return T;
   }
   void setInvalidType(ASTContext &C);
+
+  TypeRepr *getTypeRepr() const { return TyR; }
 };
 
 } // end namespace llvm

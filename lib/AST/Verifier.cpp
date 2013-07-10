@@ -927,7 +927,7 @@ namespace {
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
     void checkSourceRanges(SourceRange Current,
-                           llvm::PointerUnion3<Expr*, Stmt*, Pattern*> Parent,
+                           ASTWalker::ParentTy Parent,
                            std::function<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())

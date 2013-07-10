@@ -222,7 +222,7 @@ public:
   /// and shall not fail.
   /// FIXME: This concept seems a bit broken.
   void validateTypeSimple(Type T, bool allowUnboundGenerics = false) {
-    TypeLoc TL(T, SourceRange());
+    TypeLoc TL(T, SourceRange(), nullptr);
     bool result = validateType(TL, allowUnboundGenerics);
     assert(!result && "Validation cannot fail!");
     (void)result;

@@ -919,7 +919,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
                                      TypeLoc(ElementTy,
-                                             Value->getSourceRange()));
+                                             Value->getSourceRange(), nullptr));
       TuplePatternElt ValueElt(ValuePattern);
       Pattern *ValueParamsPattern
         = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
