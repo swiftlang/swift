@@ -286,17 +286,43 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
 
+bool ValueDecl::isSettableOnBase(Type baseType) const {
+  if (!isSettable()) return false;
+  if (!baseType) return true;
+  return (baseType->isSettableLValue() ||
+          baseType->getRValueType()->hasReferenceSemantics());
+}
+
 /// getTypeOfReference - Return the full type judgement for a non-member
 /// reference to this value.
-Type ValueDecl::getTypeOfReference() const {
-  // TODO: when the old type checker dies, set the NonSettable bit here instead
-  // of in TypeCheckConstraints.cpp.
+Type ValueDecl::getTypeOfReference(Type baseType) const {
   if (isReferencedAsLValue()) {
-    if (LValueType *LVT = Ty->getAs<LValueType>())
-      return LValueType::get(LVT->getObjectType(),
-                             LValueType::Qual::DefaultForVar, getASTContext());
-    return LValueType::get(Ty,
-                           LValueType::Qual::DefaultForVar, getASTContext());
+    // Determine the qualifiers we want.
+    LValueType::Qual quals =
+      (baseType ? LValueType::Qual::DefaultForMemberAccess
+                : LValueType::Qual::DefaultForVar);
+    if (!isSettableOnBase(baseType))
+      quals |= LValueType::Qual::NonSettable;
+
+    Type type = Ty;
+
+    // We expect the type checks below to fail, and checking is faster
+    // on a canonical type.
+    CanType storageType = type->getCanonicalType();
+
+    // Strip and re-add l-valueness, changing any qualification to the default.
+    if (isa<LValueType>(storageType)) {
+      type = type->castTo<LValueType>()->getObjectType();
+
+    // Ignore ownership qualification when reporting the formal type
+    // of the reference.  Note that we can't get l-values of
+    // non-standard reference type in the AST at the present, so this
+    // is exclusive of the above.
+    } else if (isa<ReferenceStorageType>(storageType)) {
+      type = type->castTo<ReferenceStorageType>()->getReferentType();
+    }
+
+    return LValueType::get(type, quals, getASTContext());
   }
 
   return Ty;
@@ -736,8 +762,9 @@ Type FuncDecl::computeThisType(GenericParamList **OuterGenericParams) const {
   if (ContainerType->hasReferenceSemantics())
     return ContainerType;
 
-  // 'this' is accepts implicit l-values.
-  return LValueType::get(ContainerType, LValueType::Qual::DefaultForVar,
+  // Otherwise, make an l-value type.
+  return LValueType::get(ContainerType,
+                         LValueType::Qual::DefaultForByrefThis,
                          getASTContext());
 }
 

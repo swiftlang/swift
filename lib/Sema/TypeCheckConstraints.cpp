@@ -660,28 +660,9 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 template<typename SomeValueDecl>
 static LValueType::Qual settableQualForDecl(Type baseType,
                                             SomeValueDecl *decl) {
-  bool settable = ((!baseType ||
-                    baseType->isSettableLValue() ||
-                    baseType->getRValueType()->hasReferenceSemantics()) &&
-                   decl->isSettable());
-  return settable ? LValueType::Qual(0) : LValueType::Qual::NonSettable;
-}
-
-// TODO This should replace ValueDecl::getTypeOfReference once the old
-// type checker is retired.
-static Type getTypeOfValueDeclReference(Type baseType,
-                                        ValueDecl *decl,
-                                        ASTContext &Context) {
-  LValueType::Qual qual = LValueType::Qual::DefaultForVar |
-                          settableQualForDecl(baseType, decl);
-  
-  if (decl->isReferencedAsLValue()) {
-    if (LValueType *LVT = decl->getType()->getAs<LValueType>())
-      return LValueType::get(LVT->getObjectType(), qual, Context);
-    return LValueType::get(decl->getType(), qual, Context);
-  }
-  
-  return decl->getType();
+  if (decl->isSettableOnBase(baseType))
+    return LValueType::Qual(0);
+  return LValueType::Qual::NonSettable;
 }
 
 Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
@@ -726,9 +707,7 @@ Type ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  Type valueType = getTypeOfValueDeclReference(nullptr,
-                                               value,
-                                               TC.Context);
+  Type valueType = value->getTypeOfReference();
   valueType = adjustLValueForReference(openType(valueType),
                                        value->getAttrs().isAssignment(),
                                        TC.Context);
@@ -842,13 +821,12 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   else if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
     auto resultTy = LValueType::get(subscript->getElementType(),
                                     LValueType::Qual::DefaultForMemberAccess|
-                                    LValueType::Qual::Implicit|
                                     settableQualForDecl(baseTy, subscript),
                                     TC.Context);
     type = FunctionType::get(subscript->getIndices()->getType(), resultTy,
                              TC.Context);
   } else
-    type = getTypeOfValueDeclReference(baseTy, value, TC.Context);
+    type = value->getTypeOfReference(baseTy);
 
   // For a member of an archetype, substitute the base type for the 'This'
   // type.
@@ -3273,6 +3251,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     if (!destLV->isSettable()) {
       getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_settable)
         .highlight(dest->getSourceRange());
+      return Type();
     }
     destTy = destLV->getObjectType();
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {

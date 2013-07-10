@@ -1295,9 +1295,19 @@ public:
 /// type always has the same object type as the old type with strictly
 /// "more" (i.e. a supertyped set of) qualifiers.
 class RequalifyExpr : public ImplicitConversionExpr {
+  bool IsForObject;
 public:
-  RequalifyExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type) {}
+  RequalifyExpr(Expr *subExpr, Type type, bool isForObject = false)
+    : ImplicitConversionExpr(ExprKind::Requalify, subExpr, type),
+      IsForObject(isForObject) {}
+
+  /// Is this requalification for the object operand?
+  ///
+  /// Qualification adjustments for the object operand are permitted
+  /// to remove non-settability.  This is neither sound nor a good
+  /// idea, but it's necessary until we have the capacity to control
+  /// mutation.
+  bool isForObjectOperand() const { return IsForObject; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Requalify;

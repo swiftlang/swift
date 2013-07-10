@@ -893,7 +893,7 @@ public:
   /// normal reference to this declaration.  For isReferencedAsLValue()'d decls,
   /// this returns a reference to the value's type.  For non-lvalue decls, this
   /// just returns the decl's type.
-  Type getTypeOfReference() const;
+  Type getTypeOfReference(Type baseType = Type()) const;
 
   /// isReferencedAsLValue - Returns 'true' if references to this
   /// declaration are l-values.
@@ -905,6 +905,11 @@ public:
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or [assignment] operator.
   bool isSettable() const;
+
+  /// Determine whether references to this decl are settable in the
+  /// above sense when used on a base of the given type (which may be
+  /// null to indicate that there is no base).
+  bool isSettableOnBase(Type baseType) const;
   
   void setHasFixedLifetime(bool flag) {
     ValueDeclBits.HasFixedLifetime = flag;

@@ -309,6 +309,16 @@ namespace {
                                 "input to RequalifyExpr");
       checkSameType(dstObj, srcObj,
                     "objects of result and operand of RequalifyExpr");
+
+      // As a hack, requalifications in the object operand are
+      // permitted to remove the 'non-settable' qualifier (so that you
+      // can call methods on immutable values) and 'implicit'
+      // qualifier (so that you don't have to explicitly qualify take
+      // the address of the object).
+      if (E->isForObjectOperand()) {
+        dstQuals |= LValueType::Qual::NonSettable;
+        dstQuals |= LValueType::Qual::Implicit;
+      }
       
       // FIXME: Should either properly check implicit here, or model the dropping
       // of 'implicit' differently.
@@ -660,6 +670,24 @@ namespace {
                     expr->getElseExpr()->getType(),
                     "then and else branches of an if-expr");
     }
+
+    void verifyChecked(VarDecl *var) {
+      // The fact that this is *directly* be a reference storage type
+      // cuts the code down quite a bit in getTypeOfReference.
+      if (var->getAttrs().hasOwnership() !=
+          isa<ReferenceStorageType>(var->getType().getPointer())) {
+        if (var->getAttrs().hasOwnership()) {
+          Out << "VarDecl has an ownership attribute, but its type"
+                 " is not a ReferenceStorageType: ";
+        } else {
+          Out << "VarDecl has no ownership attribute, but its type"
+                 " is a ReferenceStorageType: ";
+        }
+        var->getType().print(Out);
+        abort();
+      }
+    }
+
     /// Look through a possible l-value type, returning true if it was
     /// an l-value.
     bool lookThroughLValue(Type &type, LValueType::Qual &qs) {

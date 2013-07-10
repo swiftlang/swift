@@ -1494,11 +1494,14 @@ public:
       /// The default for a [byref] type.
       DefaultForType = 0,
 
+      /// The default for a [byref] 'this' parameter.
+      DefaultForByrefThis = 0,
+
       /// The default for a variable reference.
-      DefaultForVar = 0,
+      DefaultForVar = Implicit,
   
       /// The default for the base of a member access.
-      DefaultForMemberAccess = 0
+      DefaultForMemberAccess = Implicit,
     };
 
   private:

@@ -30,10 +30,11 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
     return false;
 
   // Non-class archetypes and existentials are always address-only.
-  // FIXME: if this is a struct has a resilient attribute, it is obviously
-  // AddressOnly.
   if (Ty->is<ArchetypeType>() || Ty->isExistentialType())
     return true;
+
+  // FIXME: if this is a struct has a resilient attribute, it is obviously
+  // AddressOnly.
 
   // Structs and tuples are address-only if any of their elements are.
   if (TupleType *TTy = Ty->getAs<TupleType>()) {
@@ -70,6 +71,16 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
             isAddressOnly(VD->getType()->getCanonicalType(), M))
           return M.AddressOnlyTypeCache[Ty.getPointer()] = true;
     return M.AddressOnlyTypeCache[Ty.getPointer()] = false;
+  }
+
+  // [weak] types are address-only, but [unowned] can just be passed around.
+  if (auto refTy = Ty->getAs<ReferenceStorageType>()) {
+    switch (refTy->getOwnership()) {
+    case Ownership::Strong: llvm_unreachable("explicit strong ownership");
+    case Ownership::Weak: return true;
+    case Ownership::Unowned: return false;
+    }
+    llvm_unreachable("bad ownership kind");
   }
 
   // Otherwise, it must not be address-only.

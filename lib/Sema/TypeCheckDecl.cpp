@@ -1281,7 +1281,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     //   0 - unowned
     //   1 - weak
     assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1);
-    unsigned ownershipKind = (unsigned) Attrs.isWeak();
+    unsigned ownershipKind = (unsigned) Attrs.getOwnership();
 
     // Only 'var' declarations can have ownership.
     // TODO: captures, consts, etc.
@@ -1307,6 +1307,11 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
       VD->getMutableAttrs().clearOwnership();
       return;
     }
+
+    // Change the type to the appropriate reference storage type.
+    VD->overwriteType(ReferenceStorageType::get(VD->getType(),
+                                                Attrs.getOwnership(),
+                                                TC.Context));
   }
 
   if (Attrs.isIBOutlet()) {

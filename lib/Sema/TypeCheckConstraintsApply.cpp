@@ -947,7 +947,9 @@ namespace {
         return MetaTypeType::get(type, cs.getASTContext());
       }
 
-      return decl->getTypeOfReference();
+      Type type = decl->getTypeOfReference();
+      return adjustLValueForReference(type, decl->getAttrs().isAssignment(),
+                                      cs.TC.Context);
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
@@ -2162,7 +2164,8 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     // If the object types are the same, just requalify it.
     if (fromLValue->getObjectType()->isEqual(containerType))
-      return new (tc.Context) RequalifyExpr(expr, destType);
+      return new (tc.Context) RequalifyExpr(expr, destType,
+                                            /*forObject*/ true);
 
     // If the object types are different, coerce to the container type.
     expr = coerceToType(expr, containerType, locator);
