@@ -689,11 +689,22 @@ bool Parser::canParseTypeTupleBody() {
       // If the tuple element starts with "ident :", then
       // the identifier is an element tag, and it is followed by a
       // value-specifier.
-      // FIXME: This doesn't catch type attrs.
       if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
         consumeToken(tok::identifier);
         consumeToken(tok::colon);
 
+        // Parse attributes.
+        if (consumeIf(tok::l_square)) {
+          while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
+                 Tok.isNot(tok::r_square) && Tok.isNot(tok::r_paren) &&
+                 !isStartOfDecl(Tok, peekToken()))
+            skipSingle();
+
+          if (!consumeIf(tok::r_square))
+            return false;
+        }
+
+        // Parse the type.
         if (!canParseType())
           return false;
 

@@ -1865,7 +1865,7 @@ public:
   /// or
   ///
   /// \code
-  ///   { |x, y| x > y }
+  ///   { x, y in x > y }
   /// \endcode
   ///
   /// But not for empty closures nor 
