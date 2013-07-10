@@ -185,9 +185,9 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
   
-  /// hasOwnership() - Are variables of this type permitted to have
+  /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool hasOwnership();
+  bool allowsOwnership();
   
   /// isUnresolvedType() - Determines whether this type is an unresolved
   /// type, meaning that part of the type depends on the context in which
@@ -1778,7 +1778,7 @@ public:
 /// \brief The storage type of a variable with non-standard reference
 /// ownership semantics, like a [weak] or [unowned] variable.
 ///
-/// The referent type always satisfies hasOwnership().
+/// The referent type always satisfies allowsOwnership().
 ///
 /// This type currently does not appear in the AST, but it is
 /// extremely useful in SIL and IR-generation.

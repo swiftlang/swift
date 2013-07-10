@@ -1293,7 +1293,7 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     }
 
     // Type of declaration must be a reference type.
-    if (!VD->getType()->hasOwnership()) {
+    if (!VD->getType()->allowsOwnership()) {
       // If we have an opaque type, suggest the possibility of adding
       // a class bound.
       if (VD->getType()->isExistentialType() ||

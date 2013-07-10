@@ -133,7 +133,7 @@ bool TypeBase::hasReferenceSemantics() {
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::hasOwnership() {
+bool TypeBase::allowsOwnership() {
   CanType canonical = getCanonicalType();
   return (!isa<AnyFunctionType>(canonical)
           && canonical->hasReferenceSemantics());
