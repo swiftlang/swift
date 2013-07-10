@@ -617,8 +617,14 @@ ERROR(expected_rpipe,expr_parsing,none,
       "expected '|' to finish closure argument list", ())
 NOTE(opening_pipe,expr_parsing,none,
      "to match this opening '|'", ())
+ERROR(expected_closure_parameter_name,expr_parsing,none,
+      "expected the name of a closure parameter", ())
 ERROR(expected_closure_result_type,expr_parsing,none,
       "expected closure result type after '->'", ())
+ERROR(expected_closure_in,expr_parsing,none,
+   "expected 'in' after the closure signature", ())
+ERROR(unexpected_tokens_before_closure_in,expr_parsing,none,
+   "unexpected tokens prior to 'in'", ())
 ERROR(expected_closure_rbrace,expr_parsing,none,
       "expected '}' at end of closure", ())
 

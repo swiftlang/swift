@@ -990,6 +990,158 @@ static SourceLoc consumePipe(Parser &parser) {
 static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
                                     Parser &P);
 
+bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
+                                            SourceLoc &arrowLoc,
+                                            TypeLoc &explicitResultType,
+                                            SourceLoc &inLoc) {
+  // Clear out result parameters.
+  params = nullptr;
+  arrowLoc = SourceLoc();
+  explicitResultType = TypeLoc();
+  inLoc = SourceLoc();
+
+  // Check whether we have a closure signature here.
+  // FIXME: We probably want to be a bit more permissive here.
+  if (Tok.is(tok::l_paren)) {
+    // Parse pattern-tuple func-signature-result? 'in'.
+    BacktrackingScope backtrack(*this);
+
+    // Parse the pattern-tuple.
+    consumeToken();
+    if (!canParseTypeTupleBody())
+      return false;
+
+    // Parse the func-signature-result, if present.
+    if (consumeIf(tok::arrow)) {
+      if (!canParseType())
+        return false;
+    }
+
+    // Parse the 'in' at the end.
+    if (!Tok.isContextualKeyword("in")) {
+      return false;
+    }
+
+    // Okay, we have a closure signature.
+  } else if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
+    BacktrackingScope backtrack(*this);
+
+    // Parse identifier (',' identifier)*
+    consumeToken();
+    while (consumeIf(tok::comma)) {
+      if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
+        consumeToken();
+        continue;
+      }
+
+      return false;
+    }
+
+    // Parse the func-signature-result, if present.
+    if (consumeIf(tok::arrow)) {
+      if (!canParseType())
+        return false;
+    }
+
+    // Parse the 'in' at the end.
+    if (!Tok.isContextualKeyword("in")) {
+      return false;
+    }
+
+    // Okay, we have a closure signature.
+  } else {
+    // No closure signature.
+    return false;
+  }
+
+  // At this point, we know we have a closure signature. Parse the parameters.
+  bool invalid = false;
+  if (Tok.is(tok::l_paren)) {
+    // Parse the pattern-tuple.
+    auto pattern = parsePatternTuple(/*AllowInitExpr=*/false);
+    if (pattern.isNonNull())
+      params = pattern.get();
+    else
+      invalid = true;
+  } else {
+    // Parse identifier (',' identifier)*
+    SmallVector<TuplePatternElt, 4> elements;
+    do {
+      if (Tok.is(tok::identifier)) {
+        auto var = new (Context) VarDecl(Tok.getLoc(),
+                                         Context.getIdentifier(Tok.getText()),
+                                         Type(), nullptr);
+        elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
+        consumeToken();
+      } else if (Tok.is(tok::kw__)) {
+        elements.push_back(TuplePatternElt(
+                             new (Context) AnyPattern(Tok.getLoc())));
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::expected_closure_parameter_name);
+        invalid = true;
+        break;
+      }
+
+      // Consume a comma to continue.
+      if (consumeIf(tok::comma)) {
+        continue;
+      }
+
+      break;
+    } while (true);
+
+    params = TuplePattern::create(Context, SourceLoc(), elements, SourceLoc());
+  }
+
+  // Parse the optional explicit return type.
+  if (Tok.is(tok::arrow)) {
+    // Consume the '->'.
+    arrowLoc = consumeToken();
+
+    // Parse the type.
+    if (parseType(explicitResultType, diag::expected_closure_result_type)) {
+      // If we couldn't parse the result type, clear out the arrow location.
+      arrowLoc = SourceLoc();
+      invalid = true;
+    }
+  }
+
+  // Parse the 'in'.
+  if (Tok.isContextualKeyword("in")) {
+    inLoc = consumeToken();
+  } else {
+    // Scan forward to see if we can find the 'in'. This re-synchronizes the
+    // parser so we can at least parse the body correctly.
+    SourceLoc startLoc = Tok.getLoc();
+    ParserPosition pos = getParserPosition();
+    while (Tok.isNot(tok::eof) && !Tok.isContextualKeyword("in") &&
+           Tok.isNot(tok::r_brace)) {
+      skipSingle();
+    }
+
+    if (Tok.isContextualKeyword("in")) {
+      // We found the 'in'. If this is the first error, complain about the
+      // junk tokens in-between but re-sync at the 'in'.
+      if (!invalid) {
+        diagnose(startLoc, diag::unexpected_tokens_before_closure_in);
+      }
+      inLoc = consumeToken();
+    } else {
+      // We didn't find an 'in', backtrack to where we started. If this is the
+      // first error, complain about the missing 'in'.
+      backtrackToPosition(pos);
+      if (!invalid) {
+        diagnose(Tok, diag::expected_closure_in)
+          .fixItInsert(Tok.getLoc(), "in ");
+      }
+      inLoc = Tok.getLoc();
+    }
+  }
+
+  return invalid;
+}
+
 Expr *Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
 
@@ -1000,6 +1152,7 @@ Expr *Parser::parseExprClosure() {
   Pattern *params = nullptr;
   SourceLoc arrowLoc;
   TypeLoc explicitResultType;
+  SourceLoc inLoc;
   if (startsWithPipe(Tok)) {
     // Consume the starting pipe.
     SourceLoc leftPipe = consumePipe(*this);
@@ -1099,6 +1252,8 @@ Expr *Parser::parseExprClosure() {
         arrowLoc = SourceLoc();
       }
     }
+  } else {
+    parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
   }
 
   // Create the closure expression and enter its context.

@@ -2450,9 +2450,9 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="grammar">
     expr-closure ::= '{' closure-signature? <a href="#brace-item-list">brace-item-list</a> '}'
 
-    closure-signature ::= '|' closure-signature-arguments? '|' <a href="#func-signature">func-signature-result</a>?
+    closure-signature ::= <a href="#pattern-tuple">pattern-tuple</a> <a href="#func-signature">func-signature-result</a>? 'in'
+    closure-signature ::= <a href="#identifier">identifier</a> (',' <a href="#identifier">identifier</a>*) <a href="#func-signature">func-signature-result</a>? 'in'
 
-    closure-signature-arguments ::= <a href="#pattern-tuple">pattern-tuple-element</a> (',' <a href="#pattern-tuple">pattern-tuple-element</a>)*
   </pre>
 
   <p>A closure defines an anonymous function as an expression. Like a
@@ -2490,13 +2490,13 @@ ill-formed if the type does not conform to the protocol.</p>
       magic(42, { $1 &lt; $0 })
 
       <i>// Provide parameter names, but infer the types.</i>
-      magic(42, { |x, y| y &lt; x })
+      magic(42, { x, y in y &lt; x })
 
       <i>// Provide parameter names and types.</i>
-      magic(42, { |x : Int, y : Int| y &lt; x })
+      magic(42, { (x : Int, y : Int) in y &lt; x })
 
       <i>// Provide parameter names and types, and return type, with multiple statements.</i>
-      magic(42, { |x : Int, y : Int| -> Bool
+      magic(42, { (x : Int, y : Int) -> Bool in
         print("Comparing \(x) to \(y).\n")
         return y &lt; x
       })

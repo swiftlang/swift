@@ -582,6 +582,23 @@ public:
   ///     '->' type
   Expr *parseExprClosure();
 
+  /// Parse the closure signature, if present.
+  ///
+  ///   closure-signature:
+  ///     pattern-tuple func-signature-result? 'in'
+  ///     identifier (',' identifier)* func-signature-result? 'in'
+  ///
+  /// \param params The parsed parameter list, or null if none was provided.
+  /// \param arrowLoc The location of the arrow, if present.
+  /// \param explicitResultType The explicit result type, if specified.
+  /// \param inLoc The location of the 'in' keyword, if present.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool parseClosureSignatureIfPresent(Pattern *&params,
+                                      SourceLoc &arrowLoc,
+                                      TypeLoc &explicitResultType,
+                                      SourceLoc &inLoc);
+
   Expr *parseExprAnonClosureArg();
   NullablePtr<Expr> parseExprList(tok LeftTok, tok RightTok);
   NullablePtr<Expr> parseExprCollection();
