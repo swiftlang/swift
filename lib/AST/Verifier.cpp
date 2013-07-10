@@ -406,11 +406,13 @@ namespace {
         } else if (!TT || TT->getFields().size() != 1 ||
                    TT->getFields()[0].getType()->getCanonicalType()
                      != InputExprTy) {
-          Out << "Type of callee does not match type of arg for ApplyExpr:";
+          Out << "Argument type does not match parameter type in ApplyExpr:"
+                 "\nArgument type: ";
           E->getArg()->getType()->print(Out);
-          Out << " vs. ";
+          Out << "\nParameter type: ";
           FT->getInput()->print(Out);
           Out << "\n";
+          E->dump();
           abort();
         }
       }
