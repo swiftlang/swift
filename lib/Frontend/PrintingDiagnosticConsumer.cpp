@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "PrintingDiagnosticConsumer.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
