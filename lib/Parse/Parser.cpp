@@ -377,9 +377,6 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     return false;
   }
 
-  // '|' is not a delimiter within any list.
-  llvm::SaveAndRestore<bool> pipeNotDelimiter(PipeIsDelimiter, false);
-  
   bool Invalid = false;
   while (true) {
     while (Tok.is(SeparatorK)) {

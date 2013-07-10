@@ -613,10 +613,6 @@ ERROR(dollar_numeric_too_large,expr_parsing,none,
 
 ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
       "anonymous closure argument not contained in a closure", ())
-ERROR(expected_rpipe,expr_parsing,none,
-      "expected '|' to finish closure argument list", ())
-NOTE(opening_pipe,expr_parsing,none,
-     "to match this opening '|'", ())
 ERROR(expected_closure_parameter_name,expr_parsing,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_closure_result_type,expr_parsing,none,

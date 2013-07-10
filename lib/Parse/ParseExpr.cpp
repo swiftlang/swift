@@ -307,11 +307,6 @@ NullablePtr<Expr> Parser::parseExprAs() {
     : (Expr*) new (Context) CoerceExpr(asLoc, type);
 }
 
-/// \brief Determine whether the given token starts with a pipe ('|').
-static bool startsWithPipe(Token tok) {
-  return tok.isAnyOperator() && tok.getText()[0] == '|';
-}
-
 /// parseExprSequence
 ///
 ///   expr-sequence:
@@ -342,11 +337,6 @@ NullablePtr<Expr> Parser::parseExprSequence(Diag<> Message) {
 
     switch (Tok.getKind()) {
     case tok::oper_binary: {
-      // If '|' is a delimiter and this operator starts with a '|',
-      // we're done.
-      if (PipeIsDelimiter && startsWithPipe(Tok))
-        goto done;
-
       // Parse the operator.
       Expr *Operator = parseExprOperator();
       SequencedExprs.push_back(Operator);
@@ -461,14 +451,6 @@ NullablePtr<Expr> Parser::parseExprUnary(Diag<> Message) {
     Operator = parseExprOperator();
     break;
   case tok::oper_binary: {
-    // If '|' is a delimiter and this operator starts with a '|',
-    // we're done. Complain about needing an expression here.
-    if (PipeIsDelimiter && startsWithPipe(Tok)) {
-      diagnose(Tok, diag::expected_expr_after_operator)
-        .highlight(SourceRange(PreviousLoc));
-      return nullptr;
-    }
-
     // For recovery purposes, accept an oper_binary here.
     SourceLoc OperEndLoc = Tok.getLoc().getAdvancedLoc(Tok.getLength());
     Tok.setKind(tok::oper_prefix);
@@ -547,8 +529,6 @@ NullablePtr<Expr> Parser::parseExprNew() {
       continue;
     }
 
-    // Pipe is not a delimiter within the square brackets.
-    llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
     auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
     if (boundValue.isNull() || !Tok.is(tok::r_square)) {
       if (!boundValue.isNull())
@@ -880,10 +860,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       continue;
     }
 
-    // Check for a postfix-operator suffix, ignoring leading pipes when
-    // pipe is a delimiter.
-    if (Tok.is(tok::oper_postfix) && !
-        (PipeIsDelimiter && startsWithPipe(Tok))) {
+    // Check for a postfix-operator suffix.
+    if (Tok.is(tok::oper_postfix)) {
       Expr *oper = parseExprOperator();
       Result = new (Context) PostfixUnaryExpr(oper, Result.get());
       continue;
@@ -964,26 +942,6 @@ Expr *Parser::parseExprIdentifier() {
   Identifier Name = Context.getIdentifier(Tok.getText());
   consumeToken();
   return actOnIdentifierExpr(Name, Loc);
-}
-
-/// \brief Consume a pipe at the beginning of the current token.
-static SourceLoc consumePipe(Parser &parser) {
-  assert(startsWithPipe(parser.Tok));
-
-  // Simple case: it's just a pipe.
-  if (parser.Tok.getLength() == 1)
-    return parser.consumeToken();
-
-  // Skip the starting '|' of the token.
-  SourceLoc loc = parser.Tok.getLoc();
-  StringRef remaining = parser.Tok.getText().substr(1);
-  parser.Tok.setToken(parser.L->getTokenKind(remaining), remaining);
-
-  // If the token was treated as a binary operator, treat it as a prefix.
-  if (parser.Tok.getKind() == tok::oper_binary)
-    parser.Tok.setKind(tok::oper_prefix);
-  
-  return loc;
 }
 
 // Note: defined below.
@@ -1148,113 +1106,12 @@ Expr *Parser::parseExprClosure() {
   // Parse the opening left brace.
   SourceLoc leftBrace = consumeToken();
 
-  // If we started with a pipe, parse the closure-signature.
+  // Parse the closure-signature, if present.
   Pattern *params = nullptr;
   SourceLoc arrowLoc;
   TypeLoc explicitResultType;
   SourceLoc inLoc;
-  if (startsWithPipe(Tok)) {
-    // Consume the starting pipe.
-    SourceLoc leftPipe = consumePipe(*this);
-
-    // The pipe is treated as a delimiter within the closure parameter list.
-    llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, true);
-
-    // Parse the list of tuple pattern elements.
-    SmallVector<TuplePatternElt, 4> elements;
-    bool invalid = false;
-    if (!startsWithPipe(Tok)) {
-      do {
-        // If we see an arrow here, the user forgot a pattern. We'll complain
-        // below.
-        if (Tok.is(tok::arrow)) {
-          break;
-        }
-
-        // Parse a pattern-tuple-element.
-        // FIXME: Eventually, we want to allow default arguments.
-        Optional<TuplePatternElt> elt = parsePatternTupleElement(false);
-        if (!elt) {
-          invalid = true;
-          break;
-        }
-
-        // Variadic elements must come last.
-        // FIXME: Unnecessary restriction. It makes conversion more interesting,
-        // but is not complicated to support.
-        if (!elements.empty() && elements.back().isVararg()) {
-          diagnose(elements.back().getPattern()->getLoc(),
-                   diag::ellipsis_pattern_not_at_end)
-          .highlight(elt->getPattern()->getSourceRange());
-
-          // Make the previous element non-variadic.
-          elements.back().revertToNonVariadic();
-        }
-
-        // Add this element to the list.
-        elements.push_back(*elt);
-
-        // Parse the comma.
-        if (Tok.is(tok::comma)) {
-          consumeToken();
-          continue;
-        }
-
-        // If it looks like we might have a pattern, assume that it's
-        // just a missing comma.
-        if (isStartOfPattern(Tok)) {
-          SourceLoc endOfPreviousLoc = getEndOfPreviousLoc();
-          diagnose(endOfPreviousLoc, diag::missing_comma_in_pattern)
-            .fixItInsert(endOfPreviousLoc, ",");
-          continue;
-        }
-
-        // Break out; we'll complain below.
-        break;
-      } while (true);
-    }
-
-    // Parse the closing pipe.
-    SourceLoc rightPipe;
-    if (!startsWithPipe(Tok)) {
-      // If the user simply forgot the pipe, we can provide a Fix-It.
-      if (Tok.is(tok::arrow)) {
-        rightPipe = getEndOfPreviousLoc();
-        diagnose(rightPipe, diag::expected_rpipe)
-          .fixItInsert(rightPipe, "|");
-        diagnose(leftPipe, diag::opening_pipe);
-      } else if (invalid) {
-        // Don't complain; just assign a location for the right
-        // pipe to the current token.
-        rightPipe = Tok.getLoc();
-      } else {
-        // Complain, but without a Fix-It because we don't know where it
-        // would go.
-        rightPipe = Tok.getLoc();
-        diagnose(rightPipe, diag::expected_rpipe);
-        diagnose(leftPipe, diag::opening_pipe);
-      }
-    } else {
-      // Consume the pipe.
-      rightPipe = consumePipe(*this);
-    }
-
-    params = TuplePattern::createSimple(Context, leftPipe, elements, rightPipe);
-
-    // Parse the optional return type.
-    if (Tok.is(tok::arrow)) {
-      // Consume the ->.
-      arrowLoc = consumeToken();
-
-      // Parse the type.
-      if (parseType(explicitResultType, diag::expected_closure_result_type)) {
-        // If we couldn't parse the result type, clear out the arrow location.
-        arrowLoc = SourceLoc();
-      }
-    }
-  } else {
-    parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
-  }
+  parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
   // Create the closure expression and enter its context.
   PipeClosureExpr *closure = new (Context) PipeClosureExpr(params, arrowLoc,
@@ -1275,9 +1132,6 @@ Expr *Parser::parseExprClosure() {
     // users who are refactoring code by adding names.
     AnonClosureVars.emplace_back();
   }
-
-  // The pipe is not a delimiter within the body of the closure.
-  llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
 
   // Parse the body.
   SmallVector<ExprStmtOrDecl, 4> bodyElements;
@@ -1510,9 +1364,6 @@ NullablePtr<Expr> Parser::parseExprCollection() {
     return new (Context) TupleExpr(RSquareLoc, { }, nullptr, RSquareLoc,
                                    /*hasTrailingClosure=*/false);
   }
-
-  // Pipe is not a delimiter within the square brackets.
-  llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
 
   // Parse the first expression.
   NullablePtr<Expr> FirstExpr

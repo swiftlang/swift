@@ -83,10 +83,6 @@ public:
     IsDelayedParsingSecondPass = true;
   }
 
-  /// \brief Whether the '|' character is currently a delimiter character,
-  /// as in a closure.
-  bool PipeIsDelimiter = false;
-
   /// Tok - This is the current token being considered by the parser.
   Token Tok;
 

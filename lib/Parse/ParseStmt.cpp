@@ -284,9 +284,6 @@ NullablePtr<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   }
   SourceLoc LBLoc = consumeToken(tok::l_brace);
 
-  // The pipe is not a delimiter within braces.
-  llvm::SaveAndRestore<bool> pipeIsDelimiter(PipeIsDelimiter, false);
-
   SmallVector<ExprStmtOrDecl, 16> Entries;
   SourceLoc RBLoc;
 

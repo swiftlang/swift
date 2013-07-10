@@ -493,9 +493,6 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     return false;
   }
 
-  // Pipe is not a delimiter within an array bound.
-  llvm::SaveAndRestore<bool> pipeIsNotDelimiter(PipeIsDelimiter, false);
-
   NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
   if (sizeEx.isNull()) return true;
 
