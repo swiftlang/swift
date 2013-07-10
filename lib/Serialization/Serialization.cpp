@@ -424,6 +424,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, POSTFIX_OPERATOR_DECL);
   RECORD(decls_block, INFIX_OPERATOR_DECL);
   RECORD(decls_block, CLASS_DECL);
+  RECORD(decls_block, ONEOF_DECL);
+  RECORD(decls_block, ONEOF_ELEMENT_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -888,8 +890,31 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::OneOf:
-    return false;
+  case DeclKind::OneOf: {
+    auto oneOf = cast<OneOfDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!oneOf->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(oneOf->getDeclContext());
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : oneOf->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[OneOfLayout::Code];
+    OneOfLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                            addIdentifierRef(oneOf->getName()),
+                            addDeclRef(DC),
+                            oneOf->isImplicit(),
+                            inherited);
+
+    writeGenericParams(oneOf->getGenericParams());
+    writeConformances(oneOf->getConformances());
+    writeMembers(oneOf);
+    return true;
+  }
 
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
@@ -1006,7 +1031,25 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::OneOfElement:
+  case DeclKind::OneOfElement: {
+    auto elem = cast<OneOfElementDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!elem->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(elem->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[OneOfElementLayout::Code];
+    OneOfElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   addIdentifierRef(elem->getName()),
+                                   addDeclRef(DC),
+                                   addTypeRef(elem->getArgumentType()),
+                                   addTypeRef(elem->getType()),
+                                   elem->isImplicit());
+    return true;
+  }
+
   case DeclKind::Subscript:
     return false;
 
@@ -1370,6 +1413,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PostfixOperatorLayout>();
     registerDeclTypeAbbr<InfixOperatorLayout>();
     registerDeclTypeAbbr<ClassLayout>();
+    registerDeclTypeAbbr<OneOfLayout>();
+    registerDeclTypeAbbr<OneOfElementLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();

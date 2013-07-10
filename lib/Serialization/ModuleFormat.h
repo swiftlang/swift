@@ -237,6 +237,8 @@ namespace decls_block {
     POSTFIX_OPERATOR_DECL,
     INFIX_OPERATOR_DECL,
     CLASS_DECL,
+    ONEOF_DECL,
+    ONEOF_ELEMENT_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -406,6 +408,7 @@ namespace decls_block {
   using StructLayout = NominalLayout<STRUCT_DECL>;
   using ProtocolLayout = NominalLayout<PROTOCOL_DECL>;
   using ClassLayout = NominalLayout<CLASS_DECL>;
+  using OneOfLayout = NominalLayout<ONEOF_DECL>;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
@@ -464,6 +467,15 @@ namespace decls_block {
     DeclIDField, // context decl
     AssociativityField,
     BCFixed<8>   // precedence
+  >;
+
+  using OneOfElementLayout = BCRecordLayout<
+    ONEOF_ELEMENT_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    TypeIDField, // argument type
+    TypeIDField, // constructor type
+    BCFixed<1>   // implicit?
   >;
 
 

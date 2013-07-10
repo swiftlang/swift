@@ -896,6 +896,71 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::ONEOF_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    bool isImplicit;
+    ArrayRef<uint64_t> inheritedIDs;
+
+    decls_block::OneOfLayout::readRecord(scratch, nameID, contextID,
+                                         isImplicit, inheritedIDs);
+
+    MutableArrayRef<TypeLoc> inherited;
+    DeclContext *DC;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      inherited = getTypes(inheritedIDs);
+      DC = getDeclContext(contextID);
+    }
+
+    auto genericParams = maybeReadGenericParams(DC);
+
+    auto oneOf = new (ctx) OneOfDecl(SourceLoc(), getIdentifier(nameID),
+                                     SourceLoc(), inherited,
+                                     genericParams, DC);
+    declOrOffset = oneOf;
+
+    if (isImplicit)
+      oneOf->setImplicit();
+    if (genericParams)
+      for (auto &genericParam : *oneOf->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(oneOf);
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (ProtocolConformance *conformance = maybeReadConformance())
+      conformanceBuf.push_back(conformance);
+    oneOf->setConformances(ctx.AllocateCopy(conformanceBuf));
+
+    auto members = readMembers();
+    assert(members.hasValue() && "could not read oneof members");
+    oneOf->setMembers(members.getValue(), SourceRange());
+
+    break;
+  }
+
+  case decls_block::ONEOF_ELEMENT_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    TypeID argTypeID, ctorTypeID;
+    bool isImplicit;
+
+    decls_block::OneOfElementLayout::readRecord(scratch, nameID, contextID,
+                                                argTypeID, ctorTypeID,
+                                                isImplicit);
+
+    auto argTy = getType(argTypeID);
+    auto elem = new (ctx) OneOfElementDecl(SourceLoc(), getIdentifier(nameID),
+                                           TypeLoc::withoutLoc(argTy),
+                                           getDeclContext(contextID));
+    declOrOffset = elem;
+
+    elem->setType(getType(ctorTypeID));
+    if (isImplicit)
+      elem->setImplicit();
+
+    break;
+  }
+
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;
