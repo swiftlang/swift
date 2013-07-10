@@ -29,7 +29,6 @@ namespace llvm {
   template <typename T, unsigned N> class SmallVector;
   template<typename T> class ArrayRef;
   template<typename T> class MutableArrayRef;
-  template<typename T> class NullablePtr;
   template<typename T> class TinyPtrVector;
   template <typename PT1, typename PT2> class PointerUnion;
   
@@ -55,7 +54,6 @@ namespace swift {
   using llvm::SmallVector;
   using llvm::ArrayRef;
   using llvm::MutableArrayRef;
-  using llvm::NullablePtr;
   using llvm::TinyPtrVector;
   using llvm::PointerUnion;
 
