@@ -436,10 +436,6 @@ public:
                           ArrayRef<SILType> contArgs = {});
   
   
-  /// emitBranch - Emit a branch to the given jump destination, threading out
-  /// through any cleanups we might need to run.
-  void emitBranch(JumpDest D);
-  
   /// emitEpilogBB - Branch to and emit the epilog basic block. This will fuse
   /// the epilog to the current basic block if the epilog bb has no predecessor.
   /// Returns true if the epilog is reachable, false if it is unreachable.

@@ -80,6 +80,13 @@ public:
   SILBasicBlock *getInsertionPoint() const {
     return BB;
   }
+  
+  /// moveBlockToEnd - Reorder a block to the end of its containing function.
+  void moveBlockToEnd(SILBasicBlock *BB) {
+    SILFunction *F = BB->getParent();
+    if (&F->getBlocks().back() != BB)
+      F->getBlocks().splice(F->end(), F->getBlocks(), BB);
+  }
 
   /// emitBlock - Each basic block is individually new'd then emitted with
   /// this function.  Since each block is implicitly added to the Function's
@@ -95,7 +102,6 @@ public:
   /// This function also sets the insertion point of the builder to be the newly
   /// emitted block.
   void emitBlock(SILBasicBlock *BB) {
-    SILFunction *F = BB->getParent();
     // If this is a fall through into BB, emit the fall through branch.
     if (hasValidInsertionPoint()) {
       assert(BB->bbarg_empty() && "cannot fall through to bb with args");
@@ -106,8 +112,7 @@ public:
     setInsertionPoint(BB);
     
     // Move block to the end of the list.
-    if (&F->getBlocks().back() != BB)
-      F->getBlocks().splice(F->end(), F->getBlocks(), BB);
+    moveBlockToEnd(BB);
   }
 
   /// enterDebugScope - Push a new debug scope and set its parent pointer.
