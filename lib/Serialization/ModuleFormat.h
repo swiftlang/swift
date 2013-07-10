@@ -236,6 +236,7 @@ namespace decls_block {
     PREFIX_OPERATOR_DECL,
     POSTFIX_OPERATOR_DECL,
     INFIX_OPERATOR_DECL,
+    CLASS_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -389,19 +390,22 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
     // Trailed by the conformance info (if any).
-    // FIXME: protocols?
   >;
 
-  using StructLayout = BCRecordLayout<
-    STRUCT_DECL,
+  template <unsigned Code>
+  using NominalLayout = BCRecordLayout<
+    Code,
     IdentifierIDField, // name
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCArray<TypeIDField> // inherited types
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.
-    // FIXME: protocols?
   >;
+
+  using StructLayout = NominalLayout<STRUCT_DECL>;
+  using ProtocolLayout = NominalLayout<PROTOCOL_DECL>;
+  using ClassLayout = NominalLayout<CLASS_DECL>;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
@@ -442,16 +446,6 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>   // implicit flag
     // The pattern trails the record.
-  >;
-
-  using ProtocolLayout = BCRecordLayout<
-    PROTOCOL_DECL,
-    IdentifierIDField, // name
-    DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    BCArray<TypeIDField> // inherited types
-    // Trailed by conformance info (if any) followed by the decl context record.
-    // FIXME: protocols?
   >;
 
   template <unsigned Code>

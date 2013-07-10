@@ -423,6 +423,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, PREFIX_OPERATOR_DECL);
   RECORD(decls_block, POSTFIX_OPERATOR_DECL);
   RECORD(decls_block, INFIX_OPERATOR_DECL);
+  RECORD(decls_block, CLASS_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -888,8 +889,34 @@ bool Serializer::writeDecl(const Decl *D) {
   }
 
   case DeclKind::OneOf:
-  case DeclKind::Class:
     return false;
+
+  case DeclKind::Class: {
+    auto theClass = cast<ClassDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!theClass->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(theClass->getDeclContext());
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : theClass->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
+    ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                            addIdentifierRef(theClass->getName()),
+                            addDeclRef(DC),
+                            theClass->isImplicit(),
+                            inherited);
+
+    writeGenericParams(theClass->getGenericParams());
+    writeConformances(theClass->getConformances());
+    writeMembers(theClass);
+    return true;
+  }
+
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
@@ -1345,6 +1372,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PrefixOperatorLayout>();
     registerDeclTypeAbbr<PostfixOperatorLayout>();
     registerDeclTypeAbbr<InfixOperatorLayout>();
+    registerDeclTypeAbbr<ClassLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();

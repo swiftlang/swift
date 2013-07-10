@@ -333,15 +333,22 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   return paramList;
 }
 
-MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs) {
+MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs,
+                                              Type *classType) {
   ASTContext &ctx = ModuleContext->Ctx;
   auto result =
     MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(rawTypeIDs.size()),
                              rawTypeIDs.size());
+  if (classType)
+    *classType = nullptr;
 
   TypeLoc *nextType = result.data();
   for (TypeID rawID : rawTypeIDs) {
     auto type = getType(rawID);
+    if (classType && type->getClassOrBoundGenericClass()) {
+      assert(!*classType && "already found a class type");
+      *classType = type;
+    }
     new (nextType) auto(TypeLoc::withoutLoc(type));
     ++nextType;
   }
@@ -858,6 +865,51 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
       
+  case decls_block::CLASS_DECL: {
+    IdentifierID nameID;
+    DeclID contextID;
+    bool isImplicit;
+    ArrayRef<uint64_t> inheritedIDs;
+
+    decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
+                                         isImplicit, inheritedIDs);
+
+    MutableArrayRef<TypeLoc> inherited;
+    Type baseClassTy;
+    DeclContext *DC;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      inherited = getTypes(inheritedIDs, &baseClassTy);
+      DC = getDeclContext(contextID);
+    }
+
+    auto genericParams = maybeReadGenericParams(DC);
+
+    auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
+                                        SourceLoc(), inherited,
+                                        genericParams, DC);
+    declOrOffset = theClass;
+
+    if (isImplicit)
+      theClass->setImplicit();
+    if (baseClassTy)
+      theClass->setBaseClassLoc(TypeLoc::withoutLoc(baseClassTy));
+    if (genericParams)
+      for (auto &genericParam : *theClass->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(theClass);
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (ProtocolConformance *conformance = maybeReadConformance())
+      conformanceBuf.push_back(conformance);
+    theClass->setConformances(ctx.AllocateCopy(conformanceBuf));
+
+    auto members = readMembers();
+    assert(members.hasValue() && "could not read struct members");
+    theClass->setMembers(members.getValue(), SourceRange());
+
+    break;
+  }
+
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;
