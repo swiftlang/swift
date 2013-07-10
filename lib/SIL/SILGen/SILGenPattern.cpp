@@ -198,6 +198,7 @@ void destructurePattern(SILGenFunction &gen,
     auto tp = cast<TuplePattern>(p);
     assert(specializerTuple->getFields().size() == tp->getFields().size()
            && "tuple patterns do not share shape");
+    (void) specializerTuple;
     std::transform(tp->getFields().begin(), tp->getFields().end(),
                    std::back_inserter(destructured),
                    [&](const TuplePatternElt &e) -> const Pattern * {
