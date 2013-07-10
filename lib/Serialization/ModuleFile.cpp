@@ -18,6 +18,8 @@
 
 using namespace swift;
 using namespace swift::serialization;
+static constexpr const auto AF_DontPopBlockAtEnd =
+  llvm::BitstreamCursor::AF_DontPopBlockAtEnd;
 
 static ModuleStatus
 validateControlBlock(llvm::BitstreamCursor &cursor,
@@ -68,7 +70,7 @@ Pattern *ModuleFile::maybeReadPattern() {
   
   SmallVector<uint64_t, 8> scratch;
 
-  auto next = DeclTypeCursor.advance();
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
@@ -170,7 +172,7 @@ ProtocolConformance *ModuleFile::maybeReadConformance() {
   BCOffsetRAII lastRecordOffset(DeclTypeCursor);
   SmallVector<uint64_t, 8> scratch;
 
-  auto next = DeclTypeCursor.advance();
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
@@ -229,7 +231,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
-  auto next = DeclTypeCursor.advance();
+  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
@@ -254,7 +256,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    auto entry = DeclTypeCursor.advance();
+    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
@@ -888,7 +890,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
-    assert(members.hasValue() && "could not read struct members");
+    assert(members.hasValue() && "could not read class members");
     theClass->setMembers(members.getValue(), SourceRange());
 
     break;
@@ -1115,7 +1117,7 @@ Type ModuleFile::getType(TypeID TID) {
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
-      auto entry = DeclTypeCursor.advance();
+      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -1328,7 +1330,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     SmallVector<Substitution, 8> substitutions;
     while (true) {
-      auto entry = DeclTypeCursor.advance();
+      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -1622,7 +1624,7 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
       break;
     }
     
-    topLevelEntry = cursor.advance(llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
   }
   
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
