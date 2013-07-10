@@ -412,7 +412,7 @@ NullablePtr<Stmt> Parser::parseStmtFor() {
   // If we have a leading identifier followed by a ':' or 'in', then this is a
   // pattern, so it is foreach.
   if (isStartOfBindingName(Tok) &&
-      (peekToken().is(tok::colon) || peekToken().isContextualKeyword("in")))
+      (peekToken().is(tok::colon) || peekToken().is(tok::kw_in)))
     return parseStmtForEach(ForLoc);
 
   // Otherwise, this is some sort of c-style for loop.
@@ -502,7 +502,7 @@ NullablePtr<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 NullablePtr<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   NullablePtr<Pattern> Pattern = parsePattern();
 
-  if (!Tok.isContextualKeyword("in")) {
+  if (!Tok.is(tok::kw_in)) {
     if (Pattern.isNonNull())
       diagnose(Tok.getLoc(), diag::expected_foreach_in);
     return nullptr;

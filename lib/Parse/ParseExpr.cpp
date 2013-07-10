@@ -976,7 +976,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     }
 
     // Parse the 'in' at the end.
-    if (!Tok.isContextualKeyword("in")) {
+    if (!Tok.is(tok::kw_in)) {
       return false;
     }
 
@@ -1002,7 +1002,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     }
 
     // Parse the 'in' at the end.
-    if (!Tok.isContextualKeyword("in")) {
+    if (!Tok.is(tok::kw_in)) {
       return false;
     }
 
@@ -1066,19 +1066,19 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   }
 
   // Parse the 'in'.
-  if (Tok.isContextualKeyword("in")) {
+  if (Tok.is(tok::kw_in)) {
     inLoc = consumeToken();
   } else {
     // Scan forward to see if we can find the 'in'. This re-synchronizes the
     // parser so we can at least parse the body correctly.
     SourceLoc startLoc = Tok.getLoc();
     ParserPosition pos = getParserPosition();
-    while (Tok.isNot(tok::eof) && !Tok.isContextualKeyword("in") &&
+    while (Tok.isNot(tok::eof) && !Tok.is(tok::kw_in) &&
            Tok.isNot(tok::r_brace)) {
       skipSingle();
     }
 
-    if (Tok.isContextualKeyword("in")) {
+    if (Tok.is(tok::kw_in)) {
       // We found the 'in'. If this is the first error, complain about the
       // junk tokens in-between but re-sync at the 'in'.
       if (!invalid) {
