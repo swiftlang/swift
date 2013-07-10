@@ -158,6 +158,32 @@ before installing this package. Uninstall as follows:
 When you find bugs in Swift, please report them using the 'Swift' Radar
 component.
 
+=== RECENT CHANGES ===
+
+* Swift has a new closure syntax. The new syntax eliminates the use of
+  pipes. Instead, the closure signature is written the same way as a
+  function type and is separated from the body by the "in"
+  keyword. For example:
+
+    sort(fruits) { (lhs : String, rhs : String) -> Bool in
+      return lhs > rhs 
+    }
+
+  When the types are omitted, one can also omit the parentheses, e.g.,
+
+    sort(fruits) { lhs, rhs in lhs > rhs }
+
+  Closures with no parameters or that use the anonymous parameters
+  ($0, $1, etc.) don't need the 'in', e.g.,
+
+    sort(fruits) { $0 > $1 }
+
+* nil can now be used with an explicit cast. Previously, 'nil' had
+  type NSObject, so one would have to write (e.g.) 'nil as! NSArray'
+  to create a nil NSArray. Now, 'nil' picks up the type of its
+  context.
+
+
 === GETTING STARTED WITH SWIFT ===
 
 Once installed, run 'swift' to bring up the interactive prompt:
