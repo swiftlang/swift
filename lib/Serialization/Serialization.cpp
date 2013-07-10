@@ -982,9 +982,6 @@ bool Serializer::writeDecl(const Decl *D) {
       return false;
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
-    const Decl *associated = fn->getGetterOrSetterDecl();
-    if (!associated)
-      associated = fn->getOperatorDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -994,7 +991,7 @@ bool Serializer::writeDecl(const Decl *D) {
                            fn->isStatic(),
                            fn->getAttrs().isAssignment(),
                            addTypeRef(fn->getType()),
-                           addDeclRef(associated),
+                           addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()));
 
     writeGenericParams(fn->getGenericParams());

@@ -735,24 +735,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         else if (isa<PostfixOperatorDecl>(op))
           attrs.ExplicitPostfix = true;
         // Note that an explicit [infix] is not required.
-      } else {
-        bool isGetter = false;
-
-        if (auto subscript = dyn_cast<SubscriptDecl>(associated)) {
-          isGetter = (subscript->getGetter() == fn);
-          assert(isGetter || subscript->getSetter() == fn);
-        } else if (auto var = dyn_cast<VarDecl>(associated)) {
-          isGetter = (var->getGetter() == fn);
-          assert(isGetter || var->getSetter() == fn);
-        } else {
-          llvm_unreachable("unknown associated decl kind");
-        }
-
-        if (isGetter)
-          fn->makeGetter(associated);
-        else
-          fn->makeSetter(associated);
       }
+      // Otherwise, unknown associated decl kind.
     }
 
     break;
