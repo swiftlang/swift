@@ -1026,13 +1026,14 @@ public:
 
 /// Recursively emit a decision tree from the given pattern matrix.
 static void emitDecisionTree(SILGenFunction &gen,
+                             SwitchStmt *stmt,
                              ClauseMatrix &&clauses,
                              CaseMap &caseMap,
                              SILBasicBlock *contBB) {
   // If there are no rows, then we fail. This will be a dataflow error if we
   // can reach here.
   if (clauses.rows() == 0) {
-    gen.B.createUnreachable();
+    gen.B.createUnreachable(stmt);
     return;
   }
   
@@ -1061,7 +1062,7 @@ static void emitDecisionTree(SILGenFunction &gen,
   // If there are no rows remaining, fail. This will be a dataflow error if we
   // can reach here.
   if (r >= rows) {
-    gen.B.createUnreachable();
+    gen.B.createUnreachable(stmt);
     return;
   }
 
@@ -1107,7 +1108,7 @@ static void emitDecisionTree(SILGenFunction &gen,
       ClauseMatrix &submatrix = specialization.first;
       nextBB = specialization.second;
       // Emit the submatrix into the true branch of the specialization.
-      emitDecisionTree(gen, std::move(submatrix), caseMap, innerContBB);
+      emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB);
       assert(!gen.B.hasValidInsertionPoint()
              && "recursive emitDecisionTree did not terminate all its BBs");
       
@@ -1126,13 +1127,13 @@ static void emitDecisionTree(SILGenFunction &gen,
   // they're exhaustive), then we're done.
   if (patternsFormSignature(specialized)) {
     // FIXME: Kill this BB.
-    gen.B.createUnreachable();
+    gen.B.createUnreachable(stmt);
     return;
   }
   
   // Otherwise, recur into the default matrix.
   clauses.reduceToDefault(skipRows);
-  return emitDecisionTree(gen, std::move(clauses), caseMap, contBB);
+  return emitDecisionTree(gen, stmt, std::move(clauses), caseMap, contBB);
 }
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
@@ -1172,7 +1173,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     }
 
     // Emit the decision tree.
-    emitDecisionTree(*this, std::move(clauses), caseMap, contBB);
+    emitDecisionTree(*this, S, std::move(clauses), caseMap, contBB);
     assert(!B.hasValidInsertionPoint() &&
            "emitDecisionTree did not terminate all its BBs");
 

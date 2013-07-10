@@ -1517,7 +1517,9 @@ public:
 /// function or after a no-return function call.
 class UnreachableInst : public TermInst {
 public:
-  UnreachableInst(SILFunction &F);
+  UnreachableInst(SILLocation Loc)
+    : TermInst(ValueKind::UnreachableInst, Loc)
+  {}
   
   SuccessorListTy getSuccessors() {
     // No Successors.

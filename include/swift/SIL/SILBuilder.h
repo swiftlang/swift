@@ -623,8 +623,8 @@ public:
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
-  UnreachableInst *createUnreachable() {
-    return insertTerminator(new (F.getModule()) UnreachableInst(F));
+  UnreachableInst *createUnreachable(SILLocation Loc) {
+    return insertTerminator(new (F.getModule()) UnreachableInst(Loc));
   }
 
   ReturnInst *createReturn(SILLocation Loc, SILValue ReturnValue) {

@@ -57,7 +57,9 @@ SILGenFunction::~SILGenFunction() {
     SILValue emptyTuple = emitEmptyTuple(SILLocation());
     Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
   } else {
-    B.createUnreachable();
+    // FIXME: Get this from the SILFunction when SILFunction has SILLocation
+    // info.
+    B.createUnreachable(SILLocation());
   }
 }
 

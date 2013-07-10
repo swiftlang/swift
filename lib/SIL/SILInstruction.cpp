@@ -456,10 +456,6 @@ TermInst::SuccessorListTy TermInst::getSuccessors() {
   return cast<BranchInst>(this)->getSuccessors();
 }
 
-UnreachableInst::UnreachableInst(SILFunction &F)
-  : TermInst(ValueKind::UnreachableInst, SILLocation()) {
-}
-
 BranchInst::BranchInst(SILLocation Loc,
                        SILBasicBlock *DestBB,
                        ArrayRef<SILValue> Args)
