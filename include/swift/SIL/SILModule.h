@@ -138,8 +138,12 @@ public:
         return &F;
     return nullptr;
   }
-  
-  /// verify - Run the SIL verifier to make sure that all Functions follow
+
+  /// \brief Analyze the module for correcntess and generate user diagnostics
+  /// if any.
+  void check() const;
+
+  /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
   

@@ -1458,6 +1458,13 @@ ERROR(invalid_sil_builtin,sil_gen,none,
       (StringRef))
 
 //==============================================================================
+// SIL Analysis Diagnostics
+//==============================================================================
+
+WARNING(missing_return,sil_analysis,none,
+      "missing return in the function expected to return %0", (StringRef))
+
+//==============================================================================
 // IR Generation Diagnostics
 //==============================================================================
 

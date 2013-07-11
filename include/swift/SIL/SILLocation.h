@@ -14,6 +14,7 @@
 #define SWIFT_SIL_LOCATION_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
 class Decl;
@@ -28,7 +29,12 @@ class Stmt;
 /// instantiation info, etc (when we get to it).
 ///
 typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
-  
+
+  // FIXME: This should be refactored into a SILLocation class.
+SourceLoc getSourceLocForSILLocation(SILLocation loc);
+SourceLoc getStartSourceLocForSILLocation(SILLocation loc);
+SourceLoc getEndSourceLocForSILLocation(SILLocation loc);
+
 } // end swift namespace
 
 
