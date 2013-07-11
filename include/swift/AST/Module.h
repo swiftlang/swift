@@ -212,12 +212,7 @@ class TranslationUnit : public Module {
 public:
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
   typedef std::pair<IdentifierType*, DeclContext*> IdentTypeAndContext;
-  typedef std::pair<TupleType*, DeclContext*> TupleTypeAndContext;
 private:
-  /// TypesWithDefaultValues - This is a list of tuples containing a default
-  /// value expression, along with the context containing the type with the
-  /// expression.
-  ArrayRef<TupleTypeAndContext> TypesWithDefaultValues;
 
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in by the Name Binding phase.
@@ -259,18 +254,6 @@ public:
     : Module(DeclContextKind::TranslationUnit, Name, Comp, C), Kind(Kind) {
   }
   
-  ArrayRef<TupleTypeAndContext> getTypesWithDefaultValues() const {
-    assert(ASTStage == NameBound);
-    return TypesWithDefaultValues;
-  }
-  void setTypesWithDefaultValues(ArrayRef<TupleTypeAndContext> T) {
-    assert(ASTStage == Parsing);
-    TypesWithDefaultValues = T;
-  }
-  void clearTypesWithDefaultValues() {
-    TypesWithDefaultValues = ArrayRef<TupleTypeAndContext>();
-  }
-
   /// ImportedModules - This is the list of modules that are imported by this
   /// module.  This is filled in as the first thing that the Name Binding phase
   /// does.

@@ -922,35 +922,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
 
-  // Check default arguments in types.
-  for (auto TypeAndContext : TU->getTypesWithDefaultValues()) {
-    TupleType *TT = TypeAndContext.first;
-    for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-      const TupleTypeElt& Elt = TT->getFields()[i];
-      if (Elt.hasInit()) {
-        // Perform global name-binding etc. for all tuple default values.
-        // FIXME: This screws up the FuncExprs list for FuncExprs in a
-        // default value; conceptually, we should be appending to the list
-        // in source order.
-        ExprHandle *init = Elt.getInit();
-        if (init->alreadyChecked())
-          continue;
-
-        Expr *initExpr = prePass.doWalk(init->getExpr(), TypeAndContext.second);
-        init->setExpr(initExpr, false);
-
-        if (TT->hasCanonicalTypeComputed()) {
-          // If we already examined a tuple in the first pass, we didn't
-          // get a chance to type-check it; do that now.
-          // FIXME: Bogus DeclContext
-          if (!TC.typeCheckExpression(initExpr, TU, Elt.getType()))
-            init->setExpr(initExpr, true);
-        }
-      }
-    }
-  }
-  TU->clearTypesWithDefaultValues();
-
   // Check default arguments in patterns.
   // FIXME: This is an ugly hack to keep default arguments working for the
   // moment; I don't really want to invest more time into them until we're

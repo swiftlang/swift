@@ -74,7 +74,6 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   ScopeInfo ScopeInfo;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
-  std::vector<TranslationUnit::TupleTypeAndContext> TypesWithDefaultValues;
   unsigned VarPatternDepth = 0;
   bool IsMainModule;
 

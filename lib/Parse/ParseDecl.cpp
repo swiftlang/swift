@@ -81,11 +81,6 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   for (auto Item : Items)
     TU->Decls.push_back(Item.get<Decl*>());
 
-  TU->setTypesWithDefaultValues(
-          Context.AllocateCopy(llvm::makeArrayRef(TypesWithDefaultValues)));
-
-  TypesWithDefaultValues.clear();
-
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;
   verify(TU);
