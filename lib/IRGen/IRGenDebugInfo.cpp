@@ -159,7 +159,6 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
     Scope = DBuilder.createLexicalBlockFile(Scope, getOrCreateFile(L.Filename));
   }
 
-
   if (L.Line == 0 && DS == LastScope) {
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
@@ -416,7 +415,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   uint64_t Align = Ty.AlignmentInBits;
   unsigned Encoding = 0;
   unsigned Flags = 0;
-  BaseTy->getString();
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
@@ -446,16 +444,35 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        Size, Align, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
-                                       DW_LANG_Swift,   // RunTimeLang
-                                       0                // *VTableHolder
+                                       DW_LANG_Swift    // RunTimeLang
                                        );
+    }
+    return llvm::DIType();
+  }
+
+  case TypeKind::Class: {
+    // Classes are represented as DW_TAG_structure_type. This way the
+    // DW_AT_APPLE_runtime_class( DW_LANG_Swift ) attribute can be
+    // used to differentiate them from C++ and ObjC classes.
+    auto ClassTy = BaseTy->castTo<ClassType>();
+    if (auto Decl = ClassTy->getDecl()) {
+      Name = Decl->getName().str();
+      Location L = getStartLoc(SM, Decl);
+      return DBuilder.createStructType(Scope,
+                                      Name,
+                                      getOrCreateFile(L.Filename),
+                                      L.Line,
+                                      Size, Align, Flags,
+                                      llvm::DIType(),  // DerivedFrom
+                                      llvm::DIArray(), // Elements
+                                      DW_LANG_Swift    // RunTimeLang
+                                      );
     }
     return llvm::DIType();
   }
 
   // Handle everything else that is based off NominalType.
   case TypeKind::OneOf:
-  case TypeKind::Class:
   case TypeKind::Protocol: {
     auto NominalTy = BaseTy->castTo<NominalType>();
     if (auto Decl = NominalTy->getDecl()) {
@@ -470,7 +487,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   // FIXME: For Size, clang uses the actual size of the type on the
   // target machine instead of the storage size that is alloca'd in
   // the LLVM IR. To look up the size of the type on the target, clang
-  // keeps a Basic/TargetInfo object around.
+  // keeps a Basic/TargetInfo object around.  Right now this is not an
+  // actual problem, since all Swift types are Structs anyway, but
+  // once we describe the individual fields, this needs to be fixed as
+  // LLVM won't even accept a Bool (i1).
   return DBuilder.createBasicType(Name, Size, Align, Encoding);
 }
 
