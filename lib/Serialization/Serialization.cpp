@@ -735,7 +735,7 @@ bool Serializer::writeCrossReference(const Decl *D) {
   const DeclContext *DC;
   for (DC = D->getDeclContext(); !DC->isModuleContext(); DC = DC->getParent()) {
     // FIXME: Handle references to things in extensions.
-    if (isa<ExtensionDecl>(D))
+    if (isa<ExtensionDecl>(DC))
       return false;
 
     auto value = cast<ValueDecl>(getDeclForContext(DC));
