@@ -956,7 +956,14 @@ static void addIncomingSILArgumentsToPHINodes(IRGenSILFunction &IGF,
   ArrayRef<llvm::PHINode*> phis = lbb.phis;
   size_t phiIndex = 0;
   for (SILValue arg : args) {
-    Explosion argValue = IGF.getLoweredExplosion(arg);
+    const LoweredValue &lv = IGF.getLoweredValue(arg);
+    
+    if (lv.isAddress()) {
+      phis[phiIndex++]->addIncoming(lv.getAddress().getAddress(), curBB);
+      continue;
+    }
+    
+    Explosion argValue = lv.getExplosion(IGF);
     while (!argValue.empty())
       phis[phiIndex++]->addIncoming(argValue.claimNext(), curBB);
   }
