@@ -672,13 +672,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit;
     bool isClassMethod;
-    bool isAssignment;
+    bool isAssignmentOrConversion;
     TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                        isClassMethod, isAssignment,
+                                        isClassMethod, isAssignmentOrConversion,
                                         signatureID, associatedDeclID,
                                         overriddenID);
 
@@ -738,8 +738,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isClassMethod);
     if (isImplicit)
       fn->setImplicit();
-    if (isAssignment)
-      fn->getMutableAttrs().Assignment = isAssignment;
+    if (isAssignmentOrConversion) {
+      if (fn->isOperator())
+        fn->getMutableAttrs().Assignment = true;
+      else
+        fn->getMutableAttrs().Conversion = true;
+    }
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {

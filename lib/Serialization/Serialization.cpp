@@ -1016,6 +1016,7 @@ bool Serializer::writeDecl(const Decl *D) {
     attrs.ExplicitPostfix = false;
     attrs.ExplicitInfix = false;
     attrs.Assignment = false;
+    attrs.Conversion = false;
 
     // FIXME: Handle other attributes.
     if (!attrs.empty())
@@ -1029,7 +1030,8 @@ bool Serializer::writeDecl(const Decl *D) {
                            addDeclRef(DC),
                            fn->isImplicit(),
                            fn->isStatic(),
-                           fn->getAttrs().isAssignment(),
+                           fn->getAttrs().isAssignment() ||
+                             fn->getAttrs().isConversion(),
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()));
