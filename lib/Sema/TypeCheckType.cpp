@@ -473,6 +473,11 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
     previousLoc = comp.Loc;
   }
 
+  if (auto mod = current.dyn_cast<Module*>()) {
+    TC.diagnose(previousLoc, diag::use_module_as_type, mod->Name);
+    return true;
+  }
+
   return false;
 }
 

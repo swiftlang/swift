@@ -919,6 +919,8 @@ ERROR(use_unresolved_identifier,sema_nb,none,
       "use of unresolved identifier %0", (Identifier))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
+ERROR(use_module_as_type,sema_nb,none,
+      "use of module %0 as a type", (Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,sema_nb,none,
