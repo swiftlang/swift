@@ -226,6 +226,7 @@ namespace decls_block {
     ARRAY_SLICE_TYPE,
     ARRAY_TYPE,
     REFERENCE_STORAGE_TYPE,
+    UNBOUND_GENERIC_TYPE,
 
     TYPE_ALIAS_DECL = 100,
     STRUCT_DECL,
@@ -389,6 +390,12 @@ namespace decls_block {
     REFERENCE_STORAGE_TYPE,
     OwnershipField,  // ownership
     TypeIDField      // implementation type
+  >;
+
+  using UnboundGenericTypeLayout = BCRecordLayout<
+    UNBOUND_GENERIC_TYPE,
+    DeclIDField, // generic decl
+    TypeIDField  // parent
   >;
 
 

@@ -1601,6 +1601,17 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::UNBOUND_GENERIC_TYPE: {
+    DeclID genericID;
+    TypeID parentID;
+    decls_block::UnboundGenericTypeLayout::readRecord(scratch,
+                                                      genericID, parentID);
+
+    auto genericDecl = cast<NominalTypeDecl>(getDecl(genericID));
+    typeOrOffset = UnboundGenericType::get(genericDecl, getType(parentID), ctx);
+    break;
+  }
+
   default:
     // We don't know how to deserialize this kind of type.
     error();

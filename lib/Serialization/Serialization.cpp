@@ -413,6 +413,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, ARRAY_SLICE_TYPE);
   RECORD(decls_block, ARRAY_TYPE);
   RECORD(decls_block, REFERENCE_STORAGE_TYPE);
+  RECORD(decls_block, UNBOUND_GENERIC_TYPE);
 
   RECORD(decls_block, TYPE_ALIAS_DECL);
   RECORD(decls_block, STRUCT_DECL);
@@ -1403,8 +1404,15 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::UnboundGeneric:
-    return false;
+  case TypeKind::UnboundGeneric: {
+    auto generic = cast<UnboundGenericType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
+    UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                         addDeclRef(generic->getDecl()),
+                                         addTypeRef(generic->getParent()));
+    return true;
+  }
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
@@ -1463,6 +1471,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
     registerDeclTypeAbbr<ArrayTypeLayout>();
+    registerDeclTypeAbbr<UnboundGenericTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<StructLayout>();
