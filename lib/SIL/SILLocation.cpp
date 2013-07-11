@@ -16,40 +16,40 @@
 #include "swift/AST/Stmt.h"
 
 namespace swift {
-SourceLoc getSourceLocForSILLocation(SILLocation loc) {
-  if (auto decl = loc.dyn_cast<Decl*>()) {
+SourceLoc SILLocation::getSourceLoc() {
+  if (auto decl = this->dyn_cast<Decl*>()) {
     return decl->getLoc();
   }
-  if (auto expr = loc.dyn_cast<Expr*>()) {
+  if (auto expr = this->dyn_cast<Expr*>()) {
     return expr->getLoc();
   }
-  if (auto stmt = loc.dyn_cast<Stmt*>()) {
+  if (auto stmt = this->dyn_cast<Stmt*>()) {
     return stmt->getStartLoc();
   }
   llvm_unreachable("impossible SILLocation");
 }
 
-SourceLoc getStartSourceLocForSILLocation(SILLocation loc) {
-  if (auto decl = loc.dyn_cast<Decl*>()) {
+SourceLoc SILLocation::getStartSourceLoc() {
+  if (auto decl = this->dyn_cast<Decl*>()) {
     return decl->getStartLoc();
   }
-  if (auto expr = loc.dyn_cast<Expr*>()) {
+  if (auto expr = this->dyn_cast<Expr*>()) {
     return expr->getStartLoc();
   }
-  if (auto stmt = loc.dyn_cast<Stmt*>()) {
+  if (auto stmt = this->dyn_cast<Stmt*>()) {
     return stmt->getStartLoc();
   }
   llvm_unreachable("impossible SILLocation");
 }
 
-SourceLoc getEndSourceLocForSILLocation(SILLocation loc) {
-  if (auto decl = loc.dyn_cast<Decl*>()) {
+SourceLoc SILLocation::getEndSourceLoc() {
+  if (auto decl = this->dyn_cast<Decl*>()) {
     return decl->getEndLoc();
   }
-  if (auto expr = loc.dyn_cast<Expr*>()) {
+  if (auto expr = this->dyn_cast<Expr*>()) {
     return expr->getEndLoc();
   }
-  if (auto stmt = loc.dyn_cast<Stmt*>()) {
+  if (auto stmt = this->dyn_cast<Stmt*>()) {
     return stmt->getEndLoc();
   }
   llvm_unreachable("impossible SILLocation");

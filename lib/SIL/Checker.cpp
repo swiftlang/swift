@@ -64,7 +64,7 @@ public:
     if (!ResTy->isVoid()) {
       SILLocation L = UI->getLoc();
       if (L)
-        diagnose(getEndSourceLocForSILLocation(L),
+        diagnose(L.getEndSourceLoc(),
                  diag::missing_return, ResTy.getString());
     }
   }

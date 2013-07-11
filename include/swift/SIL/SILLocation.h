@@ -28,12 +28,13 @@ class Stmt;
 /// FIXME: This should eventually include inlining history, generics
 /// instantiation info, etc (when we get to it).
 ///
-typedef llvm::PointerUnion3<Stmt*,Expr*, Decl*> SILLocation;
-
-  // FIXME: This should be refactored into a SILLocation class.
-SourceLoc getSourceLocForSILLocation(SILLocation loc);
-SourceLoc getStartSourceLocForSILLocation(SILLocation loc);
-SourceLoc getEndSourceLocForSILLocation(SILLocation loc);
+class SILLocation : public llvm::PointerUnion3<Stmt*,Expr*, Decl*> {
+public:
+  using llvm::PointerUnion3<Stmt*,Expr*, Decl*>::PointerUnion3;
+  SourceLoc getSourceLoc();
+  SourceLoc getStartSourceLoc();
+  SourceLoc getEndSourceLoc();
+};
 
 } // end swift namespace
 

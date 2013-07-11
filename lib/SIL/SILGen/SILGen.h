@@ -186,7 +186,7 @@ public:
   template<typename...T, typename...U>
   void diagnose(SILLocation loc, Diag<T...> diag,
                 U &&...args) {
-    M.getASTContext().Diags.diagnose(getSourceLocForSILLocation(loc),
+    M.getASTContext().Diags.diagnose(loc.getSourceLoc(),
                                      diag, std::forward<U>(args)...);
   }
 };
