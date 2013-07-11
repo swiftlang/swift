@@ -17,6 +17,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/FormattedStream.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -502,17 +503,6 @@ public:
     dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
     dest.cleanupsDepth = getCleanupsDepth();
     dest.cont = getContBB();
-    
-    SILBasicBlock *savedIP = gen.B.getInsertionBB();
-    
-    gen.B.setInsertionPoint(dest.entry);
-    gen.visit(getCaseBlock()->getBody());
-    if (gen.B.hasValidInsertionPoint())
-      gen.B.createBranch(getCaseBlock(), getContBB());
-    
-    // Restore the insertion point (unless we didn't have one).
-    if (savedIP)
-      gen.B.setInsertionPoint(savedIP);
     
     return dest.entry;
   }
@@ -1025,12 +1015,41 @@ public:
 
 } // end anonymous namespace
 
+static void emitCaseBody(SILGenFunction &gen,
+                         CaseStmt *caseStmt,
+                         const CaseBlock &caseBlock) {
+  assert(caseBlock.entry->empty() && "already emitted case body");
+  assert(gen.getCleanupsDepth() == caseBlock.cleanupsDepth
+         && "emitting case block in wrong scope");
+  
+  // Emit the case.
+  gen.B.setInsertionPoint(caseBlock.entry);
+  
+  gen.visit(caseStmt->getBody());
+  if (gen.B.hasValidInsertionPoint())
+    gen.B.createBranch(caseStmt, caseBlock.cont);
+}
+
+/// Emit cases for a scope, identified by its continuation BB.
+static void emitCasesForScope(SILGenFunction &gen,
+                              SILBasicBlock *contBB,
+                              const CaseMap &caseMap) {
+  for (auto &cases : caseMap) {
+    CaseStmt *caseStmt = cases.first;
+    const CaseBlock &caseBlock = cases.second;
+    
+    if (caseBlock.cont == contBB)
+      emitCaseBody(gen, caseStmt, caseBlock);
+  }
+}
+
 /// Recursively emit a decision tree from the given pattern matrix.
 static void emitDecisionTree(SILGenFunction &gen,
                              SwitchStmt *stmt,
                              ClauseMatrix &&clauses,
                              CaseMap &caseMap,
                              SILBasicBlock *contBB) {
+recur:
   // If there are no rows, then we fail. This will be a dataflow error if we
   // can reach here.
   if (clauses.rows() == 0) {
@@ -1113,6 +1132,9 @@ static void emitDecisionTree(SILGenFunction &gen,
       assert(!gen.B.hasValidInsertionPoint()
              && "recursive emitDecisionTree did not terminate all its BBs");
       
+      // Emit cases in this scope.
+      emitCasesForScope(gen, innerContBB, caseMap);
+      
       // Emit scope cleanups into the continuation BB.
       gen.B.emitBlock(innerContBB);
     }
@@ -1134,7 +1156,7 @@ static void emitDecisionTree(SILGenFunction &gen,
   
   // Otherwise, recur into the default matrix.
   clauses.reduceToDefault(skipRows);
-  return emitDecisionTree(gen, stmt, std::move(clauses), caseMap, contBB);
+  goto recur;
 }
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
@@ -1177,8 +1199,18 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     emitDecisionTree(*this, S, std::move(clauses), caseMap, contBB);
     assert(!B.hasValidInsertionPoint() &&
            "emitDecisionTree did not terminate all its BBs");
+    
+    // Emit cases for the outermost scope.
+    emitCasesForScope(*this, contBB, caseMap);
 
     // Emit top-level cleanups into the continuation BB.
     B.emitBlock(contBB);
   }
+  
+  assert([&] {
+    for (auto &cases : caseMap)
+      if (cases.second.entry && cases.second.entry->empty())
+        return false && "Case not emitted";
+    return true;
+  }());
 }
