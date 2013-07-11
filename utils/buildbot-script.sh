@@ -161,6 +161,35 @@ component.
 
 === RECENT CHANGES ===
 
+* Swift now has a 'switch' statement, supporting pattern matching of
+  multiple values with variable bindings, guard expressions, and range
+  comparisons. For example:
+
+    func classifyPoint(point:(Int, Int)) {
+      switch point {
+      case (0, 0):
+        println("origin")
+
+      case (_, 0):
+        println("on the x axis")
+
+      case (0, _):
+        println("on the y axis")
+
+      case (var x, var y) where x == y:
+        println("on the y = x diagonal")
+
+      case (var x, var y) where -x == y:
+        println("on the y = -x diagonal")
+
+      case (-10..10, -10..10):
+        println("close to the origin")
+
+      case (var x, var y):
+        println("length \(sqrt(x*x + y*y))")
+      }
+    }
+
 * Swift has a new closure syntax. The new syntax eliminates the use of
   pipes. Instead, the closure signature is written the same way as a
   function type and is separated from the body by the "in"
