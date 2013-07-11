@@ -1053,6 +1053,29 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::DESTRUCTOR_DECL: {
+    DeclID parentID;
+    bool isImplicit;
+    TypeID signatureID;
+    DeclID implicitThisID;
+
+    decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
+                                              signatureID, implicitThisID);
+    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
+    DeclContext *parent = getDeclContext(parentID);
+
+    auto dtor = new (ctx) DestructorDecl(ctx.getIdentifier("destructor"),
+                                         SourceLoc(), thisDecl, parent);
+    declOrOffset = dtor;
+    thisDecl->setDeclContext(dtor);
+
+    dtor->setType(getType(signatureID));
+    if (isImplicit)
+      dtor->setImplicit();
+
+    break;
+  }
+
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;

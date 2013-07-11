@@ -243,6 +243,7 @@ namespace decls_block {
     ONEOF_ELEMENT_DECL,
     SUBSCRIPT_DECL,
     EXTENSION_DECL,
+    DESTRUCTOR_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -432,7 +433,8 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
-    // Trailed by its generic parameters, if any.
+    // Trailed by its generic parameters, if any, followed by the parameter
+    // pattern.
   >;
 
   using VarLayout = BCRecordLayout<
@@ -565,6 +567,14 @@ namespace decls_block {
   using VarPatternLayout = BCRecordLayout<
     VAR_PATTERN
     // The sub-pattern trails the record.
+  >;
+
+  using DestructorLayout = BCRecordLayout<
+    DESTRUCTOR_DECL,
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    TypeIDField, // type (signature)
+    DeclIDField  // implicit this decl
   >;
 
 

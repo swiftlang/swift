@@ -430,6 +430,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, ONEOF_ELEMENT_DECL);
   RECORD(decls_block, SUBSCRIPT_DECL);
   RECORD(decls_block, EXTENSION_DECL);
+  RECORD(decls_block, DESTRUCTOR_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -1141,8 +1142,25 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::Destructor:
-    return false;
+  case DeclKind::Destructor: {
+    auto dtor = cast<DestructorDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!dtor->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(dtor->getDeclContext());
+    auto implicitThis = dtor->getImplicitThisDecl();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[DestructorLayout::Code];
+    DestructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addDeclRef(DC),
+                                 dtor->isImplicit(),
+                                 addTypeRef(dtor->getType()),
+                                 addDeclRef(implicitThis));
+    
+    return true;
+  }
   }
 }
 
@@ -1488,6 +1506,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<OneOfElementLayout>();
     registerDeclTypeAbbr<SubscriptLayout>();
     registerDeclTypeAbbr<ExtensionLayout>();
+    registerDeclTypeAbbr<DestructorLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();
