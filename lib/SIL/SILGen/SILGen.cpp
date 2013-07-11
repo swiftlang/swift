@@ -35,6 +35,27 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
     epilogBB(nullptr) {
 }
 
+// FIXME: We should be able to simplify this after the FuncExpr and friends
+// hierarhy is refactored.
+static SILLocation getFuncBodySILLocation(SILLocation Func) {
+  if (auto E = Func.dyn_cast<Expr*>()) {
+    if (const FuncExpr *FE = dyn_cast<FuncExpr>(E))
+      return SILLocation(FE->getBody());
+    if (const PipeClosureExpr *FE = dyn_cast<PipeClosureExpr>(E))
+      return SILLocation(FE->getBody());
+    if (const ClosureExpr *FE = dyn_cast<ClosureExpr>(E))
+      return SILLocation(FE->getBody());
+  }
+  if (auto D = Func.dyn_cast<Decl*>()) {
+    if (const ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
+      return SILLocation(CD->getBody());
+    if (const DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
+      return SILLocation(DD->getBody());
+  }
+  // FIXME: Should turn into assert after properties are handled.
+  return SILLocation();
+}
+
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
@@ -52,7 +73,7 @@ SILGenFunction::~SILGenFunction() {
   } else {
     // FIXME: Get this from the SILFunction when SILFunction has SILLocation
     // info.
-    B.createUnreachable(SILLocation());
+    B.createUnreachable(getFuncBodySILLocation(F.getLocation()));
   }
 }
 
@@ -267,6 +288,8 @@ SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
   // Create a debug scope for the function using astNode as source location.
   f->setDebugScope(new (M) SILDebugScope(astNode));
 
+  f->setLocation(astNode);
+
   DEBUG(llvm::dbgs() << "lowering ";
         f->printName(llvm::dbgs());
         llvm::dbgs() << " : $";
@@ -397,7 +420,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  
+  // TODO: why we have getBody here?
   SILFunction *f = preEmitFunction(thunk, method->getBody());
   SILGenFunction(*this, *f, false).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);

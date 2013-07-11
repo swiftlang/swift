@@ -61,6 +61,9 @@ private:
   /// function references.
   BlockListType BlockList;
 
+  /// The SIL location of the function, which provides a link back to the AST.
+  SILLocation Location;
+
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
 public:
@@ -96,6 +99,12 @@ public:
   void setLinkage(SILLinkage L) { ModuleAndLinkage.setInt(L); }
 
   /// Initialize the source location of the function.
+  void setLocation(SILLocation L) { Location = L; }
+
+  /// Get the source location of the function.
+  SILLocation getLocation() const { return Location; }
+
+  /// Initialize the debug scope of the function.
   void setDebugScope(SILDebugScope *DS) { DebugScope = DS; }
 
   /// Get the source location of the function.
