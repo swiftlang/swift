@@ -99,14 +99,6 @@ public:
     Address src = asDerived().Derived::getAddressForPointer(in.claimNext());
     asDerived().Derived::load(IGF, src, out);
   }
-  
-  void retain(IRGenFunction &IGF, Explosion &e) const {
-    llvm_unreachable("not retainable");
-  }
-
-  void release(IRGenFunction &IGF, Explosion &e) const {
-    llvm_unreachable("not releasable");
-  }
 };
 
 }

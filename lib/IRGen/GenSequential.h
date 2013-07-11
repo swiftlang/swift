@@ -221,14 +221,6 @@ public:
       field.getTypeInfo().copy(IGF, src, dest);
   }
 
-  void retain(IRGenFunction &IGF, Explosion &e) const {
-    llvm_unreachable("not retainable");
-  }
-
-  void release(IRGenFunction &IGF, Explosion &e) const {
-    llvm_unreachable("not releasable");
-  }
-  
   void destroy(IRGenFunction &IGF, Address addr) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {

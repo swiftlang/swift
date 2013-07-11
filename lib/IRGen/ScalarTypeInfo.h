@@ -150,16 +150,6 @@ public:
     out.add(value);
   }
   
-  void retain(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRetain(IGF, value);
-  }
-
-  void release(IRGenFunction &IGF, Explosion &e) const {
-    llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRelease(IGF, value);
-  }
-  
   void destroy(IRGenFunction &IGF, Address addr) const {
     if (!Derived::IsScalarPOD) {
       addr = asDerived().projectScalar(IGF, addr);

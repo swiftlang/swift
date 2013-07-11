@@ -45,7 +45,7 @@
 #include "IRGenModule.h"
 #include "IRGenSIL.h"
 #include "Linking.h"
-#include "TypeInfo.h"
+#include "ReferenceTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -1103,7 +1103,8 @@ void IRGenSILFunction::visitRetainInst(swift::RetainInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  TypeInfo const &ti = getFragileTypeInfo(i->getOperand().getType());
+  auto &ti =
+    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
   ti.retain(*this, lowered);
 }
 
@@ -1117,7 +1118,8 @@ void IRGenSILFunction::visitReleaseInst(swift::ReleaseInst *i) {
   }
   
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  TypeInfo const &ti = getFragileTypeInfo(i->getOperand().getType());
+  auto &ti =
+    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
   ti.release(*this, lowered);
 }
 

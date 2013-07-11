@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_HEAPTYPEINFO_H
 
 #include "llvm/IR/DerivedTypes.h"
-#include "FixedTypeInfo.h"
+#include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
 
 namespace swift {
@@ -33,13 +33,13 @@ namespace irgen {
 /// of this type:
 ///   bool hasSwiftRefcount() const;
 template <class Impl>
-class HeapTypeInfo : public SingleScalarTypeInfo<Impl, FixedTypeInfo> {
-  typedef SingleScalarTypeInfo<Impl, FixedTypeInfo> super;
+class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
+  typedef SingleScalarTypeInfo<Impl, ReferenceTypeInfo> super;
 protected:
   using super::asDerived;
 public:
   HeapTypeInfo(llvm::PointerType *storage, Size size, Alignment align)
-    : super(storage, size, align, IsNotPOD) {}
+    : super(storage, size, align) {}
 
   bool isSingleRetainablePointer(ResilienceScope scope) const {
     return asDerived().hasSwiftRefcount();
@@ -61,6 +61,16 @@ public:
     } else {
       IGF.emitObjCRetainCall(value);
     }
+  }
+
+  void retain(IRGenFunction &IGF, Explosion &e) const {
+    llvm::Value *value = e.claimNext();
+    asDerived().emitScalarRetain(IGF, value);
+  }
+
+  void release(IRGenFunction &IGF, Explosion &e) const {
+    llvm::Value *value = e.claimNext();
+    asDerived().emitScalarRelease(IGF, value);
   }
 };
 

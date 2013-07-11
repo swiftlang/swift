@@ -289,7 +289,7 @@ namespace {
   };
 
   /// The type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, FixedTypeInfo> {
+  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo> {
     /// Each possible currying of a function type has different function
     /// type variants along each of three orthogonal axes:
     ///   - the calling convention
@@ -316,7 +316,7 @@ namespace {
 
     FuncTypeInfo(AnyFunctionType *formalType, llvm::StructType *storageType,
                  Size size, Alignment align, unsigned numCurries)
-      : ScalarTypeInfo(storageType, size, align, IsNotPOD),
+      : ScalarTypeInfo(storageType, size, align),
         FormalType(formalType) {
       
       // Initialize the curryings.

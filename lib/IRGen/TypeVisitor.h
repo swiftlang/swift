@@ -36,11 +36,11 @@ public:
 
 #define TYPE(Id, Parent)
 #define UNCHECKED_TYPE(Id, Parent) \
-  template <class... As> RetTy visit##Id##Type(Id##Type *T, Args... args) { \
+  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
     llvm_unreachable(#Id "Type should not survive to IR-gen"); \
   }
 #define SUGARED_TYPE(Id, Parent) \
-  template <class... As> RetTy visit##Id##Type(Id##Type *T, Args... args) { \
+  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
     llvm_unreachable(#Id "Type should not survive canonicalization"); \
   }
 #include "swift/AST/TypeNodes.def"
@@ -49,6 +49,42 @@ public:
   RetTy visitUnboundGenericType(UnboundGenericType *T, Args... args) {
     llvm_unreachable("UnboundGenericType should not survive Sema");
   }
+};
+
+/// ReferenceTypeVisitor - This is a specialization of irgen::TypeVisitor
+/// which automatically ignores non-reference types.
+template <typename ImplClass, typename RetTy = void, typename... Args>
+class ReferenceTypeVisitor : public TypeVisitor<ImplClass, RetTy, Args...> {
+#define TYPE(Id) \
+  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
+    llvm_unreachable(#Id "Type is not a reference type"); \
+  }
+  TYPE(Array)
+  TYPE(BoundGenericOneOf)
+  TYPE(BoundGenericStruct)
+  TYPE(BuiltinFloat)
+  TYPE(BuiltinInteger)
+  TYPE(BuiltinOpaquePointer)
+  TYPE(BuiltinRawPointer)
+  TYPE(BuiltinVector)
+  TYPE(LValue)
+  TYPE(MetaType)
+  TYPE(Module)
+  TYPE(OneOf)
+  TYPE(ReferenceStorage)
+  TYPE(Struct)
+  TYPE(Tuple)
+#undef TYPE
+
+  // BuiltinObjectPointer
+  // BuiltinObjCPointer
+  // Class
+  // BoundGenericClass
+  // Protocol
+  // ProtocolComposition
+  // Archetype
+  // Function
+  // PolymorphicFunction
 };
 
 /// SubstTypeVisitor - This is a specialized type visitor for visiting

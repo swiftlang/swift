@@ -13,6 +13,13 @@
 // This file defines the interface used to perform primitive
 // operations on swift values and objects.
 //
+// This interface is supplemented in two ways:
+//   - FixedTypeInfo provides a number of operations meaningful only
+//     for types with a fixed-size representation
+//   - ReferenceTypeInfo is a further refinement of FixedTypeInfo
+//     which provides operations meaningful only for types with
+//     reference semantics
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_IRGEN_TYPEINFO_H
@@ -53,9 +60,12 @@ class TypeInfo {
   mutable const TypeInfo *NextConverted;
 
 protected:
-  TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod, IsFixedSize_t fixed)
+  enum IsReference_t : bool { IsNotReference, IsReference };
+
+  TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
+           IsFixedSize_t fixed, IsReference_t isReference = IsNotReference)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), Fixed(fixed) {}
+      POD(pod), Fixed(fixed), Reference(isReference) {}
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -86,6 +96,9 @@ private:
   /// Whether this type is known to be fixed in size.
   unsigned Fixed : 1;
 
+  /// Whether this type has reference semantics.
+  unsigned Reference : 1;
+
 public:
   /// Sets whether this type is POD.  Should only be called during
   /// completion of a forward-declaration.
@@ -106,6 +119,14 @@ public:
   /// FixedTypeInfo.
   IsFixedSize_t isFixedSize() const {
     return IsFixedSize_t(Fixed);
+  }
+
+  /// Whether this type is known to have reference semantics.  This
+  /// does not depend on resilience --- struct types never have
+  /// reference semantics in this sense --- but of course it can be
+  /// statically obscured by e.g. generics.
+  IsReference_t hasReferenceSemantics() const {
+    return IsReference_t(Reference);
   }
 
   llvm::Type *getStorageType() const { return StorageType; }
@@ -209,12 +230,6 @@ public:
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address) const = 0;
   
-  /// Retains a value.
-  virtual void retain(IRGenFunction &IGF, Explosion &explosion) const = 0;
-  
-  /// Releases a value.
-  virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
-
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single retainable object pointer?
   ///

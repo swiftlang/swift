@@ -569,7 +569,7 @@ namespace {
   /// of a refcounted pointer plus witness tables instead of using an indirect
   /// buffer.
   class ClassExistentialTypeInfo
-    : public ScalarTypeInfo<ClassExistentialTypeInfo, FixedTypeInfo>
+    : public ScalarTypeInfo<ClassExistentialTypeInfo, ReferenceTypeInfo>
   {
     unsigned NumProtocols;
     
@@ -584,8 +584,7 @@ namespace {
                                     Size size,
                                     Alignment align,
                                     ArrayRef<ProtocolEntry> protocols)
-      : ScalarTypeInfo(ty, size, align, IsNotPOD),
-        NumProtocols(protocols.size())
+      : ScalarTypeInfo(ty, size, align), NumProtocols(protocols.size())
     {
       for (unsigned i = 0; i != NumProtocols; ++i) {
         new (&getProtocolsBuffer()[i]) ProtocolEntry(protocols[i]);

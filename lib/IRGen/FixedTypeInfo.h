@@ -1,4 +1,4 @@
-//===--- FixedTypeInfo.h - Convenience for fixed-layout types ---*- C++ -*-===//
+//===--- FixedTypeInfo.h - Supplement for fixed-layout types ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -34,8 +34,10 @@ private:
   Size StorageSize;
 
 protected:
-  FixedTypeInfo(llvm::Type *type, Size size, Alignment align, IsPOD_t pod)
-    : TypeInfo(type, align, pod, IsFixedSize), StorageSize(size) {}
+  FixedTypeInfo(llvm::Type *type, Size size, Alignment align,
+                IsPOD_t pod, IsReference_t isReference = IsNotReference)
+    : TypeInfo(type, align, pod, IsFixedSize, isReference),
+      StorageSize(size) {}
 
 public:
   // This is useful for metaprogramming.
@@ -88,6 +90,7 @@ public:
     return StorageSize.roundUpToAlignment(getFixedAlignment());
   }
 
+  static bool classof(const FixedTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) { return type->isFixedSize(); }
 };
 
