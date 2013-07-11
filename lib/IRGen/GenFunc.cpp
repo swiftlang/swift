@@ -83,7 +83,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "IRGenSIL.h"
 #include "Linking.h"
 #include "FixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -1644,16 +1643,6 @@ void IRGenFunction::emitScalarReturn(Explosion &result) {
     }
     Builder.CreateRet(resultAgg);
   }
-}
-
-/// Emit the definition for the given SIL constant.
-void IRGenModule::emitSILFunction(SILFunction *f) {
-  if (f->isExternalDeclaration())
-    return;
-    
-  // FIXME: Emit all needed explosion levels.
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
-  IRGenSILFunction(*this, f, explosionLevel).emitSILFunction();
 }
 
 /// Emit the forwarding stub function for a partial application.

@@ -40,7 +40,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "IRGenSIL.h"
 #include "Linking.h"
 #include "TypeInfo.h"
 
