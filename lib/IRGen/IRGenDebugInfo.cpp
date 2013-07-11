@@ -45,6 +45,7 @@ using namespace irgen;
 // So instead, let's hijack a language with a very low potential for
 // accidental conflicts for now.
 static const unsigned DW_LANG_Swift = 0xf; /*llvm::dwarf::DW_LANG_Swift*/;
+static const unsigned DW_LANG_ObjC = llvm::dwarf::DW_LANG_ObjC; // For symmetry.
 
 /// Strdup a raw char array using the bump pointer.
 static
@@ -444,8 +445,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        Size, Align, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
-                                       DW_LANG_Swift    // RunTimeLang
-                                       );
+                                       DW_LANG_Swift);
     }
     return llvm::DIType();
   }
@@ -458,6 +458,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     if (auto Decl = ClassTy->getDecl()) {
       Name = Decl->getName().str();
       Location L = getStartLoc(SM, Decl);
+      auto Attrs = Decl->getAttrs();
+      auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return DBuilder.createStructType(Scope,
                                       Name,
                                       getOrCreateFile(L.Filename),
@@ -465,8 +467,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                       Size, Align, Flags,
                                       llvm::DIType(),  // DerivedFrom
                                       llvm::DIArray(), // Elements
-                                      DW_LANG_Swift    // RunTimeLang
-                                      );
+                                      RuntimeLang);
     }
     return llvm::DIType();
   }
