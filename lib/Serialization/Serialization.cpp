@@ -403,6 +403,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, METATYPE_TYPE);
   RECORD(decls_block, LVALUE_TYPE);
   RECORD(decls_block, ARCHETYPE_TYPE);
+  RECORD(decls_block, ARCHETYPE_NESTED_TYPE_NAMES);
   RECORD(decls_block, ARCHETYPE_NESTED_TYPES);
   RECORD(decls_block, PROTOCOL_COMPOSITION_TYPE);
   RECORD(decls_block, SUBSTITUTED_TYPE);
@@ -1240,13 +1241,16 @@ bool Serializer::writeType(Type ty) {
                                     addTypeRef(archetypeTy->getSuperclass()),
                                     conformances);
 
+    SmallVector<IdentifierID, 4> nestedTypeNames;
     SmallVector<TypeID, 4> nestedTypes;
     for (auto next : archetypeTy->getNestedTypes()) {
-      assert(next.first == next.second->getName() ||
-             (next.second == archetypeTy &&
-              next.first == TU->Ctx.getIdentifier("This")));
+      nestedTypeNames.push_back(addIdentifierRef(next.first));
       nestedTypes.push_back(addTypeRef(next.second));
     }
+
+    abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypeNamesLayout::Code];
+    ArchetypeNestedTypeNamesLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               nestedTypeNames);
 
     abbrCode = DeclTypeAbbrCodes[ArchetypeNestedTypesLayout::Code];
     ArchetypeNestedTypesLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1406,6 +1410,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<MetaTypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();
+    registerDeclTypeAbbr<ArchetypeNestedTypeNamesLayout>();
     registerDeclTypeAbbr<ArchetypeNestedTypesLayout>();
     registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
     registerDeclTypeAbbr<SubstitutedTypeLayout>();

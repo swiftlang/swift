@@ -1338,25 +1338,36 @@ Type ModuleFile::getType(TypeID TID) {
 
     scratch.clear();
     unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
+    if (kind != decls_block::ARCHETYPE_NESTED_TYPE_NAMES) {
+      error();
+      break;
+    }
+
+    ArrayRef<uint64_t> rawNameIDs;
+    decls_block::ArchetypeNestedTypeNamesLayout::readRecord(scratch,
+                                                            rawNameIDs);
+
+    entry = DeclTypeCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      error();
+      break;
+    }
+
+    SmallVector<uint64_t, 16> scratch2;
+    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
     if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
       error();
       break;
     }
 
     ArrayRef<uint64_t> rawTypeIDs;
-    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch, rawTypeIDs);
+    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch2, rawTypeIDs);
 
     SmallVector<std::pair<Identifier, ArchetypeType *>, 4> nestedTypes;
-    for (TypeID nestedID : rawTypeIDs) {
-      if (nestedID == TID) {
-        nestedTypes.push_back(std::make_pair(ctx.getIdentifier("This"),
-                                             archetype));
-      } else {
-        auto nested = getType(nestedID)->castTo<ArchetypeType>();
-        nestedTypes.push_back(std::make_pair(nested->getName(),
-                                             nested));
-      }
-    }
+    for_each(rawNameIDs, rawTypeIDs, [&](IdentifierID nameID, TypeID nestedID) {
+      auto nestedTy = getType(nestedID)->castTo<ArchetypeType>();
+      nestedTypes.push_back(std::make_pair(getIdentifier(nameID), nestedTy));
+    });
     archetype->setNestedTypes(ctx, nestedTypes);
 
     break;

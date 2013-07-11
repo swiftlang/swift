@@ -216,6 +216,7 @@ namespace decls_block {
     METATYPE_TYPE,
     LVALUE_TYPE,
     ARCHETYPE_TYPE,
+    ARCHETYPE_NESTED_TYPE_NAMES,
     ARCHETYPE_NESTED_TYPES,
     PROTOCOL_COMPOSITION_TYPE,
     SUBSTITUTED_TYPE,
@@ -323,6 +324,11 @@ namespace decls_block {
     TypeIDField,         // superclass
     BCArray<DeclIDField> // conformances
     // Trailed by the nested types record.
+  >;
+
+  using ArchetypeNestedTypeNamesLayout = BCRecordLayout<
+    ARCHETYPE_NESTED_TYPE_NAMES,
+    BCArray<IdentifierIDField>
   >;
 
   using ArchetypeNestedTypesLayout = BCRecordLayout<
