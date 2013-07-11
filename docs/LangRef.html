@@ -2472,9 +2472,34 @@ ill-formed if the type does not conform to the protocol.</p>
      href="#builtin">builtin</a> integer type.</p>
 
   <p>The '<tt>__FILE__</tt>', '<tt>__LINE__</tt>', and '<tt>__COLUMN__</tt>'
-     magic identifiers expand to a literal based on where they are defined.
-     '<tt>__FILE__</tt>' expands to a string literal, the others expand to an
-     integer literal.
+     magic identifiers expand to a literal representation of their position in
+     the source code. '<tt>__FILE__</tt>' expands to a string literal, the
+     others expand to an integer literal.</p>
+     
+  <pre class="example">
+    <i>// File foo.swift</i>
+
+    var file = __FILE__  <i>// file : String = "foo.swift"</i>
+    var line = __LINE__  <i>// line : Int = 4</i>
+    var col = __COLUMN__ <i>// column : Int = 11</i>
+  </pre>
+     
+  <p>If '<tt>__FILE__</tt>', '<tt>__LINE__</tt>', and/or '<tt>__COLUMN__</tt>'
+    are used as default argument values in a function declaration, they
+    instead expand to the source location of each function call that
+    instantiates the default argument.</p>
+
+  <pre class="example">
+    func log(message:String,
+             file:String = __FILE__,
+             line:Int = __LINE__) {
+      println("\(file):\(line): \(message)")
+    }
+
+    log("Orders received")
+    doIt()
+    log("Job's finished")
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="expr-identifier">Identifiers</h3>
