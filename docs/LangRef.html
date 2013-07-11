@@ -1877,21 +1877,21 @@ conforms to the current protocol shall conform to each of the
   <p>When a non-protocol type inherits a protocol, it is specifying
 explicitly that it conforms to that protocol. The program is
 ill-formed if the type does not conform to the protocol.</p>
- 
+
   <pre class="example">
     protocol VersionedDocument : Document { <i>// every VersionedDocument is a Document</i>
       func bumpVersion()
-   }
+    }
 
-   func print(doc : Document) { <i>/* ... */</i> }
+    func print(doc : Document) { <i>/* ... */</i> }
 
-   var myDocument : VersionedDocument;
-   print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
+    var myDocument : VersionedDocument;
+    print(myDocument) <i>// okay: a VersionedDocument is a Document</i>
 
-   class StoredHTML : VersionedDocument { <i>// okay: StoredHTML conforms to VersionedDocument</i>
-     var Title : String
-     func bumpVersion()
-  }
+    class StoredHTML : VersionedDocument { <i>// okay: StoredHTML conforms to VersionedDocument</i>
+      var Title : String
+      func bumpVersion()
+    }
   </pre>
 
   <!-- ********************************************************************* -->
@@ -1899,46 +1899,79 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ********************************************************************* -->
 
   <div class="commentary">
-    We intend to have a pattern-matching statement eventually, and
-    probably a pattern-matching predicate expression.  There are several
-    other places in the language, however, which can also be usefully
-    expressed in terms of patterns.  This has the benefit of allowing
-    uniform decomposition of tuples.<br><br>
-
     The pattern grammar mirrors the expression grammar, or to be more
     specific, the grammar of literals.  This is because the conceptual
     algorithm for matching a value against a pattern is to try to find
     an assignment of values to variables which makes the pattern equal
     the value.  So every expression form which can be used to build a
     value directly should generally have a corresponding pattern form.
-    <br><br>
-
-    For now, however, we do not include literals in the pattern grammar.
   </div>
 
   <pre class="grammar">
-    pattern-atom ::= <a href="#pattern-identifier">pattern-identifier</a>
+    pattern-atom ::= <a href="#pattern-var">pattern-var</a>
+    pattern-atom ::= <a href="#pattern-any">pattern-any</a>
     pattern-atom ::= <a href="#pattern-tuple">pattern-tuple</a>
+    pattern-atom ::= <a href="#pattern-is">pattern-is</a>
+    pattern-atom ::= <a href="#pattern-expr">expr</a>
 
     pattern      ::= pattern-atom
     pattern      ::= <a href="#pattern-typed">pattern-typed</a>
   </pre>
 
+  <p>A pattern represents the structure of a composite value.
+    Parts of a value can be extracted and bound to variables or compared
+    against other values by <i>pattern matching</i>. Among other places,
+    pattern matching occurs on the left-hand side of
+    <a href="#decl-var"><tt>var</tt> bindings</a>, in the arguments of
+    <a href="#decl-func"><tt>func</tt> declarations</a>, and in the
+    <tt>case</tt> labels of
+    <a href="#stmt-switch"><tt>switch</tt> statements</a>.
+    Some examples:</p>
+
+  <pre class="example">
+    var point = (1, 0, 0)
+
+    <i>// Extract the elements of the "point" tuple and bind them to
+    // variables x, y, and z.</i>
+    var (x, y, z) = point
+    println("x=\(x) y=\(y) z=\(z)")
+
+    <i>// Dispatch on the elements of a tuple in a "switch" statement.</i>
+    switch point {
+    case (0, 0, 0):
+      println("origin")
+    <i>// The pattern "_" matches any value.</i>
+    case (_, 0, 0):
+      println("on the x axis")
+    case (0, _, 0):
+      println("on the y axis")
+    case (0, 0, _):
+      println("on the z axis")
+    case (var x, var y, var z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+  </pre>
+
+  <p>A pattern may be "irrefutable", meaning informally that it
+    matches all values of its type.  Patterns in declarations, such as
+    <a href="#decl-var"><tt>var</tt></a> and
+    <a href="#decl-func"><tt>func</tt></a>, are required to be irrefutable.
+    Patterns in the <tt>case</tt> labels of
+    <a href="#stmt-switch"><tt>switch</tt> statements</a>, however,
+    are not.</p>
+
   <p>The basic pattern grammar is a literal "atom" followed by an
     optional type annotation.  Type annotations are useful for
     documentation, as well as for coercing a matched expression to a
     particular kind.  They are also required when patterns are used in
-    a <a href="#func-signature">function signature</a>.</p>
+    a <a href="#func-signature">function signature</a>. Type annotations
+    are currently not allowed in switch statements.</p>
 
   <p>A pattern has a type.  A pattern may be "fully-typed", meaning
     informally that its type is fully determined by the type
     annotations it contains.  Some patterns may also derive a type
     from their context, be it an enclosing pattern or the way it is
     used;  this set of situations is not yet fully determined.</p>
-
-  <p>A pattern may be "irrefutable", meaning informally that it
-    matches all values of its type.  Patterns in some contexts are
-    required to be irrefutable.</p>
 
   <!-- ********************************************************************* -->
   <h3 id="pattern-typed">Typed Patterns</h3>
@@ -1953,27 +1986,72 @@ ill-formed if the type does not conform to the protocol.</p>
     fully-typed.  It is irrefutable if and only if its subpattern is
     irrefutable.</p>
 
+  <p>Type annotations are currently not allowed in the <tt>case</tt> labels
+    of <tt>switch</tt> statements; case patterns always get their type from
+    the subject of the switch.</p>
+
   <!-- ********************************************************************* -->
-  <h3 id="pattern-identifier">Identifier Patterns</h3>
+  <h3 id="pattern-any">Any Patterns</h3>
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
-    pattern-identifier ::= <a href="#identifier">identifier</a>
+    pattern-any ::= '_'
   </pre>
 
-  <p>An identifier pattern binds a value to a particular name, which is
-    then a legal variable of the pattern's type within its scope.  It is
-    irrefutable.  It is not fully-typed;  the type must be inferred from
-    context.</p>
+  <p>The symbol <tt>_</tt> in a pattern matches and ignores any value. It
+  is irrefutable.</p>
 
-  <p>As a special case, if the identifier is <tt>_</tt> then no variable
-    comes into scope, and the value matched is lost.  Such an identifier
-    pattern is called an "ignore pattern".  An identifier pattern
-    which is not an ignore pattern is called a "named pattern".</p>
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-var">'var' Patterns</h3>
+  <!-- ********************************************************************* -->
 
-  <p>The type of a named pattern must be
+  <pre class="grammar">
+    pattern-var ::= 'var' pattern
+  </pre>
+
+  <p>The keyword <tt>var</tt> within a pattern introduces variable bindings.
+    Any identifiers within the subpattern bind new named variables to their
+    matching values.<p>
+
+  <pre class="example">
+    var point = (0, 0, 0)
+    switch point {
+    <i>// Bind x, y, z to the elements of point.</i>
+    case (var x, var y, var z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+
+    switch point {
+    <i>// Same. 'var' distributes to the identifiers in its subpattern.</i>
+    case var (x, y, z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+  </pre>
+
+  <p>Outside of a <tt>var</tt> pattern, an identifier behaves as an
+    <a href="#pattern-expr">expression pattern</a> referencing an existing
+    definition.</p>
+
+  <pre class="example">
+    var zero = 0
+    switch point {
+    <i>// x and z are bound as new variables.
+    // zero is a reference to the existing 'zero' variable.</i>
+    case (var x, zero, var z):
+      println("point off the y axis: x=\(x) z=\(z)")
+    default:
+      println("on the y axis")
+    }
+  </pre>
+
+  <p>The left-hand pattern of a <a href="#decl-var"><tt>var</tt> declaration</a>
+    and the argument pattern of a <a href="#decl-func"><tt>func</tt> declaration</a>
+    are implicitly inside a <tt>var</tt> pattern; identifiers in their patterns
+    always bind variables. Variable bindings are irrefutable.</p>
+
+  <p>The type of a bound variable must be
     <a href="#materializable">materializable</a> unless it appears in a
-    <a href="#function-signature">function-signature</a> and is directly
+    <a href="#function-signature">function-signature</a> and is of directly
     a <a href="attribute-byref"><tt>byref</tt></a>-annotated type.</p>
 
   <!-- ********************************************************************* -->
@@ -2010,6 +2088,78 @@ ill-formed if the type does not conform to the protocol.</p>
     label, has no default value, and is not varargs is treated as a
     grouping parenthesis: it has the type of its constituent pattern,
     not a tuple type.</p>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-is">'is' Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <pre class="grammar">
+    pattern-is ::= 'is' <a href="#type">type</a>
+  </pre>
+
+  <p><tt>is</tt> patterns perform a type check equivalent to the
+    <tt>x is T</tt> <a href="#expr-cast">cast operator</a>. The pattern matches
+    if the runtime type of a value is of the given type. <tt>is</tt> patterns
+    are refutable and thus cannot appear in declarations.</p>
+
+  <pre class="example">
+    class B {}
+    class D1 : B {}
+    class D2 : B {}
+
+    var bs : B[] = [B(), D1(), D2()]
+
+    for b in bs {
+      switch b {
+      case is B:
+        println("B")
+      case is D1:
+        println("D1")
+      case is D2:
+        println("D2")
+      }
+    }
+  </pre>
+
+  <!-- ********************************************************************* -->
+  <h3 id="pattern-expr">Expressions in Patterns</h3>
+  <!-- ********************************************************************* -->
+
+  <p>Patterns may include arbitrary expressions as subpatterns. Expression
+    patterns are refutable and thus cannot appear in declarations. An expression
+    pattern is compared to its corresponding value using the <tt>~=</tt>
+    operator. The match succeeds if <tt>expr ~= value</tt> evaluates to true.
+    The standard library provides a default implementation of <tt>~=</tt>
+    using <tt>==</tt> equality; additionally, range objects may be matched
+    against integer and floating-point values. The <tt>~=</tt> operator may
+    be overloaded like any function.</p>
+
+  <pre class="example">
+    var point = (0, 0, 0)
+    switch point {
+    <i>// Equality comparison.</i>
+    case (0, 0, 0):
+      println("origin")
+    <i>// Range comparison.</i>
+    case (-10..10, -10..10, -10..10):
+      println("close to the origin")
+    default:
+      println("too far away")
+    }
+
+    <i>// Define pattern matching of an integer value to a string expression.</i>
+    func ~=(pattern:String, value:Int) -&gt; Bool {
+      return pattern == "\(value)"
+    }
+
+    <i>// Now we can pattern-match strings to integers:</i>
+    switch point {
+    case ("0", "0", "0"):
+      println("origin")
+    default:
+      println("not the origin")
+    }
+  </pre>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
