@@ -368,8 +368,8 @@ class IRGenSILFunction :
   public IRGenFunction, public SILInstructionVisitor<IRGenSILFunction>
 {
 public:
-  llvm::DenseMap<SILValue, LoweredValue> loweredValues;
-  llvm::MapVector<SILBasicBlock *, LoweredBB> loweredBBs;
+  llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
+  llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
   SILFunction *CurSILFn;
   Address IndirectReturn;
@@ -383,7 +383,7 @@ public:
   void emitSILFunction();
 
   void setLoweredValue(SILValue v, LoweredValue &&lv) {
-    auto inserted = loweredValues.insert({v, std::move(lv)});
+    auto inserted = LoweredValues.insert({v, std::move(lv)});
     assert(inserted.second && "already had lowered value for sil value?!");
     (void)inserted;
   }
@@ -441,8 +441,8 @@ public:
   /// Get the LoweredValue corresponding to the given SIL value, which must
   /// have been lowered.
   LoweredValue &getLoweredValue(SILValue v) {
-    auto foundValue = loweredValues.find(v);
-    assert(foundValue != loweredValues.end() &&
+    auto foundValue = LoweredValues.find(v);
+    assert(foundValue != LoweredValues.end() &&
            "no lowered explosion for sil value!");
     return foundValue->second;
   }
@@ -467,8 +467,8 @@ public:
   }
   
   LoweredBB &getLoweredBB(SILBasicBlock *bb) {
-    auto foundBB = loweredBBs.find(bb);
-    assert(foundBB != loweredBBs.end() && "no llvm bb for sil bb?!");
+    auto foundBB = LoweredBBs.find(bb);
+    assert(foundBB != LoweredBBs.end() && "no llvm bb for sil bb?!");
     return foundBB->second;
   }
   
@@ -850,7 +850,7 @@ void IRGenSILFunction::emitSILFunction() {
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
   
   // Map the entry bb.
-  loweredBBs[CurSILFn->begin()] = LoweredBB(CurFn->begin(), {});
+  LoweredBBs[CurSILFn->begin()] = LoweredBB(CurFn->begin(), {});
   // Create LLVM basic blocks for the other bbs.
   for (SILBasicBlock *bb = CurSILFn->begin()->getNextNode();
        bb != CurSILFn->end(); bb = bb->getNextNode()) {
@@ -858,10 +858,10 @@ void IRGenSILFunction::emitSILFunction() {
     llvm::BasicBlock *llBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
     std::vector<llvm::PHINode*> phis = emitPHINodesForBBArgs(*this, bb, llBB);
     CurFn->getBasicBlockList().push_back(llBB);
-    loweredBBs[bb] = LoweredBB(llBB, std::move(phis));
+    LoweredBBs[bb] = LoweredBB(llBB, std::move(phis));
   }
 
-  auto entry = loweredBBs.begin();
+  auto entry = LoweredBBs.begin();
   Builder.SetInsertPoint(entry->second.bb);
 
   // Map the LLVM arguments to arguments on the entry point BB.
