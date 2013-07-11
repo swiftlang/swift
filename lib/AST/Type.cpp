@@ -85,7 +85,6 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
-  case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::UnstructuredUnresolved:
   case TypeKind::Tuple:
@@ -110,6 +109,7 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::ProtocolComposition:
     return cast<ProtocolCompositionType>(canonical)->requiresClass();
       
+  case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
