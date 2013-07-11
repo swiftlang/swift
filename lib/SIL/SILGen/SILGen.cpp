@@ -27,13 +27,6 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===--------------------------------------------------------------------===//
 
-// TODO: more accurately port the result schema logic from
-// IRGenFunction::emitEpilogue to handle all cases where a default void return
-// is needed
-static bool isVoidableType(Type type) {
-  return type->isEqual(type->getASTContext().TheEmptyTupleType);
-}
-
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                bool hasVoidReturn)
   : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F)),
@@ -301,7 +294,7 @@ void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   
   SILConstant constant(decl);
   SILFunction *f = preEmitFunction(constant, fe);
-  bool hasVoidReturn = isVoidableType(fe->getResultType(f->getASTContext()));
+  bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
   SILGenFunction(*this, *f, hasVoidReturn).emitFunction(fe);
   postEmitFunction(constant, f);
 
@@ -339,7 +332,7 @@ void SILGenModule::emitCurryThunk(SILConstant entryPoint,
                                   SILConstant nextEntryPoint,
                                   FuncExpr *fe) {
   SILFunction *f = preEmitFunction(entryPoint, fe);
-  bool hasVoidReturn = isVoidableType(fe->getResultType(f->getASTContext()));
+  bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
   SILGenFunction(*this, *f, hasVoidReturn)
     .emitCurryThunk(fe, entryPoint, nextEntryPoint);
   postEmitFunction(entryPoint, f);
@@ -376,7 +369,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 void SILGenModule::emitClosure(PipeClosureExpr *ce) {
   SILConstant constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
-  bool hasVoidReturn = isVoidableType(ce->getResultType());
+  bool hasVoidReturn = ce->getResultType()->isVoid();
   SILGenFunction(*this, *f, hasVoidReturn).emitClosure(ce);
   postEmitFunction(constant, f);
 }

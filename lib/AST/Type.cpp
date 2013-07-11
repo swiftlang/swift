@@ -412,6 +412,9 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   }
 }
 
+bool TypeBase::isVoid() {
+  return isEqual(getASTContext().TheEmptyTupleType);
+}
 
 ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   if (auto classTy = getAs<ClassType>())

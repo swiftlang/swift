@@ -245,6 +245,9 @@ public:
     return TypeBits.TypeBase.Validated == 2;
   }
 
+  /// \brief Check if this type is equal to the empty tuple type.
+  bool isVoid();
+
   /// \brief Mark this type as having been validated already.
   void setValidated(bool valid) { TypeBits.TypeBase.Validated = 1 + valid; }
 
