@@ -399,7 +399,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
 
       Elements.push_back(TupleTypeElt(type.getType(), name, nullptr));
       ElementsR.push_back(new (Context) NamedTypeRepr(name, type.getTypeRepr(),
-                                                      nullptr, nameLoc));
+                                                      nameLoc));
     } else {
       // Otherwise, this has to be a type.
       TypeLoc type;

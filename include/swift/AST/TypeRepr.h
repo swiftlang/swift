@@ -281,17 +281,15 @@ private:
 class NamedTypeRepr : public TypeRepr {
   Identifier Id;
   TypeRepr *Ty;
-  ExprHandle *Init;
   SourceLoc IdLoc;
 
 public:
-  NamedTypeRepr(Identifier Id, TypeRepr *Ty, ExprHandle *Init, SourceLoc IdLoc)
-    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), Init(Init), IdLoc(IdLoc) {
+  NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc)
+    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc) {
   }
 
   Identifier getName() const { return Id; }
   TypeRepr *getTypeRepr() const { return Ty; }
-  ExprHandle *getInit() const { return Init; }
   SourceLoc getNameLoc() const { return IdLoc; }
 
   static bool classof(const TypeRepr *T) {
@@ -301,7 +299,7 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const { return IdLoc; }
-  SourceLoc getEndLocImpl() const;
+  SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   friend class TypeRepr;
 };
 

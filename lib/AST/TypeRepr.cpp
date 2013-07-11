@@ -77,9 +77,3 @@ ProtocolCompositionTypeRepr::create(ASTContext &C,
   return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
                                              ProtocolLoc, AngleBrackets);
 }
-
-SourceLoc NamedTypeRepr::getEndLocImpl() const {
-  if (Init)
-    return Init->getExpr()->getEndLoc();
-  return Ty->getEndLoc();
-}

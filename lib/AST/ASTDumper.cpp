@@ -1311,10 +1311,6 @@ public:
       OS << '\n';
       printRec(T->getTypeRepr());
     }
-    if (T->getInit()) {
-      OS << '\n';
-      printRec(T->getInit()->getExpr());
-    }
     OS << ')';
   }
 
