@@ -19,7 +19,7 @@ add_swift_library(swiftAST
   Type.cpp
   TypeRepr.cpp
   Verifier.cpp
-  DEPENDS swiftBasic)
+  DEPENDS swiftBasic LLVMCore)
 
 if( NOT SWIFT_BUILT_STANDALONE )
   add_dependencies(swiftAST intrinsics_gen)
