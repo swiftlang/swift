@@ -666,9 +666,9 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     floating_literal
 ///     string_literal
 ///     character_literal
-///     ___FILE__
-///     ___LINE__
-///     ___COLUMN__
+///     '__FILE__'
+///     '__LINE__'
+///     '__COLUMN__'
 ///
 ///   expr-primary:
 ///     expr-literal
