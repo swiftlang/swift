@@ -1,4 +1,4 @@
-//===--- TypeRepr.h - Swift Language Type Representation --------*- C++ -*-===//
+//===--- TypeRepr.cpp - Swift Language Type Representation ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -69,13 +69,13 @@ TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,
                                Parens, Ellipsis);
 }
 
-CompositeTypeRepr *
-CompositeTypeRepr::create(ASTContext &C,
-                          ArrayRef<IdentTypeRepr *> Protocols,
-                          SourceLoc ProtocolLoc,
-                          SourceRange AngleBrackets) {
-  return new (C) CompositeTypeRepr(C.AllocateCopy(Protocols),
-                                   ProtocolLoc, AngleBrackets);
+ProtocolCompositionTypeRepr *
+ProtocolCompositionTypeRepr::create(ASTContext &C,
+                                    ArrayRef<IdentTypeRepr *> Protocols,
+                                    SourceLoc ProtocolLoc,
+                                    SourceRange AngleBrackets) {
+  return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
+                                             ProtocolLoc, AngleBrackets);
 }
 
 SourceLoc NamedTypeRepr::getEndLocImpl() const {

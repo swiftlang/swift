@@ -751,7 +751,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
-  bool visitCompositeTypeRepr(CompositeTypeRepr *T) {
+  bool visitProtocolCompositionTypeRepr(ProtocolCompositionTypeRepr *T) {
     for (auto elem : T->getProtocols()) {
       if (doIt(elem))
         return true;

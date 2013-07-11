@@ -309,7 +309,7 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
     Type ResultType = ProtocolCompositionType::get(Context, ArrayRef<Type>());
-    auto ResultTyR = new (Context) CompositeTypeRepr(
+    auto ResultTyR = new (Context) ProtocolCompositionTypeRepr(
                                              MutableArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
                                              SourceRange(LAngleLoc, RAngleLoc));
@@ -355,8 +355,9 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
   }
   Result =  { ProtocolCompositionType::get(Context, ProtocolTypes),
               SourceRange(ProtocolLoc, EndLoc),
-              CompositeTypeRepr::create(Context, ProtocolTypesR, ProtocolLoc,
-                                        SourceRange(LAngleLoc, EndLoc)) };
+              ProtocolCompositionTypeRepr::create(Context, ProtocolTypesR,
+                                                  ProtocolLoc,
+                                              SourceRange(LAngleLoc, EndLoc)) };
   return false;
 }
 

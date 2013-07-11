@@ -1225,19 +1225,20 @@ public:
     if (Attrs.isByref()) AttrOS << "byref,";
     if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
     if (Attrs.isThin()) AttrOS << "thin,";
-    if (Attrs.isAutoClosure()) AttrOS << "assignment,";
-    if (Attrs.isAutoClosure()) AttrOS << "conversion,";
-    if (Attrs.isAutoClosure()) AttrOS << "force_inline,";
-    if (Attrs.isAutoClosure()) AttrOS << "objc,";
-    if (Attrs.isAutoClosure()) AttrOS << "objc_block,";
-    if (Attrs.isAutoClosure()) AttrOS << "prefix,";
-    if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
-    if (Attrs.isAutoClosure()) AttrOS << "postfix,";
-    if (Attrs.isAutoClosure()) AttrOS << "infix,";
-    if (Attrs.isAutoClosure()) AttrOS << "iboutlet,";
-    if (Attrs.isAutoClosure()) AttrOS << "ibaction,";
-    if (Attrs.isAutoClosure()) AttrOS << "class_protocol,";
-    if (Attrs.isAutoClosure()) AttrOS << "stdlib,";
+    if (Attrs.isAssignment()) AttrOS << "assignment,";
+    if (Attrs.isConversion()) AttrOS << "conversion,";
+    if (Attrs.isForceInline()) AttrOS << "force_inline,";
+    if (Attrs.isObjC()) AttrOS << "objc,";
+    if (Attrs.isObjCBlock()) AttrOS << "objc_block,";
+    if (Attrs.isPrefix()) AttrOS << "prefix,";
+    if (Attrs.isPostfix()) AttrOS << "postfix,";
+    if (Attrs.isInfix()) AttrOS << "infix,";
+    if (Attrs.isIBOutlet()) AttrOS << "iboutlet,";
+    if (Attrs.isIBAction()) AttrOS << "ibaction,";
+    if (Attrs.isClassProtocol()) AttrOS << "class_protocol,";
+    if (Attrs.isStdlib()) AttrOS << "stdlib,";
+    if (Attrs.isWeak()) AttrOS << "weak,";
+    if (Attrs.isUnowned()) AttrOS << "unowned,";
     if (Attrs.cc.hasValue()) {
       AttrOS << "cc(";
       switch (Attrs.cc.getValue()) {
@@ -1317,7 +1318,7 @@ public:
     OS << ')';
   }
 
-  void visitCompositeTypeRepr(CompositeTypeRepr *T) {
+  void visitProtocolCompositionTypeRepr(ProtocolCompositionTypeRepr *T) {
     printCommon(T, "type_composite");
     for (auto elem : T->getProtocols()) {
       OS << '\n';

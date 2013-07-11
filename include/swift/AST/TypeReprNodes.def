@@ -27,7 +27,7 @@ TYPEREPR(Function, TypeRepr)
 TYPEREPR(Array, TypeRepr)
 TYPEREPR(Tuple, TypeRepr)
 TYPEREPR(Named, TypeRepr)
-TYPEREPR(Composite, TypeRepr)
+TYPEREPR(ProtocolComposition, TypeRepr)
 TYPEREPR(MetaType, TypeRepr)
 
 #undef TYPEREPR

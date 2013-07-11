@@ -117,6 +117,9 @@ public:
     ///
     /// After name binding, the value is set to the decl being referenced, and
     /// the last entry in the component list is known to be a Type.
+    ///
+    /// FIXME: DeclContext* should be available from the context within the type
+    /// checker. In that case, remove it and sneak the Id in its place.
     llvm::PointerUnion4<DeclContext*, ValueDecl*, Type, Module*> Value;
 
   public:
@@ -210,6 +213,8 @@ private:
 ///   Foo[]
 /// \endcode
 class ArrayTypeRepr : public TypeRepr {
+  // FIXME: Tail allocation. Use bits to determine whether Base/Size are
+  // availble.
   TypeRepr *Base;
   ExprHandle *Size;
   SourceRange Brackets;
@@ -241,6 +246,7 @@ private:
 class TupleTypeRepr : public TypeRepr {
   MutableArrayRef<TypeRepr *> Elements;
   SourceRange Parens;
+  // FIXME: Tail allocation.
   SourceLoc Ellipsis;
 
 public:
@@ -303,16 +309,16 @@ private:
 /// \code
 ///   protocol<Foo, Bar>
 /// \endcode
-class CompositeTypeRepr : public TypeRepr {
+class ProtocolCompositionTypeRepr : public TypeRepr {
   MutableArrayRef<IdentTypeRepr *> Protocols;
   SourceLoc ProtocolLoc;
   SourceRange AngleBrackets;
 
 public:
-  CompositeTypeRepr(MutableArrayRef<IdentTypeRepr *> Protocols,
-                    SourceLoc ProtocolLoc,
-                   SourceRange AngleBrackets)
-    : TypeRepr(TypeReprKind::Composite), Protocols(Protocols),
+  ProtocolCompositionTypeRepr(MutableArrayRef<IdentTypeRepr *> Protocols,
+                              SourceLoc ProtocolLoc,
+                              SourceRange AngleBrackets)
+    : TypeRepr(TypeReprKind::ProtocolComposition), Protocols(Protocols),
       ProtocolLoc(ProtocolLoc), AngleBrackets(AngleBrackets) {
   }
 
@@ -320,15 +326,15 @@ public:
   SourceLoc getProtocolLoc() const { return ProtocolLoc; }
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
-  static CompositeTypeRepr *create(ASTContext &C,
-                                  ArrayRef<IdentTypeRepr *> Protocols,
-                                  SourceLoc ProtocolLoc,
-                                  SourceRange AngleBrackets);
+  static ProtocolCompositionTypeRepr *create(ASTContext &C,
+                                             ArrayRef<IdentTypeRepr*> Protocols,
+                                             SourceLoc ProtocolLoc,
+                                             SourceRange AngleBrackets);
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Composite;
+    return T->getKind() == TypeReprKind::ProtocolComposition;
   }
-  static bool classof(const CompositeTypeRepr *T) { return true; }
+  static bool classof(const ProtocolCompositionTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return ProtocolLoc; }
