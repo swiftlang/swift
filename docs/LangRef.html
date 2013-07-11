@@ -2040,7 +2040,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <p>The type of a bound variable must be
     <a href="#materializable">materializable</a> unless it appears in a
-    <a href="#function-signature">function-signature</a> and is of directly
+    <a href="#function-signature">function-signature</a> and is directly of
     a <a href="attribute-byref"><tt>byref</tt></a>-annotated type.</p>
 
   <!-- ********************************************************************* -->
@@ -2462,8 +2462,9 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <p>The '<tt>__FILE__</tt>', '<tt>__LINE__</tt>', and '<tt>__COLUMN__</tt>'
      magic identifiers expand to a literal representation of their position in
-     the source code. '<tt>__FILE__</tt>' expands to a string literal, the
-     others expand to an integer literal.</p>
+     the source code. '<tt>__FILE__</tt>' expands to a string literal;
+     '<tt>__LINE__</tt>' and '<tt>__COLUMN__</tt>' each expand to an integer
+     literal.</p>
      
   <pre class="example">
     <i>// File foo.swift</i>
