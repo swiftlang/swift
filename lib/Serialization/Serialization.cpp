@@ -645,6 +645,7 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
   for (auto conformance : conformances) {
     SmallVector<DeclID, 16> data;
     SmallVector<ProtocolConformance *, 8> inherited;
+    unsigned numDefaultedDefinitions = 0;
     for (auto valueMapping : conformance->Mapping) {
       data.push_back(addDeclRef(valueMapping.first));
       data.push_back(addDeclRef(valueMapping.second));
@@ -657,11 +658,16 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
       data.push_back(addDeclRef(inheritedMapping.first));
       inherited.push_back(inheritedMapping.second);
     }
+    for (auto defaulted : conformance->DefaultedDefinitions) {
+      data.push_back(addDeclRef(defaulted));
+      ++numDefaultedDefinitions;
+    }
 
     ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                           conformance->Mapping.size(),
                                           conformance->TypeMapping.size(),
                                           conformance->InheritedMapping.size(),
+                                          numDefaultedDefinitions,
                                           data);
     writeConformances(inherited);
   }

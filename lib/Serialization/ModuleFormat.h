@@ -553,6 +553,7 @@ namespace decls_block {
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
+    BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
     // The array contains value-value pairs, then type-type pairs,
     // then protocol IDs. The additional conformances trail the record.

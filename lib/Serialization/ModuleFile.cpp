@@ -181,11 +181,12 @@ ProtocolConformance *ModuleFile::maybeReadConformance() {
     return nullptr;
 
   lastRecordOffset.reset();
-  unsigned valueCount, typeCount, inheritedCount;
+  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
   ProtocolConformanceLayout::readRecord(scratch, valueCount, typeCount,
-                                        inheritedCount, rawIDs);
+                                        inheritedCount, defaultedCount,
+                                        rawIDs);
 
   ProtocolConformance *conformance =
     ModuleContext->Ctx.Allocate<ProtocolConformance>(1);
@@ -217,6 +218,12 @@ ProtocolConformance *ModuleFile::maybeReadConformance() {
     lastRecordOffset.reset();
 
     conformance->InheritedMapping.insert(std::make_pair(proto, inherited));
+  }
+
+  while (defaultedCount--) {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
+    conformance->DefaultedDefinitions.insert(decl);
   }
 
   return conformance;
