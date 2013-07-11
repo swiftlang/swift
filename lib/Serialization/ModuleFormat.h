@@ -254,6 +254,7 @@ namespace decls_block {
     GENERIC_PARAM,
     GENERIC_REQUIREMENT,
 
+    NO_CONFORMANCE = 252,
     PROTOCOL_CONFORMANCE = 253,
     DECL_CONTEXT = 254,
     XREF = 255
@@ -547,6 +548,10 @@ namespace decls_block {
     GenericRequirementKindField, // requirement kind
     BCArray<TypeIDField>         // types involved (currently always two)
   >;
+
+  /// A placeholder for lack of conformance information. Conformances are
+  /// indexed, so simply omitting one would be incorrect.
+  using NoConformanceLayout = BCRecordLayout<NO_CONFORMANCE>;
 
   using ProtocolConformanceLayout = BCRecordLayout<
     PROTOCOL_CONFORMANCE,

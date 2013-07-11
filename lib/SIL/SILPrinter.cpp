@@ -22,7 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Interleave.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"

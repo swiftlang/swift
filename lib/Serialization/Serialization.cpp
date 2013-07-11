@@ -438,6 +438,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, GENERIC_PARAM);
   RECORD(decls_block, GENERIC_REQUIREMENT);
 
+  RECORD(decls_block, NO_CONFORMANCE);
   RECORD(decls_block, PROTOCOL_CONFORMANCE);
   RECORD(decls_block, DECL_CONTEXT);
   RECORD(decls_block, XREF);
@@ -642,7 +643,13 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
   using namespace decls_block;
 
   unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
+  unsigned altAbbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
   for (auto conformance : conformances) {
+    if (!conformance) {
+      NoConformanceLayout::emitRecord(Out, ScratchRecord, altAbbrCode);
+      continue;
+    }
+
     SmallVector<DeclID, 16> data;
     SmallVector<ProtocolConformance *, 8> inherited;
     unsigned numDefaultedDefinitions = 0;
@@ -1433,6 +1440,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<GenericParamLayout>();
     registerDeclTypeAbbr<GenericRequirementLayout>();
 
+    registerDeclTypeAbbr<NoConformanceLayout>();
     registerDeclTypeAbbr<ProtocolConformanceLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
     registerDeclTypeAbbr<XRefLayout>();

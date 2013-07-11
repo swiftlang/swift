@@ -13,6 +13,7 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -166,7 +167,7 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-ProtocolConformance *ModuleFile::maybeReadConformance() {
+Optional<ProtocolConformance *> ModuleFile::maybeReadConformance() {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(DeclTypeCursor);
@@ -174,11 +175,17 @@ ProtocolConformance *ModuleFile::maybeReadConformance() {
 
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
-    return nullptr;
+    return Nothing;
 
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
-  if (kind != PROTOCOL_CONFORMANCE)
+  if (kind == NO_CONFORMANCE) {
+    assert(scratch.empty());
+    lastRecordOffset.reset();
     return nullptr;
+  }
+
+  if (kind != PROTOCOL_CONFORMANCE)
+    return Nothing;
 
   lastRecordOffset.reset();
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
@@ -213,11 +220,11 @@ ProtocolConformance *ModuleFile::maybeReadConformance() {
       proto = cast<ProtocolDecl>(getDecl(*rawIDIter++));
     }
 
-    ProtocolConformance *inherited = maybeReadConformance();
-    assert(inherited);
+    auto inherited = maybeReadConformance();
+    assert(inherited.hasValue());
     lastRecordOffset.reset();
 
-    conformance->InheritedMapping.insert(std::make_pair(proto, inherited));
+    conformance->InheritedMapping.insert(std::make_pair(proto, *inherited));
   }
 
   while (defaultedCount--) {
@@ -533,8 +540,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       alias->setGenericParameter();
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (ProtocolConformance *conformance = maybeReadConformance())
-      conformanceBuf.push_back(conformance);
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
     alias->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     break;
@@ -571,8 +578,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         genericParam.getAsTypeParam()->setDeclContext(theStruct);
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (ProtocolConformance *conformance = maybeReadConformance())
-      conformanceBuf.push_back(conformance);
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
     theStruct->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -794,8 +801,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       proto->setImplicit();
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (ProtocolConformance *conformance = maybeReadConformance())
-      conformanceBuf.push_back(conformance);
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
     proto->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -892,8 +899,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         genericParam.getAsTypeParam()->setDeclContext(theClass);
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (ProtocolConformance *conformance = maybeReadConformance())
-      conformanceBuf.push_back(conformance);
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
     theClass->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -934,8 +941,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         genericParam.getAsTypeParam()->setDeclContext(oneOf);
 
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (ProtocolConformance *conformance = maybeReadConformance())
-      conformanceBuf.push_back(conformance);
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
     oneOf->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -1418,8 +1425,8 @@ Type ModuleFile::getType(TypeID TID) {
                                                               replacementID);
 
       SmallVector<ProtocolConformance *, 16> conformanceBuf;
-      while (ProtocolConformance *conformance = maybeReadConformance())
-        conformanceBuf.push_back(conformance);
+      while (auto conformance = maybeReadConformance())
+        conformanceBuf.push_back(*conformance);
 
       {
         BCOffsetRAII restoreOffset(DeclTypeCursor);

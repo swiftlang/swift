@@ -153,8 +153,9 @@ private:
 
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///
-  /// If the record at the cursor is not a protocol conformance, returns null.
-  ProtocolConformance *maybeReadConformance();
+  /// If the record at the cursor is not a protocol conformance, returns
+  /// Nothing. Note that a null pointer is a valid conformance.
+  Optional<ProtocolConformance *> maybeReadConformance();
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
