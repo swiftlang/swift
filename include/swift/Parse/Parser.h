@@ -640,8 +640,8 @@ public:
   GenericParamList *parseGenericParameters();
   GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
   GenericParamList *maybeParseGenericParams();
-  bool parseRequiresClause(SourceLoc &RequiresLoc,
-                           SmallVectorImpl<Requirement> &Requirements);
+  bool parseGenericWhereClause(SourceLoc &RequiresLoc,
+                               SmallVectorImpl<Requirement> &Requirements);
 };
 
 } // end namespace swift

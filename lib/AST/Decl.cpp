@@ -217,11 +217,11 @@ void Decl::setClangNode(ClangNode node) {
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
-                                   SourceLoc RequiresLoc,
+                                   SourceLoc WhereLoc,
                                    MutableArrayRef<Requirement> Requirements,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
-    RequiresLoc(RequiresLoc), Requirements(Requirements),
+    WhereLoc(WhereLoc), Requirements(Requirements),
     OuterParameters(nullptr)
 {
   memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
@@ -243,14 +243,14 @@ GenericParamList *
 GenericParamList::create(ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericParam> Params,
-                         SourceLoc RequiresLoc,
+                         SourceLoc WhereLoc,
                          MutableArrayRef<Requirement> Requirements,
                          SourceLoc RAngleLoc) {
   unsigned Size = sizeof(GenericParamList)
                 + sizeof(GenericParam) * Params.size();
   void *Mem = Context.Allocate(Size, alignof(GenericParamList));
   return new (Mem) GenericParamList(LAngleLoc, Params,
-                                    RequiresLoc,
+                                    WhereLoc,
                                     Context.AllocateCopy(Requirements),
                                     RAngleLoc);
 }

@@ -23,7 +23,7 @@ using namespace swift;
 /// < T : Comparable, U : Container> along with an optional requires clause.
 ///
 ///   generic-params:
-///     '<' generic-param (',' generic-param)? requires-clause? '>'
+///     '<' generic-param (',' generic-param)? where-clause? '>'
 ///
 ///   generic-param:
 ///     identifier
@@ -40,7 +40,7 @@ GenericParamList *Parser::parseGenericParameters() {
 
 GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
   // Parse the generic parameter list.
-  // FIXME: Allow a bare 'requires' clause with no generic parameters?
+  // FIXME: Allow a bare 'where' clause with no generic parameters?
   SmallVector<GenericParam, 4> GenericParams;
   bool Invalid = false;
   do {
@@ -84,11 +84,11 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
 
-  // Parse the optional requires-clause.
-  SourceLoc RequiresLoc;
+  // Parse the optional where-clause.
+  SourceLoc WhereLoc;
   SmallVector<Requirement, 4> Requirements;
-  if (Tok.is(tok::kw_requires) &&
-      parseRequiresClause(RequiresLoc, Requirements)) {
+  if (Tok.is(tok::kw_where) &&
+      parseGenericWhereClause(WhereLoc, Requirements)) {
     Invalid = true;
   }
   
@@ -116,7 +116,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     return nullptr;
 
   return GenericParamList::create(Context, LAngleLoc, GenericParams,
-                                  RequiresLoc, Requirements, RAngleLoc);
+                                  WhereLoc, Requirements, RAngleLoc);
 }
 
 GenericParamList *Parser::maybeParseGenericParams() {
@@ -126,11 +126,11 @@ GenericParamList *Parser::maybeParseGenericParams() {
   return parseGenericParameters();
 }
 
-/// parseRequiresClause - Parse a requires clause, which places additional
+/// parseGenericWhereClause - Parse a 'where' clause, which places additional
 /// constraints on generic parameters or types based on them.
 ///
-///   requires-clause:
-///     'requires' requirement (',' requirement) *
+///   where-clause:
+///     'where' requirement (',' requirement) *
 ///
 ///   requirement:
 ///     conformance-requirement
@@ -142,10 +142,10 @@ GenericParamList *Parser::maybeParseGenericParams() {
 ///
 ///   same-type-requirement:
 ///     type-identifier '==' type-identifier
-bool Parser::parseRequiresClause(SourceLoc &RequiresLoc,
-                                 SmallVectorImpl<Requirement> &Requirements) {
+bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
+                                     SmallVectorImpl<Requirement> &Requirements) {
   // Parse the 'requires'.
-  RequiresLoc = consumeToken(tok::kw_requires);
+  WhereLoc = consumeToken(tok::kw_where);
   bool Invalid = false;
   do {
     // Parse the leading type-identifier.

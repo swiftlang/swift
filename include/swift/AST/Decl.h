@@ -315,7 +315,7 @@ enum class RequirementKind : unsigned int {
   SameType
 };
 
-/// \brief A single requirement in a requires clause, which places additional
+/// \brief A single requirement in a where clause, which places additional
 /// restrictions on the generic parameters or associated types of a generic
 /// function, type, or protocol.
 class Requirement {
@@ -439,7 +439,7 @@ public:
 class GenericParamList {
   SourceRange Brackets;
   unsigned NumParams;
-  SourceLoc RequiresLoc;
+  SourceLoc WhereLoc;
   MutableArrayRef<Requirement> Requirements;
   ArrayRef<ArchetypeType *> AllArchetypes;
 
@@ -447,7 +447,7 @@ class GenericParamList {
 
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
-                   SourceLoc RequiresLoc,
+                   SourceLoc WhereLoc,
                    MutableArrayRef<Requirement> Requirements,
                    SourceLoc RAngleLoc);
 
@@ -465,7 +465,7 @@ public:
                                   ArrayRef<GenericParam> Params,
                                   SourceLoc RAngleLoc);
 
-  /// create - Create a new generic parameter list and requires clause within
+  /// create - Create a new generic parameter list and "where" clause within
   /// the given AST context.
   ///
   /// \param Context The ASTContext in which the generic parameter list will
@@ -473,14 +473,14 @@ public:
   /// \param LAngleLoc The location of the opening angle bracket ('<')
   /// \param Params The list of generic parameters, which will be copied into
   /// ASTContext-allocated memory.
-  /// \param RequiresLoc The location of the 'requires' keyword, if any.
+  /// \param WhereLoc The location of the 'where' keyword, if any.
   /// \param Requirements The list of requirements, which will be copied into
   /// ASTContext-allocated memory.
   /// \param RAngleLoc The location of the closing angle bracket ('>')
   static GenericParamList *create(ASTContext &Context,
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericParam> Params,
-                                  SourceLoc RequiresLoc,
+                                  SourceLoc WhereLoc,
                                   MutableArrayRef<Requirement> Requirements,
                                   SourceLoc RAngleLoc);
 
@@ -500,16 +500,16 @@ public:
   const GenericParam *begin() const { return getParams().begin(); }
   const GenericParam *end()   const { return getParams().end(); }
 
-  /// \brief Retrieve the location of the 'requires' keyword, or an invald
-  /// location if 'requires' was not present.
-  SourceLoc getRequiresLoc() const { return RequiresLoc; }
+  /// \brief Retrieve the location of the 'where' keyword, or an invalid
+  /// location if 'where' was not present.
+  SourceLoc getWhereLoc() const { return WhereLoc; }
 
   /// \brief Retrieve the set of additional requirements placed on these
   /// generic parameters and types derived from them.
   ///
   /// This list may contain both explicitly-written requirements as well as
   /// implicitly-generated requirements, and may be non-empty even if no
-  /// 'requires' keyword were present.
+  /// 'where' keyword is present.
   MutableArrayRef<Requirement> getRequirements() { return Requirements; }
 
   /// \brief Retrieve the set of additional requirements placed on these
@@ -517,7 +517,7 @@ public:
   ///
   /// This list may contain both explicitly-written requirements as well as
   /// implicitly-generated requirements, and may be non-empty even if no
-  /// 'requires' keyword were present.
+  /// 'where' keyword is present.
   ArrayRef<Requirement> getRequirements() const { return Requirements; }
 
   /// \brief Override the set of requirements associated with this generic
@@ -564,7 +564,7 @@ public:
   ///
   /// \code
   /// class Vector<T> {
-  ///   constructor<R : Range requires R.Element == T>(range : R) { }
+  ///   constructor<R : Range where R.Element == T>(range : R) { }
   /// }
   /// \endcode
   ///
