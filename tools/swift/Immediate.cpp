@@ -658,7 +658,7 @@ private:
     return (((REPLInput*)clientdata)->*method)(ch);
   }
   
-  bool isAtStartOfLine(LineInfoW const *line) {
+  bool isAtStartOfLine(const LineInfoW *line) {
     for (wchar_t c : llvm::makeArrayRef(line->buffer,
                                         line->cursor - line->buffer)) {
       if (!iswspace(c))
@@ -668,8 +668,8 @@ private:
   }
 
   // /^\s*\w+\s*:$/
-  bool lineLooksLikeLabel(LineInfoW const *line) {
-    wchar_t const *p = line->buffer;
+  bool lineLooksLikeLabel(const LineInfoW *line) {
+    const wchar_t *p = line->buffer;
     while (p != line->cursor && iswspace(*p))
       ++p;
 
@@ -687,8 +687,8 @@ private:
   }
   
   // /^\s*set\s*\(.*\)\s*:$/
-  bool lineLooksLikeSetter(LineInfoW const *line) {
-    wchar_t const *p = line->buffer;
+  bool lineLooksLikeSetter(const LineInfoW *line) {
+    const wchar_t *p = line->buffer;
     while (p != line->cursor && iswspace(*p))
       ++p;
     
@@ -713,6 +713,24 @@ private:
 
     return *p == L')';
   }
+  
+  // /^\s*case.*:$/
+  bool lineLooksLikeCase(const LineInfoW *line) {
+    const wchar_t *p = line->buffer;
+    while (p != line->cursor && iswspace(*p))
+      ++p;
+    
+    if (p == line->cursor || *p++ != L'c')
+      return false;
+    if (p == line->cursor || *p++ != L'a')
+      return false;
+    if (p == line->cursor || *p++ != L's')
+      return false;
+    if (p == line->cursor || *p++ != L'e')
+      return false;
+    
+    return line->cursor[-1] == ':';
+  }
 
   void outdent() {
     // If we didn't already outdent, do so.
@@ -728,13 +746,16 @@ private:
     wchar_t s[2] = {(wchar_t)ch, 0};
     el_winsertstr(e, s);
     
-    LineInfoW const *line = el_wline(e);
+    const LineInfoW *line = el_wline(e);
 
     // Outdent if the line looks like a label.
     if (lineLooksLikeLabel(line))
       outdent();
     // Outdent if the line looks like a setter.
-    if (lineLooksLikeSetter(line))
+    else if (lineLooksLikeSetter(line))
+      outdent();
+    // Outdent if the line looks like a 'case' label.
+    else if (lineLooksLikeCase(line))
       outdent();
     
     return CC_REFRESH;
@@ -757,7 +778,7 @@ private:
   }
   
   unsigned char onIndentOrComplete(int ch) {
-    LineInfoW const *line = el_wline(e);
+    const LineInfoW *line = el_wline(e);
     
     // FIXME: UTF-8? What's that?
     size_t cursorPos = line->cursor - line->buffer;
@@ -765,7 +786,7 @@ private:
     // If there's nothing but whitespace before the cursor, indent to the next
     // 2-character tab stop.
     if (isAtStartOfLine(line)) {
-      wchar_t const *indent = cursorPos & 1 ? L" " : L"  ";
+      const wchar_t *indent = cursorPos & 1 ? L" " : L"  ";
       el_winsertstr(e, indent);
       return CC_REFRESH;
     }
