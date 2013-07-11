@@ -375,8 +375,6 @@ public:
                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
                  std::function<bool()> callback);
   
-  bool parseValueSpecifier(TypeLoc &Loc, NullablePtr<Expr> &Init);
-
   void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                        bool IsTopLevel,
                        BraceItemListKind Kind = BraceItemListKind::Brace);

@@ -448,6 +448,8 @@ ERROR(tuple_ellipsis_init,type_parsing,none,
       "varargs used with tuple field with initializer", ())
 ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
       "unexpected '...' before the end of a tuple list", ())
+ERROR(tuple_type_init,pattern_parsing,none,
+      "default argument not permitted in a tuple type", ())
 
 // Protocol Types
 ERROR(expected_lbrace_protocol_type,type_parsing,none,
@@ -474,7 +476,7 @@ ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
 ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
       "variadic arguments '...' must come at the end of the pattern", ())
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
-      "tuple element in pattern cannot have a default initializer", ())
+      "default argument is only permitted for a non-curried function parameter",())
 ERROR(missing_comma_in_pattern,pattern_parsing,none,
       "missing comma between patterns", ())
 ERROR(var_pattern_in_var,pattern_parsing,none,

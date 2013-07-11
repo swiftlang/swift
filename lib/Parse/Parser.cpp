@@ -435,38 +435,6 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   return Invalid;
 }
 
-
-/// value-specifier:
-///   ':' type-annotation
-///   ':' type-annotation '=' expr
-///   '=' expr
-bool Parser::parseValueSpecifier(TypeLoc &Ty,
-                                 NullablePtr<Expr> &Init) {
-  // Diagnose when we don't have a type or an expression.
-  if (Tok.isNot(tok::colon) && Tok.isNot(tok::equal)) {
-    diagnose(Tok, diag::expected_type_or_init);
-    // TODO: Recover better by still creating var, but making it have
-    // 'invalid' type so that uses of the identifier are not errors.
-    return true;
-  }
-  
-  // Parse the type if present.
-  if (consumeIf(tok::colon) &&
-      parseTypeAnnotation(Ty, diag::expected_type))
-    return true;
-  
-  // Parse the initializer, if present.
-  if (consumeIf(tok::equal)) {
-    NullablePtr<Expr> Tmp = parseExpr(diag::expected_initializer_expr);
-    if (Tmp.isNull())
-      return true;
-    
-    Init = Tmp.get();
-  }
-  
-  return false;
-}
-
 /// diagnoseRedefinition - Diagnose a redefinition error, with a note
 /// referring back to the original definition.
 

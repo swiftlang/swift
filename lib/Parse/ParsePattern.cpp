@@ -36,7 +36,7 @@ static bool parseCurriedFunctionArguments(Parser &P,
   // parseFunctionArguments parsed the first argument pattern.
   // Parse additional curried argument clauses as long as we can.
   while (P.Tok.is(tok::l_paren)) {
-    NullablePtr<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/true);
+    NullablePtr<Pattern> pattern = P.parsePatternTuple(/*AllowInitExpr=*/false);
     if (pattern.isNull())
       return true;
     else {
@@ -332,10 +332,13 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
   ExprHandle *init = nullptr;
   if (Tok.is(tok::equal)) {
     SourceLoc EqualLoc = consumeToken();
-    if (!allowInitExpr) {
-      diagnose(EqualLoc, diag::non_func_decl_pattern_init);
-    }
     NullablePtr<Expr> initR = parseExpr(diag::expected_initializer_expr);
+
+    if (!allowInitExpr) {
+      auto inFlight = diagnose(EqualLoc, diag::non_func_decl_pattern_init);
+      if (initR.isNonNull())
+        inFlight.fixItRemove(SourceRange(EqualLoc, initR.get()->getEndLoc()));
+    }
 
     // FIXME: Silently dropping initializer expressions where they aren't
     // permitted.

@@ -657,7 +657,7 @@
   <h3 id="decl-var">var Declarations</h3>
   <!-- ===================================================================== -->
   
-  <pre id="value-specifier" class="grammar">
+  <pre class="grammar">
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
 
     decl-var        ::= 'var' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
@@ -1188,7 +1188,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <h3 id="decl-subscript">subscript Declarations</h3>
   <!-- ===================================================================== -->
   
-  <pre id="value-specifier" class="grammar">
+  <pre class="grammar">
     decl-subscript        ::= subscript-head '{' <a href="#get-set">get-set<a/> '}'
     <a id="subscript-head"></a>subscript-head        ::= 'subscript' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a>
   </pre>
@@ -1575,7 +1575,7 @@ if vec[3] {
   <pre class="grammar">
     type-tuple ::= '(' type-tuple-body? ')'
     type-tuple-body ::= type-tuple-element (',' type-tuple-element)* '...'?
-    type-tuple-element ::= identifier <a href="#value-specifier">value-specifier</a>
+    type-tuple-element ::= identifier ':' <a href="#type">type-annotation</a>
     type-tuple-element ::= <a href="#type">type-annotation</a>
   </pre>
 
@@ -1590,16 +1590,7 @@ if vec[3] {
   tuples are widely accessible and available everywhere in the language,
   aggregate data access and transformation is uniform and powerful.</p>
 
-  <p>Each element of a tuple contains an optional name followed by a type and/or
-  a default value expression, whose type conversion rules work like those in a
-  var declaration.  The name affects swizzling of elements in the tuple when <a
-  href="#typecheck_conversions">tuple conversions</a> are performed.</p>
-
-  <p>For tuples with elements with default values, the default value is
-  evaluated when converting an expression to that tuple type if it is used, or
-  when a value of that tuple type is default-initialized.  The default value
-  is not allowed to refer to local declarations. FIXME: Maybe we should relax
-  this?</p>
+  <p>Each element of a tuple contains an optional name followed by a type.</p>
 
   <p>If the tuple body ends with '...', the tuple is a varargs tuple. The type
      of the last element is changed from T to T[], and there are special rules
@@ -1610,8 +1601,6 @@ if vec[3] {
   var a : ()
   var b : (Int, Int)
   var c : (x : (), y : Int)
-  var d : (a : Int, b = 4)       <i>// Value is initialized to (0,4)</i>
-  var e : (a : Int, b = 4) = (1) <i>// Value is initialized to (1,4)</i>
 
   <i>// Tuple type inferred from an initializers:</i>
   var m = ()                     <i>// Type = ()</i>

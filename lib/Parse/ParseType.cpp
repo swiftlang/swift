@@ -367,42 +367,39 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:
-///     identifier value-specifier
+///     identifier ':' type-annotation
 ///     type-annotation
 bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   SmallVector<TupleTypeElt, 8> Elements;
   SmallVector<TypeRepr *, 8> ElementsR;
-  bool HadExpr = false;
   bool HadEllipsis = false;
 
   bool Invalid = parseList(tok::r_paren, LPLoc, RPLoc,
                            tok::comma, /*OptionalSep=*/false,
                            diag::expected_rparen_tuple_type_list,
                            [&] () -> bool {
-    // If the tuple element starts with "ident :" or "ident =", then
-    // the identifier is an element tag, and it is followed by a
-    // value-specifier.
-    if (isStartOfBindingName(Tok) &&
-        (peekToken().is(tok::colon) || peekToken().is(tok::equal))) {
+    // If the tuple element starts with "ident :", then
+    // the identifier is an element tag, and it is followed by a type
+    // annotation.
+    if (isStartOfBindingName(Tok) && peekToken().is(tok::colon)) {
+      // Consume the name
+      // FIXME: Should the identifier '_' ever be formed?
       Identifier name = Context.getIdentifier(Tok.getText());
       SourceLoc nameLoc = consumeToken();
 
-      NullablePtr<Expr> init;
+      // Consume the ':'.
+      consumeToken(tok::colon);
+
+      // Parse the type annotation.
       TypeLoc type;
-      if (parseValueSpecifier(type, init))
+      if (parseTypeAnnotation(type, diag::expected_type))
         return true;
 
-      ExprHandle *initHandle = nullptr;
-      if (init.isNonNull()) {
-        Invalid = true;
-        initHandle = ExprHandle::get(Context, init.get());
-      }
-      HadExpr |= init.isNonNull();
-      Elements.push_back(TupleTypeElt(type.getType(), name, initHandle));
+      Elements.push_back(TupleTypeElt(type.getType(), name, nullptr));
       ElementsR.push_back(new (Context) NamedTypeRepr(name, type.getTypeRepr(),
-                                                      initHandle, nameLoc));
+                                                      nullptr, nameLoc));
     } else {
       // Otherwise, this has to be a type.
       TypeLoc type;
@@ -411,6 +408,17 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
       Elements.push_back(type.getType());
       ElementsR.push_back(type.getTypeRepr());
     }
+
+    // Parse '= expr' here so we can complain about it directly, rather
+    // than dying when we see it.
+    if (Tok.is(tok::equal)) {
+      SourceLoc equalLoc = consumeToken(tok::equal);
+      auto init = parseExpr(diag::expected_initializer_expr);
+      auto inFlight = diagnose(equalLoc, diag::tuple_type_init);
+      if (init.isNonNull())
+        inFlight.fixItRemove(SourceRange(equalLoc, init.get()->getEndLoc()));
+    }
+
     if (Tok.is(tok::ellipsis)) {
       EllipsisLoc = consumeToken(tok::ellipsis);
       if (Tok.is(tok::r_paren)) {
@@ -426,7 +434,6 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
 
   // A "tuple" with one anonymous element is actually not a tuple.
   if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
-    assert(!HadExpr && "Only TupleTypes have default values");
     Result = { ParenType::get(Context, Elements.back().getType()),
                SourceRange(LPLoc, Tok.getLoc()),
                TupleTypeRepr::create(Context, ElementsR,
@@ -452,9 +459,6 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   }
 
   TupleType *TT = TupleType::get(Elements, Context)->castTo<TupleType>();
-  if (HadExpr)
-    TypesWithDefaultValues.emplace_back(TT, CurDeclContext);
-
   Result = { TT, SourceRange(LPLoc, RPLoc),
              TupleTypeRepr::create(Context, ElementsR,
                                    SourceRange(LPLoc, Tok.getLoc()),
@@ -684,9 +688,8 @@ bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
     do {
-      // If the tuple element starts with "ident :", then
-      // the identifier is an element tag, and it is followed by a
-      // value-specifier.
+      // If the tuple element starts with "ident :", then it is followed
+      // by a type annotation.
       if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
         consumeToken(tok::identifier);
         consumeToken(tok::colon);
@@ -706,7 +709,8 @@ bool Parser::canParseTypeTupleBody() {
         if (!canParseType())
           return false;
 
-        // Parse default values.
+        // Parse default values. This aren't actually allowed, but we recover
+        // better if we skip over them.
         if (consumeIf(tok::equal)) {
           while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
                  Tok.isNot(tok::r_brace) && Tok.isNot(tok::ellipsis) &&
@@ -720,7 +724,18 @@ bool Parser::canParseTypeTupleBody() {
       }
       
       // Otherwise, this has to be a type.
-      // FIXME: Type attributes!
+
+      // Parse attributes.
+      if (consumeIf(tok::l_square)) {
+        while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
+               Tok.isNot(tok::r_square) && Tok.isNot(tok::r_paren) &&
+               !isStartOfDecl(Tok, peekToken()))
+          skipSingle();
+
+        if (!consumeIf(tok::r_square))
+          return false;
+      }
+
       if (!canParseType())
         return false;
     } while (consumeIf(tok::comma));
