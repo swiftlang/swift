@@ -240,6 +240,7 @@ namespace decls_block {
     CLASS_DECL,
     ONEOF_DECL,
     ONEOF_ELEMENT_DECL,
+    SUBSCRIPT_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -485,7 +486,19 @@ namespace decls_block {
     BCFixed<1>   // implicit?
   >;
 
+  using SubscriptLayout = BCRecordLayout<
+    SUBSCRIPT_DECL,
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit?
+    TypeIDField, // subscript dummy type
+    TypeIDField, // element type
+    DeclIDField, // getter
+    DeclIDField, // setter
+    DeclIDField  // overridden decl
+    // The indices pattern trails the record.
+  >;
 
+  
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN
     // The sub-pattern trails the record.

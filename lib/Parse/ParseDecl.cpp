@@ -1819,6 +1819,24 @@ Decl *Parser::parseDeclProtocol(unsigned Flags) {
   return Proto;
 }
 
+namespace {
+  /// Recursively walks a pattern and sets all variables' decl contexts to the
+  /// given context.
+  class SetVarContext : public ASTWalker {
+    DeclContext *CurDeclContext;
+
+  public:
+    SetVarContext(DeclContext *Context) : CurDeclContext(Context) {}
+
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P))
+        Named->getDecl()->setDeclContext(CurDeclContext);
+      return P;
+    }
+  };
+}
+
 /// parseDeclSubscript - Parse a 'subscript' declaration, returning true
 /// on error.
 ///
@@ -1846,7 +1864,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   NullablePtr<Pattern> Indices = parsePatternTuple(/*AllowInitExpr=*/false);
   if (Indices.isNull())
     return true;
-  
+  Indices.get()->walk(SetVarContext(CurDeclContext));
+
   // '->'
   if (!Tok.is(tok::arrow)) {
     diagnose(Tok.getLoc(), diag::expected_arrow_subscript);

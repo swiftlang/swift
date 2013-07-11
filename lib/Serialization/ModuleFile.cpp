@@ -975,6 +975,41 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::SUBSCRIPT_DECL: {
+    DeclID contextID;
+    bool isImplicit;
+    TypeID declTypeID, elemTypeID;
+    DeclID getterID, setterID;
+    DeclID overriddenID;
+
+    decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
+                                             declTypeID, elemTypeID,
+                                             getterID, setterID,
+                                             overriddenID);
+
+    Pattern *indices = maybeReadPattern();
+    assert(indices);
+
+    auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
+    auto getter = cast_or_null<FuncDecl>(getDecl(getterID));
+    auto setter = cast_or_null<FuncDecl>(getDecl(setterID));
+
+    auto subscript = new (ctx) SubscriptDecl(ctx.getIdentifier("__subscript"),
+                                             SourceLoc(), indices, SourceLoc(),
+                                             elemTy, SourceRange(),
+                                             getter, setter,
+                                             getDeclContext(contextID));
+    declOrOffset = subscript;
+
+    subscript->setType(getType(declTypeID));
+    if (isImplicit)
+      subscript->setImplicit();
+
+    auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
+    subscript->setOverriddenDecl(overriddenDecl);
+    break;
+  }
+
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;

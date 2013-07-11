@@ -427,6 +427,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, CLASS_DECL);
   RECORD(decls_block, ONEOF_DECL);
   RECORD(decls_block, ONEOF_ELEMENT_DECL);
+  RECORD(decls_block, SUBSCRIPT_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -1064,8 +1065,30 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::Subscript:
-    return false;
+  case DeclKind::Subscript: {
+    auto subscript = cast<SubscriptDecl>(D);
+
+    // FIXME: Handle attributes.
+    if (!subscript->getAttrs().empty())
+      return false;
+
+    const Decl *DC = getDeclForContext(subscript->getDeclContext());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
+    SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addDeclRef(DC),
+                                subscript->isImplicit(),
+                                addTypeRef(subscript->getType()),
+                                addTypeRef(subscript->getElementType()),
+                                addDeclRef(subscript->getGetter()),
+                                addDeclRef(subscript->getSetter()),
+                                addDeclRef(subscript->getOverriddenDecl()));
+
+    writePattern(subscript->getIndices());
+
+    return true;
+  }
+
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
@@ -1433,6 +1456,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ClassLayout>();
     registerDeclTypeAbbr<OneOfLayout>();
     registerDeclTypeAbbr<OneOfElementLayout>();
+    registerDeclTypeAbbr<SubscriptLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();
