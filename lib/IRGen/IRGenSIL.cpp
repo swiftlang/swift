@@ -63,14 +63,17 @@ class StaticFunction {
   llvm::Function *function;
   /// The function's native calling convention.
   AbstractCC cc;
+  /// The function's explosion level.
+  ExplosionKind explosionLevel;
   
 public:
-  StaticFunction(llvm::Function *function, AbstractCC cc)
-    : function(function), cc(cc)
+  StaticFunction(llvm::Function *function, AbstractCC cc, ExplosionKind level)
+    : function(function), cc(cc), explosionLevel(level)
   {}
   
   llvm::Function *getFunction() const { return function; }
   AbstractCC getAbstractCC() const { return cc; }
+  ExplosionKind getExplosionLevel() const { return explosionLevel; }
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };
@@ -403,11 +406,12 @@ public:
   /// Create a new StaticFunction corresponding to the given SIL value.
   void setLoweredStaticFunction(SILValue v,
                                 llvm::Function *f,
-                                AbstractCC cc) {
+                                AbstractCC cc,
+                                ExplosionKind explosionLevel) {
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
-    setLoweredValue(v, StaticFunction{f, cc});
+    setLoweredValue(v, StaticFunction{f, cc, explosionLevel});
   }
   
   void setLoweredObjCMethod(SILValue v, SILConstant method,
@@ -670,7 +674,8 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
       IGF.setLoweredAddress(SILValue(arg,0),
                             ti.getAddressForPointer(phis.back()));
     } else {
-      ExplosionSchema schema = ti.getSchema(IGF.CurExplosionLevel);
+      // PHIs are always emitted with maximal explosion.
+      ExplosionSchema schema = ti.getSchema(ExplosionKind::Maximal);
       for (auto &elt : schema) {
         if (elt.isScalar())
           phis.push_back(
@@ -681,7 +686,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
                      predecessors));
       }
       
-      Explosion argValue(IGF.CurExplosionLevel);
+      Explosion argValue(ExplosionKind::Maximal);
       for (llvm::PHINode *phi : make_range(phis.begin()+first, phis.end()))
         argValue.add(phi);
       IGF.setLoweredExplosion(SILValue(arg,0), argValue);
@@ -722,38 +727,46 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
 /// convention.
 static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                             SILBasicBlock *entry,
-                                            Explosion &params,
+                                            Explosion &allParamValues,
                                             SILType funcTy) {
   SILFunctionTypeInfo *funcTI = funcTy.getFunctionTypeInfo(*IGF.IGM.SILMod);
   
   // Map the indirect return if present.
-  ArrayRef<SILArgument*> args
-    = emitEntryPointIndirectReturn(IGF, entry, params, funcTI,
+  ArrayRef<SILArgument*> params
+    = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTI,
       [&]() -> bool {
-        TypeInfo const &retType
-          = IGF.IGM.getFragileTypeInfo(funcTI->getResultType());
-        ExplosionSchema schema = retType.getSchema(IGF.CurExplosionLevel);
-     
-        return schema.requiresIndirectResult();
+        auto retType = funcTI->getResultType().getSwiftRValueType();
+        return IGF.IGM.requiresIndirectResult(retType, IGF.CurExplosionLevel);
       });
 
-  // Map the remaining SIL argument to LLVM arguments.
-  for (SILArgument *arg : args) {
-    SILValue argv(arg, 0);
-    TypeInfo const &argType = IGF.getFragileTypeInfo(arg->getType());
-    if (arg->getType().isAddress()) {
-      IGF.setLoweredAddress(argv,
-                            argType.getAddressForPointer(params.claimNext()));
+  // Map the remaining SIL parameters to LLVM parameters.
+  for (SILArgument *param : params) {
+    // Pull out the parameter value and its formal type.
+    auto &paramTI = IGF.getFragileTypeInfo(param->getType());
+
+    // If the SIL parameter isn't passed indirectly, we need to map it
+    // to an explosion.  Fortunately, in this case we have a guarantee
+    // that it's passed directly in IR.
+    if (!param->getType().isAddress()) {
+      Explosion paramValues(IGF.CurExplosionLevel);
+      paramTI.reexplode(IGF, allParamValues, paramValues);
+      IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
       continue;
     }
-    Explosion explosion(IGF.CurExplosionLevel);
-    argType.reexplode(IGF, params, explosion);
-    IGF.setLoweredExplosion(arg, explosion);
+
+    // Okay, the type is passed indirectly in SIL, so we need to map
+    // it to an address.
+    // FIXME: that doesn't mean we should physically pass it
+    // indirectly at this explosion level, but SIL currently gives us
+    // no ability to distinguish between an l-value and a byval argument.
+    Address paramAddr
+      = paramTI.getAddressForPointer(allParamValues.claimNext());
+    IGF.setLoweredAddress(SILValue(param, 0), paramAddr);
   }
   
   // Bind polymorphic arguments.
   if (auto polyFn = funcTy.getAs<PolymorphicFunctionType>())
-    emitPolymorphicParameters(IGF, polyFn, params);
+    emitPolymorphicParameters(IGF, polyFn, allParamValues);
 }
 
 /// Emit entry point arguments for the parameters of a C function, or the
@@ -947,14 +960,17 @@ void IRGenSILFunction::visitBuiltinFunctionRefInst(
 }
 
 void IRGenSILFunction::visitFunctionRefInst(swift::FunctionRefInst *i) {
-  llvm::Function *fnptr = IGM.getAddrOfSILFunction(i->getFunction(),
-                                                   CurExplosionLevel);
+  // FIXME: pick the best available explosion level
+  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  llvm::Function *fnptr =
+    IGM.getAddrOfSILFunction(i->getFunction(), explosionLevel);
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if
   // we don't need to.
   setLoweredStaticFunction(SILValue(i, 0), fnptr,
-                           i->getFunction()->getAbstractCC());
+                           i->getFunction()->getAbstractCC(),
+                           explosionLevel);
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1025,7 +1041,7 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
   getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
   
   if (isUsedAsSwiftMetatype) {
-    Explosion e(IGF.CurExplosionLevel);
+    Explosion e(ExplosionKind::Maximal);
     emitMetaTypeRef(IGF, instanceType, e);
     if (!isUsedAsObjCClass) {
       IGF.setLoweredExplosion(SILValue(i, 0), e);
@@ -1034,7 +1050,6 @@ static void emitMetatypeInst(IRGenSILFunction &IGF,
     swiftMetatype = e.claimNext();
   }
   if (isUsedAsObjCClass) {
-    Explosion e(IGF.CurExplosionLevel);
     objcClass = emitClassHeapMetadataRef(IGF, instanceType);
   }
   IGF.setLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
@@ -1071,7 +1086,7 @@ void IRGenSILFunction::visitArchetypeMetatypeInst(
   
   llvm::Value *metatype = emitTypeMetadataRefForArchetype(*this, base,
                                                     i->getOperand().getType());
-  Explosion result(CurExplosionLevel);
+  Explosion result(ExplosionKind::Maximal);
   result.add(metatype);
   setLoweredExplosion(SILValue(i, 0), result);
 }
@@ -1088,7 +1103,7 @@ void IRGenSILFunction::visitProtocolMetatypeInst(
     metatype = emitTypeMetadataRefForOpaqueExistential(*this, existential,
                                                  i->getOperand().getType());
   }
-  Explosion result(CurExplosionLevel);
+  Explosion result(ExplosionKind::Maximal);
   result.add(metatype);
   setLoweredExplosion(SILValue(i, 0), result);
 }
@@ -1104,8 +1119,15 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
                               SILValue newArg) {
   if (newArg.getType().isAddress()) {
     args.add(IGF.getLoweredAddress(newArg).getAddress());
-  } else {
+    return;
+  }
+
+  // Otherwise, it's an explosion, which we may need to translate.
+  if (args.getKind() == IGF.getExplosionKind(newArg)) {
     IGF.getLoweredExplosion(newArg, args);
+  } else {
+    Explosion temp = IGF.getLoweredExplosion(newArg);
+    IGF.getFragileTypeInfo(newArg.getType()).reexplode(IGF, temp, args);
   }
 }
 
@@ -1116,10 +1138,12 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          ArrayRef<Substitution> substitutions) {
   llvm::Value *calleeFn, *calleeData;
   ExtraData extraData;
+  ExplosionKind explosionLevel;
   
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
+    explosionLevel = lv.getStaticFunction().getExplosionLevel();
     calleeData = nullptr;
     extraData = ExtraData::None;
     break;
@@ -1130,7 +1154,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                      calleeTy,
                                      resultTy,
                                      substitutions,
-                                     IGF.CurExplosionLevel,
+                                     ExplosionKind::Minimal,
                                      bool(objcMethod.getSuperSearchType()));
   }
       
@@ -1154,9 +1178,12 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     else
       llvm_unreachable("unexpected extra data for function value");
 
+    // Indirect functions are always minimal.
+    explosionLevel = ExplosionKind::Minimal;
+
     // Cast the callee pointer to the right function type.
     llvm::AttributeSet attrs;
-    auto fnPtrTy = IGF.IGM.getFunctionType(calleeTy, IGF.CurExplosionLevel,
+    auto fnPtrTy = IGF.IGM.getFunctionType(calleeTy, explosionLevel,
                                            extraData, attrs)->getPointerTo();
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnPtrTy);
     break;
@@ -1178,7 +1205,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   Callee callee = Callee::forKnownFunction(calleeTy,
                                            resultTy,
                                            substitutions, calleeFn, calleeData,
-                                           IGF.CurExplosionLevel);
+                                           explosionLevel);
   return CallEmission(IGF, callee);
 }
 
@@ -1245,7 +1272,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
                                  FuncDecl *builtin,
                                  ApplyInst *i,
                                  ArrayRef<Substitution> substitutions) {
-  Explosion args(IGF.CurExplosionLevel);
+  Explosion args(ExplosionKind::Maximal);
   
   auto argValues = i->getArguments();
   
@@ -1261,7 +1288,7 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   if (indirectResult.isValid()) {
     emitBuiltinCall(IGF, builtin, args, nullptr, indirectResult, substitutions);
   } else {
-    Explosion result(IGF.CurExplosionLevel);
+    Explosion result(ExplosionKind::Maximal);
     emitBuiltinCall(IGF, builtin, args, &result, Address(), substitutions);
     IGF.setLoweredExplosion(SILValue(i,0), result);
   }
@@ -1288,7 +1315,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                                      resultTy, calleeLV);
   
   // Lower the SIL arguments to IR arguments.
-  Explosion llArgs(CurExplosionLevel);
+  Explosion llArgs(emission.getCurExplosionLevel());
   
   // Save off the indirect return argument, if any.
   OperandValueArrayRef args = i->getArgumentsWithoutIndirectReturn(*IGM.SILMod);
@@ -1339,7 +1366,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // be how we model "address" properties in the future.
   
   // If the result is a non-address value, emit to an explosion.
-  Explosion result(CurExplosionLevel);
+  Explosion result(emission.getCurExplosionLevel());
   emission.emitToExplosion(result);
   setLoweredExplosion(SILValue(i, 0), result);
 }
@@ -1405,7 +1432,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   assert(i->getCallee().getType().castTo<FunctionType>()->isThin() &&
          "can't closure a function that already has context");
   
-  Explosion llArgs(CurExplosionLevel);
+  Explosion llArgs(ExplosionKind::Maximal);
   SmallVector<SILType, 8> argTypes;
   for (SILValue arg : i->getArguments()) {
     emitApplyArgument(*this, llArgs, arg);
@@ -1415,7 +1442,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   }
   
   // Create the thunk and function value.
-  Explosion function(CurExplosionLevel);
+  Explosion function(ExplosionKind::Maximal);
   emitFunctionPartialApplication(*this, calleeFn, llArgs,
                                  argTypes, substitutions,
                                  origCalleeTy, i->getCallee().getType(),
@@ -1426,7 +1453,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
   llvm::Value *constant = llvm::ConstantInt::get(IGM.LLVMContext,
                                                  i->getValue());
-  Explosion e(CurExplosionLevel);
+  Explosion e(ExplosionKind::Maximal);
   e.add(constant);
   setLoweredExplosion(SILValue(i, 0), e);
 }
@@ -1434,13 +1461,13 @@ void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
 void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
   llvm::Value *constant = llvm::ConstantFP::get(IGM.LLVMContext,
                                                 i->getValue());
-  Explosion e(CurExplosionLevel);
+  Explosion e(ExplosionKind::Maximal);
   e.add(constant);
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
-  Explosion e(CurExplosionLevel);
+  Explosion e(ExplosionKind::Maximal);
   emitStringLiteral(*this, i->getValue(), e);
   setLoweredExplosion(SILValue(i, 0), e);
 }
@@ -1520,14 +1547,14 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
 }
 
 void IRGenSILFunction::visitStructInst(swift::StructInst *i) {
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   for (SILValue elt : i->getElements())
     out.add(getLoweredExplosion(elt).claimAll());
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   for (SILValue elt : i->getElements())
     out.add(getLoweredExplosion(elt).claimAll());
   setLoweredExplosion(SILValue(i, 0), out);
@@ -1536,24 +1563,24 @@ void IRGenSILFunction::visitTupleInst(swift::TupleInst *i) {
 void IRGenSILFunction::visitBuiltinZeroInst(swift::BuiltinZeroInst *i) {
   auto &ti = getFragileTypeInfo(i->getType());
   llvm::Value *zeroValue = llvm::Constant::getNullValue(ti.getStorageType());
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   out.add(zeroValue);
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitTupleExtractInst(swift::TupleExtractInst *i) {
   SILValue v(i, 0);
-  Explosion lowered(CurExplosionLevel);
-  Explosion operand = getLoweredExplosion(i->getOperand());
+  Explosion fullTuple = getLoweredExplosion(i->getOperand());
+  Explosion output(fullTuple.getKind());
   SILType baseType = i->getOperand().getType();
   
   projectTupleElementFromExplosion(*this,
                                    baseType,
-                                   operand,
+                                   fullTuple,
                                    i->getFieldNo(),
-                                   lowered);
-  operand.claimAll();
-  setLoweredExplosion(v, lowered);
+                                   output);
+  fullTuple.claimAll();
+  setLoweredExplosion(v, output);
 }
 
 void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
@@ -1570,7 +1597,7 @@ void IRGenSILFunction::visitTupleElementAddrInst(swift::TupleElementAddrInst *i)
 
 void IRGenSILFunction::visitStructExtractInst(swift::StructExtractInst *i) {
   SILValue v(i, 0);
-  Explosion lowered(CurExplosionLevel);
+  Explosion lowered(ExplosionKind::Maximal);
   Explosion operand = getLoweredExplosion(i->getOperand());
   SILType baseType = i->getOperand().getType();
   
@@ -1611,12 +1638,12 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
 
 void IRGenSILFunction::visitModuleInst(swift::ModuleInst *i) {
   // Currently, module values are always empty.
-  Explosion empty(CurExplosionLevel);
+  Explosion empty(ExplosionKind::Maximal);
   setLoweredExplosion(SILValue(i, 0), empty);
 }
 
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
-  Explosion lowered(CurExplosionLevel);
+  Explosion lowered(ExplosionKind::Maximal);
   Address source = getLoweredAddress(i->getOperand());
   const TypeInfo &type = getFragileTypeInfo(i->getType().getObjectType());
   type.loadAsTake(*this, source, lowered);
@@ -1705,7 +1732,7 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   llvm::Value *alloced = emitClassAllocation(*this, i->getType());
-  Explosion e(CurExplosionLevel);
+  Explosion e(ExplosionKind::Maximal);
   e.add(alloced);
   setLoweredExplosion(SILValue(i, 0), e);
 }
@@ -1731,7 +1758,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
                                     // FIXME: derive name from SIL location
                                     "");
   
-  Explosion box(CurExplosionLevel);
+  Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());
   setLoweredExplosion(boxValue, box);
   setLoweredAddress(ptrValue, addr.getAddress());
@@ -1746,26 +1773,21 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   HeapArrayInfo arrayInfo(*this, i->getElementType()->getCanonicalType());
   Address ptr;
   llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this, lengthValue, ptr, "");
-  Explosion boxEx(CurExplosionLevel);
+  Explosion boxEx(ExplosionKind::Maximal);
   boxEx.add(box);
   setLoweredExplosion(boxValue, boxEx);
   setLoweredAddress(ptrValue, ptr);
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
-  Explosion to(CurExplosionLevel);
-  Explosion from = getLoweredExplosion(i->getOperand());
-
-  // FIXME: could change explosion level here?
-  assert(to.getKind() == from.getKind());
-  to.add(from.claimAll());
-
-  setLoweredExplosion(SILValue(i, 0), to);
+  // This instruction is specified to be a no-op.
+  Explosion temp = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(SILValue(i, 0), temp);
 }
 
 void IRGenSILFunction::visitAddressToPointerInst(swift::AddressToPointerInst *i)
 {
-  Explosion to(CurExplosionLevel);
+  Explosion to(ExplosionKind::Maximal);
   llvm::Value *addrValue = getLoweredAddress(i->getOperand()).getAddress();
   if (addrValue->getType() != IGM.Int8PtrTy)
     addrValue = Builder.CreateBitCast(addrValue, IGM.Int8PtrTy);
@@ -1796,7 +1818,7 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
   
   ptrValue = IGF.Builder.CreateBitCast(ptrValue, castToType);
   
-  Explosion to(IGF.CurExplosionLevel);
+  Explosion to(ExplosionKind::Maximal);
   to.add(ptrValue);
   IGF.setLoweredExplosion(dest, to);
 }
@@ -1832,7 +1854,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
                                             swift::ThinToThickFunctionInst *i) {
   // Take the incoming function pointer and add a null context pointer to it.
   Explosion from = getLoweredExplosion(i->getOperand());
-  Explosion to(CurExplosionLevel);
+  Explosion to(ExplosionKind::Maximal);
   to.add(from.claimNext());
   to.add(IGM.RefCountedNull);
   setLoweredExplosion(SILValue(i, 0), to);
@@ -1840,7 +1862,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
 
 void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
-  Explosion to(CurExplosionLevel);
+  Explosion to(ExplosionKind::Maximal);
   emitBridgeToBlock(*this, i->getType(), from, to);
   setLoweredExplosion(SILValue(i, 0), to);
 }
@@ -1851,7 +1873,7 @@ void IRGenSILFunction::visitArchetypeRefToSuperInst(
   Explosion archetype = getLoweredExplosion(i->getOperand());
   llvm::Value *in = archetype.claimNext();
   
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   const TypeInfo &baseTypeInfo = getFragileTypeInfo(i->getType());
   llvm::Type *baseTy = baseTypeInfo.StorageType;
   llvm::Value *cast = Builder.CreateBitCast(in, baseTy);
@@ -1863,7 +1885,7 @@ void IRGenSILFunction::visitSuperToArchetypeRefInst(
                                              swift::SuperToArchetypeRefInst *i) {
   Explosion super = getLoweredExplosion(i->getOperand());
   llvm::Value *in = super.claimNext();
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   llvm::Value *cast
     = emitSuperToClassArchetypeConversion(in, i->getType(), i->getMode());
   out.add(cast);
@@ -1930,7 +1952,7 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
   llvm::Value *result = Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
                                     val, llvm::ConstantPointerNull::get(valTy));
   
-  Explosion out(CurExplosionLevel);
+  Explosion out(ExplosionKind::Maximal);
   out.add(result);
   setLoweredExplosion(SILValue(i, 0), out);
 }
@@ -1981,7 +2003,7 @@ void IRGenSILFunction::visitIndexRawPointerInst(swift::IndexRawPointerInst *i) {
   // We don't expose a non-inbounds GEP operation.
   llvm::Value *destValue = Builder.CreateInBoundsGEP(base, index);
   
-  Explosion result(CurExplosionLevel);
+  Explosion result(ExplosionKind::Maximal);
   result.add(destValue);
   setLoweredExplosion(SILValue(i, 0), result);
 }
@@ -1999,7 +2021,7 @@ void IRGenSILFunction::visitInitExistentialInst(swift::InitExistentialInst *i) {
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
   Explosion instance = getLoweredExplosion(i->getOperand());
-  Explosion result(CurExplosionLevel);
+  Explosion result(ExplosionKind::Maximal);
   emitClassExistentialContainer(*this,
                                result, i->getType(),
                                instance.claimNext(), i->getOperand().getType(),
@@ -2043,7 +2065,7 @@ void IRGenSILFunction::visitProjectExistentialInst(
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
   Address object = emitOpaqueExistentialProjection(*this, base, baseTy);
-  Explosion lowered(CurExplosionLevel);
+  Explosion lowered(ExplosionKind::Maximal);
   lowered.add(object.getAddress());
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
@@ -2053,7 +2075,7 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
   SILType baseTy = i->getOperand().getType();
   Explosion base = getLoweredExplosion(i->getOperand());
   
-  Explosion result(CurExplosionLevel);
+  Explosion result(ExplosionKind::Maximal);
   llvm::Value *instance
     = emitClassExistentialProjection(*this, base, baseTy);
   result.add(instance);
@@ -2071,7 +2093,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   SILType baseTy = i->getOperand().getType();
   SILConstant member = i->getMember();
   
-  Explosion lowered(CurExplosionLevel);
+  Explosion lowered(ExplosionKind::Maximal);
   if (baseTy.isClassExistentialType()) {
     Explosion base = getLoweredExplosion(i->getOperand());
     emitClassProtocolMethodValue(*this, base, baseTy, member, lowered);
@@ -2094,7 +2116,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   SILType baseTy = i->getLookupArchetype();
   SILConstant member = i->getMember();
 
-  Explosion lowered(CurExplosionLevel);
+  Explosion lowered(ExplosionKind::Maximal);
   emitArchetypeMethodValue(*this, baseTy, member, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
@@ -2167,12 +2189,13 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   SILConstant method = i->getMember();
   
   // For Swift classes, get the method implementation from the vtable.
+  // FIXME: better explosion kind, map as static.
   llvm::Value *fnValue = emitVirtualMethodValue(*this, baseValue,
                                                 i->getOperand().getType(),
                                                 method, i->getType(),
-                                                CurExplosionLevel);
+                                                ExplosionKind::Minimal);
   fnValue = Builder.CreateBitCast(fnValue, IGM.Int8PtrTy);
-  Explosion e(CurExplosionLevel);
+  Explosion e(ExplosionKind::Maximal);
   e.add(fnValue);
   setLoweredExplosion(SILValue(i, 0), e);
 }
@@ -2196,15 +2219,16 @@ void IRGenSILFunction::visitSpecializeInst(swift::SpecializeInst *i) {
         && !isa<PartialApplyInst>(use->getUser())) {
       assert(operand.kind == LoweredValue::Kind::StaticFunction &&
          "specialization thunks for dynamic function values not yet supported");
-      
+
+      // FIXME: better explosion level, preserve!
       llvm::Function *thunk = emitFunctionSpecialization(IGM,
                                  operand.getStaticFunction().getFunction(),
                                  i->getOperand().getType(),
                                  i->getType(),
                                  i->getSubstitutions(),
-                                 CurExplosionLevel);
+                                 ExplosionKind::Minimal);
       
-      Explosion result(CurExplosionLevel);
+      Explosion result(ExplosionKind::Maximal);
       result.add(Builder.CreateBitCast(thunk, IGM.Int8PtrTy));
       return setLoweredExplosion(SILValue(i, 0), result);
     }
