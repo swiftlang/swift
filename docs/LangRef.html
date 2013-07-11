@@ -2149,6 +2149,12 @@ ill-formed if the type does not conform to the protocol.</p>
       println("not the origin")
     }
   </pre>
+
+  <p>The order of evaluation of expressions in patterns, including whether an
+    expression is evaluated at all, is unspecified. The compiler is free to
+    reorder or elide expression evaluation in patterns to improve dispatch
+    efficiency. Expressions in patterns therefore cannot be relied on for
+    side effects.</p>
   
   <!-- ********************************************************************* -->
   <h2 id="expr">Expressions</h2>
@@ -3039,8 +3045,8 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt-return ::= 'break'
   </pre>
 
-  <p>The 'break' statement transfers control out of the enclosing 'for' loop,
-  'while' loop, or 'switch' statement.</p>
+  <p>The 'break' statement transfers control out of the enclosing 'for' loop or
+  'while' loop.</p>
 
   <!-- ===================================================================== -->
   <h3 id="stmt-continue">'continue' Statement</h3>
@@ -3215,47 +3221,76 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="grammar">
     stmt-switch ::= 'switch' <a href="#expr">expr-basic</a> '{' stmt-switch-case* '}'
-    stmt-switch-case ::= (case-label | default-label) <a href="#brace-item-list">brace-item</a>*
+    stmt-switch-case ::= (case-label+ | default-label) <a href="#brace-item-list">brace-item</a>*
 
-    case-label ::= 'case' expr (',' expr)* ':'
+    case-label ::= 'case' <a href="#pattern">pattern</a> (',' pattern)* ('where' expr)? ':'
     default-label ::= 'default' ':'
   </pre>
 
-  <p>TODO: Design subject to change. Pattern matching and more efficient IR switch-
-  able implementation of value switching need to be integrated into the design.
+  <p>'switch' statements branch on the value of an expression by
+    <a href="#pattern">pattern matching</a>.
+    The subject expression of the switch is evaluated and tested against the
+    patterns in its <tt>case</tt> labels in source order. When a pattern is
+    found that matches the value, control is transferred into the matching
+    <tt>case</tt> block. <tt>case</tt> labels may declare multiple patterns
+    separated by commas, and multiple <tt>case</tt> labels may cover a
+    case block. Case labels may optionally specify a <i>guard</i> expression,
+    introduced by the <tt>where</tt> keyword; if present, control is
+    transferred to the case only if the subject value both matches one of its
+    patterns and the guard expression evaluates to true. Patterns are tested
+    "as if" in source order; if multiple cases can match a value, control is
+    transferred only to the first matching case. The actual execution order
+    of pattern matching operations, and in particular the evaluation order of
+    <a href="#pattern-expr">expression patterns</a>, is unspecified.</p>
 
-  <p>'switch' statements provide convenient branching over multiple possible
-  values of a single expression. The subject expression of the switch is evaluated
-  and compared to the values in each case using the <tt>=~</tt> operator, and the
-  first matching case block is branched to. If no case matches, then the 'default'
-  block is branched to, or if there is no 'default' block, control flow moves past
-  the 'switch'. Cases may specify multiple comma-separated expressions; the case
-  will be branched to if any expression matches the subject.
+  <p>A switch may also contain a <tt>default</tt> block. If present, it
+    receives control if no cases match the subject value. The <tt>default</tt>
+    block must appear at the end of the switch and must be the only label for
+    its block. (<tt>default</tt> is equivalent to a final <tt>case _</tt>
+    pattern.) Switches are required to be exhaustive; either the contained case
+    patterns must cover every possible value of the subject's type, or else
+    an explicit <tt>default</tt> block must be specified to handle uncovered
+    cases.</p>
 
-  <p>Some examples:
+  <p>Every case and default block has its own
+    scope. Declarations within a case or default block are only visible within
+    that block. Case patterns may bind variables using the
+    <a href="#pattern-var"><tt>var</tt> keyword</a>; those variables are also
+    scoped into the corresponding case block, and may be referenced in the
+    <tt>where</tt> guard for the case label. However, if a case block matches
+    multiple patterns, none of those patterns may contain variable bindings.</p>
+    
+  <p>Control does not implicitly 'fall through' from one case block to
+    the next. <a href="#stmt-fallthrough"><tt>fallthrough</tt> statements</a>
+    may explicitly transfer control among case blocks.
+    <a href="#stmt-break"><tt>break</tt></a> and
+    <a href="#stmt-continue"><tt>continue</tt></a>
+    within a switch will break or continue out of an enclosing 'while' or
+    'for' loop, not out of the 'switch' itself.</p>
 
   <pre class="example">
-    func judge(n:Int) {
-      switch n {
-      case 0:
-        println("I was using that before it was cool.")
+    func classifyPoint(point:(Int, Int)) {
+      switch point {
+      case (0, 0):
+        println("origin")
 
-      case 2, 3, 5, 7:
-        println("A bit past its prime.")
+      case (_, 0):
+        println("on the x axis")
 
-      case 6:
-        println("A little too perfect, if you ask me.")
+      case (0, _):
+        println("on the y axis")
 
-      default:
-        println("I dunno. It's just some number.")
+      case (var x, var y) where x == y:
+        println("on the y = x diagonal")
+
+      case (var x, var y) where -x == y:
+        println("on the y = -x diagonal")
+
+      case (var x, var y):
+        println("length \(sqrt(x*x + y*y))")
       }
     }
   </pre>
-
-  <p>Unlike a C-style 'switch', every 'case' and 'default' block has its own scope,
-  and control does not implicitly 'fall through' from one case block to the next.
-  'break' and 'continue' within a 'switch' will break or continue out of an enclosing
-  'while' or 'for' loop, not out of the 'switch' itself.
 
   <!-- ===================================================================== -->
   <h3 id="stmt-fallthrough">'fallthrough' Statement</h3>
@@ -3265,7 +3300,13 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
     stmt-fallthrough ::= 'fallthrough'
   </pre>
 
-  <p>write me.</p>
+  <p><tt>fallthrough</tt> transfers control from a <tt>case</tt> block of a
+    <a href="#stmt-switch"><tt>switch</tt> statement</a> to the next
+    <tt>case</tt> or <tt>default</tt> block within the switch. It may only
+    appear inside a <tt>switch</tt>. <tt>fallthrough</tt> cannot be used in
+    the final block of a <tt>switch</tt>. It also cannot transfer control into
+    a <tt>case</tt> block whose pattern contains
+    <a href="#pattern-var"><tt>var</tt> bindings</a>.</p>
 
   <!-- ********************************************************************* -->
   <h2>Protocols</h2>
