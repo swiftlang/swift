@@ -640,7 +640,7 @@ public:
   GenericParamList *parseGenericParameters();
   GenericParamList *parseGenericParameters(SourceLoc LAngleLoc);
   GenericParamList *maybeParseGenericParams();
-  bool parseGenericWhereClause(SourceLoc &RequiresLoc,
+  bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<Requirement> &Requirements);
 };
 
