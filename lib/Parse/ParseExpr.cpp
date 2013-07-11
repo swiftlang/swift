@@ -677,7 +677,6 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     expr-anon-closure-argument
 ///     expr-delayed-identifier
 ///     expr-paren
-///     expr-func
 ///     expr-super
 ///
 ///   expr-delayed-identifier:
