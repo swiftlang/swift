@@ -598,11 +598,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                signatureID, implicitThisID);
     VarDecl *thisDecl;
-    NominalTypeDecl *parent;
+    DeclContext *parent;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
-      parent = cast<NominalTypeDecl>(getDeclContext(parentID));
+      parent = getDeclContext(parentID);
     }
 
     auto genericParams = maybeReadGenericParams(parent);
@@ -1011,6 +1011,45 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
     subscript->setOverriddenDecl(overriddenDecl);
+    break;
+  }
+
+  case decls_block::EXTENSION_DECL: {
+    TypeID baseID;
+    DeclID contextID;
+    bool isImplicit;
+    ArrayRef<uint64_t> inheritedIDs;
+
+    decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
+                                             isImplicit, inheritedIDs);
+
+    TypeLoc baseTy;
+    MutableArrayRef<TypeLoc> inherited;
+    DeclContext *DC;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      baseTy = TypeLoc::withoutLoc(getType(baseID));
+      inherited = getTypes(inheritedIDs);
+      DC = getDeclContext(contextID);
+    }
+
+    auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, inherited,
+                                             DC);
+    declOrOffset = extension;
+
+    if (isImplicit)
+      extension->setImplicit();
+
+    SmallVector<ProtocolConformance *, 16> conformanceBuf;
+    while (auto conformance = maybeReadConformance())
+      conformanceBuf.push_back(*conformance);
+    extension->setConformances(ctx.AllocateCopy(conformanceBuf));
+
+    auto members = readMembers();
+    assert(members.hasValue() && "could not read extension members");
+    extension->setMembers(members.getValue(), SourceRange());
+
+    baseTy.getType()->getAnyNominal()->addExtension(extension);
     break;
   }
 
@@ -1781,14 +1820,19 @@ bool ModuleFile::associateWithModule(Module *module) {
   }
 
   ModuleContext = module;
-  return true;
+
+  // FIXME: The only reason we're deserializing eagerly is to force extensions
+  // to load, which they shouldn't yet anyway.
+  buildTopLevelDeclMap();
+  return Status == ModuleStatus::Valid;
 }
 
 void ModuleFile::buildTopLevelDeclMap() {
   // FIXME: be more lazy about deserialization by encoding this some other way.
   for (DeclID ID : RawTopLevelIDs) {
-    auto value = cast<ValueDecl>(getDecl(ID));
-    TopLevelIDs[value->getName()] = ID;
+    // FIXME: Right now ExtensionDecls are in here as well.
+    if (auto value = dyn_cast<ValueDecl>(getDecl(ID)))
+      TopLevelIDs[value->getName()] = ID;
   }
 
   RawTopLevelIDs.clear();
@@ -1796,9 +1840,6 @@ void ModuleFile::buildTopLevelDeclMap() {
 
 void ModuleFile::lookupValue(Identifier name,
                              SmallVectorImpl<ValueDecl*> &results) {
-  if (!RawTopLevelIDs.empty())
-    buildTopLevelDeclMap();
-
   if (DeclID ID = TopLevelIDs.lookup(name))
     results.push_back(cast<ValueDecl>(getDecl(ID)));
 }

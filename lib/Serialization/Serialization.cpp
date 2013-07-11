@@ -178,11 +178,11 @@ namespace {
     /// Writes a generic parameter list.
     bool writeGenericParams(const GenericParamList *genericParams);
 
-    /// Writes a generic parameter list.
+    /// Writes a list of protocol conformances.
     void writeConformances(ArrayRef<ProtocolConformance *> conformances);
 
-    /// Writes the members of a simple nominal decl.
-    void writeMembers(const NominalTypeDecl *D);
+    /// Writes an array of members for a decl context.
+    void writeMembers(ArrayRef<Decl *> members);
 
     /// Writes a reference to a decl in another module.
     ///
@@ -428,6 +428,7 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, ONEOF_DECL);
   RECORD(decls_block, ONEOF_ELEMENT_DECL);
   RECORD(decls_block, SUBSCRIPT_DECL);
+  RECORD(decls_block, EXTENSION_DECL);
 
   RECORD(decls_block, PAREN_PATTERN);
   RECORD(decls_block, TUPLE_PATTERN);
@@ -683,12 +684,12 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
 }
 
 
-void Serializer::writeMembers(const NominalTypeDecl *D) {
+void Serializer::writeMembers(ArrayRef<Decl*> members) {
   using namespace decls_block;
   
   unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
   SmallVector<DeclID, 16> memberIDs;
-  for (auto member : D->getMembers())
+  for (auto member : members)
     memberIDs.push_back(addDeclRef(member));
   DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
@@ -787,8 +788,26 @@ bool Serializer::writeDecl(const Decl *D) {
     // serialized module?
     return true;
 
-  case DeclKind::Extension:
-    return false;
+  case DeclKind::Extension: {
+    auto extension = cast<ExtensionDecl>(D);
+
+    const Decl *DC = getDeclForContext(extension->getDeclContext());
+
+    SmallVector<TypeID, 4> inherited;
+    for (auto parent : extension->getInherited())
+      inherited.push_back(addTypeRef(parent.getType()));
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
+    ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                addTypeRef(extension->getExtendedType()),
+                                addDeclRef(DC),
+                                extension->isImplicit(),
+                                inherited);
+
+    writeConformances(extension->getConformances());
+    writeMembers(extension->getMembers());
+    return true;
+  }
 
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
@@ -901,7 +920,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(theStruct->getGenericParams());
     writeConformances(theStruct->getConformances());
-    writeMembers(theStruct);
+    writeMembers(theStruct->getMembers());
     return true;
   }
 
@@ -927,7 +946,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(oneOf->getGenericParams());
     writeConformances(oneOf->getConformances());
-    writeMembers(oneOf);
+    writeMembers(oneOf->getMembers());
     return true;
   }
 
@@ -953,7 +972,7 @@ bool Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(theClass->getGenericParams());
     writeConformances(theClass->getConformances());
-    writeMembers(theClass);
+    writeMembers(theClass->getMembers());
     return true;
   }
 
@@ -980,7 +999,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                inherited);
 
     writeConformances(proto->getConformances());
-    writeMembers(proto);
+    writeMembers(proto->getMembers());
     return true;
   }
 
@@ -1105,12 +1124,12 @@ bool Serializer::writeDecl(const Decl *D) {
     if (ctor->getAllocThisExpr())
       return false;
 
-    const DeclContext *DC = ctor->getDeclContext();
+    const Decl *DC = getDeclForContext(ctor->getDeclContext());
     auto implicitThis = ctor->getImplicitThisDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclRef(cast<NominalTypeDecl>(DC)),
+                                  addDeclRef(DC),
                                   ctor->isImplicit(),
                                   addTypeRef(ctor->getType()),
                                   addDeclRef(implicitThis));
@@ -1385,7 +1404,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::UnboundGeneric:
-    llvm_unreachable("should not need to be serialized");
+    return false;
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
@@ -1459,6 +1478,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<OneOfLayout>();
     registerDeclTypeAbbr<OneOfElementLayout>();
     registerDeclTypeAbbr<SubscriptLayout>();
+    registerDeclTypeAbbr<ExtensionLayout>();
 
     registerDeclTypeAbbr<ParenPatternLayout>();
     registerDeclTypeAbbr<TuplePatternLayout>();
@@ -1532,6 +1552,9 @@ void Serializer::writeTranslationUnit(const TranslationUnit *TU) {
     if (isa<ImportDecl>(D))
       continue;
     else if (isa<ValueDecl>(D))
+      topLevelIDs.push_back(addDeclRef(D));
+    else if (isa<ExtensionDecl>(D))
+      // FIXME: should have a lazy extension table
       topLevelIDs.push_back(addDeclRef(D));
     else if (isa<OperatorDecl>(D))
       operatorIDs.push_back(addDeclRef(D));

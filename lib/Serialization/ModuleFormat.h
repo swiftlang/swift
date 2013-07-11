@@ -241,6 +241,7 @@ namespace decls_block {
     ONEOF_DECL,
     ONEOF_ELEMENT_DECL,
     SUBSCRIPT_DECL,
+    EXTENSION_DECL,
 
     PAREN_PATTERN = 200,
     TUPLE_PATTERN,
@@ -496,6 +497,15 @@ namespace decls_block {
     DeclIDField, // setter
     DeclIDField  // overridden decl
     // The indices pattern trails the record.
+  >;
+
+  using ExtensionLayout = BCRecordLayout<
+    EXTENSION_DECL,
+    TypeIDField, // base type
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    BCArray<TypeIDField> // inherited types
+    // Trailed by conformance info (if any), then the decl context record.
   >;
 
   
