@@ -88,7 +88,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
 }
 
 void CodeCompletionString::dump() const {
-  print(llvm::outs());
+  print(llvm::errs());
 }
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
@@ -110,7 +110,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
 }
 
 void CodeCompletionResult::dump() const {
-  print(llvm::outs());
+  print(llvm::errs());
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
