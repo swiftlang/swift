@@ -318,6 +318,8 @@ public:
   }
 
   void addClangDecl(const clang::NamedDecl *ND) {
+    // FIXME: Eventually, we'll import the Clang Decl and format it as a Swift
+    // declaration.  Right now we don't do this because of performance reasons.
     StringRef Name = ND->getName();
     if (Name.empty())
       return;
@@ -342,6 +344,7 @@ public:
     if (Kind == LookupKind::ValueExpr) {
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         // Swift does not have class variables.
+        // FIXME: add code completion results when class variables are added.
         if (ExprType->is<MetaTypeType>())
           return;
         addSwiftVarDeclRef(VD);
