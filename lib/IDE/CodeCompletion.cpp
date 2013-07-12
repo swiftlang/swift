@@ -211,7 +211,6 @@ class CompletionLookup : swift::VisibleDeclConsumer,
 {
   CodeCompletionContext &CompletionContext;
   ASTContext &SwiftContext;
-  StringRef Prefix;
 
   enum class LookupKind {
     ValueExpr,
@@ -224,9 +223,8 @@ class CompletionLookup : swift::VisibleDeclConsumer,
 
 public:
   CompletionLookup(CodeCompletionContext &CompletionContext,
-                   ASTContext &SwiftContext, StringRef Prefix)
-      : CompletionContext(CompletionContext), SwiftContext(SwiftContext),
-        Prefix(Prefix) {
+                   ASTContext &SwiftContext)
+      : CompletionContext(CompletionContext), SwiftContext(SwiftContext) {
   }
 
   void setHaveDot() {
@@ -236,8 +234,6 @@ public:
   void addSwiftVarDeclRef(const VarDecl *VD) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
-    if (!Prefix.empty() && !Name.startswith(Prefix))
-      return;
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -264,8 +260,6 @@ public:
   void addSwiftMethodCall(const FuncDecl *FD) {
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
-    if (!Prefix.empty() && !Name.startswith(Prefix))
-      return;
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -423,7 +417,7 @@ public:
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
   typecheckExpr(E);
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, "");
+  CompletionLookup Lookup(CompletionContext, TU->Ctx);
   Lookup.setHaveDot();
   Lookup.getValueExprCompletions(E->getType());
 
@@ -433,7 +427,7 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   typecheckExpr(E);
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx, "");
+  CompletionLookup Lookup(CompletionContext, TU->Ctx);
   Lookup.getValueExprCompletions(E->getType());
 
   Consumer.handleResults(CompletionContext.takeResults());
