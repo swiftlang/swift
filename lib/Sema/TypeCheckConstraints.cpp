@@ -2853,14 +2853,6 @@ namespace {
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For FuncExprs, we just want to type-check the patterns as written,
-      // but not walk into the body. The body will by type-checked separately.
-      if (auto func = dyn_cast<FuncExpr>(expr)) {
-        TC.semaFuncExpr(func, /*isFirstPass=*/false,
-                        /*allowUnknownTypes=*/true);
-        return { false, expr };
-      }
-
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.

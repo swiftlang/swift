@@ -616,6 +616,75 @@ public:
     // PatternBindingDecl.
   }
 
+  bool semaFuncParamPatterns(DeclContext *dc,
+                             ArrayRef<Pattern*> paramPatterns,
+                             bool isFirstPass) {
+    bool badType = false;
+    for (Pattern *P : paramPatterns) {
+      if (P->hasType())
+        continue;
+      if (TC.typeCheckPattern(P, dc, isFirstPass, false)) {
+        badType = true;
+        continue;
+      }
+    }
+    return badType;
+  }
+
+  void semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
+    if (FE->getType() && !FE->getType()->isUnresolvedType())
+      return;
+
+    bool badType = false;
+    if (FE->getBodyResultTypeLoc().getType()) {
+      if (TC.validateType(FE->getBodyResultTypeLoc())) {
+        FE->getBodyResultTypeLoc().setInvalidType(TC.Context);
+        badType = true;
+      }
+    }
+
+    badType = badType || semaFuncParamPatterns(FE, FE->getArgParamPatterns(),
+                                               isFirstPass);
+    badType = badType || semaFuncParamPatterns(FE, FE->getBodyParamPatterns(),
+                                               isFirstPass);
+
+    if (badType) {
+      FE->setType(ErrorType::get(TC.Context));
+      return;
+    }
+
+    Type funcTy = FE->getBodyResultTypeLoc().getType();
+    if (!funcTy) {
+      funcTy = TupleType::getEmpty(TC.Context);
+    }
+
+    // FIXME: it would be nice to have comments explaining what this is all about.
+    auto patterns = FE->getArgParamPatterns();
+    bool isInstanceFunc = false;
+    GenericParamList *genericParams = nullptr;
+    GenericParamList *outerGenericParams = nullptr;
+    if (FuncDecl *FD = FE->getDecl()) {
+      isInstanceFunc = (bool)FD->computeThisType(&outerGenericParams);
+      genericParams = FD->getGenericParams();
+    }
+
+    for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
+      Type argTy = patterns[e - i - 1]->getType();
+      if (e - i - 1 == isInstanceFunc && genericParams) {
+        funcTy = PolymorphicFunctionType::get(argTy, funcTy,
+                                              genericParams,
+                                              TC.Context);
+      } else if (e - i - 1 == 0 && outerGenericParams) {
+        funcTy = PolymorphicFunctionType::get(argTy, funcTy,
+                                              outerGenericParams,
+                                              TC.Context);
+      } else {
+        funcTy = FunctionType::get(argTy, funcTy, TC.Context);
+      }
+    }
+    FE->setType(funcTy);
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (IsSecondPass)
       return;
@@ -643,7 +712,7 @@ public:
       checkGenericParams(gp);
     }
 
-    TC.semaFuncExpr(body, IsFirstPass, /*allowUnknownTypes*/false);
+    semaFuncExpr(body, IsFirstPass);
     FD->setType(body->getType());
 
     validateAttributes(FD);

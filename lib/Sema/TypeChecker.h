@@ -314,8 +314,6 @@ public:
   /// \returns true if \c t1 is a valid substitution for \c t2.
   bool isSubstitutableFor(Type t1, ArchetypeType *t2);
 
-  void semaFuncExpr(FuncExpr *FE, bool isFirstPass, bool allowUnknownTypes);
-
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
