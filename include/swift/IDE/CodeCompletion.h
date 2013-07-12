@@ -73,6 +73,8 @@ class CodeCompletionString {
       // Punctuation.
       LeftParen,
       RightParen,
+      LeftBracket,
+      RightBracket,
       Dot,
       Comma,
 
@@ -98,6 +100,8 @@ class CodeCompletionString {
       return Kind == ChunkKind::Text ||
              Kind == ChunkKind::LeftParen ||
              Kind == ChunkKind::RightParen ||
+             Kind == ChunkKind::LeftBracket ||
+             Kind == ChunkKind::RightBracket ||
              Kind == ChunkKind::Dot ||
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::CallParameterName ||
@@ -260,6 +264,14 @@ public:
 
   void addRightParen() {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
+  }
+
+  void addLeftBracket() {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+  }
+
+  void addRightBracket() {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightBracket, "]");
   }
 
   void addDot() {

@@ -62,6 +62,8 @@ std::string CodeCompletionString::getAsString() const {
     case Chunk::ChunkKind::Text:
     case Chunk::ChunkKind::LeftParen:
     case Chunk::ChunkKind::RightParen:
+    case Chunk::ChunkKind::LeftBracket:
+    case Chunk::ChunkKind::RightBracket:
     case Chunk::ChunkKind::Dot:
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::CallParameterName:
@@ -227,8 +229,9 @@ public:
     HaveDot = true;
   }
 
-  void addSwiftVarDeclRef(VarDecl *VD) {
+  void addSwiftVarDeclRef(const VarDecl *VD) {
     StringRef Name = VD->getName().get();
+    assert(!Name.empty() && "name should not be empty");
     if (!Prefix.empty() && !Name.startswith(Prefix))
       return;
 
@@ -242,8 +245,21 @@ public:
     Builder.addTypeAnnotation(VD->getType().getString());
   }
 
-  void addSwiftMethodCall(FuncDecl *FD) {
+  void addTuplePatternParameters(CodeCompletionResultBuilder &Builder,
+                                 const TuplePattern *TP) {
+    bool NeedComma = false;
+    for (auto TupleElt : TP->getFields()) {
+      if (NeedComma)
+        Builder.addComma(", ");
+      Builder.addCallParameter(TupleElt.getPattern()->getBoundName().str(),
+                               TupleElt.getPattern()->getType().getString());
+      NeedComma = true;
+    }
+  }
+
+  void addSwiftMethodCall(const FuncDecl *FD) {
     StringRef Name = FD->getName().get();
+    assert(!Name.empty() && "name should not be empty");
     if (!Prefix.empty() && !Name.startswith(Prefix))
       return;
 
@@ -260,15 +276,7 @@ public:
     unsigned FirstIndex = 0;
     if (Patterns[0]->isImplicit())
       FirstIndex = 1;
-    TuplePattern *First = cast<TuplePattern>(Patterns[FirstIndex]);
-    bool NeedComma = false;
-    for (auto TupleElt : First->getFields()) {
-      if (NeedComma)
-        Builder.addComma(", ");
-      Builder.addCallParameter(TupleElt.getPattern()->getBoundName().str(),
-                               TupleElt.getPattern()->getType().getString());
-      NeedComma = true;
-    }
+    addTuplePatternParameters(Builder, cast<TuplePattern>(Patterns[FirstIndex]));
     Builder.addRightParen();
     // FIXME: Pattern should pretty-print itself.
     llvm::SmallString<32> Type;
@@ -287,12 +295,22 @@ public:
     // TODO: skip arguments with default parameters?
   }
 
-  void addSwiftSubscriptCall(SubscriptDecl *SD) {
-    // FIXME: produce square brackets.
+  void addSwiftSubscriptCall(const SubscriptDecl *SD) {
+    assert(!HaveDot && "can not add a subscript after a dot");
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::SwiftDeclaration);
+    Builder.setAssociatedSwiftDecl(SD);
+    Builder.addLeftBracket();
+    addTuplePatternParameters(Builder, cast<TuplePattern>(SD->getIndices()));
+    Builder.addRightBracket();
+    Builder.addTypeAnnotation(SD->getElementType().getString());
   }
 
   void addClangDecl(const clang::NamedDecl *ND) {
     StringRef Name = ND->getName();
+    if (Name.empty())
+      return;
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::ClangDeclaration);
@@ -311,12 +329,6 @@ public:
 
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *D) override {
-    StringRef Name = D->getName().get();
-
-    // Don't complete nameless values.
-    if (Name.empty())
-      return;
-
     if (Kind == LookupKind::ValueExpr) {
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         // Swift does not have class variables.
@@ -327,6 +339,12 @@ public:
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        // We can not call getters or setters.  We use VarDecls and
+        // SubscriptDecls to produce completions that refer to getters and
+        // setters.
+        if (FD->isGetterOrSetter())
+          return;
+
         // Don't complete class methods of instances; don't complete instance
         // methods of metatypes.
         if (FD->isStatic() != ExprType->is<MetaTypeType>())
