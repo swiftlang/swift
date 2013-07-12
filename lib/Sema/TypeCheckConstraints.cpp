@@ -2430,7 +2430,7 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
                                                nullptr,
-                                               field.getVarargBaseTy()));
+                                               field.isVararg()));
                                                
                }
                return TupleType::get(fields, tc.Context);

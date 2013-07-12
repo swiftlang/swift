@@ -652,38 +652,34 @@ class TupleTypeElt {
   /// Name - An optional name for the field.
   Identifier Name;
 
-  /// Ty - This is the type of the field, which is mandatory.
-  Type Ty;
+  /// \brief This is the type of the field, which is mandatory, along with a bit
+  /// indicating whether this is a vararg.
+  llvm::PointerIntPair<Type, 1, bool> TyAndVararg;
 
   /// Init - This is a default value for the tuple element, used if an explicit
   /// value is not specified.
   ExprHandle *Init;
 
-  /// VarargBaseTy - This is the base type of the field, ignoring the "..."
-  /// specifier, if one is present.
-  Type VarargBaseTy;
-
 public:
   TupleTypeElt() = default;
-  /*implicit*/ TupleTypeElt(Type ty,
-                            Identifier name = Identifier(),
-                            ExprHandle *init = nullptr,
-                            Type VarargBaseTy = Type())
-    : Name(name), Ty(ty), Init(init), VarargBaseTy(VarargBaseTy) { }
+  inline /*implicit*/ TupleTypeElt(Type ty,
+                                   Identifier name = Identifier(),
+                                   ExprHandle *init = nullptr,
+                                   bool isVarArg = false);
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : Name(Identifier()), Ty(Ty), Init(nullptr),VarargBaseTy(Type()) { }
+    : Name(Identifier()), TyAndVararg(Ty, false), Init(nullptr) { }
 
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
 
-  Type getType() const { return Ty; }
-  bool isVararg() const { return !VarargBaseTy.isNull(); }
-  Type getVarargBaseTy() const { return VarargBaseTy; }
+  Type getType() const { return TyAndVararg.getPointer(); }
+  bool isVararg() const { return TyAndVararg.getInt(); }
+  inline Type getVarargBaseTy() const;
 
   /// \brief Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
     TupleTypeElt Result(*this);
-    Result.Ty = T;
+    Result.TyAndVararg.setPointerAndInt(T, false);
     return Result;
   }
   
@@ -1900,6 +1896,24 @@ inline bool TypeBase::mayHaveSuperclass() {
     return nullptr;
 
   return (bool)archetype->requiresClass();
+}
+
+inline TupleTypeElt::TupleTypeElt(Type ty,
+                                  Identifier name,
+                                  ExprHandle *init,
+                                  bool isVarArg)
+  : Name(name), TyAndVararg(ty, isVarArg), Init(init) {
+  assert(!isVarArg || isa<ArraySliceType>(ty.getPointer()) ||
+         (isa<BoundGenericType>(ty.getPointer()) &&
+          ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
+}
+
+inline Type TupleTypeElt::getVarargBaseTy() const {
+  TypeBase *T = getType().getPointer();
+  if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
+    return AT->getBaseType();
+  // It's the stdlib Slice<T>.
+  return cast<BoundGenericType>(T)->getGenericArgs()[0];
 }
 
 inline Identifier SubstitutableType::getName() const {

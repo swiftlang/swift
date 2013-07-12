@@ -1318,14 +1318,14 @@ Type ModuleFile::getType(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      TypeID varargBaseID;
+      bool isVararg;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  varargBaseID);
+                                                  isVararg);
 
       {
         BCOffsetRAII restoreOffset(DeclTypeCursor);
         elements.push_back({getType(typeID), getIdentifier(nameID),
-                            /*initializer=*/nullptr, getType(varargBaseID)});
+                            /*initializer=*/nullptr, isVararg});
       }
     }
 

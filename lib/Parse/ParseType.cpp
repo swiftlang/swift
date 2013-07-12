@@ -458,7 +458,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
     Type FullTy = ArraySliceType::get(BaseTy, Context);
     Identifier Name = Elements.back().getName();
     ExprHandle *Init = Elements.back().getInit();
-    Elements.back() = TupleTypeElt(FullTy, Name, Init, BaseTy);
+    Elements.back() = TupleTypeElt(FullTy, Name, Init, true);
   }
 
   TupleType *TT = TupleType::get(Elements, Context)->castTo<TupleType>();

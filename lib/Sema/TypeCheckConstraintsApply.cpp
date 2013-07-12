@@ -1691,7 +1691,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       toSugarFields.push_back(TupleTypeElt(fromEltType,
                                            toElt.getName(),
                                            toElt.getInit(),
-                                           toElt.getVarargBaseTy()));
+                                           toElt.isVararg()));
       fromTupleExprFields[sources[i]] = fromElt;
       hasInits |= toElt.hasInit();
       continue;
@@ -1720,11 +1720,11 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
                                          toElt.getName(),
                                          toElt.getInit(),
-                                         toElt.getVarargBaseTy()));
+                                         toElt.isVararg()));
     fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
                                                    fromElt.getName(),
                                                    fromElt.getInit(),
-                                                   fromElt.getVarargBaseTy());
+                                                   fromElt.isVararg());
     hasInits |= toElt.hasInit();
   }
 
@@ -1768,7 +1768,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                             convertedElt->getType(),
                                             fromElt.getName(),
                                             fromElt.getInit(),
-                                            fromElt.getVarargBaseTy());
+                                            fromElt.isVararg());
     }
 
     // Find the appropriate injection function.
@@ -1874,7 +1874,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
         sugarFields.push_back(TupleTypeElt(field.getType(),
                                            field.getName(),
                                            field.getInit(),
-                                           expr->getType()));
+                                           true));
       }
       else {
         assert((field.getType()->isUnresolvedType() ||

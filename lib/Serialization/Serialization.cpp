@@ -1253,7 +1253,7 @@ bool Serializer::writeType(Type ty) {
       TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addIdentifierRef(elt.getName()),
                                      addTypeRef(elt.getType()),
-                                     addTypeRef(elt.getVarargBaseTy()));
+                                     elt.isVararg());
     }
 
     return true;

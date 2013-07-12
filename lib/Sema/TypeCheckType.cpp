@@ -933,23 +933,15 @@ Type TypeChecker::transformType(Type type,
           const TupleTypeElt &FromElt =Tuple->getFields()[I];
           Elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
                                           FromElt.getInit(),
-                                          FromElt.getVarargBaseTy()));
+                                          FromElt.isVararg()));
         }
 
         AnyChanged = true;
       }
 
-      // Substitute into the base type of a variadic tuple.
-      Type VarargBaseTy;
-      if (Elt.isVararg()) {
-        VarargBaseTy = transformType(Elt.getVarargBaseTy(), fn);
-        if (!VarargBaseTy)
-          return Type();
-      }
-
       // Add the new tuple element, with the new type, no initializer,
       Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), Elt.getInit(),
-                                      VarargBaseTy));
+                                      Elt.isVararg()));
       ++Index;
     }
 

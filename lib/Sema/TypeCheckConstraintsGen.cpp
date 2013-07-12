@@ -532,7 +532,7 @@ namespace {
       TupleTypeElt dictionaryEltsElt(dictionaryEltsTy,
                                      /*name=*/ Identifier(),
                                      /*init=*/ nullptr,
-                                     elementTy);
+                                     /*isVarArg=*/ true);
       Type dictionaryEltsTupleTy = TupleType::get(dictionaryEltsElt, C);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(),
@@ -606,12 +606,8 @@ namespace {
                                              index++)));
           auto name = findPatternName(tupleElt.getPattern());
           Type varArgBaseTy;
-          if (tupleElt.isVararg()) {
-            varArgBaseTy
-              = cast<ArraySliceType>(eltTy.getPointer())->getBaseType();
-          }
           tupleTypeElts.push_back(TupleTypeElt(eltTy, name, tupleElt.getInit(),
-                                               varArgBaseTy));
+                                               tupleElt.isVararg()));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }

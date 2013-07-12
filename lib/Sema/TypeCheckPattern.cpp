@@ -215,7 +215,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init,
-                                      elt.getVarargBaseType()));
+                                      elt.isVararg()));
     }
 
     if (hadError) {

@@ -525,19 +525,15 @@ static Type getStrippedType(ASTContext &context, Type type,
             Identifier newName = stripLabels? Identifier() : Elt.getName();
             ExprHandle *newDefArg = stripDefaultArgs? nullptr : Elt.getInit();
             Elements.push_back(TupleTypeElt(Elt.getType(), newName, newDefArg,
-                                            Elt.getVarargBaseTy()));
+                                            Elt.isVararg()));
           }
           Rebuild = true;
         }
 
-        Type VarargBaseType;
-        if (Elt.isVararg())
-          VarargBaseType = getStrippedType(context, Elt.getVarargBaseTy(),
-                                           stripLabels, stripDefaultArgs);
         Identifier newName = stripLabels? Identifier() : Elt.getName();
         ExprHandle *newDefArg = stripDefaultArgs? nullptr : Elt.getInit();
         Elements.push_back(TupleTypeElt(EltTy, newName, newDefArg,
-                                        VarargBaseType));
+                                        Elt.isVararg()));
       }
       ++Idx;
     }
@@ -790,13 +786,10 @@ CanType TypeBase::getCanonicalType() {
     for (const TupleTypeElt &field : TT->getFields()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
-      Type canVarargBaseTy;
-      if (field.isVararg())
-        canVarargBaseTy = field.getVarargBaseTy()->getCanonicalType();
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
                                      field.getName(),
                                      field.getInit(),
-                                     canVarargBaseTy));
+                                     field.isVararg()));
     }
 
     ASTContext &C = CanElts[0].getType()->getASTContext();
@@ -1029,14 +1022,8 @@ bool TypeBase::isSpelledLike(Type other) {
       
       if (myField.isVararg() != theirField.isVararg())
         return false;
-      if (myField.isVararg()) {
-        if (!myField.getVarargBaseTy()
-              ->isSpelledLike(theirField.getVarargBaseTy()))
-          return false;
-      } else {
-        if (!myField.getType()->isSpelledLike(theirField.getType()))
-          return false;
-      }
+      if (!myField.getType()->isSpelledLike(theirField.getType()))
+        return false;
     }
     return true;
   }
