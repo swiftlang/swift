@@ -436,7 +436,7 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
 
 
 ///   sil-type:
-///     '$' '*'? type-annotation
+///     '$' '*'? attribute-list (generic-params)? type
 ///
 bool SILParser::parseSILType(SILType &Result) {
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
@@ -449,8 +449,38 @@ bool SILParser::parseSILType(SILType &Result) {
     P.consumeToken();
   }
 
+  // Parse attributes.
+  DeclAttributes attrs;
+  P.parseAttributeList(attrs);
+
+  // Parse Generic Parameters. Generic Parameters are visible in the function
+  // body.
+  GenericParamList *PList = P.maybeParseGenericParams();
+
   TypeLoc Ty;
-  if (P.parseTypeAnnotation(Ty, diag::expected_sil_type))
+  if (P.parseType(Ty, diag::expected_sil_type))
+    return true;
+
+  // Build PolymorphicFunctionType if necessary.
+  FunctionType *FT = dyn_cast<FunctionType>(Ty.getType().getPointer());
+  if (FT && PList) {
+    Type resultType = PolymorphicFunctionType::get(FT->getInput(),
+                                             FT->getResult(), PList,
+                                             attrs.isThin(),
+                                             attrs.hasCC()
+                                             ? attrs.getAbstractCC()
+                                             : AbstractCC::Freestanding,
+                                             P.Context);
+    SourceRange resultRange = { attrs.LSquareLoc,
+                                Ty.getSourceRange().End };
+    Ty = { resultType, resultRange, Ty.getTypeRepr() };
+    // Reset attributes that are applied.
+    attrs.Thin = false;
+    attrs.cc = Nothing;
+  }
+
+  // Apply attributes to the type.
+  if (P.applyAttributeToType(Ty, attrs))
     return true;
 
   // If we successfully parsed the type, do some type checking / name binding

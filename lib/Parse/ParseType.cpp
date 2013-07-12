@@ -40,7 +40,10 @@ bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
   // Parse the type.
   if (parseType(result, message))
     return true;
+  return applyAttributeToType(result, attrs);
+}
 
+bool Parser::applyAttributeToType(TypeLoc &result, DeclAttributes &attrs) {
   // Apply those attributes that do apply.
   if (attrs.empty()) return false;
 

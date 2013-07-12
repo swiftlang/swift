@@ -480,6 +480,8 @@ public:
   bool parseTypeTupleBody(TypeLoc &ResultLoc);
   bool parseTypeArray(TypeLoc &ResultLoc);
 
+  bool applyAttributeToType(TypeLoc &ResultLoc, DeclAttributes &Attr);
+
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
