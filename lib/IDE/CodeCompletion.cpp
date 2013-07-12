@@ -405,7 +405,12 @@ public:
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.
-    addKeyword("metatype", ExprType);
+    // Use the canonical type as a type annotation because looking at the
+    // '.metatype' in the IDE is a way to understand what type the expression
+    // has.
+    addKeyword(
+        "metatype",
+        MetaTypeType::get(ExprType, SwiftContext)->getCanonicalType());
   }
 
   void getCompletionsInDeclContext(DeclContext *DC, SourceLoc Loc) {
