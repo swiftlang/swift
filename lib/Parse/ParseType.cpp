@@ -366,7 +366,7 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
 
 /// parseTypeTupleBody
 ///   type-tuple:
-///     lparen-any type-tuple-body? ')'
+///     '(' type-tuple-body? ')'
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:

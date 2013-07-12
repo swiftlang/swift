@@ -497,7 +497,8 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, NameLoc };
 }
 
-OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
+OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, bool Enum,
+                     Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
   : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, GenericParams),
@@ -876,9 +877,11 @@ SourceRange FuncDecl::getSourceRange() const {
 }
 
 SourceRange OneOfElementDecl::getSourceRange() const {
+  if (ResultType.hasLocation())
+    return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())
-    return { IdentifierLoc, ArgumentType.getSourceRange().End };
-  return IdentifierLoc;
+    return {getStartLoc(), ArgumentType.getSourceRange().End};
+  return {getStartLoc(), IdentifierLoc};
 }
 
 SourceLoc SubscriptDecl::getLoc() const {

@@ -478,6 +478,9 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_oneof:
     HadParseError = parseDeclOneOf(Flags, Entries);
     break;
+  case tok::kw_case:
+    HadParseError = parseDeclOneOfElement(Flags, Entries);
+    break;
   case tok::kw_struct:
     HadParseError = parseDeclStruct(Flags, Entries);
     break;
@@ -1398,13 +1401,10 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
 ///
 ///   decl-oneof:
 ///      'oneof' attribute-list identifier generic-params? inheritance?
-///          '{' oneof-body '}'
-///   oneof-body:
-///      oneof-element (',' oneof-element)* decl*
-///   oneof-element:
-///      identifier
-///      identifier ':' type-annotation
-///      
+///          '{' decl-oneof-body '}'
+///   decl-oneof-body:
+///      decl*
+///
 bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
 
@@ -1433,7 +1433,9 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
     return true;
 
-  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc, OneOfName, OneOfNameLoc,
+  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc,
+                                           /*isEnum*/ false,
+                                           OneOfName, OneOfNameLoc,
                                            Context.AllocateCopy(Inherited),
                                            GenericParams, CurDeclContext);
   Decls.push_back(OOD);
@@ -1442,95 +1444,102 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
   // Now that we have a context, update the generic parameters with that
   // context.
-  if (GenericParams) {
-    for (auto Param : *GenericParams) {
+  if (GenericParams)
+    for (auto Param : *GenericParams)
       Param.setDeclContext(OOD);
-    }
-  }
-
-  struct OneOfElementInfo {
-    SourceLoc NameLoc;
-    StringRef Name;
-    TypeLoc EltTypeLoc;
-  };
-  SmallVector<OneOfElementInfo, 8> ElementInfos;
-
-  {
-    ContextChange CC(*this, OOD);
-    Scope S(this, ScopeKind::OneofBody);
-
-    // Parse the comma separated list of oneof elements.
-    while (Tok.is(tok::identifier)) {
-      OneOfElementInfo ElementInfo;
-      ElementInfo.Name = Tok.getText();
-      ElementInfo.NameLoc = Tok.getLoc();
-    
-      consumeToken(tok::identifier);
-    
-      // See if we have a type specifier for this oneof element.
-      // If so, parse it.
-      if (consumeIf(tok::colon) &&
-          parseTypeAnnotation(ElementInfo.EltTypeLoc,
-                              diag::expected_type_oneof_element)) {
-        skipUntil(tok::r_brace);
-        return true;
-      }
-    
-      ElementInfos.push_back(ElementInfo);
-    
-      // Require comma separation.
-      if (!consumeIf(tok::comma))
-        break;
-    }
-  }
-
-  llvm::SmallDenseMap<Identifier, OneOfElementDecl*, 16> SeenSoFar;
-  SmallVector<Decl *, 16> MemberDecls;
-
-  for (const OneOfElementInfo &Elt : ElementInfos) {
-    Identifier NameI = Context.getIdentifier(Elt.Name);
-
-    // Create a decl for each element, giving each a temporary type.
-    OneOfElementDecl *OOED =
-        new (Context) OneOfElementDecl(Elt.NameLoc, NameI,
-                                       Elt.EltTypeLoc, OOD);
-
-    // If this was multiply defined, reject it.
-    auto insertRes = SeenSoFar.insert(std::make_pair(NameI, OOED));
-    if (!insertRes.second) {
-      diagnose(Elt.NameLoc, diag::duplicate_oneof_element, Elt.Name);
-      
-      diagnose(insertRes.first->second->getLoc(),
-               diag::previous_definition, NameI);
-      
-      // Don't copy this element into NewElements.
-      continue;
-    }
-
-    MemberDecls.push_back(OOED);
-  }
-
+  
   bool Invalid = false;
-
-  // Parse the extended body of the oneof.
+  // Parse the body.
+  SmallVector<Decl*, 8> MemberDecls;
   {
     ContextChange CC(*this, OOD);
-    Scope S(this, ScopeKind::OneofBody);
+    Scope S(this, ScopeKind::ClassBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                        diag::expected_rbrace_oneof_type,
-                                       PD_HasContainerType|PD_DisallowVar);
+                                       PD_HasContainerType
+                                         | PD_AllowOneOfElement
+                                         | PD_DisallowVar);
   }
-
-  OOD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
-
+  
+  OOD->setMembers(Context.AllocateCopy(MemberDecls), {LBLoc, RBLoc});
   ScopeInfo.addToScope(OOD);
-
+  
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(OneOfLoc, diag::disallowed_type);
     return true;
   }
-
+  
   return Invalid;
+}
+
+/// parseDeclOneOfElement - Parse a 'case' of a oneof, returning true on error.
+///
+///   decl-oneof-element:
+///      'case' identifier type-tuple? ('->' type)?
+bool Parser::parseDeclOneOfElement(unsigned Flags,
+                                   SmallVectorImpl<Decl*> &Decls) {
+  SourceLoc CaseLoc = consumeToken(tok::kw_case);
+  
+  // TODO: Accept attributes here?
+  
+  Identifier Name;
+  SourceLoc NameLoc;
+  // For recovery, see if the user typed something resembling a switch "case"
+  // label.
+  if (!Tok.is(tok::identifier)) {
+    NullablePtr<Pattern> pattern = parseMatchingPattern();
+    if (pattern.isNull())
+      return true;
+    diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+    skipUntil(tok::colon);
+    consumeIf(tok::colon);
+    return true;
+  }
+  
+  if (parseIdentifier(Name, NameLoc,
+                      diag::expected_identifier_in_decl, "oneof case"))
+    return true;
+  
+  // See if there's a following argument type.
+  TypeLoc ArgType;
+  if (Tok.isFollowingLParen()) {
+    if (parseTypeTupleBody(ArgType))
+      return true;
+  }
+  
+  // See if there's a result type.
+  SourceLoc ArrowLoc;
+  TypeLoc ResultType;
+  if (Tok.is(tok::arrow)) {
+    ArrowLoc = consumeToken();
+    if (parseType(ResultType, diag::expected_type_oneof_element_result))
+      return true;
+  }
+  
+  // For recovery, again make sure the the user didn't try to spell a switch
+  // case label:
+  // 'case Identifier:',
+  // 'case Identifier, ...:', or
+  // 'case Identifier where ...:'
+  if (Tok.is(tok::colon) || Tok.is(tok::comma) || Tok.is(tok::kw_where)) {
+    diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+    skipUntil(tok::colon);
+    consumeIf(tok::colon);
+    return true;
+  }
+  
+  // Add the element.
+  auto *result = new (Context) OneOfElementDecl(CaseLoc, NameLoc, Name,
+                                                ArgType, ArrowLoc, ResultType,
+                                                CurDeclContext);
+  Decls.push_back(result);
+  
+  if (!(Flags & PD_AllowOneOfElement)) {
+    diagnose(CaseLoc, diag::disallowed_oneof_element);
+    return true;
+  }
+  
+  return false;
 }
 
 /// \brief Parse the members in a struct/class/protocol definition.

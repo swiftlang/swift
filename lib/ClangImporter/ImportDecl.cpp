@@ -433,6 +433,7 @@ namespace {
       case EnumKind::OneOf:
         oneOfDecl = new (Impl.SwiftContext)
           OneOfDecl(Impl.importSourceLoc(decl->getLocStart()),
+                    /*isEnum*/ true,
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
                     { }, nullptr, dc);
@@ -665,7 +666,10 @@ namespace {
           return known->second;
 
         auto element
-          = new (context) OneOfElementDecl(SourceLoc(), name, TypeLoc(), dc);
+          = new (context) OneOfElementDecl(SourceLoc(), SourceLoc(),
+                                           name, TypeLoc(),
+                                           SourceLoc(), TypeLoc(),
+                                           dc);
 
         // Give the oneof element the appropriate type.
         auto oneof = cast<OneOfDecl>(dc);

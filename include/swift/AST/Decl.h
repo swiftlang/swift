@@ -1138,18 +1138,39 @@ public:
   using DeclContext::operator new;
 };
 
-/// OneOfDecl - This is the declaration of a oneof, for example:
+/// \brief This is the declaration of a oneof.
 ///
-///    oneof Bool { true, false }
+/// For example:
+///
+/// \code
+///    oneof Bool {
+///      case false
+///      case true
+///    }
+///
+///    oneof Optional<T> {
+///      case None
+///      case Just(T)
+///    }
+/// \endcode
 ///
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
-/// to get the declared type ("Bool" in the above example).
+/// to get the declared type ("Bool" or "Optional" in the above example).
+///
+/// Enum declarations are syntactic sugar for oneofs consisting only of
+/// simple cases with no associated data or member methods or properties.
+/// For example, the Bool declaration above could be written equivalently as:
+///
+/// \code
+///   enum Bool { false, true }
+/// \endcode
 class OneOfDecl : public NominalTypeDecl {
   SourceLoc OneOfLoc;
   SourceLoc NameLoc;
+  bool Enum;
 
 public:
-  OneOfDecl(SourceLoc OneOfLoc, Identifier Name, SourceLoc NameLoc,
+  OneOfDecl(SourceLoc OneOfLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
@@ -1158,6 +1179,9 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(OneOfLoc, getBraces().End);
   }
+  
+  /// True if this declaration uses 'enum' syntax.
+  bool isEnum() const { return Enum; }
 
   OneOfElementDecl *getElement(Identifier Name) const;
 
@@ -1528,31 +1552,74 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
 };
 
-/// OneOfElementDecl - This represents an element of a 'oneof' declaration, e.g.
-/// X and Y in:
-///   oneof d { X : int, Y : int, Z }
+/// \brief This represents a case of a 'oneof' or 'enum' declaration.
+///
+/// For example, the X, Y, and Z in this oneof:
+///
+/// \code
+///   oneof V {
+///     case X(Int)
+///     case Y(Int)
+///     case Z
+///   }
+/// \endcode
+///
+/// Also, the X, Y, and Z in this enum:
+///
+/// \code
+///   enum E { X, Y, Z }
+/// \endcode
+///
 /// The type of a OneOfElementDecl is always the OneOfType for the containing
 /// oneof.
 class OneOfElementDecl : public ValueDecl {
+  SourceLoc CaseLoc;
   SourceLoc IdentifierLoc;
 
-  /// ArgumentType - This is the type specified with the oneof element.  For
-  /// example 'int' in the Y example above.  This is null if there is no type
-  /// associated with this element (such as in the Z example).
+  /// This is the type specified with the oneof element, for
+  /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
+  /// associated with this element, as in 'case Z' or in all elements of enum
+  /// definitions.
   TypeLoc ArgumentType;
+  
+  SourceLoc ResultArrowLoc;
+  /// The optional refined type of the case. Must be an instance of the generic
+  /// type of the containing oneof.
+  TypeLoc ResultType;
     
 public:
-  OneOfElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                   TypeLoc ArgumentType, DeclContext *DC)
+  OneOfElementDecl(SourceLoc CaseLoc,
+                   SourceLoc IdentifierLoc, Identifier Name,
+                   TypeLoc ArgumentType,
+                   SourceLoc ArrowLoc,
+                   TypeLoc ResultType,
+                   DeclContext *DC)
   : ValueDecl(DeclKind::OneOfElement, DC, Name, Type()),
-    IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType) {}
+    CaseLoc(CaseLoc), IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
+    ResultArrowLoc(ArrowLoc),
+    ResultType(ResultType)
+  {}
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
   TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
 
-  SourceLoc getStartLoc() const { return IdentifierLoc; }
+  bool hasResultType() const { return !ResultType.getType().isNull(); }
+  Type getResultType() const { return ResultType.getType(); }
+  TypeLoc &getResultTypeLoc() { return ResultType; }
+  
+  /// True if this element is part of an 'enum' declaration.
+  bool isEnumElement() const { return CaseLoc.isInvalid(); }
+  
+  /// Location of the 'case' keyword for the element, or invalid if the element
+  /// appears in an enum.
+  SourceLoc getCaseLoc() const { return CaseLoc; }
+  
+  SourceLoc getStartLoc() const {
+    return CaseLoc.isValid() ? CaseLoc : IdentifierLoc;
+  }
   SourceLoc getLoc() const { return IdentifierLoc; }
+  SourceLoc getResultArrowLoc() const { return ResultArrowLoc; }
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {

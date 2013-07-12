@@ -492,6 +492,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // argument type
+    TypeIDField, // result type
     TypeIDField, // constructor type
     BCFixed<1>   // implicit?
   >;

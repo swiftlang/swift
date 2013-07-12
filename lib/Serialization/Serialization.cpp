@@ -1083,6 +1083,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                    addIdentifierRef(elem->getName()),
                                    addDeclRef(DC),
                                    addTypeRef(elem->getArgumentType()),
+                                   addTypeRef(elem->getResultType()),
                                    addTypeRef(elem->getType()),
                                    elem->isImplicit());
     return true;

@@ -401,7 +401,8 @@ public:
     PD_DisallowFuncDef      = 1 << 6,
     PD_DisallowInit         = 1 << 7,
     PD_DisallowTypeAliasDef = 1 << 8,
-    PD_AllowDestructor      = 1 << 9
+    PD_AllowDestructor      = 1 << 9,
+    PD_AllowOneOfElement    = 1 << 10,
   };
   
   TypeAliasDecl *parseDeclTypeAlias(bool WantDefinition);
@@ -422,6 +423,7 @@ public:
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclOneOfElement(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);

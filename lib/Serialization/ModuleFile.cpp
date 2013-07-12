@@ -933,7 +933,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto genericParams = maybeReadGenericParams(DC);
 
-    auto oneOf = new (ctx) OneOfDecl(SourceLoc(), getIdentifier(nameID),
+    // FIXME Preserve the isEnum bit.
+    auto oneOf = new (ctx) OneOfDecl(SourceLoc(),
+                                     /*isEnum*/ false,
+                                     getIdentifier(nameID),
                                      SourceLoc(), inherited,
                                      genericParams, DC);
     declOrOffset = oneOf;
@@ -959,16 +962,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::ONEOF_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    TypeID argTypeID, ctorTypeID;
+    TypeID argTypeID, resTypeID, ctorTypeID;
     bool isImplicit;
 
     decls_block::OneOfElementLayout::readRecord(scratch, nameID, contextID,
-                                                argTypeID, ctorTypeID,
+                                                argTypeID, resTypeID,
+                                                ctorTypeID,
                                                 isImplicit);
 
     auto argTy = getType(argTypeID);
-    auto elem = new (ctx) OneOfElementDecl(SourceLoc(), getIdentifier(nameID),
+    auto resTy = getType(resTypeID);
+    auto elem = new (ctx) OneOfElementDecl(SourceLoc(),
+                                           SourceLoc(),
+                                           getIdentifier(nameID),
                                            TypeLoc::withoutLoc(argTy),
+                                           SourceLoc(),
+                                           TypeLoc::withoutLoc(resTy),
                                            getDeclContext(contextID));
     declOrOffset = elem;
 

@@ -157,7 +157,7 @@ ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
 ERROR(disallowed_var_decl,decl_parsing,none,
-      "'var' declarations not allowed here, use data members instead", ())
+      "'var' declarations without getter/setter not allowed here", ())
 ERROR(disallowed_property_decl,decl_parsing,none,
       "'var' declarations with getter/setter not allowed here", ())
 ERROR(disallowed_property_multiple_getset,decl_parsing,none,
@@ -168,6 +168,8 @@ ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
 ERROR(disallowed_init,decl_parsing,none,
       "variable initializer is not allowed here", ())
+ERROR(disallowed_oneof_element,decl_parsing,none,
+      "oneof 'case' is not allowed outside of a oneof", ())
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
@@ -425,9 +427,11 @@ ERROR(expected_lbrace_oneof_type,type_parsing,none,
 ERROR(expected_rbrace_oneof_type,type_parsing,none,
       "expected '}' at end of oneof", ())
 ERROR(duplicate_oneof_element,type_parsing,none,
-      "duplicate definition of element '%0'", (StringRef))
+      "duplicate definition of oneof case '%0'", (StringRef))
 ERROR(expected_type_oneof_element,type_parsing,none,
-      "expected type while parsing oneof element", ())
+      "expected type in parentheses after 'case' name", ())
+ERROR(expected_type_oneof_element_result,type_parsing,none,
+      "expected type after '->' in 'case'", ())
 
 // Array Types      
 ERROR(expected_expr_array_type,expr_parsing,none,
@@ -559,7 +563,7 @@ ERROR(expected_lbrace_after_switch,stmt_parsing,none,
 ERROR(expected_rbrace_switch,stmt_parsing,none,
       "expected '}' at end of 'switch' statement", ())
 ERROR(case_outside_of_switch,stmt_parsing,none,
-      "'%0' can only appear inside a 'switch' statement", (StringRef))
+      "'%0' label can only appear inside a 'switch' statement", (StringRef))
 ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
       "all statements inside a switch must be covered by a 'case' or 'default'",
       ())
