@@ -82,7 +82,12 @@ public:
                      SILLocation Loc = SILLocation());
 
   /// Create debug info for the given funtion.
-  void createFunction(SILDebugScope *DS, llvm::Function *Fn, AbstractCC CC);
+  /// @param DS - The parent scope of the functino
+  /// @param Fn - The IR representation of the function.
+  /// @param CC - The calling convention of the function.
+  /// @param Ty - The signature of the function.
+  void createFunction(SILDebugScope *DS, llvm::Function *Fn,
+                      AbstractCC CC, SILType Ty);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls createFunction, creates a debug

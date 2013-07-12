@@ -277,9 +277,35 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   return StringRef();
 }
 
+static AnyFunctionType* getFunctionType(SILType SILTy) {
+  if (SILTy.isNull())
+    return nullptr;
+
+  TypeBase* Ty = SILTy.getSwiftType().getPointer();
+  if (!Ty)
+    return nullptr;
+
+  auto FnTy = dyn_cast<AnyFunctionType>(Ty);
+  if (!FnTy) {
+    DEBUG(llvm::dbgs() << "Unexpected function type: "; SILTy.dump();
+          llvm::dbgs() << "\n");
+    return nullptr;
+  }
+
+  return FnTy;
+}
+
+static llvm::DIArray createParameterTypes(AnyFunctionType *FnTy) {
+  if (!FnTy)
+    return llvm::DIArray();
+
+  return llvm::DIArray();
+}
+
 void IRGenDebugInfo::createFunction(SILDebugScope *DS,
                                     llvm::Function *Fn,
-                                    AbstractCC CC) {
+                                    AbstractCC CC,
+                                    SILType SILTy) {
   StringRef Name;
   Location L = {};
   if (DS) {
@@ -291,20 +317,23 @@ void IRGenDebugInfo::createFunction(SILDebugScope *DS,
   auto Scope = TheCU;
   auto Line = L.Line;
 
-  // We don't support debug info for types.
-  llvm::DIArray ParameterTypes;
+  AnyFunctionType* FnTy = getFunctionType(SILTy);
   llvm::DICompositeType FnType =
-    DBuilder.createSubroutineType(File, ParameterTypes);
-  llvm::DIArray TParams;
+    DBuilder.createSubroutineType(File, createParameterTypes(FnTy));
+  llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
 
   // Various flags
   bool IsLocalToUnit = false;
   bool IsDefinition = true;
-  unsigned Flags = 0;
   bool IsOptimized = Opts.OptLevel > 0;
+  unsigned Flags = 0;
+
   if (Name.empty())
     Flags |= llvm::DIDescriptor::FlagArtificial;
+
+  if (FnTy && FnTy->isBlock())
+    Flags |= llvm::DIDescriptor::FlagAppleBlock;
 
   switch (CC) {
   // FIXME: We need to invent new DWARF attributes for the CC, but we
@@ -323,7 +352,7 @@ void IRGenDebugInfo::createFunction(SILDebugScope *DS,
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
                             FnType, IsLocalToUnit, IsDefinition,
                             /*ScopeLine =*/Line,
-                            Flags, IsOptimized, Fn, TParams, Decl);
+                            Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = SP;
 }
 
@@ -331,7 +360,7 @@ void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
   SILDebugScope *Scope = new (SILMod) SILDebugScope();
-  createFunction(Scope, Fn, AbstractCC::Freestanding);
+  createFunction(Scope, Fn, AbstractCC::Freestanding, SILType());
   setCurrentLoc(Builder, Scope);
 }
 
