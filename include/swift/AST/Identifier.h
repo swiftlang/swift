@@ -47,12 +47,6 @@ enum class DeclRefKind {
   PrefixOperator
 };
 
-/// \brief The represention of an identifier as stored within the identifier
-/// table.
-class StoredIdentifierInfo {
-
-};
-
 /// Identifier - This is an instance of a uniqued identifier created by
 /// ASTContext.  It just wraps a nul-terminated "const char*".
 class Identifier {
