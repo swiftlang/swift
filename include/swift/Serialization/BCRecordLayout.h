@@ -455,7 +455,7 @@ public:
   /// if you don't care about a particular parameter. Blob data is not included
   /// in the buffer and should be handled separately by the caller.
   template <typename BufferTy, typename... Data>
-  static void readRecord(BufferTy buffer, Data &... data) {
+  static void readRecord(BufferTy &buffer, Data &... data) {
     static_assert(sizeof...(data) <= sizeof...(Fields),
                   "Too many record elements");
     static_assert(sizeof...(Fields) <=
