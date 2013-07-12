@@ -83,10 +83,10 @@ public:
                      SILLocation Loc = SILLocation());
 
   /// Create debug info for the given funtion.
-  /// \param DS - The parent scope of the functino
-  /// \param Fn - The IR representation of the function.
-  /// \param CC - The calling convention of the function.
-  /// \param Ty - The signature of the function.
+  /// \param DS The parent scope of the functino
+  /// \param Fn The IR representation of the function.
+  /// \param CC The calling convention of the function.
+  /// \param Ty The signature of the function.
   void createFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
                       AbstractCC CC, SILType Ty);
 
@@ -101,7 +101,7 @@ public:
 
   /// Emit a dbg.declare instrinsic at the current insertion point and
   /// the Builder's current debug location.
-  /// \param Tag - The DWARF tag that should be used.
+  /// \param Tag The DWARF tag that should be used.
   void emitVariableDeclaration(IRBuilder& Builder,
                                llvm::Value *Storage,
                                DebugTypeInfo Ty,
