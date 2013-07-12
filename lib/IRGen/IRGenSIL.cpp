@@ -948,7 +948,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   fn = link.createFunction(*this, fnType, cc, attrs);
   if (DebugInfo)
-    DebugInfo->createFunction(f->getDebugScope(), fn);
+    DebugInfo->createFunction(f->getDebugScope(), fn, f->getAbstractCC());
 
   return fn;
 }

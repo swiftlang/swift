@@ -82,7 +82,7 @@ public:
                      SILLocation Loc = SILLocation());
 
   /// Create debug info for the given funtion.
-  void createFunction(SILDebugScope *DS, llvm::Function *Fn);
+  void createFunction(SILDebugScope *DS, llvm::Function *Fn, AbstractCC CC);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls createFunction, creates a debug

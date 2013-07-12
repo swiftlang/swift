@@ -277,18 +277,19 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
   return StringRef();
 }
 
-void IRGenDebugInfo::createFunction(SILDebugScope* DS,
-                                    llvm::Function *Fn) {
+void IRGenDebugInfo::createFunction(SILDebugScope *DS,
+                                    llvm::Function *Fn,
+                                    AbstractCC CC) {
   StringRef Name;
   Location L = {};
   if (DS) {
     L = getStartLoc(SM, DS->Loc);
     Name = getName(DS->Loc);
   }
-  StringRef LinkageName = Fn->getName();
-  llvm::DIFile File = getOrCreateFile(L.Filename);
-  llvm::DIDescriptor Scope = TheCU;
-  unsigned Line = L.Line;
+  auto LinkageName = Fn->getName();
+  auto File = getOrCreateFile(L.Filename);
+  auto Scope = TheCU;
+  auto Line = L.Line;
 
   // We don't support debug info for types.
   llvm::DIArray ParameterTypes;
@@ -298,18 +299,31 @@ void IRGenDebugInfo::createFunction(SILDebugScope* DS,
   llvm::DISubprogram Decl;
 
   // Various flags
-  bool isLocalToUnit = false;
-  bool isDefinition = true;
+  bool IsLocalToUnit = false;
+  bool IsDefinition = true;
   unsigned Flags = 0;
+  bool IsOptimized = Opts.OptLevel > 0;
   if (Name.empty())
     Flags |= llvm::DIDescriptor::FlagArtificial;
-  bool isOptimized = Opts.OptLevel > 0;
+
+  switch (CC) {
+  // FIXME: We need to invent new DWARF attributes for the CC, but we
+  // can't do that without patching the LLVM backend.
+  // Hijacking a completely different field for now.
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    IsLocalToUnit = true;
+    break;
+  case AbstractCC::Method:
+  case AbstractCC::Freestanding:
+    IsLocalToUnit = false;
+  }
 
   llvm::DISubprogram SP =
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
-                            FnType, isLocalToUnit, isDefinition,
+                            FnType, IsLocalToUnit, IsDefinition,
                             /*ScopeLine =*/Line,
-                            Flags, isOptimized, Fn, TParams, Decl);
+                            Flags, IsOptimized, Fn, TParams, Decl);
   ScopeCache[DS] = SP;
 }
 
@@ -317,7 +331,7 @@ void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
   SILDebugScope *Scope = new (SILMod) SILDebugScope();
-  createFunction(Scope, Fn);
+  createFunction(Scope, Fn, AbstractCC::Freestanding);
   setCurrentLoc(Builder, Scope);
 }
 
