@@ -278,9 +278,6 @@ StringRef IRGenDebugInfo::getName(SILLocation L) {
 }
 
 static AnyFunctionType* getFunctionType(SILType SILTy) {
-  if (SILTy.isNull())
-    return nullptr;
-
   TypeBase* Ty = SILTy.getSwiftType().getPointer();
   if (!Ty)
     return nullptr;
@@ -295,14 +292,29 @@ static AnyFunctionType* getFunctionType(SILType SILTy) {
   return FnTy;
 }
 
-static llvm::DIArray createParameterTypes(AnyFunctionType *FnTy) {
-  if (!FnTy)
-    return llvm::DIArray();
+/// Create the array of function parameters for FnTy.
+llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
+                                                   SILType SILTy,
+                                                   llvm::DIDescriptor Scope) {
+  if (!SILTy.getSwiftType()) return llvm::DIArray();
+  SILFunctionTypeInfo *FnTy = SILTy.getFunctionTypeInfo(SILMod);
+  if (!FnTy) return llvm::DIArray();
 
-  return llvm::DIArray();
+  llvm::SmallVector<llvm::Value *, 16> Parameters;
+
+  // Actually, the input type is either a single type or a tuple
+  // type. We currently represent a function with one n-tuple argument
+  // as an n-ary function.
+  for (auto Param : FnTy->getInputTypes()) {
+    DebugTypeInfo DTy(Param.getSwiftType(), /* FIXME: Size */8, /* FIXME: Align */8);
+    Parameters.push_back(getOrCreateType(DTy, Scope));
+  }
+
+  return DBuilder.getOrCreateArray(Parameters);
 }
 
-void IRGenDebugInfo::createFunction(SILDebugScope *DS,
+void IRGenDebugInfo::createFunction(SILModule &SILMod,
+                                    SILDebugScope *DS,
                                     llvm::Function *Fn,
                                     AbstractCC CC,
                                     SILType SILTy) {
@@ -318,8 +330,8 @@ void IRGenDebugInfo::createFunction(SILDebugScope *DS,
   auto Line = L.Line;
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
-  llvm::DICompositeType FnType =
-    DBuilder.createSubroutineType(File, createParameterTypes(FnTy));
+  auto Params = createParameterTypes(SILMod, SILTy, Scope);
+  llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
 
@@ -350,7 +362,7 @@ void IRGenDebugInfo::createFunction(SILDebugScope *DS,
 
   llvm::DISubprogram SP =
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
-                            FnType, IsLocalToUnit, IsDefinition,
+                            DIFnTy, IsLocalToUnit, IsDefinition,
                             /*ScopeLine =*/Line,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = SP;
@@ -360,7 +372,7 @@ void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
   SILDebugScope *Scope = new (SILMod) SILDebugScope();
-  createFunction(Scope, Fn, AbstractCC::Freestanding, SILType());
+  createFunction(SILMod, Scope, Fn, AbstractCC::Freestanding, SILType());
   setCurrentLoc(Builder, Scope);
 }
 
@@ -370,6 +382,15 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                                                   const llvm::Twine &Name) {
   emitVariableDeclaration(Builder, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable);
+}
+
+void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
+                                                llvm::Value *Storage,
+                                                DebugTypeInfo Ty,
+                                                const llvm::Twine &Name,
+                                                unsigned ArgNo) {
+  emitVariableDeclaration(Builder, Storage, Ty, Name,
+                          llvm::dwarf::DW_TAG_arg_variable, ArgNo);
 }
 
 /// Return the DIFile that is the ancestor of Scope.

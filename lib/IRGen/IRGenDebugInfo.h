@@ -39,6 +39,7 @@ namespace swift {
 
 class SILDebugScope;
 class SILModule;
+class SILFunctionTypeInfo;
 
 namespace irgen {
 
@@ -86,7 +87,7 @@ public:
   /// @param Fn - The IR representation of the function.
   /// @param CC - The calling convention of the function.
   /// @param Ty - The signature of the function.
-  void createFunction(SILDebugScope *DS, llvm::Function *Fn,
+  void createFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
                       AbstractCC CC, SILType Ty);
 
   /// Convenience function useful for functions without any source
@@ -115,6 +116,13 @@ public:
                                     DebugTypeInfo Ty,
                                     const llvm::Twine &Name);
 
+  /// Convenience function for variables that are function arguments.
+  void emitArgVariableDeclaration(IRBuilder& Builder,
+                                  llvm::Value *Storage,
+                                  DebugTypeInfo Ty,
+                                  const llvm::Twine &Name,
+                                  unsigned ArgNo);
+
   /// Emit debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
                                      StringRef Name,
@@ -131,6 +139,9 @@ private:
   llvm::DIFile getOrCreateFile(const char *Filename);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
+  llvm::DIArray createParameterTypes(SILModule &SILMod,
+                                     SILType FnTy,
+                                     llvm::DIDescriptor Scope);
 };
 
 } // irgen
