@@ -93,11 +93,50 @@ private:
   /// All modules this module depends on.
   SmallVector<Dependency, 8> Dependencies;
 
+  template <typename T>
+  class Serialized {
+  private:
+    using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
+
+    using ImplTy = PointerUnion<T, serialization::BitOffset>;
+    ImplTy Value;
+
+  public:
+    /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
+
+    bool isComplete() const {
+      return Value.template is<T>();
+    }
+
+    T get() const {
+      return Value.template get<T>();
+    }
+
+    /*implicit*/ operator T() const {
+      return get();
+    }
+
+    /*implicit*/ operator serialization::BitOffset() const {
+      return Value.template get<serialization::BitOffset>();
+    }
+
+    /*implicit*/ operator RawBitOffset() const {
+      return Value.template get<serialization::BitOffset>();
+    }
+
+    template <typename Derived>
+    Serialized &operator=(Derived deserialized) {
+      assert(!isComplete() || ImplTy(deserialized) == Value);
+      Value = deserialized;
+      return *this;
+    }
+  };
+
   /// Decls referenced by this module.
-  std::vector<PointerUnion<Decl*, serialization::BitOffset>> Decls;
+  std::vector<Serialized<Decl*>> Decls;
 
   /// Types referenced by this module.
-  std::vector<PointerUnion<Type, serialization::BitOffset>> Types;
+  std::vector<Serialized<Type>> Types;
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
@@ -187,15 +226,19 @@ private:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
+  Optional<Decl *> requestDecl(serialization::DeclID);
+
+  Optional<Type> requestType(serialization::TypeID);
+
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
   /// \param ForcedContext Optional override for the decl context of certain
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
-  /// \param DidRecord Optional callback, called when certain kinds of decls
-  ///                  have been recorded in the decl table but not necessarily
-  ///                  completed.
+  /// \param DidRecord Optional callback, called at some point after the decl
+  ///                  has been recorded in the decl table (but not necessarily
+  ///                  completed).
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = {},
                 Optional<std::function<void(Decl*)>> DidRecord = {});

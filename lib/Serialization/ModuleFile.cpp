@@ -489,14 +489,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
 
-  if (declOrOffset.is<Decl *>()) {
-    auto result = declOrOffset.get<Decl *>();
+  if (declOrOffset.isComplete()) {
     if (DidRecord)
-      (*DidRecord)(result);
-    return result;
+      (*DidRecord)(declOrOffset);
+    return declOrOffset;
   }
 
-  DeclTypeCursor.JumpToBit(declOrOffset.get<BitOffset>());
+  DeclTypeCursor.JumpToBit(declOrOffset);
   auto entry = DeclTypeCursor.advance();
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -504,12 +503,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     error();
     return nullptr;
   }
-
-#ifndef NDEBUG
-  assert(declOrOffset.get<BitOffset>() != 0 &&
-         "this decl is already being deserialized");
-  declOrOffset = BitOffset(0);
-#endif
 
   ASTContext &ctx = ModuleContext->Ctx;
 
@@ -540,6 +533,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
 
+      DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+
+      if (declOrOffset.isComplete())
+        break;
+
       TypeLoc *nextInheritedType = inherited.data();
       for (TypeID TID : inheritedIDs) {
         auto type = getType(TID);
@@ -548,10 +546,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       }
 
       underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-      DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     }
 
-    
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType,
                                          DC, inherited);
@@ -583,8 +579,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      inherited = getTypes(inheritedIDs);
+
       DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+
+      inherited = getTypes(inheritedIDs);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
@@ -593,8 +593,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                           SourceLoc(), inherited,
                                           genericParams, DC);
     declOrOffset = theStruct;
-    if (DidRecord)
+    if (DidRecord) {
       (*DidRecord)(theStruct);
+      DidRecord.reset();
+    }
 
     if (isImplicit)
       theStruct->setImplicit();
@@ -626,9 +628,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclContext *parent;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
+
       parent = getDeclContext(parentID);
+      if (declOrOffset.isComplete())
+        break;
+
+      thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
     }
+
 
     auto genericParams = maybeReadGenericParams(parent);
 
@@ -673,17 +680,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
                                  getType(typeID), DC);
 
-    // Explicitly set the getter and setter info /before/ recording the VarDecl
-    // in the map. The functions will check this to know if they are getters or
-    // setters.
+    declOrOffset = var;
+
     if (getterID || setterID) {
       var->setProperty(ctx, SourceLoc(),
                        cast_or_null<FuncDecl>(getDecl(getterID)),
                        cast_or_null<FuncDecl>(getDecl(setterID)),
                        SourceLoc());
     }
-
-    declOrOffset = var;
 
     if (isImplicit)
       var->setImplicit();
@@ -711,6 +715,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
     }
 
     // Read generic params before reading the type, because the type may
@@ -816,17 +822,24 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, inheritedIDs);
 
+    DeclContext *DC;
     MutableArrayRef<TypeLoc> inherited;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+      DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+
       inherited = getTypes(inheritedIDs);
     }
-    auto proto = new (ctx) ProtocolDecl(getDeclContext(contextID), SourceLoc(),
-                                        SourceLoc(), getIdentifier(nameID),
-                                        inherited);
+    auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
+                                        getIdentifier(nameID), inherited);
     declOrOffset = proto;
-    if (DidRecord)
+    if (DidRecord) {
       (*DidRecord)(proto);
+      DidRecord.reset();
+    }
 
     if (isImplicit)
       proto->setImplicit();
@@ -910,8 +923,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      inherited = getTypes(inheritedIDs, &baseClassTy);
+
       DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+
+      inherited = getTypes(inheritedIDs, &baseClassTy);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
@@ -920,8 +937,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         SourceLoc(), inherited,
                                         genericParams, DC);
     declOrOffset = theClass;
-    if (DidRecord)
+    if (DidRecord) {
       (*DidRecord)(theClass);
+      DidRecord.reset();
+    }
 
     if (isImplicit)
       theClass->setImplicit();
@@ -956,8 +975,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      inherited = getTypes(inheritedIDs);
+
       DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+
+      inherited = getTypes(inheritedIDs);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
@@ -969,8 +992,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                      SourceLoc(), inherited,
                                      genericParams, DC);
     declOrOffset = oneOf;
-    if (DidRecord)
+    if (DidRecord) {
       (*DidRecord)(oneOf);
+      DidRecord.reset();
+    }
 
     if (isImplicit)
       oneOf->setImplicit();
@@ -1001,6 +1026,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                 ctorTypeID,
                                                 isImplicit);
 
+    DeclContext *DC = getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      break;
+
     auto argTy = getType(argTypeID);
     auto resTy = getType(resTypeID);
     auto elem = new (ctx) OneOfElementDecl(SourceLoc(),
@@ -1009,7 +1038,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                            TypeLoc::withoutLoc(argTy),
                                            SourceLoc(),
                                            TypeLoc::withoutLoc(resTy),
-                                           getDeclContext(contextID));
+                                           DC);
     declOrOffset = elem;
 
     elem->setType(getType(ctorTypeID));
@@ -1031,6 +1060,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                              getterID, setterID,
                                              overriddenID);
 
+    DeclContext *DC;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+    }
+
     Pattern *indices = maybeReadPattern();
     assert(indices);
 
@@ -1041,8 +1078,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto subscript = new (ctx) SubscriptDecl(ctx.getIdentifier("__subscript"),
                                              SourceLoc(), indices, SourceLoc(),
                                              elemTy, SourceRange(),
-                                             getter, setter,
-                                             getDeclContext(contextID));
+                                             getter, setter, DC);
     declOrOffset = subscript;
 
     subscript->setType(getType(declTypeID));
@@ -1068,9 +1104,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+      DC = getDeclContext(contextID);
+      if (declOrOffset.isComplete())
+        break;
+
       baseTy = TypeLoc::withoutLoc(getType(baseID));
       inherited = getTypes(inheritedIDs);
-      DC = getDeclContext(contextID);
     }
 
     auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, inherited,
@@ -1101,8 +1141,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
                                               signatureID, implicitThisID);
-    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
+
     DeclContext *parent = getDeclContext(parentID);
+    if (declOrOffset.isComplete())
+      break;
+
+    auto thisDecl = cast<VarDecl>(getDecl(implicitThisID, nullptr));
 
     auto dtor = new (ctx) DestructorDecl(ctx.getIdentifier("destructor"),
                                          SourceLoc(), thisDecl, parent);
@@ -1238,7 +1282,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     return nullptr;
   }
 
-  return declOrOffset.get<Decl *>();
+  if (DidRecord)
+    (*DidRecord)(declOrOffset);
+  return declOrOffset;
 }
 
 /// Translate from the Serialization calling convention enum values to the AST
@@ -1280,10 +1326,10 @@ Type ModuleFile::getType(TypeID TID) {
   assert(TID <= Types.size() && "invalid decl ID");
   auto &typeOrOffset = Types[TID-1];
 
-  if (typeOrOffset.is<Type>())
-    return typeOrOffset.get<Type>();
+  if (typeOrOffset.isComplete())
+    return typeOrOffset;
 
-  DeclTypeCursor.JumpToBit(typeOrOffset.get<BitOffset>());
+  DeclTypeCursor.JumpToBit(typeOrOffset);
   auto entry = DeclTypeCursor.advance();
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -1291,12 +1337,6 @@ Type ModuleFile::getType(TypeID TID) {
     error();
     return nullptr;
   }
-
-#ifndef NDEBUG
-  assert(typeOrOffset.get<BitOffset>() != 0 &&
-         "this type is already being deserialized");
-  typeOrOffset = BitOffset(0);
-#endif
 
   ASTContext &ctx = ModuleContext->Ctx;
 
@@ -1313,6 +1353,7 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
+
     typeOrOffset = alias->getDeclaredType();
     break;
   }
@@ -1331,7 +1372,7 @@ Type ModuleFile::getType(TypeID TID) {
       typeOrOffset = NominalType::get(nominal, parentTy, ctx);
     }));
 
-    assert(typeOrOffset.is<Type>());
+    assert(typeOrOffset.isComplete());
     break;
   }
 
@@ -1476,6 +1517,10 @@ Type ModuleFile::getType(TypeID TID) {
         conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
     }
 
+    // See if we triggered deserialization through our conformances.
+    if (typeOrOffset.isComplete())
+      break;
+
     auto archetype = ArchetypeType::getNew(ctx, parent, getIdentifier(nameID),
                                            conformances, superclass, index);
     typeOrOffset = archetype;
@@ -1532,8 +1577,7 @@ Type ModuleFile::getType(TypeID TID) {
     for (TypeID protoID : rawProtocolIDs)
       protocols.push_back(getType(protoID));
 
-    auto composition = ProtocolCompositionType::get(ctx, protocols);
-    typeOrOffset = composition;
+    typeOrOffset = ProtocolCompositionType::get(ctx, protocols);
     break;
   }
 
@@ -1690,7 +1734,7 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
   
-  return typeOrOffset.get<Type>();
+  return typeOrOffset;
 }
 
 ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
