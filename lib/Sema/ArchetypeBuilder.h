@@ -28,7 +28,8 @@ class Requirement;
 class SourceLoc;
 class Type;
 class TypeAliasDecl;
-class TypeChecker;
+class ASTContext;
+class DiagnosticEngine;
 
 /// \brief Collects a set of requirements of generic parameters, both explicitly
 /// stated and inferred, and determines the set of archetypes for each of
@@ -36,7 +37,8 @@ class TypeChecker;
 class ArchetypeBuilder {
   struct PotentialArchetype;
 
-  TypeChecker &TC;
+  ASTContext &Context;
+  DiagnosticEngine &Diags;
   struct Implementation;
   std::unique_ptr<Implementation> Impl;
 
@@ -71,7 +73,7 @@ class ArchetypeBuilder {
                               PotentialArchetype *T2);
 
 public:
-  ArchetypeBuilder(TypeChecker &TC);
+  ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags);
   ArchetypeBuilder(ArchetypeBuilder &&) = default;
   ArchetypeBuilder &operator=(ArchetypeBuilder &&) = default;
   ~ArchetypeBuilder();

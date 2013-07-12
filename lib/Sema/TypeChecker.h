@@ -158,6 +158,7 @@ class TypeChecker : public ASTMutationListener {
 public:
   TranslationUnit &TU;
   ASTContext &Context;
+  DiagnosticEngine &Diags;
 
   /// \brief The list of implicitly-defined functions created by the
   /// type checker.
@@ -178,8 +179,6 @@ private:
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
-  
-  DiagnosticEngine &Diags;
 
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;

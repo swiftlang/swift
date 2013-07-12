@@ -136,16 +136,16 @@ public:
 
   /// \brief Retrieve (or build) the archetype corresponding to the potential
   /// archetype.
-  ArchetypeType *getArchetype(TypeChecker &TC) {
+  ArchetypeType *getArchetype(ASTContext &Context) {
     // Retrieve the archetype from the representation of this set.
     if (Representative != this)
-      return getRepresentative()->getArchetype(TC);
+      return getRepresentative()->getArchetype(Context);
 
     if (!Archetype) {
       // Allocate a new archetype.
       ArchetypeType *ParentArchetype = nullptr;
       if (Parent)
-        ParentArchetype = Parent->getArchetype(TC);
+        ParentArchetype = Parent->getArchetype(Context);
 
       // If we ended up building our parent archetype, then we'll have
       // already filled in our own archetype.
@@ -154,7 +154,7 @@ public:
 
       SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
                                             ConformsTo.end());
-      Archetype = ArchetypeType::getNew(TC.Context, ParentArchetype,
+      Archetype = ArchetypeType::getNew(Context, ParentArchetype,
                                         Name, Protos, Superclass, Index);
 
       // Collect the set of nested types of this archetype, and put them into
@@ -162,9 +162,9 @@ public:
       SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
       for (auto Nested : NestedTypes) {
         FlatNestedTypes.push_back({ Nested.first,
-                                    Nested.second->getArchetype(TC) });
+                                    Nested.second->getArchetype(Context) });
       }
-      Archetype->setNestedTypes(TC.Context, FlatNestedTypes);
+      Archetype->setNestedTypes(Context, FlatNestedTypes);
     }
 
     return Archetype;
@@ -216,8 +216,8 @@ struct ArchetypeBuilder::Implementation {
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 };
 
-ArchetypeBuilder::ArchetypeBuilder(TypeChecker &TC)
-  : TC(TC), Impl(new Implementation)
+ArchetypeBuilder::ArchetypeBuilder(ASTContext &Context, DiagnosticEngine &Diags)
+  : Context(Context), Diags(Diags), Impl(new Implementation)
 {
 }
 
@@ -334,8 +334,8 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   // FIXME: We should compute the meet here.
   if (T->Superclass) {
     if (!T->Superclass->isEqual(Superclass)) {
-      TC.diagnose(ColonLoc, diag::requires_superclass_conflict, T->Name,
-                  T->Superclass, Superclass);
+      Diags.diagnose(ColonLoc, diag::requires_superclass_conflict, T->Name,
+                     T->Superclass, Superclass);
       return true;
     }
 
@@ -379,8 +379,8 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // don't actually have two parameters.
   // FIXME: Should we simply allow this?
   if (T1Depth == 0 && T2Depth == 0) {
-    TC.diagnose(EqualLoc, diag::requires_generic_param_equal,
-                T1->Name, T2->Name);
+    Diags.diagnose(EqualLoc, diag::requires_generic_param_equal,
+                   T1->Name, T2->Name);
     return true;
   }
 
@@ -408,8 +408,8 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
-      TC.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
-                  0, Req.getSubject(), 0);
+      Diags.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
+                     0, Req.getSubject(), 0);
       return true;
     }
 
@@ -440,8 +440,8 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
     if (!FirstPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
-      TC.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
-                  1, Req.getFirstType(), 1);
+      Diags.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
+                     1, Req.getFirstType(), 1);
       return true;
     }
 
@@ -449,8 +449,8 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
     if (!SecondPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
-      TC.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
-                  2, Req.getSecondType(), 1);
+      Diags.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
+                     2, Req.getSecondType(), 1);
       return true;
     }
     return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);
@@ -484,7 +484,7 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype = PA.second->getArchetype(TC);
+    auto Archetype = PA.second->getArchetype(Context);
     Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }

@@ -129,7 +129,7 @@ public:
     assert(GenericParams && "Missing generic parameters");
 
     // Assign archetypes to each of the generic parameters.
-    ArchetypeBuilder Builder(TC);
+    ArchetypeBuilder Builder(TC.Context, TC.Diags);
     unsigned Index = 0;
     for (auto GP : *GenericParams) {
       auto TypeParam = GP.getAsTypeParam();
@@ -584,7 +584,7 @@ public:
     }
 
     // Build archetypes for this protocol.
-    ArchetypeBuilder builder(TC);
+    ArchetypeBuilder builder(TC.Context, TC.Diags);
     builder.addGenericParameter(thisDecl, 0);
     builder.addImplicitConformance(thisDecl, PD);
     builder.assignArchetypes();
