@@ -295,6 +295,18 @@ public:
     // TODO: skip arguments with default parameters?
   }
 
+  void addSwiftConstructorCall(const ConstructorDecl *CD) {
+    assert(!HaveDot && "can not add a constructor call after a dot");
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::SwiftDeclaration);
+    Builder.setAssociatedSwiftDecl(CD);
+    Builder.addLeftParen();
+    addTuplePatternParameters(Builder, cast<TuplePattern>(CD->getArguments()));
+    Builder.addRightParen();
+    Builder.addTypeAnnotation(CD->getResultType().getString());
+  }
+
   void addSwiftSubscriptCall(const SubscriptDecl *SD) {
     assert(!HaveDot && "can not add a subscript after a dot");
     CodeCompletionResultBuilder Builder(
@@ -357,10 +369,10 @@ public:
         return;
 
       // FIXME: super.constructor
-      if (isa<ConstructorDecl>(D)) {
+      if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         if (!ExprType->is<MetaTypeType>())
           return;
-        // FIXME: produce a constructor call.
+        addSwiftConstructorCall(CD);
         return;
       }
 

@@ -936,6 +936,13 @@ Type ConstructorDecl::getArgumentType() const {
   return ArgTy;
 }
 
+Type ConstructorDecl::getResultType() const {
+  Type ArgTy = getType();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
+  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
+  return ArgTy;
+}
+
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef
 ConstructorDecl::getObjCSelector(llvm::SmallVectorImpl<char> &buffer) const {

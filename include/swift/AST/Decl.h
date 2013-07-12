@@ -1696,6 +1696,9 @@ public:
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
 
+  /// \brief Get the type of the constructed object.
+  Type getResultType() const;
+
   /// getImplicitThisDecl - This method returns the implicit 'this' decl.
   VarDecl *getImplicitThisDecl() const { return ImplicitThisDecl; }
 
