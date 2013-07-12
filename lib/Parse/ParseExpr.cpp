@@ -555,8 +555,6 @@ NullablePtr<Expr> Parser::parseExprNew() {
   return NewArrayExpr::create(Context, newLoc, elementTy, bounds);
 }
 
-#include "llvm/Support/raw_ostream.h"
-
 static VarDecl *getImplicitThisDeclForSuperContext(Parser &P,
                                                    DeclContext *dc,
                                                    SourceLoc loc) {
