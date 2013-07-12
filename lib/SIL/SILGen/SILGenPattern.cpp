@@ -54,6 +54,11 @@ static bool isWildcardPattern(const Pattern *p) {
     return isWildcardPattern(cast<VarPattern>(p)->getSubPattern());
   }
 }
+
+/// True if a pattern is a simple variable binding.
+static bool isBindingPattern(const Pattern *p) {
+  return p && isa<NamedPattern>(p->getSemanticsProvidingPattern());
+}
   
 /// Emit a conditional branch testing if a value matches the top-level node
 /// of this pattern.
@@ -869,11 +874,15 @@ public:
           newPatterns.push_back(nullptr);
       } else {
         // Non-wildcards destructure relative to the specializing pattern
-        // constructor. Since the result row may bind to newly-exposed vars,
+        // constructor. If the specialization exposes variable bindings,
         // we rescope it to the specialized scope.
         destructurePattern(gen, specializer, columns[0], newPatterns);
-        rowDepth = CleanupsDepth::invalid();
-        rowCont = specCont;
+        for (auto *newPattern : newPatterns)
+          if (isBindingPattern(newPattern)) {
+            rowDepth = CleanupsDepth::invalid();
+            rowCont = specCont;
+            break;
+          }
       }
       assert(newPatterns.size() == specializedWidth &&
              "destructurePattern did not produce number of columns reported "
@@ -1135,11 +1144,18 @@ recur:
       // Emit cases in this scope.
       emitCasesForScope(gen, innerContBB, caseMap);
       
-      // Emit scope cleanups into the continuation BB.
-      gen.B.emitBlock(innerContBB);
+      if (innerContBB->pred_empty()) {
+        // If the continuation wasn't used, kill it.
+        innerContBB->eraseFromParent();
+        gen.B.clearInsertionPoint();
+      } else {
+        // Otherwise, emit scope cleanups into the continuation BB.
+        gen.B.emitBlock(innerContBB);
+      }
     }
     // Chain the inner continuation to the outer.
-    gen.B.createBranch(SILLocation(), contBB);
+    if (gen.B.hasValidInsertionPoint())
+      gen.B.createBranch(SILLocation(), contBB);
     
     // Continue dispatch on the false branch, if any.
     if (nextBB)
@@ -1203,8 +1219,14 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // Emit cases for the outermost scope.
     emitCasesForScope(*this, contBB, caseMap);
 
-    // Emit top-level cleanups into the continuation BB.
-    B.emitBlock(contBB);
+    if (contBB->pred_empty()) {
+      // If the continuation BB wasn't used, kill it.
+      contBB->eraseFromParent();
+      B.clearInsertionPoint();
+    } else {
+      // Otherwise, emit top-level cleanups into the continuation BB.
+      B.emitBlock(contBB);
+    }
   }
   
   assert([&] {
