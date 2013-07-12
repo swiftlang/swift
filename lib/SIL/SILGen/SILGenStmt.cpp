@@ -356,9 +356,8 @@ void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
 }
 
 void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
-  // TODO fallthrough
-  SGM.diagnose(S->getLoc(), diag::not_implemented);
-  exit(1);
+  // Implemented in SILGenPattern.cpp.
+  emitSwitchFallthrough(S);
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,

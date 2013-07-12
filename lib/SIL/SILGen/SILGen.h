@@ -240,6 +240,8 @@ public:
     return state.getInt();
   }
 };
+
+class SwitchContext;
   
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
@@ -268,6 +270,7 @@ public:
   
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
+  std::vector<SwitchContext *> SwitchStack;
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
@@ -519,6 +522,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   void emitSwitchStmt(SwitchStmt *S);
+  void emitSwitchFallthrough(FallthroughStmt *S);
   
   //===--------------------------------------------------------------------===//
   // Expressions

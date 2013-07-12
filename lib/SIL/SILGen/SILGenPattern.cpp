@@ -433,6 +433,32 @@ struct CaseBlock {
 /// dispatch is resolved.
 using CaseMap = llvm::MapVector<CaseStmt*, CaseBlock>;
 
+/// Emit the entry point BB for a case block, if necessary, and add it to the
+/// CaseMap. Returns the entry point BB emitted for the block.
+SILBasicBlock *emitCaseBlock(SILGenFunction &gen, CaseMap &caseMap,
+                             CaseStmt *caseBlock,
+                             CleanupsDepth cleanupsDepth,
+                             SILBasicBlock *contBB) {
+  CaseBlock &dest = caseMap[caseBlock];
+  
+  // If the block was emitted, sanity check that it was emitted at the same
+  // scope level we think it should be.
+  if (dest.entry) {
+    assert(cleanupsDepth == dest.cleanupsDepth
+           && "divergent cleanup depths for case");
+    assert(contBB == dest.cont
+           && "divergent continuation BBs for case");
+    return dest.entry;
+  }
+  
+  // Set up the basic block for the case.
+  dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+  dest.cleanupsDepth = cleanupsDepth;
+  dest.cont = contBB;
+  
+  return dest.entry;
+}
+  
 /// A handle to a row in a clause matrix. Does not own memory; use of the
 /// ClauseRow must be dominated by its originating ClauseMatrix.
 class ClauseRow {
@@ -489,27 +515,10 @@ public:
   }
   
   /// Emit the case block corresponding to this row if necessary. Returns the
-  /// entry point BB emitted for the block. If the mayUseBB argument is nonnull,
-  /// and the case has not been emitted, it will be emitted into the given BB.
+  /// entry point BB emitted for the block.
   SILBasicBlock *emitCaseBlock(SILGenFunction &gen, CaseMap &caseMap) const {
-    CaseBlock &dest = caseMap[getCaseBlock()];
-    
-    // If the block was emitted, sanity check that it was emitted at the same
-    // scope level we think it should be.
-    if (dest.entry) {
-      assert(getCleanupsDepth() == dest.cleanupsDepth
-             && "divergent cleanup depths for case");
-      assert(getContBB() == dest.cont
-             && "divergent continuation BBs for case");
-      return dest.entry;
-    }
-
-    // Set up the basic block for the case.
-    dest.entry = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-    dest.cleanupsDepth = getCleanupsDepth();
-    dest.cont = getContBB();
-    
-    return dest.entry;
+    return ::emitCaseBlock(gen, caseMap,
+                           getCaseBlock(), getCleanupsDepth(), getContBB());
   }
   
   /// Emit dispatch to the row's destination. If the row has no guard, the
@@ -1175,6 +1184,19 @@ recur:
   goto recur;
 }
 
+/// Context info used to emit FallthroughStmts.
+/// Since fallthrough-able case blocks must not bind variables, they are always
+/// emitted in the outermost scope of the switch.
+class Lowering::SwitchContext {
+public:
+  // A reference to the active case-to-BB mapping.
+  CaseMap &caseMap;
+  // The cleanup scope of the outermost switch scope.
+  CleanupsDepth outerScope;
+  // The outermost continuation BB for the switch.
+  SILBasicBlock *outerContBB;
+};
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   Scope OuterSwitchScope(Cleanups);
   
@@ -1206,10 +1228,16 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // Bind variable bindings from the topmost pattern nodes.
     clauses.emitVarsInColumn(*this, 0);
     
+    CleanupsDepth cleanupsDepth = Cleanups.getCleanupsDepth();
+    
     // Update the case scopes to include the bound variables.
     for (unsigned r = 0, e = clauses.rows(); r < e; ++r) {
-      clauses[r].setCleanupsDepth(Cleanups.getCleanupsDepth());
+      clauses[r].setCleanupsDepth(cleanupsDepth);
     }
+
+    // Push context for fallthrough statements.
+    SwitchContext context{caseMap, cleanupsDepth, contBB};
+    SwitchStack.push_back(&context);
 
     // Emit the decision tree.
     emitDecisionTree(*this, S, std::move(clauses), caseMap, contBB);
@@ -1219,6 +1247,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // Emit cases for the outermost scope.
     emitCasesForScope(*this, contBB, caseMap);
 
+    SwitchStack.pop_back();
+    
     if (contBB->pred_empty()) {
       // If the continuation BB wasn't used, kill it.
       contBB->eraseFromParent();
@@ -1235,4 +1265,18 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         return false && "Case not emitted";
     return true;
   }());
+}
+
+void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
+  assert(!SwitchStack.empty() && "fallthrough outside of switch?!");
+  SwitchContext *context = SwitchStack.back();
+  
+  // Get the destination block.
+  SILBasicBlock *dest = emitCaseBlock(*this, context->caseMap,
+                                      S->getFallthroughDest(),
+                                      context->outerScope,
+                                      context->outerContBB);
+  
+  // Jump to it.
+  Cleanups.emitBranchAndCleanups(JumpDest{dest, context->outerScope});
 }
