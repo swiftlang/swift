@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "ArchetypeBuilder.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "llvm/ADT/Twine.h"

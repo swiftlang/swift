@@ -15,8 +15,8 @@
 // those requirements.
 //
 //===----------------------------------------------------------------------===//
-#include "ArchetypeBuilder.h"
 #include "TypeChecker.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
