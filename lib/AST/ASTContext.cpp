@@ -51,7 +51,9 @@ struct ASTContext::Implementation {
 
   /// \brief The set of AST mutation listeners.
   SmallVector<ASTMutationListener *, 4> MutationListeners;
-  
+
+
+
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
   llvm::DenseMap<swift::Decl *, ClangNode> ClangNodes;

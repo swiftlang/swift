@@ -1121,6 +1121,11 @@ public:
     assert(getKind() == OverloadChoiceKind::TupleIndex);
     return (DeclOrKind >> 1) - (uintptr_t)OverloadChoiceKind::TupleIndex;
   }
+
+  /// \brief Retrieves an opaque choice that ignores the base type.
+  void *getOpaqueChoiceSimple() const {
+    return reinterpret_cast<void*>(DeclOrKind);
+  }
 };
 
 /// \brief An overload set, which is a set of overloading choices from which

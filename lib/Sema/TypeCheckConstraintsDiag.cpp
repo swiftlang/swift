@@ -166,6 +166,24 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
   return cs.getConstraintLocator(anchor, path);
 }
 
+/// Simplify the given locator down to a specific anchor expression,
+/// if possible.
+///
+/// \returns the anchor expression if it fully describes the locator, or
+/// null otherwise.
+static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
+                                     ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return nullptr;
+
+  SourceRange range1, range2;
+  locator = simplifyLocator(cs, locator, range1, range2);
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  return locator->getAnchor();
+}
+
 /// \brief Emit a diagnostic for the given failure.
 ///
 /// \param cs The constraint system in which the diagnostic was generated.
@@ -237,6 +255,113 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
   return true;
 }
 
+/// \brief Determine the number of distinct overload choices in the
+/// provided set.
+static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
+  llvm::SmallPtrSet<void *, 4> uniqueChoices;
+  unsigned result = 0;
+  for (auto choice : choices) {
+    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()))
+      ++result;
+  }
+  return result;
+}
+
+/// \brief Determine the name of the overload in a set of overload choices.
+static Identifier getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+  for (auto choice : choices) {
+    if (choice.getKind() == OverloadChoiceKind::Decl)
+      return choice.getDecl()->getName();
+  }
+
+  return Identifier();
+}
+
+bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
+  // Produce a diff of the solutions.
+  SolutionDiff diff(solutions);
+
+  // Find the locators which have the largest numbers of
+  SmallVector<unsigned, 2> mostDistinctOverloads;
+  unsigned maxDistinctOverloads = 0;
+  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
+    auto &overload = diff.overloads[i];
+
+    // If we can't resolve the locator to an anchor expression with no path,
+    // we can't diagnose this well.
+    if (!simplifyLocatorToAnchor(cs, overload.locator))
+      continue;
+
+    // If we don't have a name to hang on to, it'll be hard to diagnose this
+    // overload.
+    if (getOverloadChoiceName(overload.choices).empty())
+      continue;
+
+    unsigned distinctOverloads = countDistinctOverloads(overload.choices);
+
+    // We need at least two overloads to make this interesting.
+    if (distinctOverloads < 2)
+      continue;
+
+    // If we have more distinct overload choices for this locator than for
+    // prior locators, just keep this locator.
+    if (distinctOverloads > maxDistinctOverloads) {
+      maxDistinctOverloads = distinctOverloads;
+      mostDistinctOverloads.clear();
+      mostDistinctOverloads.push_back(i);
+      continue;
+    }
+
+    // If we have as many distinct overload choices for this locator as
+    // the best so far, add this locator to the set.
+    if (distinctOverloads == maxDistinctOverloads) {
+      mostDistinctOverloads.push_back(i);
+      continue;
+    }
+
+    // We have better results. Ignore this one.
+  }
+
+  // FIXME: Should be able to pick the best locator, e.g., based on some
+  // depth-first numbering of expressions.
+  if (mostDistinctOverloads.size() == 1) {
+    auto &overload = diff.overloads[mostDistinctOverloads[0]];
+    auto name = getOverloadChoiceName(overload.choices);
+    auto anchor = simplifyLocatorToAnchor(cs, overload.locator);
+
+    // Emit the ambiguity diagnostic.
+    auto &tc = cs.getTypeChecker();
+    tc.diagnose(anchor->getLoc(),
+                name.isOperator() ? diag::ambiguous_operator_ref
+                                  : diag::ambiguous_decl_ref,
+                name);
+
+    // Emit candidates.
+    for (auto choice : overload.choices) {
+      switch (choice.getKind()) {
+      case OverloadChoiceKind::Decl:
+        // FIXME: show deduced types, etc, etc.
+        tc.diagnose(choice.getDecl(), diag::found_candidate);
+        break;
+
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::FunctionReturningBaseType:
+      case OverloadChoiceKind::IdentityFunction:
+      case OverloadChoiceKind::TupleIndex:
+        // FIXME: Actually diagnose something here.
+        break;
+      }
+    }
+
+    return true;
+  }
+
+  // FIXME: If we inferred different types for literals (for example),
+  // could diagnose ambiguity that way as well.
+
+  return false;
+}
+
 bool ConstraintSystem::diagnose() {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
@@ -264,6 +389,11 @@ bool ConstraintSystem::diagnose() {
 
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
+
+    // If there are multiple solutions, try to diagnose an ambiguity.
+    if (solutions.size() > 1 && diagnoseAmbiguity(*this, solutions)) {
+      return true;
+    }
 
     // Remove the solver state.
     this->solverState = nullptr;
