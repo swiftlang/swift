@@ -51,12 +51,11 @@ CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   NumChunks = Chunks.size();
 }
 
-std::string CodeCompletionString::getAsString() const {
-  std::string Result;
+void CodeCompletionString::print(raw_ostream &OS) const {
   unsigned PrevNestingLevel = 0;
   for (auto C : getChunks()) {
     if (C.getNestingLevel() < PrevNestingLevel) {
-      Result += "#}";
+      OS << "#}";
     }
     switch (C.getKind()) {
     case Chunk::ChunkKind::Text:
@@ -69,44 +68,49 @@ std::string CodeCompletionString::getAsString() const {
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
-      Result += C.getText();
+      OS << C.getText();
       break;
     case Chunk::ChunkKind::OptionalBegin:
     case Chunk::ChunkKind::CallParameterBegin:
-      Result += "{#";
+      OS << "{#";
       break;
     case Chunk::ChunkKind::TypeAnnotation:
-      Result += "[#";
-      Result += C.getText();
-      Result += "#]";
+      OS << "[#";
+      OS << C.getText();
+      OS << "#]";
     }
     PrevNestingLevel = C.getNestingLevel();
   }
   while (PrevNestingLevel > 0) {
-    Result += "#}";
+    OS << "#}";
     PrevNestingLevel--;
   }
-  return Result;
 }
 
-std::string CodeCompletionResult::getAsString() const {
-  std::string Result;
+void CodeCompletionString::dump() const {
+  print(llvm::outs());
+}
+
+void CodeCompletionResult::print(raw_ostream &OS) const {
   switch (Kind) {
   case ResultKind::SwiftDeclaration:
-    Result += "SwiftDecl: ";
+    OS << "SwiftDecl: ";
     break;
   case ResultKind::ClangDeclaration:
-    Result += "ClangDecl: ";
+    OS << "ClangDecl: ";
     break;
   case ResultKind::Keyword:
-    Result += "Keyword: ";
+    OS << "Keyword: ";
     break;
   case ResultKind::Pattern:
-    Result += "Pattern: ";
+    OS << "Pattern: ";
     break;
   }
-  Result += CompletionString->getAsString();
-  return Result;
+  CompletionString->print(OS);
+}
+
+void CodeCompletionResult::dump() const {
+  print(llvm::outs());
 }
 
 void CodeCompletionResultBuilder::addChunkWithText(
@@ -439,7 +443,8 @@ void PrintingCodeCompletionConsumer::handleResults(
     ArrayRef<CodeCompletionResult *> Results) {
   OS << "Begin completions\n";
   for (auto Result : Results) {
-    OS << Result->getAsString() << "\n";
+    Result->print(OS);
+    OS << "\n";
   }
   OS << "End completions\n";
 }

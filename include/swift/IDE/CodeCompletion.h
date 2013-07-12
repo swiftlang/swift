@@ -160,7 +160,9 @@ public:
                               NumChunks);
   }
 
-  std::string getAsString() const;
+  /// Print a debug representation of the code completion string to \p OS.
+  void print(raw_ostream &OS) const;
+  void dump() const;
 };
 
 /// \brief A single code completion result.
@@ -212,7 +214,9 @@ public:
     return AssociatedDecl.get<const clang::Decl *>();
   }
 
-  std::string getAsString() const;
+  /// Print a debug representation of the code completion result to \p OS.
+  void print(raw_ostream &OS) const;
+  void dump() const;
 };
 
 class CodeCompletionResultBuilder {
