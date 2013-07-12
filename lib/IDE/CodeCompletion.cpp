@@ -377,6 +377,8 @@ public:
       }
 
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+        if (ExprType->is<MetaTypeType>())
+          return;
         addSwiftSubscriptCall(SD);
         return;
       }
