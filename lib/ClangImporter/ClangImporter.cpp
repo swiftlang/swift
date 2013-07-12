@@ -434,7 +434,8 @@ void ClangImporter::lookupValue(Module *module,
   }
 }
 
-void ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) {
+void
+ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
   auto &sema = Impl.Instance->getSema();
   sema.LookupVisibleDecls(Impl.getClangASTContext().getTranslationUnitDecl(),
                           clang::Sema::LookupNameKind::LookupAnyName,

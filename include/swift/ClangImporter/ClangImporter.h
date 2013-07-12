@@ -107,7 +107,7 @@ public:
   ///
   /// \param consumer The VisibleDeclConsumer that will be fed decls as they
   ///   are found.
-  void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer);
+  void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const;
 
   /// \brief Load extensions to the given nominal type.
   ///

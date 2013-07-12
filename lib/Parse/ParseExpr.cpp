@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -811,6 +812,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
+        if (Tok.is(tok::code_complete) && Result.isNonNull()) {
+          CodeCompletion->completeDotExpr(Result.get());
+          return 0;
+        }
         diagnose(Tok, diag::expected_field_name);
         return 0;
       }
@@ -865,6 +870,11 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       Result = new (Context) PostfixUnaryExpr(oper, Result.get());
       continue;
     }
+
+   if (Tok.is(tok::code_complete) && Result.isNonNull()) {
+     CodeCompletion->completePostfixExpr(Result.get());
+     return 0;
+   }
 
     break;
   }

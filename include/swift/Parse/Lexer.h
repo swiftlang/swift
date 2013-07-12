@@ -82,8 +82,15 @@ public:
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
-    State(const char *CurPtr): CurPtr(CurPtr) {}
+  public:
+    State(): CurPtr(nullptr) {}
+
+  private:
+    explicit State(const char *CurPtr): CurPtr(CurPtr) {}
     const char *CurPtr;
+    bool isValid() const {
+      return CurPtr != nullptr;
+    }
     friend class Lexer;
   };
 
@@ -157,6 +164,7 @@ public:
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
   void restoreState(State S) {
+    assert(S.isValid());
     assert(BufferStart <= S.CurPtr && S.CurPtr <= BufferEnd &&
            "state for the wrong buffer");
     CurPtr = S.CurPtr;
@@ -172,6 +180,7 @@ public:
 
   bool stateRangeHasCodeCompletionToken(State Begin, State End,
                                         unsigned TokenOffset) {
+    assert(Begin.isValid() && End.isValid());
     assert(Begin.CurPtr <= End.CurPtr && "states don't form a range");
     const char *CodeCompletePtr = BufferStart + TokenOffset;
     return Begin.CurPtr <= CodeCompletePtr &&

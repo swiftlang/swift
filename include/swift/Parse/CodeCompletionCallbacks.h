@@ -14,7 +14,6 @@
 #define SWIFT_PARSE_CODE_COMPLETION_CALLBACKS_H
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ParserTokenRange.h"
 #include "swift/Parse/Parser.h"
 
 namespace swift {
@@ -24,7 +23,7 @@ class CodeCompletionCallbacks {
 protected:
   Parser &P;
   ASTContext &Context;
-  ParserTokenRange TokenRange;
+  Parser::ParserPosition ExprBeginPosition;
 
 public:
   CodeCompletionCallbacks(Parser &P)
@@ -33,11 +32,19 @@ public:
 
   virtual ~CodeCompletionCallbacks() {}
 
-  void setTokenRange(ParserTokenRange PTR) {
-    TokenRange = PTR;
+  void setExprBeginning(Parser::ParserPosition PP) {
+    ExprBeginPosition = PP;
   }
 
+  /// \brief Complete the whole expression.  This is a fallback that should
+  /// produce results when more specific completion methods failed.
   virtual void completeExpr() = 0;
+
+  /// \brief Complete expr-dot after we have consumed the dot.
+  virtual void completeDotExpr(Expr *E) = 0;
+
+  /// \brief Complete expr-postfix.
+  virtual void completePostfixExpr(Expr *E) = 0;
 };
 
 /// \brief A factory to create instances of \c CodeCompletionCallbacks.

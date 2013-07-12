@@ -135,6 +135,11 @@ public:
   // Routines to save and restore parser state.
 
   class ParserPosition {
+  public:
+    ParserPosition() = default;
+    ParserPosition &operator=(const ParserPosition &) = default;
+
+  private:
     ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
         LS(LS), PreviousLoc(PreviousLoc)
     {}

@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
@@ -84,10 +85,17 @@ bool Parser::parseExprOrStmt(ExprStmtOrDecl &Result) {
     return false;
   }
 
+  if (CodeCompletion)
+    CodeCompletion->setExprBeginning(getParserPosition());
+
   NullablePtr<Expr> ResultExpr = parseExpr(diag::expected_expr,
                                            /*usesExprBasic*/ false);
-  if (ResultExpr.isNull())
+  if (ResultExpr.isNull()) {
+    if (CodeCompletion) {
+      CodeCompletion->completeExpr();
+    }
     return true;
+  }
   
   Result = ResultExpr.get();
   return false;
