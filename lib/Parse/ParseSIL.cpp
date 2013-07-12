@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILArgument.h"
@@ -78,6 +79,9 @@ namespace {
     llvm::StringMap<ValueBase*> LocalValues;
     llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
+
+    /// Construct ArchetypeType from Generic Params.
+    bool handleGenericParams(GenericParamList *GenericParams);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -434,6 +438,45 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
   return false;
 }
 
+/// Construct ArchetypeType from Generic Params.
+bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
+  ArchetypeBuilder Builder(P.Context, P.Diags);
+  unsigned Index = 0;
+  for (auto GP : *GenericParams) {
+    auto TypeParam = GP.getAsTypeParam();
+    // Do some type checking / name binding for Inherited.
+    for (auto Inherited : TypeParam->getInherited()) {
+      // We have to lie and say we're done with parsing to make this happen.
+      assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+             "Unexpected stage during parsing!");
+      llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+                                                 TranslationUnit::Parsed);
+      if (performTypeLocChecking(P.TU, Inherited))
+        return true;
+    }
+    // Add the generic parameter to the builder.
+    Builder.addGenericParameter(TypeParam, Index++);
+  }
+  // Add the requirements clause to the builder.
+  for (auto &Req : GenericParams->getRequirements()) {
+    if (Req.isInvalid())
+      continue;
+
+    if (Builder.addRequirement(Req))
+      Req.setInvalid();
+  }
+  // Wire up the archetypes.
+  Builder.assignArchetypes();
+  for (auto GP : *GenericParams) {
+    auto TypeParam = GP.getAsTypeParam();
+
+    TypeParam->getUnderlyingTypeLoc()
+      = TypeLoc::withoutLoc(Builder.getArchetype(TypeParam));
+  }
+  GenericParams->setAllArchetypes(
+    P.Context.AllocateCopy(Builder.getAllArchetypes()));
+  return false;
+}
 
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
@@ -464,6 +507,8 @@ bool SILParser::parseSILType(SILType &Result) {
   // Build PolymorphicFunctionType if necessary.
   FunctionType *FT = dyn_cast<FunctionType>(Ty.getType().getPointer());
   if (FT && PList) {
+    if (handleGenericParams(PList))
+      return true;
     Type resultType = PolymorphicFunctionType::get(FT->getInput(),
                                              FT->getResult(), PList,
                                              attrs.isThin(),
@@ -708,6 +753,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
+    .Case("archetype_method", ValueKind::ArchetypeMethodInst)
     .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
@@ -1159,6 +1205,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy);
     break;
   }
+  case ValueKind::ArchetypeMethodInst: {
+    SILType LookupTy;
+    SILConstant Member;
+    SILType MethodTy;
+    SourceLoc TyLoc;
+    if (parseSILType(LookupTy, TyLoc) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILConstant(Member) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(MethodTy, TyLoc)
+       )
+      return true;
+    ResultVal = B.createArchetypeMethod(SILLocation(), LookupTy, Member,
+                                        MethodTy);
+    break;
+  }
   }
   
   setLocalValue(ResultVal, ResultName, ResultNameLoc);
@@ -1314,32 +1376,39 @@ bool Parser::parseDeclSIL() {
   SILType FnType;
   SourceLoc FnNameLoc;
 
+  Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(FnLinkage, *this) ||
       parseToken(tok::sil_at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
-      parseToken(tok::colon, diag::expected_sil_type) ||
-      FunctionState.parseSILType(FnType))
+      parseToken(tok::colon, diag::expected_sil_type))
     return true;
+  {
+    // Construct a Scope for the function body so TypeAliasDecl can be added to
+    // the scope.
+    Scope Body(this, ScopeKind::FunctionBody);
+    if (FunctionState.parseSILType(FnType))
+      return true;
 
-  // TODO: Verify it is a function type.
+    // TODO: Verify it is a function type.
   
-  FunctionState.F =
-    FunctionState.getGlobalNameForDefinition(FnName, FnType, FnNameLoc);
-  FunctionState.F->setLinkage(FnLinkage);
+    FunctionState.F =
+      FunctionState.getGlobalNameForDefinition(FnName, FnType, FnNameLoc);
+    FunctionState.F->setLinkage(FnLinkage);
 
-  // Now that we have a SILFunction parse the body, if present.
+    // Now that we have a SILFunction parse the body, if present.
 
-  SourceLoc LBraceLoc = Tok.getLoc();
-  if (consumeIf(tok::l_brace)) {
-    // Parse the basic block list.
-    do {
-      if (FunctionState.parseSILBasicBlock())
-        return true;
-    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+    SourceLoc LBraceLoc = Tok.getLoc();
+    if (consumeIf(tok::l_brace)) {
+      // Parse the basic block list.
+      do {
+        if (FunctionState.parseSILBasicBlock())
+          return true;
+      } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
 
-    SourceLoc RBraceLoc;
-    parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
-                       LBraceLoc);
+      SourceLoc RBraceLoc;
+      parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                         LBraceLoc);
+    } 
   }
 
   return FunctionState.diagnoseProblems();

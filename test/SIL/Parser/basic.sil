@@ -195,4 +195,40 @@ bb0:
   %5 = downcast unconditional %C : $C to $D   // CHECK: downcast unconditional {{.*}} : $C to $D
 }
 
+// Generated from:
+// func archetype_member_ref<T:Runcible>(x:T) {
+//   x.free_method()
+//   var u = x.associated_method()
+//   T.static_method()
+// }
 
+protocol Runcible {
+  typealias U
+  var free:Int
+  var associated:U
+
+  func free_method() -> Int
+  func associated_method() -> U.metatype
+  static func static_method()
+}
+
+// CHECK: $[thin] <T : Runcible> (x : T) -> ()
+sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $[thin] <T : Runcible> (x : T) -> () {
+bb0(%0 : $*T):
+  // CHECK: archetype_method $*T, #Runcible.free_method!1
+  %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [byref] T) -> Int64 // user: %2
+  %2 = apply %1(%0) : $[cc(method)] ((), [byref] T) -> Int64
+  %3 = alloc_var stack $T.U.metatype  // var u    // users: %10, %6
+  // CHECK: archetype_method $*T, #Runcible.associated_method!1
+  %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %5
+  %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %6
+  %6 = store %5 to %3 : $*T.U.metatype
+  %7 = metatype $T.metatype                       // user: %9
+  // CHECK: archetype_method $*T, #Runcible.static_method!1
+  %8 = archetype_method $*T, #Runcible.static_method!1 : $((), T.metatype) -> () // user: %9
+  %9 = apply %8(%7) : $((), T.metatype) -> ()
+  %10 = dealloc_var stack %3 : $*T.U.metatype
+  %11 = tuple ()                                  // user: %13
+  %12 = destroy_addr %0 : $*T
+  %13 = return %11 : $()
+}

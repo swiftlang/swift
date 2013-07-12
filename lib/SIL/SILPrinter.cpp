@@ -595,10 +595,10 @@ public:
     OS << "archetype_method ";
     if (AMI->isVolatile())
       OS << "[volatile] ";
-    OS << "$";
     AMI->getLookupArchetype().print(OS);
     OS << ", ";
     AMI->getMember().print(OS);
+    OS << " : " << AMI->getType(0);
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
     printDynamicMethodInst(AMI, AMI->getOperand(), "protocol_method");
