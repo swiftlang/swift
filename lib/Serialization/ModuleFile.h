@@ -188,8 +188,17 @@ private:
   DeclContext *getDeclContext(serialization::DeclID DID);
 
   /// Returns the decl with the given ID, deserializing it if needed.
+  ///
+  /// \param DID The ID for the decl within this module.
+  /// \param ForcedContext Optional override for the decl context of certain
+  ///                      kinds of decls, used to avoid re-entrant
+  ///                      deserialization.
+  /// \param DidRecord Optional callback, called when certain kinds of decls
+  ///                  have been recorded in the decl table but not necessarily
+  ///                  completed.
   Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = {});
+                Optional<DeclContext *> ForcedContext = {},
+                Optional<std::function<void(Decl*)>> DidRecord = {});
 
   /// Returns the type with the given ID, deserializing it if needed.
   Type getType(serialization::TypeID TID);

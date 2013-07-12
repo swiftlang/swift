@@ -16,11 +16,31 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include <functional>
 
 using namespace swift;
 using namespace swift::serialization;
 static constexpr const auto AF_DontPopBlockAtEnd =
   llvm::BitstreamCursor::AF_DontPopBlockAtEnd;
+
+/// Declares a member \c type that is a std::function compatible with the given
+/// callable type.
+///
+/// \tparam T A callable type, such as a lambda.
+template <typename T>
+struct as_function : public as_function<decltype(&T::operator())> {};
+
+template <typename L, typename R, typename... Args>
+struct as_function<R(L::*)(Args...) const> {
+  using type = std::function<R(Args...)>;
+};
+
+/// Returns a std::function that can call a void-returning, single-argument
+/// lambda without copying it.
+template <typename L>
+static typename as_function<L>::type makeStackLambda(const L &theLambda) {
+  return std::cref(theLambda);
+}
 
 static ModuleStatus
 validateControlBlock(llvm::BitstreamCursor &cursor,
@@ -178,16 +198,15 @@ Optional<ProtocolConformance *> ModuleFile::maybeReadConformance() {
     return Nothing;
 
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
-  if (kind == NO_CONFORMANCE) {
-    assert(scratch.empty());
-    lastRecordOffset.reset();
-    return nullptr;
-  }
-
-  if (kind != PROTOCOL_CONFORMANCE)
+  if (kind != PROTOCOL_CONFORMANCE && kind != NO_CONFORMANCE)
     return Nothing;
 
   lastRecordOffset.reset();
+  if (kind == NO_CONFORMANCE) {
+    assert(scratch.empty());
+    return nullptr;
+  }
+
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
@@ -222,13 +241,13 @@ Optional<ProtocolConformance *> ModuleFile::maybeReadConformance() {
 
     auto inherited = maybeReadConformance();
     assert(inherited.hasValue());
-    lastRecordOffset.reset();
 
     conformance->InheritedMapping.insert(std::make_pair(proto, *inherited));
   }
 
+  lastRecordOffset.reset();
+
   while (defaultedCount--) {
-    BCOffsetRAII restoreOffset(DeclTypeCursor);
     auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
     conformance->DefaultedDefinitions.insert(decl);
   }
@@ -382,8 +401,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   SmallVector<uint64_t, 16> memberIDBuffer;
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
-  if (kind != DECL_CONTEXT)
-    return Nothing;
+  assert(kind == DECL_CONTEXT);
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::DeclContextLayout::readRecord(memberIDBuffer, rawMemberIDs);
@@ -463,15 +481,20 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   }
 }
 
-Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
+Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
+                          Optional<std::function<void(Decl*)>> DidRecord) {
   if (DID == 0)
     return nullptr;
 
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
 
-  if (declOrOffset.is<Decl *>())
-    return declOrOffset.get<Decl *>();
+  if (declOrOffset.is<Decl *>()) {
+    auto result = declOrOffset.get<Decl *>();
+    if (DidRecord)
+      (*DidRecord)(result);
+    return result;
+  }
 
   DeclTypeCursor.JumpToBit(declOrOffset.get<BitOffset>());
   auto entry = DeclTypeCursor.advance();
@@ -570,6 +593,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           SourceLoc(), inherited,
                                           genericParams, DC);
     declOrOffset = theStruct;
+    if (DidRecord)
+      (*DidRecord)(theStruct);
 
     if (isImplicit)
       theStruct->setImplicit();
@@ -800,6 +825,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         SourceLoc(), getIdentifier(nameID),
                                         inherited);
     declOrOffset = proto;
+    if (DidRecord)
+      (*DidRecord)(proto);
 
     if (isImplicit)
       proto->setImplicit();
@@ -893,6 +920,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         SourceLoc(), inherited,
                                         genericParams, DC);
     declOrOffset = theClass;
+    if (DidRecord)
+      (*DidRecord)(theClass);
 
     if (isImplicit)
       theClass->setImplicit();
@@ -940,6 +969,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                      SourceLoc(), inherited,
                                      genericParams, DC);
     declOrOffset = oneOf;
+    if (DidRecord)
+      (*DidRecord)(oneOf);
 
     if (isImplicit)
       oneOf->setImplicit();
@@ -1290,8 +1321,17 @@ Type ModuleFile::getType(TypeID TID) {
     DeclID declID;
     TypeID parentID;
     decls_block::NominalTypeLayout::readRecord(scratch, declID, parentID);
-    typeOrOffset = NominalType::get(cast<NominalTypeDecl>(getDecl(declID)),
-                                    getType(parentID), ctx);
+
+    Type parentTy = getType(parentID);
+
+    // Record the type as soon as possible. Members of a nominal type often
+    // try to refer back to the type.
+    getDecl(declID, Nothing, makeStackLambda([&](Decl *D) {
+      auto nominal = cast<NominalTypeDecl>(D);
+      typeOrOffset = NominalType::get(nominal, parentTy, ctx);
+    }));
+
+    assert(typeOrOffset.is<Type>());
     break;
   }
 
