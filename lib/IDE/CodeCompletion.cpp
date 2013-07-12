@@ -257,6 +257,23 @@ public:
     }
   }
 
+  void addSwiftFunctionCall(const AnyFunctionType *AFT) {
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::Pattern);
+    Builder.addLeftParen();
+    bool NeedComma = false;
+    for (auto TupleElt : AFT->getInput()->castTo<TupleType>()->getFields()) {
+      if (NeedComma)
+        Builder.addComma(", ");
+      Builder.addCallParameter(TupleElt.getName().str(),
+                               TupleElt.getType().getString());
+      NeedComma = true;
+    }
+    Builder.addRightParen();
+    Builder.addTypeAnnotation(AFT->getResult().getString());
+  }
+
   void addSwiftMethodCall(const FuncDecl *FD) {
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -398,9 +415,18 @@ public:
   void getValueExprCompletions(Type ExprType) {
     Kind = LookupKind::ValueExpr;
     this->ExprType = ExprType;
-    if (ExprType->is<AnyFunctionType>()) {
-      // FIXME: produce a call.
-    } else {
+    bool Done = false;
+    if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
+      addSwiftFunctionCall(AFT);
+      Done = true;
+    }
+    if (auto LVT = ExprType->getAs<LValueType>()) {
+      if (auto AFT = LVT->getObjectType()->getAs<AnyFunctionType>()) {
+        addSwiftFunctionCall(AFT);
+        Done = true;
+      }
+    }
+    if (!Done) {
       lookupVisibleDecls(*this, ExprType);
     }
     // Add the special qualified keyword 'metatype' so that, for example,
