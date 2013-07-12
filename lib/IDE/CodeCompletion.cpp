@@ -330,13 +330,15 @@ public:
     Builder.addTextChunk(Name);
   }
 
-  void addKeyword(StringRef Name) {
+  void addKeyword(StringRef Name, Type TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Keyword);
     if (!HaveDot)
       Builder.addDot();
     Builder.addTextChunk(Name);
+    if (!TypeAnnotation.isNull())
+      Builder.addTypeAnnotation(TypeAnnotation.getString());
   }
 
   // Implement swift::VisibleDeclConsumer
@@ -403,7 +405,7 @@ public:
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.
-    addKeyword("metatype");
+    addKeyword("metatype", ExprType);
   }
 
   void getCompletionsInDeclContext(DeclContext *DC, SourceLoc Loc) {
