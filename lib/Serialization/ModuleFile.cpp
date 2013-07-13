@@ -1641,7 +1641,7 @@ Type ModuleFile::getType(TypeID TID) {
       }
     }
 
-    boundTy->setSubstitutions(substitutions);
+    boundTy->setSubstitutions(ctx.AllocateCopy(substitutions));
     break;
   }
 
