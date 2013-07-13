@@ -527,8 +527,6 @@ static bool isLocalLinkageType(CanType type) {
   switch (base->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("error type in IRGen");
-  case TypeKind::UnstructuredUnresolved:
-    llvm_unreachable("unresolved type in IRGen");
   case TypeKind::TypeVariable:
     llvm_unreachable("type variable in IRgen");
       

@@ -524,7 +524,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
-  case TypeKind::UnstructuredUnresolved:
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:

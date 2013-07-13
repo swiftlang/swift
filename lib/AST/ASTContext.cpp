@@ -161,8 +161,6 @@ ASTContext::ASTContext(LangOptions &langOpts, llvm::SourceMgr &sourcemgr,
                         BuiltinRawPointerType(*this)),
     TheOpaquePointerType(new (*this, AllocationArena::Permanent)
                          BuiltinOpaquePointerType(*this)),
-    TheUnstructuredUnresolvedType(new (*this, AllocationArena::Permanent)
-                                    UnstructuredUnresolvedType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)
@@ -323,10 +321,6 @@ ArrayRef<Decl *> ASTContext::getTypesThatConformTo(ProtocolDecl *protocol) {
 
 // Simple accessors.
 Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
-Type UnstructuredUnresolvedType::get(ASTContext &C) { 
-  return C.TheUnstructuredUnresolvedType; 
-}
-
 
 BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
   BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];

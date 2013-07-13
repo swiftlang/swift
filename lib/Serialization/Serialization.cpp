@@ -1211,9 +1211,6 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::BuiltinVector:
     llvm_unreachable("should always be accessed through an implicit typealias");
 
-  case TypeKind::UnstructuredUnresolved:
-    llvm_unreachable("should have been resolved before serialization");
-
   case TypeKind::NameAlias: {
     auto nameAlias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = nameAlias->getDecl();

@@ -86,7 +86,6 @@ bool TypeBase::hasReferenceSemantics() {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinVector:
-  case TypeKind::UnstructuredUnresolved:
   case TypeKind::Tuple:
   case TypeKind::OneOf:
   case TypeKind::Struct:
@@ -318,7 +317,6 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
-  case TypeKind::UnstructuredUnresolved:
   case TypeKind::NameAlias:
   case TypeKind::Identifier:
   case TypeKind::Module:
@@ -460,7 +458,6 @@ static Type getStrippedType(ASTContext &context, Type type,
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinVector:
-  case TypeKind::UnstructuredUnresolved:
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
@@ -1458,10 +1455,6 @@ void BuiltinVectorType::print(raw_ostream &OS) const {
 
 void ErrorType::print(raw_ostream &OS) const {
   OS << "<<error type>>";
-}
-
-void UnstructuredUnresolvedType::print(raw_ostream &OS) const {
-  OS << "<<unresolved type>>";
 }
 
 void ParenType::print(raw_ostream &OS) const {

@@ -497,29 +497,6 @@ public:
   }
 };
   
-/// UnstructuredUnresolvedType - This is a expression type whose actual kind
-/// is specified by context which hasn't been provided yet, and which
-/// has no known structure. For example, a tuple element ".foo" will have
-/// an unstructured unresolved type. however, a tuple "(x, .foo)" would have
-/// an unresolved type that is not an UnstructuredUnresolvedType, because it is
-/// known to be a tuple type and have a first element of the type of x.
-class UnstructuredUnresolvedType : public TypeBase {
-  friend class ASTContext;
-  // The Unresolved type is always canonical.
-  UnstructuredUnresolvedType(ASTContext &C) 
-    : TypeBase(TypeKind::UnstructuredUnresolved, &C, /*Unresolved=*/true,
-               /*HasTypeVariable=*/false) {}
-public:
-  static Type get(ASTContext &C);
-
-  void print(raw_ostream &OS) const;
-  
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnstructuredUnresolved;
-  }
-};
-
 /// NameAliasType - An alias type is a name for another type, just like a
 /// typedef in C.
 class NameAliasType : public TypeBase {
