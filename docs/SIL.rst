@@ -74,7 +74,7 @@ Notation
 --------
 
 SIL notation uses a scheme similar to LLVM assembly language, in which program
-identifiers are perfixed with sigils and bare keywords are reserved for IR
+identifiers are prefixed with sigils and bare keywords are reserved for IR
 syntax. Comments are introduced with ``;`` and go to the end of the line::
 
   ; This is a comment
@@ -82,7 +82,8 @@ syntax. Comments are introduced with ``;`` and go to the end of the line::
 
 Operand names are preceded by a ``%``. An operand may represent multiple
 values, in which case a value must be selected with ``#`` followed by an
-integer. Operand names may consist of an integer or Swift dotted name::
+integer index (starting from 0). Operand names may consist of an integer or
+Swift dotted name::
 
   ; These are operands:
   %0
@@ -141,21 +142,21 @@ SIL classifies types into two additional subgroups based on ABI stability:
 
 * *Loadable types* are types with a fully exposed concrete representation:
 
-  * Reference types,
-  * Builtin value types,
-  * Fragile struct types in which all element types are loadable, and
-  * Tuple types in which all element types are loadable.
+  * Reference types
+  * Builtin value types
+  * Fragile struct types in which all element types are loadable
+  * Tuple types in which all element types are loadable
 
   A *loadable aggregate type* is a tuple or struct type that is loadable.
 
 * *Address-only types* are value types for which the compiler cannot access a
   full concrete representation:
   
-  * Resilient value types,
+  * Resilient value types
   * Fragile struct or tuple types that contain resilient types as elements at
-    any depth,
-  * Protocol types, and
-  * Generic archetypes.
+    any depth
+  * Protocol types
+  * Generic archetypes
 
   Values of address-only types must reside in memory and can only be referenced
   in SIL by address. Address-only type addresses cannot be loaded from or
