@@ -1959,7 +1959,7 @@ void ModuleFile::buildTopLevelDeclMap() {
   for (DeclID ID : RawTopLevelIDs) {
     // FIXME: Right now ExtensionDecls are in here as well.
     if (auto value = dyn_cast<ValueDecl>(getDecl(ID)))
-      TopLevelIDs[value->getName()] = ID;
+      TopLevelDecls[value->getName()].push_back(value);
   }
 
   RawTopLevelIDs.clear();
@@ -1967,8 +1967,11 @@ void ModuleFile::buildTopLevelDeclMap() {
 
 void ModuleFile::lookupValue(Identifier name,
                              SmallVectorImpl<ValueDecl*> &results) {
-  if (DeclID ID = TopLevelIDs.lookup(name))
-    results.push_back(cast<ValueDecl>(getDecl(ID)));
+  auto iter = TopLevelDecls.find(name);
+  if (iter == TopLevelDecls.end())
+    return;
+
+  results.append(iter->second.begin(), iter->second.end());
 }
 
 OperatorKind getOperatorKind(DeclKind kind) {

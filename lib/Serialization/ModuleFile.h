@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 
 namespace llvm {
@@ -155,8 +156,7 @@ private:
   std::vector<SerializedIdentifier> Identifiers;
 
   /// All top-level decls in this module.
-  // FIXME: A single identifier may refer to multiple decls.
-  llvm::DenseMap<Identifier, serialization::DeclID> TopLevelIDs;
+  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl *>> TopLevelDecls;
 
   /// An array of the top-level decl IDs.
   // FIXME: We don't really want to deserialize all of these at once.
