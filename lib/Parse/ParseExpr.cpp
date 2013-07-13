@@ -760,7 +760,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Identifier Name;
     SourceLoc NameLoc;
     if (parseIdentifier(Name, NameLoc,diag::expected_identifier_after_dot_expr))
-      return 0;
+      return nullptr;
     
     // Handle .foo by just making an AST node.
     Result = new (Context) UnresolvedMemberExpr(DotLoc, NameLoc, Name);
@@ -784,16 +784,16 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:
     consumeToken(tok::unknown);
-    return 0;
+    return nullptr;
 
   default:
     diagnose(Tok.getLoc(), ID);
-    return 0;
+    return nullptr;
   }
   
   // If we had a parse error, don't attempt to parse suffixes.
   if (Result.isNull())
-    return 0;
+    return nullptr;
     
   // Handle suffix expressions.
   while (1) {
@@ -812,10 +812,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         if (Tok.is(tok::code_complete) && Result.isNonNull()) {
           CodeCompletion->completeDotExpr(Result.get());
-          return 0;
+          return nullptr;
         }
         diagnose(Tok, diag::expected_field_name);
-        return 0;
+        return nullptr;
       }
         
       Identifier Name = Context.getIdentifier(Tok.getText());
@@ -846,7 +846,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     if (Tok.isFollowingLParen()) {
       NullablePtr<Expr> Arg =parseExprList(tok::l_paren, tok::r_paren);
       if (Arg.isNull())
-        return 0;
+        return nullptr;
       Result = new (Context) CallExpr(Result.get(), Arg.get());
       continue;
     }
@@ -857,7 +857,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       NullablePtr<Expr> Idx = parseExprList(tok::l_square,
                                             tok::r_square);
       if (Idx.isNull())
-        return 0;
+        return nullptr;
       Result = new (Context) SubscriptExpr(Result.get(), Idx.get());
       continue;
     }
@@ -869,11 +869,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       continue;
     }
 
-   if (Tok.is(tok::code_complete) && Result.isNonNull()) {
-     CodeCompletion->completePostfixExpr(Result.get());
-     return 0;
-   }
-
+    if (Tok.is(tok::code_complete) && Result.isNonNull()) {
+      CodeCompletion->completePostfixExpr(Result.get());
+      return nullptr;
+    }
     break;
   }
   
