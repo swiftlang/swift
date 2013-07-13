@@ -224,8 +224,8 @@ bb0(%0 : $*T):
   %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %6
   %6 = store %5 to %3 : $*T.U.metatype
   %7 = metatype $T.metatype                       // user: %9
-  // CHECK: archetype_method $*T, #Runcible.static_method!1
-  %8 = archetype_method $*T, #Runcible.static_method!1 : $((), T.metatype) -> () // user: %9
+  // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
+  %8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $((), T.metatype) -> () // user: %9
   %9 = apply %8(%7) : $((), T.metatype) -> ()
   %10 = dealloc_var stack %3 : $*T.U.metatype
   %11 = tuple ()                                  // user: %13

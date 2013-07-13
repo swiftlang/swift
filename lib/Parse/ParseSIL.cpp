@@ -438,6 +438,19 @@ static bool parseSILLinkage(SILLinkage &Result, Parser &P) {
   return false;
 }
 
+/// Parse an option attribute ('[' Expected ']')?
+static bool parseSILOptional(bool &Result, Parser &P, StringRef Expected) {
+  if (P.consumeIf(tok::l_square)) {
+    Identifier Id;
+    P.parseIdentifier(Id, diag::expected_in_attribute_list);
+    if (Id.str() != Expected)
+      return true;
+    P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    Result = true;
+  }
+  return false;
+}
+
 /// Construct ArchetypeType from Generic Params.
 bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
   ArchetypeBuilder Builder(P.Context, P.Diags);
@@ -1178,6 +1191,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::ProtocolMethodInst: {
+    bool IsVolatile = false;
+    if (parseSILOptional(IsVolatile, P, "volatile"))
+      return true;
     SILConstant Member;
     SILType MethodTy;
     SourceLoc TyLoc;
@@ -1188,10 +1204,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(MethodTy, TyLoc)
        )
       return true;
-    ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy);
+    ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy,
+                                       IsVolatile);
     break;
   }
   case ValueKind::ClassMethodInst: {
+    bool IsVolatile = false;
+    if (parseSILOptional(IsVolatile, P, "volatile"))
+      return true;
     SILConstant Member;
     SILType MethodTy;
     SourceLoc TyLoc;
@@ -1202,10 +1222,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(MethodTy, TyLoc)
        )
       return true;
-    ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy);
+    ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy,
+                                    IsVolatile);
     break;
   }
   case ValueKind::ArchetypeMethodInst: {
+    bool IsVolatile = false;
+    if (parseSILOptional(IsVolatile, P, "volatile"))
+      return true;
     SILType LookupTy;
     SILConstant Member;
     SILType MethodTy;
@@ -1218,7 +1242,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
        )
       return true;
     ResultVal = B.createArchetypeMethod(SILLocation(), LookupTy, Member,
-                                        MethodTy);
+                                        MethodTy, IsVolatile);
     break;
   }
   }
