@@ -423,14 +423,7 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   if (Invalid)
     return nullptr;
 
-  // A pattern which wraps a single anonymous pattern is not a tuple.
-  if (elts.size() == 1 &&
-      elts[0].getInit() == nullptr &&
-      elts[0].getPattern()->getBoundName().empty() &&
-      !elts[0].isVararg())
-    return new (Context) ParenPattern(LPLoc, elts[0].getPattern(), RPLoc);
-
-  return TuplePattern::create(Context, LPLoc, elts, RPLoc);
+  return TuplePattern::createSimple(Context, LPLoc, elts, RPLoc);
 }
 
 NullablePtr<Pattern> Parser::parseMatchingPattern() {
