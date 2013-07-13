@@ -14,6 +14,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCRecordLayout.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
@@ -179,7 +180,8 @@ namespace {
     bool writeGenericParams(const GenericParamList *genericParams);
 
     /// Writes a list of protocol conformances.
-    void writeConformances(ArrayRef<ProtocolConformance *> conformances);
+    void writeConformances(ArrayRef<ProtocolDecl *> protocols,
+                           ArrayRef<ProtocolConformance *> conformances);
 
     /// Writes an array of members for a decl context.
     void writeMembers(ArrayRef<Decl *> members);
@@ -645,45 +647,50 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolConformance *> conformances) {
+Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
+                              ArrayRef<ProtocolConformance *> conformances) {
   using namespace decls_block;
 
-  unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
-  unsigned altAbbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
-  for (auto conformance : conformances) {
-    if (!conformance) {
-      NoConformanceLayout::emitRecord(Out, ScratchRecord, altAbbrCode);
-      continue;
+  for_each(protocols, conformances,
+           [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
+    if (!conf) {
+      unsigned abbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
+      NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addDeclRef(proto));
+      return;
     }
 
     SmallVector<DeclID, 16> data;
-    SmallVector<ProtocolConformance *, 8> inherited;
-    unsigned numDefaultedDefinitions = 0;
-    for (auto valueMapping : conformance->Mapping) {
+    for (auto valueMapping : conf->Mapping) {
       data.push_back(addDeclRef(valueMapping.first));
       data.push_back(addDeclRef(valueMapping.second));
     }
-    for (auto typeMapping : conformance->TypeMapping) {
+    for (auto typeMapping : conf->TypeMapping) {
       data.push_back(addTypeRef(typeMapping.first));
       data.push_back(addTypeRef(typeMapping.second));
     }
-    for (auto inheritedMapping : conformance->InheritedMapping) {
-      data.push_back(addDeclRef(inheritedMapping.first));
-      inherited.push_back(inheritedMapping.second);
-    }
-    for (auto defaulted : conformance->DefaultedDefinitions) {
+    for (auto defaulted : conf->DefaultedDefinitions) {
       data.push_back(addDeclRef(defaulted));
-      ++numDefaultedDefinitions;
     }
 
+    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
     ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          conformance->Mapping.size(),
-                                          conformance->TypeMapping.size(),
-                                          conformance->InheritedMapping.size(),
-                                          numDefaultedDefinitions,
+                                          addDeclRef(proto),
+                                          conf->Mapping.size(),
+                                          conf->TypeMapping.size(),
+                                          conf->InheritedMapping.size(),
+                                          conf->DefaultedDefinitions.size(),
                                           data);
-    writeConformances(inherited);
-  }
+
+    // FIXME: Unfortunate to have to copy these.
+    SmallVector<ProtocolDecl *, 8> inheritedProtos;
+    SmallVector<ProtocolConformance *, 8> inheritedConformance;
+    for (auto inheritedMapping : conf->InheritedMapping) {
+      inheritedProtos.push_back(inheritedMapping.first);
+      inheritedConformance.push_back(inheritedMapping.second);
+    }
+    writeConformances(inheritedProtos, inheritedConformance);
+  });
 }
 
 
@@ -807,7 +814,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                 extension->isImplicit(),
                                 inherited);
 
-    writeConformances(extension->getConformances());
+    writeConformances(extension->getProtocols(), extension->getConformances());
     writeMembers(extension->getMembers());
     return true;
   }
@@ -897,7 +904,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 inherited);
 
-    writeConformances(typeAlias->getConformances());
+    writeConformances(typeAlias->getProtocols(), typeAlias->getConformances());
     return true;
   }
 
@@ -922,7 +929,7 @@ bool Serializer::writeDecl(const Decl *D) {
                              inherited);
 
     writeGenericParams(theStruct->getGenericParams());
-    writeConformances(theStruct->getConformances());
+    writeConformances(theStruct->getProtocols(), theStruct->getConformances());
     writeMembers(theStruct->getMembers());
     return true;
   }
@@ -948,7 +955,7 @@ bool Serializer::writeDecl(const Decl *D) {
                             inherited);
 
     writeGenericParams(oneOf->getGenericParams());
-    writeConformances(oneOf->getConformances());
+    writeConformances(oneOf->getProtocols(), oneOf->getConformances());
     writeMembers(oneOf->getMembers());
     return true;
   }
@@ -974,7 +981,7 @@ bool Serializer::writeDecl(const Decl *D) {
                             inherited);
 
     writeGenericParams(theClass->getGenericParams());
-    writeConformances(theClass->getConformances());
+    writeConformances(theClass->getProtocols(), theClass->getConformances());
     writeMembers(theClass->getMembers());
     return true;
   }
@@ -1001,7 +1008,6 @@ bool Serializer::writeDecl(const Decl *D) {
                                proto->isImplicit(),
                                inherited);
 
-    writeConformances(proto->getConformances());
     writeMembers(proto->getMembers());
     return true;
   }
@@ -1452,7 +1458,7 @@ bool Serializer::writeType(Type ty) {
         BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                    addTypeRef(sub.Archetype),
                                                    addTypeRef(sub.Replacement));
-        writeConformances(sub.Conformance);
+        writeConformances(sub.Archetype->getConformsTo(), sub.Conformance);
       }
     }
 

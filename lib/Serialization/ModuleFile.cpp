@@ -187,11 +187,12 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-Optional<ProtocolConformance *> ModuleFile::maybeReadConformance() {
+Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
+ModuleFile::maybeReadConformance() {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(DeclTypeCursor);
-  SmallVector<uint64_t, 8> scratch;
+  SmallVector<uint64_t, 16> scratch;
 
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
@@ -203,56 +204,52 @@ Optional<ProtocolConformance *> ModuleFile::maybeReadConformance() {
 
   lastRecordOffset.reset();
   if (kind == NO_CONFORMANCE) {
-    assert(scratch.empty());
-    return nullptr;
+    DeclID protoID;
+    NoConformanceLayout::readRecord(scratch, protoID);
+    return std::make_pair(cast<ProtocolDecl>(getDecl(protoID)), nullptr);
   }
 
+  DeclID protoID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
-  ProtocolConformanceLayout::readRecord(scratch, valueCount, typeCount,
+  ProtocolConformanceLayout::readRecord(scratch, protoID, valueCount, typeCount,
                                         inheritedCount, defaultedCount,
                                         rawIDs);
 
   ProtocolConformance *conformance =
     ModuleContext->Ctx.Allocate<ProtocolConformance>(1);
 
-  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
-  {
-    BCOffsetRAII restoreOffset(DeclTypeCursor);
-    while (valueCount--) {
-      auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
-      auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
-      conformance->Mapping.insert(std::make_pair(first, second));
-    }
-    while (typeCount--) {
-      auto first = getType(*rawIDIter++)->castTo<SubstitutableType>();
-      auto second = getType(*rawIDIter++);
-      conformance->TypeMapping.insert(std::make_pair(first, second));
-    }
-  }
-
   while (inheritedCount--) {
-    ProtocolDecl *proto;
-    {
-      BCOffsetRAII restoreOffset(DeclTypeCursor);
-      proto = cast<ProtocolDecl>(getDecl(*rawIDIter++));
-    }
-
     auto inherited = maybeReadConformance();
     assert(inherited.hasValue());
 
-    conformance->InheritedMapping.insert(std::make_pair(proto, *inherited));
+    conformance->InheritedMapping.insert(inherited.getValue());
   }
 
+  // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
+
+  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+  while (valueCount--) {
+    auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
+    auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
+    conformance->Mapping.insert(std::make_pair(first, second));
+  }
+  while (typeCount--) {
+    auto first = getType(*rawIDIter++)->castTo<SubstitutableType>();
+    auto second = getType(*rawIDIter++);
+    conformance->TypeMapping.insert(std::make_pair(first, second));
+  }
   while (defaultedCount--) {
     auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
     conformance->DefaultedDefinitions.insert(decl);
   }
 
-  return conformance;
+  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+
+  return std::make_pair(proto, conformance);
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
@@ -558,9 +555,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isGeneric)
       alias->setGenericParameter();
 
+    SmallVector<ProtocolDecl *, 16> protoBuf;
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
+    while (auto conformance = maybeReadConformance()) {
+      protoBuf.push_back(conformance.getValue().first);
+      conformanceBuf.push_back(conformance.getValue().second);
+    }
+    alias->setProtocols(ctx.AllocateCopy(protoBuf));
     alias->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     break;
@@ -604,9 +605,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *theStruct->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theStruct);
 
+    SmallVector<ProtocolDecl *, 16> protoBuf;
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
+    while (auto conformance = maybeReadConformance()) {
+      protoBuf.push_back(conformance.getValue().first);
+      conformanceBuf.push_back(conformance.getValue().second);
+    }
+    theStruct->setProtocols(ctx.AllocateCopy(protoBuf));
     theStruct->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -844,11 +849,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       proto->setImplicit();
 
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
-    proto->setConformances(ctx.AllocateCopy(conformanceBuf));
-
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
     proto->setMembers(members.getValue(), SourceRange());
@@ -950,9 +950,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *theClass->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theClass);
 
+    SmallVector<ProtocolDecl *, 16> protoBuf;
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
+    while (auto conformance = maybeReadConformance()) {
+      protoBuf.push_back(conformance.getValue().first);
+      conformanceBuf.push_back(conformance.getValue().second);
+    }
+    theClass->setProtocols(ctx.AllocateCopy(protoBuf));
     theClass->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -1003,9 +1007,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *oneOf->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(oneOf);
 
+    SmallVector<ProtocolDecl *, 16> protoBuf;
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
+    while (auto conformance = maybeReadConformance()) {
+      protoBuf.push_back(conformance.getValue().first);
+      conformanceBuf.push_back(conformance.getValue().second);
+    }
+    oneOf->setProtocols(ctx.AllocateCopy(protoBuf));
     oneOf->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -1120,9 +1128,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       extension->setImplicit();
 
+    SmallVector<ProtocolDecl *, 16> protoBuf;
     SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance())
-      conformanceBuf.push_back(*conformance);
+    while (auto conformance = maybeReadConformance()) {
+      protoBuf.push_back(conformance.getValue().first);
+      conformanceBuf.push_back(conformance.getValue().second);
+    }
+    extension->setProtocols(ctx.AllocateCopy(protoBuf));
     extension->setConformances(ctx.AllocateCopy(conformanceBuf));
 
     auto members = readMembers();
@@ -1631,7 +1643,7 @@ Type ModuleFile::getType(TypeID TID) {
 
       SmallVector<ProtocolConformance *, 16> conformanceBuf;
       while (auto conformance = maybeReadConformance())
-        conformanceBuf.push_back(*conformance);
+        conformanceBuf.push_back(conformance.getValue().second);
 
       {
         BCOffsetRAII restoreOffset(DeclTypeCursor);

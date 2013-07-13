@@ -598,17 +598,22 @@ namespace decls_block {
 
   /// A placeholder for lack of conformance information. Conformances are
   /// indexed, so simply omitting one would be incorrect.
-  using NoConformanceLayout = BCRecordLayout<NO_CONFORMANCE>;
+  using NoConformanceLayout = BCRecordLayout<
+    NO_CONFORMANCE,
+    DeclIDField  // the protocol
+  >;
 
   using ProtocolConformanceLayout = BCRecordLayout<
     PROTOCOL_CONFORMANCE,
+    DeclIDField, // the protocol
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
     BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
-    // The array contains value-value pairs, then type-type pairs,
-    // then protocol IDs. The additional conformances trail the record.
+    // The array contains value-value pairs, then type-type pairs, then
+    // defaulted definitions.
+    // The inherited conformances trail the record.
   >;
 
   using DeclContextLayout = BCRecordLayout<

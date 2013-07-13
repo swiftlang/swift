@@ -689,7 +689,7 @@ public:
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> getProtocols() { return Protocols; }
+  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     Protocols = protocols;
@@ -973,7 +973,7 @@ public:
   ///
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols() { return Protocols; }
+  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     Protocols = protocols;
