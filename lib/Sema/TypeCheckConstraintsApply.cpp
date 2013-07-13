@@ -1867,8 +1867,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
     }
     if (i == toScalarIdx) {
       if (field.isVararg()) {
-        assert((field.getVarargBaseTy()->isUnresolvedType() ||
-                expr->getType()->isEqual(field.getVarargBaseTy())) &&
+        assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
                "scalar field is not equivalent to dest vararg field?!");
 
         sugarFields.push_back(TupleTypeElt(field.getType(),
@@ -1877,8 +1876,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                            true));
       }
       else {
-        assert((field.getType()->isUnresolvedType() ||
-                expr->getType()->isEqual(field.getType())) &&
+        assert(expr->getType()->isEqual(field.getType()) &&
                "scalar field is not equivalent to dest tuple field?!");
         sugarFields.push_back(TupleTypeElt(expr->getType(),
                                            field.getName()));

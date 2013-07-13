@@ -78,9 +78,6 @@ class alignas(8) TypeBase {
   const TypeKind Kind;
 
   struct TypeBaseBits {
-    /// Unresolved - Whether this type is unresolved.
-    unsigned Unresolved : 1;
-
     /// \brief Whether this type has a type variable somewhere in it.
     unsigned HasTypeVariable : 1;
 
@@ -91,27 +88,22 @@ class alignas(8) TypeBase {
     /// 2 -> valid
     unsigned Validated : 2;
   };
-  static const unsigned NumTypeBaseBits = 4;
+  static const unsigned NumTypeBaseBits = 3;
   
   union {
     TypeBaseBits TypeBase;
   } TypeBits;
   
 protected:
-  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool Unresolved,
-           bool HasTypeVariable)
+  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool HasTypeVariable)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
       CanonicalType = CanTypeCtx;
     
-    setUnresolved(Unresolved);
     setHasTypeVariable(HasTypeVariable);
     TypeBits.TypeBase.Validated = 0;
   }
-
-  /// \brief Mark this type as unresolved.
-  void setUnresolved(bool D = true) { TypeBits.TypeBase.Unresolved = D; }
 
   /// \brief Mark this type as having a type variable.
   void setHasTypeVariable(bool TV = true) {
@@ -187,12 +179,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership();
-  
-  /// isUnresolvedType() - Determines whether this type is an unresolved
-  /// type, meaning that part of the type depends on the context in which
-  /// the type occurs.
-  bool isUnresolvedType() const;
+  bool allowsOwnership();  
 
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const;
@@ -311,8 +298,7 @@ class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
   ErrorType(ASTContext &C) 
-    : TypeBase(TypeKind::Error, &C, /*Unresolved=*/false,
-               /*HasTypeVariable=*/false) { }
+    : TypeBase(TypeKind::Error, &C, /*HasTypeVariable=*/false) { }
 public:
   static Type get(ASTContext &C);
   
@@ -328,8 +314,7 @@ public:
 class BuiltinType : public TypeBase {
 protected:
   BuiltinType(TypeKind kind, ASTContext &canTypeCtx)
-  : TypeBase(kind, &canTypeCtx, /*unresolved*/ false,
-             /*HasTypeVariable=*/false) {}
+  : TypeBase(kind, &canTypeCtx, /*HasTypeVariable=*/false) {}
 public:
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BuiltinType &&
@@ -503,8 +488,7 @@ class NameAliasType : public TypeBase {
   friend class TypeAliasDecl;
   // NameAliasType are never canonical.
   NameAliasType(TypeAliasDecl *d) 
-    : TypeBase(TypeKind::NameAlias, nullptr, /*Unresolved=*/false,
-               /*HasTypeVariable=*/false),
+    : TypeBase(TypeKind::NameAlias, nullptr, /*HasTypeVariable=*/false),
       TheDecl(d) {}
   TypeAliasDecl *const TheDecl;
 
@@ -558,8 +542,7 @@ public:
 private:
   // IdentifierType are never canonical.
   IdentifierType(MutableArrayRef<Component> Components)
-    : TypeBase(TypeKind::Identifier, nullptr, /*Unresolved=*/false,
-               /*HasTypeVariable=*/false),
+    : TypeBase(TypeKind::Identifier, nullptr, /*HasTypeVariable=*/false),
       Components(Components) {}
 public:
   
@@ -604,8 +587,7 @@ class ParenType : public TypeBase {
 
   friend class ASTContext;
   ParenType(Type UnderlyingType, bool HasTypeVariable)
-    : TypeBase(TypeKind::Paren, nullptr, UnderlyingType->isUnresolvedType(),
-               HasTypeVariable),
+    : TypeBase(TypeKind::Paren, nullptr, HasTypeVariable),
       UnderlyingType(UnderlyingType) {}
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
@@ -739,7 +721,7 @@ private:
                      bool hasTypeVariable)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
-               /*Unresolved=*/false, hasTypeVariable),
+               hasTypeVariable),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
@@ -944,7 +926,7 @@ protected:
   NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
               Type Parent, bool HasTypeVariable)
     : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
-               /*Unresolved=*/false, HasTypeVariable),
+               HasTypeVariable),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
@@ -1106,7 +1088,7 @@ public:
 private:
   ModuleType(Module *M, ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
-               /*Unresolved=*/false, /*HasTypeVariable=*/false),
+               /*HasTypeVariable=*/false),
       TheModule(M) {
   }
 };
@@ -1144,9 +1126,9 @@ class AnyFunctionType : public TypeBase {
   const llvm::PointerIntPair<Type, 1, bool> OutputAndIsThin;
 protected:
   AnyFunctionType(TypeKind Kind, ASTContext *CanTypeContext,
-                  Type Input, Type Output, bool isUnresolved,
-                  bool HasTypeVariable, bool isThin, AbstractCC cc)
-    : TypeBase(Kind, CanTypeContext, isUnresolved, HasTypeVariable),
+                  Type Input, Type Output, bool HasTypeVariable, 
+                  bool isThin, AbstractCC cc)
+    : TypeBase(Kind, CanTypeContext, HasTypeVariable),
       InputAndCC(Input, cc), OutputAndIsThin(Output, isThin) {
   }
 
@@ -1311,8 +1293,7 @@ private:
 class ArraySliceType : public TypeBase {
   // ArraySliceTypes are never canonical.
   ArraySliceType(Type base, bool hasTypeVariable)
-    : TypeBase(TypeKind::ArraySlice, nullptr,
-               /*Unresolved=*/base->isUnresolvedType(), hasTypeVariable),
+    : TypeBase(TypeKind::ArraySlice, nullptr, hasTypeVariable),
       Base(base) {}
 
   Type Base;
@@ -1418,7 +1399,7 @@ private:
 
   ProtocolCompositionType(ASTContext *Ctx, ArrayRef<Type> Protocols)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               /*Unresolved=*/false, /*HasTypeVariable=*/false),
+               /*HasTypeVariable=*/false),
       Protocols(Protocols) { }
 };
 
@@ -1563,8 +1544,7 @@ private:
 
   LValueType(Type objectTy, Qual quals, ASTContext *canonicalContext,
              bool hasTypeVariable)
-    : TypeBase(TypeKind::LValue, canonicalContext, 
-               objectTy->isUnresolvedType(), hasTypeVariable),
+    : TypeBase(TypeKind::LValue, canonicalContext, hasTypeVariable),
       ObjectTy(objectTy), Quals(quals) {}
 
 public:
@@ -1599,10 +1579,10 @@ class SubstitutableType : public TypeBase {
   Type Superclass;
 
 protected:
-  SubstitutableType(TypeKind K, ASTContext *C, bool Unresolved,
+  SubstitutableType(TypeKind K, ASTContext *C, 
                     ArrayRef<ProtocolDecl *> ConformsTo,
                     Type Superclass)
-    : TypeBase(K, C, Unresolved, /*HasTypeVariable=*/false),
+    : TypeBase(K, C, /*HasTypeVariable=*/false),
       ConformsTo(ConformsTo), Superclass(Superclass) { }
 
 public:
@@ -1714,8 +1694,7 @@ private:
   ArchetypeType(ASTContext &Ctx, ArchetypeType *Parent,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
-    : SubstitutableType(TypeKind::Archetype, &Ctx, /*Unresolved=*/false,
-                        ConformsTo, Superclass),
+    : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
       Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
 
@@ -1726,8 +1705,7 @@ class SubstitutedType : public TypeBase {
   // SubstitutedTypes are never canonical.
   explicit SubstitutedType(Type Original, Type Replacement,
                            bool HasTypeVariable)
-    : TypeBase(TypeKind::Substituted, nullptr, Replacement->isUnresolvedType(),
-               HasTypeVariable),
+    : TypeBase(TypeKind::Substituted, nullptr, HasTypeVariable),
       Original(Original), Replacement(Replacement) {}
   
   Type Original;
@@ -1763,7 +1741,7 @@ public:
 /// extremely useful in SIL and IR-generation.
 class ReferenceStorageType : public TypeBase {
   ReferenceStorageType(Type referent, Ownership ownership, ASTContext *C)
-    : TypeBase(TypeKind::ReferenceStorage, C, false, false),
+    : TypeBase(TypeKind::ReferenceStorage, C, false),
       Referent(referent), Oship(ownership) {}
 
   Type Referent;
@@ -1786,7 +1764,7 @@ public:
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
   TypeVariableType(ASTContext &C)
-    : TypeBase(TypeKind::TypeVariable, &C, true, true) { }
+    : TypeBase(TypeKind::TypeVariable, &C, true) { }
 
   class Implementation;
   
@@ -1826,10 +1804,6 @@ public:
     return T->getKind() == TypeKind::TypeVariable;
   }
 };
-
-inline bool TypeBase::isUnresolvedType() const {
-  return TypeBits.TypeBase.Unresolved;
-}
 
 inline bool TypeBase::hasTypeVariable() const {
   return TypeBits.TypeBase.HasTypeVariable;

@@ -481,19 +481,9 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    ArrayRef<Type> genericArgs,
                                    ASTContext *context,
                                    bool hasTypeVariable)
-  : TypeBase(theKind, context, /*Unresolved=*/false,
-             hasTypeVariable),
+  : TypeBase(theKind, context, hasTypeVariable),
     TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
 {
-  // Determine whether this type is unresolved.
-  if (parent && parent->isUnresolvedType())
-    setUnresolved();
-  else for (Type arg : genericArgs) {
-    if (arg->isUnresolvedType()) {
-      setUnresolved();
-      break;
-    }
-  }
 }
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
@@ -695,7 +685,7 @@ MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
 }
 
 MetaTypeType::MetaTypeType(Type T, ASTContext *C, bool HasTypeVariable)
-  : TypeBase(TypeKind::MetaType, C, T->isUnresolvedType(), HasTypeVariable),
+  : TypeBase(TypeKind::MetaType, C, HasTypeVariable),
     InstanceType(T) {
 }
 
@@ -745,7 +735,6 @@ FunctionType::FunctionType(Type input, Type output,
              (input->isCanonical() && output->isCanonical()) ?
                &input->getASTContext() : 0,
              input, output,
-             (input->isUnresolvedType() || output->isUnresolvedType()),
              hasTypeVariable,
              isThin,
              cc),
@@ -777,7 +766,6 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
   : AnyFunctionType(TypeKind::PolymorphicFunction,
                     (input->isCanonical() && output->isCanonical()) ?&C : 0,
                     input, output,
-                    (input->isUnresolvedType() || output->isUnresolvedType()),
                     /*HasTypeVariable=*/false,
                     isThin, cc),
     Params(params)
@@ -803,7 +791,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
 ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
   : TypeBase(TypeKind::Array, 
              base->isCanonical() ? &base->getASTContext() : 0,
-             base->isUnresolvedType(), hasTypeVariable),
+             hasTypeVariable),
     Base(base), Size(size) {}
 
 

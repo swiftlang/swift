@@ -1097,16 +1097,7 @@ bool TypeBase::isSpelledLike(Type other) {
 
 TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx,
                      bool hasTypeVariable)
-  : TypeBase(TypeKind::Tuple, CanCtx, /*Unresolved=*/false, hasTypeVariable),
-    Fields(fields) {
-  // Determine whether this tuple type is unresolved.
-  for (const auto &F : Fields) {
-    if (!F.getType().isNull() && F.getType()->isUnresolvedType()) {
-      setUnresolved();
-      break;
-    }
-  }
-}
+  : TypeBase(TypeKind::Tuple, CanCtx, hasTypeVariable), Fields(fields) { }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
@@ -1392,8 +1383,6 @@ std::string TypeBase::getString() const {
 
 void TypeBase::dump() const {
   print(llvm::errs());
-  if (isUnresolvedType())
-    llvm::errs() << " [unresolved]";
   llvm::errs() << '\n';
 }
 

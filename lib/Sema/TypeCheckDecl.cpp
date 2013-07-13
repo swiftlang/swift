@@ -672,7 +672,7 @@ public:
   }
 
   void semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
-    if (FE->getType() && !FE->getType()->isUnresolvedType())
+    if (FE->getType())
       return;
 
     bool badType = false;
