@@ -289,7 +289,7 @@ namespace decls_block {
     TUPLE_TYPE_ELT,
     IdentifierIDField, // name
     TypeIDField,       // type
-    TypeIDField        // vararg base type, or 0
+    BCFixed<1>         // vararg?
   >;
 
   using IdentifierTypeLayout = BCRecordLayout<
