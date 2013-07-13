@@ -395,6 +395,51 @@ public:
   }
 };
   
+/// A pattern that matches a oneof case. If the oneof value is in the matching
+/// case, then the value is extracted. If there is a subpattern, it is then
+/// matched against the associated value for the case.
+class OneOfElementPattern : public Pattern {
+  Expr *Element;
+  Pattern /*nullable*/ *SubPattern;
+  
+public:
+  OneOfElementPattern(Expr *Element, Pattern *SubPattern)
+    : Pattern(PatternKind::OneOfElement),
+      Element(Element), SubPattern(SubPattern) {
+    if (SubPattern && SubPattern->isImplicit())
+      setImplicit();
+  }
+  
+  bool hasSubPattern() const { return SubPattern; }
+  
+  const Pattern *getSubPattern() const {
+    return SubPattern;
+  }
+  
+  Pattern *getSubPattern() {
+    return SubPattern;
+  }
+  
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+  
+  Expr *getElementExpr() const { return Element; }
+  void setElementExpr(Expr *e) { Element = e; }
+  
+  OneOfElementDecl *getElementDecl() const;
+  
+  SourceLoc getLoc() const { return Element->getLoc(); }
+  SourceRange getSourceRange() const {
+    return SubPattern
+      ? SourceRange{Element->getSourceRange().Start,
+                    SubPattern->getSourceRange().End}
+      : Element->getSourceRange();
+  }
+  
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::OneOfElement;
+  }
+};
+  
 /// A pattern which matches a value obtained by evaluating an expression.
 /// The match will be tested using user-defined '~=' operator function lookup;
 /// the match succeeds if 'patternValue ~= matchedValue' produces a true value.

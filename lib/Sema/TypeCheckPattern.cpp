@@ -43,6 +43,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Paren)
   ALWAYS_RESOLVED_PATTERN(Tuple)
   ALWAYS_RESOLVED_PATTERN(NominalType)
+  ALWAYS_RESOLVED_PATTERN(OneOfElement)
   ALWAYS_RESOLVED_PATTERN(Typed)
 #undef ALWAYS_RESOLVED_PATTERN
 
@@ -378,6 +379,19 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
     
     // TODO: Resolve the cast kind.
     IP->setType(type);
+    return false;
+  }
+      
+  case PatternKind::OneOfElement: {
+    auto *OP = cast<OneOfElementPattern>(P);
+    
+    // If there is a subpattern, push the oneof element type down onto it.
+    if (OP->hasSubPattern()) {
+      Type elementType = OP->getElementDecl()->getArgumentType();
+      if (!elementType)
+        elementType = TupleType::getEmpty(Context);
+      return coerceToType(OP->getSubPattern(), dc, elementType);
+    }
     return false;
   }
       

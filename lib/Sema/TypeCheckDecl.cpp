@@ -236,6 +236,12 @@ public:
       return visitBoundVars(cast<TypedPattern>(P)->getSubPattern());
     case PatternKind::NominalType:
       return visitBoundVars(cast<NominalTypePattern>(P)->getSubPattern());
+    case PatternKind::OneOfElement: {
+      auto *OP = cast<OneOfElementPattern>(P);
+      if (OP->hasSubPattern())
+        visitBoundVars(OP->getSubPattern());
+      return;
+    }
     case PatternKind::Var:
       return visitBoundVars(cast<VarPattern>(P)->getSubPattern());
 

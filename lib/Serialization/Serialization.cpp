@@ -587,6 +587,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     writePattern(nom->getSubPattern());
     break;
   }
+  case PatternKind::OneOfElement:
   case PatternKind::Expr:
     llvm_unreachable("FIXME: not implemented");
 

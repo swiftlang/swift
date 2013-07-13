@@ -55,6 +55,13 @@ static void WalkPattern(Pattern *P) {
   
   case PatternKind::NominalType:
     return WalkPattern(cast<NominalTypePattern>(P)->getSubPattern());
+      
+  case PatternKind::OneOfElement: {
+    auto *OP = cast<OneOfElementPattern>(P);
+    if (OP->hasSubPattern())
+       WalkPattern(OP);
+    return;
+  }
 
   case PatternKind::Var:
     return WalkPattern(cast<VarPattern>(P)->getSubPattern());

@@ -236,6 +236,14 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
+  case PatternKind::OneOfElement: {
+    auto elt = cast<OneOfElementPattern>(pattern);
+    // FIXME: Print element expr.
+    if (elt->hasSubPattern())
+      printPattern(elt->getSubPattern());
+    break;
+  }
+      
   case PatternKind::Expr: {
     // FIXME: Print expr.
     break;

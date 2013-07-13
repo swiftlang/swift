@@ -122,19 +122,29 @@ namespace {
       printCommon(P, "pattern_nominal") << ' ';
       P->getCastTypeLoc().getType()->print(OS);
       OS << '\n';
-      P->getSubPattern()->print(OS);
+      printRec(P->getSubPattern());
       OS << ')';
     }
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';
-      P->getSubExpr()->print(OS);
+      printRec(P->getSubExpr());
       OS << ')';
     }
     void visitVarPattern(VarPattern *P) {
       printCommon(P, "pattern_var");
       OS << '\n';
-      P->getSubPattern()->print(OS);
+      printRec(P->getSubPattern());
+      OS << ')';
+    }
+    void visitOneOfElementPattern(OneOfElementPattern *P) {
+      printCommon(P, "pattern_oneof_element");
+      OS << '\n';
+      printRec(P->getElementExpr());
+      if (P->hasSubPattern()) {
+        OS << '\n';
+        printRec(P->getSubPattern());
+      }
       OS << ')';
     }
   };

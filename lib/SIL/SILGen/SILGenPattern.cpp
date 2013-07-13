@@ -43,6 +43,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Tuple:
   case PatternKind::Isa:
   case PatternKind::NominalType:
+  case PatternKind::OneOfElement:
     return false;
   
   // Recur into simple wrapping patterns.
@@ -142,6 +143,7 @@ static SILBasicBlock *emitBranchAndDestructure(SILGenFunction &gen,
   }
       
   case PatternKind::NominalType:
+  case PatternKind::OneOfElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -169,6 +171,7 @@ unsigned getDestructuredWidth(const Pattern *specializer) {
     return 1;
       
   case PatternKind::NominalType:
+  case PatternKind::OneOfElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -270,6 +273,7 @@ void destructurePattern(SILGenFunction &gen,
     return;
   }
       
+  case PatternKind::OneOfElement:
   case PatternKind::NominalType:
     llvm_unreachable("not implemented");
       
@@ -361,6 +365,7 @@ bool arePatternsOrthogonal(const Pattern *a,
   }
       
   case PatternKind::NominalType:
+  case PatternKind::OneOfElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -393,6 +398,9 @@ patternsFormSignature(ArrayRef<const Pattern*> set) {
     case PatternKind::Named:
     case PatternKind::Expr:
       llvm_unreachable("shouldn't have specialized on a wildcard");
+        
+    case PatternKind::OneOfElement:
+      llvm_unreachable("not implemented");
         
     case PatternKind::Paren:
     case PatternKind::Var:
@@ -656,6 +664,7 @@ const ExprPattern *getAsExprPattern(const Pattern *p) {
   case PatternKind::Any:
   case PatternKind::Isa:
   case PatternKind::NominalType:
+  case PatternKind::OneOfElement:
     return nullptr;
 
   // Recur into simple wrapping patterns.
@@ -963,6 +972,7 @@ public:
       case PatternKind::Any:
       case PatternKind::Tuple:
       case PatternKind::NominalType:
+      case PatternKind::OneOfElement:
       case PatternKind::Isa:
         continue;
           

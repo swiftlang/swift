@@ -42,6 +42,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, PatternKind kind) {
     return OS << "expression pattern";
   case PatternKind::Var:
     return OS << "'var' binding pattern";
+  case PatternKind::OneOfElement:
+    return OS << "oneof case matching pattern";
   }
 }
 
@@ -137,6 +139,13 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   case PatternKind::NominalType:
     return cast<NominalTypePattern>(this)->getSubPattern()
              ->collectVariables(variables);
+      
+  case PatternKind::OneOfElement: {
+    auto *OP = cast<OneOfElementPattern>(this);
+    if (OP->hasSubPattern())
+      OP->collectVariables(variables);
+    return;
+  }
   
   case PatternKind::Expr:
     return;
@@ -204,6 +213,16 @@ Pattern *Pattern::clone(ASTContext &context) const {
     result = new(context) NominalTypePattern(nom->getCastTypeLoc(),
                                            nom->getSubPattern()->clone(context),
                                            nom->getCastKind());
+    break;
+  }
+      
+  case PatternKind::OneOfElement: {
+    auto oof = cast<OneOfElementPattern>(this);
+    Pattern *sub = nullptr;
+    if (oof->hasSubPattern())
+      sub = oof->getSubPattern()->clone(context);
+    result = new(context) OneOfElementPattern(oof->getElementExpr(),
+                                              sub);
     break;
   }
       
@@ -288,4 +307,10 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
 
 SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
+}
+
+OneOfElementDecl *OneOfElementPattern::getElementDecl() const {
+  auto *apply = cast<ApplyExpr>(getElementExpr());
+  auto *decl = cast<DeclRefExpr>(apply->getFn());
+  return cast<OneOfElementDecl>(decl->getDecl());
 }

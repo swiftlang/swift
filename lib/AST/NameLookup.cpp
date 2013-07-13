@@ -167,6 +167,12 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl());
     case PatternKind::NominalType:
       return checkPattern(cast<NominalTypePattern>(Pat)->getSubPattern());
+    case PatternKind::OneOfElement: {
+      auto *OP = cast<OneOfElementPattern>(Pat);
+      if (OP->hasSubPattern())
+        checkPattern(OP->getSubPattern());
+      return;
+    }
     case PatternKind::Var:
       return checkPattern(cast<VarPattern>(Pat)->getSubPattern());
     // Handle non-vars.

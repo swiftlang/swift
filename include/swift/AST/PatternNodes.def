@@ -35,6 +35,7 @@ PATTERN(Any, Pattern)
 PATTERN(Typed, Pattern)
 REFUTABLE_PATTERN(Isa, Pattern)
 REFUTABLE_PATTERN(NominalType, Pattern)
+REFUTABLE_PATTERN(OneOfElement, Pattern)
 REFUTABLE_PATTERN(Expr, Pattern)
 // FIXME: Not really refutable, but should only appear in refutable pattern
 // productions.

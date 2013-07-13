@@ -679,6 +679,21 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
   
+  Pattern *visitOneOfElementPattern(OneOfElementPattern *P) {
+    if (Expr *newElement = doIt(P->getElementExpr()))
+      P->setElementExpr(newElement);
+    else
+      return nullptr;
+    
+    if (P->hasSubPattern()) {
+      if (Pattern *newSub = doIt(P->getSubPattern()))
+        P->setSubPattern(newSub);
+      else
+        return nullptr;
+    }
+    return P;
+  }
+  
   Pattern *visitExprPattern(ExprPattern *P) {
     // If the pattern has been type-checked, walk the match expression, which
     // includes the explicit subexpression.
