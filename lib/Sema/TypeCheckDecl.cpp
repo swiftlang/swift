@@ -279,6 +279,39 @@ public:
     llvm_unreachable("bad pattern kind!");
   }
 
+  void setBoundVarsTypeError(Pattern *pattern) {
+    switch (pattern->getKind()) {
+    case PatternKind::Tuple:
+      for (auto &field : cast<TuplePattern>(pattern)->getFields())
+        setBoundVarsTypeError(field.getPattern());
+      return;
+    case PatternKind::Paren:
+      return setBoundVarsTypeError(cast<ParenPattern>(pattern)->getSubPattern());
+    case PatternKind::Typed:
+      return setBoundVarsTypeError(cast<TypedPattern>(pattern)->getSubPattern());
+    case PatternKind::NominalType:
+      return setBoundVarsTypeError(cast<NominalTypePattern>(pattern)
+                                     ->getSubPattern());
+    case PatternKind::Var:
+      return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern());
+
+    // Handle vars.
+    case PatternKind::Named: {
+      VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
+      if (!var->hasType())
+        var->setType(ErrorType::get(TC.Context));
+      return;
+    }
+
+    // Handle non-vars.
+    case PatternKind::Any:
+    case PatternKind::Isa:
+    case PatternKind::Expr:
+      return;
+    }
+    llvm_unreachable("bad pattern kind!");
+  }
+
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool DelayCheckingPattern =
       TC.TU.Kind != TranslationUnit::Library &&
@@ -341,6 +374,7 @@ public:
         if (DestTy)
           TC.diagnose(PBD, diag::while_converting_var_init,
                       DestTy);
+        setBoundVarsTypeError(PBD->getPattern());
         return;
       }
       if (!DestTy) {

@@ -159,7 +159,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    P->setType(SP->getType());
+    if (SP->hasType())
+      P->setType(SP->getType());
     return false;
   }
 
@@ -186,12 +187,15 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     // information, then the lack of type information is not an error.  Just set
     // our type to UnresolvedType.
     if (allowUnknownTypes) {
-      P->setType(Context.TheUnstructuredUnresolvedType);
       return false;
     }
       
     diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
+    if (auto named = dyn_cast<NamedPattern>(P)) {
+      if (auto var = named->getDecl())
+        var->setType(ErrorType::get(Context));
+    }
     return true;
 
   // A tuple pattern propagates its tuple-ness out.
@@ -199,17 +203,20 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
+    bool missingType = false;
     for (TuplePatternElt &elt : cast<TuplePattern>(P)->getFields()) {
       Type type;
       ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
       if (typeCheckPattern(pattern, dc, isFirstPass, allowUnknownTypes)) {
         hadError = true;
-      } else {
+      } else if (pattern->hasType()) {
         type = pattern->getType();
+      } else {
+        missingType = true;
       }
 
-      if (init && !isFirstPass && !init->alreadyChecked()) {
+      if (init && !isFirstPass && !init->alreadyChecked() && type) {
         Expr *e = init->getExpr();
         typeCheckExpression(e, dc, type);
         init->setExpr(e, true);
@@ -223,7 +230,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    P->setType(TupleType::get(typeElts, Context));
+    if (!missingType)
+      P->setType(TupleType::get(typeElts, Context));
     return false;
   }
 

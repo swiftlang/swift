@@ -712,8 +712,6 @@ namespace {
       if (auto *Named = dyn_cast<NamedPattern>(P)) {
         VarDecl *VD = Named->getDecl();
         VD->setDeclContext(CurDeclContext);
-        if (!VD->hasType())
-          VD->setType(UnstructuredUnresolvedType::get(Context));
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
         

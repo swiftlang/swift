@@ -482,7 +482,8 @@ class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   bool IsSpecialized = false;
 
 public:
-  OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc, Type Ty)
+  OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc,
+                        Type Ty = Type())
     : OverloadSetRefExpr(ExprKind::OverloadedDeclRef, Decls, Ty), Loc(Loc) { }
   
   SourceLoc getLoc() const { return Loc; }
@@ -510,7 +511,7 @@ class OverloadedMemberRefExpr : public OverloadSetRefExpr {
 public:
   OverloadedMemberRefExpr(Expr *SubExpr, SourceLoc DotLoc,
                           ArrayRef<ValueDecl *> Decls, SourceLoc MemberLoc,
-                          Type Ty)
+                          Type Ty = Type())
     : OverloadSetRefExpr(ExprKind::OverloadedMemberRef, Decls, Ty),
       SubExpr(SubExpr), DotLoc(DotLoc), MemberLoc(MemberLoc) { }
 

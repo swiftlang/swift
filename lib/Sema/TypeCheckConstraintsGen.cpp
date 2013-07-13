@@ -947,8 +947,7 @@ namespace {
           auto members
             = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
           return new (TC.Context) OverloadedMemberRefExpr(base,
-                                   dotCall->getDotLoc(), members, memberLoc,
-                                   UnstructuredUnresolvedType::get(TC.Context));
+                                   dotCall->getDotLoc(), members, memberLoc);
         }
       }
 
@@ -963,8 +962,8 @@ namespace {
           auto members
             = TC.Context.AllocateCopy(ArrayRef<ValueDecl *>(&member, 1));
           return new (TC.Context) OverloadedMemberRefExpr(base,
-                                    dotIgnored->getDotLoc(), members, memberLoc,
-                                    UnstructuredUnresolvedType::get(TC.Context));
+                                    dotIgnored->getDotLoc(), members,
+                                                          memberLoc);
         }
       }
       
