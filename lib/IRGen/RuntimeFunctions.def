@@ -1,0 +1,259 @@
+//===-- RuntimeFunctions.def - Runtime Functions Database -------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of
+// runtime functions.
+//
+//===----------------------------------------------------------------------===//
+
+/// FUNCTION(Id, Name, ReturnTys, ArgTys, CC, Attrs)
+///   Makes available as "Id" the following runtime function:
+///     ReturnTy Name(ArgsTys...);
+///   ReturnTys is a call to RETURNS, which takes a non-empty list
+///     of expressions meant to be looked up in IRGenModule.
+///   ArgTys is either NO_ARGS or a call to ARGS, which takes a non-empty
+///     list of expressions meant to be looked up in IRGenModule.
+///   Attrs is a parenthesized list of attributes.
+///
+///   By default, passes Id to FUNCTION_ID.  Therefore, the valid uses of
+///   this database define either:
+///     FUNCTION_ID
+///   or all of the following:
+///     FUNCTION
+///     RETURNS
+///     ARGS
+///     NO_ARGS
+///     ATTRS
+///     NO_ATTRS
+#ifndef FUNCTION
+#define FUNCTION(Id, Name, ReturnTys, ArgTys, CC, Attrs) FUNCTION_ID(Id)
+#endif
+
+// struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
+FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// RefCounted *swift_allocObject(Metadata *type, size_t size, size_t align);
+FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_deallocObject(RefCounted *obj, size_t size);
+FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void *swift_rawAlloc(SwiftAllocIndex index);
+FUNCTION(RawAlloc,       swift_rawAlloc,      RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_rawDealloc(void *ptr, SwiftAllocIndex index);
+FUNCTION(RawDealloc,     swift_rawDealloc,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void *swift_slowAlloc(size_t size, size_t flags);
+FUNCTION(SlowAlloc,      swift_slowAlloc,     RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_slowRawDealloc(void *ptr, size_t size);
+FUNCTION(SlowRawDealloc, swift_slowRawDealloc,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void *swift_copyPOD(void *dest, void *src, Metadata *self);
+FUNCTION(CopyPOD,        swift_copyPOD,       RuntimeCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_retain_noresult(void *ptr);
+FUNCTION(RetainNoResult, swift_retain_noresult,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_release(void *ptr);
+FUNCTION(Release,        swift_release,       RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// type_metadata_t *swift_getFunctionTypeMetadata(type_metadata_t *arg,
+//                                                type_metadata_t *result);
+FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
+//                                           const void *arguments);
+FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+// type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
+FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
+FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getTupleTypeMetadata(size_t numElements,
+//                                             type_metadata_t * const *elts,
+//                                             const char *labels,
+//                                            value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type_metadata_t *swift_getTupleTypeMetadata2(type_metadata_t *elt0,
+//                                              type_metadata_t *elt1,
+//                                              const char *labels,
+//                                            value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type_metadata_t *swift_getTupleTypeMetadata3(type_metadata_t *elt0,
+//                                              type_metadata_t *elt1,
+//                                              type_metadata_t *elt2,
+//                                              const char *labels,
+//                                            value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              Int8PtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
+FUNCTION(StaticTypeof, swift_staticTypeof, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
+FUNCTION(ObjectTypeof, swift_objectTypeof, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
+FUNCTION(ObjCTypeof, swift_objcTypeof, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// Class object_getClass(id object);
+//
+// This is readonly instead of readnone because isa-rewriting can have
+// a noticeable effect.
+FUNCTION(GetObjectClass, object_getClass, C_CC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// type_metadata_t *swift_getObjectType(id object);
+//
+// Since this is intended to look through dynamic subclasses, it's
+// invariant across reasonable isa-rewriting schemes and therefore can
+// be readnone.
+FUNCTION(GetObjectType, swift_getObjectType, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// void *swift_dynamicCastClass(void*, void*);
+FUNCTION(DynamicCastClass, swift_dynamicCastClass, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastClassUnconditional(void*, void*);
+FUNCTION(DynamicCastClassUnconditional, swift_dynamicCastClassUnconditional,
+         RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCast(void*, void*);
+FUNCTION(DynamicCast, swift_dynamicCast, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastUnconditional(void*, void*);
+FUNCTION(DynamicCastUnconditional, swift_dynamicCastUnconditional, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// opaque *swift_dynamicCastIndirect(opaque*, void*, void*);
+FUNCTION(DynamicCastIndirect, swift_dynamicCastIndirect, RuntimeCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(OpaquePtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// opaque *swift_dynamicCastIndirectUnconditional(opaque*, void*, void*);
+FUNCTION(DynamicCastIndirectUnconditional,
+         swift_dynamicCastIndirectUnconditional, RuntimeCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(OpaquePtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+FUNCTION(ObjCRetain, objc_retain, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCRelease, objc_release, C_CC,
+         RETURNS(VoidTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCRetainAutoreleasedReturnValue,
+         objc_retainAutoreleasedReturnValue, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCAutoreleaseReturnValue, objc_autoreleaseReturnValue, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCMsgSend, objc_msgSend, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendStret, objc_msgSend_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuper, objc_msgSendSuper2, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCMsgSendSuperStret, objc_msgSendSuper2_stret, C_CC,
+         RETURNS(VoidTy), NO_ARGS, NO_ATTRS)
+FUNCTION(ObjCSelRegisterName, sel_registerName, C_CC,
+         RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone))
+
+#undef RETURNS
+#undef ARGS
+#undef ATTRS
+#undef NO_ARGS
+#undef NO_ATTRS
+#undef FUNCTION
+#undef FUNCTION_NAME

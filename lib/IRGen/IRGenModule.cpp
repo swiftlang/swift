@@ -187,6 +187,7 @@ IRGenModule::~IRGenModule() {
 static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
                       llvm::Constant *&cache,
                       char const *name,
+                      llvm::CallingConv::ID cc,
                       std::initializer_list<llvm::Type*> retTypes,
                       std::initializer_list<llvm::Type*> argTypes,
                       std::initializer_list<Attribute::AttrKind> attrs
@@ -209,7 +210,7 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
-    fn->setCallingConv(IGM.RuntimeCC);
+    fn->setCallingConv(cc);
 
     for (auto Attr : attrs)
       fn->addFnAttr(Attr);
@@ -218,198 +219,31 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
   return cache;
 }
 
-llvm::Constant *IRGenModule::getAllocBoxFn() {
-  // struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
-  return getRuntimeFn(*this, AllocBoxFn, "swift_allocBox",
-                      { RefCountedPtrTy, OpaquePtrTy },
-                      { TypeMetadataPtrTy },
-                      { Attribute::NoUnwind });
+
+// Explicitly listing these constants is an unfortunate compromise for
+// making the database file much more compact.
+//
+// They have to be non-local because otherwise we'll get warnings when
+// a particular x-macro expansion doesn't use one.
+namespace RuntimeConstants {
+  const auto ReadNone = llvm::Attribute::ReadNone;
+  const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto NoUnwind = llvm::Attribute::NoUnwind;
+  const auto C_CC = llvm::CallingConv::C;
 }
 
-llvm::Constant *IRGenModule::getAllocObjectFn() {
-  // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t align);
-  return getRuntimeFn(*this, AllocObjectFn, "swift_allocObject",
-                      { RefCountedPtrTy },
-                      { TypeMetadataPtrTy, SizeTy, SizeTy },
-                      { Attribute::NoUnwind });
+#define RETURNS(...) { __VA_ARGS__ }
+#define ARGS(...) { __VA_ARGS__ }
+#define NO_ARGS {}
+#define ATTRS(...) { __VA_ARGS__ }
+#define NO_ATTRS {}
+#define FUNCTION(ID, NAME, CC, RETURNS, ARGS, ATTRS)       \
+llvm::Constant *IRGenModule::get##ID##Fn() {               \
+  using namespace RuntimeConstants;                        \
+  return getRuntimeFn(*this, ID##Fn, #NAME, CC,            \
+                      RETURNS, ARGS, ATTRS);               \
 }
-
-llvm::Constant *IRGenModule::getDeallocObjectFn() {
-  // void swift_deallocObject(RefCounted *obj, size_t size);
-  return getRuntimeFn(*this, DeallocObjectFn, "swift_deallocObject",
-                      { VoidTy },
-                      { RefCountedPtrTy, SizeTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getRawAllocFn() {
-  /// void *swift_rawAlloc(SwiftAllocIndex index);
-  return getRuntimeFn(*this, RawAllocFn, "swift_rawAlloc",
-                      { Int8PtrTy },
-                      { SizeTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getRawDeallocFn() {
-  /// void swift_rawDealloc(void *ptr, SwiftAllocIndex index);
-  return getRuntimeFn(*this, RawDeallocFn, "swift_rawDealloc",
-                      { VoidTy },
-                      { Int8PtrTy, SizeTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getSlowAllocFn() {
-  /// void *swift_slowAlloc(size_t size, size_t flags);
-  return getRuntimeFn(*this, SlowAllocFn, "swift_slowAlloc",
-                      { Int8PtrTy },
-                      { SizeTy, SizeTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getSlowRawDeallocFn() {
-  /// void swift_slowRawDealloc(void *ptr, size_t size);
-  return getRuntimeFn(*this, SlowRawDeallocFn, "swift_slowRawDealloc",
-                      { VoidTy },
-                      { Int8PtrTy, SizeTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getCopyPODFn() {
-  /// void *swift_copyPOD(void *dest, void *src, Metadata *self);
-  return getRuntimeFn(*this, CopyPODFn, "swift_copyPOD",
-                      { OpaquePtrTy },
-                      { OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastClassFn() {
-  // void *swift_dynamicCastClass(void*, void*);
-  return getRuntimeFn(*this, DynamicCastClassFn, "swift_dynamicCastClass",
-                      { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastClassUnconditionalFn() {
-  // void *swift_dynamicCastClassUnconditional(void*, void*);
-  return getRuntimeFn(*this, DynamicCastClassUnconditionalFn,
-                      "swift_dynamicCastClassUnconditional",
-                      { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastFn() {
-  // void *swift_dynamicCast(void*, void*);
-  return getRuntimeFn(*this, DynamicCastFn, "swift_dynamicCast",
-                      { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastUnconditionalFn() {
-  // void *swift_dynamicCastUnconditional(void*, void*);
-  return getRuntimeFn(*this, DynamicCastUnconditionalFn,
-                      "swift_dynamicCastUnconditional",
-                      { Int8PtrTy },
-                      { Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastIndirectFn() {
-  // opaque *swift_dynamicCastIndirect(opaque*, void*, void*);
-  return getRuntimeFn(*this, DynamicCastIndirectFn,
-                      "swift_dynamicCastIndirect",
-                      { OpaquePtrTy },
-                      { OpaquePtrTy, Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, llvm::Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getDynamicCastIndirectUnconditionalFn() {
-  // opaque *swift_dynamicCastIndirectUnconditional(opaque*, void*, void*);
-  return getRuntimeFn(*this, DynamicCastIndirectUnconditionalFn,
-                      "swift_dynamicCastIndirectUnconditional",
-                      { OpaquePtrTy },
-                      { OpaquePtrTy, Int8PtrTy, Int8PtrTy },
-                      { Attribute::NoUnwind, llvm::Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getRetainNoResultFn() {
-  // void swift_retainNoResult(void *ptr);
-  getRuntimeFn(*this, RetainNoResultFn, "swift_retain_noresult",
-               { VoidTy }, { RefCountedPtrTy },
-               { Attribute::NoUnwind });
-  if (auto fn = dyn_cast<llvm::Function>(RetainNoResultFn))
-    fn->setDoesNotCapture(1);
-  return RetainNoResultFn;
-}
-
-llvm::Constant *IRGenModule::getReleaseFn() {
-  // void swift_release(void *ptr);
-  getRuntimeFn(*this, ReleaseFn, "swift_release",
-               { VoidTy }, { RefCountedPtrTy }, { Attribute::NoUnwind });
-  if (auto fn = dyn_cast<llvm::Function>(ReleaseFn))
-    fn->setDoesNotCapture(1);
-  return ReleaseFn;
-}
-
-llvm::Constant *IRGenModule::getGetFunctionMetadataFn() {
-  // type_metadata_t *swift_getFunctionMetadata(type_metadata_t *arg,
-  //                                            type_metadata_t *result);
-  return getRuntimeFn(*this, GetFunctionMetadataFn,
-                      "swift_getFunctionTypeMetadata",
-                      { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy, TypeMetadataPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-llvm::Constant *IRGenModule::getGetGenericMetadataFn() {
-  // type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
-  //                                           const void *arguments);
-  return getRuntimeFn(*this, GetGenericMetadataFn, "swift_getGenericMetadata",
-                      { TypeMetadataPtrTy },
-                      { TypeMetadataPatternPtrTy, Int8PtrTy });
-}
-
-llvm::Constant *IRGenModule::getGetMetatypeMetadataFn() {
-  // type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
-  return getRuntimeFn(*this, GetMetatypeMetadataFn, "swift_getMetatypeMetadata",
-                      { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-llvm::Constant *IRGenModule::getGetObjCClassMetadataFn() {
-  // type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
-  return getRuntimeFn(*this, GetObjCClassMetadataFn, "swift_getObjCClassMetadata",
-                      { TypeMetadataPtrTy },
-                      { TypeMetadataPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-llvm::Constant *IRGenModule::getStaticTypeofFn() {
-  // type_metadata_t *swift_staticTypeof(opaque_t *obj, type_metadata_t *self);
-  return getRuntimeFn(*this, StaticTypeofFn, "swift_staticTypeof",
-                      { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-llvm::Constant *IRGenModule::getObjectTypeofFn() {
-  // type_metadata_t *swift_objectTypeof(opaque_t *obj, type_metadata_t *self);
-  return getRuntimeFn(*this, ObjectTypeofFn, "swift_objectTypeof",
-                      { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy },
-                      { Attribute::NoUnwind });
-}
-
-llvm::Constant *IRGenModule::getObjCTypeofFn() {
-  // type_metadata_t *swift_objcTypeof(opaque_t *obj, type_metadata_t *self);
-  return getRuntimeFn(*this, ObjCTypeofFn, "swift_objcTypeof",
-                      { TypeMetadataPtrTy },
-                      { OpaquePtrTy, TypeMetadataPtrTy },
-                      { Attribute::NoUnwind });
-}
+#include "RuntimeFunctions.def"
 
 llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
   if (EmptyTupleMetadata)
@@ -417,82 +251,6 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
 
   return EmptyTupleMetadata =
     Module.getOrInsertGlobal("_TMdT_", FullTypeMetadataStructTy);
-}
-
-llvm::Constant *IRGenModule::getGetTupleMetadataFn() {
-  // type_metadata_t *swift_getTupleMetadata(size_t numElements,
-  //                                         type_metadata_t * const *elements,
-  //                                         const char *labels,
-  //                                         value_witness_table_t *proposed);
-  return getRuntimeFn(*this, GetTupleMetadataFn, "swift_getTupleTypeMetadata",
-                      { TypeMetadataPtrTy },
-                      {
-                        SizeTy,
-                        TypeMetadataPtrTy->getPointerTo(0),
-                        Int8PtrTy,
-                        WitnessTablePtrTy
-                      },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getGetTupleMetadata2Fn() {
-  // type_metadata_t *swift_getTupleMetadata2(type_metadata_t *elt0,
-  //                                          type_metadata_t *elt1,
-  //                                          const char *labels,
-  //                                          value_witness_table_t *proposed);
-  return getRuntimeFn(*this, GetTupleMetadata2Fn, "swift_getTupleTypeMetadata2",
-                      { TypeMetadataPtrTy },
-                      {
-                        TypeMetadataPtrTy, 
-                        TypeMetadataPtrTy,
-                        Int8PtrTy,
-                        WitnessTablePtrTy
-                      },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-llvm::Constant *IRGenModule::getGetTupleMetadata3Fn() {
-  // type_metadata_t *swift_getTupleMetadata3(type_metadata_t *elt0,
-  //                                          type_metadata_t *elt1,
-  //                                          type_metadata_t *elt2,
-  //                                          const char *labels,
-  //                                          value_witness_table_t *proposed);
-  return getRuntimeFn(*this, GetTupleMetadata3Fn, "swift_getTupleTypeMetadata3",
-                      { TypeMetadataPtrTy },
-                      {
-                        TypeMetadataPtrTy,
-                        TypeMetadataPtrTy,
-                        TypeMetadataPtrTy,
-                        Int8PtrTy,
-                        WitnessTablePtrTy
-                      },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
-}
-
-
-llvm::Constant *IRGenModule::getGetObjectClassFn() {
-  if (GetObjectClassFn) return GetObjectClassFn;
-
-  // Class object_getClass(id object);
-  // This is an Objective-C runtime function.
-  // We have to mark it readonly instead of readnone because isa-rewriting
-  // can have a noticeable effect here.
-  return getRuntimeFn(*this, GetObjectClassFn, "object_getClass",
-                      { TypeMetadataPtrTy },
-                      { ObjCPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadOnly });
-}
-
-llvm::Constant *IRGenModule::getGetObjectTypeFn() {
-  // type_metadata_t *swift_getObjectType(id object);
-
-  // Since this supposedly looks through dynamic subclasses, it's
-  // invariant across reasonable isa-rewriting schemes and therefore
-  // can be readnone.
-  return getRuntimeFn(*this, GetObjectTypeFn, "swift_getObjectType",
-                      { TypeMetadataPtrTy },
-                      { ObjCPtrTy },
-                      { Attribute::NoUnwind, Attribute::ReadNone });
 }
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {

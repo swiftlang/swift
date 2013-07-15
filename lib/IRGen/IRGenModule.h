@@ -231,100 +231,23 @@ private:
 
 //--- Runtime ---------------------------------------------------------------
 public:
-  llvm::Constant *getAllocObjectFn();
-  llvm::Constant *getAllocBoxFn();
-  llvm::Constant *getRetainNoResultFn();
-  llvm::Constant *getReleaseFn();
-  llvm::Constant *getDeallocObjectFn();
- 
-  llvm::Constant *getRawAllocFn();
-  llvm::Constant *getRawDeallocFn();
-  llvm::Constant *getSlowAllocFn();
-  llvm::Constant *getSlowRawDeallocFn();
-
-  llvm::Constant *getCopyPODFn();
-
-  llvm::Constant *getDynamicCastClassFn();
-  llvm::Constant *getDynamicCastClassUnconditionalFn();
-  llvm::Constant *getDynamicCastFn();
-  llvm::Constant *getDynamicCastUnconditionalFn();
-  llvm::Constant *getDynamicCastIndirectFn();
-  llvm::Constant *getDynamicCastIndirectUnconditionalFn();
-
-  llvm::Constant *getObjCRetainFn();
-  llvm::Constant *getObjCRetainAutoreleasedReturnValueFn();
-  llvm::Constant *getObjCReleaseFn();
-  llvm::Constant *getObjCAutoreleaseReturnValueFn();
-
-  llvm::Constant *getObjCMsgSendFn();
-  llvm::Constant *getObjCMsgSendStretFn();
-  llvm::Constant *getObjCMsgSendSuperFn();
-  llvm::Constant *getObjCMsgSendSuperStretFn();
-
-  llvm::Constant *getObjCSelRegisterNameFn();
-  llvm::Constant *getGetObjectClassFn();
-  llvm::Constant *getGetObjectTypeFn();
-
-  llvm::Constant *getGetFunctionMetadataFn();
-  llvm::Constant *getGetGenericMetadataFn();
-  llvm::Constant *getGetMetatypeMetadataFn();
   llvm::Constant *getEmptyTupleMetadata();
-  llvm::Constant *getGetTupleMetadataFn();
-  llvm::Constant *getGetTupleMetadata2Fn();
-  llvm::Constant *getGetTupleMetadata3Fn();
-  llvm::Constant *getGetObjCClassMetadataFn();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
-  
-  llvm::Constant *getStaticTypeofFn();
-  llvm::Constant *getObjectTypeofFn();
-  llvm::Constant *getObjCTypeofFn();
-  
   ClassDecl *getSwiftRootClass();
 
 private:
-  llvm::Function *MemCpyFn = nullptr;
-  llvm::Constant *AllocObjectFn = nullptr;
-  llvm::Constant *AllocBoxFn = nullptr;
-  llvm::Constant *RetainNoResultFn = nullptr;
-  llvm::Constant *ReleaseFn = nullptr;
-  llvm::Constant *DeallocObjectFn = nullptr;
-  llvm::Constant *RawAllocFn = nullptr;
-  llvm::Constant *RawDeallocFn = nullptr;
-  llvm::Constant *SlowAllocFn = nullptr;
-  llvm::Constant *SlowRawDeallocFn = nullptr;
-  llvm::Constant *DynamicCastClassFn = nullptr;
-  llvm::Constant *DynamicCastClassUnconditionalFn = nullptr;
-  llvm::Constant *DynamicCastFn = nullptr;
-  llvm::Constant *DynamicCastUnconditionalFn = nullptr;
-  llvm::Constant *DynamicCastIndirectFn = nullptr;
-  llvm::Constant *DynamicCastIndirectUnconditionalFn = nullptr;
-  llvm::Constant *CopyPODFn = nullptr;
-  llvm::Constant *GetFunctionMetadataFn = nullptr;
-  llvm::Constant *GetGenericMetadataFn = nullptr;
-  llvm::Constant *GetMetatypeMetadataFn = nullptr;
-  llvm::Constant *GetObjCClassMetadataFn = nullptr;
   llvm::Constant *EmptyTupleMetadata = nullptr;
-  llvm::Constant *GetTupleMetadataFn = nullptr;
-  llvm::Constant *GetTupleMetadata2Fn = nullptr;
-  llvm::Constant *GetTupleMetadata3Fn = nullptr;
-  llvm::Constant *GetObjectClassFn = nullptr;
-  llvm::Constant *GetObjectTypeFn = nullptr;
-  llvm::Constant *ObjCAutoreleaseReturnValueFn = nullptr;
-  llvm::Constant *ObjCRetainFn = nullptr;
-  llvm::Constant *ObjCRetainAutoreleasedReturnValueFn = nullptr;
-  llvm::Constant *ObjCReleaseFn = nullptr;
-  llvm::Constant *ObjCMsgSendFn = nullptr;
-  llvm::Constant *ObjCMsgSendStretFn = nullptr;
-  llvm::Constant *ObjCMsgSendSuperFn = nullptr;
-  llvm::Constant *ObjCMsgSendSuperStretFn = nullptr;
-  llvm::Constant *ObjCSelRegisterNameFn = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
-  llvm::Constant *StaticTypeofFn = nullptr;
-  llvm::Constant *ObjectTypeofFn = nullptr;
-  llvm::Constant *ObjCTypeofFn = nullptr;
   ClassDecl *SwiftRootClass = nullptr;
+
+#define FUNCTION_ID(Id)             \
+public:                             \
+  llvm::Constant *get##Id##Fn();    \
+private:                            \
+  llvm::Constant *Id##Fn = nullptr;
+#include "RuntimeFunctions.def"
 
 //--- Generic ---------------------------------------------------------------
 public:
