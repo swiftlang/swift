@@ -244,6 +244,13 @@ public:
     IsSuperRefExpr = true;
   }
 
+  void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
+    if (T->isVoid())
+      Builder.addTypeAnnotation("Void");
+    else
+      Builder.addTypeAnnotation(T.getString());
+  }
+
   void addSwiftVarDeclRef(const VarDecl *VD) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -255,7 +262,7 @@ public:
     if (!HaveDot)
       Builder.addDot();
     Builder.addTextChunk(Name);
-    Builder.addTypeAnnotation(VD->getType().getString());
+    addTypeAnnotation(Builder, VD->getType());
   }
 
   void addTuplePatternParameters(CodeCompletionResultBuilder &Builder,
@@ -284,7 +291,7 @@ public:
       NeedComma = true;
     }
     Builder.addRightParen();
-    Builder.addTypeAnnotation(AFT->getResult().getString());
+    addTypeAnnotation(Builder, AFT->getResult());
   }
 
   void addSwiftMethodCall(const FuncDecl *FD) {
@@ -307,18 +314,22 @@ public:
     addTuplePatternParameters(Builder, cast<TuplePattern>(Patterns[FirstIndex]));
     Builder.addRightParen();
     // FIXME: Pattern should pretty-print itself.
-    llvm::SmallString<32> Type;
+    llvm::SmallString<32> TypeStr;
     for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
-      Type += "(";
+      TypeStr += "(";
       for (auto TupleElt : cast<TuplePattern>(Patterns[i])->getFields()) {
-        Type += TupleElt.getPattern()->getBoundName().str();
-        Type += ": ";
-        Type += TupleElt.getPattern()->getType().getString();
+        TypeStr += TupleElt.getPattern()->getBoundName().str();
+        TypeStr += ": ";
+        TypeStr += TupleElt.getPattern()->getType().getString();
       }
-      Type += ") -> ";
+      TypeStr += ") -> ";
     }
-    Type += FE->getResultType(SwiftContext).getString();
-    Builder.addTypeAnnotation(Type);
+    Type ResultType = FE->getResultType(SwiftContext);
+    if (ResultType->isVoid())
+      TypeStr += "Void";
+    else
+      TypeStr += ResultType.getString();
+    Builder.addTypeAnnotation(TypeStr);
 
     // TODO: skip arguments with default parameters?
   }
@@ -335,7 +346,7 @@ public:
     Builder.addLeftParen();
     addTuplePatternParameters(Builder, cast<TuplePattern>(CD->getArguments()));
     Builder.addRightParen();
-    Builder.addTypeAnnotation(CD->getResultType().getString());
+    addTypeAnnotation(Builder, CD->getResultType());
   }
 
   void addSwiftSubscriptCall(const SubscriptDecl *SD) {
@@ -347,7 +358,7 @@ public:
     Builder.addLeftBracket();
     addTuplePatternParameters(Builder, cast<TuplePattern>(SD->getIndices()));
     Builder.addRightBracket();
-    Builder.addTypeAnnotation(SD->getElementType().getString());
+    addTypeAnnotation(Builder, SD->getElementType());
   }
 
   void addClangDecl(const clang::NamedDecl *ND) {
@@ -371,7 +382,7 @@ public:
       Builder.addDot();
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.isNull())
-      Builder.addTypeAnnotation(TypeAnnotation.getString());
+      addTypeAnnotation(Builder, TypeAnnotation);
   }
 
   // Implement swift::VisibleDeclConsumer
