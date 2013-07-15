@@ -211,6 +211,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
                            diag::serialization_missing_dependencies,
                            missingNames);
       }
+
+      module->File = nullptr;
     }
   }
 
