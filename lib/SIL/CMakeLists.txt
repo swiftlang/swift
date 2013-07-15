@@ -1,4 +1,5 @@
 add_subdirectory(SILGen)
+add_subdirectory(Passes)
 add_swift_library(swiftSIL
   Checker.cpp
   Dominance.cpp

@@ -67,7 +67,7 @@ public:
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
       CurInstruction->print(llvm::dbgs());
-      llvm::dbgs() << "In function @" << F.getMangledName() << " basic block:\n";
+      llvm::dbgs() << "In function @" << F.getMangledName() <<" basic block:\n";
       CurInstruction->getParent()->print(llvm::dbgs());
     }
 
@@ -118,7 +118,7 @@ public:
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
         require(valueI->getParent()->getParent() == &F,
-                "instruction uses value of instruction from different function");
+                "instruction uses value of instruction from another function");
         require(Dominance.properlyDominates(valueI, I),
                 "instruction doesn't dominate its operand");
       }

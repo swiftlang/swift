@@ -129,6 +129,8 @@ namespace swift {
   SILModule *performSILGeneration(TranslationUnit *TU,
                                   unsigned StartElem = 0);
 
+  void performSILMemoryPromotion(SILModule *M);
+
   /// Serializes a translation unit to the given output file.
   ///
   /// This interface is still prone to change!

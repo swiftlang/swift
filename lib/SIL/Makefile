@@ -13,7 +13,7 @@
 SWIFT_LEVEL := ../..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
-PARALLEL_DIRS = SILGen
+PARALLEL_DIRS = SILGen Passes
 
 LIBRARYNAME := swiftSIL
 
