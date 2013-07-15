@@ -25,7 +25,7 @@
 using namespace swift;
 
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                Module *curModule) {
+                                const Module *curModule) {
   // Category declarations by their signatures.
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>>
     declsBySignature;

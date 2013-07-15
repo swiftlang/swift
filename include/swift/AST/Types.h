@@ -72,7 +72,7 @@ class alignas(8) TypeBase {
   /// CanonicalType - This field is always set to the ASTContext for canonical
   /// types, and is otherwise lazily populated by ASTContext when the canonical
   /// form of a non-canonical type is requested.
-  llvm::PointerUnion<TypeBase *, ASTContext*> CanonicalType;
+  llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
 
   /// Kind - The discriminator that indicates what subclass of type this is.
   const TypeKind Kind;
@@ -95,7 +95,7 @@ class alignas(8) TypeBase {
   } TypeBits;
   
 protected:
-  TypeBase(TypeKind kind, ASTContext *CanTypeCtx, bool HasTypeVariable)
+  TypeBase(TypeKind kind, const ASTContext *CanTypeCtx, bool HasTypeVariable)
     : CanonicalType((TypeBase*)nullptr), Kind(kind) {
     // If this type is canonical, switch the CanonicalType union to ASTContext.
     if (CanTypeCtx)
@@ -115,7 +115,7 @@ public:
   TypeKind getKind() const { return Kind; }
 
   /// isCanonical - Return true if this is a canonical type.
-  bool isCanonical() const { return CanonicalType.is<ASTContext*>(); }
+  bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
   
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
@@ -126,12 +126,12 @@ public:
   CanType getCanonicalType();
   
   /// getASTContext - Return the ASTContext that this type belongs to.
-  ASTContext &getASTContext() {
+  const ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.
-    if (CanonicalType.is<ASTContext*>())
-      return *CanonicalType.get<ASTContext*>();
+    if (CanonicalType.is<const ASTContext *>())
+      return *CanonicalType.get<const ASTContext *>();
     // If not, canonicalize it to get the Context.
-    return *getCanonicalType()->CanonicalType.get<ASTContext*>();
+    return *getCanonicalType()->CanonicalType.get<const ASTContext *>();
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.
@@ -286,8 +286,8 @@ private:
 public:
   // Only allow allocation of Types using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t bytes, ASTContext &ctx, AllocationArena arena,
-                     unsigned alignment = 8);
+  void *operator new(size_t bytes, const ASTContext &ctx,
+                     AllocationArena arena, unsigned alignment = 8);
 };
 
 /// ErrorType - This represents a type that was erroneously constructed.  This
@@ -300,7 +300,7 @@ class ErrorType : public TypeBase {
   ErrorType(ASTContext &C) 
     : TypeBase(TypeKind::Error, &C, /*HasTypeVariable=*/false) { }
 public:
-  static Type get(ASTContext &C);
+  static Type get(const ASTContext &C);
   
   void print(raw_ostream &OS) const;
   
@@ -313,7 +313,7 @@ public:
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
-  BuiltinType(TypeKind kind, ASTContext &canTypeCtx)
+  BuiltinType(TypeKind kind, const ASTContext &canTypeCtx)
   : TypeBase(kind, &canTypeCtx, /*HasTypeVariable=*/false) {}
 public:
   static bool classof(const TypeBase *T) {
@@ -326,7 +326,7 @@ public:
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
 class BuiltinRawPointerType : public BuiltinType {
   friend class ASTContext;
-  BuiltinRawPointerType(ASTContext &C)
+  BuiltinRawPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinRawPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
@@ -342,7 +342,7 @@ public:
 /// checking against using arbitrary raw pointers as generic parameters.
 class BuiltinOpaquePointerType : public BuiltinType {
   friend class ASTContext;
-  BuiltinOpaquePointerType(ASTContext &C)
+  BuiltinOpaquePointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinOpaquePointer, C) {}
 public:
   void print(raw_ostream &OS) const;
@@ -357,7 +357,7 @@ public:
 /// manipulated via an unsafe pointer type.
 class BuiltinObjectPointerType : public BuiltinType {
   friend class ASTContext;
-  BuiltinObjectPointerType(ASTContext &C)
+  BuiltinObjectPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinObjectPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
@@ -371,7 +371,7 @@ public:
 /// Useful for pushing an Objective-C type through swift.
 class BuiltinObjCPointerType : public BuiltinType {
   friend class ASTContext;
-  BuiltinObjCPointerType(ASTContext &C)
+  BuiltinObjCPointerType(const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinObjCPointer, C) {}
 public:
   void print(raw_ostream &OS) const;
@@ -388,12 +388,13 @@ class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
 
   friend class ASTContext;
 
-  BuiltinVectorType(ASTContext &context, Type elementType, unsigned numElements)
+  BuiltinVectorType(const ASTContext &context, Type elementType,
+                    unsigned numElements)
     : BuiltinType(TypeKind::BuiltinVector, context),
       elementType(elementType), numElements(numElements) { }
 
 public:
-  static BuiltinVectorType *get(ASTContext &context, Type elementType,
+  static BuiltinVectorType *get(const ASTContext &context, Type elementType,
                                 unsigned numElements);
 
   void print(raw_ostream &OS) const;
@@ -425,11 +426,11 @@ public:
 class BuiltinIntegerType : public BuiltinType {
   friend class ASTContext;
   unsigned BitWidth;
-  BuiltinIntegerType(unsigned BitWidth, ASTContext &C)
+  BuiltinIntegerType(unsigned BitWidth, const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinInteger, C), BitWidth(BitWidth) {}
 public:
   
-  static BuiltinIntegerType *get(unsigned BitWidth, ASTContext &C);
+  static BuiltinIntegerType *get(unsigned BitWidth, const ASTContext &C);
   
   /// getBitWidth - Return the bitwidth of the integer.
   unsigned getBitWidth() const {
@@ -453,7 +454,7 @@ public:
 private:
   FPKind Kind;
   
-  BuiltinFloatType(FPKind Kind, ASTContext &C)
+  BuiltinFloatType(FPKind Kind, const ASTContext &C)
     : BuiltinType(TypeKind::BuiltinFloat, C), Kind(Kind) {}
 public:
   
@@ -592,7 +593,7 @@ class ParenType : public TypeBase {
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
 
-  static ParenType *get(ASTContext &C, Type underlying);
+  static ParenType *get(const ASTContext &C, Type underlying);
    
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
@@ -658,10 +659,10 @@ public:
   /// Returns a ParenType instead if there is exactly one element which
   /// is unlabeled and not varargs, so it doesn't accidentally construct
   /// a tuple which is impossible to write.
-  static Type get(ArrayRef<TupleTypeElt> Fields, ASTContext &C);
+  static Type get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C);
 
   /// getEmpty - Return the empty tuple type '()'.
-  static Type getEmpty(ASTContext &C);
+  static Type getEmpty(const ASTContext &C);
 
   /// getFields - Return the fields of this tuple.
   ArrayRef<TupleTypeElt> getFields() const { return Fields; }
@@ -704,7 +705,7 @@ public:
                       ArrayRef<TupleTypeElt> Fields);
   
 private:
-  TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx,
+  TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
             bool hasTypeVariable);
 };
 
@@ -717,7 +718,7 @@ class UnboundGenericType : public TypeBase, public llvm::FoldingSetNode {
   Type Parent;
 
 private:
-  UnboundGenericType(NominalTypeDecl *TheDecl, Type Parent, ASTContext &C,
+  UnboundGenericType(NominalTypeDecl *TheDecl, Type Parent, const ASTContext &C,
                      bool hasTypeVariable)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
@@ -726,7 +727,7 @@ private:
 
 public:
   static UnboundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
-                                 ASTContext &C);
+                                 const ASTContext &C);
 
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
@@ -768,7 +769,7 @@ class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
 
 protected:
   BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
-                   ArrayRef<Type> genericArgs, ASTContext *context,
+                   ArrayRef<Type> genericArgs, const ASTContext *context,
                    bool hasTypeVariable);
 
 public:
@@ -826,7 +827,7 @@ public:
 class BoundGenericClassType : public BoundGenericType {
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
-                        ArrayRef<Type> genericArgs, ASTContext *context,
+                        ArrayRef<Type> genericArgs, const ASTContext *context,
                         bool hasTypeVariable)
     : BoundGenericType(TypeKind::BoundGenericClass,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
@@ -856,7 +857,7 @@ public:
 class BoundGenericOneOfType : public BoundGenericType {
 private:
   BoundGenericOneOfType(OneOfDecl *theDecl, Type parent,
-                        ArrayRef<Type> genericArgs, ASTContext *context,
+                        ArrayRef<Type> genericArgs, const ASTContext *context,
                         bool hasTypeVariable)
     : BoundGenericType(TypeKind::BoundGenericOneOf,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
@@ -886,7 +887,7 @@ public:
 class BoundGenericStructType : public BoundGenericType {
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
-                         ArrayRef<Type> genericArgs, ASTContext *context,
+                         ArrayRef<Type> genericArgs, const ASTContext *context,
                          bool hasTypeVariable)
     : BoundGenericType(TypeKind::BoundGenericStruct, 
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
@@ -923,14 +924,14 @@ class NominalType : public TypeBase {
   Type Parent;
 
 protected:
-  NominalType(TypeKind K, ASTContext *C, NominalTypeDecl *TheDecl,
+  NominalType(TypeKind K, const ASTContext *C, NominalTypeDecl *TheDecl,
               Type Parent, bool HasTypeVariable)
     : TypeBase(K, (!Parent || Parent->isCanonical())? C : nullptr,
                HasTypeVariable),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
-  static NominalType *get(NominalTypeDecl *D, Type Parent, ASTContext &C);
+  static NominalType *get(NominalTypeDecl *D, Type Parent, const ASTContext &C);
 
   /// \brief Returns the declaration that declares this type.
   NominalTypeDecl *getDecl() const { return TheDecl; }
@@ -962,7 +963,7 @@ public:
 
   /// \brief Retrieve the type when we're referencing the given oneof
   /// declaration in the parent type \c Parent.
-  static OneOfType *get(OneOfDecl *D, Type Parent, ASTContext &C);
+  static OneOfType *get(OneOfDecl *D, Type Parent, const ASTContext &C);
 
   void print(raw_ostream &O) const;
 
@@ -977,7 +978,7 @@ public:
   }
 
 private:
-  OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &Ctx,
+  OneOfType(OneOfDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
 
@@ -991,7 +992,7 @@ public:
 
   /// \brief Retrieve the type when we're referencing the given struct
   /// declaration in the parent type \c Parent.
-  static StructType *get(StructDecl *D, Type Parent, ASTContext &C);
+  static StructType *get(StructDecl *D, Type Parent, const ASTContext &C);
 
   void print(raw_ostream &O) const;
 
@@ -1006,7 +1007,7 @@ public:
   }
   
 private:
-  StructType(StructDecl *TheDecl, Type Parent, ASTContext &Ctx,
+  StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
              bool HasTypeVariable);
 };
 
@@ -1020,7 +1021,7 @@ public:
 
   /// \brief Retrieve the type when we're referencing the given class
   /// declaration in the parent type \c Parent.
-  static ClassType *get(ClassDecl *D, Type Parent, ASTContext &C);
+  static ClassType *get(ClassDecl *D, Type Parent, const ASTContext &C);
 
   void print(raw_ostream &O) const;
 
@@ -1035,7 +1036,7 @@ public:
   }
   
 private:
-  ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &Ctx,
+  ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
 
@@ -1050,7 +1051,7 @@ class MetaTypeType : public TypeBase {
   
 public:
   /// get - Return the MetaTypeType for the specified type declaration.
-  static MetaTypeType *get(Type T, ASTContext &C);
+  static MetaTypeType *get(Type T, const ASTContext &C);
 
   Type getInstanceType() const { return InstanceType; }
 
@@ -1062,7 +1063,7 @@ public:
   }
   
 private:
-  MetaTypeType(Type T, ASTContext *Ctx, bool HasTypeVariable);
+  MetaTypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable);
   friend class TypeDecl;
 };
   
@@ -1086,7 +1087,7 @@ public:
   }
   
 private:
-  ModuleType(Module *M, ASTContext &Ctx)
+  ModuleType(Module *M, const ASTContext &Ctx)
     : TypeBase(TypeKind::Module, &Ctx, // Always canonical
                /*HasTypeVariable=*/false),
       TheModule(M) {
@@ -1125,7 +1126,7 @@ class AnyFunctionType : public TypeBase {
   const llvm::PointerIntPair<Type, 3, AbstractCC> InputAndCC;
   const llvm::PointerIntPair<Type, 1, bool> OutputAndIsThin;
 protected:
-  AnyFunctionType(TypeKind Kind, ASTContext *CanTypeContext,
+  AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, bool HasTypeVariable, 
                   bool isThin, AbstractCC cc)
     : TypeBase(Kind, CanTypeContext, HasTypeVariable),
@@ -1171,29 +1172,29 @@ class FunctionType : public AnyFunctionType {
   bool Block : 1;
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result, ASTContext &C) {
+  static FunctionType *get(Type Input, Type Result, const ASTContext &C) {
     return get(Input, Result, false, false, false, C);
   }
   static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
-                           ASTContext &C) {
+                           const ASTContext &C) {
     return get(Input, Result, isAutoClosure, false, false,
                AbstractCC::Freestanding, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock,
-                           ASTContext &C) {
+                           const ASTContext &C) {
     return get(Input, Result, isAutoClosure, isBlock, false,
                AbstractCC::Freestanding, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock, bool isThin,
-                           ASTContext &C) {
+                           const ASTContext &C) {
     return get(Input, Result, isAutoClosure, isBlock, isThin,
                AbstractCC::Freestanding, C);
   }
   static FunctionType *get(Type Input, Type Result,
                            bool isAutoClosure, bool isBlock, bool isThin,
-                           AbstractCC cc, ASTContext &C);
+                           AbstractCC cc, const ASTContext &C);
 
   /// True if this type allows an implicit conversion from a function argument
   /// expression of type T to a function of type () -> T.
@@ -1227,14 +1228,14 @@ public:
   /// 'Constructor' Factory Function
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
-                                      ASTContext &C) {
+                                      const ASTContext &C) {
     return get(input, output, params, false, AbstractCC::Freestanding, C);
   }
 
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
                                       bool isThin,
-                                      ASTContext &C) {
+                                      const ASTContext &C) {
     return get(input, output, params, isThin, AbstractCC::Freestanding, C);
   }
   
@@ -1242,7 +1243,7 @@ public:
                                       GenericParamList *params,
                                       bool isThin,
                                       AbstractCC cc,
-                                      ASTContext &C);
+                                      const ASTContext &C);
 
   GenericParamList &getGenericParams() const { return *Params; }
 
@@ -1258,7 +1259,7 @@ private:
   PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
                           bool isThin,
                           AbstractCC cc,
-                          ASTContext &C);
+                          const ASTContext &C);
 };  
   
 /// ArrayType - An array type has a base type and either an unspecified or a
@@ -1272,7 +1273,7 @@ class ArrayType : public TypeBase {
   
 public:
   /// 'Constructor' Factory Function.
-  static ArrayType *get(Type BaseType, uint64_t Size, ASTContext &C);
+  static ArrayType *get(Type BaseType, uint64_t Size, const ASTContext &C);
 
   Type getBaseType() const { return Base; }
   uint64_t getSize() const { return Size; }
@@ -1300,7 +1301,7 @@ class ArraySliceType : public TypeBase {
   Type Impl;
 
 public:
-  static ArraySliceType *get(Type baseTy, ASTContext &C);
+  static ArraySliceType *get(Type baseTy, const ASTContext &C);
 
   bool hasImplementationType() const { return !Impl.isNull(); }
   void setImplementationType(Type ty) {
@@ -1348,7 +1349,7 @@ public:
 
 private:
   friend class ProtocolDecl;
-  ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx);
+  ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
 };
 
 /// ProtocolCompositionType - A type that composes some number of protocols
@@ -1373,7 +1374,7 @@ class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
   /// given set of protocols.
-  static Type get(ASTContext &C, ArrayRef<Type> Protocols);
+  static Type get(const ASTContext &C, ArrayRef<Type> Protocols);
   
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
@@ -1394,10 +1395,10 @@ public:
   }
   
 private:
-  static ProtocolCompositionType *build(ASTContext &C,
+  static ProtocolCompositionType *build(const ASTContext &C,
                                         ArrayRef<Type> Protocols);
 
-  ProtocolCompositionType(ASTContext *Ctx, ArrayRef<Type> Protocols)
+  ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
     : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
                /*HasTypeVariable=*/false),
       Protocols(Protocols) { }
@@ -1542,13 +1543,13 @@ private:
   Type ObjectTy;
   Qual Quals; // TODO: put these bits in TypeBase
 
-  LValueType(Type objectTy, Qual quals, ASTContext *canonicalContext,
+  LValueType(Type objectTy, Qual quals, const ASTContext *canonicalContext,
              bool hasTypeVariable)
     : TypeBase(TypeKind::LValue, canonicalContext, hasTypeVariable),
       ObjectTy(objectTy), Quals(quals) {}
 
 public:
-  static LValueType *get(Type type, Qual quals, ASTContext &C);
+  static LValueType *get(Type type, Qual quals, const ASTContext &C);
 
   Type getObjectType() const { return ObjectTy; }
   Qual getQualifiers() const { return Quals; }
@@ -1579,7 +1580,7 @@ class SubstitutableType : public TypeBase {
   Type Superclass;
 
 protected:
-  SubstitutableType(TypeKind K, ASTContext *C, 
+  SubstitutableType(TypeKind K, const ASTContext *C, 
                     ArrayRef<ProtocolDecl *> ConformsTo,
                     Type Superclass)
     : TypeBase(K, C, /*HasTypeVariable=*/false),
@@ -1634,7 +1635,7 @@ public:
   /// getNew - Create a new archetype with the given name.
   ///
   /// The ConformsTo array will be copied into the ASTContext by this routine.
-  static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
+  static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                Identifier Name, ArrayRef<Type> ConformsTo,
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
@@ -1643,7 +1644,7 @@ public:
   ///
   /// The ConformsTo array will be minimized then copied into the ASTContext
   /// by this routine.
-  static ArchetypeType *getNew(ASTContext &Ctx, ArchetypeType *Parent,
+  static ArchetypeType *getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                           Identifier Name,
                           llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                           Type Superclass,
@@ -1691,7 +1692,7 @@ public:
   }
   
 private:
-  ArchetypeType(ASTContext &Ctx, ArchetypeType *Parent,
+  ArchetypeType(const ASTContext &Ctx, ArchetypeType *Parent,
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
@@ -1712,7 +1713,8 @@ class SubstitutedType : public TypeBase {
   Type Replacement;
   
 public:
-  static SubstitutedType *get(Type Original, Type Replacement, ASTContext &C);
+  static SubstitutedType *get(Type Original, Type Replacement,
+                              const ASTContext &C);
   
   /// \brief Retrieve the original type that is being replaced.
   Type getOriginal() const { return Original; }
@@ -1740,7 +1742,7 @@ public:
 /// This type currently does not appear in the AST, but it is
 /// extremely useful in SIL and IR-generation.
 class ReferenceStorageType : public TypeBase {
-  ReferenceStorageType(Type referent, Ownership ownership, ASTContext *C)
+  ReferenceStorageType(Type referent, Ownership ownership, const ASTContext *C)
     : TypeBase(TypeKind::ReferenceStorage, C, false),
       Referent(referent), Oship(ownership) {}
 
@@ -1748,7 +1750,7 @@ class ReferenceStorageType : public TypeBase {
   Ownership Oship;
 public:
   static ReferenceStorageType *get(Type referent, Ownership ownership,
-                                   ASTContext &C);
+                                   const ASTContext &C);
 
   Type getReferentType() const { return Referent; }
   Ownership getOwnership() const { return Oship; }
@@ -1763,7 +1765,7 @@ public:
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
-  TypeVariableType(ASTContext &C)
+  TypeVariableType(const ASTContext &C)
     : TypeBase(TypeKind::TypeVariable, &C, true) { }
 
   class Implementation;
@@ -1772,7 +1774,7 @@ public:
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
-  static TypeVariableType *getNew(ASTContext &C, Args &&...args);
+  static TypeVariableType *getNew(const ASTContext &C, Args &&...args);
 
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.

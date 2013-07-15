@@ -92,7 +92,7 @@ enum NameLookupOptions {
 /// module, as is an imported module.
 class Module : public DeclContext {
 protected:
-  void *LookupCachePimpl;
+  mutable void *LookupCachePimpl;
   Component *Comp;
 public:
   ASTContext &Ctx;
@@ -142,7 +142,7 @@ public:
   /// given consumer object.
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
-                          NLKind LookupKind);
+                          NLKind LookupKind) const;
 
   /// Look for the set of declarations with the given name within a type,
   /// its extensions and, optionally, its supertypes.

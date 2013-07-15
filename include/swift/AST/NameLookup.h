@@ -225,14 +225,14 @@ public:
 /// \param decls The set of declarations being considered.
 /// \param curModule The current module.
 void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         Module *curModule);
+                         const Module *curModule);
 
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer. If the current DeclContext is nested in a FuncExpr, the
 /// SourceLoc is used to determine which declarations in that FuncExpr's
 /// context are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        DeclContext *DC, SourceLoc Loc = SourceLoc(),
+                        const DeclContext *DC, SourceLoc Loc = SourceLoc(),
                         bool IsTypeLookup = false);
   
 /// Finds decls visible as members of the given type and feeds them to the given

@@ -151,7 +151,7 @@ Type AllocVarInst::getElementType() const {
 
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
 static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
-  ASTContext &Ctx = EltTy.getASTContext();
+  const ASTContext &Ctx = EltTy.getASTContext();
 
   SILType ResTys[] = {
     SILType::getObjectPointerType(Ctx),

@@ -217,7 +217,7 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   }
   
   // Create the new function type.
-  ASTContext &C = t->getASTContext();
+  const ASTContext &C = t->getASTContext();
   Type inputType = TupleType::get(inputs, C);
   if (isPolymorphic) {
     auto *curriedGenericParams = GenericParamList::create(C,

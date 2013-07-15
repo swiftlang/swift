@@ -27,8 +27,8 @@
 #include <iterator>
 using namespace swift;
 
-// Only allow allocation of Stmts using the allocator in ASTContext.
-void *TypeBase::operator new(size_t bytes, ASTContext &ctx,
+// Only allow allocation of Types using the allocator in ASTContext.
+void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
                              AllocationArena arena, unsigned alignment) {
   return ctx.Allocate(bytes, alignment, arena);
 }
@@ -740,7 +740,7 @@ CanType TypeBase::getCanonicalType() {
          "Cannot call getCanonicalType before name binding is complete");
 
   // If the type is itself canonical, return it.
-  if (CanonicalType.is<ASTContext*>())
+  if (isCanonical())
     return CanType(this);
   // If the canonical type was already computed, just return what we have.
   if (TypeBase *CT = CanonicalType.get<TypeBase*>())
@@ -789,7 +789,7 @@ CanType TypeBase::getCanonicalType() {
                                      field.isVararg()));
     }
 
-    ASTContext &C = CanElts[0].getType()->getASTContext();
+    const ASTContext &C = CanElts[0].getType()->getASTContext();
     Result = TupleType::get(CanElts, C)->castTo<TupleType>();
     break;
   }
@@ -842,7 +842,7 @@ CanType TypeBase::getCanonicalType() {
     for (Type t : cast<ProtocolCompositionType>(this)->getProtocols())
       CanProtos.push_back(t->getCanonicalType());
     assert(!CanProtos.empty() && "Non-canonical empty composition?");
-    ASTContext &C = CanProtos[0]->getASTContext();
+    const ASTContext &C = CanProtos[0]->getASTContext();
     Type Composition = ProtocolCompositionType::get(C, CanProtos);
     Result = Composition.getPointer();
     break;
@@ -1095,7 +1095,7 @@ bool TypeBase::isSpelledLike(Type other) {
 
 }
 
-TupleType::TupleType(ArrayRef<TupleTypeElt> fields, ASTContext *CanCtx,
+TupleType::TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
                      bool hasTypeVariable)
   : TypeBase(TypeKind::Tuple, CanCtx, hasTypeVariable), Fields(fields) { }
 
@@ -1169,7 +1169,8 @@ bool SubstitutableType::requiresClass() const {
   return false;
 }
 
-ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
+ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
+                                     ArchetypeType *Parent,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
                                      Type Superclass,
                                      Optional<unsigned> Index) {
@@ -1189,7 +1190,7 @@ ArchetypeType *ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
 }
 
 ArchetypeType *
-ArchetypeType::getNew(ASTContext &Ctx, ArchetypeType *Parent,
+ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       Identifier Name,
                       llvm::SmallVectorImpl<ProtocolDecl *> &ConformsTo,
                       Type Superclass, Optional<unsigned> Index) {
@@ -1267,20 +1268,20 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
 
 bool BoundGenericType::hasSubstitutions() {
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
-  ASTContext &ctx = canon->getASTContext();
+  const ASTContext &ctx = canon->getASTContext();
   return (bool)ctx.getSubstitutions(canon);
 }
 
 ArrayRef<Substitution>
 BoundGenericType::getSubstitutions() {
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
-  ASTContext &ctx = canon->getASTContext();
+  const ASTContext &ctx = canon->getASTContext();
   return *ctx.getSubstitutions(canon);
 }
 
 void BoundGenericType::setSubstitutions(ArrayRef<Substitution> Subs){
   auto *canon = getCanonicalType()->castTo<BoundGenericType>();
-  ASTContext &ctx = canon->getASTContext();
+  const ASTContext &ctx = canon->getASTContext();
   ctx.setSubstitutions(canon, Subs);
 }
 
@@ -1299,8 +1300,8 @@ bool ProtocolCompositionType::requiresClass() const {
   return false;
 }
 
-Type
-ProtocolCompositionType::get(ASTContext &C, ArrayRef<Type> ProtocolTypes) {
+Type ProtocolCompositionType::get(const ASTContext &C,
+                                  ArrayRef<Type> ProtocolTypes) {
   for (Type t : ProtocolTypes) {
     if (!t->isCanonical())
       return build(C, ProtocolTypes);

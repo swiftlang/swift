@@ -240,7 +240,7 @@ GenericParamList *GenericParamList::create(ASTContext &Context,
 }
 
 GenericParamList *
-GenericParamList::create(ASTContext &Context,
+GenericParamList::create(const ASTContext &Context,
                          SourceLoc LAngleLoc,
                          ArrayRef<GenericParam> Params,
                          SourceLoc WhereLoc,

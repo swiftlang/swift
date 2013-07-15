@@ -233,7 +233,7 @@ bool ASTContext::hadError() const {
 }
 
 Optional<ArrayRef<Substitution>>
-ASTContext::getSubstitutions(BoundGenericType* Bound) {
+ASTContext::getSubstitutions(BoundGenericType* Bound) const {
   assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
   auto Known = Impl.BoundGenericSubstitutions.find(Bound);
   if (Known == Impl.BoundGenericSubstitutions.end())
@@ -243,7 +243,7 @@ ASTContext::getSubstitutions(BoundGenericType* Bound) {
 }
 
 void ASTContext::setSubstitutions(BoundGenericType* Bound,
-                                  ArrayRef<Substitution> Subs) {
+                                  ArrayRef<Substitution> Subs) const {
   assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
   assert(Impl.BoundGenericSubstitutions.count(Bound) == 0 &&
          "Already have substitutions?");
@@ -320,9 +320,10 @@ ArrayRef<Decl *> ASTContext::getTypesThatConformTo(ProtocolDecl *protocol) {
 //===----------------------------------------------------------------------===//
 
 // Simple accessors.
-Type ErrorType::get(ASTContext &C) { return C.TheErrorType; }
+Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
-BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth, ASTContext &C) {
+BuiltinIntegerType *BuiltinIntegerType::get(unsigned BitWidth,
+                                            const ASTContext &C) {
   BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];
   if (Result == 0)
     Result = new (C, AllocationArena::Permanent) BuiltinIntegerType(BitWidth,C);
@@ -335,7 +336,8 @@ static AllocationArena getArena(bool hasTypeVariable) {
                         : AllocationArena::Permanent;;
 }
 
-BuiltinVectorType *BuiltinVectorType::get(ASTContext &context, Type elementType,
+BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
+                                          Type elementType,
                                           unsigned numElements) {
   llvm::FoldingSetNodeID id;
   BuiltinVectorType::Profile(id, elementType, numElements);
@@ -354,7 +356,7 @@ BuiltinVectorType *BuiltinVectorType::get(ASTContext &context, Type elementType,
 }
 
 
-ParenType *ParenType::get(ASTContext &C, Type underlying) {
+ParenType *ParenType::get(const ASTContext &C, Type underlying) {
   bool hasTypeVariable = underlying->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
   ParenType *&Result = C.Impl.getArena(arena).ParenTypes[underlying];
@@ -364,7 +366,7 @@ ParenType *ParenType::get(ASTContext &C, Type underlying) {
   return Result;
 }
 
-Type TupleType::getEmpty(ASTContext &C) { return C.TheEmptyTupleType; }
+Type TupleType::getEmpty(const ASTContext &C) { return C.TheEmptyTupleType; }
 
 void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
@@ -378,7 +380,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
-Type TupleType::get(ArrayRef<TupleTypeElt> Fields, ASTContext &C) {
+Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType());
 
@@ -442,7 +444,7 @@ void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
 
 UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
                                             Type Parent,
-                                            ASTContext &C) {
+                                            const ASTContext &C) {
   llvm::FoldingSetNodeID ID;
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = 0;
@@ -479,7 +481,7 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
                                    NominalTypeDecl *theDecl,
                                    Type parent,
                                    ArrayRef<Type> genericArgs,
-                                   ASTContext *context,
+                                   const ASTContext *context,
                                    bool hasTypeVariable)
   : TypeBase(theKind, context, hasTypeVariable),
     TheDecl(theDecl), Parent(parent), GenericArgs(genericArgs)
@@ -533,7 +535,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   return newType;
 }
 
-NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, ASTContext &C) {
+NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
   switch (D->getKind()) {
   case DeclKind::OneOf:
     return OneOfType::get(cast<OneOfDecl>(D), Parent, C);
@@ -549,11 +551,11 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, ASTContext &C) {
   }
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, ASTContext &C,
+OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, const ASTContext &C,
                      bool HasTypeVariable)
   : NominalType(TypeKind::OneOf, &C, TheDecl, Parent, HasTypeVariable) { }
 
-OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, ASTContext &C) {
+OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   OneOfType::Profile(id, D, Parent);
 
@@ -575,11 +577,11 @@ void OneOfType::Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent) {
   ID.AddPointer(Parent.getPointer());
 }
 
-StructType::StructType(StructDecl *TheDecl, Type Parent, ASTContext &C,
+StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
                        bool HasTypeVariable)
   : NominalType(TypeKind::Struct, &C, TheDecl, Parent, HasTypeVariable) { }
 
-StructType *StructType::get(StructDecl *D, Type Parent, ASTContext &C) {
+StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   StructType::Profile(id, D, Parent);
 
@@ -601,11 +603,11 @@ void StructType::Profile(llvm::FoldingSetNodeID &ID, StructDecl *D, Type Parent)
   ID.AddPointer(Parent.getPointer());
 }
 
-ClassType::ClassType(ClassDecl *TheDecl, Type Parent, ASTContext &C,
+ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
                      bool HasTypeVariable)
   : NominalType(TypeKind::Class, &C, TheDecl, Parent, HasTypeVariable) { }
 
-ClassType *ClassType::get(ClassDecl *D, Type Parent, ASTContext &C) {
+ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
   ClassType::Profile(id, D, Parent);
 
@@ -634,7 +636,7 @@ IdentifierType *IdentifierType::getNew(ASTContext &C,
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::build(ASTContext &C, ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = 0;
   llvm::FoldingSetNodeID ID;
@@ -659,7 +661,7 @@ ProtocolCompositionType::build(ASTContext &C, ArrayRef<Type> Protocols) {
 }
 
 ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
-                                                ASTContext &C) {
+                                                const ASTContext &C) {
   assert(ownership != Ownership::Strong &&
          "ReferenceStorageType is unnecessary for strong ownership");
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
@@ -673,7 +675,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
                                                      T->isCanonical() ? &C : 0);
 }
 
-MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
+MetaTypeType *MetaTypeType::get(Type T, const ASTContext &C) {
   bool hasTypeVariable = T->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
@@ -684,7 +686,7 @@ MetaTypeType *MetaTypeType::get(Type T, ASTContext &C) {
                                              hasTypeVariable);
 }
 
-MetaTypeType::MetaTypeType(Type T, ASTContext *C, bool HasTypeVariable)
+MetaTypeType::MetaTypeType(Type T, const ASTContext *C, bool HasTypeVariable)
   : TypeBase(TypeKind::MetaType, C, HasTypeVariable),
     InstanceType(T) {
 }
@@ -709,7 +711,7 @@ static char getFuncAttrKey(bool isAutoClosure, bool isBlock, bool isThin,
 FunctionType *FunctionType::get(Type Input, Type Result,
                                 bool isAutoClosure, bool isBlock, bool isThin,
                                 AbstractCC cc,
-                                ASTContext &C) {
+                                const ASTContext &C) {
   bool hasTypeVariable = Input->hasTypeVariable() || Result->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
   char attrKey = getFuncAttrKey(isAutoClosure, isBlock, isThin, cc);
@@ -749,7 +751,7 @@ PolymorphicFunctionType *PolymorphicFunctionType::get(Type input, Type output,
                                                       GenericParamList *params,
                                                       bool isThin,
                                                       AbstractCC cc,
-                                                      ASTContext &C) {
+                                                      const ASTContext &C) {
   // FIXME: one day we should do canonicalization properly.
   bool hasTypeVariable = input->hasTypeVariable() || output->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
@@ -762,7 +764,7 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
                                                  GenericParamList *params,
                                                  bool isThin,
                                                  AbstractCC cc,
-                                                 ASTContext &C)
+                                                 const ASTContext &C)
   : AnyFunctionType(TypeKind::PolymorphicFunction,
                     (input->isCanonical() && output->isCanonical()) ?&C : 0,
                     input, output,
@@ -775,7 +777,7 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
 
 /// Return a uniqued array type with the specified base type and the
 /// specified size.
-ArrayType *ArrayType::get(Type BaseType, uint64_t Size, ASTContext &C) {
+ArrayType *ArrayType::get(Type BaseType, uint64_t Size, const ASTContext &C) {
   assert(Size != 0);
 
   bool hasTypeVariable = BaseType->hasTypeVariable();
@@ -796,7 +798,7 @@ ArrayType::ArrayType(Type base, uint64_t size, bool hasTypeVariable)
 
 
 /// Return a uniqued array slice type with the specified base type.
-ArraySliceType *ArraySliceType::get(Type base, ASTContext &C) {
+ArraySliceType *ArraySliceType::get(Type base, const ASTContext &C) {
   bool hasTypeVariable = base->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
@@ -806,11 +808,11 @@ ArraySliceType *ArraySliceType::get(Type base, ASTContext &C) {
   return entry = new (C, arena) ArraySliceType(base, hasTypeVariable);
 }
 
-ProtocolType::ProtocolType(ProtocolDecl *TheDecl, ASTContext &Ctx)
+ProtocolType::ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx)
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, /*Parent=*/Type(),
                 /*HasTypeVariable=*/false) { }
 
-LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
+LValueType *LValueType::get(Type objectTy, Qual quals, const ASTContext &C) {
   bool hasTypeVariable = objectTy->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
@@ -819,14 +821,14 @@ LValueType *LValueType::get(Type objectTy, Qual quals, ASTContext &C) {
   if (entry)
     return entry;
 
-  ASTContext *canonicalContext = (objectTy->isCanonical() ? &C : nullptr);
+  const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
   return entry = new (C, arena) LValueType(objectTy, quals, canonicalContext,
                                            hasTypeVariable);
 }
 
 /// Return a uniqued substituted type.
 SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
-                                      ASTContext &C) {
+                                      const ASTContext &C) {
   bool hasTypeVariable = Replacement->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 

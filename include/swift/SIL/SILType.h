@@ -171,7 +171,7 @@ public:
   }
   
   /// Returns the ASTContext for the referenced Swift type.
-  ASTContext &getASTContext() const {
+  const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();
   }
   
@@ -180,18 +180,18 @@ public:
   //
   
   /// Get the ObjectPointer type as a SILType.
-  static SILType getObjectPointerType(ASTContext &C);
+  static SILType getObjectPointerType(const ASTContext &C);
   /// Get the ObjCPointer type as a SILType.
-  static SILType getObjCPointerType(ASTContext &C);
+  static SILType getObjCPointerType(const ASTContext &C);
   /// Get the RawPointer type as a SILType.
-  static SILType getRawPointerType(ASTContext &C);
+  static SILType getRawPointerType(const ASTContext &C);
   /// Get the OpaquePointer type as a SILType.
-  static SILType getOpaquePointerType(ASTContext &C);
+  static SILType getOpaquePointerType(const ASTContext &C);
   /// Get a builtin integer type as a SILType.
-  static SILType getBuiltinIntegerType(unsigned bitWidth, ASTContext &C);
+  static SILType getBuiltinIntegerType(unsigned bitWidth, const ASTContext &C);
   /// Get a builtin floating-point type as a SILType.
   static SILType getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
-                                     ASTContext &C);
+                                     const ASTContext &C);
   
   //
   // Utilities for treating SILType as a pointer-like type.

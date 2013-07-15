@@ -219,7 +219,7 @@ public:
 
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
-                 AllocationArena arena = AllocationArena::Permanent) {
+                 AllocationArena arena = AllocationArena::Permanent) const {
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
     
@@ -229,7 +229,7 @@ public:
 
   template <typename T>
   T *Allocate(unsigned numElts,
-              AllocationArena arena = AllocationArena::Permanent) {
+              AllocationArena arena = AllocationArena::Permanent) const {
     T *res = (T*)Allocate(sizeof(T)*numElts, __alignof__(T), arena);
     for (unsigned i = 0; i != numElts; ++i)
       new (res+i) T();
@@ -239,7 +239,7 @@ public:
   /// Allocate a copy of the specified object.
   template <typename T>
   typename std::remove_reference<T>::type *AllocateObjectCopy(T &&t,
-              AllocationArena arena = AllocationArena::Permanent) {
+              AllocationArena arena = AllocationArena::Permanent) const {
     // This function can not be named AllocateCopy because it would always win
     // overload resolution over the AllocateCopy(ArrayRef<T>).
     using TNoRef = typename std::remove_reference<T>::type;
@@ -250,7 +250,7 @@ public:
 
   template <typename T, typename It>
   T *AllocateCopy(It start, It end,
-                  AllocationArena arena = AllocationArena::Permanent) {
+                  AllocationArena arena = AllocationArena::Permanent) const {
     T *res = (T*)Allocate(sizeof(T)*(end-start), __alignof__(T), arena);
     for (unsigned i = 0; start != end; ++start, ++i)
       new (res+i) T(*start);
@@ -258,28 +258,31 @@ public:
   }
 
   template<typename T>
-  MutableArrayRef<T> AllocateCopy(ArrayRef<T> array,
-                           AllocationArena arena = AllocationArena::Permanent) {
+  MutableArrayRef<T> AllocateCopy(
+      ArrayRef<T> array,
+      AllocationArena arena = AllocationArena::Permanent) const {
     return MutableArrayRef<T>(AllocateCopy<T>(array.begin(),array.end(), arena),
                               array.size());
   }
 
 
   template<typename T>
-  ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
-                           AllocationArena arena = AllocationArena::Permanent) {
+  ArrayRef<T> AllocateCopy(
+      const SmallVectorImpl<T> &vec,
+      AllocationArena arena = AllocationArena::Permanent) const {
     return AllocateCopy(ArrayRef<T>(vec), arena);
   }
 
   template<typename T>
   MutableArrayRef<T>
   AllocateCopy(SmallVectorImpl<T> &vec,
-               AllocationArena arena = AllocationArena::Permanent) {
+               AllocationArena arena = AllocationArena::Permanent) const {
     return AllocateCopy(MutableArrayRef<T>(vec), arena);
   }
 
-  StringRef AllocateCopy(StringRef Str,
-                         AllocationArena arena = AllocationArena::Permanent) {
+  StringRef AllocateCopy(
+      StringRef Str,
+      AllocationArena arena = AllocationArena::Permanent) const {
     ArrayRef<char> Result =
         AllocateCopy(llvm::makeArrayRef(Str.data(), Str.size()), arena);
     return StringRef(Result.data(), Result.size());
@@ -403,10 +406,12 @@ private:
   friend class BoundGenericType;
 
   /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<ArrayRef<Substitution>> getSubstitutions(BoundGenericType* Bound);
+  Optional<ArrayRef<Substitution>>
+  getSubstitutions(BoundGenericType *Bound) const;
 
   /// \brief Set the substitutions for the given bound generic type.
-  void setSubstitutions(BoundGenericType* Bound, ArrayRef<Substitution> Subs);
+  void setSubstitutions(BoundGenericType *Bound,
+                        ArrayRef<Substitution> Subs) const;
 };
   
 } // end namespace swift

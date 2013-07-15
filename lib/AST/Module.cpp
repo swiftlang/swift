@@ -94,7 +94,7 @@ namespace {
   public:
     typedef Module::AccessPathTy AccessPathTy;
     
-    TUModuleCache(TranslationUnit &TU);
+    TUModuleCache(const TranslationUnit &TU);
     
     void lookupValue(AccessPathTy AccessPath, Identifier Name, 
                      NLKind LookupKind, TranslationUnit &TU, 
@@ -103,11 +103,11 @@ namespace {
     void lookupVisibleDecls(AccessPathTy AccessPath,
                             VisibleDeclConsumer &Consumer,
                             NLKind LookupKind,
-                            TranslationUnit &TU);
+                            const TranslationUnit &TU);
   };
 } // end anonymous namespace.
 
-static TUModuleCache &getTUCachePimpl(void *&Ptr, TranslationUnit &TU) {
+static TUModuleCache &getTUCachePimpl(void *&Ptr, const TranslationUnit &TU) {
   // FIXME: This leaks.  Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
   if (Ptr == 0)
@@ -133,7 +133,7 @@ void TUModuleCache::doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators) {
 }
 
 /// Populate our cache on the first name lookup.
-TUModuleCache::TUModuleCache(TranslationUnit &TU) {
+TUModuleCache::TUModuleCache(const TranslationUnit &TU) {
   doPopulateCache(TU.Decls, false);
 }
 
@@ -161,7 +161,7 @@ void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
 void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
                                        VisibleDeclConsumer &Consumer,
                                        NLKind LookupKind,
-                                       TranslationUnit &TU) {
+                                       const TranslationUnit &TU) {
   // TODO: ImportDecls cannot specified namespaces or individual entities
   // yet, so everything is just a lookup at the top-level.
   assert(AccessPath.size() <= 1 && "Don't handle this yet");
@@ -205,8 +205,8 @@ void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
 /// given consumer object.
 void Module::lookupVisibleDecls(AccessPathTy AccessPath,
                                 VisibleDeclConsumer &Consumer,
-                                NLKind LookupKind) {
-  if (BuiltinModule *BM = dyn_cast<BuiltinModule>(this)) {
+                                NLKind LookupKind) const {
+  if (auto BM = dyn_cast<BuiltinModule>(this)) {
     // TODO Look through the Builtin module.
     (void)BM;
     return;

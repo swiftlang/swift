@@ -477,7 +477,7 @@ public:
   /// \param Requirements The list of requirements, which will be copied into
   /// ASTContext-allocated memory.
   /// \param RAngleLoc The location of the closing angle bracket ('>')
-  static GenericParamList *create(ASTContext &Context,
+  static GenericParamList *create(const ASTContext &Context,
                                   SourceLoc LAngleLoc,
                                   ArrayRef<GenericParam> Params,
                                   SourceLoc WhereLoc,

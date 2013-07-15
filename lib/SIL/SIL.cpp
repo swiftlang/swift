@@ -207,33 +207,34 @@ SILConstant SILConstant::getDefaultArgGenerator(Loc loc,
   return result;
 }
 
-SILType SILType::getObjectPointerType(ASTContext &C) {
+SILType SILType::getObjectPointerType(const ASTContext &C) {
   return SILType(CanType(C.TheObjectPointerType),
                  /*isAddress=*/ false);
 }
 
-SILType SILType::getObjCPointerType(ASTContext &C) {
+SILType SILType::getObjCPointerType(const ASTContext &C) {
   return SILType(CanType(C.TheObjCPointerType),
                  /*isAddress=*/ false);
 }
 
-SILType SILType::getRawPointerType(ASTContext &C) {
+SILType SILType::getRawPointerType(const ASTContext &C) {
   return SILType(CanType(C.TheRawPointerType),
                  /*isAddress=*/false);
 }
 
-SILType SILType::getOpaquePointerType(ASTContext &C) {
+SILType SILType::getOpaquePointerType(const ASTContext &C) {
   return SILType(CanType(C.TheOpaquePointerType),
                  /*isAddress=*/false);
 }
 
-SILType SILType::getBuiltinIntegerType(unsigned bitWidth, ASTContext &C) {
+SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
+                                       const ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
                  /*isAddress=*/false);
 }
 
 SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
-                                     ASTContext &C) {
+                                     const ASTContext &C) {
   Type ty;
   switch (Kind) {
   case BuiltinFloatType::IEEE16:

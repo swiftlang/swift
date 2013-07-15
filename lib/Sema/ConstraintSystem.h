@@ -2210,7 +2210,8 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 } // end namespace constraints
 
 template<typename ...Args>
-TypeVariableType *TypeVariableType::getNew(ASTContext &C, Args &&...args) {
+TypeVariableType *TypeVariableType::getNew(const ASTContext &C,
+                                           Args &&...args) {
   // Allocate memory
   void *mem = C.Allocate(sizeof(TypeVariableType) + sizeof(Implementation),
                          alignof(TypeVariableType),

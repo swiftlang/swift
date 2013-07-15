@@ -29,8 +29,8 @@ VisibleDeclConsumer::~VisibleDeclConsumer() {
 static void DoGlobalExtensionLookup(Type BaseType,
                                     VisibleDeclConsumer &Consumer,
                                     ArrayRef<ValueDecl*> BaseMembers,
-                                    Module *CurModule,
-                                    Module *BaseModule,
+                                    const Module *CurModule,
+                                    const Module *BaseModule,
                                     bool IsTypeLookup) {
   SmallVector<ValueDecl *, 4> found;
   
@@ -68,19 +68,19 @@ namespace {
 
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
-                           Module &M,
+                           const Module &M,
                            bool IsTypeLookup,
                            bool OnlyInstanceMembers,
                            VisitedSet &Visited);
 static void lookupTypeMembers(Type BaseType,
                               VisibleDeclConsumer &Consumer,
-                              Module &M,
+                              const Module &M,
                               bool IsTypeLookup);
 
 
 static void lookupVisibleMemberDecls(Type BaseTy,
                                      VisibleDeclConsumer &Consumer,
-                                     Module &M,
+                                     const Module &M,
                                      bool IsTypeLookup) {
   VisitedSet Visited;
   doMemberLookup(BaseTy, Consumer, M,
@@ -98,7 +98,7 @@ static void lookupVisibleMemberDecls(Type BaseTy,
 /// name lookup.
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
-                           Module &M,
+                           const Module &M,
                            bool IsTypeLookup,
                            bool OnlyInstanceMembers,
                            VisitedSet &Visited) {
@@ -207,7 +207,7 @@ static void doMemberLookup(Type BaseTy,
 }
 
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
-                              Module &M, bool IsTypeLookup) {
+                              const Module &M, bool IsTypeLookup) {
   NominalTypeDecl *D;
   ArrayRef<ValueDecl*> BaseMembers;
   SmallVector<ValueDecl*, 2> BaseMembersStorage;
@@ -296,7 +296,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       checkValueDecl(P.getDecl());
   }
 
-  void checkTranslationUnit(TranslationUnit *TU) {
+  void checkTranslationUnit(const TranslationUnit *TU) {
     for (Decl *D : TU->Decls)
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
         visit(TLCD->getBody());
@@ -368,23 +368,23 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 } // end anonymous namespace
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                               DeclContext *DC,
+                               const DeclContext *DC,
                                SourceLoc Loc,
                                bool IsTypeLookup) {
-  DeclContext *ModuleDC = DC;
+  const DeclContext *ModuleDC = DC;
   while (!ModuleDC->isModuleContext())
     ModuleDC = ModuleDC->getParent();
 
-  Module &M = *cast<Module>(ModuleDC);
+  const Module &M = *cast<Module>(ModuleDC);
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleContext()) {
-    ValueDecl *BaseDecl = 0;
-    ValueDecl *MetaBaseDecl = 0;
+    const ValueDecl *BaseDecl = 0;
+    const ValueDecl *MetaBaseDecl = 0;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
-    if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
+    if (auto FE = dyn_cast<FuncExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
@@ -408,22 +408,22 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look in the generic parameters after checking our local declaration.
       if (FD)
         GenericParams = FD->getGenericParams();
-    } else if (PipeClosureExpr *CE = dyn_cast<PipeClosureExpr>(DC)) {
+    } else if (auto CE = dyn_cast<PipeClosureExpr>(DC)) {
       if (Loc.isValid()) {
         FindLocalVal(Loc, Consumer).visit(CE->getBody());
       }
-    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
+    } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
       if (NominalType *NT = ExtendedType->getAs<NominalType>())
         BaseDecl = NT->getDecl();
       else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
         BaseDecl = UGT->getDecl();
       MetaBaseDecl = BaseDecl;
-    } else if (NominalTypeDecl *ND = dyn_cast<NominalTypeDecl>(DC)) {
+    } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();
       BaseDecl = ND;
       MetaBaseDecl = BaseDecl;
-    } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(DC)) {
+    } else if (auto CD = dyn_cast<ConstructorDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
@@ -437,7 +437,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
         MetaBaseDecl = UGT->getDecl();
       DC = DC->getParent();
-    } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(DC)) {
+    } else if (auto DD = dyn_cast<DestructorDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       if (Loc.isValid()) {
@@ -466,7 +466,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   }
 
   if (Loc.isValid()) {
-    if (TranslationUnit *TU = dyn_cast<TranslationUnit>(&M)) {
+    if (auto TU = dyn_cast<TranslationUnit>(&M)) {
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
@@ -487,7 +487,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // The builtin module has no imports.
   if (isa<BuiltinModule>(M)) return;
   
-  TranslationUnit &TU = cast<TranslationUnit>(M);
+  const TranslationUnit &TU = cast<TranslationUnit>(M);
 
   // Scrape through all of the imports looking for additional results.
   // FIXME: Implement DAG-based shadowing rules.
