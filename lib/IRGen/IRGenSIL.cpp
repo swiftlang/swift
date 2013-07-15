@@ -1710,8 +1710,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   case AllocKind::Stack:
     isOnHeap = NotOnHeap;
     break;
-  case AllocKind::Pseudo:
-    llvm_unreachable("pseudo allocation not implemented");
   }
 
   // Derive name from SIL location.
@@ -1747,8 +1745,6 @@ void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
   case AllocKind::Stack:
     // Nothing to do. We could emit a lifetime.end here maybe.
     break;
-  case AllocKind::Pseudo:
-    llvm_unreachable("pseudo allocation not implemented");
   }
 }
 

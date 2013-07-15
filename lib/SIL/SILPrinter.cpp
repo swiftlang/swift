@@ -315,7 +315,6 @@ public:
   static const char *getAllocKind(AllocKind kind) {
     switch (kind) {
     case AllocKind::Heap:   return "heap";
-    case AllocKind::Pseudo: return "pseudo";
     case AllocKind::Stack:  return "stack";
     }
   }
@@ -843,7 +842,7 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  OS << "import Builtin\nimport swift\n";
+  OS << "import Builtin\nimport swift\n\n";
 
   for (SILFunction const &f : *this)
     f.print(OS);

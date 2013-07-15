@@ -168,7 +168,7 @@ public:
 };
   
 enum class AllocKind : uint8_t {
-  Heap, Stack, Pseudo
+  Heap, Stack
 };
 
 /// AllocInst - This is the abstract base class common among all the memory
@@ -226,7 +226,7 @@ public:
   }
 };
 
-/// This represents the allocation of a heap box for a Swift value of some type.  This
+/// This represents the allocation of a heap box for a Swift value of some type.
 /// The instruction returns two values.  The first return value is the object
 /// pointer with Builtin.ObjectPointer type.  The second return value
 /// is an address pointing to the contained element. The contained

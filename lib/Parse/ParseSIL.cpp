@@ -731,7 +731,6 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc) {
 /// parseAllocKind - Parse an allocation specifier.
 ///    sil-alloc-kind:
 ///      'heap'
-///      'pseudo'
 ///      'stack'
 bool SILParser::parseAllocKind(AllocKind &Result) {
   Identifier Id;
@@ -740,8 +739,6 @@ bool SILParser::parseAllocKind(AllocKind &Result) {
     return true;
   if (Id.str() == "heap")
     Result = AllocKind::Heap;
-  else if (Id.str() == "pseudo")
-    Result = AllocKind::Pseudo;
   else if (Id.str() == "stack")
     Result = AllocKind::Stack;
   else {
