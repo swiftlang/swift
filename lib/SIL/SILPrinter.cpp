@@ -390,12 +390,13 @@ public:
        << getIDAndType(SI->getDest());
   }
   void visitCopyAddrInst(CopyAddrInst *CI) {
-    OS << "copy_addr " << getID(CI->getSrc());
+    OS << "copy_addr ";
     if (CI->isTakeOfSrc())
-      OS << " [take]";
-    OS << " to " << getID(CI->getDest());
+      OS << "[take] ";
+    OS << getID(CI->getSrc()) << " to ";
     if (CI->isInitializationOfDest())
-      OS << " [initialization]";
+      OS << "[initialization] ";
+    OS << getIDAndType(CI->getDest());
   }
   void visitInitializeVarInst(InitializeVarInst *ZI) {
     OS << "initialize_var ";
@@ -615,8 +616,8 @@ public:
     OS << "upcast_existential ";
     if (UEI->isTakeOfSrc())
       OS << "[take] ";
-    OS << getID(UEI->getSrcExistential())
-       << " to " << getID(UEI->getDestExistential());
+    OS << getIDAndType(UEI->getSrcExistential())
+       << " to " << getIDAndType(UEI->getDestExistential());
   }
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getID(DEI->getOperand());

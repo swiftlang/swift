@@ -232,3 +232,29 @@ bb0(%0 : $*T):
   %12 = destroy_addr %0 : $*T
   %13 = return %11 : $()
 }
+
+protocol Bendable { }
+
+// CHECK: $[thin] (x : protocol<Bendable, Runcible>) -> Runcible
+sil @_T4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $[thin] (x : protocol<Bendable, Runcible>) -> Runcible {
+bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
+  // CHECK: alloc_box
+  %2 = alloc_box $protocol<Bendable, Runcible>
+  // CHECK: copy_addr [take] {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
+  %3 = copy_addr [take] %1 to [initialization] %2#1 : $*protocol<Bendable, Runcible>
+  // CHECK: alloc_var
+  %4 = alloc_var $protocol<Bendable, Runcible>
+  // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
+  %5 = copy_addr %2#1 to [initialization] %4 : $*protocol<Bendable, Runcible>
+  // CHECK: upcast_existential [take] {{.*}} : $*protocol<Bendable, Runcible> to {{.*}} : $*Runcible
+  %6 = upcast_existential [take] %4 : $*protocol<Bendable, Runcible> to %0 : $*Runcible
+  %7 = tuple ()
+  // CHECK: destroy_addr
+  %8 = destroy_addr %4 : $*protocol<Bendable, Runcible>
+  // CHECK: dealloc_var
+  %9 = dealloc_var %4 : $*protocol<Bendable, Runcible>
+  // CHECK: release
+  %10 = release %2#0 : $Builtin.ObjectPointer
+  // CHECK: return
+  %11 = return %7 : $()
+}

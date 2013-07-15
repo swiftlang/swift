@@ -750,6 +750,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("condbranch", ValueKind::CondBranchInst)
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
+    .Case("copy_addr", ValueKind::CopyAddrInst)
     .Case("dealloc_var", ValueKind::DeallocVarInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
@@ -779,6 +780,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("upcast", ValueKind::UpcastInst)
+    .Case("upcast_existential", ValueKind::UpcastExistentialInst)
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
     .Default(ValueKind::SILArgument);
 
@@ -1213,6 +1215,54 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     ResultVal = B.createArchetypeMethod(SILLocation(), LookupTy, Member,
                                         MethodTy, IsVolatile);
+    break;
+  }
+  case ValueKind::CopyAddrInst: {
+    bool IsTake = false, IsInit = false;
+    UnresolvedValueName SrcLName;
+    SILValue DestLVal;
+    SourceLoc ToLoc, DestLoc;
+    Identifier ToToken;
+    if (parseSILOptional(IsTake, P, "take") || parseValueName(SrcLName) ||
+        P.parseIdentifier(ToToken, ToLoc,
+                          diag::expected_tok_in_sil_instr, "to") ||
+        parseSILOptional(IsInit, P, "initialization") ||
+        parseTypedValueRef(DestLVal, DestLoc))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    if (!DestLVal.getType().isAddress()) {
+      P.diagnose(DestLoc, diag::sil_invalid_instr_operands);
+      return true;
+    }
+
+    SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType());
+    ResultVal = B.createCopyAddr(SILLocation(), SrcLVal, DestLVal, IsTake,
+                                IsInit);
+    break;
+  }
+  case ValueKind::UpcastExistentialInst: {
+    SILValue DestVal;
+    SourceLoc SrcLoc, DestLoc, ToLoc;
+    Identifier ToToken;
+    bool IsTake = false;
+    if (parseSILOptional(IsTake, P, "take") ||
+        parseTypedValueRef(Val, SrcLoc) ||
+        P.parseIdentifier(ToToken, ToLoc,
+                          diag::expected_tok_in_sil_instr, "to") ||
+        parseTypedValueRef(DestVal, DestLoc))
+      return true;
+
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+    ResultVal = B.createUpcastExistential(SILLocation(), Val, DestVal,
+                                          IsTake);
     break;
   }
   }
