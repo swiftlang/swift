@@ -294,7 +294,11 @@ public:
                                      ->getSubPattern());
     case PatternKind::Var:
       return setBoundVarsTypeError(cast<VarPattern>(pattern)->getSubPattern());
-
+    case PatternKind::OneOfElement:
+      if (auto subpattern = cast<OneOfElementPattern>(pattern)->getSubPattern())
+        setBoundVarsTypeError(subpattern);
+      return;
+        
     // Handle vars.
     case PatternKind::Named: {
       VarDecl *var = cast<NamedPattern>(pattern)->getDecl();
