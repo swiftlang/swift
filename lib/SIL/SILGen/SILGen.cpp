@@ -312,6 +312,9 @@ void SILGenModule::postEmitFunction(SILConstant constant,
 }
 
 void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
+  // Emit any default argument getter functions.
+  emitDefaultArgGenerators(decl, fe);
+
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return;
   
@@ -411,6 +414,34 @@ void SILGenModule::emitDestructor(ClassDecl *cd,
   SILFunction *f = preEmitFunction(destroyer, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
+}
+
+void SILGenModule::emitDefaultArgGenerator(SILConstant constant, Expr *arg) {
+  SILFunction *f = preEmitFunction(constant, arg);
+  SILGenFunction(*this, *f, /*hasVoidReturn=*/arg->getType()->isVoid())
+    .emitGeneratorFunction(constant, arg);
+  postEmitFunction(constant, f);
+}
+  
+void SILGenModule::emitDefaultArgGenerators(SILConstant::Loc decl,
+                                            FuncExpr *fe) {
+  unsigned index = 0;
+  for (auto pattern : fe->getArgParamPatterns()) {
+    pattern = pattern->getSemanticsProvidingPattern();
+    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
+    if (!tuplePattern) {
+      ++index;
+      continue;
+    }
+
+    for (auto &elt : tuplePattern->getFields()) {
+      if (auto handle = elt.getInit()) {
+        emitDefaultArgGenerator(SILConstant::getDefaultArgGenerator(decl,index),
+                                handle->getExpr());
+      }
+      ++index;
+    }
+  }
 }
 
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {

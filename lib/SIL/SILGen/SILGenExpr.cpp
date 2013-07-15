@@ -1804,6 +1804,11 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   B.createReturn(fe, toClosure);
 }
 
+void SILGenFunction::emitGeneratorFunction(SILConstant function, Expr *value) {
+  emitProlog({ }, value->getType());
+  emitReturnExpr(value, value);
+}
+
 RValue SILGenFunction::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {

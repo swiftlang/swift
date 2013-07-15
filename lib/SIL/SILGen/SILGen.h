@@ -129,7 +129,13 @@ public:
   /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
   void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
+
+  /// Emits the default argument generator with the given expression.
+  void emitDefaultArgGenerator(SILConstant constant, Expr *arg);
   
+  /// Emits the default argument generator for the given function.
+  void emitDefaultArgGenerators(SILConstant::Loc decl, FuncExpr *fe);
+
   /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
   /// function.
   void emitCurryThunk(SILConstant entryPoint,
@@ -397,6 +403,8 @@ public:
   /// of a function to another.
   void emitCurryThunk(FuncExpr *fe, SILConstant fromLevel, SILConstant toLevel);
 
+  // Generate a nullary function that returns the given value.
+  void emitGeneratorFunction(SILConstant function, Expr *value);
 
   /// Generate an ObjC-compatible thunk for a method.
   void emitObjCMethodThunk(SILConstant thunk);

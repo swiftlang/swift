@@ -70,6 +70,7 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
   case SILConstant::Kind::OneOfElement:
   case SILConstant::Kind::Destroyer:
   case SILConstant::Kind::GlobalAccessor:
+  case SILConstant::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
   }
 }

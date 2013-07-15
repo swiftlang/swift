@@ -151,6 +151,9 @@ void SILConstant::print(raw_ostream &OS) const {
   case SILConstant::Kind::GlobalAccessor:
     OS << "globalaccessor";
     break;
+  case SILConstant::Kind::DefaultArgGenerator:
+    OS << "defaultarg" << "." << defaultArgIndex;
+    break;
   }
   if (uncurryLevel != 0) {
     if (kind != SILConstant::Kind::Func)

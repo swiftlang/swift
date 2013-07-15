@@ -537,6 +537,52 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
                            C);
 }
 
+/// Get the type of a default argument generator, () -> T.
+static Type getDefaultArgGeneratorType(ValueDecl *vd, unsigned defaultArgIndex,
+                                       ASTContext &context) {
+  // Find the patterns.
+  ArrayRef<Pattern *> patterns;
+  Pattern *singlePattern = nullptr;
+  if (auto fd = dyn_cast<FuncDecl>(vd)) {
+    patterns = fd->getBody()->getArgParamPatterns();
+  } else {
+    singlePattern = cast<ConstructorDecl>(vd)->getArguments();
+    patterns = singlePattern;
+  }
+
+  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
+  // representation.
+  Type resultTy;
+  for (auto origPattern : patterns) {
+    auto pattern = origPattern->getSemanticsProvidingPattern();
+    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
+    if (!tuplePattern) {
+      if (defaultArgIndex == 0) {
+        resultTy = origPattern->getType();
+        break;
+      }
+
+      --defaultArgIndex;
+      continue;
+    }
+
+
+    for (auto &elt : tuplePattern->getFields()) {
+      if (elt.getInit() && defaultArgIndex == 0) {
+        resultTy = elt.getPattern()->getType();
+        break;
+      }
+      --defaultArgIndex;
+    }
+
+    if (resultTy)
+      break;
+  }
+
+  assert(resultTy && "Didn't find default argument?");
+  return FunctionType::get(TupleType::getEmpty(context), resultTy, context);
+}
+
 /// Get the type of a destructor function, This -> ().
 static Type getDestroyingDestructorType(ClassDecl *cd, ASTContext &C) {
   Type classType = cd->getDeclaredTypeInContext();
@@ -690,6 +736,9 @@ Type TypeConverter::makeConstantType(SILConstant c) {
     VarDecl *var = cast<VarDecl>(vd);
     assert(!var->isProperty() && "constant ref to non-physical global var");
     return getGlobalAccessorType(var->getType(), Context);
+  }
+  case SILConstant::Kind::DefaultArgGenerator: {
+    return getDefaultArgGeneratorType(vd, c.defaultArgIndex, Context);
   }
   }
 }

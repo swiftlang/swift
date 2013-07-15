@@ -49,7 +49,7 @@ static unsigned getNaturalUncurryLevel(FuncDecl *fd) {
 SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
                          unsigned atUncurryLevel,
                          bool isObjC)
-  : loc(vd), kind(kind), isObjC(isObjC)
+  : loc(vd), kind(kind), isObjC(isObjC), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
 
@@ -126,7 +126,9 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
 
 SILConstant::SILConstant(SILConstant::Loc baseLoc,
                          unsigned atUncurryLevel,
-                         bool asObjC) {
+                         bool asObjC) 
+ : defaultArgIndex(0)
+{
   unsigned naturalUncurryLevel;
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
@@ -194,6 +196,15 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
     : atUncurryLevel;
     
   isObjC = asObjC;
+}
+
+SILConstant SILConstant::getDefaultArgGenerator(Loc loc,
+                                                unsigned defaultArgIndex) {
+  SILConstant result;
+  result.loc = loc;
+  result.kind = Kind::DefaultArgGenerator;
+  result.defaultArgIndex = defaultArgIndex;
+  return result;
 }
 
 SILType SILType::getObjectPointerType(ASTContext &C) {

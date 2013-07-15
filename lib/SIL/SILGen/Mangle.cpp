@@ -34,6 +34,7 @@ static char mangleConstructorKind(SILConstant::Kind kind) {
   case SILConstant::Kind::OneOfElement:
   case SILConstant::Kind::Destroyer:
   case SILConstant::Kind::GlobalAccessor:
+  case SILConstant::Kind::DefaultArgGenerator:
     llvm_unreachable("not a constructor kind");
   }
 }
@@ -133,6 +134,18 @@ void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
     mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
     buffer << 'a';
     return;
+
+  //   entity ::= declaration 'e' index           // default arg generator
+  case SILConstant::Kind::DefaultArgGenerator:
+    buffer << introducer;
+    if (f->getLinkage() == SILLinkage::Internal) buffer << 'L';
+    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, 0);
+    buffer << 'e';
+    if (c.defaultArgIndex > 0)
+      buffer << (c.defaultArgIndex - 1);
+    buffer << '_';
+    return;
   }
+
   llvm_unreachable("bad entity kind!");
 }

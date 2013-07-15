@@ -73,7 +73,10 @@ struct SILConstant {
     
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
-    GlobalAccessor
+    GlobalAccessor,
+
+    /// References the generator for a default argument of a function.
+    DefaultArgGenerator
   };
   
   /// The ValueDecl or CapturingExpr represented by this SILConstant.
@@ -84,13 +87,16 @@ struct SILConstant {
   unsigned uncurryLevel : 16;
   /// True if this references an ObjC-visible method.
   unsigned isObjC : 1;
+  /// The default argument index for a default argument getter.
+  unsigned defaultArgIndex : 10;
   
   /// A magic value for SILConstant constructors to ask for the natural uncurry
   /// level of the constant.
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
   
   /// Produces a null SILConstant.
-  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0) {}
+  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0),
+                  defaultArgIndex(0) {}
   
   /// Produces a SILConstant of the given kind for the given decl.
   explicit SILConstant(ValueDecl *decl, Kind kind,
@@ -116,7 +122,10 @@ struct SILConstant {
   explicit SILConstant(Loc loc,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                        bool isObjC = false);
-    
+
+  /// Produce a SIL constant for a default argument generator.
+  static SILConstant getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
+
   bool isNull() const { return loc.isNull(); }
   
   bool hasDecl() const { return loc.is<ValueDecl*>(); }
@@ -150,13 +159,15 @@ struct SILConstant {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
       && uncurryLevel == rhs.uncurryLevel
-      && isObjC == rhs.isObjC;
+      && isObjC == rhs.isObjC
+      && defaultArgIndex == rhs.defaultArgIndex;
   }
   bool operator!=(SILConstant rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
       || kind != rhs.kind
       || uncurryLevel != rhs.uncurryLevel
-      || isObjC != rhs.isObjC;
+      || isObjC != rhs.isObjC
+      || defaultArgIndex != rhs.defaultArgIndex;
   }
   
   void print(llvm::raw_ostream &os) const;
@@ -165,22 +176,26 @@ struct SILConstant {
   // Returns the SILConstant for an entity at a shallower uncurry level.
   SILConstant atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
-    return SILConstant(loc.getOpaqueValue(), kind, level, isObjC);
+    return SILConstant(loc.getOpaqueValue(), kind, level, isObjC,
+                       defaultArgIndex);
   }
   
   // Returns the ObjC (or native) entry point corresponding to the same
   // constant.
   SILConstant asObjC(bool objc = true) const {
-    return SILConstant(loc.getOpaqueValue(), kind, uncurryLevel, objc);
+    return SILConstant(loc.getOpaqueValue(), kind, uncurryLevel, objc,
+                       defaultArgIndex);
   }
   
   /// Produces a SILConstant from an opaque value.
   explicit SILConstant(void *opaqueLoc,
                        Kind kind,
                        unsigned uncurryLevel,
-                       bool isObjC)
+                       bool isObjC,
+                       unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
-      kind(kind), uncurryLevel(uncurryLevel), isObjC(isObjC)
+      kind(kind), uncurryLevel(uncurryLevel), isObjC(isObjC),
+      defaultArgIndex(defaultArgIndex)
   {}
 };
 
@@ -197,15 +212,17 @@ template<> struct DenseMapInfo<swift::SILConstant> {
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILConstant getEmptyKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false);
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
   }
   static swift::SILConstant getTombstoneKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false);
+    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
   }
   static unsigned getHashValue(swift::SILConstant Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
     unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
-    unsigned h3 = UnsignedInfo::getHashValue(Val.uncurryLevel);
+    unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
+                    ? UnsignedInfo::getHashValue(Val.defaultArgIndex)
+                    : UnsignedInfo::getHashValue(Val.uncurryLevel);
     unsigned h4 = UnsignedInfo::getHashValue(Val.isObjC);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
   }
