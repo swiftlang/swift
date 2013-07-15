@@ -52,7 +52,8 @@ class alignas(8) Pattern {
   class TuplePatternBitfields {
     friend class TuplePattern;
     unsigned : NumPatternBits;
-    unsigned NumFields : NumBitsAllocated - NumPatternBits;
+    unsigned HasVararg : 1;
+    unsigned NumFields : NumBitsAllocated - NumPatternBits - 1;
   };
 
 protected:
@@ -163,38 +164,24 @@ public:
 /// An element of a tuple pattern.
 class TuplePatternElt {
   Pattern *ThePattern;
-
-  // FIXME: Init and VarargBaseType can be collapsed into one field.
   ExprHandle *Init;
-  Type VarargBaseType;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P, ExprHandle *init = nullptr,
-                           Type varargBaseType = Type())
-    : ThePattern(P), Init(init), VarargBaseType(varargBaseType) {}
+  explicit TuplePatternElt(Pattern *P, ExprHandle *init = nullptr)
+    : ThePattern(P), Init(init) {}
 
   Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *p) { ThePattern = p; }
 
   ExprHandle *getInit() const { return Init; }
-
-  bool isVararg() const { return !VarargBaseType.isNull(); }
-  Type getVarargBaseType() const { return VarargBaseType; }
-  void setVarargBaseType(Type ty) { VarargBaseType = ty; }
-
-  /// \brief Revert this variadic tuple pattern element to a
-  /// non-variadic version.
-  ///
-  /// Used for error recovery, when we've detected that the element
-  /// is not the last one.
-  void revertToNonVariadic();
 };
 
 /// A pattern consisting of a tuple of patterns.
 class TuplePattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
+  // TuplePatternBits.HasVararg
   // TuplePatternBits.NumFields
 
   TuplePatternElt *getFieldsBuffer() {
@@ -204,9 +191,22 @@ class TuplePattern : public Pattern {
     return reinterpret_cast<const TuplePatternElt *>(this + 1);
   }
 
-  TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp)
+  SourceLoc *getEllipsisLocPtr() {
+    assert(TuplePatternBits.HasVararg);
+    return reinterpret_cast<SourceLoc *>(getFieldsBuffer()+getNumFields());
+  }
+  const SourceLoc *getEllipsisLocPtr() const {
+    assert(TuplePatternBits.HasVararg);
+    return reinterpret_cast<const SourceLoc *>(getFieldsBuffer()+getNumFields());
+  }
+
+  TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp, bool hasVararg,
+               SourceLoc ellipsis)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
     TuplePatternBits.NumFields = numFields;
+    TuplePatternBits.HasVararg = hasVararg;
+    if (hasVararg)
+      *getEllipsisLocPtr() = ellipsis;
     assert(lp.isValid() == rp.isValid());
     if (!lp.isValid())
       setImplicit();
@@ -214,14 +214,16 @@ class TuplePattern : public Pattern {
 
 public:
   static TuplePattern *create(ASTContext &C, SourceLoc lp,
-                              ArrayRef<TuplePatternElt> elements,
-                              SourceLoc rp);
+                              ArrayRef<TuplePatternElt> elements, SourceLoc rp,
+                              bool hasVararg = false,
+                              SourceLoc ellipsis = SourceLoc());
 
   /// \brief Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
-                               ArrayRef<TuplePatternElt> elements,
-                               SourceLoc rp);
+                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
+                               bool hasVararg = false,
+                               SourceLoc ellipsis = SourceLoc());
 
   unsigned getNumFields() const {
     return TuplePatternBits.NumFields;
@@ -235,10 +237,17 @@ public:
     return ArrayRef<TuplePatternElt>(getFieldsBuffer(), getNumFields());
   }
 
+  bool hasVararg() const { return TuplePatternBits.HasVararg; }
+
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const { return SourceRange(LPLoc, RPLoc); }
   SourceLoc getLoc() const { return LPLoc; }
+  SourceLoc getEllipsisLoc() const {
+    if (hasVararg())
+      return *getEllipsisLocPtr();
+    return SourceLoc();
+  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;

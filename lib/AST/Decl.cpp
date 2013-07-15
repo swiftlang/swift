@@ -780,8 +780,7 @@ bool FuncDecl::isUnaryOperator() const {
   if (!argTuple)
     return true;
 
-  return argTuple->getNumFields() == 1
-    && !argTuple->getFields()[0].isVararg();
+  return argTuple->getNumFields() == 1 && !argTuple->hasVararg();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -796,7 +795,7 @@ bool FuncDecl::isBinaryOperator() const {
     return false;
   
   return argTuple->getNumFields() == 2
-    || (argTuple->getNumFields() == 1 && argTuple->getFields()[0].isVararg());
+    || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
 }
 
 StringRef VarDecl::getObjCGetterSelector(llvm::SmallVectorImpl<char> &buffer)

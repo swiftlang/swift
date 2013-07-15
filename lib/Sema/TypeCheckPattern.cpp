@@ -149,7 +149,8 @@ Pattern *TypeChecker::resolvePattern(Pattern *P) {
 /// UnresolvedType.
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    bool isFirstPass,
-                                   bool allowUnknownTypes) {
+                                   bool allowUnknownTypes,
+                                   bool isVararg) {
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -169,11 +170,16 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     bool hadError = false;
     TypedPattern *TP = cast<TypedPattern>(P);
-    if (validateType(TP->getTypeLoc())) {
+    TypeLoc &TL = TP->getTypeLoc();
+    if (isVararg) {
+      Type sliceTy = ArraySliceType::get(TL.getType(), Context);
+      TL = { sliceTy, TL.getSourceRange(), nullptr };
+    }
+    if (validateType(TL)) {
       TP->setType(ErrorType::get(Context));
       hadError = true;
     } else {
-      TP->setType(TP->getTypeLoc().getType());
+      TP->setType(TL.getType());
     }
     hadError |= coerceToType(TP->getSubPattern(), dc, P->getType());
     return hadError;
@@ -200,15 +206,19 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 
   // A tuple pattern propagates its tuple-ness out.
   case PatternKind::Tuple: {
+    auto tuplePat = cast<TuplePattern>(P);
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
     bool missingType = false;
-    for (TuplePatternElt &elt : cast<TuplePattern>(P)->getFields()) {
+    for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
+      TuplePatternElt &elt = tuplePat->getFields()[i];
       Type type;
       ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, dc, isFirstPass, allowUnknownTypes)) {
+      bool isVararg = tuplePat->hasVararg() && i == e-1;
+      if (typeCheckPattern(pattern, dc, isFirstPass, allowUnknownTypes,
+                           isVararg)) {
         hadError = true;
       } else if (pattern->hasType()) {
         type = pattern->getType();
@@ -223,7 +233,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(), init,
-                                      elt.isVararg()));
+                                      isVararg));
     }
 
     if (hadError) {

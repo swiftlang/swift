@@ -161,7 +161,7 @@ static bool parseSelectorFunctionArguments(Parser &P,
       P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
       return true;
     }
-    
+
     TuplePatternElt const &firstElt = firstTuple->getFields()[0];
     bodyElts.push_back(firstElt);
     lp = firstTuple->getLParenLoc();
@@ -169,8 +169,7 @@ static bool parseSelectorFunctionArguments(Parser &P,
       getFirstSelectorPattern(P.Context,
                               firstElt.getPattern(),
                               firstTuple->getLoc()),
-      firstElt.getInit(),
-      firstElt.getVarargBaseType()));
+                              firstElt.getInit()));
   } else
     llvm_unreachable("unexpected function argument pattern!");
   
@@ -346,40 +345,7 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
       init = ExprHandle::get(Context, initR.get());
   }
 
-  // The result, should we succeed.
-  TuplePatternElt result(pattern.get(), init);
-
-  // If there is no ellipsis, we're done.
-  if (Tok.isNot(tok::ellipsis))
-    return result;
-
-  // An element cannot have both an initializer and an ellipsis.
-  if (init) {
-    diagnose(Tok.getLoc(), diag::tuple_ellipsis_init)
-      .highlight(init->getExpr()->getSourceRange());
-    consumeToken(tok::ellipsis);
-    return result;
-  }
-  
-  SourceLoc ellipsisLoc = consumeToken(tok::ellipsis);
-
-  // An ellipsis element shall have a specified element type.
-  // FIXME: This seems unnecessary.
-  TypedPattern *typedPattern = dyn_cast<TypedPattern>(result.getPattern());
-  if (!typedPattern) {
-    diagnose(ellipsisLoc, diag::untyped_pattern_ellipsis)
-      .highlight(result.getPattern()->getSourceRange());
-    return result;
-  }
-
-  // Update the element and pattern to make it variadic.
-  Type subTy = typedPattern->getTypeLoc().getType();
-  result.setVarargBaseType(subTy);
-  typedPattern->getTypeLoc()
-    = TypeLoc(ArraySliceType::get(subTy, Context),
-                                  typedPattern->getTypeLoc().getSourceRange(),
-                                  typedPattern->getTypeLoc().getTypeRepr());
-  return result;
+  return TuplePatternElt(pattern.get(), init);
 }
 
 /// Parse a tuple pattern.
@@ -391,6 +357,7 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
 
 NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
+  SourceLoc EllipsisLoc;
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
@@ -403,27 +370,47 @@ NullablePtr<Pattern> Parser::parsePatternTuple(bool AllowInitExpr) {
     if (!elt)
       return true;
 
+    // Add this element to the list.
+    elts.push_back(*elt);
+
+    // If there is no ellipsis, we're done with the element.
+    if (Tok.isNot(tok::ellipsis))
+      return false;
+    SourceLoc ellLoc = consumeToken(tok::ellipsis);
+
+    // An element cannot have both an initializer and an ellipsis.
+    if (elt->getInit()) {
+      diagnose(ellLoc, diag::tuple_ellipsis_init)
+        .highlight(elt->getInit()->getExpr()->getSourceRange());
+      return false;
+    }
+
+    // An ellipsis element shall have a specified element type.
+    // FIXME: This seems unnecessary.
+    TypedPattern *typedPattern = dyn_cast<TypedPattern>(elt->getPattern());
+    if (!typedPattern) {
+      diagnose(ellLoc, diag::untyped_pattern_ellipsis)
+        .highlight(elt->getPattern()->getSourceRange());
+      return false;
+    }
+
     // Variadic elements must come last.
     // FIXME: Unnecessary restriction. It makes conversion more interesting,
     // but is not complicated to support.
-    if (!elts.empty() && elts.back().isVararg()) {
-      diagnose(elts.back().getPattern()->getLoc(),
-               diag::ellipsis_pattern_not_at_end)
-        .highlight(elt->getPattern()->getSourceRange());
-
-      // Make the previous element non-variadic.
-      elts.back().revertToNonVariadic();
+    if (Tok.is(tok::r_paren)) {
+      EllipsisLoc = ellLoc;
+    } else {
+      diagnose(ellLoc, diag::ellipsis_pattern_not_at_end);
     }
 
-    // Add this element to the list.
-    elts.push_back(*elt);
     return false;
   });
 
   if (Invalid)
     return nullptr;
 
-  return TuplePattern::createSimple(Context, LPLoc, elts, RPLoc);
+  return TuplePattern::createSimple(Context, LPLoc, elts, RPLoc,
+                                    EllipsisLoc.isValid(), EllipsisLoc);
 }
 
 NullablePtr<Pattern> Parser::parseMatchingPattern() {

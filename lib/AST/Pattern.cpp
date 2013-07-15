@@ -187,9 +187,11 @@ Pattern *Pattern::clone(ASTContext &context) const {
     elts.reserve(tuple->getNumFields());
     for (const auto &elt : tuple->getFields())
       elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
-                                     elt.getInit(), elt.getVarargBaseType()));
+                                     elt.getInit()));
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                  tuple->getRParenLoc());
+                                  tuple->getRParenLoc(),
+                                  tuple->hasVararg(),
+                                  tuple->getEllipsisLoc());
     break;
   }
 
@@ -266,43 +268,33 @@ Identifier Pattern::getBoundName() const {
   return Identifier();
 }
 
-void TuplePatternElt::revertToNonVariadic() {
-  assert(VarargBaseType && "Not a variadic element");
-
-  // Fix the pattern.
-  auto typedPattern = cast<TypedPattern>(ThePattern);
-  typedPattern->getTypeLoc()
-    = TypeLoc(VarargBaseType, typedPattern->getTypeLoc().getSourceRange(),
-              typedPattern->getTypeLoc().getTypeRepr());
-
-  // Clear out the variadic base type.
-  VarargBaseType = Type();
-}
-
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
-                                   ArrayRef<TuplePatternElt> elts,
-                                   SourceLoc rp) {
+                                   ArrayRef<TuplePatternElt> elts, SourceLoc rp,
+                                   bool hasVararg, SourceLoc ellipsis) {
   unsigned n = elts.size();
-  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt),
+  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt) +
+                            (hasVararg ? sizeof(SourceLoc) : 0),
                             alignof(TuplePattern));
-  TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp);
+  TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp, hasVararg,
+                                                     ellipsis);
   memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
   return pattern;
 }
 
 Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
-                                    SourceLoc rp) {
+                                    SourceLoc rp,
+                                    bool hasVararg, SourceLoc ellipsis) {
   if (elements.size() == 1 &&
       elements[0].getInit() == nullptr &&
       elements[0].getPattern()->getBoundName().empty() &&
-      !elements[0].isVararg()) {
+      !hasVararg) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp);
   }
 
-  return create(C, lp, elements, rp);
+  return create(C, lp, elements, rp, hasVararg, ellipsis);
 }
 
 SourceRange TypedPattern::getSourceRange() const {

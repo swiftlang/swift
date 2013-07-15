@@ -454,7 +454,8 @@ public:
   Pattern *resolvePattern(Pattern *P);
   
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        bool isFirstPass, bool allowUnknownTypes);
+                        bool isFirstPass, bool allowUnknownTypes,
+                        bool isVararg = false);
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);

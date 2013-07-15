@@ -598,16 +598,16 @@ namespace {
         auto tuplePat = cast<TuplePattern>(pattern);
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
         tupleTypeElts.reserve(tuplePat->getNumFields());
-        unsigned index = 0;
-        for (auto tupleElt : tuplePat->getFields()) {
+        for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
+          auto tupleElt = tuplePat->getFields()[i];
+          bool isVararg = tuplePat->hasVararg() && i == e-1;
           Type eltTy = getTypeForPattern(tupleElt.getPattern(), expr,
                                          locator.withPathElement(
-                                           LocatorPathElt::getTupleElement(
-                                             index++)));
+                                           LocatorPathElt::getTupleElement(i)));
           auto name = findPatternName(tupleElt.getPattern());
           Type varArgBaseTy;
           tupleTypeElts.push_back(TupleTypeElt(eltTy, name, tupleElt.getInit(),
-                                               tupleElt.isVararg()));
+                                               isVararg));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }

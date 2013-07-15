@@ -110,8 +110,9 @@ Pattern *ModuleFile::maybeReadPattern() {
   case decls_block::TUPLE_PATTERN: {
     TypeID tupleTypeID;
     unsigned count;
+    bool hasVararg;
 
-    TuplePatternLayout::readRecord(scratch, tupleTypeID, count);
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, hasVararg);
 
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
@@ -122,21 +123,18 @@ Pattern *ModuleFile::maybeReadPattern() {
       kind = DeclTypeCursor.readRecord(next.ID, scratch);
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
-      TypeID varargsTypeID;
-      TuplePatternEltLayout::readRecord(scratch, varargsTypeID);
+      // FIXME: Add something for this record or remove it.
+      // TuplePatternEltLayout::readRecord(scratch);
 
       Pattern *subPattern = maybeReadPattern();
       assert(subPattern);
 
-      elements.push_back(TuplePatternElt(subPattern));
-      if (varargsTypeID) {
-        BCOffsetRAII restoreOffset(DeclTypeCursor);
-        elements.back().setVarargBaseType(getType(varargsTypeID));
-      }
+      elements.push_back(TuplePatternElt(subPattern, nullptr));
     }
 
     auto result = TuplePattern::create(ModuleContext->Ctx, SourceLoc(),
-                                       elements, SourceLoc());
+                                       elements, SourceLoc(), hasVararg,
+                                       SourceLoc());
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       result->setType(getType(tupleTypeID));

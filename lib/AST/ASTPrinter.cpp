@@ -200,12 +200,12 @@ void PrintAST::printPattern(const Pattern *pattern) {
         OS << ", ";
       }
       printPattern(elt.getPattern());
-      if (elt.isVararg()) {
-        OS << "...";
-      }
       if (Options.VarInitializers && elt.getInit()) {
         // FIXME: Print initializer here.
       }
+    }
+    if (tuple->hasVararg()) {
+      OS << "...";
     }
     OS << ")";
     break;

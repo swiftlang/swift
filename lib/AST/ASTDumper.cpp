@@ -72,6 +72,12 @@ namespace {
 
       if (ShowColors)
         OS << llvm::sys::Process::ResetColor();
+
+      if (P->hasType()) {
+        OS << " type='";
+        P->getType()->print(OS);
+        OS << '\'';
+      }
       return OS;
     }
 
@@ -82,6 +88,8 @@ namespace {
     }
     void visitTuplePattern(TuplePattern *P) {
       printCommon(P, "pattern_tuple");
+      if (P->hasVararg())
+        OS << " hasVararg";
       for (unsigned i = 0, e = P->getNumFields(); i != e; ++i) {
         OS << '\n';
         printRec(P->getFields()[i].getPattern());
@@ -99,12 +107,7 @@ namespace {
       printCommon(P, "pattern_any") << ')';
     }
     void visitTypedPattern(TypedPattern *P) {
-      printCommon(P, "pattern_typed") << ' ';
-      if (!P->hasType())
-        OS << "<no type yet>";
-      else
-        P->getType()->print(OS);
-      OS << '\n';
+      printCommon(P, "pattern_typed") << '\n';
       printRec(P->getSubPattern());
       if (P->getTypeLoc().getTypeRepr()) {
         OS << '\n';

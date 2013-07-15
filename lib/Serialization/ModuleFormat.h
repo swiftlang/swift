@@ -527,13 +527,13 @@ namespace decls_block {
   using TuplePatternLayout = BCRecordLayout<
     TUPLE_PATTERN,
     TypeIDField, // type
-    BCVBR<5>     // arity
+    BCVBR<5>,    // arity
+    BCFixed<1>  // has vararg?
     // The elements trail the record.
   >;
 
   using TuplePatternEltLayout = BCRecordLayout<
-    TUPLE_PATTERN_ELT,
-    TypeIDField  // vararg base type, or 0
+    TUPLE_PATTERN_ELT
     // The element pattern trails the record.
   >;
 
