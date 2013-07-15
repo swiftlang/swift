@@ -447,7 +447,7 @@ NominalTypeDecl *TypeBase::getAnyNominal() {
   return nullptr;
 }
 
-static Type getStrippedType(ASTContext &context, Type type,
+static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   switch (type->getKind()) {
   case TypeKind::Error: 
@@ -620,7 +620,7 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
-Type TypeBase::getWithoutDefaultArgs(ASTContext &Context) {
+Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*labels=*/false,
                          /*defaultArgs=*/true);
 }

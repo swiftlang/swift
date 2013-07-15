@@ -265,7 +265,7 @@ public:
   Type getUnlabeledType(ASTContext &Context);
 
   /// \brief Retrieve the type without any default arguments.
-  Type getWithoutDefaultArgs(ASTContext &Context);
+  Type getWithoutDefaultArgs(const ASTContext &Context);
 
   /// getRValueType - For an lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
