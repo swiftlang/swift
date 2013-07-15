@@ -271,7 +271,11 @@ public:
     for (auto TupleElt : TP->getFields()) {
       if (NeedComma)
         Builder.addComma(", ");
-      Builder.addCallParameter(TupleElt.getPattern()->getBoundName().str(),
+      StringRef BoundNameStr;
+      Identifier BoundName = TupleElt.getPattern()->getBoundName();
+      if (BoundName.get())
+        BoundNameStr = BoundName.str();
+      Builder.addCallParameter(BoundNameStr,
                                TupleElt.getPattern()->getType().getString());
       NeedComma = true;
     }

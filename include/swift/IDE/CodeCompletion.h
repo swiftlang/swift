@@ -291,10 +291,12 @@ public:
   void addCallParameter(StringRef Name, StringRef Type) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    addChunkWithText(
-        CodeCompletionString::Chunk::ChunkKind::CallParameterName, Name);
-    addChunkWithText(
-        CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    if (!Name.empty()) {
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterName, Name);
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    }
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);
     CurrentNestingLevel--;
