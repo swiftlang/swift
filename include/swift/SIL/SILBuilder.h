@@ -136,16 +136,12 @@ public:
   // SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
-  AllocVarInst *createAllocVar(SILLocation Loc, AllocKind allocKind,
-                               SILType elementType) {
-    return insert(new (F.getModule())
-                    AllocVarInst(Loc, allocKind, elementType, F));
+  AllocVarInst *createAllocVar(SILLocation Loc, SILType elementType) {
+    return insert(new (F.getModule()) AllocVarInst(Loc, elementType, F));
   }
 
-  AllocRefInst *createAllocRef(SILLocation Loc, AllocKind allocKind,
-                               SILType elementType) {
-    return insert(new (F.getModule())
-                    AllocRefInst(Loc, allocKind, elementType, F));
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType) {
+    return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F));
   }
   
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
@@ -583,26 +579,20 @@ public:
       createReleaseInst(Loc, Operand);
   }
   ReleaseInst *createReleaseInst(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                    ReleaseInst(Loc, Operand));
+    return insert(new (F.getModule()) ReleaseInst(Loc, Operand));
   }
   RetainAutoreleasedInst *
   createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                    RetainAutoreleasedInst(Loc, Operand));
+    return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
   }
-  DeallocVarInst *createDeallocVar(SILLocation loc, AllocKind allocKind,
-                                   SILValue operand) {
-    return insert(new (F.getModule())
-                    DeallocVarInst(loc, allocKind, operand));
+  DeallocVarInst *createDeallocVar(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) DeallocVarInst(loc, operand));
   }
   DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand) {
-    return insert(new (F.getModule())
-                    DeallocRefInst(loc, operand));
+    return insert(new (F.getModule()) DeallocRefInst(loc, operand));
   }
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
-    return insert(new (F.getModule())
-                    DestroyAddrInst(Loc, Operand));
+    return insert(new (F.getModule()) DestroyAddrInst(Loc, Operand));
   }
 
   //===--------------------------------------------------------------------===//

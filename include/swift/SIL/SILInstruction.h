@@ -167,23 +167,15 @@ public:
   }
 };
   
-enum class AllocKind : uint8_t {
-  Stack
-};
-
 /// AllocInst - This is the abstract base class common among all the memory
-/// allocation mechanisms.  This can allocate heap or stack memory.
+/// allocation mechanisms.
 class AllocInst : public SILInstruction {
-  AllocKind allocKind;
-
 protected:
-  AllocInst(ValueKind Kind, SILLocation Loc, SILType Ty, AllocKind allocKind)
-    : SILInstruction(Kind, Loc, Ty), allocKind(allocKind) {}
+  AllocInst(ValueKind Kind, SILLocation Loc, SILType Ty)
+    : SILInstruction(Kind, Loc, Ty) {}
 public:
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  AllocKind getAllocKind() const { return allocKind; }
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
@@ -193,11 +185,11 @@ public:
   }
 };
 
-/// AllocVarInst - This represents the allocation of an unboxed variable or
-/// temporary. The memory is provided uninitialized.
+/// AllocVarInst - This represents the allocation of an unboxed stack memory.
+/// The memory is provided uninitialized.
 class AllocVarInst : public AllocInst {
 public:
-  AllocVarInst(SILLocation loc, AllocKind allocKind, SILType elementType,
+  AllocVarInst(SILLocation loc, SILType elementType,
                SILFunction &F);
 
   /// getDecl - Return the underlying variable declaration associated with this
@@ -218,8 +210,7 @@ public:
 /// returned uninitialized.
 class AllocRefInst : public AllocInst {
 public:
-  AllocRefInst(SILLocation loc, AllocKind allocKind, SILType type,
-               SILFunction &F);
+  AllocRefInst(SILLocation loc, SILType type, SILFunction &F);
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
@@ -1384,17 +1375,13 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// DeallocVarInst - Deallocate memory allocated by alloc_var.
+/// DeallocVarInst - Deallocate stack memory allocated by alloc_var.
 class DeallocVarInst : public UnaryInstructionBase<ValueKind::DeallocVarInst,
                                                    SILInstruction,
-                                                   /*HAS_RESULT*/ false>
-{
-  AllocKind allocKind;
+                                                   /*HAS_RESULT*/ false> {
 public:
-  DeallocVarInst(SILLocation Loc, AllocKind allocKind, SILValue Operand)
-    : UnaryInstructionBase(Loc, Operand), allocKind(allocKind) {}
-  
-  AllocKind getAllocKind() const { return allocKind; }
+  DeallocVarInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
 };
   
 /// DeallocRefInst - Deallocate memory allocated for a box or reference type

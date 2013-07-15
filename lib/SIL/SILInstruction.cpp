@@ -124,12 +124,8 @@ ArrayRef<Operand> SILInstruction::getAllOperands() const {
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-AllocVarInst::AllocVarInst(SILLocation loc, AllocKind allocKind,
-                           SILType elementType,
-                           SILFunction &F)
-  : AllocInst(ValueKind::AllocVarInst, loc,
-              elementType.getAddressType(),
-              allocKind) {
+AllocVarInst::AllocVarInst(SILLocation loc, SILType elementType, SILFunction &F)
+  : AllocInst(ValueKind::AllocVarInst, loc, elementType.getAddressType()) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -142,12 +138,8 @@ VarDecl *AllocVarInst::getDecl() const {
   }
 }
 
-AllocRefInst::AllocRefInst(SILLocation loc, AllocKind allocKind,
-                           SILType elementType,
-                           SILFunction &F)
-: AllocInst(ValueKind::AllocRefInst, loc,
-            elementType,
-            allocKind) {
+AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
+  : AllocInst(ValueKind::AllocRefInst, loc, elementType) {
 }
 
 

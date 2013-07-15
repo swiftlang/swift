@@ -47,7 +47,7 @@ namespace {
     CleanupTemporaryAllocation(SILValue alloc) : alloc(alloc) {}
     
     void emit(SILGenFunction &gen) override {
-      gen.B.createDeallocVar(SILLocation(), AllocKind::Stack, alloc);
+      gen.B.createDeallocVar(SILLocation(), alloc);
     }
   };
   
@@ -286,7 +286,7 @@ RValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
-  SILValue tmpMem = B.createAllocVar(loc, AllocKind::Stack, ty);
+  SILValue tmpMem = B.createAllocVar(loc, ty);
   Cleanups.pushCleanup<CleanupTemporaryAllocation>(tmpMem);
   return tmpMem;
 }
@@ -1344,7 +1344,7 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
     gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
     gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
   } else {
-    SILValue addr = gen.B.createAllocVar(ctor, AllocKind::Stack, thisTy);
+    SILValue addr = gen.B.createAllocVar(ctor, thisTy);
     gen.B.createInitializeVar(ctor, addr, /*canDefaultConstruct*/ false);
     SILValue result = gen.B.createLoad(ctor, addr);
     gen.B.createReturn(ctor, result);
@@ -1504,7 +1504,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   } else {
     // We can just take ownership from the stack slot and consider it
     // deinitialized.
-    B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+    B.createDeallocVar(ctor, thisLV);
   }
   B.createReturn(ctor, thisValue);
 }
@@ -1631,7 +1631,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // Otherwise, just emit an alloc_ref instruction for the default allocation
     // path.
     // FIXME: should have a cleanup in case of exception
-    thisValue = B.createAllocRef(ctor, AllocKind::Stack, thisTy);
+    thisValue = B.createAllocRef(ctor, thisTy);
   }
   args.push_back(thisValue);
 
@@ -1706,7 +1706,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   } else {
     // We can just take ownership from the stack slot and consider it
     // deinitialized.
-    B.createDeallocVar(ctor, AllocKind::Stack, thisLV);
+    B.createDeallocVar(ctor, thisLV);
   }
   B.createReturn(ctor, thisValue);
 }

@@ -312,22 +312,14 @@ public:
     OS << "argument of " << getID(A->getParent());
   }
   
-  static const char *getAllocKind(AllocKind kind) {
-    switch (kind) {
-    case AllocKind::Stack:  return "stack";
-    }
-  }
-
   void visitAllocVarInst(AllocVarInst *AVI) {
-    OS << "alloc_var " << getAllocKind(AVI->getAllocKind());
-    OS << " $" << AVI->getElementType().getString();
+    OS << "alloc_var $" << AVI->getElementType().getString();
     if (VarDecl *vd = AVI->getDecl())
       OS << "  // var " << vd->getName();
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
-    OS << "alloc_ref " << getAllocKind(ARI->getAllocKind())
-       << ' ' << ARI->getType();
+    OS << "alloc_ref " << ARI->getType();
   }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
@@ -658,8 +650,7 @@ public:
     OS << "release " << getIDAndType(RI->getOperand());
   }
   void visitDeallocVarInst(DeallocVarInst *DI) {
-    OS << "dealloc_var " << getAllocKind(DI->getAllocKind()) << ' '
-       << getIDAndType(DI->getOperand());
+    OS << "dealloc_var " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
     OS << "dealloc_ref " << getIDAndType(DI->getOperand());

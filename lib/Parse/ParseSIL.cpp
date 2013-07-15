@@ -141,7 +141,6 @@ namespace {
       SourceLoc Tmp;
       return parseTypedValueRef(Result, Tmp);
     }
-    bool parseAllocKind(AllocKind &Result);
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
     bool parseSILInstruction(SILBasicBlock *BB);
@@ -728,25 +727,6 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc) {
 }
 
 
-/// parseAllocKind - Parse an allocation specifier.
-///    sil-alloc-kind:
-///      'stack'
-bool SILParser::parseAllocKind(AllocKind &Result) {
-  Identifier Id;
-  SourceLoc Loc;
-  if (P.parseIdentifier(Id, Loc, diag::sil_expected_allocation_kind))
-    return true;
-  if (Id.str() == "stack")
-    Result = AllocKind::Stack;
-  else {
-    P.diagnose(Loc, diag::sil_expected_allocation_kind);
-    return true;
-  }
-    
-  return false;
-}
-
-
 /// getInstructionKind - This method maps the string form of a SIL instruction
 /// opcode to an enum.
 bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
@@ -1051,27 +1031,23 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::AllocVarInst:
   case ValueKind::AllocRefInst: {
-    AllocKind Kind;
     SILType Ty;
-    if (parseAllocKind(Kind) ||
-        parseSILType(Ty))
+    if (parseSILType(Ty))
       return true;
     
     if (Opcode == ValueKind::AllocVarInst)
-      ResultVal = B.createAllocVar(SILLocation(), Kind, Ty);
+      ResultVal = B.createAllocVar(SILLocation(), Ty);
     else {
       assert(Opcode == ValueKind::AllocRefInst);
-      ResultVal = B.createAllocRef(SILLocation(), Kind, Ty);
+      ResultVal = B.createAllocRef(SILLocation(), Ty);
     }
     break;
   }
   case ValueKind::DeallocVarInst: {
-    AllocKind Kind;
-    if (parseAllocKind(Kind) ||
-        parseTypedValueRef(Val))
+    if (parseTypedValueRef(Val))
       return true;
     
-    ResultVal = B.createDeallocVar(SILLocation(), Kind, Val);
+    ResultVal = B.createDeallocVar(SILLocation(), Val);
     break;
   }
   case ValueKind::MetatypeInst: {

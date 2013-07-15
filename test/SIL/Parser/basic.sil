@@ -55,23 +55,23 @@ sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
 
 sil @return_int : $[thin] (a : Int64) -> Int64 { // CHECK: $[thin] (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_var stack $Int64              // CHECK: alloc_var stack $Int64
+  %1 = alloc_var $Int64                    // CHECK: alloc_var $Int64
   %2 = store %0 to %1 : $*Int64            // CHECK: %2 = store %0 to %1 : $*Int64
   %3 = load %1 : $*Int64                   // CHECK: load {{.*}} : $*Int64
-  %4 = dealloc_var stack %1 : $*Int64      // CHECK: dealloc_var stack {{.*}} : $*Int64
+  %4 = dealloc_var %1 : $*Int64            // CHECK: dealloc_var {{.*}} : $*Int64
   %5 = return %3 : $Int64                  // CHECK: return {{.*}} : $Int64
 }
 
 sil @call_fn_pointer : $[thin] (a : () -> Int64) -> Int64 {
 bb0(%0 : $() -> Int64):
-  %1 = alloc_var stack $() -> Int64        // CHECK: alloc_var stack $() -> Int64
+  %1 = alloc_var $() -> Int64              // CHECK: alloc_var $() -> Int64
   %2 = store %0 to %1 : $*() -> Int64      // CHECK: store %0 to %1 : $*() -> Int64
   %3 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
   %4 = retain %3 : $() -> Int64            // CHECK: retain %3 : $() -> Int64
   %5 = apply %3() : $() -> Int64           // CHECK: apply %3() : $() -> Int64
   %6 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
   %7 = release %6 : $() -> Int64           // CHECK: release {{.*}} : $() -> Int64
-  %8 = dealloc_var stack %1 : $*() -> Int64// CHECK: dealloc_var stack %1 : $*() -> Int64
+  %8 = dealloc_var %1 : $*() -> Int64      // CHECK: dealloc_var %1 : $*() -> Int64
   %9 = return %5 : $Int64                  // CHECK: return %5 : $Int64
 }
 
@@ -103,8 +103,8 @@ sil @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val 
 sil @_T4test1xFT1aSb_Si : $[thin] (a : Bool) -> Int64 {
 // CHECK: bb0(%0 : $Bool):
 bb0(%0 : $Bool):
-  // CHECK: alloc_var stack $Bool
-  %1 = alloc_var stack $Bool
+  // CHECK: alloc_var $Bool
+  %1 = alloc_var $Bool
   // CHECK: store
   %2 = store %0 to %1 : $*Bool
   // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
@@ -125,7 +125,7 @@ bb1:
   // CHECK: apply
   %9 = apply %6(%8, %7) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_var
-  %10 = dealloc_var stack %1 : $*Bool
+  %10 = dealloc_var %1 : $*Bool
   // CHECK: return
   %11 = return %9 : $Int64
 
@@ -140,7 +140,7 @@ bb2:
   // CHECK: apply
   %15 = apply %12(%14, %13) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_var
-  %16 = dealloc_var stack %1 : $*Bool
+  %16 = dealloc_var %1 : $*Bool
   // CHECK: return
   %17 = return %15 : $Int64
 }
@@ -177,16 +177,16 @@ class D : C {
 
 sil @classes : $[thin] () -> () {
 bb0:
-  // CHECK: %0 = alloc_ref stack $C
-  %C = alloc_ref stack $C
+  // CHECK: %0 = alloc_ref $C
+  %C = alloc_ref $C
   // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
   %1 = ref_to_object_pointer %C : $C to $Builtin.ObjectPointer
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : $[cc(method), thin] ((), C) -> ()
   
-  // CHECK: alloc_ref stack $D
-  %D = alloc_ref stack $D
+  // CHECK: alloc_ref $D
+  %D = alloc_ref $D
   
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C
@@ -218,7 +218,7 @@ bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.free_method!1
   %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [byref] T) -> Int64 // user: %2
   %2 = apply %1(%0) : $[cc(method)] ((), [byref] T) -> Int64
-  %3 = alloc_var stack $T.U.metatype  // var u    // users: %10, %6
+  %3 = alloc_var $T.U.metatype
   // CHECK: archetype_method $*T, #Runcible.associated_method!1
   %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %5
   %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %6
@@ -227,7 +227,7 @@ bb0(%0 : $*T):
   // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
   %8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $((), T.metatype) -> () // user: %9
   %9 = apply %8(%7) : $((), T.metatype) -> ()
-  %10 = dealloc_var stack %3 : $*T.U.metatype
+  %10 = dealloc_var %3 : $*T.U.metatype
   %11 = tuple ()                                  // user: %13
   %12 = destroy_addr %0 : $*T
   %13 = return %11 : $()

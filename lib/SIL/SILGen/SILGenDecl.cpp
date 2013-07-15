@@ -968,7 +968,7 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd) {
 
   if (vd->hasFixedLifetime()) {
     // If the variable has a fixed lifetime, allocate it on the stack.
-    SILValue addr = B.createAllocVar(vd, AllocKind::Stack, lType);
+    SILValue addr = B.createAllocVar(vd, lType);
     VarLocs[vd] = {SILValue(), addr};
   } else {
     // If the variable has its lifetime extended by a closure, heap-allocate it
@@ -1014,7 +1014,7 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
         emitReleaseRValue(vd, value);
       }
     }
-    B.createDeallocVar(vd, AllocKind::Stack, loc.address);
+    B.createDeallocVar(vd, loc.address);
   } else {
     // For a heap variable, the box is responsible for the value. We just need
     // to give up our retain count on it.
@@ -1035,7 +1035,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
   
   if (vd->hasFixedLifetime()) {
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
-    B.createDeallocVar(vd, AllocKind::Stack, loc.address);
+    B.createDeallocVar(vd, loc.address);
   } else {
     assert(loc.box && "captured var should have been given a box");
     B.createDeallocRef(vd, loc.box);
@@ -1089,9 +1089,9 @@ static void emitObjCUnconsumedArgument(SILGenFunction &gen,
                                        SILValue arg) {
   // If address-only, copy to raise the ownership count.
   if (arg.getType().isAddressOnly(gen.SGM.M)) {
-    SILValue tmp = gen.B.createAllocVar(loc, AllocKind::Stack, arg.getType());
+    SILValue tmp = gen.B.createAllocVar(loc, arg.getType());
     gen.B.createCopyAddr(loc, arg, tmp, /*isTake*/false, /*isInit*/ true);
-    gen.B.createDeallocVar(loc, AllocKind::Stack, tmp);
+    gen.B.createDeallocVar(loc, tmp);
     return;
   }
   

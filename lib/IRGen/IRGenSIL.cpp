@@ -1703,13 +1703,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
   SILValue v(i, 0);
 
-  OnHeap_t isOnHeap = NotOnHeap;
-  switch (i->getAllocKind()) {
-  case AllocKind::Stack:
-    isOnHeap = NotOnHeap;
-    break;
-  }
-
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
   StringRef dbgname =
@@ -1719,7 +1712,7 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
 # endif
     "";
 
-  OwnedAddress addr = type.allocate(*this, isOnHeap, dbgname);
+  OwnedAddress addr = type.allocate(*this, NotOnHeap, dbgname);
   if (IGM.DebugInfo && Decl)
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
                                                 addr.getAddressPointer(),
@@ -1737,11 +1730,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
-  switch (i->getAllocKind()) {
-  case AllocKind::Stack:
-    // Nothing to do. We could emit a lifetime.end here maybe.
-    break;
-  }
+  // Nothing to do. We could emit a lifetime.end here maybe.
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
