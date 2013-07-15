@@ -45,6 +45,13 @@ public:
 
   /// \brief Complete expr-postfix.
   virtual void completePostfixExpr(Expr *E) = 0;
+
+  /// \brief Complete expr-super after we have consumed the 'super' keyword.
+  virtual void completeExprSuper(SuperRefExpr *SRE) = 0;
+
+  /// \brief Complete expr-super after we have consumed the 'super' keyword and
+  /// a dot.
+  virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
 };
 
 /// \brief A factory to create instances of \c CodeCompletionCallbacks.

@@ -999,9 +999,6 @@ namespace {
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
-      // Recast the expr as being of the original type of 'this' so that
-      // coercion inserts the necessary conversion nodes for IRGen.
-      expr->setType(expr->getThis()->getTypeOfReference());
       return expr;
     }
 

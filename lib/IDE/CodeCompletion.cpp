@@ -166,15 +166,18 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionConsumer &Consumer;
   TranslationUnit *const TU;
 
-  void typecheckExpr(Expr *&E) {
+  template<typename ExprType>
+  void typecheckExpr(ExprType *&E) {
     assert(E && "should have an expression");
 
     DEBUG(llvm::dbgs() << "\nparsed:\n";
           E->print(llvm::dbgs());
           llvm::dbgs() << "\n");
 
-    if (!typeCheckCompletionContextExpr(TU, E))
+    Expr *AsExpr = E;
+    if (!typeCheckCompletionContextExpr(TU, AsExpr))
       return;
+    E = cast<ExprType>(AsExpr);
 
     DEBUG(llvm::dbgs() << "\type checked:\n";
           E->print(llvm::dbgs());
@@ -192,6 +195,8 @@ public:
   void completeExpr() override;
   void completeDotExpr(Expr *E) override;
   void completePostfixExpr(Expr *E) override;
+  void completeExprSuper(SuperRefExpr *SRE) override;
+  void completeExprSuperDot(SuperRefExpr *SRE) override;
 };
 } // end unnamed namespace
 
@@ -211,6 +216,7 @@ class CompletionLookup : swift::VisibleDeclConsumer,
 {
   CodeCompletionContext &CompletionContext;
   ASTContext &SwiftContext;
+  const DeclContext *CurrDeclContext;
 
   enum class LookupKind {
     ValueExpr,
@@ -220,15 +226,22 @@ class CompletionLookup : swift::VisibleDeclConsumer,
   LookupKind Kind;
   Type ExprType;
   bool HaveDot = false;
+  bool IsSuperRefExpr = false;
 
 public:
   CompletionLookup(CodeCompletionContext &CompletionContext,
-                   ASTContext &SwiftContext)
-      : CompletionContext(CompletionContext), SwiftContext(SwiftContext) {
+                   ASTContext &SwiftContext,
+                   const DeclContext *CurrDeclContext)
+      : CompletionContext(CompletionContext), SwiftContext(SwiftContext),
+        CurrDeclContext(CurrDeclContext) {
   }
 
   void setHaveDot() {
     HaveDot = true;
+  }
+
+  void setIsSuperRefExpr() {
+    IsSuperRefExpr = true;
   }
 
   void addSwiftVarDeclRef(const VarDecl *VD) {
@@ -316,6 +329,9 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::SwiftDeclaration);
     Builder.setAssociatedSwiftDecl(CD);
+    if (IsSuperRefExpr && isa<ConstructorDecl>(CurrDeclContext)) {
+      Builder.addTextChunk("constructor");
+    }
     Builder.addLeftParen();
     addTuplePatternParameters(Builder, cast<TuplePattern>(CD->getArguments()));
     Builder.addRightParen();
@@ -392,6 +408,8 @@ public:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         if (!ExprType->is<MetaTypeType>())
           return;
+        if (IsSuperRefExpr && !isa<ConstructorDecl>(CurrDeclContext))
+          return;
         addSwiftConstructorCall(CD);
         return;
       }
@@ -453,7 +471,7 @@ public:
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
   typecheckExpr(E);
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx);
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.setHaveDot();
   Lookup.getValueExprCompletions(E->getType());
 
@@ -463,8 +481,29 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   typecheckExpr(E);
 
-  CompletionLookup Lookup(CompletionContext, TU->Ctx);
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.getValueExprCompletions(E->getType());
+
+  Consumer.handleResults(CompletionContext.takeResults());
+}
+
+void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
+  typecheckExpr(SRE);
+
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
+  Lookup.setIsSuperRefExpr();
+  Lookup.getValueExprCompletions(SRE->getType());
+
+  Consumer.handleResults(CompletionContext.takeResults());
+}
+
+void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
+  typecheckExpr(SRE);
+
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
+  Lookup.setIsSuperRefExpr();
+  Lookup.setHaveDot();
+  Lookup.getValueExprCompletions(SRE->getType());
 
   Consumer.handleResults(CompletionContext.takeResults());
 }

@@ -583,10 +583,7 @@ public:
   
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
-    // FIXME: Eliminate the implicit coercions of the SuperExpr.
     Expr *arg = apply->getArg();
-    while (auto *conversion = dyn_cast<ImplicitConversionExpr>(arg))
-      arg = conversion->getSubExpr();
     ManagedValue super = gen.visit(arg).getAsSingleValue(gen);
     if (super.isLValue()) {
       super = gen.emitManagedRValueWithCleanup(

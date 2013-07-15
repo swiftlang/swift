@@ -630,6 +630,11 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 
       // The result of the called constructor is used to rebind 'this'.
       return new (Context) RebindThisInConstructorExpr(result, thisDecl);
+    } else if (Tok.is(tok::code_complete)) {
+      if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
+        CodeCompletion->completeExprSuperDot(SRE);
+      }
+      return nullptr;
     } else {
       // super.foo
       SourceLoc nameLoc;
@@ -652,10 +657,15 @@ NullablePtr<Expr> Parser::parseExprSuper() {
     if (idx.isNull())
       return 0;
     return new (Context) SubscriptExpr(superRef, idx.get());
-  } else {
-    diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
-    return nullptr;
   }
+  if (Tok.is(tok::code_complete)) {
+    if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
+      CodeCompletion->completeExprSuper(SRE);
+      return nullptr;
+    }
+  }
+  diagnose(superLoc, diag::expected_dot_or_subscript_after_super);
+  return nullptr;
 }
 
 /// parseExprPostfix
