@@ -314,7 +314,6 @@ public:
   
   static const char *getAllocKind(AllocKind kind) {
     switch (kind) {
-    case AllocKind::Heap:   return "heap";
     case AllocKind::Stack:  return "stack";
     }
   }

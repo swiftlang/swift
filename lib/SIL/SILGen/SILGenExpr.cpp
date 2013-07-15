@@ -1631,7 +1631,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // Otherwise, just emit an alloc_ref instruction for the default allocation
     // path.
     // FIXME: should have a cleanup in case of exception
-    thisValue = B.createAllocRef(ctor, AllocKind::Heap, thisTy);
+    thisValue = B.createAllocRef(ctor, AllocKind::Stack, thisTy);
   }
   args.push_back(thisValue);
 

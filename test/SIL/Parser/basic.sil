@@ -177,16 +177,16 @@ class D : C {
 
 sil @classes : $[thin] () -> () {
 bb0:
-  // CHECK: %0 = alloc_ref heap $C
-  %C = alloc_ref heap $C
+  // CHECK: %0 = alloc_ref stack $C
+  %C = alloc_ref stack $C
   // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
   %1 = ref_to_object_pointer %C : $C to $Builtin.ObjectPointer
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : $[cc(method), thin] ((), C) -> ()
   
-  // CHECK: alloc_ref heap $D
-  %D = alloc_ref heap $D
+  // CHECK: alloc_ref stack $D
+  %D = alloc_ref stack $D
   
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C

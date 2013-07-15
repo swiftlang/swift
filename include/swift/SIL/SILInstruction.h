@@ -168,7 +168,7 @@ public:
 };
   
 enum class AllocKind : uint8_t {
-  Heap, Stack
+  Stack
 };
 
 /// AllocInst - This is the abstract base class common among all the memory

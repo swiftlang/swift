@@ -1705,8 +1705,6 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
 
   OnHeap_t isOnHeap = NotOnHeap;
   switch (i->getAllocKind()) {
-  case AllocKind::Heap:
-    llvm_unreachable("heap alloc_var not implemented");
   case AllocKind::Stack:
     isOnHeap = NotOnHeap;
     break;
@@ -1740,8 +1738,6 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 
 void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
   switch (i->getAllocKind()) {
-  case AllocKind::Heap:
-    llvm_unreachable("FIXME: heap dealloc_var not implemented");
   case AllocKind::Stack:
     // Nothing to do. We could emit a lifetime.end here maybe.
     break;
