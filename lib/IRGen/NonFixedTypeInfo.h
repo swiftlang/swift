@@ -55,6 +55,7 @@ public:
       llvm::Value *metadata = asImpl().getMetadataRef(IGF);
       llvm::Value *box, *address;
       IGF.emitAllocBoxCall(metadata, box, address);
+      address = IGF.Builder.CreateBitCast(address, StorageType->getPointerTo());
       return OwnedAddress(getAddressForPointer(address), box);
     }
 
