@@ -507,10 +507,12 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     if (!IsTypeLookup || isa<TypeDecl>(VD))
       Results.push_back(Result::getModuleMember(VD));
 
-  // The builtin module has no imports.
-  if (isa<BuiltinModule>(M)) return;
-  
-  TranslationUnit &TU = cast<TranslationUnit>(M);
+  // Currently, only translation units have imports that affect unqualified
+  // lookup.
+  // FIXME: Re-exported modules?
+  TranslationUnit *TU = dyn_cast<TranslationUnit>(&M);
+  if (!TU)
+    return;
 
   llvm::SmallPtrSet<CanType, 8> CurModuleTypes;
   for (ValueDecl *VD : CurModuleResults) {
@@ -525,7 +527,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   // Scrape through all of the imports looking for additional results.
   // FIXME: Implement DAG-based shadowing rules.
   llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
+  for (auto &ImpEntry : TU->getImportedModules()) {
     if (!Visited.insert(ImpEntry.second))
       continue;
 
@@ -557,7 +559,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   if (Name == M.Name) {
     Results.push_back(Result::getModuleName(&M));
   } else {
-    for (const auto &ImpEntry : TU.getImportedModules())
+    for (const auto &ImpEntry : TU->getImportedModules())
       if (ImpEntry.second->Name == Name) {
         Results.push_back(Result::getModuleName(ImpEntry.second));
         break;

@@ -224,6 +224,20 @@ static bool IRGenImportedModules(TranslationUnit *TU,
       continue;
     }
 
+    // Load the shared library corresponding to this module.
+    // FIXME: Swift and Clang modules alike need to record the dylibs against
+    // which one needs to link when using the module. For now, just hardcode
+    // the Swift libraries we care about.
+    StringRef sharedLibName
+      = llvm::StringSwitch<StringRef>(ModPair.second->Name.str())
+          .Case("Foundation", "libswiftFoundation.dylib")
+          .Case("ObjectiveC", "libswiftObjectiveC.dylib")
+          .Case("AppKit",     "libswiftAppKit.dylib")
+          .Case("POSIX",      "libswift_stdlib_posix.dylib")
+          .Default("");
+    if (!sharedLibName.empty())
+      loadRuntimeLib(sharedLibName, CmdLine);
+
     // FIXME: Handle Swift modules that need IRGen here.
     if (isa<LoadedModule>(ModPair.second))
       continue;
@@ -267,20 +281,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
     llvm::Function *InitFn = Module.getFunction(InitFnName);
     if (InitFn)
       InitFns.push_back(InitFn);
-
-    // Load the shared library corresponding to this module.
-    // FIXME: Swift and Clang modules alike need to record the dylibs against
-    // which one needs to link when using the module. For now, just hardcode
-    // the Swift libraries we care about.
-    StringRef sharedLibName
-      = llvm::StringSwitch<StringRef>(SubTU->Name.str())
-          .Case("Foundation", "libswiftFoundation.dylib")
-          .Case("ObjectiveC", "libswiftObjectiveC.dylib")
-          .Case("AppKit",     "libswiftAppKit.dylib")
-          .Default("");
-    if (!sharedLibName.empty()) {
-      loadRuntimeLib(sharedLibName, CmdLine);
-    }
   }
 
   return false;
