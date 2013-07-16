@@ -66,12 +66,13 @@ class IRGenDebugInfo {
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
   const Options &Opts;
+  TypeConverter &Types;
 
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
 
 public:
-  IRGenDebugInfo(const Options &Opts,
+  IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
                  llvm::SourceMgr &SM, llvm::Module &M);
 
   /// Finalize the DIBuilder.
@@ -82,13 +83,17 @@ public:
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                      SILLocation Loc = SILLocation());
 
-  /// Create debug info for the given funtion.
-  /// \param DS The parent scope of the functino
+  /// Create debug info for the given function.
+  /// \param DS The parent scope of the function.
   /// \param Fn The IR representation of the function.
   /// \param CC The calling convention of the function.
   /// \param Ty The signature of the function.
   void createFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
                       AbstractCC CC, SILType Ty);
+
+  /// Create debug info for a given SIL function.
+  void createFunction(SILFunction *SILFn, llvm::Function *Fn);
+
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls createFunction, creates a debug
@@ -140,7 +145,8 @@ private:
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
-                                     SILType FnTy,
+                                     SILType SILTy,
+                                     llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope);
 };
 

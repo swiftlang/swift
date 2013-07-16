@@ -17,6 +17,7 @@
 #include "IRGenDebugInfo.h"
 #include "swift/AST/Expr.h"
 #include "swift/IRGen/Options.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/config/config.h"
@@ -31,6 +32,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
+#include "GenType.h"
 
 using namespace swift;
 using namespace irgen;
@@ -68,9 +70,10 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
   return BumpAllocatedString(S.data(), S.size(), BP);
 }
 
-IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, llvm::SourceMgr &SM,
-                               llvm::Module &M)
-  : SM(SM), DBuilder(M), Opts(Opts), LastLoc({}), LastScope(nullptr) {
+IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
+                               llvm::SourceMgr &SM, llvm::Module &M)
+  : SM(SM), DBuilder(M), Opts(Opts), Types(Types),
+    LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
   std::string MainFilename = Opts.MainInputFilename;
@@ -217,8 +220,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
     return llvm::DIFile();
 
   // Look in the cache first.
-  auto CachedFile =
-    DIFileCache.find(Filename);
+  auto CachedFile = DIFileCache.find(Filename);
 
   if (CachedFile != DIFileCache.end()) {
     // Verify that the information still exists.
@@ -293,42 +295,47 @@ static AnyFunctionType* getFunctionType(SILType SILTy) {
 /// Create the array of function parameters for FnTy.
 llvm::DIArray IRGenDebugInfo::createParameterTypes(SILModule &SILMod,
                                                    SILType SILTy,
+                                                   llvm::FunctionType *IRTy,
                                                    llvm::DIDescriptor Scope) {
-  if (!SILTy.getSwiftType()) return llvm::DIArray();
-  SILFunctionTypeInfo *FnTy = SILTy.getFunctionTypeInfo(SILMod);
-  if (!FnTy) return llvm::DIArray();
+  if (!SILTy.getSwiftType())
+    return llvm::DIArray();
+
+  SILFunctionTypeInfo *TypeInfo = SILTy.getFunctionTypeInfo(SILMod);
+  if (!TypeInfo) return llvm::DIArray();
 
   llvm::SmallVector<llvm::Value *, 16> Parameters;
-
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto Param : FnTy->getInputTypes()) {
-    DebugTypeInfo DTy(Param.getSwiftType(), /* FIXME: Size */8, /* FIXME: Align */8);
+  unsigned I = 0;
+  for (auto Param : TypeInfo->getInputTypes()) {
+    CanType CTy = Param.getSwiftType();
+    DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));
     Parameters.push_back(getOrCreateType(DTy, Scope));
+    ++I;
   }
 
   return DBuilder.getOrCreateArray(Parameters);
 }
 
-void IRGenDebugInfo::createFunction(SILModule &SILMod,
-                                    SILDebugScope *DS,
+void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
                                     llvm::Function *Fn,
-                                    AbstractCC CC,
-                                    SILType SILTy) {
+                                    AbstractCC CC, SILType SILTy) {
   StringRef Name;
   Location L = {};
   if (DS) {
     L = getStartLoc(SM, DS->Loc);
     Name = getName(DS->Loc);
   }
+  assert(Fn);
   auto LinkageName = Fn->getName();
   auto File = getOrCreateFile(L.Filename);
   auto Scope = TheCU;
   auto Line = L.Line;
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
-  auto Params = createParameterTypes(SILMod, SILTy, Scope);
+  auto Params = createParameterTypes(SILMod, SILTy, Fn->getFunctionType(),
+                                     Scope);
   llvm::DICompositeType DIFnTy = DBuilder.createSubroutineType(File, Params);
   llvm::DIArray TemplateParameters;
   llvm::DISubprogram Decl;
@@ -366,6 +373,14 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod,
   ScopeCache[DS] = SP;
 }
 
+void IRGenDebugInfo::createFunction(SILFunction *SILFn, llvm::Function *Fn) {
+
+  createFunction(SILFn->getModule(),
+                 SILFn->getDebugScope(), Fn,
+                 SILFn->getAbstractCC(),
+                 SILFn->getLoweredType());
+}
+
 void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
                                               IRBuilder &Builder,
                                               llvm::Function *Fn) {
@@ -378,6 +393,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
                                                   const llvm::Twine &Name) {
+
   emitVariableDeclaration(Builder, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable);
 }
