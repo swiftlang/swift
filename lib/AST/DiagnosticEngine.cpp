@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/TypeRepr.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
@@ -156,7 +157,11 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
   case DiagnosticArgumentKind::Type:
     assert(Modifier.empty() && "Improper modifier for Type argument");
-    Out << '\'' << Arg.getAsType().getString() << '\'';
+    Out << '\'' << Arg.getAsType() << '\'';
+    break;
+  case DiagnosticArgumentKind::TypeRepr:
+    assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
+    Out << '\'' << Arg.getAsTypeRepr() << '\'';
     break;
   case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");

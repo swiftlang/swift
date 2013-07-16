@@ -54,7 +54,7 @@ namespace {
     void printRec(Decl *D) { D->dump(Indent+2); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
-    void printRec(TypeRepr *T) { T->print(OS, Indent+2); }
+    void printRec(TypeRepr *T);
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
 
     raw_ostream &printCommon(Pattern *P, const char *Name) {
@@ -170,7 +170,7 @@ namespace {
     void printRec(Expr *E) { E->print(OS, Indent+2); }
     void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
-    void printRec(TypeRepr *T) { T->print(OS, Indent+2); }
+    void printRec(TypeRepr *T);
 
     void printGenericParameters(GenericParamList *Params) {
       if (!Params)
@@ -1223,49 +1223,9 @@ public:
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T) {
-    printCommon(T, "type_attributed") << " attrs=[";
-    const DeclAttributes &Attrs = T->getAttrs();
-    llvm::SmallString<64> AttrStr;
-    llvm::raw_svector_ostream AttrOS(AttrStr);
-    if (Attrs.Resilience.isValid()) {
-      switch (Attrs.Resilience.getResilience()) {
-      case Resilience::InherentlyFragile: AttrOS << "born_fragile,"; break;
-      case Resilience::Fragile: AttrOS << "fragile,"; break;
-      case Resilience::Resilient: AttrOS << "resilient,"; break;
-      }
-    }
-    if (!Attrs.AsmName.empty())
-      AttrOS << "asmname=\"" << Attrs.AsmName << "\",";
-    if (Attrs.isByref()) AttrOS << "byref,";
-    if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
-    if (Attrs.isThin()) AttrOS << "thin,";
-    if (Attrs.isAssignment()) AttrOS << "assignment,";
-    if (Attrs.isConversion()) AttrOS << "conversion,";
-    if (Attrs.isForceInline()) AttrOS << "force_inline,";
-    if (Attrs.isObjC()) AttrOS << "objc,";
-    if (Attrs.isObjCBlock()) AttrOS << "objc_block,";
-    if (Attrs.isPrefix()) AttrOS << "prefix,";
-    if (Attrs.isPostfix()) AttrOS << "postfix,";
-    if (Attrs.isInfix()) AttrOS << "infix,";
-    if (Attrs.isIBOutlet()) AttrOS << "iboutlet,";
-    if (Attrs.isIBAction()) AttrOS << "ibaction,";
-    if (Attrs.isClassProtocol()) AttrOS << "class_protocol,";
-    if (Attrs.isStdlib()) AttrOS << "stdlib,";
-    if (Attrs.isWeak()) AttrOS << "weak,";
-    if (Attrs.isUnowned()) AttrOS << "unowned,";
-    if (Attrs.cc.hasValue()) {
-      AttrOS << "cc(";
-      switch (Attrs.cc.getValue()) {
-      case AbstractCC::C: AttrOS << "cdecl"; break;
-      case AbstractCC::ObjCMethod: AttrOS << "objc_method"; break;
-      case AbstractCC::Freestanding: AttrOS << "freestanding"; break;
-      case AbstractCC::Method: AttrOS << "method"; break;
-      }
-      AttrOS << "),";
-    }
-    AttrOS.flush();
-    AttrStr.pop_back(); // Remove last comma.
-    OS << AttrStr << "])\n";
+    printCommon(T, "type_attributed") << " attrs=";
+    T->printAttrs(OS);
+    OS << '\n';
     printRec(T->getTypeRepr());
   }
 
@@ -1346,11 +1306,15 @@ public:
 
 } // end anonymous namespace.
 
-void TypeRepr::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
+void PrintDecl::printRec(TypeRepr *T) {
+  PrintTypeRepr(OS, Indent+2).visit(T);
 }
 
-void TypeRepr::print(raw_ostream &OS, unsigned Indent) const {
-  PrintTypeRepr(OS, Indent).visit(const_cast<TypeRepr*>(this));
+void PrintPattern::printRec(TypeRepr *T) {
+  PrintTypeRepr(OS, Indent+2).visit(T);
+}
+
+void TypeRepr::dump() const {
+  PrintTypeRepr(llvm::errs(), 0).visit(const_cast<TypeRepr*>(this));
+  llvm::errs() << '\n';
 }

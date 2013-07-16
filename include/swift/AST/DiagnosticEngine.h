@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
@@ -83,6 +84,7 @@ namespace swift {
     Unsigned,
     Identifier,
     Type,
+    TypeRepr,
     PatternKind
   };
 
@@ -98,6 +100,7 @@ namespace swift {
       StringRef StringVal;
       Identifier IdentifierVal;
       Type TypeVal;
+      TypeRepr *TyR;
       PatternKind PatternKindVal;
     };
     
@@ -120,6 +123,20 @@ namespace swift {
 
     DiagnosticArgument(Type T)
       : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
+    }
+
+    DiagnosticArgument(TypeRepr *T)
+      : Kind(DiagnosticArgumentKind::TypeRepr), TyR(T) {
+    }
+
+    DiagnosticArgument(const TypeLoc &TL) {
+      if (TypeRepr *tyR = TL.getTypeRepr()) {
+        Kind = DiagnosticArgumentKind::TypeRepr;
+        TyR = tyR;
+      } else {
+        Kind = DiagnosticArgumentKind::Type;
+        TypeVal = TL.getType();
+      }
     }
     
     DiagnosticArgument(PatternKind K)
@@ -151,6 +168,11 @@ namespace swift {
     Type getAsType() const {
       assert(Kind == DiagnosticArgumentKind::Type);
       return TypeVal;
+    }
+
+    TypeRepr *getAsTypeRepr() const {
+      assert(Kind == DiagnosticArgumentKind::TypeRepr);
+      return TyR;
     }
     
     PatternKind getAsPatternKind() const {

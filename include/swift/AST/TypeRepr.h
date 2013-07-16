@@ -65,7 +65,7 @@ public:
   void operator delete(void *data) = delete;
   void *operator new(size_t bytes, void *data) = delete;
 
-  void print(llvm::raw_ostream &OS, unsigned Indent = 0) const;
+  void print(llvm::raw_ostream &OS) const;
   void dump() const;
 };
 
@@ -85,6 +85,8 @@ public:
   const DeclAttributes &getAttrs() const { return Attrs; }
   TypeRepr *getTypeRepr() const { return Ty; }
 
+  void printAttrs(llvm::raw_ostream &OS) const;
+
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Attributed;
   }
@@ -93,6 +95,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Attrs.LSquareLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -178,6 +181,7 @@ private:
       return Components.back().getGenericArgs().back()->getEndLoc();
     return Components.back().getIdLoc();
   }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -205,6 +209,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -236,6 +241,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return Brackets.End; }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -259,6 +265,7 @@ public:
   MutableArrayRef<TypeRepr *> getElements() const { return Elements; }
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
+  bool hasEllipsis() const { return Ellipsis.isValid(); }
 
   static TupleTypeRepr *create(ASTContext &C, ArrayRef<TypeRepr *> Elements,
                                SourceRange Parens, SourceLoc Ellipsis);
@@ -271,6 +278,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Parens.Start; }
   SourceLoc getEndLocImpl() const { return Parens.End; }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -300,6 +308,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return IdLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -337,6 +346,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return ProtocolLoc; }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
@@ -364,9 +374,18 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return MetaLoc; }
+  void printImpl(llvm::raw_ostream &OS) const;
   friend class TypeRepr;
 };
 
 } // end namespace swift
+
+namespace llvm {
+  static inline raw_ostream &
+  operator<<(raw_ostream &OS, swift::TypeRepr *TyR) {
+    TyR->print(OS);
+    return OS;
+  }
+} // end namespace llvm
 
 #endif

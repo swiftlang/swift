@@ -159,7 +159,7 @@ public:
             !Req.getConstraint()->getClassOrBoundGenericClass()) {
           TC.diagnose(GenericParams->getWhereLoc(),
                       diag::requires_conformance_nonprotocol,
-                      Req.getSubject(), Req.getConstraint());
+                      Req.getSubjectLoc(), Req.getConstraintLoc());
           Req.getConstraintLoc().setInvalidType(TC.Context);
           Req.setInvalid();
           continue;
