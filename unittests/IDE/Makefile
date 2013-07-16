@@ -13,7 +13,7 @@
 SWIFT_LEVEL = ../..
 TESTNAME = IDE
 include $(SWIFT_LEVEL)/../../Makefile.config
-LINK_COMPONENTS := $(TARGETS_TO_BUILD)
+LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader bitwriter support option
 USEDLIBS = swiftIDE.a swiftClangImporter.a swiftSema.a swiftSIL.a swiftIRGen.a swiftParse.a swiftAST.a swiftBasic.a
 LLVMLibsOptions :=     \
   -lclangDriver        \

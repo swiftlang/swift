@@ -790,6 +790,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     Result = parseExprCollection();
     break;
 
+  case tok::code_complete:
+    CodeCompletion->completePostfixExprBeginning();
+    return nullptr;
+
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
   case tok::unknown:

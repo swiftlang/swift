@@ -43,7 +43,11 @@ public:
   /// \brief Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(Expr *E) = 0;
 
-  /// \brief Complete expr-postfix.
+  /// \brief Complete the beginning of expr-postfix -- no tokens provided
+  /// by user.
+  virtual void completePostfixExprBeginning() = 0;
+
+  /// \brief Complete a given expr-postfix.
   virtual void completePostfixExpr(Expr *E) = 0;
 
   /// \brief Complete expr-super after we have consumed the 'super' keyword.

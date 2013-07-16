@@ -194,6 +194,7 @@ public:
 
   void completeExpr() override;
   void completeDotExpr(Expr *E) override;
+  void completePostfixExprBeginning() override;
   void completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
@@ -228,6 +229,10 @@ class CompletionLookup : swift::VisibleDeclConsumer,
   bool HaveDot = false;
   bool IsSuperRefExpr = false;
 
+  bool needDot() const {
+    return Kind == LookupKind::ValueExpr && !HaveDot;
+  }
+
 public:
   CompletionLookup(CodeCompletionContext &CompletionContext,
                    ASTContext &SwiftContext,
@@ -259,7 +264,7 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::SwiftDeclaration);
     Builder.setAssociatedSwiftDecl(VD);
-    if (!HaveDot)
+    if (needDot())
       Builder.addDot();
     Builder.addTextChunk(Name);
     addTypeAnnotation(Builder, VD->getType());
@@ -306,7 +311,7 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::SwiftDeclaration);
     Builder.setAssociatedSwiftDecl(FD);
-    if (!HaveDot)
+    if (needDot())
       Builder.addDot();
     Builder.addTextChunk(Name);
     Builder.addLeftParen();
@@ -382,7 +387,7 @@ public:
     CodeCompletionResultBuilder Builder(
         CompletionContext,
         CodeCompletionResult::ResultKind::Keyword);
-    if (!HaveDot)
+    if (needDot())
       Builder.addDot();
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.isNull())
@@ -391,7 +396,8 @@ public:
 
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *D) override {
-    if (Kind == LookupKind::ValueExpr) {
+    switch (Kind) {
+    case LookupKind::ValueExpr:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         // Swift does not have class variables.
         // FIXME: add code completion results when class variables are added.
@@ -435,6 +441,29 @@ public:
         addSwiftSubscriptCall(SD);
         return;
       }
+
+    case LookupKind::DeclContext:
+      if (auto *VD = dyn_cast<VarDecl>(D)) {
+        addSwiftVarDeclRef(VD);
+        return;
+      }
+
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        // We can not call operators with a postfix parenthesis syntax.
+        if (FD->isBinaryOperator() || FD->isUnaryOperator())
+          return;
+
+        // We can not call getters or setters.  We use VarDecls and
+        // SubscriptDecls to produce completions that refer to getters and
+        // setters.
+        if (FD->isGetterOrSetter())
+          return;
+
+        addSwiftMethodCall(FD);
+        return;
+      }
+
+      return;
     }
   }
 
@@ -472,9 +501,9 @@ public:
         MetaTypeType::get(ExprType, SwiftContext)->getCanonicalType());
   }
 
-  void getCompletionsInDeclContext(DeclContext *DC, SourceLoc Loc) {
+  void getCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::DeclContext;
-    lookupVisibleDecls(*this, DC, Loc);
+    lookupVisibleDecls(*this, CurrDeclContext, Loc);
 
     if (auto Importer = SwiftContext.getClangModuleLoader())
       static_cast<ClangImporter&>(*Importer).lookupVisibleDecls(*this);
@@ -489,6 +518,14 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.setHaveDot();
   Lookup.getValueExprCompletions(E->getType());
+
+  Consumer.handleResults(CompletionContext.takeResults());
+}
+
+void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
+  CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
+  assert(P.Tok.is(tok::code_complete));
+  Lookup.getCompletionsInDeclContext(P.Tok.getLoc());
 
   Consumer.handleResults(CompletionContext.takeResults());
 }
