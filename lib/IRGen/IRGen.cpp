@@ -187,9 +187,9 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   if (!Opts.OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
-    unsigned OSFlags = 0;
+    llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
     if (isBinaryOutput(Opts.OutputKind))
-      OSFlags |= raw_fd_ostream::F_Binary;
+      OSFlags |= llvm::sys::fs::F_Binary;
     RawOS.reset(new raw_fd_ostream(Opts.OutputFilename.c_str(),
                                    Error, OSFlags));
     if (RawOS->has_error() || !Error.empty()) {
