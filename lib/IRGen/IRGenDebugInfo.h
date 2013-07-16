@@ -24,6 +24,7 @@
 #include "llvm/Support/SourceMgr.h"
 
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/AST/Stmt.h"
 
 #include "DebugTypeInfo.h"
@@ -37,9 +38,11 @@ namespace llvm {
 
 namespace swift {
 
+class SILArgument;
 class SILDebugScope;
 class SILModule;
 class SILFunctionTypeInfo;
+class AllocVarInst;
 
 namespace irgen {
 
@@ -56,17 +59,22 @@ typedef struct {
 class IRGenDebugInfo {
   llvm::SourceMgr &SM;
   llvm::DIBuilder DBuilder;
+  const Options &Opts;
+  TypeConverter &Types;
 
   // Various caches.
-  llvm::DenseMap<SILDebugScope*, llvm::DIDescriptor> ScopeCache;
+  llvm::DenseMap<SILDebugScope *, llvm::DIDescriptor> ScopeCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<DebugTypeInfo, llvm::WeakVH> DITypeCache;
+
+  // These are used by getArgNo.
+  SILFunction *LastFn;
+  SILBasicBlock::const_bbarg_iterator LastArg, LastEnd;
+  unsigned LastArgNo;
 
   StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
-  const Options &Opts;
-  TypeConverter &Types;
 
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
@@ -75,7 +83,7 @@ public:
   IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
                  llvm::SourceMgr &SM, llvm::Module &M);
 
-  /// Finalize the DIBuilder.
+  /// Finalize the llvm::DIBuilder owned by this object.
   void finalize();
 
   /// Update the IRBuilder's current debug location to the location
@@ -119,7 +127,8 @@ public:
   void emitStackVariableDeclaration(IRBuilder& Builder,
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
-                                    const llvm::Twine &Name);
+                                    const llvm::Twine &Name,
+                                    swift::AllocVarInst *i);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,
@@ -148,6 +157,7 @@ private:
                                      SILType SILTy,
                                      llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope);
+  unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
 };
 
 } // irgen

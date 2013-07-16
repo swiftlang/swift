@@ -18,6 +18,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/config/config.h"
@@ -73,7 +74,7 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
                                llvm::SourceMgr &SM, llvm::Module &M)
   : SM(SM), DBuilder(M), Opts(Opts), Types(Types),
-    LastLoc({}), LastScope(nullptr) {
+    LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
   std::string MainFilename = Opts.MainInputFilename;
@@ -389,11 +390,53 @@ void IRGenDebugInfo::createArtificialFunction(SILModule &SILMod,
   setCurrentLoc(Builder, Scope);
 }
 
+/// Return the position of Arg in Fn's signature, counting from 1.
+unsigned IRGenDebugInfo::getArgNo(SILFunction *Fn, SILArgument *Arg) {
+  // Based on the assumption that arguments will appear in order in the
+  // instruction stream, make one attempt to reuse the last iterator.
+  // LastFn also acts as a sentinel for LastArg/End.
+  if (Fn == LastFn) {
+    ++LastArg; ++LastArgNo;
+    if (LastArg != LastEnd && *LastArg == Arg)
+      return LastArgNo;
+  }
+  // Otherwise perform a linear scan through all the arguments.
+  LastArgNo = 1;
+  if (!Fn->empty()) {
+    const SILBasicBlock &FirstBB = Fn->front();
+    LastArg = FirstBB.bbarg_begin();
+    LastEnd = FirstBB.bbarg_end();
+    LastFn = Fn;
+    while (LastArg != LastEnd) {
+      if (*LastArg == Arg)
+        return LastArgNo;
+
+      ++LastArg; ++LastArgNo;
+    }
+  }
+  DEBUG(llvm::dbgs() << "Failed to find argument number for ";
+        Arg->dump(); llvm::dbgs() << "\nIn:"; Fn->dump());
+  return 0;
+}
+
 void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
-                                                  const llvm::Twine &Name) {
-
+                                                  const llvm::Twine &Name,
+                                                  swift::AllocVarInst *i) {
+  // Make a best effort to find out if this variable is actually an
+  // argument of the current function. This is done by looking at the
+  // source of the first store to this alloca.  Unless we start
+  // enriching SIL with debug metadata or debug intrinsics, that's the
+  // best we can do.
+  for (auto Use : i->getUses())
+    if (auto Store = dyn_cast<StoreInst>(Use->getUser()))
+      if (auto SILArg = dyn_cast<SILArgument>(Store->getSrc())) {
+        assert(i && i->getParent() && i->getParent()->getParent() );
+        auto Fn = i->getParent()->getParent();
+        emitArgVariableDeclaration(Builder, Storage, Ty, Name, getArgNo(Fn, SILArg));
+        return;
+      }
   emitVariableDeclaration(Builder, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable);
 }

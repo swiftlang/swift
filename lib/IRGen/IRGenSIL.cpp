@@ -1711,7 +1711,8 @@ void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
                                                 addr.getAddressPointer(),
                                                 DebugTypeInfo(*Decl, type),
-                                                Decl->getName().str());
+                                                Decl->getName().str(),
+                                                i);
 
   setLoweredAddress(v, addr.getAddress());
 }
