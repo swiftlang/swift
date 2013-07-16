@@ -927,6 +927,10 @@ ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
 ERROR(use_module_as_type,sema_nb,none,
       "use of module %0 as a type", (Identifier))
+ERROR(use_non_type_value,sema_nb,none,
+      "%0 is not a type", (Identifier))
+NOTE(use_non_type_value_prev,sema_nb,none,
+     "%0 declared here", (Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,sema_nb,none,

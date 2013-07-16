@@ -339,7 +339,13 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       return true;
     }
   } else {
-    auto typeDecl = cast<TypeDecl>(Components[0].Value.get<ValueDecl *>());
+    auto VD = Components[0].Value.get<ValueDecl *>();
+    auto typeDecl = dyn_cast<TypeDecl>(VD);
+    if (!typeDecl) {
+      TC.diagnose(Components[0].Loc, diag::use_non_type_value, VD->getName());
+      TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
+      return true;
+    }
     auto type = typeDecl->getDeclaredType();
 
     // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
