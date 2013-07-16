@@ -482,11 +482,6 @@ public:
 
   void visitSILBasicBlock(SILBasicBlock *BB);
   
-  void visitSILInstruction(SILInstruction *i) {
-    i->dump();
-    llvm_unreachable("irgen for SIL instruction not yet implemented");
-  }
-  
   void visitAllocVarInst(AllocVarInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
@@ -538,7 +533,7 @@ public:
   void visitReleaseInst(ReleaseInst *i);
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
   void visitDeallocVarInst(DeallocVarInst *i);
-  //void visitDeallocRefInst(DeallocRefInst *i);
+  void visitDeallocRefInst(DeallocRefInst *i);
 
   void visitInitializeVarInst(InitializeVarInst *i);
   void visitCopyAddrInst(CopyAddrInst *i);
@@ -555,6 +550,7 @@ public:
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
+  void visitConvertCCInst(ConvertCCInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
   void visitSuperToArchetypeRefInst(SuperToArchetypeRefInst *i);
@@ -1733,6 +1729,10 @@ void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
   // Nothing to do. We could emit a lifetime.end here maybe.
 }
 
+void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
+  llvm_unreachable("not implemented");
+}
+
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue boxValue(i, 0);
   SILValue ptrValue(i, 1);
@@ -1842,6 +1842,10 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   to.add(from.claimNext());
   to.add(IGM.RefCountedNull);
   setLoweredExplosion(SILValue(i, 0), to);
+}
+
+void IRGenSILFunction::visitConvertCCInst(swift::ConvertCCInst *i) {
+  llvm_unreachable("not implemented");
 }
 
 void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
