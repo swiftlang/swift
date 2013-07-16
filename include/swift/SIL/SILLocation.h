@@ -17,12 +17,14 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/SourceLoc.h"
 
 #include <cstddef>
 #include <type_traits>
 
 namespace swift {
+
+class SourceLoc;
+
 /// SILLocation - This is a pointer to the AST node that a SIL instruction was
 /// derived from. This may be null if AST information is unavailable or
 /// stripped.
