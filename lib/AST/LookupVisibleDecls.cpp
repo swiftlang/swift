@@ -521,9 +521,16 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                bool IsTypeLookup) {
   swift::NominalTypeDecl *ntd = nullptr;
   
-  if (LValueType *lvt = BaseTy->getAs<LValueType>())
-    ntd = lvt->getObjectType()->getNominalOrBoundGenericNominal();
-  else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
+  if (LValueType *lvt = BaseTy->getAs<LValueType>()) {
+    Type ObjectType = lvt->getObjectType();
+    if (auto *AT = ObjectType->getAs<ArchetypeType>()) {
+      for (auto *PD : AT->getConformsTo()) {
+        lookupVisibleDecls(Consumer, PD->getDeclaredType(), IsTypeLookup);
+      }
+      return;
+    }
+    ntd = ObjectType->getNominalOrBoundGenericNominal();
+  } else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
     ntd = mtt->getInstanceType()->getNominalOrBoundGenericNominal();
   else
     ntd = BaseTy->getNominalOrBoundGenericNominal();

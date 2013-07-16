@@ -539,7 +539,9 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleDecls(*this, ExprType);
+      // Use a canonical type here to ensure that we get ArchetypeTypes instead
+      // of IdentifierTypes.
+      lookupVisibleDecls(*this, ExprType->getCanonicalType());
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.
