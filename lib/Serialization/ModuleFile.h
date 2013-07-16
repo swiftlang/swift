@@ -227,10 +227,6 @@ private:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclID DID);
 
-  Optional<Decl *> requestDecl(serialization::DeclID);
-
-  Optional<Type> requestType(serialization::TypeID);
-
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.

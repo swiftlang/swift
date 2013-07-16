@@ -72,9 +72,10 @@ using AbstractCCField = BCFixed<2>;
 // VERSION_MAJOR.
 enum XRefKind : uint8_t {
   SwiftValue = 0,
+  SwiftExtensionValue,
   SwiftOperator
 };
-using XRefKindField = BCFixed<1>;
+using XRefKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -637,7 +638,9 @@ namespace decls_block {
     XREF,
     XRefKindField, // reference kind
     TypeIDField,   // type if value, operator kind if operator
-    BCArray<IdentifierIDField> // access path
+    BCArray<IdentifierIDField> // extension module name (if extension value)
+                               // base module name
+                               // access path
   >;
 }
 

@@ -485,6 +485,18 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
+/// Returns the appropriate module for the given name.
+///
+/// An empty name represents the builtin module. All other names are looked up
+/// in the ASTContext.
+static Module *getModule(ASTContext &ctx, Identifier name) {
+  if (name.empty())
+    return ctx.TheBuiltinModule;
+
+  // FIXME: provide a real source location.
+  return ctx.getModule(std::make_pair(name, SourceLoc()), false);
+}
+
 
 /// Translate from the Serialization assocativity enum values to the AST
 /// strongly-typed enum.
@@ -1210,61 +1222,64 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     Identifier moduleName = getIdentifier(rawAccessPath.front());
     rawAccessPath = rawAccessPath.slice(1);
 
-    Module *M;
-    if (moduleName.empty()) {
-      M = ctx.TheBuiltinModule;
-    } else {
-      // FIXME: provide a real source location.
-      M = ctx.getModule(std::make_pair(moduleName, SourceLoc()), false);
-    }
+    Module *M = getModule(ctx, moduleName);
     assert(M && "missing dependency");
 
     switch (kind) {
-    case XRefKind::SwiftValue: {
+    case XRefKind::SwiftValue:
+    case XRefKind::SwiftExtensionValue: {
       // Start by looking up the top-level decl in the module.
+      Module *baseModule = M;
+      if (kind == XRefKind::SwiftExtensionValue) {
+        baseModule = getModule(ctx, getIdentifier(rawAccessPath.front()));
+        rawAccessPath = rawAccessPath.slice(1);
+      }
+
       SmallVector<ValueDecl *, 8> values;
-      M->lookupValue(Module::AccessPathTy(),
-                     getIdentifier(rawAccessPath.front()),
-                     NLKind::QualifiedLookup,
-                     values);
+      baseModule->lookupValue(Module::AccessPathTy(),
+                              getIdentifier(rawAccessPath.front()),
+                              NLKind::QualifiedLookup,
+                              values);
       rawAccessPath = rawAccessPath.slice(1);
 
       // Then, follow the chain of nested ValueDecls until we run out of
       // identifiers in the access path.
       SmallVector<ValueDecl *, 8> baseValues;
-      while (!rawAccessPath.empty()) {
+      for (IdentifierID nextID : rawAccessPath) {
         baseValues.swap(values);
         values.clear();
         for (auto base : baseValues) {
-          // FIXME: extensions?
           if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
-            Identifier memberName = getIdentifier(rawAccessPath.front());
+            Identifier memberName = getIdentifier(nextID);
             auto members = nominal->lookupDirect(memberName);
             values.append(members.begin(), members.end());
           }
         }
-        rawAccessPath = rawAccessPath.slice(1);
       }
 
       // If we have a type to validate against, filter out any ValueDecls that
       // don't match that type.
       CanType expectedTy;
-      Type maybeExpectedTy = getType(expectedTypeID);
-      if (maybeExpectedTy)
+      if (Type maybeExpectedTy = getType(expectedTypeID))
         expectedTy = maybeExpectedTy->getCanonicalType();
 
       ValueDecl *result = nullptr;
       for (auto value : values) {
-        if (!expectedTy || value->getType()->getCanonicalType() == expectedTy) {
-          // It's an error if more than one value has the same type.
-          // FIXME: Functions and constructors can overload based on parameter
-          // names.
-          if (result) {
-            error();
-            return nullptr;
-          }
+        if (value->getModuleContext() != M)
+          continue;
+        if (expectedTy && value->getType()->getCanonicalType() != expectedTy)
+          continue;
+
+        if (!result || result == value) {
           result = value;
+          continue;
         }
+
+        // It's an error if more than one value has the same type.
+        // FIXME: Functions and constructors can overload based on parameter
+        // names.
+        error();
+        return nullptr;
       }
 
       // It's an error if lookup doesn't actually find anything -- that means

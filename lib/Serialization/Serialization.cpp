@@ -158,6 +158,14 @@ namespace {
     /// \returns The ID for the given Identifier in this module.
     IdentifierID addIdentifierRef(Identifier ident);
 
+    /// Records the use of the given module.
+    ///
+    /// The module's name will be scheduled for serialization if necessary.
+    ///
+    /// \returns The ID for the identifier for the module's name, or 0 for the
+    ///          builtin module.
+    IdentifierID addModuleRef(const Module *M);
+
     /// Returns the declaration the given generic parameter list is associated
     /// with.
     const Decl *getGenericContext(const GenericParamList *paramList);
@@ -345,6 +353,14 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
   id = ++LastIdentifierID;
   IdentifiersToWrite.push_back(ident);
   return id;
+}
+
+IdentifierID Serializer::addModuleRef(const Module *M) {
+  assert(M != TU && "cannot form cross-reference to module being serialized");
+  if (M == TU->Ctx.TheBuiltinModule)
+    return 0;
+
+  return addIdentifierRef(M->Name);
 }
 
 const Decl *Serializer::getGenericContext(const GenericParamList *paramList) {
@@ -762,19 +778,21 @@ bool Serializer::writeCrossReference(const Decl *D) {
 
   // Build up the access path by walking through parent DeclContexts.
   const DeclContext *DC;
+  const ExtensionDecl *extension = nullptr;
   for (DC = D->getDeclContext(); !DC->isModuleContext(); DC = DC->getParent()) {
-    // FIXME: Handle references to things in extensions.
-    if (isa<ExtensionDecl>(DC))
-      return false;
+    if ((extension = dyn_cast<ExtensionDecl>(DC)))
+      DC = extension->getExtendedType()->getNominalOrBoundGenericNominal();
 
     auto value = cast<ValueDecl>(getDeclForContext(DC));
     accessPath.push_back(addIdentifierRef(value->getName()));
   }
 
-  if (DC == TU->Ctx.TheBuiltinModule)
-    accessPath.push_back(0);
-  else
-    accessPath.push_back(addIdentifierRef(cast<Module>(DC)->Name));
+  accessPath.push_back(addModuleRef(cast<Module>(DC)));
+  if (extension) {
+    assert(kind == XRefKind::SwiftValue);
+    kind = XRefKind::SwiftExtensionValue;
+    accessPath.push_back(addModuleRef(extension->getModuleContext()));
+  }
 
   // Store the access path in forward order.
   std::reverse(accessPath.begin(), accessPath.end());
