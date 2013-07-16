@@ -1215,10 +1215,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::XREF: {
     uint8_t kind;
     TypeID expectedTypeID;
+    bool isWithinExtension;
     ArrayRef<uint64_t> rawAccessPath;
 
     decls_block::XRefLayout::readRecord(scratch, kind, expectedTypeID,
-                                        rawAccessPath);
+                                        isWithinExtension, rawAccessPath);
 
     // First, find the module this reference is referring to.
     Identifier moduleName = getIdentifier(rawAccessPath.front());
@@ -1229,10 +1230,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     switch (kind) {
     case XRefKind::SwiftValue:
-    case XRefKind::SwiftExtensionValue: {
+    case XRefKind::SwiftGenericParameter: {
       // Start by looking up the top-level decl in the module.
       Module *baseModule = M;
-      if (kind == XRefKind::SwiftExtensionValue) {
+      if (isWithinExtension) {
         baseModule = getModule(ctx, getIdentifier(rawAccessPath.front()));
         rawAccessPath = rawAccessPath.slice(1);
       }
@@ -1262,8 +1263,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       // If we have a type to validate against, filter out any ValueDecls that
       // don't match that type.
       CanType expectedTy;
-      if (Type maybeExpectedTy = getType(expectedTypeID))
-        expectedTy = maybeExpectedTy->getCanonicalType();
+      if (kind == XRefKind::SwiftValue)
+        if (Type maybeExpectedTy = getType(expectedTypeID))
+          expectedTy = maybeExpectedTy->getCanonicalType();
 
       ValueDecl *result = nullptr;
       for (auto value : values) {
@@ -1289,6 +1291,30 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       if (!result) {
         error();
         return nullptr;
+      }
+
+      if (kind == XRefKind::SwiftGenericParameter) {
+        GenericParamList *paramList = nullptr;
+
+        if (auto nominal = dyn_cast<NominalTypeDecl>(result))
+          paramList = nominal->getGenericParams();
+        else if (auto fn = dyn_cast<FuncDecl>(result))
+          paramList = fn->getGenericParams();
+        else if (auto ctor = dyn_cast<ConstructorDecl>(result))
+          paramList = ctor->getGenericParams();
+
+        if (!paramList) {
+          error();
+          return nullptr;
+        }
+
+        if (expectedTypeID >= paramList->size()) {
+          error();
+          return nullptr;
+        }
+
+        result = paramList->getParams()[expectedTypeID].getDecl();
+        assert(result);
       }
 
       declOrOffset = result;

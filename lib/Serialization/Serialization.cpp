@@ -747,13 +747,32 @@ bool Serializer::writeCrossReference(const Decl *D) {
 
   if (auto value = dyn_cast<ValueDecl>(D)) {
     kind = XRefKind::SwiftValue;
-    accessPath.push_back(addIdentifierRef(value->getName()));
 
-    // Make sure we don't create a self-referential type.
-    Type ty = value->getType();
-    if (ty->is<MetaTypeType>())
-      ty = nullptr;
-    typeID = addTypeRef(ty);
+    if (auto alias = dyn_cast<TypeAliasDecl>(D)) {
+      if (alias->isGenericParameter()) {
+        DeclContext *DC = alias->getDeclContext();
+        auto params = DC->getGenericParamsOfContext()->getParams();
+
+        auto iter = std::find_if(params.begin(), params.end(),
+                                 [=](const GenericParam &param) {
+          return param.getAsTypeParam() == alias;
+        });
+        assert(iter != params.end() && "generic param not in list");
+
+        kind = XRefKind::SwiftGenericParameter;
+        typeID = std::distance(params.begin(), iter);
+      }
+    }
+
+    if (kind == XRefKind::SwiftValue) {
+      accessPath.push_back(addIdentifierRef(value->getName()));
+
+      // Make sure we don't create a self-referential type.
+      Type ty = value->getType();
+      if (ty->is<MetaTypeType>())
+        ty = nullptr;
+      typeID = addTypeRef(ty);
+    }
 
   } else if (auto op = dyn_cast<OperatorDecl>(D)) {
     kind = XRefKind::SwiftOperator;
@@ -788,18 +807,15 @@ bool Serializer::writeCrossReference(const Decl *D) {
   }
 
   accessPath.push_back(addModuleRef(cast<Module>(DC)));
-  if (extension) {
-    assert(kind == XRefKind::SwiftValue);
-    kind = XRefKind::SwiftExtensionValue;
+  if (extension)
     accessPath.push_back(addModuleRef(extension->getModuleContext()));
-  }
 
   // Store the access path in forward order.
   std::reverse(accessPath.begin(), accessPath.end());
 
   unsigned abbrCode = DeclTypeAbbrCodes[XRefLayout::Code];
   XRefLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                         kind, typeID, accessPath);
+                         kind, typeID, !!extension, accessPath);
 
   return true;
 }

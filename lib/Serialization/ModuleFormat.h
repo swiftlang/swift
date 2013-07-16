@@ -72,8 +72,8 @@ using AbstractCCField = BCFixed<2>;
 // VERSION_MAJOR.
 enum XRefKind : uint8_t {
   SwiftValue = 0,
-  SwiftExtensionValue,
-  SwiftOperator
+  SwiftOperator,
+  SwiftGenericParameter
 };
 using XRefKindField = BCFixed<2>;
 
@@ -638,7 +638,9 @@ namespace decls_block {
   using XRefLayout = BCRecordLayout<
     XREF,
     XRefKindField, // reference kind
-    TypeIDField,   // type if value, operator kind if operator
+    TypeIDField,   // type if value, operator kind if operator,
+                   // index if generic parameter
+    BCFixed<1>,    // within extension?
     BCArray<IdentifierIDField> // extension module name (if extension value)
                                // base module name
                                // access path
