@@ -1690,7 +1690,7 @@ void swift::serialize(const TranslationUnit *TU, const char *outputPath,
                       FileBufferIDs inputFiles) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
-                           llvm::raw_fd_ostream::F_Binary);
+                           llvm::sys::fs::F_Binary);
 
   if (out.has_error() || !errorInfo.empty()) {
     TU->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
