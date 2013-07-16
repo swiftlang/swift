@@ -1,4 +1,4 @@
-//===--- Checker.cpp - Analyzes and checking of Swift SIL Code ------------===//
+//===-- DataflowDiagnostics.cpp - Emits diagnostics based on SIL analysis -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,8 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Subsystems.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Diagnostics.h"
@@ -63,12 +65,12 @@ static void diagnoseUnreachable(const SILInstruction *I,
     }
   }
 }
+
 }; // end of anonymous namespace
 
-void SILModule::check() const {
-  const SILModule *M = this;
+void swift::emitSILDataflowDiagnostics(const SILModule *M) {
   for (auto &Fn : *M)
     for (auto &BB : Fn)
       for (auto &I : BB)
-        diagnoseUnreachable(&I, getASTContext());
+        diagnoseUnreachable(&I, M->getASTContext());
 }

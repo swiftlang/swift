@@ -496,10 +496,6 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     addGlobalVariable(vd);
 }
 
-void SILGenModule::postEmitModule() {
-  M.check();
-}
-
 //===--------------------------------------------------------------------===//
 // SILModule::constructSIL method implementation
 //===--------------------------------------------------------------------===//
@@ -515,8 +511,6 @@ SILModule *SILModule::constructSIL(TranslationUnit *tu,
   for (auto def : tu->getASTContext().ExternalDefinitions) {
     sgm.emitExternalDefinition(def);
   }
-
-  sgm.postEmitModule();
 
   return m;
 }

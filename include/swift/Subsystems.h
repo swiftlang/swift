@@ -133,6 +133,10 @@ namespace swift {
   /// "alloc_var stack" allocations into SSA registers where possible.
   void performSILMemoryPromotion(SILModule *M);
 
+  /// \brief Analyze the SIL module for correcntess and generate user
+  /// diagnostics if any.
+  void emitSILDataflowDiagnostics(const SILModule *M);
+
   /// Serializes a translation unit to the given output file.
   ///
   /// This interface is still prone to change!

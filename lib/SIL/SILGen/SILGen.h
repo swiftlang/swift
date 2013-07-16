@@ -174,8 +174,6 @@ public:
   /// dispatch.
   bool requiresObjCSuperDispatch(ValueDecl *vd);
 
-  void postEmitModule();
-
   /// Known functions for bridging.
   SILConstant getStringToNSStringFn();
   SILConstant getNSStringToStringFn();
