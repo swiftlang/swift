@@ -1629,6 +1629,111 @@ namespace {
   };
 }
 
+/// \brief Given a constraint locator, find the owner of default arguments for
+/// that tuple, i.e., a FuncDecl.
+static ValueDecl *
+findDefaultArgumentOwner(ConstraintSystem &cs,
+                         const Solution &solution,
+                         ConstraintLocator *locator) {
+  if (locator->getPath().empty() || !locator->getAnchor())
+    return nullptr;
+
+  // If the locator points to a function application, find the function itself.
+  if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
+    SmallVector<LocatorPathElt, 4> newPath;
+    newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
+
+    // If we have an interpolation argument, dig out the constructor if we
+    // can.
+    // FIXME: This representation is actually quite awful
+    if (newPath.size() == 1 &&
+        newPath[0].getKind() == ConstraintLocator::InterpolationArgument) {
+      newPath.push_back(ConstraintLocator::ConstructorMember);
+
+      locator = cs.getConstraintLocator(locator->getAnchor(), newPath);
+      auto known = solution.overloadChoices.find(locator);
+      if (known != solution.overloadChoices.end()) {
+        auto &choice = known->second.first;
+        if (choice.getKind() == OverloadChoiceKind::Decl)
+          return choice.getDecl();
+      }
+      return nullptr;
+    } else {
+      newPath.push_back(ConstraintLocator::ApplyFunction);
+    }
+    locator = cs.getConstraintLocator(locator->getAnchor(), newPath);
+  }
+
+  // Simplify the locator.
+  SourceRange range1, range2;
+  locator = simplifyLocator(cs, locator, range1, range2);
+
+  // If we didn't map down to a specific expression, we can't handle a default
+  // argument.
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  // Find the declaration to which the anchor refers. This feels less general
+  // than it should be.
+  auto anchor = locator->getAnchor();
+
+  // Unwrap any specializations, constructor calls, implicit conversions, and
+  // '.'s.
+  // FIXME: This is brittle.
+  do {
+    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
+      anchor = specialize->getSubExpr();
+      continue;
+    }
+
+    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
+      anchor = implicit->getSubExpr();
+      continue;
+    }
+
+    if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
+      anchor = constructor->getFn();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
+      anchor = dotSyntax->getRHS();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(anchor)) {
+      anchor = dotSyntax->getFn();
+      continue;
+    }
+
+    break;
+  } while (true);
+
+  // Simple case: direct reference to a declaration.
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor)) {
+    return dre->getDecl();
+  }
+  if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
+    return mre->getDecl();
+  }
+
+  // Overloaded and unresolved cases: find the resolved overload.
+  if (isa<OverloadedDeclRefExpr>(anchor) ||
+      isa<OverloadedMemberRefExpr>(anchor) ||
+      isa<UnresolvedDeclRefExpr>(anchor) ||
+      isa<UnresolvedMemberExpr>(anchor)) {
+    auto anchorLocator = cs.getConstraintLocator(anchor, { });
+    auto known = solution.overloadChoices.find(anchorLocator);
+    if (known != solution.overloadChoices.end()) {
+      auto &choice = known->second.first;
+      if (choice.getKind() == OverloadChoiceKind::Decl)
+        return choice.getDecl();
+    }
+  }
+
+  return nullptr;
+}
+
 Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
@@ -1658,6 +1763,16 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       anythingShuffled = true;
       hasInits = true;
       toSugarFields.push_back(toElt);
+
+      // Dig out the default argument for the given locator.
+      auto owner = findDefaultArgumentOwner(cs, solution,
+                                            cs.getConstraintLocator(locator));
+      if (!owner) {
+        llvm::errs() << "Could not find default argument for locator: ";
+        cs.getConstraintLocator(locator)->dump(&tc.Context.SourceMgr);
+        llvm::errs() << "\n";
+        assert(false);
+      }
       continue;
     }
 
@@ -2076,7 +2191,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto openedType = selected.second->castTo<FunctionType>()->getResult();
       expr = finishApply(apply, openedType,
                          ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr, { })));
+                           cs.getConstraintLocator(apply, { })));
     } else {
       // If there was no conversion member, look for a constructor member.
       // This is only used for handling interpolated string literals, where

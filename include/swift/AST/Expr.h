@@ -2610,7 +2610,7 @@ public:
 /// \brief An expression that describes the use of a default value, which may
 /// come from the default argument of a function type or member initializer.
 ///
-/// This expression is synthesizes by type checking and cannot be written
+/// This expression is synthesized by type checking and cannot be written
 /// directly by the user.
 class DefaultValueExpr : public Expr {
   Expr *subExpr;

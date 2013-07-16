@@ -91,14 +91,10 @@ void Failure::dump(llvm::SourceMgr *sm) {
 }
 
 
-/// \brief Simplify the given locator by zeroing in on the most specific
-/// subexpression described by the locator.
-///
-/// \param range1 Will be populated with an "interesting" range 
-static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
-                                          ConstraintLocator *locator,
-                                          SourceRange &range1,
-                                          SourceRange &range2) {
+ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
+                                                ConstraintLocator *locator,
+                                                SourceRange &range1,
+                                                SourceRange &range2) {
   range1 = SourceRange();
   range2 = SourceRange();
 
@@ -118,7 +114,7 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getArg();
+        anchor = applyExpr->getFn();
         path = path.slice(1);
         continue;
       }
@@ -144,6 +140,14 @@ static ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
       if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(anchor)) {
         range1 = dotExpr->getNameLoc();
         anchor = dotExpr->getBase();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    case ConstraintLocator::InterpolationArgument:
+      if (auto interp = dyn_cast<InterpolatedStringLiteralExpr>(anchor)) {
+        anchor = interp->getSegments()[path[0].getValue()];
         path = path.slice(1);
         continue;
       }

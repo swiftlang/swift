@@ -2207,6 +2207,19 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
                          SmallVectorImpl<int> &sources,
                          SmallVectorImpl<unsigned> &variadicArgs);
 
+/// Simplify the given locator by zeroing in on the most specific
+/// subexpression described by the locator.
+///
+/// \param cs The constraint system in which the locator will be simplified.
+/// \param locator The locator to simplify.
+/// \param range1 Will be populated with an "interesting" range.
+/// \param range2 Will be populated with a second "interesting" range.
+/// \return the simplified locator.
+ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
+                                   ConstraintLocator *locator,
+                                   SourceRange &range1,
+                                   SourceRange &range2);
+
 } // end namespace constraints
 
 template<typename ...Args>
