@@ -258,3 +258,24 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: return
   %11 = return %7 : $()
 }
+
+protocol [class_protocol] ClassBound {
+  func classBoundMethod()
+}
+
+// CHECK: $[thin] (x : ClassBound) -> ()
+sil @_T4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $[thin] (x : ClassBound) -> () {
+bb0(%0 : $ClassBound):
+  %1 = alloc_box $ClassBound                // CHECK: alloc_box
+  %2 = store %0 to %1#1 : $*ClassBound      // CHECK: store
+  %3 = load %1#1 : $*ClassBound             // CHECK: load
+  %4 = retain %3 : $ClassBound              // CHECK: retain
+  // CHECK: project_existential_ref {{%.*}} : $ClassBound
+  %5 = project_existential_ref %3 : $ClassBound
+  // CHECK: protocol_method
+  %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : $[cc(method), thin] ((), Builtin.ObjCPointer) -> ()
+  %7 = apply %6(%5) : $[cc(method), thin] ((), Builtin.ObjCPointer) -> ()
+  %8 = tuple ()
+  %9 = release %1#0 : $Builtin.ObjectPointer
+  %10 = return %8 : $()
+}

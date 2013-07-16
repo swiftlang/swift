@@ -767,6 +767,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("project_downcast_existential_addr",
           ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
+    .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
@@ -863,6 +864,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ProjectExistentialInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createProjectExistential(SILLocation(), Val);
+    break;
+  case ValueKind::ProjectExistentialRefInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createProjectExistentialRef(SILLocation(), Val);
     break;
       
   case ValueKind::RetainInst:
