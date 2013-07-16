@@ -216,19 +216,19 @@ protocol Runcible {
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $[thin] <T : Runcible> (x : T) -> () {
 bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.free_method!1
-  %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [byref] T) -> Int64 // user: %2
+  %1 = archetype_method $*T, #Runcible.free_method!1 : $[cc(method)] ((), [byref] T) -> Int64
   %2 = apply %1(%0) : $[cc(method)] ((), [byref] T) -> Int64
   %3 = alloc_var $T.U.metatype
   // CHECK: archetype_method $*T, #Runcible.associated_method!1
-  %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %5
-  %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype // user: %6
+  %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype
+  %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype
   %6 = store %5 to %3 : $*T.U.metatype
-  %7 = metatype $T.metatype                       // user: %9
+  %7 = metatype $T.metatype
   // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
-  %8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $((), T.metatype) -> () // user: %9
+  %8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $((), T.metatype) -> ()
   %9 = apply %8(%7) : $((), T.metatype) -> ()
   %10 = dealloc_var %3 : $*T.U.metatype
-  %11 = tuple ()                                  // user: %13
+  %11 = tuple ()
   %12 = destroy_addr %0 : $*T
   %13 = return %11 : $()
 }
