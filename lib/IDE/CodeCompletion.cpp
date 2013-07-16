@@ -370,6 +370,16 @@ public:
     addTypeAnnotation(Builder, SD->getElementType());
   }
 
+  void addSwiftNominalTypeRef(const NominalTypeDecl *NTD) {
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::SwiftDeclaration);
+    Builder.setAssociatedSwiftDecl(NTD);
+    Builder.addTextChunk(NTD->getName().str());
+    addTypeAnnotation(Builder,
+                      MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
+  }
+
   void addClangDecl(const clang::NamedDecl *ND) {
     // FIXME: Eventually, we'll import the Clang Decl and format it as a Swift
     // declaration.  Right now we don't do this because of performance reasons.
@@ -460,6 +470,11 @@ public:
           return;
 
         addSwiftMethodCall(FD);
+        return;
+      }
+
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        addSwiftNominalTypeRef(NTD);
         return;
       }
 
