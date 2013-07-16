@@ -308,8 +308,13 @@ void SILGenModule::postEmitFunction(SILConstant constant,
 }
 
 void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
-  // Emit any default argument getter functions.
-  emitDefaultArgGenerators(decl, fe);
+  // Emit any default argument generators.
+  {
+    auto patterns = fe->getArgParamPatterns();
+    if (fe->getDecl() && fe->getDecl()->getDeclContext()->isTypeContext())
+      patterns = patterns.slice(1);
+    emitDefaultArgGenerators(decl, patterns);
+  }
 
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return;
@@ -365,6 +370,9 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
 }
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
+  // Emit any default argument getter functions.
+  emitDefaultArgGenerators(decl, decl->getArguments());
+
   SILConstant constant(decl);
   SILFunction *f = preEmitFunction(constant, decl);
 
@@ -420,9 +428,9 @@ void SILGenModule::emitDefaultArgGenerator(SILConstant constant, Expr *arg) {
 }
   
 void SILGenModule::emitDefaultArgGenerators(SILConstant::Loc decl,
-                                            FuncExpr *fe) {
+                                            ArrayRef<Pattern*> patterns) {
   unsigned index = 0;
-  for (auto pattern : fe->getArgParamPatterns()) {
+  for (auto pattern : patterns) {
     pattern = pattern->getSemanticsProvidingPattern();
     auto tuplePattern = dyn_cast<TuplePattern>(pattern);
     if (!tuplePattern) {

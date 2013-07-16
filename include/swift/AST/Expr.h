@@ -1246,10 +1246,16 @@ private:
   /// destination slice type.
   Expr *InjectionFn;
 
+  /// If there are any default arguments, the owning function
+  /// declaration.
+  ValueDecl *DefaultArgsOwner;
+
 public:
-  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, Type ty)
+  TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
+                   ValueDecl *defaultArgsOwner, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
-      ElementMapping(elementMapping), InjectionFn(nullptr) {}
+      ElementMapping(elementMapping), InjectionFn(nullptr),
+      DefaultArgsOwner(defaultArgsOwner) {}
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
 
@@ -1262,6 +1268,9 @@ public:
   Expr *getVarargsInjectionFunctionOrNull() const {
     return InjectionFn;
   }
+
+  /// Retrieve the owner of the default arguments.
+  ValueDecl *getDefaultArgsOwner() const { return DefaultArgsOwner; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;

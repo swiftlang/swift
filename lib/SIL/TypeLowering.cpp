@@ -545,6 +545,8 @@ static Type getDefaultArgGeneratorType(ValueDecl *vd, unsigned defaultArgIndex,
   Pattern *singlePattern = nullptr;
   if (auto fd = dyn_cast<FuncDecl>(vd)) {
     patterns = fd->getBody()->getArgParamPatterns();
+    if (fd->getDeclContext()->isTypeContext())
+      patterns = patterns.slice(1);
   } else {
     singlePattern = cast<ConstructorDecl>(vd)->getArguments();
     patterns = singlePattern;

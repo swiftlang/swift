@@ -818,11 +818,11 @@ namespace {
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
-      = tc.getProtocol(expr->getLoc(),
-                       KnownProtocolKind::StringLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::StringLiteralConvertible);
       ProtocolDecl *builtinProtocol
-      = tc.getProtocol(expr->getLoc(),
-                       KnownProtocolKind::BuiltinStringLiteralConvertible);
+        = tc.getProtocol(expr->getLoc(),
+                         KnownProtocolKind::BuiltinStringLiteralConvertible);
       
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1632,9 +1632,8 @@ namespace {
 /// \brief Given a constraint locator, find the owner of default arguments for
 /// that tuple, i.e., a FuncDecl.
 static ValueDecl *
-findDefaultArgumentOwner(ConstraintSystem &cs,
-                         const Solution &solution,
-                         ConstraintLocator *locator) {
+findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
+                     ConstraintLocator *locator) {
   if (locator->getPath().empty() || !locator->getAnchor())
     return nullptr;
 
@@ -1754,6 +1753,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getFields().size());
+  ValueDecl *defaultArgsOwner = nullptr;
   for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
     const auto &toElt = toTuple->getFields()[i];
     auto toEltType = toElt.getType();
@@ -1765,13 +1765,15 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       toSugarFields.push_back(toElt);
 
       // Dig out the default argument for the given locator.
-      auto owner = findDefaultArgumentOwner(cs, solution,
-                                            cs.getConstraintLocator(locator));
-      if (!owner) {
-        llvm::errs() << "Could not find default argument for locator: ";
-        cs.getConstraintLocator(locator)->dump(&tc.Context.SourceMgr);
-        llvm::errs() << "\n";
-        assert(false);
+      if (!defaultArgsOwner) {
+        defaultArgsOwner 
+          = findDefaultArgsOwner(cs, solution,
+                                 cs.getConstraintLocator(locator));
+        assert(defaultArgsOwner && "Missing default arguments owner?");
+      } else {
+        assert(findDefaultArgsOwner(cs, solution, 
+                                    cs.getConstraintLocator(locator))
+                 == defaultArgsOwner);
       }
       continue;
     }
@@ -1925,7 +1927,9 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
-  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, toSugarType);
+  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, 
+                                                   defaultArgsOwner,
+                                                   toSugarType);
   shuffle->setVarargsInjectionFunction(injectionFn);
   return shuffle;
 }

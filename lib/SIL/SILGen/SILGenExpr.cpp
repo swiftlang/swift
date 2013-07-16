@@ -14,6 +14,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -829,6 +830,32 @@ RValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E,
   }
 }
 
+/// \brief Determine whether the given expression contains a magic identifier
+/// such as __FILE__ or __LINE__.
+static bool containsMagicIdentifier(Expr *expr) {
+  class Walker : public ASTWalker {
+    bool found = false;
+
+  public:
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) {
+      if (found) {
+        return { false, expr };
+      }
+
+      if (isa<MagicIdentifierLiteralExpr>(expr)) {
+        found = true;
+      }
+      return { !found, expr };
+    }
+
+    bool wasFound() const { return found; }
+  };
+
+  Walker walker;
+  expr->walk(walker);
+  return walker.wasFound();
+}
+
 RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                              SGFContext C) {
   /* TODO:
@@ -863,9 +890,28 @@ RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
       // location.
       llvm::SaveAndRestore<SourceLoc> Save(overrideLocationForMagicIdentifiers);
       overrideLocationForMagicIdentifiers = E->getStartLoc();
-      
-      assert(field.hasInit() && "no default initializer for field!");
-      result.addElement(visit(field.getInit()->getExpr()));
+
+      // Recognize uses of __FILE__, __LINE__, etc. and emit the initializer
+      // directly.
+      // FIXME: This is a complete hack, which relies on having the expression
+      // on hand, which in turn makes the default argument value API.
+      if (containsMagicIdentifier(field.getInit()->getExpr())) {
+        result.addElement(visit(field.getInit()->getExpr()));
+        continue;
+      }
+
+      unsigned destIndex
+        = shuffleIndexIterator - E->getElementMapping().begin() - 1;
+      SILConstant generator 
+        = SILConstant::getDefaultArgGenerator(E->getDefaultArgsOwner(),
+                                              destIndex);
+      auto fnRef = emitFunctionRef(E, generator);
+      auto generatorTy = SGM.getConstantType(generator);
+      auto resultTy = generatorTy.getFunctionResultType();
+      auto apply = emitApply(E, fnRef, { }, resultTy,
+                             OwnershipConventions::getDefault(*this,
+                                                              generatorTy));
+      result.addElement(*this, apply);
       continue;
     }
 

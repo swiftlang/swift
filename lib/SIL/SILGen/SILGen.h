@@ -134,7 +134,8 @@ public:
   void emitDefaultArgGenerator(SILConstant constant, Expr *arg);
   
   /// Emits the default argument generator for the given function.
-  void emitDefaultArgGenerators(SILConstant::Loc decl, FuncExpr *fe);
+  void emitDefaultArgGenerators(SILConstant::Loc decl, 
+                                ArrayRef<Pattern*> patterns);
 
   /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
   /// function.
