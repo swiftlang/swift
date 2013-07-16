@@ -79,25 +79,6 @@ public:
   SILDebugScope *getDebugScope() const { return DebugScope; }
   void setDebugScope(SILDebugScope *DS)  { DebugScope = DS; }
 
-  /// Return the AST expression that this instruction is produced from, or null
-  /// if it is implicitly generated.  Note that this is aborts on locations that
-  /// come from statements.
-  template<typename T>
-  T *getLocDecl() const { return cast_or_null<T>(Loc.get<Decl*>()); }
-
-  /// Return the AST expression that this instruction is produced from, or null
-  /// if it is implicitly generated.  Note that this is aborts on locations that
-  /// come from statements.
-  template<typename T>
-  T *getLocExpr() const { return cast_or_null<T>(Loc.get<Expr*>()); }
-
-  /// Return the AST statement that this instruction is produced from, or null
-  /// if it is implicitly generated.  Note that this is aborts on locations that
-  /// come from statements.
-  template<typename T>
-  T *getLocStmt() const { return cast_or_null<T>(Loc.get<Stmt*>()); }
-
-
   /// removeFromParent - This method unlinks 'this' from the containing basic
   /// block, but does not delete it.
   ///

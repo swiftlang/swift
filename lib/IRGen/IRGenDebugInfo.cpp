@@ -132,13 +132,13 @@ Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
 
 /// getStartLoc - extract the start location from a SILLocation.
 static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
-  if (Expr* E = Loc.dyn_cast<Expr*>())
+  if (Expr* E = Loc.getAs<Expr>())
     return getStartLoc(SM, E);
 
-  if (Stmt* S = Loc.dyn_cast<Stmt*>())
+  if (Stmt* S = Loc.getAs<Stmt>())
     return getStartLoc(SM, S);
 
-  if (Decl* D = Loc.dyn_cast<Decl*>())
+  if (Decl* D = Loc.getAs<Decl>())
     return getStartLoc(SM, D);
 
   Location None = {};
@@ -265,14 +265,12 @@ StringRef IRGenDebugInfo::getName(const FuncDecl& FD) {
 
 /// Attempt to figure out the unmangled name of a function.
 StringRef IRGenDebugInfo::getName(SILLocation L) {
-  if (Expr* E = L.dyn_cast<Expr*>())
-    if (FuncExpr* FE = dyn_cast<FuncExpr>(E))
-      if (FuncDecl* FD = FE->getDecl())
-        return getName(*FD);
-
-  if (Decl* D = L.dyn_cast<Decl*>())
-    if (FuncDecl* FD = dyn_cast<FuncDecl>(D))
+  if (FuncExpr* FE = L.getAs<FuncExpr>())
+    if (FuncDecl* FD = FE->getDecl())
       return getName(*FD);
+
+  if (FuncDecl* FD = L.getAs<FuncDecl>())
+    return getName(*FD);
 
   return StringRef();
 }

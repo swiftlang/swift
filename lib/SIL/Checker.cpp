@@ -50,10 +50,9 @@ public:
     SILLocation FLoc = F->getLocation();
 
     Type ResTy;
-    const Expr *E = FLoc.dyn_cast<Expr*>();
-    assert(E && "Should be an Expr as it's the parent of the basic block.");
 
-    if (const FuncExpr *FExpr = dyn_cast<FuncExpr>(E))
+    // Should be an Expr as it's the parent of the basic block.
+    if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>())
       ResTy = FExpr->getResultType(Context);
     else {
       // FIXME: Not all closure types have the result type getter right now.

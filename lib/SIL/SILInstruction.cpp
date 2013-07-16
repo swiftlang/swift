@@ -131,11 +131,7 @@ AllocVarInst::AllocVarInst(SILLocation loc, SILType elementType, SILFunction &F)
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
 VarDecl *AllocVarInst::getDecl() const {
-  if (Decl *d = getLoc().dyn_cast<Decl*>()) {
-    return dyn_cast<VarDecl>(d);
-  } else {
-    return nullptr;
-  }
+  return getLoc().getAs<VarDecl>();
 }
 
 AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)

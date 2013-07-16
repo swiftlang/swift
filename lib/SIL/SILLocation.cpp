@@ -17,39 +17,39 @@
 
 namespace swift {
 SourceLoc SILLocation::getSourceLoc() {
-  if (auto decl = this->dyn_cast<Decl*>()) {
+  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getLoc();
   }
-  if (auto expr = this->dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
     return expr->getLoc();
   }
-  if (auto stmt = this->dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
     return stmt->getStartLoc();
   }
   llvm_unreachable("impossible SILLocation");
 }
 
 SourceLoc SILLocation::getStartSourceLoc() {
-  if (auto decl = this->dyn_cast<Decl*>()) {
+  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getStartLoc();
   }
-  if (auto expr = this->dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
     return expr->getStartLoc();
   }
-  if (auto stmt = this->dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
     return stmt->getStartLoc();
   }
   llvm_unreachable("impossible SILLocation");
 }
 
 SourceLoc SILLocation::getEndSourceLoc() {
-  if (auto decl = this->dyn_cast<Decl*>()) {
+  if (auto decl = ASTNode.dyn_cast<Decl*>()) {
     return decl->getEndLoc();
   }
-  if (auto expr = this->dyn_cast<Expr*>()) {
+  if (auto expr = ASTNode.dyn_cast<Expr*>()) {
     return expr->getEndLoc();
   }
-  if (auto stmt = this->dyn_cast<Stmt*>()) {
+  if (auto stmt = ASTNode.dyn_cast<Stmt*>()) {
     return stmt->getEndLoc();
   }
   llvm_unreachable("impossible SILLocation");

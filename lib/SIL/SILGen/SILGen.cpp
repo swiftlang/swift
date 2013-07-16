@@ -38,20 +38,16 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
 // FIXME: We should be able to simplify this after the FuncExpr and friends
 // hierarhy is refactored.
 static SILLocation getFuncBodySILLocation(SILLocation Func) {
-  if (auto E = Func.dyn_cast<Expr*>()) {
-    if (const FuncExpr *FE = dyn_cast<FuncExpr>(E))
-      return SILLocation(FE->getBody());
-    if (const PipeClosureExpr *FE = dyn_cast<PipeClosureExpr>(E))
-      return SILLocation(FE->getBody());
-    if (const ClosureExpr *FE = dyn_cast<ClosureExpr>(E))
-      return SILLocation(FE->getBody());
-  }
-  if (auto D = Func.dyn_cast<Decl*>()) {
-    if (const ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D))
-      return SILLocation(CD->getBody());
-    if (const DestructorDecl *DD = dyn_cast<DestructorDecl>(D))
-      return SILLocation(DD->getBody());
-  }
+  if (const FuncExpr *FE = Func.getAs<FuncExpr>())
+    return SILLocation(FE->getBody());
+  if (const PipeClosureExpr *FE = Func.getAs<PipeClosureExpr>())
+    return SILLocation(FE->getBody());
+  if (const ClosureExpr *FE = Func.getAs<ClosureExpr>())
+    return SILLocation(FE->getBody());
+  if (const ConstructorDecl *CD = Func.getAs<ConstructorDecl>())
+    return SILLocation(CD->getBody());
+  if (const DestructorDecl *DD = Func.getAs<DestructorDecl>())
+    return SILLocation(DD->getBody());
   // FIXME: Should turn into assert after properties are handled.
   return SILLocation();
 }
