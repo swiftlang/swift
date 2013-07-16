@@ -745,6 +745,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
+    .Case("builtin_zero", ValueKind::BuiltinZeroInst)
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
     .Case("condbranch", ValueKind::CondBranchInst)
@@ -778,6 +779,9 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
+    .Case("struct", ValueKind::StructInst)
+    .Case("struct_element_addr", ValueKind::StructElementAddrInst)
+    .Case("struct_extract", ValueKind::StructExtractInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
@@ -794,6 +798,14 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   return true;
 }
 
+/// Find the ValueDecl given a member name and a type.
+static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
+  SmallVector<ValueDecl *, 4> Lookup;
+  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, Lookup);
+  assert(Lookup.size() == 1);
+  ValueDecl *VD = Lookup[0];
+  return VD;
+}
 
 ///   sil-instruction:
 ///     sil_local_name '=' identifier ...
@@ -1277,6 +1289,59 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(Val))
       return true;
     ResultVal = B.createInitializeVar(SILLocation(), Val, !NoDefault);
+    break;
+  }
+  case ValueKind::StructInst: {
+    SILType StructTy;
+    if (parseSILType(StructTy) ||
+        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      return true;
+
+    // Parse a list of SILValue.
+    if (P.Tok.isNot(tok::r_paren)) {
+      do {
+        if (parseTypedValueRef(Val)) return true;
+        OpList.push_back(Val);
+      } while (P.consumeIf(tok::comma));
+    }
+    if (P.parseToken(tok::r_paren,
+                     diag::expected_tok_in_sil_instr,")"))
+      return true;
+
+    ResultVal = B.createStruct(SILLocation(), StructTy, OpList);
+    break;
+  }
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::StructExtractInst: {
+    Identifier ElemId;
+    SourceLoc NameLoc;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseToken(tok::sil_at_sign, diag::expected_tok_in_sil_instr, "@") ||
+        P.parseIdentifier(ElemId, NameLoc, diag::sil_struct_inst_wrong_field))
+      return true;
+    ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
+                                     ElemId);
+    if (!FieldV || !isa<VarDecl>(FieldV)) {
+      P.diagnose(NameLoc, diag::sil_struct_inst_wrong_field);
+      return true;
+    }
+    VarDecl *Field = cast<VarDecl>(FieldV);
+    auto ResultTy = SILType::getPrimitiveType(
+                      Field->getType()->getCanonicalType(),
+                      Opcode == ValueKind::StructElementAddrInst);
+    if (Opcode == ValueKind::StructElementAddrInst)
+      ResultVal = B.createStructElementAddr(SILLocation(), Val, Field,
+                                            ResultTy);
+    else
+      ResultVal = B.createStructExtract(SILLocation(), Val, Field, ResultTy);
+    break;
+  }
+  case ValueKind::BuiltinZeroInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+    ResultVal = B.createBuiltinZero(SILLocation(), Ty);
     break;
   }
   }

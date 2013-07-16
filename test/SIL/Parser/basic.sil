@@ -292,3 +292,39 @@ bb0(%0 : $Val.metatype):
   %3 = load %1 : $*Val
   %4 = return %3 : $Val
 }
+
+class Ref {
+}
+struct Aleph {
+  var a:Ref
+  var b:Val
+}
+
+// CHECK: $[thin] ((a : Ref, b : Val), Aleph.metatype) -> Aleph
+sil @_TV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $[thin] ((a : Ref, b : Val), Aleph.metatype) -> Aleph {
+bb0(%0 : $Ref, %1 : $Val, %2 : $Aleph.metatype):
+  // CHECK: struct $Aleph ({{%.*}} : $Ref, {{%.*}} : $Val)
+  %3 = struct $Aleph (%0 : $Ref, %1 : $Val)
+  %4 = return %3 : $Aleph  // CHECK: return
+}
+
+// CHECK: $[thin] ((), Aleph.metatype) -> Aleph
+sil @_TV6struct5AlephCfMS0_FT_S0_ : $[thin] ((), Aleph.metatype) -> Aleph {
+bb0(%0 : $Aleph.metatype):
+  %1 = tuple ()
+  %2 = alloc_box $Aleph       // CHECK: alloc_box
+  // CHECK: initialize_var [no_default_construct]
+  %3 = initialize_var [no_default_construct] %2#1 : $*Aleph
+  %4 = builtin_zero $Ref      // CHECK: builtin_zero $Ref
+  // CHECK: struct_element_addr {{.*}} : $*Aleph, @a
+  %5 = struct_element_addr %2#1 : $*Aleph, @a
+  %6 = load %5 : $*Ref
+  %7 = store %4 to %5 : $*Ref
+  %8 = release %6 : $Ref
+  %14 = load %2#1 : $*Aleph
+  // CHECK: struct_extract {{%.*}} : $Aleph, @a
+  %15 = struct_extract %14 : $Aleph, @a
+  %16 = retain %15 : $Ref
+  %17 = release %2#0 : $Builtin.ObjectPointer
+  %18 = return %14 : $Aleph
+}
