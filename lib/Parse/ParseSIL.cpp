@@ -757,6 +757,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
+    .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
@@ -1268,6 +1269,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     ResultVal = B.createUpcastExistential(SILLocation(), Val, DestVal,
                                           IsTake);
+    break;
+  }
+  case ValueKind::InitializeVarInst: {
+    bool NoDefault = false;
+    if (parseSILOptional(NoDefault, P, "no_default_construct") ||
+        parseTypedValueRef(Val))
+      return true;
+    ResultVal = B.createInitializeVar(SILLocation(), Val, !NoDefault);
     break;
   }
   }

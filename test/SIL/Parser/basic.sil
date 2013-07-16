@@ -279,3 +279,16 @@ bb0(%0 : $ClassBound):
   %9 = release %1#0 : $Builtin.ObjectPointer
   %10 = return %8 : $()
 }
+
+struct Val {
+}
+
+// CHECK: $[thin] ((), Val.metatype) -> Val
+sil @_TV4todo3ValCfMS0_FT_S0_ : $[thin] ((), Val.metatype) -> Val {
+bb0(%0 : $Val.metatype):
+  %1 = alloc_var $Val // CHECK: alloc_var
+  // CHECK: initialize_var [no_default_construct] {{%.*}} : $*Val
+  %2 = initialize_var [no_default_construct] %1 : $*Val
+  %3 = load %1 : $*Val
+  %4 = return %3 : $Val
+}
