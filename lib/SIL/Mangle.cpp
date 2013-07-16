@@ -449,7 +449,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <tuple-element> ::= <identifier>? <type>
 void Mangler::mangleType(Type type, ExplosionKind explosion,
                          unsigned uncurryLevel) {
-  TypeBase *base = type.getPointer();
+  TypeBase *base = type->getCanonicalType().getPointer();
 
   switch (base->getKind()) {
   case TypeKind::Error:
