@@ -23,25 +23,18 @@
 
 using namespace swift;
 
-class BasicSILUnreachableChecker :
-public SILVisitor<BasicSILUnreachableChecker> {
-  ASTContext &Context;
+namespace {
 
-  template<typename...T, typename...U>
-  void diagnose(SourceLoc loc, Diag<T...> diag,
-                U &&...args) {
-    Context.Diags.diagnose(loc,
-                           diag, std::forward<U>(args)...);
-  }
+template<typename...T, typename...U>
+void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
+              U &&...args) {
+  Context.Diags.diagnose(loc,
+                         diag, std::forward<U>(args)...);
+}
 
-public:
-  BasicSILUnreachableChecker(ASTContext &C) : Context(C) {}
-
-  // Base case: no extra verification to do.
-  void visitSILInstruction(SILInstruction *I) {}
-  void visitSILArgument(SILArgument *A) {}
-
-  void visitUnreachableInst(UnreachableInst *UI) {
+static void diagnoseUnreachable(const SILInstruction *I,
+                                ASTContext &Context) {
+  if (auto *UI = dyn_cast<UnreachableInst>(I)){
     const SILBasicBlock *BB = UI->getParent();
     const SILFunction *F = BB->getParent();
 
@@ -55,7 +48,8 @@ public:
     if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>())
       ResTy = FExpr->getResultType(Context);
     else {
-      // FIXME: Not all closure types have the result type getter right now.
+      // FIXME: Not all closure types have the result type getter right
+      // now.
       return;
     }
 
@@ -63,14 +57,18 @@ public:
     if (!ResTy->isVoid()) {
       SILLocation L = UI->getLoc();
       if (L)
-        diagnose(L.getEndSourceLoc(),
+        diagnose(Context,
+                 L.getEndSourceLoc(),
                  diag::missing_return, ResTy.getString());
     }
   }
-};
+}
+}; // end of anonymous namespace
 
 void SILModule::check() const {
-  for (auto &F : *this)
-    BasicSILUnreachableChecker(getASTContext())
-      .visitSILFunction(const_cast<SILFunction*>(&F));
+  const SILModule *M = this;
+  for (auto &Fn : *M)
+    for (auto &BB : Fn)
+      for (auto &I : BB)
+        diagnoseUnreachable(&I, getASTContext());
 }

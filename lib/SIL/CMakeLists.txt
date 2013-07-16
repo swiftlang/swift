@@ -1,7 +1,7 @@
 add_subdirectory(SILGen)
 add_subdirectory(Passes)
 add_swift_library(swiftSIL
-  Checker.cpp
+  DataflowDiagnostics.cpp
   Dominance.cpp
   Mangle.cpp
   SILBasicBlock.cpp
