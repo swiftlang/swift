@@ -88,10 +88,24 @@ class alignas(8) TypeBase {
     /// 2 -> valid
     unsigned Validated : 2;
   };
-  static const unsigned NumTypeBaseBits = 3;
-  
+
+  enum { NumTypeBaseBits = 3 };
+  static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
+
+protected:
+  struct AnyFunctionTypeBits {
+    unsigned : NumTypeBaseBits;
+
+    /// Extra information which affects how the function is called, like
+    /// regparm and the calling convention.
+    unsigned ExtInfo : 7;
+  };
+  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
+  static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
+
   union {
     TypeBaseBits TypeBase;
+    AnyFunctionTypeBits AnyFunctionType;
   } TypeBits;
   
 protected:
@@ -1127,32 +1141,127 @@ enum class AbstractCC : unsigned char {
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const llvm::PointerIntPair<Type, 3, AbstractCC> InputAndCC;
-  const llvm::PointerIntPair<Type, 1, bool> OutputAndIsThin;
+  const Type Input;
+  const Type Output;
+
+public:
+  /// \brief A class which abstracts out some details necessary for
+  /// making a call.
+  class ExtInfo {
+    // Feel free to rearrange or add bits, but if you go over 7,
+    // you'll need to adjust both the Bits field below and
+    // BaseType::AnyFunctionTypeBits.
+
+    //   |  CC  |isThin|isAutoClosure|isBlock|
+    //   |0 .. 3|   4  |      5      |   6   |
+    //
+    enum { CallConvMask = 0xF };
+    enum { ThinMask = 0x10 };
+    enum { AutoClosureMask = 0x20 };
+    enum { BlockMask = 0x40 };
+
+    uint16_t Bits;
+
+    ExtInfo(unsigned Bits) : Bits(static_cast<uint16_t>(Bits)) {}
+
+    friend class AnyFunctionType;
+    
+  public:
+    // Constructor with all defaults.
+    ExtInfo() : Bits(0) {}
+
+    // Constructor with no defaults.
+    ExtInfo(AbstractCC CC, bool IsThin, bool IsAutoClosure, bool IsBlock) {
+      Bits = ((unsigned) CC) |
+             (IsThin ? ThinMask : 0) |
+             (IsAutoClosure ? AutoClosureMask : 0) |
+             (IsBlock ? BlockMask : 0);
+    }
+
+    explicit ExtInfo(AbstractCC CC) : Bits(0) {
+      Bits = (Bits & ~CallConvMask) | (unsigned) CC;
+    }
+
+    AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
+    bool isThin() const { return Bits & ThinMask; }
+    bool isAutoClosure() const { return Bits & AutoClosureMask; }
+    bool isBlock() const { return Bits & BlockMask; }
+
+    // Note that we don't have setters. That is by design, use
+    // the following with methods instead of mutating these objects.
+    ExtInfo withCallingConv(AbstractCC CC) const {
+      return ExtInfo((Bits & ~CallConvMask) | (unsigned) CC);
+    }
+    ExtInfo withIsThin(bool IsThin) const {
+      if (IsThin)
+        return ExtInfo(Bits | ThinMask);
+      else
+        return ExtInfo(Bits & ~ThinMask);
+    }
+    ExtInfo withIsAutoClosure(bool IsAutoClosure) const {
+      if (IsAutoClosure)
+        return ExtInfo(Bits | AutoClosureMask);
+      else
+        return ExtInfo(Bits & ~AutoClosureMask);
+    }
+    ExtInfo withIsBlock(bool IsBlock) const {
+      if (IsBlock)
+        return ExtInfo(Bits | BlockMask);
+      else
+        return ExtInfo(Bits & ~BlockMask);
+    }
+
+
+    bool operator==(ExtInfo Other) const {
+      return Bits == Other.Bits;
+    }
+    bool operator!=(ExtInfo Other) const {
+      return Bits != Other.Bits;
+    }
+  };
+
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, bool HasTypeVariable, 
-                  bool isThin, AbstractCC cc)
-    : TypeBase(Kind, CanTypeContext, HasTypeVariable),
-      InputAndCC(Input, cc), OutputAndIsThin(Output, isThin) {
+                  Type Input, Type Output, bool HasTypeVariable,
+                  bool isThin, AbstractCC cc,
+                  bool isAutoClosure = false, bool isBlock = false)
+  : TypeBase(Kind, CanTypeContext, HasTypeVariable),
+    Input(Input), Output(Output) {
+
+    TypeBits.AnyFunctionType.ExtInfo = ExtInfo(cc, isThin,
+                                               isAutoClosure, isBlock).Bits;
   }
 
 public:
-  Type getInput() const { return InputAndCC.getPointer(); }
-  Type getResult() const { return OutputAndIsThin.getPointer(); }
-  
-  AbstractCC getAbstractCC() const { return InputAndCC.getInt(); }
-  
-  /// True if the function type is "thin", meaning values of the type can be
-  /// represented as simple function pointers without context.
-  bool isThin() const { return OutputAndIsThin.getInt(); }
 
-  /// True if this type allows an implicit conversion from a function argument
-  /// expression of type T to a function of type () -> T.
-  bool isAutoClosure() const;
+  Type getInput() const { return Input; }
+  Type getResult() const { return Output; }
+
+  ExtInfo getExtInfo() const {
+    return ExtInfo(TypeBits.AnyFunctionType.ExtInfo);
+  }
+
+  /// \brief Returns the calling conventions of the function.
+  AbstractCC getAbstractCC() const {
+    return getExtInfo().getCC();
+  }
   
-  /// True if this type is an Objective-C-compatible block type.
-  bool isBlock() const;
+  /// \brief True if the function type is "thin", meaning values of the type can
+  /// be represented as simple function pointers without context.
+  bool isThin() const {
+    return getExtInfo().isThin();
+  }
+
+  /// \brief True if this type allows an implicit conversion from a function
+  /// argument expression of type T to a function of type () -> T.
+  bool isAutoClosure() const {
+    return getExtInfo().isAutoClosure();
+  }
+  
+  /// \brief True if this type is an Objective-C-compatible block type.
+  bool isBlock() const {
+    return getExtInfo().isBlock();
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1165,15 +1274,10 @@ public:
 ///
 /// If the AutoClosure bit is set to true, then the input type is known to be ()
 /// and a value of this function type is only assignable (in source code) from
-/// the destination type of the function.  Sema inserts an ImplicitClosure to
+/// the destination type of the function. Sema inserts an ImplicitClosure to
 /// close over the value.  For example:
 ///   var x : [auto_closure] () -> int = 4
 class FunctionType : public AnyFunctionType {
-  bool AutoClosure : 1;
-  
-  /// True if this type represents an ObjC-compatible block value. This is a
-  /// temporary hack to make simple demo-quality block interop easy.
-  bool Block : 1;
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, const ASTContext &C) {
@@ -1200,13 +1304,6 @@ public:
                            bool isAutoClosure, bool isBlock, bool isThin,
                            AbstractCC cc, const ASTContext &C);
 
-  /// True if this type allows an implicit conversion from a function argument
-  /// expression of type T to a function of type () -> T.
-  bool isAutoClosure() const { return AutoClosure; }
-  
-  /// True if this type is an Objective-C-compatible block type.
-  bool isBlock() const { return Block; }
-  
   void print(raw_ostream &OS) const;
   
   // Implement isa/cast/dyncast/etc.

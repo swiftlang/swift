@@ -1345,18 +1345,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   return build(C, CanProtocolTypes);
 }
 
-bool AnyFunctionType::isAutoClosure() const {
-  if (auto *ft = dyn_cast<FunctionType>(this))
-    return ft->isAutoClosure();
-  return false;
-}
-
-bool AnyFunctionType::isBlock() const {
-  if (auto *ft = dyn_cast<FunctionType>(this))
-    return ft->isBlock();
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//

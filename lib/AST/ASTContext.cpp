@@ -739,9 +739,9 @@ FunctionType::FunctionType(Type input, Type output,
              input, output,
              hasTypeVariable,
              isThin,
-             cc),
-    AutoClosure(isAutoClosure),
-    Block(isBlock)
+             cc,
+             isAutoClosure,
+             isBlock)
 { }
 
 
