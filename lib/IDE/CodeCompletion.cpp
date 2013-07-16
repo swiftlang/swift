@@ -375,6 +375,8 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::SwiftDeclaration);
     Builder.setAssociatedSwiftDecl(NTD);
+    if (needDot())
+      Builder.addDot();
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder,
                       MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
@@ -429,6 +431,11 @@ public:
         if (FD->isStatic() != ExprType->is<MetaTypeType>())
           return;
         addSwiftMethodCall(FD);
+        return;
+      }
+
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+        addSwiftNominalTypeRef(NTD);
         return;
       }
 
