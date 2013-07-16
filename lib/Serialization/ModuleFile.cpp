@@ -812,6 +812,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setStatic(isClassMethod);
     if (isImplicit)
       fn->setImplicit();
+    if (!blobData.empty())
+      fn->getMutableAttrs().AsmName = ctx.AllocateCopy(blobData);
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
         fn->getMutableAttrs().Assignment = true;

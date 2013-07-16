@@ -469,7 +469,8 @@ namespace decls_block {
     BCFixed<1>,   // assignment? / conversion?
     TypeIDField,  // type (signature)
     DeclIDField,  // operator decl
-    DeclIDField   // overridden function
+    DeclIDField,  // overridden function
+    BCBlob        // asmname, if any
     // The record is trailed by its generic parameters, if any, followed by its
     // argument and body parameter patterns.
   >;

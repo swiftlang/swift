@@ -1081,6 +1081,7 @@ bool Serializer::writeDecl(const Decl *D) {
     attrs.ExplicitInfix = false;
     attrs.Assignment = false;
     attrs.Conversion = false;
+    attrs.AsmName = {};
 
     // FIXME: Handle other attributes.
     if (!attrs.empty())
@@ -1098,7 +1099,8 @@ bool Serializer::writeDecl(const Decl *D) {
                              fn->getAttrs().isConversion(),
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
-                           addDeclRef(fn->getOverriddenDecl()));
+                           addDeclRef(fn->getOverriddenDecl()),
+                           attrs.AsmName);
 
     writeGenericParams(fn->getGenericParams());
 

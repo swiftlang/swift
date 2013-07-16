@@ -196,7 +196,7 @@ public:
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !isStdlib() &&
-           !hasOwnership();
+           !hasOwnership() && AsmName.empty();
   }
 
   void clearOwnership() {

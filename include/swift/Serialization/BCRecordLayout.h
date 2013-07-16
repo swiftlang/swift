@@ -351,6 +351,8 @@ namespace impl {
       (void)buffer;
     }
 
+    /// Blob data is not stored in the buffer if you are using the correct
+    /// accessor; this method should not be used.
     template <typename ElementTy, typename DataTy>
     static void read(ArrayRef<ElementTy> buffer, DataTy &data) = delete;
   };
