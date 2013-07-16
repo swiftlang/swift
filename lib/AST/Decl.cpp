@@ -420,6 +420,53 @@ bool ValueDecl::needsCapture() const {
   return true;
 }
 
+std::pair<DefaultArgumentKind, Type>
+ValueDecl::getDefaultArg(unsigned index) const {
+  ArrayRef<const Pattern *> patterns;
+  if (auto func = dyn_cast<FuncDecl>(this)) {
+    patterns = func->getBody()->getArgParamPatterns();
+
+    // Skip the 'this' parameter; it is not counted.
+    if (func->getDeclContext()->isTypeContext())
+      patterns = patterns.slice(1);
+  } else {
+    auto constructor = dyn_cast<ConstructorDecl>(this);
+    patterns = constructor->getArguments();
+  }
+
+  // Find the (sub-)pattern for this index.
+  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
+  // representation.
+  const TuplePatternElt *found = nullptr;
+  for (auto origPattern : patterns) {
+    auto pattern = origPattern->getSemanticsProvidingPattern();
+    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
+    if (!tuplePattern) {
+      if (index == 0) {
+        return { DefaultArgumentKind::None, Type() };
+      }
+
+      --index;
+      continue;
+    }
+
+
+    for (auto &elt : tuplePattern->getFields()) {
+      if (index == 0) {
+        found = &elt;
+        break;
+      }
+      --index;
+    }
+
+    if (found)
+      break;
+  }
+
+  assert(found && "No argument with this index");
+  return { found->getDefaultArgKind(), found->getPattern()->getType() };
+}
+
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this))
     return TAD->getAliasType();

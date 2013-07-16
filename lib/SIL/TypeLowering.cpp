@@ -540,47 +540,7 @@ static Type getGlobalAccessorType(Type varType, ASTContext &C) {
 /// Get the type of a default argument generator, () -> T.
 static Type getDefaultArgGeneratorType(ValueDecl *vd, unsigned defaultArgIndex,
                                        ASTContext &context) {
-  // Find the patterns.
-  ArrayRef<Pattern *> patterns;
-  Pattern *singlePattern = nullptr;
-  if (auto fd = dyn_cast<FuncDecl>(vd)) {
-    patterns = fd->getBody()->getArgParamPatterns();
-    if (fd->getDeclContext()->isTypeContext())
-      patterns = patterns.slice(1);
-  } else {
-    singlePattern = cast<ConstructorDecl>(vd)->getArguments();
-    patterns = singlePattern;
-  }
-
-  // FIXME: This is O(n), which is lame. We should fix the FuncDecl
-  // representation.
-  Type resultTy;
-  for (auto origPattern : patterns) {
-    auto pattern = origPattern->getSemanticsProvidingPattern();
-    auto tuplePattern = dyn_cast<TuplePattern>(pattern);
-    if (!tuplePattern) {
-      if (defaultArgIndex == 0) {
-        resultTy = origPattern->getType();
-        break;
-      }
-
-      --defaultArgIndex;
-      continue;
-    }
-
-
-    for (auto &elt : tuplePattern->getFields()) {
-      if (elt.getInit() && defaultArgIndex == 0) {
-        resultTy = elt.getPattern()->getType();
-        break;
-      }
-      --defaultArgIndex;
-    }
-
-    if (resultTy)
-      break;
-  }
-
+  auto resultTy = vd->getDefaultArg(defaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
   return FunctionType::get(TupleType::getEmpty(context), resultTy, context);
 }

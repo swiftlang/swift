@@ -521,6 +521,23 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     ImportedModule.emit(ScratchRecord, name);
 }
 
+/// Translate AST default argument kind to the Serialization enum values, which
+/// are guaranteed to be stable.
+static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) {
+  switch (kind) {
+  case swift::DefaultArgumentKind::None:
+    return serialization::DefaultArgumentKind::None;
+  case swift::DefaultArgumentKind::Normal:
+    return serialization::DefaultArgumentKind::Normal;
+  case swift::DefaultArgumentKind::Column:
+    return serialization::DefaultArgumentKind::Column;
+  case swift::DefaultArgumentKind::File:
+    return serialization::DefaultArgumentKind::File;
+  case swift::DefaultArgumentKind::Line:
+    return serialization::DefaultArgumentKind::Line;
+  }
+}
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -542,8 +559,10 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     abbrCode = DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
     for (auto &elt : tuple->getFields()) {
-      // FIXME: Handle default arguments?
-      TuplePatternEltLayout::emitRecord(Out, ScratchRecord, abbrCode);
+      // FIXME: Default argument expressions?
+      TuplePatternEltLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
       writePattern(elt.getPattern());
     }
     break;

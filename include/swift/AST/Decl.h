@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
@@ -839,7 +840,6 @@ public:
   using DeclContext::operator new;
 };
 
-
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
@@ -939,6 +939,18 @@ public:
   void setIsObjC(bool value) {
     AttrsAndIsObjC = {AttrsAndIsObjC.getPointer(), value};
   }
+
+  /// Determine the default argument kind and type for the given argument index
+  /// in this declaration, which must be a function or constructor.
+  ///
+  /// FIXME: When we add AbstractFuncDecl, this should move there.
+  ///
+  /// \param index The index of the argument for which we are querying the
+  /// default argument.
+  ///
+  /// \returns the default argument kind and, if there is a default argument,
+  /// the type of the corresponding parameter.
+  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned index) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_ValueDecl &&

@@ -187,7 +187,8 @@ Pattern *Pattern::clone(ASTContext &context) const {
     elts.reserve(tuple->getNumFields());
     for (const auto &elt : tuple->getFields())
       elts.push_back(TuplePatternElt(elt.getPattern()->clone(context),
-                                     elt.getInit()));
+                                     elt.getInit(),
+                                     elt.getDefaultArgKind()));
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
                                   tuple->getRParenLoc(),
                                   tuple->hasVararg(),

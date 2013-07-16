@@ -1233,7 +1233,13 @@ public:
     /// tuple should be default-initialized.
     DefaultInitialize = -1,
     /// The element mapping value signaling the first variadic field.
-    FirstVariadic = -2
+    FirstVariadic = -2,
+    /// The element mapping value indicating that the field of the
+    /// destination tuple should be default-initialized with an expression
+    /// provided by the caller.
+    /// FIXME: Yet another indication that TupleShuffleExpr uses the wrong
+    /// formulation.
+    CallerDefaultInitialize = -3
   };
 private:
   /// This contains an entry for each element in the Expr type.  Each element
@@ -1250,12 +1256,17 @@ private:
   /// declaration.
   ValueDecl *DefaultArgsOwner;
 
+  ArrayRef<Expr *> CallerDefaultArgs;
+
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
-                   ValueDecl *defaultArgsOwner, Type ty)
+                   ValueDecl *defaultArgsOwner,
+                   ArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
       ElementMapping(elementMapping), InjectionFn(nullptr),
-      DefaultArgsOwner(defaultArgsOwner) {}
+      DefaultArgsOwner(defaultArgsOwner), CallerDefaultArgs(CallerDefaultArgs)
+  {
+  }
 
   ArrayRef<int> getElementMapping() const { return ElementMapping; }
 
@@ -1271,6 +1282,9 @@ public:
 
   /// Retrieve the owner of the default arguments.
   ValueDecl *getDefaultArgsOwner() const { return DefaultArgsOwner; }
+
+  /// Retrieve the caller-defaulted arguments.
+  ArrayRef<Expr *> getCallerDefaultArgs() const { return CallerDefaultArgs; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;

@@ -86,6 +86,25 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+/// Translate from the serialization DefaultArgumentKind enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static Optional<swift::DefaultArgumentKind>
+getActualDefaultArgKind(uint8_t raw) {
+  switch (static_cast<serialization::DefaultArgumentKind>(raw)) {
+  case serialization::DefaultArgumentKind::None:
+    return swift::DefaultArgumentKind::None;
+  case serialization::DefaultArgumentKind::Normal:
+    return swift::DefaultArgumentKind::Normal;
+  case serialization::DefaultArgumentKind::Column:
+    return swift::DefaultArgumentKind::Column;
+  case serialization::DefaultArgumentKind::File:
+    return swift::DefaultArgumentKind::File;
+  case serialization::DefaultArgumentKind::Line:
+    return swift::DefaultArgumentKind::Line;
+  }
+  return Nothing;
+}
+
 Pattern *ModuleFile::maybeReadPattern() {
   using namespace decls_block;
   
@@ -124,12 +143,21 @@ Pattern *ModuleFile::maybeReadPattern() {
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
       // FIXME: Add something for this record or remove it.
-      // TuplePatternEltLayout::readRecord(scratch);
+      uint8_t rawDefaultArg;
+      TuplePatternEltLayout::readRecord(scratch, rawDefaultArg);
 
       Pattern *subPattern = maybeReadPattern();
       assert(subPattern);
 
-      elements.push_back(TuplePatternElt(subPattern, nullptr));
+      // Decode the default argument kind.
+      // FIXME: Default argument expression, if available.
+      swift::DefaultArgumentKind defaultArgKind
+        = swift::DefaultArgumentKind::None;
+      if (auto defaultArg = getActualDefaultArgKind(rawDefaultArg))
+        defaultArgKind = *defaultArg;
+
+      elements.push_back(TuplePatternElt(subPattern, nullptr,
+                                         defaultArgKind));
     }
 
     auto result = TuplePattern::create(ModuleContext->Ctx, SourceLoc(),

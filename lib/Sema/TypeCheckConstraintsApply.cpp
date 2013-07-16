@@ -1753,6 +1753,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  fromTuple->getFields().size());
+  SmallVector<Expr *, 2> callerDefaultArgs;
   ValueDecl *defaultArgsOwner = nullptr;
   for (unsigned i = 0, n = toTuple->getFields().size(); i != n; ++i) {
     const auto &toElt = toTuple->getFields()[i];
@@ -1760,11 +1761,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
     // If we're default-initializing this member, there's nothing to do.
     if (sources[i] == TupleShuffleExpr::DefaultInitialize) {
-      anythingShuffled = true;
-      hasInits = true;
-      toSugarFields.push_back(toElt);
-
-      // Dig out the default argument for the given locator.
+      // Dig out the owner of the default arguments.
       if (!defaultArgsOwner) {
         defaultArgsOwner 
           = findDefaultArgsOwner(cs, solution,
@@ -1775,6 +1772,44 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                     cs.getConstraintLocator(locator))
                  == defaultArgsOwner);
       }
+
+      anythingShuffled = true;
+      hasInits = true;
+      toSugarFields.push_back(toElt);
+
+      auto defArg = defaultArgsOwner->getDefaultArg(i);
+      MagicIdentifierLiteralExpr::KindTy magicKind;
+      switch (defArg.first) {
+      case DefaultArgumentKind::None:
+        llvm_unreachable("No default argument here?");
+
+      case DefaultArgumentKind::Normal:
+        // Argument filled in by callee.
+        continue;
+
+      case DefaultArgumentKind::Column:
+        magicKind = MagicIdentifierLiteralExpr::Column;
+        break;
+
+      case DefaultArgumentKind::File:
+        magicKind = MagicIdentifierLiteralExpr::File;
+        break;
+
+
+      case DefaultArgumentKind::Line:
+        magicKind = MagicIdentifierLiteralExpr::Line;
+        break;
+      }
+
+      // Create the default argument, which is a converted magic identifier
+      // literal expression.
+      Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind,
+                                                               expr->getLoc());
+      bool invalid = tc.typeCheckExpression(init, cs.DC, defArg.second);
+      assert(!invalid && "conversion cannot fail");
+      (void)invalid;
+      callerDefaultArgs.push_back(init);
+      sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
       continue;
     }
 
@@ -1927,8 +1962,10 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
+  auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
   auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping, 
                                                    defaultArgsOwner,
+                                                   callerDefaultArgsCopy,
                                                    toSugarType);
   shuffle->setVarargsInjectionFunction(injectionFn);
   return shuffle;

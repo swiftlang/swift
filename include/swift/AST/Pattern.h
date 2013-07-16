@@ -19,6 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Expr.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
@@ -165,17 +166,24 @@ public:
 class TuplePatternElt {
   Pattern *ThePattern;
   ExprHandle *Init;
+  DefaultArgumentKind DefArgKind;
 
 public:
   TuplePatternElt() = default;
-  explicit TuplePatternElt(Pattern *P, ExprHandle *init = nullptr)
-    : ThePattern(P), Init(init) {}
+  explicit TuplePatternElt(Pattern *P)
+    : ThePattern(P), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
+
+  TuplePatternElt(Pattern *p, ExprHandle *init, DefaultArgumentKind defArgKind)
+    : ThePattern(p), Init(init), DefArgKind(defArgKind) {}
 
   Pattern *getPattern() { return ThePattern; }
   const Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *p) { ThePattern = p; }
 
   ExprHandle *getInit() const { return Init; }
+
+  DefaultArgumentKind getDefaultArgKind() const { return DefArgKind; }
+  void setDefaultArgKind(DefaultArgumentKind DAK) { DefArgKind = DAK; }
 };
 
 /// A pattern consisting of a tuple of patterns.

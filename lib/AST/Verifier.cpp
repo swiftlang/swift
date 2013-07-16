@@ -596,14 +596,23 @@ namespace {
       }
       unsigned varargsStartIndex = 0;
       Type varargsType;
+      unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
-        unsigned subElem = E->getElementMapping()[i];
-        if (subElem == -1U)
+        int subElem = E->getElementMapping()[i];
+        if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
-        if (subElem == -2U) {
+        if (subElem == TupleShuffleExpr::FirstVariadic) {
           varargsStartIndex = i + 1;
           varargsType = TT->getFields()[i].getVarargBaseTy();
           break;
+        }
+        if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
+          auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
+          if (!TT->getElementType(i)->isEqual(init->getType())) {
+            Out << "Type mismatch in TupleShuffleExpr\n";
+            abort();
+          }
+          continue;
         }
         if (!TT->getElementType(i)->isEqual(SubTT->getElementType(subElem))) {
           Out << "Type mismatch in TupleShuffleExpr\n";

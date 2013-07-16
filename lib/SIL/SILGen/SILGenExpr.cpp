@@ -830,32 +830,6 @@ RValue SILGenFunction::visitTupleElementExpr(TupleElementExpr *E,
   }
 }
 
-/// \brief Determine whether the given expression contains a magic identifier
-/// such as __FILE__ or __LINE__.
-static bool containsMagicIdentifier(Expr *expr) {
-  class Walker : public ASTWalker {
-    bool found = false;
-
-  public:
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *expr) {
-      if (found) {
-        return { false, expr };
-      }
-
-      if (isa<MagicIdentifierLiteralExpr>(expr)) {
-        found = true;
-      }
-      return { !found, expr };
-    }
-
-    bool wasFound() const { return found; }
-  };
-
-  Walker walker;
-  expr->walk(walker);
-  return walker.wasFound();
-}
-
 RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
                                              SGFContext C) {
   /* TODO:
@@ -877,6 +851,7 @@ RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
   auto outerFields = E->getType()->castTo<TupleType>()->getFields();
   auto shuffleIndexIterator = E->getElementMapping().begin(),
     shuffleIndexEnd = E->getElementMapping().end();
+  unsigned callerDefaultArgIndex = 0;
   for (auto &field : outerFields) {
     assert(shuffleIndexIterator != shuffleIndexEnd &&
            "ran out of shuffle indexes before running out of fields?!");
@@ -885,21 +860,6 @@ RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // If the shuffle index is DefaultInitialize, we're supposed to use the
     // default value.
     if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
-      // If magic identifiers like __FILE__ are expanded in this default
-      // argument, have them use the location of this expression, not their
-      // location.
-      llvm::SaveAndRestore<SourceLoc> Save(overrideLocationForMagicIdentifiers);
-      overrideLocationForMagicIdentifiers = E->getStartLoc();
-
-      // Recognize uses of __FILE__, __LINE__, etc. and emit the initializer
-      // directly.
-      // FIXME: This is a complete hack, which relies on having the expression
-      // on hand, which in turn makes the default argument value API.
-      if (containsMagicIdentifier(field.getInit()->getExpr())) {
-        result.addElement(visit(field.getInit()->getExpr()));
-        continue;
-      }
-
       unsigned destIndex
         = shuffleIndexIterator - E->getElementMapping().begin() - 1;
       SILConstant generator 
@@ -912,6 +872,15 @@ RValue SILGenFunction::visitTupleShuffleExpr(TupleShuffleExpr *E,
                              OwnershipConventions::getDefault(*this,
                                                               generatorTy));
       result.addElement(*this, apply);
+      continue;
+    }
+
+    // If the shuffle index is CallerDefaultInitialize, we're supposed to
+    // use the caller-provided default value. This is used only in special
+    // cases, e.g., __FILE__, __LINE__, and __COLUMN__.
+    if (shuffleIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+      auto arg = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
+      result.addElement(visit(arg));
       continue;
     }
 

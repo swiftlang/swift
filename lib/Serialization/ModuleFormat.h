@@ -112,6 +112,17 @@ enum Ownership : uint8_t {
 };
 using OwnershipField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum DefaultArgumentKind : uint8_t {
+  None = 0,
+  Normal,
+  File,
+  Line,
+  Column
+};
+using DefaultArgumentField = BCFixed<3>;
+
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
 ///
@@ -533,7 +544,8 @@ namespace decls_block {
   >;
 
   using TuplePatternEltLayout = BCRecordLayout<
-    TUPLE_PATTERN_ELT
+    TUPLE_PATTERN_ELT,
+    DefaultArgumentField   // default argument
     // The element pattern trails the record.
   >;
 

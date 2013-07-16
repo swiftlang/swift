@@ -47,6 +47,26 @@ static bool parseCurriedFunctionArguments(Parser &P,
   return false;
 }
 
+/// \brief Determine the kind of a default argument given a parsed
+/// expression that has not yet been type-checked.
+static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
+  if (!init || !init->getExpr())
+    return DefaultArgumentKind::None;
+
+  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init->getExpr());
+  if (!magic)
+    return DefaultArgumentKind::Normal;
+
+  switch (magic->getKind()) {
+  case MagicIdentifierLiteralExpr::Column:
+    return DefaultArgumentKind::Column;
+  case MagicIdentifierLiteralExpr::File:
+    return DefaultArgumentKind::File;
+  case MagicIdentifierLiteralExpr::Line:
+    return DefaultArgumentKind::Line;
+  }
+}
+
 static bool parseSelectorArgument(Parser &P,
                                   SmallVectorImpl<TuplePatternElt> &argElts,
                                   SmallVectorImpl<TuplePatternElt> &bodyElts,
@@ -122,8 +142,10 @@ static bool parseSelectorArgument(Parser &P,
   }
   
   rp = P.consumeToken(tok::r_paren);
-  argElts.push_back(TuplePatternElt(argPattern.get(), init));
-  bodyElts.push_back(TuplePatternElt(bodyPattern.get(), init));
+  argElts.push_back(TuplePatternElt(argPattern.get(), init,
+                                    getDefaultArgKind(init)));
+  bodyElts.push_back(TuplePatternElt(bodyPattern.get(), init,
+                                     getDefaultArgKind(init)));
   return false;
 }
 
@@ -169,7 +191,8 @@ static bool parseSelectorFunctionArguments(Parser &P,
       getFirstSelectorPattern(P.Context,
                               firstElt.getPattern(),
                               firstTuple->getLoc()),
-                              firstElt.getInit()));
+      firstElt.getInit(),
+      firstElt.getDefaultArgKind()));
   } else
     llvm_unreachable("unexpected function argument pattern!");
   
@@ -345,7 +368,7 @@ Optional<TuplePatternElt> Parser::parsePatternTupleElement(bool allowInitExpr) {
       init = ExprHandle::get(Context, initR.get());
   }
 
-  return TuplePatternElt(pattern.get(), init);
+  return TuplePatternElt(pattern.get(), init, getDefaultArgKind(init));
 }
 
 /// Parse a tuple pattern.
