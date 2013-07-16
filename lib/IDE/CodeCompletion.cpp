@@ -382,6 +382,23 @@ public:
                       MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
   }
 
+  void addSwiftTypeAliasRef(const TypeAliasDecl *TAD) {
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::SwiftDeclaration);
+    Builder.setAssociatedSwiftDecl(TAD);
+    if (needDot())
+      Builder.addDot();
+    Builder.addTextChunk(TAD->getName().str());
+    Type TypeAnnotation;
+    if (TAD->hasUnderlyingType())
+      TypeAnnotation = MetaTypeType::get(TAD->getUnderlyingType(),
+                                         SwiftContext);
+    else
+      TypeAnnotation = MetaTypeType::get(TAD->getDeclaredType(), SwiftContext);
+    addTypeAnnotation(Builder, TypeAnnotation);
+  }
+
   void addClangDecl(const clang::NamedDecl *ND) {
     // FIXME: Eventually, we'll import the Clang Decl and format it as a Swift
     // declaration.  Right now we don't do this because of performance reasons.
@@ -439,6 +456,11 @@ public:
         return;
       }
 
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+        addSwiftTypeAliasRef(TAD);
+        return;
+      }
+
       if (HaveDot)
         return;
 
@@ -482,6 +504,11 @@ public:
 
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         addSwiftNominalTypeRef(NTD);
+        return;
+      }
+
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+        addSwiftTypeAliasRef(TAD);
         return;
       }
 
