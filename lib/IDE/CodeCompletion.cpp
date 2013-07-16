@@ -480,6 +480,7 @@ public:
         addSwiftSubscriptCall(SD);
         return;
       }
+      return;
 
     case LookupKind::DeclContext:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
