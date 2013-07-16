@@ -263,6 +263,18 @@ public:
   /// simply because we don't have Slice<T> yet.
   Type substType(Type T, TypeSubstitutionMap &Substitutions,
                  bool IgnoreMissing = false);
+  
+  /// \brief Apply generic arguments to the given type.
+  ///
+  /// \param type         The unbound generic type to which to apply arguments.
+  /// \param loc          The source location for diagnostic reporting.
+  /// \param genericArgs  The list of generic arguments to apply to the type.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  Type applyGenericArguments(Type type,
+                             SourceLoc loc,
+                             ArrayRef<TypeLoc> genericArgs);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.
@@ -451,7 +463,7 @@ public:
 
   /// \brief Resolve ambiguous pattern/expr productions inside a pattern using
   /// name lookup information. Must be done before type-checking the pattern.
-  Pattern *resolvePattern(Pattern *P);
+  Pattern *resolvePattern(Pattern *P, DeclContext *dc);
   
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool isFirstPass, bool allowUnknownTypes,
@@ -565,7 +577,7 @@ public:
   /// \returns The result of name lookup.
   LookupResult lookupMember(Type type, Identifier name);
 
-  /// \brief Lookup a member type within the given type.
+  /// \brief Look up a member type within the given type.
   ///
   /// This routine looks for member types with the given name within the
   /// given type. 
@@ -576,8 +588,21 @@ public:
   ///
   /// \returns The result of name lookup.
   LookupTypeResult lookupMemberType(Type type, Identifier name);
+  
+  /// \brief Look up a member type within the given module.
+  ///
+  /// This looks for members types directly within the module. It finds types
+  /// that would be found by qualified reference (such as swift.Int) and not
+  /// types that are imports.
+  ///
+  /// \param module The module in which to look for a member type.
+  ///
+  /// \param name The name of the type to look for.
+  ///
+  /// \returns The result of name lookup.
+  LookupTypeResult lookupMemberType(Module *module, Identifier name);
 
-  /// \brief Lookup the constructors of the given type.
+  /// \brief Look up the constructors of the given type.
   ///
   /// \param type The type for which we will look for constructors.
   ///

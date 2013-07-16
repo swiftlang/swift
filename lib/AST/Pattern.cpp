@@ -223,7 +223,11 @@ Pattern *Pattern::clone(ASTContext &context) const {
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
       sub = oof->getSubPattern()->clone(context);
-    result = new(context) OneOfElementPattern(oof->getElementExpr(),
+    result = new(context) OneOfElementPattern(oof->getParentType(),
+                                              oof->getLoc(),
+                                              oof->getNameLoc(),
+                                              oof->getName(),
+                                              oof->getElementDecl(),
                                               sub);
     break;
   }
@@ -299,10 +303,4 @@ Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
 
 SourceRange TypedPattern::getSourceRange() const {
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
-}
-
-OneOfElementDecl *OneOfElementPattern::getElementDecl() const {
-  auto *apply = cast<ApplyExpr>(getElementExpr());
-  auto *decl = cast<DeclRefExpr>(apply->getFn());
-  return cast<OneOfElementDecl>(decl->getDecl());
 }

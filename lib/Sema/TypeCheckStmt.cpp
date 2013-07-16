@@ -458,7 +458,7 @@ public:
       for (auto *caseLabel : caseBlock->getCaseLabels()) {
         // Resolve the patterns in the label.
         for (auto *&pattern : caseLabel->getPatterns()) {
-          if (auto *newPattern = TC.resolvePattern(pattern)) {
+          if (auto *newPattern = TC.resolvePattern(pattern, DC)) {
             pattern = newPattern;
           } else {
             hadTypeError = true;

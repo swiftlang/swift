@@ -242,6 +242,10 @@ public:
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
   
+  /// \brief If this is a oneof or a bound generic oneof type, returns the
+  /// (possibly generic) oneof.
+  OneOfDecl *getOneOfOrBoundGenericOneOf();
+  
   /// \brief Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
   /// with a class type.

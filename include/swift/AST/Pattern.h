@@ -408,13 +408,20 @@ public:
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
 class OneOfElementPattern : public Pattern {
-  Expr *Element;
+  TypeLoc ParentType;
+  SourceLoc DotLoc;
+  SourceLoc NameLoc;
+  Identifier Name;
+  OneOfElementDecl *ElementDecl;
   Pattern /*nullable*/ *SubPattern;
   
 public:
-  OneOfElementPattern(Expr *Element, Pattern *SubPattern)
+  OneOfElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
+                      Identifier Name,
+                      OneOfElementDecl *Element, Pattern *SubPattern)
     : Pattern(PatternKind::OneOfElement),
-      Element(Element), SubPattern(SubPattern) {
+      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+      ElementDecl(Element), SubPattern(SubPattern) {
     if (SubPattern && SubPattern->isImplicit())
       setImplicit();
   }
@@ -431,18 +438,23 @@ public:
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
   
-  Expr *getElementExpr() const { return Element; }
-  void setElementExpr(Expr *e) { Element = e; }
+  Identifier getName() const { return Name; }
   
-  OneOfElementDecl *getElementDecl() const;
+  OneOfElementDecl *getElementDecl() const { return ElementDecl; }
+  void setElementDecl(OneOfElementDecl *d) { ElementDecl = d; }
   
-  SourceLoc getLoc() const { return Element->getLoc(); }
-  SourceRange getSourceRange() const {
-    return SubPattern
-      ? SourceRange{Element->getSourceRange().Start,
-                    SubPattern->getSourceRange().End}
-      : Element->getSourceRange();
+  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return DotLoc; }
+  SourceLoc getStartLoc() const {
+    return ParentType.hasLocation() ? ParentType.getSourceRange().Start
+                                    : DotLoc;
   }
+  SourceLoc getEndLoc() const {
+    return SubPattern ? SubPattern->getSourceRange().End : NameLoc;
+  }
+  SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
+  
+  TypeLoc getParentType() const { return ParentType; }
   
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::OneOfElement;

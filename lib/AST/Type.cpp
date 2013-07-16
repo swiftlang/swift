@@ -424,6 +424,16 @@ ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   return nullptr;
 }
 
+OneOfDecl *TypeBase::getOneOfOrBoundGenericOneOf() {
+  if (auto oofTy = getAs<OneOfType>())
+    return oofTy->getDecl();
+  
+  if (auto boundTy = getAs<BoundGenericType>())
+    return dyn_cast<OneOfDecl>(boundTy->getDecl());
+  
+  return nullptr;
+}
+
 NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
   if (auto nominalTy = getAs<NominalType>())
     return nominalTy->getDecl();

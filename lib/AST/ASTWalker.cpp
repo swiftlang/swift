@@ -680,11 +680,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Pattern *visitOneOfElementPattern(OneOfElementPattern *P) {
-    if (Expr *newElement = doIt(P->getElementExpr()))
-      P->setElementExpr(newElement);
-    else
-      return nullptr;
-    
     if (P->hasSubPattern()) {
       if (Pattern *newSub = doIt(P->getSubPattern()))
         P->setSubPattern(newSub);

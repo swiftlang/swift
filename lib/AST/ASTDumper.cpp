@@ -142,8 +142,9 @@ namespace {
     }
     void visitOneOfElementPattern(OneOfElementPattern *P) {
       printCommon(P, "pattern_oneof_element");
-      OS << '\n';
-      printRec(P->getElementExpr());
+      OS << ' ';
+      P->getParentType().getType()->print(OS);
+      OS << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';
         printRec(P->getSubPattern());

@@ -158,13 +158,14 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 }
 
 /// Apply generic arguments to the given type.
-static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
-                                  ArrayRef<TypeLoc> genericArgs) {
+Type TypeChecker::applyGenericArguments(Type type,
+                                        SourceLoc loc,
+                                        ArrayRef<TypeLoc> genericArgs) {
   auto unbound = type->getAs<UnboundGenericType>();
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
     // them.
-    TC.diagnose(loc, diag::not_a_generic_type, type);
+    diagnose(loc, diag::not_a_generic_type, type);
 
     // Just return the type; this provides better recovery anyway.
     return type;
@@ -175,8 +176,8 @@ static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
   if (genericParams->size() != genericArgs.size()) {
     // FIXME: Show the type name here.
     // FIXME: Point at the actual declaration of the underlying type.
-    TC.diagnose(loc, diag::type_parameter_count_mismatch,
-                genericArgs.size(), genericParams->size());
+    diagnose(loc, diag::type_parameter_count_mismatch,
+             genericArgs.size(), genericParams->size());
     return nullptr;
   }
 
@@ -186,8 +187,8 @@ static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
     // Validate the generic argument.
     // FIXME: Totally broken. We need GenericArgs to be mutable!
     TypeLoc genericArgCopy = genericArg;
-    if (TC.validateType(genericArgCopy)) {
-      genericArgCopy.setInvalidType(TC.Context);
+    if (validateType(genericArgCopy)) {
+      genericArgCopy.setInvalidType(Context);
       return nullptr;
     }
 
@@ -201,7 +202,7 @@ static Type applyGenericArguments(TypeChecker &TC, Type type, SourceLoc loc,
   // FIXME: Total hack. We should do the checking of the arguments right
   // here.
   TypeLoc tl{type, loc, nullptr};
-  if (TC.validateType(tl)) {
+  if (validateType(tl)) {
     return nullptr;
   }
 
@@ -216,6 +217,26 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, TypeLoc tl) {
   auto unbound = tl.getType()->castTo<UnboundGenericType>();
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
+}
+
+/// \brief Find a type member as a qualified member of a module.
+LookupTypeResult TypeChecker::lookupMemberType(Module *module, Identifier name){
+  LookupTypeResult result;
+  SmallVector<ValueDecl*, 4> decls;
+  // FIXME: The use of AccessPathTy() is weird here.
+  module->lookupValue(Module::AccessPathTy(), name,
+                      NLKind::QualifiedLookup, decls);
+  
+  for (auto decl : decls) {
+    // Only consider type declarations.
+    auto typeDecl = dyn_cast<TypeDecl>(decl);
+    if (!typeDecl)
+      continue;
+    
+    auto type = typeDecl->getDeclaredType();
+    result.addResult({typeDecl, type});
+  }
+  return result;
 }
 
 /// \brief Validate the given identifier type.
@@ -344,9 +365,9 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       // FIXME: Diagnose this and drop the arguments.
     } else {
       // Apply the generic arguments to the type.
-      auto type = applyGenericArguments(TC, current.get<Type>(),
-                                        Components[0].Loc,
-                                        Components[0].GenericArgs);
+      auto type = TC.applyGenericArguments(current.get<Type>(),
+                                           Components[0].Loc,
+                                           Components[0].GenericArgs);
       if (!type)
         return true;
 
@@ -397,8 +418,8 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
 
       // If there are generic arguments, apply them now.
       if (!comp.GenericArgs.empty()) {
-        memberType = applyGenericArguments(TC, memberType, comp.Loc,
-                                           comp.GenericArgs);
+        memberType = TC.applyGenericArguments(memberType, comp.Loc,
+                                              comp.GenericArgs);
         if (!memberType)
           return true;
       }
@@ -411,45 +432,22 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
     }
 
     // Lookup into a module.
-    // FIXME: The use of AccessPathTy() is weird here.
     auto module = current.get<Module *>();
-    SmallVector<ValueDecl*, 4> decls;
-    module->lookupValue(Module::AccessPathTy(), comp.Id,
-                        NLKind::QualifiedLookup, decls);
-
-    bool isAmbiguous = false;
-    Type foundType;
-    for (auto decl : decls) {
-      // Only consider type declarations.
-      auto typeDecl = dyn_cast<TypeDecl>(decl);
-      if (!typeDecl)
-        continue;
-
-      auto type = typeDecl->getDeclaredType();
-      if (!foundType) {
-        foundType = type;
-        continue;
-      }
-
-      if (!foundType->isEqual(type)) {
-        isAmbiguous = true;
-        break;
-      }
-    }
+    LookupTypeResult foundModuleTypes = TC.lookupMemberType(module, comp.Id);
 
     // If we didn't find a type, complain.
-    if (!foundType) {
+    if (!foundModuleTypes) {
       // FIXME: Fully-qualified module name?
       TC.diagnose(comp.Loc, diag::no_module_type, comp.Id, module->Name);
       return true;
     }
 
     // If lookup was ambiguous, complain.
-    if (isAmbiguous) {
+    if (foundModuleTypes.isAmbiguous()) {
       TC.diagnose(comp.Loc, diag::ambiguous_module_type, comp.Id, module->Name);
-      for (auto decl : decls) {
+      for (auto foundType : foundModuleTypes) {
         // Only consider type declarations.
-        auto typeDecl = dyn_cast<TypeDecl>(decl);
+        auto typeDecl = foundType.first;
         if (!typeDecl)
           continue;
 
@@ -458,11 +456,12 @@ static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
       }
       return true;
     }
+    Type foundType = foundModuleTypes[0].second;
 
     // If there are generic arguments, apply them now.
     if (!comp.GenericArgs.empty()) {
-      foundType = applyGenericArguments(TC, foundType, comp.Loc,
-                                        comp.GenericArgs);
+      foundType = TC.applyGenericArguments(foundType, comp.Loc,
+                                           comp.GenericArgs);
       if (!foundType)
         return true;
     }

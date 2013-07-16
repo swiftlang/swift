@@ -19,9 +19,242 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/NameLookup.h"
+#include <utility>
 using namespace swift;
 
 namespace {
+
+/// Resolves an expression consisting of nested member references ending in a
+/// decl reference to a type, returning true on success or false on failure.
+class ResolveTypeReference : public ASTVisitor<ResolveTypeReference,
+                                               /*ExprRetTy=*/ bool>
+{
+public:
+  TypeChecker &TC;
+  SmallVectorImpl<IdentTypeRepr::Component> &components;
+  llvm::PointerUnion<Module*, TypeDecl*> curScope;
+  Type curType;
+  DeclContext *rootDC;
+
+  ResolveTypeReference(TypeChecker &TC,
+                       SmallVectorImpl<IdentTypeRepr::Component> &components,
+                       DeclContext *rootDC)
+    : TC(TC), components(components), rootDC(rootDC) {}
+  
+  Type doIt(Expr *e) {
+    if (!visit(e))
+      return Type();
+    // If we succeeded, store the resolved type in the final component of the
+    // identifier.
+    if (curType)
+      components.back().setValue(curType);
+    
+    return curType;
+  }
+  
+  bool visitExpr(Expr *e) {
+    return false;
+  }
+  
+  bool visitDeclRefExpr(DeclRefExpr *dre) {
+    assert(components.empty() && "decl ref should be root element of expr");
+    assert(!curScope && "decl ref should be root element of expr");
+    
+    // Get the declared type.
+    auto *td = dyn_cast<TypeDecl>(dre->getDecl());
+    if (!td)
+      return false;
+    
+    curScope = td;
+    curType = td->getDeclaredType();
+    
+    // Track the AST location of the component.
+    components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}, nullptr});
+    components.back().setValue(curScope.get<TypeDecl*>());
+    return true;
+  }
+  
+  bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
+    assert(components.empty() && "decl ref should be root element of expr");
+    assert(!curScope && "decl ref should be root element of expr");
+    
+    // Look up the type.
+    UnqualifiedLookup lookup(udre->getName(), rootDC);
+    if (!lookup.isSuccess())
+      return false;
+    
+    // Prefer a type result if we find one, but accept a module too.
+    for (auto &result : lookup.Results) {
+      switch (result.Kind) {
+      case UnqualifiedLookupResult::ModuleName:
+        // If we see two modules, bail on ambiguity.
+        if (curScope.is<Module*>())
+          return false;
+        // If we already have a type, favor it.
+        if (curScope.is<TypeDecl*>())
+          continue;
+
+        curScope = result.getNamedModule();
+        break;
+      
+      // Ignore kinds that never refer to types.
+      case UnqualifiedLookupResult::MemberProperty:
+      case UnqualifiedLookupResult::MemberFunction:
+        continue;
+          
+      // See whether we resolved a type.
+      case UnqualifiedLookupResult::ModuleMember:
+      case UnqualifiedLookupResult::LocalDecl:
+      case UnqualifiedLookupResult::MetatypeMember:
+      case UnqualifiedLookupResult::ExistentialMember:
+      case UnqualifiedLookupResult::ArchetypeMember:
+      case UnqualifiedLookupResult::MetaArchetypeMember: {
+        auto *td = dyn_cast<TypeDecl>(result.getValueDecl());
+        if (!td)
+          continue;
+        // If we already have a type, bail on ambiguity.
+        if (curScope.is<TypeDecl*>())
+          continue;
+        
+        curScope = td;
+        curType = td->getDeclaredType();
+        break;
+      }
+      }
+    }
+    
+    assert(curScope && "shouldn't have got past the loop without a curType");
+    
+    // Track the AST location of the component.
+    components.push_back({udre->getLoc(), udre->getName(), {}, nullptr});
+    if (curScope.is<TypeDecl*>())
+      components.back().setValue(curScope.get<TypeDecl*>());
+    else
+      components.back().setValue(curScope.get<Module*>());
+    return true;
+  }
+  
+  bool visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
+    if (!visit(ude->getBase()))
+      return false;
+    
+    assert(!components.empty() && "no components before dot expr?!");
+    assert(curScope && "no base context?!");
+    
+    // Do qualified lookup into the current scope.
+    LookupTypeResult lookup;
+    if (TypeDecl *td = curScope.dyn_cast<TypeDecl*>()) {
+      // Only nominal types have members.
+      auto *ntd = dyn_cast<NominalTypeDecl>(td);
+      if (!ntd)
+        return false;
+      
+      // Find a type member by the given name.
+      lookup = TC.lookupMemberType(td->getDeclaredType(), ude->getName());
+    } else if (Module *m = curScope.dyn_cast<Module*>()) {
+      // Look into the module.
+      lookup = TC.lookupMemberType(m, ude->getName());
+    } else
+      llvm_unreachable("invalid curType");
+    
+    // Make sure the lookup succeeded.
+    if (!lookup || lookup.isAmbiguous())
+      return false;
+    
+    curScope = lookup[0].first;
+    curType = lookup[0].second;
+    
+    // Track the AST location of the new component.
+    components.push_back({ude->getLoc(), ude->getName(), {}, nullptr});
+    components.back().setValue(curScope.get<TypeDecl*>());
+    return true;
+  }
+  
+  bool visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *use) {
+    if (!visit(use->getSubExpr()))
+      return false;
+    
+    assert(!components.empty() && "no components before generic args?!");
+    assert(curScope && "no base context?!");
+    
+    // Generic parameters don't affect lookup (yet; GADTs or
+    // constrained extensions would change this), but apply the parameters for
+    // validation and source tracking purposes.
+    
+    curType = TC.applyGenericArguments(curType, use->getLoc(),
+                                       use->getUnresolvedParams());
+    if (!curType)
+      return false;
+    
+    // Track the AST location of the generic arguments.
+    SmallVector<TypeRepr*, 4> argTypeReprs;
+    for (auto &arg : use->getUnresolvedParams())
+      argTypeReprs.push_back(arg.getTypeRepr());
+    
+    auto origComponent = components.back();
+    components.back() = {origComponent.getIdLoc(),
+                         origComponent.getIdentifier(),
+                         TC.Context.AllocateCopy(argTypeReprs),
+                         nullptr};
+    components.back().setValue(origComponent.getBoundDecl());
+    return true;
+  }
+};
+  
+/// Find a oneof element in a oneof type.
+OneOfElementDecl *
+lookupOneOfMemberElement(TypeChecker &TC, Type ty, Identifier name) {
+  // The type must be a oneof.
+  OneOfDecl *oof = ty->getOneOfOrBoundGenericOneOf();
+  if (!oof)
+    return nullptr;
+  
+  // Look up the case inside the oneof.
+  LookupResult foundElements = TC.lookupMember(ty, name);
+  if (!foundElements)
+    return nullptr;
+  
+  // See if there is any oneof element in there.
+  OneOfElementDecl *foundElement = nullptr;
+  for (ValueDecl *e : foundElements) {
+    auto *oe = dyn_cast<OneOfElementDecl>(e);
+    if (!oe)
+      continue;
+    // Ambiguities should be ruled out by parsing.
+    assert(!foundElement && "ambiguity in oneof case name lookup?!");
+    foundElement = oe;
+  }
+  
+  return foundElement;
+}
+  
+/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to a oneof element
+/// reference, returning a TypeLoc over the type reference and the referenced
+/// OneOfElementDecl if successful, or returning null on failure.
+static std::pair<TypeLoc, OneOfElementDecl*>
+lookupOneOfElementReference(TypeChecker &TC,
+                            UnresolvedDotExpr *refExpr,
+                            DeclContext *DC) {
+  // The left side of the dot needs to be a type; do type lookup on it.
+  SmallVector<IdentTypeRepr::Component, 4> components;
+  
+  Type ty = ResolveTypeReference(TC, components, DC).doIt(refExpr->getBase());
+  if (!ty)
+    return {{}, nullptr};
+  
+  // Look up the case inside the oneof.
+  OneOfElementDecl *foundElement
+    = lookupOneOfMemberElement(TC, ty, refExpr->getName());
+  if (!foundElement)
+    return {{}, nullptr};
+  
+  // Build a TypeLoc to preserve AST location info for the reference chain.
+  TypeRepr *repr
+    = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+  TypeLoc loc(ty, refExpr->getBase()->getSourceRange(), repr);
+  return {loc, foundElement};
+}
 
 class ResolvePattern : public ASTVisitor<ResolvePattern,
                                          /*ExprRetTy=*/Pattern*,
@@ -30,9 +263,10 @@ class ResolvePattern : public ASTVisitor<ResolvePattern,
                                          /*PatternRetTy=*/Pattern*>
 {
 public:
-  ASTContext &C;
+  TypeChecker &TC;
+  DeclContext *DC;
   
-  ResolvePattern(ASTContext &C) : C(C) {}
+  ResolvePattern(TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
   
   // Handle productions that are always leaf patterns or are already resolved.
 #define ALWAYS_RESOLVED_PATTERN(Id) \
@@ -67,6 +301,15 @@ public:
     return exprAsPattern;
   }
   
+  // Convert a subexpression to a pattern if possible, or wrap it in an
+  // ExprPattern.
+  Pattern *getSubExprPattern(Expr *E) {
+    Pattern *p = visit(E);
+    if (!p)
+      return new (TC.Context) ExprPattern(E, nullptr, nullptr);
+    return p;
+  }
+  
   // Most exprs remain exprs and should be wrapped in ExprPatterns.
   Pattern *visitExpr(Expr *E) {
     return nullptr;
@@ -77,60 +320,98 @@ public:
     return visit(E->getSubPattern());
   }
   
-  // Parens and tuples have to become patterns if they contain any patterns. If
-  // they have only exprs as children, a tuple pattern or expr would be
-  // equivalent, but it avoids some destructuring if we leave them as leaf
-  // exprs.
+  // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
     if (Pattern *subPattern = visit(E->getSubExpr()))
-      return new (C) ParenPattern(E->getLParenLoc(), subPattern,
-                                  E->getRParenLoc());
+      return new (TC.Context) ParenPattern(E->getLParenLoc(), subPattern,
+                                           E->getRParenLoc());
     return nullptr;
   }
   
+  // Convert all tuples to patterns.
   Pattern *visitTupleExpr(TupleExpr *E) {
-    SmallVector<Pattern*, 4> patterns;
-    bool hasPattern = false;
-    
-    for (auto *subExpr : E->getElements()) {
-      Pattern *pattern = visit(subExpr);
-      hasPattern |= bool(pattern);
-      patterns.push_back(pattern);
-    }
-    
     // Construct a TuplePattern.
     // FIXME: Carry over field labels.
     SmallVector<TuplePatternElt, 4> patternElts;
     
-    for (unsigned i = 0, e = E->getNumElements(); i < e; ++i) {
-      Pattern *pattern = patterns[i];
-      if (!pattern)
-        pattern = new (C) ExprPattern(E->getElement(i),
-                                      /*matchFn*/ nullptr,
-                                      /*matchVar*/ nullptr);
+    for (auto *subExpr : E->getElements()) {
+      Pattern *pattern = getSubExprPattern(subExpr);
       patternElts.push_back(TuplePatternElt(pattern));
     }
     
-    return TuplePattern::create(C, E->getLoc(),
+    return TuplePattern::create(TC.Context, E->getLoc(),
                                 patternElts, E->getRParenLoc());
   }
   
-  // TODO: Call syntax 'T(x...)' forms a pattern if 'T' is a type and '(x...)' is a
-  // TuplePattern with labeled fields.
-  /*
-  Pattern *visitCallExpr(CallExpr *E) {
-    // The arguments must form a tuple with all named keys.
-    auto *argTuple = dyn_cast<TupleExpr>(E->getArg());
-    if (!argTuple)
-      return nullptr;
-    if (!argTuple->getElementNames())
-      return nullptr;
-    for (unsigned i = 0, e = argTuple->getNumElements(); i < e; ++i)
-      if (!argTuple->getElementName(i).get())
-        return nullptr;
-    ...;
+  // Unresolved member syntax '.Element' forms a OneOfElement pattern. The
+  // element will be resolved when we type-check the pattern.
+  Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
+    return new (TC.Context) OneOfElementPattern(TypeLoc(), ume->getDotLoc(),
+                                                ume->getNameLoc(),
+                                                ume->getName(),
+                                                nullptr, nullptr);
   }
-   */
+  
+  // Member syntax 'T.Element' forms a pattern if 'T' is a oneof and the
+  // member name is a member of the oneof.
+  Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
+    TypeLoc referencedType;
+    OneOfElementDecl *referencedDecl;
+    std::tie(referencedType, referencedDecl)
+      = lookupOneOfElementReference(TC, ude, DC);
+    
+    if (!referencedDecl)
+      return nullptr;
+    
+    return new (TC.Context) OneOfElementPattern(referencedType,
+                                                ude->getDotLoc(),
+                                                ude->getNameLoc(),
+                                                ude->getName(),
+                                                referencedDecl,
+                                                nullptr);
+    
+    return nullptr;
+  }
+  
+  // Call syntax 'T.Element(x...)' or '.Element(x...)' forms a pattern if
+  // the callee references a oneof element. The arguments then form a tuple
+  // pattern matching the element's data.
+  Pattern *visitCallExpr(CallExpr *ce) {
+    // '.Element(x...)' is always treated as a OneOfElementPattern.
+    if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
+      auto *subPattern = getSubExprPattern(ce->getArg());
+      return new (TC.Context) OneOfElementPattern(TypeLoc(), ume->getDotLoc(),
+                                         ume->getNameLoc(),
+                                         ume->getName(),
+                                         nullptr,
+                                         subPattern);
+    }
+    
+    // 'T.Element(x...)' is treated as a OneOfElementPattern if the dotted path
+    // references a oneof element.
+    
+    if (auto *ude = dyn_cast<UnresolvedDotExpr>(ce->getFn())) {
+      TypeLoc referencedType;
+      OneOfElementDecl *referencedDecl;
+      std::tie(referencedType, referencedDecl)
+        = lookupOneOfElementReference(TC, ude, DC);
+      
+      if (!referencedDecl)
+        return nullptr;
+      
+      if (auto oofElt = dyn_cast<OneOfElementDecl>(referencedDecl)) {
+        auto *subPattern = getSubExprPattern(ce->getArg());
+        return new (TC.Context) OneOfElementPattern(referencedType,
+                                                    ude->getDotLoc(),
+                                                    ude->getNameLoc(),
+                                                    ude->getName(),
+                                                    oofElt,
+                                                    subPattern);
+      }
+    }
+
+    return nullptr;
+  }
 };
 
 } // end anonymous namespace
@@ -139,8 +420,8 @@ public:
 /// expr/pattern productions occur (tuples, function calls, etc.), favor the
 /// pattern interpretation if it forms a valid pattern; otherwise, leave it as
 /// an expression.
-Pattern *TypeChecker::resolvePattern(Pattern *P) {
-  return ResolvePattern(Context).visit(P);
+Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
+  return ResolvePattern(*this, DC).visit(P);
 }
 
 /// Perform bottom-up type-checking on a pattern.  If this returns
@@ -248,7 +529,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
-    llvm_unreachable("not implemented");
+    llvm_unreachable("bottom-up type checking of refutable patterns "
+                     "not implemented");
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -402,6 +684,19 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
       
   case PatternKind::OneOfElement: {
     auto *OP = cast<OneOfElementPattern>(P);
+    
+    // If the element decl was not resolved (because it was spelled without a
+    // type as `.Foo`), resolve it now that we have a type.
+    if (!OP->getElementDecl()) {
+      OneOfElementDecl *element
+        = lookupOneOfMemberElement(*this, type, OP->getName());
+      if (!element) {
+        diagnose(OP->getLoc(), diag::oneof_element_pattern_member_not_found,
+                 OP->getName().str(), type);
+        return true;
+      }
+      OP->setElementDecl(element);
+    }
     
     // If there is a subpattern, push the oneof element type down onto it.
     if (OP->hasSubPattern()) {
