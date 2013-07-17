@@ -213,6 +213,11 @@ component.
   to create a nil NSArray. Now, 'nil' picks up the type of its
   context.
 
+* POSIX.EnvironmentVariables and swift.CommandLineArguments global variables
+  were merged into a swift.Process variable.  Now you can access command line
+  arguments with Process.arguments.  In order to acces environment variables
+  add "import POSIX" and use Process.environmentVariables.
+
 
 === GETTING STARTED WITH SWIFT ===
 

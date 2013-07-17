@@ -1,4 +1,4 @@
-struct _CommandLineArguments {
+struct _Process {
   // This variable gets (re-)initialized on-demand to reflect the actual argument vector
   var _arguments : String[]
 
@@ -14,4 +14,4 @@ struct _CommandLineArguments {
   }
 }
 
-var CommandLineArguments : _CommandLineArguments
+var Process : _Process
