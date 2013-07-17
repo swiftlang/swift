@@ -522,6 +522,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                bool IsTypeLookup) {
+  // Operate on a canonical type so that we don't need to unwrap the type
+  // sugar.
+  BaseTy = BaseTy->getCanonicalType();
+
   swift::NominalTypeDecl *ntd = nullptr;
   
   if (LValueType *lvt = BaseTy->getAs<LValueType>()) {
