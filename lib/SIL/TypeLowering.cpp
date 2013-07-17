@@ -39,6 +39,8 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
       return typeDecl->getDeclaredType()->getCanonicalType();
     return CanType();
   });
+
+  assert(t && "bridging type not found but we got past the clang importer?!");
   
   DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
           << " mapped to ";
@@ -715,8 +717,7 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   case AbstractCC::ObjCMethod:
     // Map native types back to bridged types.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
-    if (get##NativeType##Type() && get##BridgedType##Type()             \
-        && t->isEqual(get##NativeType##Type()))                         \
+    if (t->isEqual(get##NativeType##Type()))                         \
       return get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
     return t;

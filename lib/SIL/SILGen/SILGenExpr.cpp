@@ -2095,10 +2095,10 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
     // If the output is a bridged type, convert it back to a native type.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType)  \
-    if (v.getType().getSwiftType() == SGM.Types.get##BridgedType##Type() \
-        && nativeTy == SGM.Types.get##NativeType##Type()) {              \
-      return emitBridge##BridgedType##To##NativeType(*this, loc, v);     \
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType)     \
+    if (nativeTy == SGM.Types.get##NativeType##Type() &&                    \
+        v.getType().getSwiftType() == SGM.Types.get##BridgedType##Type()) { \
+      return emitBridge##BridgedType##To##NativeType(*this, loc, v);        \
     }
 #include "swift/SIL/BridgedTypes.def"
     return v;
