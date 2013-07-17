@@ -361,3 +361,27 @@ bb0(%0 : $Int64, %1 : $Float32):
   %26 = release %2#0 : $Builtin.ObjectPointer
   %27 = return %25 : $()
 }
+
+class M {
+  var member : Int
+}
+
+// CHECK: $[cc(method), thin] ((x : Int64), M) -> ()
+sil @_TC3ref1C3foofS0_FT1xSi_T_ : $[cc(method), thin] ((x : Int64), M) -> () {
+bb0(%0 : $Int64, %1 : $M):
+  %2 = alloc_box $Int64     // CHECK: alloc_box $Int64
+  %3 = store %0 to %2#1 : $*Int64
+  %4 = alloc_box $M         // CHECK: alloc_box $M
+  %5 = store %1 to %4#1 : $*M
+  %6 = load %2#1 : $*Int64  // CHECK: load {{.*}} : $*Int64
+  %7 = load %4#1 : $*M      // CHECK: load {{.*}} : $*M
+  %8 = retain %7 : $M
+  // CHECK: ref_element_addr {{%.*}} : $M, @member
+  %9 = ref_element_addr %7 : $M, @member
+  %10 = store %6 to %9 : $*Int64
+  %11 = release %7 : $M
+  %12 = tuple ()
+  %13 = release %4#0 : $Builtin.ObjectPointer
+  %14 = release %2#0 : $Builtin.ObjectPointer
+  %15 = return %12 : $()
+}

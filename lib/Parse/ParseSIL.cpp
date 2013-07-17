@@ -772,6 +772,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
+    .Case("ref_element_addr", ValueKind::RefElementAddrInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("release", ValueKind::ReleaseInst)
@@ -1373,6 +1374,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILType(Ty))
       return true;
     ResultVal = B.createBuiltinZero(SILLocation(), Ty);
+    break;
+  }
+  case ValueKind::RefElementAddrInst: {
+    Identifier ElemId;
+    SourceLoc NameLoc;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        P.parseToken(tok::sil_at_sign, diag::expected_tok_in_sil_instr, "@") ||
+        P.parseIdentifier(ElemId, NameLoc, diag::sil_ref_inst_wrong_field))
+      return true;
+    ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
+                                     ElemId);
+    if (!FieldV || !isa<VarDecl>(FieldV)) {
+      P.diagnose(NameLoc, diag::sil_ref_inst_wrong_field);
+      return true;
+    }
+    VarDecl *Field = cast<VarDecl>(FieldV);
+    auto ResultTy = SILType::getPrimitiveType(
+                      Field->getType()->getCanonicalType(), true);
+    ResultVal = B.createRefElementAddr(SILLocation(), Val, Field,
+                                       ResultTy).getDef();
     break;
   }
   }

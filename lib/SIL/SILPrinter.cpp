@@ -558,7 +558,7 @@ public:
     << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    OS << "ref_element_addr " << getID(EI->getOperand()) << ", @"
+    OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", @"
        << EI->getField()->getName().get();
   }
   

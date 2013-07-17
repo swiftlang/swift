@@ -364,6 +364,8 @@ ERROR(sil_tuple_inst_wrong_field,decl_parsing,none,
       "tuple instruction requires a field number", ())
 ERROR(sil_struct_inst_wrong_field,decl_parsing,none,
       "struct instruction requires a field name", ())
+ERROR(sil_ref_inst_wrong_field,decl_parsing,none,
+      "ref_element_addr instruction requires a field name", ())
 ERROR(sil_expected_allocation_kind,decl_parsing,none,
       "expected allocation kind (heap, pseudo, or stack)", ())
 ERROR(sil_invalid_instr_operands,decl_parsing,none,
