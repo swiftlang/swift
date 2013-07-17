@@ -1462,7 +1462,7 @@ private:
 /// var x : protocol<P, Q>
 /// \endcode
 ///
-/// Here, the type of x is a a composition of the protocols 'P' and 'Q'.
+/// Here, the type of x is a composition of the protocols 'P' and 'Q'.
 ///
 /// The canonical form of a protocol composition type is based on a sorted (by
 /// module and name), minimized (based on redundancy due to protocol
