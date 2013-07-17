@@ -60,12 +60,17 @@ class TypeInfo {
   mutable const TypeInfo *NextConverted;
 
 protected:
-  enum IsReference_t : bool { IsNotReference, IsReference };
+  enum SpecialTypeInfoKind {
+    STIK_None,
+    STIK_Reference,
+    STIK_Weak,
+    STIK_Unowned,
+  };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
-           IsFixedSize_t fixed, IsReference_t isReference = IsNotReference)
+           IsFixedSize_t fixed, SpecialTypeInfoKind stik = STIK_None)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), Fixed(fixed), Reference(isReference) {}
+      POD(pod), Fixed(fixed), STIK(stik) {}
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -96,8 +101,8 @@ private:
   /// Whether this type is known to be fixed in size.
   unsigned Fixed : 1;
 
-  /// Whether this type has reference semantics.
-  unsigned Reference : 1;
+  /// The kind of supplemental API this type has, if any.
+  unsigned STIK : 2;
 
 public:
   /// Sets whether this type is POD.  Should only be called during
@@ -114,19 +119,21 @@ public:
   /// particular action on copy or destroy.
   IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
 
+  /// Returns the type of special interface followed by this TypeInfo.
+  /// It is important for our design that this depends only on
+  /// immediate type structure and not on, say, properties that can
+  /// vary by resilience.  Of course, generics can obscure these
+  /// properties on their parameter types, but then the program
+  /// can rely on them.
+  SpecialTypeInfoKind getSpecialTypeInfoKind() const {
+    return SpecialTypeInfoKind(STIK);
+  }
+
   /// Whether this type is known to be fixed-size in the local
   /// resilience domain.  If true, this TypeInfo can be cast to
   /// FixedTypeInfo.
   IsFixedSize_t isFixedSize() const {
     return IsFixedSize_t(Fixed);
-  }
-
-  /// Whether this type is known to have reference semantics.  This
-  /// does not depend on resilience --- struct types never have
-  /// reference semantics in this sense --- but of course it can be
-  /// statically obscured by e.g. generics.
-  IsReference_t hasReferenceSemantics() const {
-    return IsReference_t(Reference);
   }
 
   llvm::Type *getStorageType() const { return StorageType; }

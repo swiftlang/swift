@@ -32,6 +32,8 @@
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "TypeVisitor.h"
+#include "UnownedTypeInfo.h"
+#include "WeakTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;

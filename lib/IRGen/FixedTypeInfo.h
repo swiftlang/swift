@@ -35,8 +35,8 @@ private:
 
 protected:
   FixedTypeInfo(llvm::Type *type, Size size, Alignment align,
-                IsPOD_t pod, IsReference_t isReference = IsNotReference)
-    : TypeInfo(type, align, pod, IsFixedSize, isReference),
+                IsPOD_t pod, SpecialTypeInfoKind stik = STIK_None)
+    : TypeInfo(type, align, pod, IsFixedSize, stik),
       StorageSize(size) {}
 
 public:

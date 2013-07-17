@@ -73,7 +73,7 @@ public:
     asDerived().emitScalarRelease(IGF, value);
   }
 
-  const TypeInfo *createWeakStorageType(TypeConverter &TC) const {
+  const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const {
     if (asDerived().hasSwiftRefcount()) {
       return TC.createSwiftWeakStorageType(this->getStorageType());
     } else {
@@ -81,7 +81,7 @@ public:
     }
   }
 
-  const TypeInfo *createUnownedStorageType(TypeConverter &TC) const {
+  const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC) const {
     if (asDerived().hasSwiftRefcount()) {
       return TC.createSwiftUnownedStorageType(this->getStorageType());
     } else {

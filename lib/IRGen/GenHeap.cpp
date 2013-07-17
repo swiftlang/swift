@@ -32,6 +32,8 @@
 #include "IRGenModule.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
+#include "UnownedTypeInfo.h"
+#include "WeakTypeInfo.h"
 
 #include "GenHeap.h"
 
@@ -582,11 +584,11 @@ namespace {
   /// with a known-Swift reference count.
   class SwiftUnownedReferenceTypeInfo
     : public SingleScalarTypeInfo<SwiftUnownedReferenceTypeInfo,
-                                  FixedTypeInfo> {
+                                  UnownedTypeInfo> {
   public:
     SwiftUnownedReferenceTypeInfo(llvm::Type *type,
                                   Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, alignment, IsNotPOD) {}
+      : SingleScalarTypeInfo(type, size, alignment) {}
 
     enum { IsScalarPOD = false };
 
@@ -603,11 +605,11 @@ namespace {
   /// with a known-Swift reference count.
   class SwiftWeakReferenceTypeInfo
     : public IndirectTypeInfo<SwiftWeakReferenceTypeInfo,
-                              FixedTypeInfo> {
+                              WeakTypeInfo> {
   public:
     SwiftWeakReferenceTypeInfo(llvm::Type *type,
                                Size size, Alignment alignment)
-      : IndirectTypeInfo(type, size, alignment, IsNotPOD) {}
+      : IndirectTypeInfo(type, size, alignment) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr) const {
@@ -635,14 +637,14 @@ namespace {
   };
 }
 
-const TypeInfo *
+const UnownedTypeInfo *
 TypeConverter::createSwiftUnownedStorageType(llvm::Type *valueType) {
   return new SwiftUnownedReferenceTypeInfo(valueType,
                                            IGM.getPointerSize(),
                                            IGM.getPointerAlignment());
 }
 
-const TypeInfo *
+const WeakTypeInfo *
 TypeConverter::createSwiftWeakStorageType(llvm::Type *valueType) {
   return new SwiftWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
                                         IGM.getWeakReferenceSize(),
@@ -654,11 +656,11 @@ namespace {
   /// that is not necessarily a Swift object.
   class UnknownUnownedReferenceTypeInfo :
       public SingleScalarTypeInfo<UnknownUnownedReferenceTypeInfo,
-                                  FixedTypeInfo> {
+                                  UnownedTypeInfo> {
   public:
     UnknownUnownedReferenceTypeInfo(llvm::Type *type,
                                     Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, alignment, IsNotPOD) {}
+      : SingleScalarTypeInfo(type, size, alignment) {}
 
     enum { IsScalarPOD = false };
 
@@ -675,11 +677,11 @@ namespace {
   /// that is not necessarily a Swift object.
   class UnknownWeakReferenceTypeInfo :
       public IndirectTypeInfo<UnknownWeakReferenceTypeInfo,
-                              FixedTypeInfo> {
+                              WeakTypeInfo> {
   public:
     UnknownWeakReferenceTypeInfo(llvm::Type *type,
                                  Size size, Alignment alignment)
-      : IndirectTypeInfo(type, size, alignment, IsNotPOD) {}
+      : IndirectTypeInfo(type, size, alignment) {}
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                             Address srcAddr) const {
@@ -707,14 +709,14 @@ namespace {
   };
 }
 
-const TypeInfo *
+const UnownedTypeInfo *
 TypeConverter::createUnknownUnownedStorageType(llvm::Type *valueType) {
   return new UnknownUnownedReferenceTypeInfo(valueType,
                                              IGM.getPointerSize(),
                                              IGM.getPointerAlignment());
 }
 
-const TypeInfo *
+const WeakTypeInfo *
 TypeConverter::createUnknownWeakStorageType(llvm::Type *valueType) {
   return new UnknownWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
                                           IGM.getWeakReferenceSize(),

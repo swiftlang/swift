@@ -58,6 +58,8 @@
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
+#include "UnownedTypeInfo.h"
+#include "WeakTypeInfo.h"
 
 #include "GenProto.h"
 
@@ -565,14 +567,13 @@ namespace {
 
   /// A type implementation for [weak] existential types.
   class WeakClassExistentialTypeInfo :
-      public IndirectTypeInfo<WeakClassExistentialTypeInfo, FixedTypeInfo> {
+      public IndirectTypeInfo<WeakClassExistentialTypeInfo, WeakTypeInfo> {
     unsigned NumProtocols;
 
   public:
     WeakClassExistentialTypeInfo(unsigned numProtocols,
                                  llvm::Type *ty, Size size, Alignment align)
-      : IndirectTypeInfo(ty, size, align, IsNotPOD),
-        NumProtocols(numProtocols) {
+      : IndirectTypeInfo(ty, size, align), NumProtocols(numProtocols) {
     }
 
     void emitCopyOfTables(IRGenFunction &IGF, Address dest, Address src) const {
@@ -766,11 +767,11 @@ namespace {
   /// A type implementation for [unowned] class existential types.
   class UnownedClassExistentialTypeInfo
     : public ScalarExistentialTypeInfoBase<UnownedClassExistentialTypeInfo,
-                                           FixedTypeInfo> {
+                                           UnownedTypeInfo> {
   public:
     UnownedClassExistentialTypeInfo(unsigned numTables,
                                     llvm::Type *ty, Size size, Alignment align)
-      : ScalarExistentialTypeInfoBase(numTables, ty, size, align, IsNotPOD) {}
+      : ScalarExistentialTypeInfoBase(numTables, ty, size, align) {}
 
     void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownWeakRetain(value);
@@ -881,7 +882,8 @@ namespace {
       IGF.emitUnknownRelease(value);
     }
 
-    const TypeInfo *createUnownedStorageType(TypeConverter &TC) const override {
+    const UnownedTypeInfo *
+    createUnownedStorageType(TypeConverter &TC) const override {
       // We can just re-use the storage type for the [unowned] type.
       return new UnownedClassExistentialTypeInfo(NumProtocols,
                                                  getStorageType(),
@@ -889,7 +891,8 @@ namespace {
                                                  getFixedAlignment());
     }
 
-    const TypeInfo *createWeakStorageType(TypeConverter &TC) const override {
+    const WeakTypeInfo *
+    createWeakStorageType(TypeConverter &TC) const override {
       Size size = TC.IGM.getWeakReferenceSize()
                 + NumProtocols * TC.IGM.getPointerSize();
 

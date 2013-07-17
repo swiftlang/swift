@@ -50,6 +50,8 @@ namespace irgen {
   class ProtocolInfo;
   class Size;
   class TypeInfo;
+  class UnownedTypeInfo;
+  class WeakTypeInfo;
 
 /// Either a type or a forward-declaration.
 typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
@@ -98,10 +100,10 @@ public:
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
 
-  const TypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
-  const TypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
-  const TypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
-  const TypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
+  const WeakTypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
+  const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
+  const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
+  const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
 
 private:
   class Types_t {
