@@ -144,11 +144,12 @@ if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
 To: $PACKAGE_ANNOUNCEMENT_ADDRESS
 Subject: Swift package $package_basename now available
 
-A new Swift package sftp://matte.apple.com/$package_basename
-is available. You can download and install it using the command line:
+A new Swift package is available at
+You can download and install it using the command line:
 
-        sftp matte.apple.com:/$package_basename ~/Downloads
         sudo darwinup install ~/Downloads/$package_basename
+
+where \$USER is your Open Directory username.
 
 We recommend uninstalling any previous Swift packages you have installed
 before installing this package. Uninstall as follows:
