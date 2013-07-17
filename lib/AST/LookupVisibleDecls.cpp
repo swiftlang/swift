@@ -258,7 +258,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     Consumer.foundDecl(D);
   }
 
-  void checkPattern(Pattern *Pat) {
+  void checkPattern(const Pattern *Pat) {
     switch (Pat->getKind()) {
     case PatternKind::Tuple:
       for (auto &field : cast<TuplePattern>(Pat)->getFields())
@@ -385,6 +385,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     if (auto FE = dyn_cast<FuncExpr>(DC)) {
+      for (auto *P : FE->getArgParamPatterns())
+        FindLocalVal(Loc, Consumer).checkPattern(P);
+
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
