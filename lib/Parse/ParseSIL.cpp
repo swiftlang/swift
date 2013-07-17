@@ -761,6 +761,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
+    .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
@@ -784,6 +785,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
+    .Case("string_literal", ValueKind::StringLiteralInst)
     .Case("struct", ValueKind::StructInst)
     .Case("struct_element_addr", ValueKind::StructElementAddrInst)
     .Case("struct_extract", ValueKind::StructExtractInst)
@@ -891,6 +893,43 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     
     ResultVal = B.createIntegerLiteral(SILLocation(), Ty, P.Tok.getText());
     P.consumeToken(tok::integer_literal);
+    break;
+  }
+  case ValueKind::FloatLiteralInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+   
+    if (P.Tok.getKind() != tok::floating_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "float");
+      return true;
+    }
+   
+    ResultVal = B.createFloatLiteral(SILLocation(), Ty, P.Tok.getText());
+    P.consumeToken(tok::floating_literal);
+    break;
+  }
+  case ValueKind::StringLiteralInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+    
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+      return true;
+    }
+   
+    // We should remove '"' from token.
+    StringRef Str = P.Tok.getText();
+    if (Str.size() < 2 || Str[0] != '"' || Str[Str.size()-1] != '"') {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+      return true;
+    }
+    ResultVal = B.createStringLiteral(SILLocation(), Ty,
+                                      Str.substr(1, Str.size()-1));
+    P.consumeToken(tok::string_literal);
     break;
   }
       
