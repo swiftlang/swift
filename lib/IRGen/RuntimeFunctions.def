@@ -98,6 +98,90 @@ FUNCTION(Release,        swift_release,       RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_weakRetain(void *ptr);
+FUNCTION(WeakRetain,     swift_weakRetain,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakRelease(void *ptr);
+FUNCTION(WeakRelease,    swift_weakRelease,   RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakDestroy(void **object);
+FUNCTION(WeakDestroy,   swift_weakDestroy,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakCopyInit(void **dest, void **src);
+FUNCTION(WeakCopyInit,   swift_weakCopyInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakTakeInit(void **dest, void **src);
+FUNCTION(WeakTakeInit,   swift_weakTakeInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakCopyAssign(void **dest, void **src);
+FUNCTION(WeakCopyAssign, swift_weakCopyAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_weakTakeAssign(void **dest, void **src);
+FUNCTION(WeakTakeAssign, swift_weakTakeAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakRetain(void *value);
+FUNCTION(UnknownWeakRetain, swift_unknownWeakRetain, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakRelease(void *value);
+FUNCTION(UnknownWeakRelease, swift_unknownWeakRelease, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakDestroy(void **object);
+FUNCTION(UnknownWeakDestroy,   swift_unknownWeakDestroy,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakCopyInit(void **dest, void **src);
+FUNCTION(UnknownWeakCopyInit,   swift_unknownWeakCopyInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakTakeInit(void **dest, void **src);
+FUNCTION(UnknownWeakTakeInit,   swift_unknownWeakTakeInit,  RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakCopyAssign(void **dest, void **src);
+FUNCTION(UnknownWeakCopyAssign, swift_unknownWeakCopyAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_unknownWeakTakeAssign(void **dest, void **src);
+FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
+         ATTRS(NoUnwind))
+
 // type_metadata_t *swift_getFunctionTypeMetadata(type_metadata_t *arg,
 //                                                type_metadata_t *result);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,

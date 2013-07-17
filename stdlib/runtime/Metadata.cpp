@@ -219,8 +219,10 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
   // a Swift object, not if the target type is a Swift type.
   // FIXME: This should also be conditionally compiled based on whether
   // Objective-C support is enabled.
+#if SWIFT_OBJC_INTEROP
   if (!targetType->isTypeMetadata())
     return swift_dynamicCastObjCClassUnconditional(object, targetType);
+#endif
 
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {

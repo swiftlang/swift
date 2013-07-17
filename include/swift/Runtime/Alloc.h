@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "swift/Runtime/Config.h"
 #include "swift/Runtime/FastEntryPoints.h"
 
 namespace swift {
@@ -249,44 +250,87 @@ public:
   HeapObject *operator *() const { return object; }
 };
 
+/// Increment the weak retain count.
+extern "C" void swift_weakRetain(HeapObject *value);
+
+/// Decrement the weak retain count.
+extern "C" void swift_weakRelease(HeapObject *value);
+
+/// A weak reference value object.  This is ABI.
+struct WeakReference {
+  HeapObject *Value;
+};
+
 /// Initialize a weak reference.
 ///
-/// \param object - never null
-extern "C" void swift_weakInit(HeapObject **object);
+/// \param ref - never null
+extern "C" void swift_weakInit(WeakReference *ref);
 
 /// Destroy a weak reference.
 ///
-/// \param object - never null
-extern "C" void swift_weakDestroy(HeapObject **object);
+/// \param ref - never null, but can refer to a null object
+extern "C" void swift_weakDestroy(WeakReference *ref);
 
 /// Copy initialize a weak reference.
 ///
-/// \param dest - never null
-/// \param source - never null
-extern "C" void swift_weakCopyInit(HeapObject **dest, HeapObject **source);
+/// \param dest - never null, but can refer to a null object
+/// \param src - never null, but can refer to a null object
+extern "C" void swift_weakCopyInit(WeakReference *dest, WeakReference *src);
 
 /// Take initialize a weak reference.
 ///
-/// \param dest - never null
-/// \param source - never null
-extern "C" void swift_weakTakeInit(HeapObject **dest, HeapObject **source);
+/// \param dest - never null, but can refer to a null object
+/// \param src - never null, but can refer to a null object
+extern "C" void swift_weakTakeInit(WeakReference *dest, WeakReference *src);
 
 /// Copy assign a weak reference.
 ///
-/// \param dest - never null
-/// \param source - never null
-extern "C" void swift_weakCopyAssign(HeapObject **dest, HeapObject **source);
+/// \param dest - never null, but can refer to a null object
+/// \param src - never null, but can refer to a null object
+extern "C" void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 
 /// Take assign a weak reference.
 ///
-/// \param dest - never null
-/// \param source - never null
-extern "C" void swift_weakTakeAssign(HeapObject **dest, HeapObject **source);
+/// \param dest - never null, but can refer to a null object
+/// \param src - never null, but can refer to a null object
+extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
 /// Try to retain a weak reference
 ///
-/// \param object - never null
-extern "C" HeapObject *swift_weakTryRetain(HeapObject **object);
+/// \param object - never null, but can refer to a null object
+extern "C" HeapObject *swift_weakTryRetain(WeakReference *object);
+
+#if SWIFT_OBJC_INTEROP
+
+/// Increment the weak-reference count of an object that might not be
+/// a native Swift object.
+extern "C" void swift_unknownWeakRetain(void *value);
+
+/// Decrement the weak-reference count of an object that might not be
+/// a native Swift object.
+extern "C" void swift_unknownWeakRelease(void *value);
+
+/// Destroy a weak reference variable that might not refer to a native
+/// Swift object.
+extern "C" void swift_unknownWeakDestroy(WeakReference *object);
+
+/// Copy-initialize a weak reference variable from one that might not
+/// refer to a native Swift object.
+extern "C" void swift_unknownWeakCopyInit(WeakReference *dest, WeakReference *src);
+
+/// Take-initialize a weak reference variable from one that might not
+/// refer to a native Swift object.
+extern "C" void swift_unknownWeakTakeInit(WeakReference *dest, WeakReference *src);
+
+/// Copy-assign a weak reference variable from another when either
+/// or both variables might not refer to a native Swift object.
+extern "C" void swift_unknownWeakCopyAssign(WeakReference *dest, WeakReference *src);
+
+/// Take-assign a weak reference variable from another when either
+/// or both variables might not refer to a native Swift object.
+extern "C" void swift_unknownWeakTakeAssign(WeakReference *dest, WeakReference *src);
+
+#endif
 
 } // end namespace swift
 

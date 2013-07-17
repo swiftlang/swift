@@ -80,6 +80,10 @@ IRGenModule::IRGenModule(ASTContext &Context,
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
+  // For now, native weak references are just a pointer.
+  WeakReferencePtrTy =
+    createStructPointerType(*this, "swift.weak", { RefCountedPtrTy });
+
   // A type metadata is the structure pointed to by the canonical
   // address point of a type metadata.  This is at least one word, and
   // potentially more than that, past the start of the actual global

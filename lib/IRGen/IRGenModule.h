@@ -128,6 +128,7 @@ public:
   };
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
+  llvm::PointerType *WeakReferencePtrTy;/// %swift.weak_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
@@ -156,6 +157,9 @@ public:
     // We always use the pointer's width as its swift ABI alignment.
     return Alignment(PtrSize.getValue());
   }
+
+  Size getWeakReferenceSize() const { return PtrSize; }
+  Alignment getWeakReferenceAlignment() const { return getPointerAlignment(); }
 
   llvm::Type *getFixedBufferTy();
   llvm::Type *getValueWitnessTy(ValueWitness index);

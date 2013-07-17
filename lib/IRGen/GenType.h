@@ -38,6 +38,7 @@ namespace swift {
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
+  class ReferenceStorageType;
   class StructDecl;
   class TupleType;
   class TypeBase;
@@ -55,7 +56,9 @@ typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
 
 /// The helper class for generating types.
 class TypeConverter {
+public:
   IRGenModule &IGM;
+private:
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
   const ProtocolInfo *FirstProtocol;
@@ -82,6 +85,7 @@ class TypeConverter {
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinObjectPointer();
   const TypeInfo *convertBuiltinObjCPointer();
+  const TypeInfo *convertReferenceStorageType(ReferenceStorageType *T);
 
 public:
   TypeConverter(IRGenModule &IGM);
@@ -93,6 +97,11 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+
+  const TypeInfo *createSwiftWeakStorageType(llvm::Type *valueType);
+  const TypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
+  const TypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
+  const TypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
 
 private:
   class Types_t {

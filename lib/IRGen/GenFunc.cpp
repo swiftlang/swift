@@ -335,6 +335,14 @@ namespace {
                                        numCurries);
     }
 
+    // Function types do not satisfy allowsOwnership.
+    const TypeInfo *createWeakStorageType(TypeConverter &TC) const override {
+      llvm_unreachable("[weak] function type");
+    }
+    const TypeInfo *createUnownedStorageType(TypeConverter &TC) const override {
+      llvm_unreachable("[unowned] function type");
+    }
+
     /// The storage type of a function is always just a pair of i8*s:
     /// a function pointer and a retainable pointer.  We have to use
     /// i8* instead of an appropriate function-pointer type because we

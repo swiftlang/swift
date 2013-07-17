@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements layout for heap metadata.
+//  This file implements routines for arbitrary Swift-native heap objects,
+//  such as layout and reference-counting.
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,6 +31,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "HeapTypeInfo.h"
+#include "IndirectTypeInfo.h"
 
 #include "GenHeap.h"
 
@@ -575,10 +577,202 @@ const TypeInfo *TypeConverter::convertBuiltinObjectPointer() {
                                           IGM.getPointerAlignment());
 }
 
+namespace {
+  /// A type implementation for an [unowned] reference to an object
+  /// with a known-Swift reference count.
+  class SwiftUnownedReferenceTypeInfo
+    : public SingleScalarTypeInfo<SwiftUnownedReferenceTypeInfo,
+                                  FixedTypeInfo> {
+  public:
+    SwiftUnownedReferenceTypeInfo(llvm::Type *type,
+                                  Size size, Alignment alignment)
+      : SingleScalarTypeInfo(type, size, alignment, IsNotPOD) {}
+
+    enum { IsScalarPOD = false };
+
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitWeakRetain(value);
+    }
+
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitWeakRelease(value);
+    }
+  };
+
+  /// A type implementation for a [weak] reference to an object
+  /// with a known-Swift reference count.
+  class SwiftWeakReferenceTypeInfo
+    : public IndirectTypeInfo<SwiftWeakReferenceTypeInfo,
+                              FixedTypeInfo> {
+  public:
+    SwiftWeakReferenceTypeInfo(llvm::Type *type,
+                               Size size, Alignment alignment)
+      : IndirectTypeInfo(type, size, alignment, IsNotPOD) {}
+
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr) const {
+      IGF.emitWeakCopyInit(destAddr, srcAddr);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr) const {
+      IGF.emitWeakTakeInit(destAddr, srcAddr);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
+                        Address srcAddr) const {
+      IGF.emitWeakCopyAssign(destAddr, srcAddr);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address destAddr,
+                        Address srcAddr) const {
+      IGF.emitWeakTakeAssign(destAddr, srcAddr);
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      IGF.emitWeakDestroy(addr);
+    }
+  };
+}
+
+const TypeInfo *
+TypeConverter::createSwiftUnownedStorageType(llvm::Type *valueType) {
+  return new SwiftUnownedReferenceTypeInfo(valueType,
+                                           IGM.getPointerSize(),
+                                           IGM.getPointerAlignment());
+}
+
+const TypeInfo *
+TypeConverter::createSwiftWeakStorageType(llvm::Type *valueType) {
+  return new SwiftWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
+                                        IGM.getWeakReferenceSize(),
+                                        IGM.getWeakReferenceAlignment());
+}
+
+namespace {
+  /// A type implementation for an [unowned] reference to an object
+  /// that is not necessarily a Swift object.
+  class UnknownUnownedReferenceTypeInfo :
+      public SingleScalarTypeInfo<UnknownUnownedReferenceTypeInfo,
+                                  FixedTypeInfo> {
+  public:
+    UnknownUnownedReferenceTypeInfo(llvm::Type *type,
+                                    Size size, Alignment alignment)
+      : SingleScalarTypeInfo(type, size, alignment, IsNotPOD) {}
+
+    enum { IsScalarPOD = false };
+
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitUnknownWeakRetain(value);
+    }
+
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
+      IGF.emitUnknownWeakRelease(value);
+    }
+  };
+
+  /// A type implementation for a [weak] reference to an object
+  /// that is not necessarily a Swift object.
+  class UnknownWeakReferenceTypeInfo :
+      public IndirectTypeInfo<UnknownWeakReferenceTypeInfo,
+                              FixedTypeInfo> {
+  public:
+    UnknownWeakReferenceTypeInfo(llvm::Type *type,
+                                 Size size, Alignment alignment)
+      : IndirectTypeInfo(type, size, alignment, IsNotPOD) {}
+
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr) const {
+      IGF.emitUnknownWeakCopyInit(destAddr, srcAddr);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr) const {
+      IGF.emitUnknownWeakTakeInit(destAddr, srcAddr);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address destAddr,
+                        Address srcAddr) const {
+      IGF.emitUnknownWeakCopyAssign(destAddr, srcAddr);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address destAddr,
+                        Address srcAddr) const {
+      IGF.emitUnknownWeakTakeAssign(destAddr, srcAddr);
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr) const {
+      IGF.emitUnknownWeakDestroy(addr);
+    }
+  };
+}
+
+const TypeInfo *
+TypeConverter::createUnknownUnownedStorageType(llvm::Type *valueType) {
+  return new UnknownUnownedReferenceTypeInfo(valueType,
+                                             IGM.getPointerSize(),
+                                             IGM.getPointerAlignment());
+}
+
+const TypeInfo *
+TypeConverter::createUnknownWeakStorageType(llvm::Type *valueType) {
+  return new UnknownWeakReferenceTypeInfo(IGM.WeakReferencePtrTy,
+                                          IGM.getWeakReferenceSize(),
+                                          IGM.getWeakReferenceAlignment());
+}
+
 /// Does the given value superficially not require reference-counting?
 static bool doesNotRequireRefCounting(llvm::Value *value) {
   // Constants never require reference-counting.
   return isa<llvm::Constant>(value);
+}
+
+/// Emit a unary call to perform a ref-counting operation.
+///
+/// \param fn - expected signature 'void (T*)'
+static void emitUnaryRefCountCall(IRGenFunction &IGF,
+                                  llvm::Constant *fn,
+                                  llvm::Value *value) {
+  auto fnTy = cast<llvm::FunctionType>(fn->getType()->getPointerElementType());
+
+  // Instead of casting the input to %swift.refcounted*, we cast the
+  // function type.  This tends to produce less IR, but might be evil.
+  if (value->getType() != fnTy->getParamType(0)) {
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+  }
+  
+  // Emit the call.
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();  
+}
+
+/// Emit a unary call to perform a ref-counting operation.
+///
+/// \param fn - expected signature 'void (T*, T*)'
+static void emitBinaryRefCountCall(IRGenFunction &IGF,
+                                   llvm::Constant *fn,
+                                   llvm::Value *dest,
+                                   llvm::Value *src) {
+  assert(dest->getType() == src->getType() &&
+         "type mismatch in binary refcounting operation");
+
+  // Instead of casting the input to %swift.refcounted*, we cast the
+  // function type.  This tends to produce less IR, but might be evil.
+  if (dest->getType() !=
+        cast<llvm::FunctionType>(fn->getType())->getParamType(0)) {
+    llvm::Type *paramTypes[] = { dest->getType(), dest->getType() };
+    llvm::FunctionType *fnType =
+      llvm::FunctionType::get(IGF.IGM.VoidTy, paramTypes, false);
+    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+  }
+  
+  // Emit the call.
+  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, dest, src);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();  
 }
 
 /// Emit a call to swift_retain_noresult.  In general, you should not be using
@@ -634,37 +828,58 @@ void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
   Builder.CreateStore(newValue, address);
 }
 
-/// Emit a call to swift_release for the given value.
-static void emitReleaseCall(IRGenFunction &IGF, llvm::Value *value) {
-  // Instead of casting the input to %swift.refcounted*, we cast the
-  // function type.  This tends to produce less IR, but might be evil.
-  llvm::Constant *fn = IGF.IGM.getReleaseFn();
-  if (value->getType() != IGF.IGM.RefCountedPtrTy) {
-    llvm::FunctionType *fnType =
-    llvm::FunctionType::get(IGF.IGM.VoidTy, value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
-  }
-  
-  // The call itself can never throw.
-  llvm::CallInst *call = IGF.Builder.CreateCall(fn, value);
-  call->setCallingConv(IGF.IGM.RuntimeCC);
-  call->setDoesNotThrow();
-}
-
 /// Emit a release of a live value.
 void IRGenFunction::emitRelease(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
-  return emitReleaseCall(*this, value);
+  emitUnaryRefCountCall(*this, IGM.getReleaseFn(), value);
 }
 
 void IRGenFunction::emitUnknownRetain(llvm::Value *value, Explosion &e) {
+  if (!IGM.ObjCInterop)
+    return emitRetain(value, e);
   return emitObjCRetain(value, e);
 }
 
 llvm::Value *IRGenFunction::emitUnknownRetainCall(llvm::Value *value) {
+  if (!IGM.ObjCInterop) {
+    emitRetainCall(value);
+    return value;
+  }
   return emitObjCRetainCall(value);
 }
 
 void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
+  if (!IGM.ObjCInterop)
+    return emitRelease(value);
   return emitObjCRelease(value);
 }
+
+#define REFCOUNT_VALUE(ID)                                            \
+void IRGenFunction::emit##ID(llvm::Value *value) {                    \
+  if (doesNotRequireRefCounting(value)) return;                       \
+  emitUnaryRefCountCall(*this, IGM.get##ID##Fn(), value);             \
+}
+#define REFCOUNT_ADDR(ID)                                             \
+void IRGenFunction::emit##ID(Address addr) {                          \
+  emitUnaryRefCountCall(*this, IGM.get##ID##Fn(), addr.getAddress()); \
+}
+#define REFCOUNT_ADDR_ADDR(ID)                                        \
+void IRGenFunction::emit##ID(Address dest, Address src) {             \
+  emitBinaryRefCountCall(*this, IGM.get##ID##Fn(), dest.getAddress(), \
+                         src.getAddress());                           \
+}
+
+REFCOUNT_VALUE(WeakRelease)
+REFCOUNT_VALUE(WeakRetain)
+REFCOUNT_ADDR(WeakDestroy)
+REFCOUNT_ADDR_ADDR(WeakCopyInit)
+REFCOUNT_ADDR_ADDR(WeakCopyAssign)
+REFCOUNT_ADDR_ADDR(WeakTakeInit)
+REFCOUNT_ADDR_ADDR(WeakTakeAssign)
+REFCOUNT_VALUE(UnknownWeakRelease)
+REFCOUNT_VALUE(UnknownWeakRetain)
+REFCOUNT_ADDR(UnknownWeakDestroy)
+REFCOUNT_ADDR_ADDR(UnknownWeakCopyInit)
+REFCOUNT_ADDR_ADDR(UnknownWeakCopyAssign)
+REFCOUNT_ADDR_ADDR(UnknownWeakTakeInit)
+REFCOUNT_ADDR_ADDR(UnknownWeakTakeAssign)

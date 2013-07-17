@@ -27,8 +27,6 @@
 using namespace swift;
 
 extern "C" HeapObject *swift_tryRetain(HeapObject *object);
-extern "C" void swift_weakRetain(HeapObject *object);
-extern "C" void swift_weakRelease(HeapObject *object);
 
 struct AllocCacheEntry {
   struct AllocCacheEntry *next;
@@ -430,57 +428,60 @@ extern "C" bool swift_isUniquelyReferenced(HeapObject *object) {
   return result;
 }
 
-void swift::swift_weakInit(HeapObject **object) {
-  *object = nullptr;
+void swift::swift_weakInit(WeakReference *ref) {
+  ref->Value = nullptr;
 }
 
-void swift::swift_weakDestroy(HeapObject **object) {
-  auto tmp = *object;
-  *object = nullptr;
+void swift::swift_weakDestroy(WeakReference *ref) {
+  auto tmp = ref->Value;
+  ref->Value = nullptr;
   swift_weakRelease(tmp);
 }
 
-void swift::swift_weakCopyInit(HeapObject **dest, HeapObject **source) {
-  if ((*source)->refCount & RC_DEALLOCATING_BIT) {
-    auto tmp = *source;
-    *source = nullptr;
-    *dest = nullptr;
-    swift_weakRelease(tmp);
+void swift::swift_weakCopyInit(WeakReference *dest, WeakReference *src) {
+  auto object = src->Value;
+  if (object == nullptr) {
+    dest->Value = nullptr;
+  } else if (object->refCount & RC_DEALLOCATING_BIT) {
+    src->Value = nullptr;
+    dest->Value = nullptr;
+    swift_weakRelease(object);
   } else {
-    *dest = *source;
-    swift_weakRetain(*dest);
+    dest->Value = object;
+    swift_weakRetain(object);
   }
 }
 
-void swift::swift_weakTakeInit(HeapObject **dest, HeapObject **source) {
-  *dest = *source;
-  if ((*dest)->refCount & RC_DEALLOCATING_BIT) {
-    auto tmp = *dest;
-    *dest = nullptr;
-    swift_weakRelease(tmp);
+void swift::swift_weakTakeInit(WeakReference *dest, WeakReference *src) {
+  auto object = src->Value;
+  dest->Value = object;
+  if (object != nullptr && object->refCount & RC_DEALLOCATING_BIT) {
+    dest->Value = nullptr;
+    swift_weakRelease(object);
   }
 }
 
-void swift::swift_weakCopyAssign(HeapObject **dest, HeapObject **source) {
-  if (*dest) {
-    swift_weakRelease(*dest);
+void swift::swift_weakCopyAssign(WeakReference *dest, WeakReference *src) {
+  if (auto object = dest->Value) {
+    swift_weakRelease(object);
   }
-  swift_weakCopyInit(dest, source);
+  swift_weakCopyInit(dest, src);
 }
 
-void swift::swift_weakTakeAssign(HeapObject **dest, HeapObject **source) {
-  if (*dest) {
-    swift_weakRelease(*dest);
+void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
+  if (auto object = dest->Value) {
+    swift_weakRelease(object);
   }
-  swift_weakTakeInit(dest, source);
+  swift_weakTakeInit(dest, src);
 }
 
-HeapObject *swift::swift_weakTryRetain(HeapObject **object) {
-  if (*object == nullptr) return nullptr;
-  if ((*object)->refCount & RC_DEALLOCATING_BIT) {
-    swift_weakRelease(*object);
-    *object = nullptr;
+HeapObject *swift::swift_weakTryRetain(WeakReference *ref) {
+  auto object = ref->Value;
+  if (object == nullptr) return nullptr;
+  if (object->refCount & RC_DEALLOCATING_BIT) {
+    swift_weakRelease(object);
+    ref->Value = nullptr;
     return nullptr;
   }
-  return swift_tryRetain(*object);
+  return swift_tryRetain(object);
 }

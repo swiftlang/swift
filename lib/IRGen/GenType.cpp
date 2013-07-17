@@ -29,6 +29,7 @@
 #include "Explosion.h"
 #include "Linking.h"
 #include "ProtocolInfo.h"
+#include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "TypeVisitor.h"
 
@@ -447,7 +448,7 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
   case TypeKind::ReferenceStorage:
-    llvm_unreachable("can't emit reference storage types yet");
+    return convertReferenceStorageType(cast<ReferenceStorageType>(ty));
   }
   llvm_unreachable("bad type kind");
 }
@@ -462,6 +463,22 @@ const TypeInfo *TypeConverter::convertLValueType(LValueType *T) {
   // primitive pointer.
   return createPrimitive(referenceType, IGM.getPointerSize(),
                          IGM.getPointerAlignment());
+}
+
+/// Convert a ReferenceStorageType.  The implementation here depends
+/// on the underlying reference type.
+const TypeInfo *
+TypeConverter::convertReferenceStorageType(ReferenceStorageType *refType) {
+  CanType referent = CanType(refType->getReferentType());
+  assert(referent->allowsOwnership());
+  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
+
+  switch (refType->getOwnership()) {
+  case Ownership::Strong: llvm_unreachable("explicit strong ownership");
+  case Ownership::Weak: return referentTI.createWeakStorageType(*this);
+  case Ownership::Unowned: return referentTI.createUnownedStorageType(*this);
+  }
+  llvm_unreachable("bad ownership");
 }
 
 static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,

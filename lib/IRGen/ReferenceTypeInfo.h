@@ -37,6 +37,12 @@ public:
   /// Releases a value.
   virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
+  /// Produce the storage information for [weak] storage.
+  virtual const TypeInfo *createWeakStorageType(TypeConverter &TC) const = 0;
+
+  /// Produce the storage information for [unowned] storage.
+  virtual const TypeInfo *createUnownedStorageType(TypeConverter &TC) const = 0;
+
   static bool classof(const ReferenceTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
     return type->hasReferenceSemantics();

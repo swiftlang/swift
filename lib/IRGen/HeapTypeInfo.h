@@ -72,6 +72,22 @@ public:
     llvm::Value *value = e.claimNext();
     asDerived().emitScalarRelease(IGF, value);
   }
+
+  const TypeInfo *createWeakStorageType(TypeConverter &TC) const {
+    if (asDerived().hasSwiftRefcount()) {
+      return TC.createSwiftWeakStorageType(this->getStorageType());
+    } else {
+      return TC.createUnknownWeakStorageType(this->getStorageType());
+    }
+  }
+
+  const TypeInfo *createUnownedStorageType(TypeConverter &TC) const {
+    if (asDerived().hasSwiftRefcount()) {
+      return TC.createSwiftUnownedStorageType(this->getStorageType());
+    } else {
+      return TC.createUnknownUnownedStorageType(this->getStorageType());
+    }
+  }
 };
 
 }
