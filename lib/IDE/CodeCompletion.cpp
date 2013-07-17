@@ -270,20 +270,25 @@ public:
     addTypeAnnotation(Builder, VD->getType());
   }
 
-  void addTuplePatternParameters(CodeCompletionResultBuilder &Builder,
-                                 const TuplePattern *TP) {
-    bool NeedComma = false;
-    for (auto TupleElt : TP->getFields()) {
-      if (NeedComma)
-        Builder.addComma(", ");
-      StringRef BoundNameStr;
-      Identifier BoundName = TupleElt.getPattern()->getBoundName();
-      if (BoundName.get())
-        BoundNameStr = BoundName.str();
-      Builder.addCallParameter(BoundNameStr,
-                               TupleElt.getPattern()->getType().getString());
-      NeedComma = true;
+  void addPatternParameters(CodeCompletionResultBuilder &Builder,
+                            const Pattern *P) {
+    if (auto *TP = dyn_cast<TuplePattern>(P)) {
+      bool NeedComma = false;
+      for (auto TupleElt : TP->getFields()) {
+        if (NeedComma)
+          Builder.addComma(", ");
+        StringRef BoundNameStr;
+        Identifier BoundName = TupleElt.getPattern()->getBoundName();
+        if (BoundName.get())
+          BoundNameStr = BoundName.str();
+        Builder.addCallParameter(BoundNameStr,
+                                 TupleElt.getPattern()->getType().getString());
+        NeedComma = true;
+      }
+      return;
     }
+    auto *PP = cast<ParenPattern>(P);
+    Builder.addCallParameter("", PP->getSubPattern()->getType().getString());
   }
 
   void addSwiftFunctionCall(const AnyFunctionType *AFT) {
@@ -320,7 +325,7 @@ public:
     unsigned FirstIndex = 0;
     if (Patterns[0]->isImplicit())
       FirstIndex = 1;
-    addTuplePatternParameters(Builder, cast<TuplePattern>(Patterns[FirstIndex]));
+    addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();
     // FIXME: Pattern should pretty-print itself.
     llvm::SmallString<32> TypeStr;
@@ -353,7 +358,7 @@ public:
       Builder.addTextChunk("constructor");
     }
     Builder.addLeftParen();
-    addTuplePatternParameters(Builder, cast<TuplePattern>(CD->getArguments()));
+    addPatternParameters(Builder, CD->getArguments());
     Builder.addRightParen();
     addTypeAnnotation(Builder, CD->getResultType());
   }
@@ -365,7 +370,7 @@ public:
         CodeCompletionResult::ResultKind::SwiftDeclaration);
     Builder.setAssociatedSwiftDecl(SD);
     Builder.addLeftBracket();
-    addTuplePatternParameters(Builder, cast<TuplePattern>(SD->getIndices()));
+    addPatternParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
     addTypeAnnotation(Builder, SD->getElementType());
   }
