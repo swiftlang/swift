@@ -83,6 +83,9 @@ namespace {
     /// Construct ArchetypeType from Generic Params.
     bool handleGenericParams(GenericParamList *GenericParams);
     bool performTypeLocChecking(TypeLoc &T);
+
+    /// Look up the Bool type.
+    Type lookupBoolType(SourceLoc Loc);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -760,6 +763,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
+    .Case("is_nonnull", ValueKind::IsNonnullInst)
     .Case("function_ref", ValueKind::FunctionRefInst)
     .Case("load", ValueKind::LoadInst)
     .Case("metatype", ValueKind::MetatypeInst)
@@ -808,6 +812,23 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   assert(Lookup.size() == 1);
   ValueDecl *VD = Lookup[0];
   return VD;
+}
+
+/// Use performTypeLocChecking to get the type for Bool. Another option
+/// is to use UnqualifiedLookup.
+Type SILParser::lookupBoolType(SourceLoc Loc) {
+  SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
+  SmallVector<TypeRepr*, 8> GenericArgs;
+  ComponentsR.push_back(IdentTypeRepr::Component(Loc, 
+                          P.Context.getIdentifier("Bool"),
+                          GenericArgs, P.TU));
+  IdentTypeRepr *TyRepr = IdentTypeRepr::create(P.Context, ComponentsR);
+  TypeLoc Ty = TyRepr;
+  if (performTypeLocChecking(Ty)) {
+    P.diagnose(Loc, diag::bool_type_broken);
+    return Type();
+  }
+  return Ty.getType();
 }
 
 ///   sil-instruction:
@@ -1395,6 +1416,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                       Field->getType()->getCanonicalType(), true);
     ResultVal = B.createRefElementAddr(SILLocation(), Val, Field,
                                        ResultTy).getDef();
+    break;
+  }
+  case ValueKind::IsNonnullInst: {
+    SourceLoc Loc;
+    if (parseTypedValueRef(Val, Loc))
+      return true;
+    auto BoolTy = SILType::getPrimitiveType(
+                    lookupBoolType(Loc)->getCanonicalType());
+    ResultVal = B.createIsNonnull(SILLocation(), Val, BoolTy);
     break;
   }
   }

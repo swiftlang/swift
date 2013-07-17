@@ -385,3 +385,20 @@ bb0(%0 : $Int64, %1 : $M):
   %14 = release %2#0 : $Builtin.ObjectPointer
   %15 = return %12 : $()
 }
+
+class B { }
+class E : B { }
+
+// CHECK: $[thin] (b : B) -> Bool
+sil @_T4null3isaFT1bCS_1B_Sb : $[thin] (b : B) -> Bool {
+bb0(%0 : $B):
+  %1 = alloc_box $B                           // CHECK: alloc_box
+  %2 = store %0 to %1#1 : $*B
+  %3 = load %1#1 : $*B                        // CHECK: load
+  %4 = retain %3 : $B
+  %5 = downcast conditional %3 : $B to $E     // CHECK: downcast
+  %6 = is_nonnull %5 : $E                     // CHECK: is_nonnull {{%.*}} : $E
+  %7 = release %3 : $B
+  %8 = release %1#0 : $Builtin.ObjectPointer
+  %9 = return %6 : $Bool
+}
