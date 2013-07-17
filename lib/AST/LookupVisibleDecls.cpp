@@ -529,6 +529,12 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
       }
       return;
     }
+    if (auto *PCT = ObjectType->getAs<ProtocolCompositionType>()) {
+      for (Type P : PCT->getProtocols()) {
+        lookupVisibleDecls(Consumer, P, IsTypeLookup);
+      }
+      return;
+    }
     ntd = ObjectType->getNominalOrBoundGenericNominal();
   } else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
     ntd = mtt->getInstanceType()->getNominalOrBoundGenericNominal();
