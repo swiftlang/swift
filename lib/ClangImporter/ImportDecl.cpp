@@ -254,7 +254,7 @@ namespace {
                                       Impl.importSourceLoc(Decl->getLocStart()),
                                       Name,
                                       Loc,
-                                      TypeLoc(SwiftType, Loc, nullptr),
+                                      TypeLoc::withoutLoc(SwiftType),
                                       DC,
                                       { });
     }
@@ -757,7 +757,7 @@ namespace {
       // FIXME: Poor location info.
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc(resultTy, loc, nullptr), dc);
+                                       TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
@@ -900,7 +900,7 @@ namespace {
       thisPat->setType(thisVar->getType());
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc(thisTy, loc, nullptr));
+                                               TypeLoc::withoutLoc(thisTy));
       thisPat->setType(thisVar->getType());
       argPatterns.push_back(thisPat);
       bodyPatterns.push_back(thisPat);
@@ -927,7 +927,7 @@ namespace {
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto funcExpr = FuncExpr::create(Impl.SwiftContext, loc,
                                        argPatterns, bodyPatterns,
-                                       TypeLoc(resultTy, loc, nullptr), dc);
+                                       TypeLoc::withoutLoc(resultTy), dc);
       funcExpr->setType(type);
 
       auto result = new (Impl.SwiftContext) FuncDecl(SourceLoc(), loc,
@@ -1146,7 +1146,7 @@ namespace {
       thisPat->setType(thisMetaTy);
       thisPat
         = new (Impl.SwiftContext) TypedPattern(thisPat,
-                                               TypeLoc(thisMetaTy, loc, nullptr));
+                                               TypeLoc::withoutLoc(thisMetaTy));
       thisPat->setType(thisMetaTy);
 
       argPatterns.push_back(thisPat);
@@ -1403,7 +1403,7 @@ namespace {
       auto funcExpr = FuncExpr::create(context, getter->getLoc(),
                                        getterArgs,
                                        getterArgs,
-                                       TypeLoc(elementTy, loc, nullptr),
+                                       TypeLoc::withoutLoc(elementTy),
                                        getter->getDeclContext());
       funcExpr->setType(getterType);
       setVarDeclContexts(getterArgs, funcExpr);
@@ -1527,8 +1527,7 @@ namespace {
       auto funcExpr = FuncExpr::create(context, setter->getLoc(),
                                        setterArgs,
                                        setterArgs,
-                                       TypeLoc(TupleType::getEmpty(context),
-                                               loc, nullptr),
+                              TypeLoc::withoutLoc(TupleType::getEmpty(context)),
                                        setter->getDeclContext());
       funcExpr->setType(setterType);
       setVarDeclContexts(setterArgs, funcExpr);
@@ -1715,13 +1714,13 @@ namespace {
         setterThunk = buildSetterThunk(setter, dc, setterIndices);
 
       // Build the subscript declaration.
-      auto loc = decl->getLoc();
       auto argPatterns
         = getterThunk->getBody()->getArgParamPatterns()[1]->clone(context);
       auto name = context.getIdentifier("__subscript");
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
-                                      decl->getLoc(), TypeLoc(elementTy, loc, nullptr),
+                                      decl->getLoc(),
+                                      TypeLoc::withoutLoc(elementTy),
                                       SourceRange(), getterThunk, setterThunk,
                                       dc);
       setVarDeclContexts(argPatterns, subscript->getDeclContext());
@@ -1947,7 +1946,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto result
         = new (Impl.SwiftContext)
-            ExtensionDecl(loc, TypeLoc(objcClass->getDeclaredType(), loc, nullptr),
+            ExtensionDecl(loc, TypeLoc::withoutLoc(objcClass->getDeclaredType()),
                           importObjCProtocols(decl->getReferencedProtocols()),
                           dc);
       objcClass->addExtension(result);
@@ -2137,9 +2136,7 @@ namespace {
         if (!super)
           return nullptr;
 
-        TypeLoc superTy(super->getDeclaredType(),
-                        Impl.importSourceRange(decl->getSuperClassLoc()), nullptr);
-        result->setBaseClassLoc(superTy);
+        result->setBaseClassLoc(TypeLoc::withoutLoc(super->getDeclaredType()));
       }
 
       // Import protocols this class conforms to.

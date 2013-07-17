@@ -758,7 +758,7 @@ void Parser::addVarsToScope(Pattern *Pat,
 ///   set-name:
 ///     '(' identifier ')'
 bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
-                         Type ElementTy, FuncDecl *&Get, FuncDecl *&Set,
+                         TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc) {
   bool Invalid = false;
   Get = 0;
@@ -814,10 +814,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Scope S(this, ScopeKind::FunctionBody);
 
       // Start the function.
-      Type GetterRetTy = ElementTy;
-      FuncExpr *GetFn = actOnFuncExprStart(GetLoc,
-                                           TypeLoc::withoutLoc(GetterRetTy),
-                                           Params, Params);
+      FuncExpr *GetFn = actOnFuncExprStart(GetLoc, ElementTy, Params,Params);
       
       // Establish the new context.
       ContextChange CC(*this, GetFn);
@@ -909,13 +906,12 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     if (SetName.empty())
       SetName = Context.getIdentifier("value");
     {
-      VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName, ElementTy,
-                                             CurDeclContext);
+      VarDecl *Value = new (Context) VarDecl(SetNameLoc, SetName,
+                                             Type(), CurDeclContext);
       
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     TypeLoc(ElementTy,
-                                             Value->getSourceRange(), nullptr));
+                                     ElementTy);
       TuplePatternElt ValueElt(ValuePattern);
       Pattern *ValueParamsPattern
         = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
@@ -984,13 +980,13 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
 
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
-  Type Ty;
+  TypeLoc TyLoc;
   if (TypedPattern *TP = dyn_cast<TypedPattern>(&pattern)) {
-    Ty = TP->getTypeLoc().getType();
+    TyLoc = TP->getTypeLoc();
   } else {
     if (PrimaryVar)
       diagnose(pattern.getLoc(), diag::getset_missing_type);
-    Ty = ErrorType::get(Context);
+    TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
   
   SourceLoc LBLoc = consumeToken(tok::l_brace);
@@ -999,7 +995,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType) {
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, /*Indices=*/0, Ty, Get, Set, LastValidLoc))
+  if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc, Get, Set, LastValidLoc))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1906,7 +1902,7 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   FuncDecl *Get = 0;
   FuncDecl *Set = 0;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, Indices.get(), ElementTy.getType(),
+  if (parseGetSet(HasContainerType, Indices.get(), ElementTy,
                   Get, Set, LastValidLoc))
     Invalid = true;
 

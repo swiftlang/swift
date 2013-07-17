@@ -82,6 +82,7 @@ namespace {
 
     /// Construct ArchetypeType from Generic Params.
     bool handleGenericParams(GenericParamList *GenericParams);
+    bool performTypeLocChecking(TypeLoc &T);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -457,13 +458,8 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();
     // Do some type checking / name binding for Inherited.
-    for (auto Inherited : TypeParam->getInherited()) {
-      // We have to lie and say we're done with parsing to make this happen.
-      assert(P.TU->ASTStage == TranslationUnit::Parsing &&
-             "Unexpected stage during parsing!");
-      llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
-                                                 TranslationUnit::Parsed);
-      if (performTypeLocChecking(P.TU, Inherited))
+    for (auto &Inherited : TypeParam->getInherited()) {
+      if (performTypeLocChecking(Inherited))
         return true;
     }
     // Add the generic parameter to the builder.
@@ -488,6 +484,16 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
   GenericParams->setAllArchetypes(
     P.Context.AllocateCopy(Builder.getAllArchetypes()));
   return false;
+}
+
+bool SILParser::performTypeLocChecking(TypeLoc &T) {
+  // Do some type checking / name binding for the parsed type.
+  // We have to lie and say we're done with parsing to make this happen.
+  assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+         "Unexpected stage during parsing!");
+  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+                                                    TranslationUnit::Parsed);
+  return swift::performTypeLocChecking(P.TU, T);
 }
 
 ///   sil-type:
@@ -516,11 +522,19 @@ bool SILParser::parseSILType(SILType &Result) {
   if (P.parseType(Ty, diag::expected_sil_type))
     return true;
 
+  // Apply attributes to the type.
+  if (P.applyAttributeToType(Ty, attrs))
+    return true;
+
+  if (PList)
+    if (handleGenericParams(PList))
+      return true;
+  if (performTypeLocChecking(Ty))
+    return true;
+
   // Build PolymorphicFunctionType if necessary.
   FunctionType *FT = dyn_cast<FunctionType>(Ty.getType().getPointer());
   if (FT && PList) {
-    if (handleGenericParams(PList))
-      return true;
     Type resultType = PolymorphicFunctionType::get(FT->getInput(),
                                              FT->getResult(), PList,
                                              attrs.isThin(),
@@ -528,29 +542,14 @@ bool SILParser::parseSILType(SILType &Result) {
                                              ? attrs.getAbstractCC()
                                              : AbstractCC::Freestanding,
                                              P.Context);
-    SourceRange resultRange = { attrs.LSquareLoc,
-                                Ty.getSourceRange().End };
-    Ty = { resultType, resultRange, Ty.getTypeRepr() };
+    Ty.setType(resultType);
     // Reset attributes that are applied.
     attrs.Thin = false;
     attrs.cc = Nothing;
   }
 
-  // Apply attributes to the type.
-  if (P.applyAttributeToType(Ty, attrs))
+  if (performTypeLocChecking(Ty))
     return true;
-
-  // If we successfully parsed the type, do some type checking / name binding
-  // of it.
-  {
-    // We have to lie and say we're done with parsing to make this happen.
-    assert(P.TU->ASTStage == TranslationUnit::Parsing &&
-           "Unexpected stage during parsing!");
-    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
-                                                      TranslationUnit::Parsed);
-    if (performTypeLocChecking(P.TU, Ty))
-      return true;
-  }
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
                                      isAddress);

@@ -47,68 +47,7 @@ bool Parser::applyAttributeToType(TypeLoc &result, DeclAttributes &attrs) {
   // Apply those attributes that do apply.
   if (attrs.empty()) return false;
 
-  result = { result.getType(), result.getSourceRange(),
-                new (Context) AttributedTypeRepr(attrs, result.getTypeRepr()) };
-
-  if (attrs.isByref()) {
-    LValueType::Qual quals;
-    Type resultType = LValueType::get(result.getType(), quals, Context);
-    SourceRange resultRange = { attrs.LSquareLoc,
-                                result.getSourceRange().End };
-    result = { resultType, resultRange, result.getTypeRepr() };
-    attrs.Byref = false; // so that the empty() check below works
-  }
-
-  // Handle the auto_closure, cc, and objc_block attributes for function types.
-  if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
-      attrs.isThin()) {
-    FunctionType *FT = dyn_cast<FunctionType>(result.getType().getPointer());
-    TupleType *InputTy = 0;
-    if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
-    if (FT == 0) {
-      // auto_closures and objc_blocks require a syntactic function type.
-      if (attrs.isAutoClosure())
-        diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
-                 "auto_closure");
-      if (attrs.isObjCBlock())
-        diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
-                 "objc_block");
-      if (attrs.hasCC())
-        diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
-                 "cc");
-      if (attrs.isThin())
-        diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
-                 "thin");
-    } else if (attrs.isAutoClosure() &&
-               (InputTy == 0 || !InputTy->getFields().empty())) {
-      // auto_closures must take () syntactically.
-      diagnose(attrs.LSquareLoc, diag::autoclosure_function_input_nonunit,
-               FT->getInput());
-    } else {
-      // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
-      // bit.
-      Type resultType = FunctionType::get(FT->getInput(), FT->getResult(),
-                                          attrs.isAutoClosure(),
-                                          attrs.isObjCBlock(),
-                                          attrs.isThin(),
-                                          attrs.hasCC()
-                                           ? attrs.getAbstractCC()
-                                           : AbstractCC::Freestanding,
-                                          Context);
-      SourceRange resultRange = { attrs.LSquareLoc,
-                                  result.getSourceRange().End };
-      result = { resultType, resultRange, result.getTypeRepr() };
-    }
-    attrs.AutoClosure = false;
-    attrs.ObjCBlock = false;
-    attrs.Thin = false;
-    attrs.cc = Nothing;
-  }
-  
-  // FIXME: this is lame.
-  if (!attrs.empty())
-    diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
-
+  result = new (Context) AttributedTypeRepr(attrs, result.getTypeRepr());
   return false;
 }
 
@@ -157,14 +96,9 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
          peekToken().is(tok::kw_metatype)) {
     consumeToken();
     SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
-
-    Type metatypeType = MetaTypeType::get(Result.getType(), Context);
     TypeRepr *metaTyR = new (Context) MetaTypeTypeRepr(Result.getTypeRepr(),
                                                        metatypeLoc);
-
-    SourceRange metatypeTypeRange{ Result.getSourceRange().Start,
-                                   metatypeLoc };
-    Result = { metatypeType, metatypeTypeRange, metaTyR };
+    Result = metaTyR;
   }
 
   // Handle type-function if we have an arrow.
@@ -173,13 +107,9 @@ bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
     if (parseType(SecondHalf,
                   diag::expected_type_function_result))
       return true;
-    Type FnType = FunctionType::get(Result.getType(), SecondHalf.getType(),
-                                    Context);
     TypeRepr *FnTyR = new (Context) FunctionTypeRepr(Result.getTypeRepr(),
                                                      SecondHalf.getTypeRepr());
-    SourceRange FnTypeRange{ Result.getSourceRange().Start,
-                             SecondHalf.getSourceRange().End };
-    Result = { FnType, FnTypeRange, FnTyR };
+    Result = FnTyR;
     return false;
   }
 
@@ -236,13 +166,11 @@ bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 bool Parser::parseTypeIdentifier(TypeLoc &Result) {
-  SourceLoc StartLoc = Tok.getLoc();
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
     return true;
   }
 
-  SmallVector<IdentifierType::Component, 4> Components;
   SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
@@ -251,13 +179,12 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
       return true;
     SourceLoc LAngle, RAngle;
+    // FIXME: Wasted allocation.
     MutableArrayRef<TypeLoc> GenericArgs;
     if (startsWithLess(Tok)) {
       if (parseGenericArguments(GenericArgs, LAngle, RAngle))
         return true;
     }
-    Components.push_back(IdentifierType::Component(Loc, Name, GenericArgs,
-                                                   CurDeclContext));
     EndLoc = Loc;
       
     SmallVector<TypeRepr *, 4> GenericArgsTyR;
@@ -279,14 +206,11 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).
-  if (auto Entry = ScopeInfo.lookupValueName(Components[0].Id)) {
-    Components[0].setValue(Entry);
+  if (auto Entry = ScopeInfo.lookupValueName(ComponentsR[0].getIdentifier()))
     ComponentsR[0].setValue(Entry);
-  }
 
-  auto Ty = IdentifierType::getNew(Context, Components);
   auto TyR = IdentTypeRepr::create(Context, ComponentsR);
-  Result = { Ty, SourceRange(StartLoc, EndLoc), TyR };
+  Result = TyR;
   return false;
 }
 
@@ -311,12 +235,11 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
-    Type ResultType = ProtocolCompositionType::get(Context, ArrayRef<Type>());
     auto ResultTyR = new (Context) ProtocolCompositionTypeRepr(
                                              MutableArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
                                              SourceRange(LAngleLoc, RAngleLoc));
-    Result = { ResultType, SourceRange(ProtocolLoc, RAngleLoc), ResultTyR };
+    Result = ResultTyR;
     return false;
   }
   
@@ -350,17 +273,13 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
     EndLoc = consumeStartingGreater();
   }
 
-  SmallVector<Type, 4> ProtocolTypes;
   SmallVector<IdentTypeRepr *, 4> ProtocolTypesR;
   for (TypeLoc T : Protocols) {
-    ProtocolTypes.push_back(T.getType());
     ProtocolTypesR.push_back(cast<IdentTypeRepr>(T.getTypeRepr()));
   }
-  Result =  { ProtocolCompositionType::get(Context, ProtocolTypes),
-              SourceRange(ProtocolLoc, EndLoc),
-              ProtocolCompositionTypeRepr::create(Context, ProtocolTypesR,
-                                                  ProtocolLoc,
-                                              SourceRange(LAngleLoc, EndLoc)) };
+  Result =  ProtocolCompositionTypeRepr::create(Context, ProtocolTypesR,
+                                                ProtocolLoc,
+                                                SourceRange(LAngleLoc, EndLoc));
   return false;
 }
 
@@ -375,7 +294,6 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
 bool Parser::parseTypeTupleBody(TypeLoc &Result) {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
-  SmallVector<TupleTypeElt, 8> Elements;
   SmallVector<TypeRepr *, 8> ElementsR;
   bool HadEllipsis = false;
 
@@ -400,7 +318,6 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
       if (parseTypeAnnotation(type, diag::expected_type))
         return true;
 
-      Elements.push_back(TupleTypeElt(type.getType(), name, nullptr));
       ElementsR.push_back(new (Context) NamedTypeRepr(name, type.getTypeRepr(),
                                                       nameLoc));
     } else {
@@ -408,7 +325,6 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
       TypeLoc type;
       if (parseTypeAnnotation(type))
         return true;
-      Elements.push_back(type.getType());
       ElementsR.push_back(type.getTypeRepr());
     }
 
@@ -434,38 +350,14 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
     return false;
   });
 
-
-  // A "tuple" with one anonymous element is actually not a tuple.
-  if (Elements.size() == 1 && !Elements.back().hasName() && !HadEllipsis) {
-    Result = { ParenType::get(Context, Elements.back().getType()),
-               SourceRange(LPLoc, Tok.getLoc()),
-               TupleTypeRepr::create(Context, ElementsR,
-                                     SourceRange(LPLoc, Tok.getLoc()),
-                                     SourceLoc()) };
-    return Invalid;
+  if (HadEllipsis && ElementsR.empty()) {
+    diagnose(EllipsisLoc, diag::empty_tuple_ellipsis);
+    return true;
   }
 
-  if (HadEllipsis) {
-    if (Elements.empty()) {
-      diagnose(EllipsisLoc, diag::empty_tuple_ellipsis);
-      return true;
-    }
-    if (Elements.back().getInit()) {
-      diagnose(EllipsisLoc, diag::tuple_ellipsis_init);
-      return true;
-    }
-    Type BaseTy = Elements.back().getType();
-    Type FullTy = ArraySliceType::get(BaseTy, Context);
-    Identifier Name = Elements.back().getName();
-    ExprHandle *Init = Elements.back().getInit();
-    Elements.back() = TupleTypeElt(FullTy, Name, Init, true);
-  }
-
-  TupleType *TT = TupleType::get(Elements, Context)->castTo<TupleType>();
-  Result = { TT, SourceRange(LPLoc, RPLoc),
-             TupleTypeRepr::create(Context, ElementsR,
-                                   SourceRange(LPLoc, Tok.getLoc()),
-                                   EllipsisLoc) };
+  Result = TupleTypeRepr::create(Context, ElementsR,
+                                 SourceRange(LPLoc, Tok.getLoc()),
+                                 HadEllipsis ? EllipsisLoc : SourceLoc());
   return Invalid;
 }
 
@@ -492,12 +384,9 @@ bool Parser::parseTypeArray(TypeLoc &result) {
       return true;
 
     // Just build a normal array slice type.
-    SourceRange arrayRange{ result.getSourceRange().Start, rsquareLoc };
-    result = { ArraySliceType::get(result.getType(), Context),
-               arrayRange,
-               new (Context) ArrayTypeRepr(result.getTypeRepr(),
-                                           nullptr,
-                                         SourceRange(lsquareLoc, rsquareLoc)) };
+    result = new (Context) ArrayTypeRepr(result.getTypeRepr(),
+                                         nullptr,
+                                         SourceRange(lsquareLoc, rsquareLoc));
     return false;
   }
 

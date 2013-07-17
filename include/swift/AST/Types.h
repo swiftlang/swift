@@ -80,16 +80,9 @@ class alignas(8) TypeBase {
   struct TypeBaseBits {
     /// \brief Whether this type has a type variable somewhere in it.
     unsigned HasTypeVariable : 1;
-
-    /// \brief Whether this type has been validated.
-    ///
-    /// 0 -> not validated
-    /// 1 -> invalid
-    /// 2 -> valid
-    unsigned Validated : 2;
   };
 
-  enum { NumTypeBaseBits = 3 };
+  enum { NumTypeBaseBits = 1 };
   static_assert(NumTypeBaseBits <= 32, "fits in an unsigned");
 
 protected:
@@ -116,7 +109,6 @@ protected:
       CanonicalType = CanTypeCtx;
     
     setHasTypeVariable(HasTypeVariable);
-    TypeBits.TypeBase.Validated = 0;
   }
 
   /// \brief Mark this type as having a type variable.
@@ -237,20 +229,8 @@ public:
   /// unspecialized generic, but the type Vector<Int> is not.
   bool isUnspecializedGeneric();
 
-  /// \brief Whether this type has been validated yet.
-  bool wasValidated() const { return TypeBits.TypeBase.Validated != 0; }
-
-  /// \brief Whether this type is valid.
-  bool isValid() const {
-    assert(wasValidated() && "Type not yet validated");
-    return TypeBits.TypeBase.Validated == 2;
-  }
-
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
-
-  /// \brief Mark this type as having been validated already.
-  void setValidated(bool valid) { TypeBits.TypeBase.Validated = 1 + valid; }
 
   /// \brief If this is a class type or a bound generic class type, returns the
   /// (possibly generic) class.

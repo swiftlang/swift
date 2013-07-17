@@ -27,6 +27,17 @@
 #include <iterator>
 using namespace swift;
 
+bool TypeLoc::isError() const {
+  assert(wasValidated() && "Type not yet validated");
+  return !getType()->is<ErrorType>();
+}
+
+SourceRange TypeLoc::getSourceRange() const {
+  if (TyR)
+    return TyR->getSourceRange();
+  return SourceRange();
+}
+
 // Only allow allocation of Types using the allocator in ASTContext.
 void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
                              AllocationArena arena, unsigned alignment) {

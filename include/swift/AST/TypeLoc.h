@@ -19,6 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
   class ASTContext;
@@ -28,39 +29,37 @@ namespace swift {
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
 struct TypeLoc {
 private:
-  Type T;
-  // FIXME: Currently, there's only one kind of TypeLoc; we need multiple kinds
-  // for more accurate source location information.
-  SourceRange Range;
-
+  /// \brief The resolved type and a bit indicating if it was validated, which
+  /// means it went through possible generic substitutions.
+  llvm::PointerIntPair<Type, 1, bool> TAndValidBit;
   TypeRepr *TyR = nullptr;
+
+  TypeLoc(Type T, TypeRepr *TyR) : TAndValidBit(T, false), TyR(TyR) {}
 
 public:
   TypeLoc() {}
-  TypeLoc(Type T, SourceRange Range, TypeRepr *TyR)
-    : T(T), Range(Range), TyR(TyR) {}
+  TypeLoc(TypeRepr *TyR) : TyR(TyR) {}
 
-private:
-  explicit TypeLoc(Type T, TypeRepr *TyR) : T(T), TyR(TyR) {}
+  bool wasValidated() const { return TAndValidBit.getInt(); }
+  bool isError() const;
 
-public:
   // FIXME: We generally shouldn't need to build TypeLocs without a location.
   static TypeLoc withoutLoc(Type T) {
     return TypeLoc(T, nullptr);
   }
 
-  SourceRange getSourceRange() const {
-    return Range;
-  }
-  bool hasLocation() const {
-    return Range.isValid();
-  }
-  Type getType() const {
-    return T;
-  }
-  void setInvalidType(ASTContext &C);
+  SourceRange getSourceRange() const;
 
+  bool hasLocation() const { return TyR != nullptr; }
   TypeRepr *getTypeRepr() const { return TyR; }
+  Type getType() const { return TAndValidBit.getPointer(); }
+
+  bool isNull() const { return getType().isNull() && TyR == nullptr; }
+
+  void setInvalidType(ASTContext &C);
+  void setType(Type Ty, bool validated = false) {
+    TAndValidBit.setPointerAndInt(Ty, validated);
+  }
 };
 
 } // end namespace llvm

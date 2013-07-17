@@ -592,7 +592,7 @@ namespace {
       case PatternKind::Typed:
         // For a typed pattern, simply return the type of the pattern.
         // FIXME: Error recovery if the type is an error type?
-        return cast<TypedPattern>(pattern)->getTypeLoc().getType();
+        return cast<TypedPattern>(pattern)->getType();
 
       case PatternKind::Tuple: {
         auto tuplePat = cast<TuplePattern>(pattern);

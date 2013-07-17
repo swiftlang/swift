@@ -38,10 +38,6 @@ TypeChecker::TypeChecker(TranslationUnit &TU, DiagnosticEngine &Diags)
 {
   Context.addMutationListener(*this);
 
-  // Validate any external types already part of the translation unit.
-  for (auto type : Context.ExternalTypes)
-    validateTypeSimple(type);
-  
   // Add any external definitions already part of the translation unit.
   // Note: the underlying vector can get reallocated during this traversal.
   // We don't want to pick up the new external definitions.
@@ -711,8 +707,9 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     return;
   }
 
-  if (!ED->getExtendedType()->is<NominalType>() &&
-      !ED->getExtendedType()->is<UnboundGenericType>()) {
+  Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
+  if (!ExtendedTy->is<NominalType>() && !ExtendedTy->is<UnboundGenericType>() &&
+      !ExtendedTy->is<ErrorType>()) {
     TC.diagnose(ED, diag::non_nominal_extension,
                 false, ED->getExtendedType());
     ED->getExtendedTypeLoc().setInvalidType(TC.Context);
@@ -1031,14 +1028,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
 
   unsigned currentFuncExpr = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
-  unsigned currentExternalType = 0;
   do {
-    // Validate any externally-created types.
-    for (unsigned n = TC.Context.ExternalTypes.size(); currentExternalType != n;
-         ++currentExternalType) {
-      TC.validateTypeSimple(TC.Context.ExternalTypes[currentExternalType]);
-    }
-
     // Type check the body of each of the FuncExpr in turn.  Note that outside
     // FuncExprs must be visited before nested FuncExprs for type-checking to
     // work correctly.
@@ -1105,8 +1095,7 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
                              TC.implicitlyDefinedFunctions.end());
     TC.implicitlyDefinedFunctions.clear();
   } while (currentFuncExpr < prePass.FuncExprs.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
-           currentExternalType < TC.Context.ExternalTypes.size());
+           currentExternalDef < TC.Context.ExternalDefinitions.size());
 
   // FIXME: Horrible hack. Store this somewhere more sane.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;

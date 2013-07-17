@@ -313,7 +313,6 @@ class TypedPattern : public Pattern {
 public:
   TypedPattern(Pattern *pattern, TypeLoc tl)
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
-    assert(pattern->isImplicit() == !tl.hasLocation());
     if (pattern->isImplicit())
       setImplicit();
   }

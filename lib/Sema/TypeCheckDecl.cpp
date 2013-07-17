@@ -427,11 +427,7 @@ public:
   
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (!IsSecondPass) {
-      // FIXME: Need to fix the validateType API for typealias.
-      if (!TC.validateType(TAD->getUnderlyingTypeLoc())) {
-        TypeLoc FakeTypeLoc(TAD->getDeclaredType(), TAD->getLoc(), nullptr);
-        TC.validateType(FakeTypeLoc);
-      }
+      TC.validateType(TAD->getUnderlyingTypeLoc());
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         checkInherited(TAD, TAD->getInherited());
     }
@@ -680,9 +676,8 @@ public:
       return;
 
     bool badType = false;
-    if (FE->getBodyResultTypeLoc().getType()) {
+    if (!FE->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FE->getBodyResultTypeLoc())) {
-        FE->getBodyResultTypeLoc().setInvalidType(TC.Context);
         badType = true;
       }
     }
@@ -738,10 +733,6 @@ public:
     // Before anything else, set up the 'this' argument correctly.
     GenericParamList *outerGenericParams = nullptr;
     if (Type thisType = FD->computeThisType(&outerGenericParams)) {
-      // FIXME: this can actually fail when the context is an extension
-      // of a type that can't be resolved. We need a better fix for this.
-      TypeLoc tl = TypeLoc::withoutLoc(thisType);
-      TC.validateType(tl);
       TypedPattern *thisPattern =
         cast<TypedPattern>(body->getArgParamPatterns()[0]);
       if (thisPattern->hasType()) {
@@ -792,6 +783,13 @@ public:
     OneOfDecl *OOD = cast<OneOfDecl>(ED->getDeclContext());
     Type ElemTy = OOD->getDeclaredTypeInContext();
 
+    if (!ED->getArgumentTypeLoc().isNull())
+      if (TC.validateType(ED->getArgumentTypeLoc()))
+        return;
+    if (!ED->getResultTypeLoc().isNull())
+      if (TC.validateType(ED->getResultTypeLoc()))
+        return;
+
     // If we have a simple element, just set the type.
     if (ED->getArgumentType().isNull()) {
       Type argTy = MetaTypeType::get(ElemTy, TC.Context);
@@ -803,11 +801,6 @@ public:
       ED->setType(fnTy);
       return;
     }
-
-    // We have an element with an argument type; validate the argument,
-    // then compute a function type.
-    if (TC.validateType(ED->getArgumentTypeLoc()))
-      return;
 
     Type fnTy = FunctionType::get(ED->getArgumentType(), ElemTy, TC.Context);
     if (auto gp = OOD->getGenericParamsOfContext())

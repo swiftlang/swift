@@ -252,7 +252,8 @@ lookupOneOfElementReference(TypeChecker &TC,
   // Build a TypeLoc to preserve AST location info for the reference chain.
   TypeRepr *repr
     = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
-  TypeLoc loc(ty, refExpr->getBase()->getSourceRange(), repr);
+  TypeLoc loc(repr);
+  loc.setType(ty);
   return {loc, foundElement};
 }
 
@@ -424,6 +425,32 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC) {
   return ResolvePattern(*this, DC).visit(P);
 }
 
+static bool validateTypedPattern(TypeChecker &TC, TypedPattern *TP,
+                                 bool isVararg) {
+  if (TP->hasType())
+    return TP->getType()->is<ErrorType>();
+
+  bool hadError = false;
+  TypeLoc &TL = TP->getTypeLoc();
+  if (TC.validateType(TL))
+    hadError = true;
+  Type Ty = TL.getType();
+
+  if (isVararg && !hadError) {
+    // FIXME: Use ellipsis loc for diagnostic.
+    Ty = TC.getArraySliceType(TP->getLoc(), Ty, false);
+    if (Ty.isNull())
+      hadError = true;
+  }
+
+  if (hadError) {
+    TP->setType(ErrorType::get(TC.Context));
+  } else {
+    TP->setType(Ty);
+  }
+  return hadError;
+}
+
 /// Perform bottom-up type-checking on a pattern.  If this returns
 /// false, the type of the pattern will have been set.  If allowUnknownTypes is
 /// true, then this accepts "any" and "named" patterns, setting their type to
@@ -449,19 +476,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
-    bool hadError = false;
     TypedPattern *TP = cast<TypedPattern>(P);
-    TypeLoc &TL = TP->getTypeLoc();
-    if (isVararg) {
-      Type sliceTy = ArraySliceType::get(TL.getType(), Context);
-      TL = { sliceTy, TL.getSourceRange(), nullptr };
-    }
-    if (validateType(TL)) {
-      TP->setType(ErrorType::get(Context));
-      hadError = true;
-    } else {
-      TP->setType(TL.getType());
-    }
+    bool hadError = validateTypedPattern(*this, TP, isVararg);
     hadError |= coerceToType(TP->getSubPattern(), dc, P->getType());
     return hadError;
   }
@@ -536,7 +552,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
+bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
+                               bool isVararg) {
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren:
@@ -550,12 +567,8 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = false;
-    if (validateType(TP->getTypeLoc())) {
-      TP->overwriteType(ErrorType::get(Context));
-      hadError = true;
-    } else {
-      TP->setType(TP->getTypeLoc().getType());
+    bool hadError = validateTypedPattern(*this, TP, isVararg);
+    if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
         // Complain if the types don't match exactly.
         // TODO: allow implicit conversions?
@@ -612,6 +625,7 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
     for (unsigned i = 0, e = TP->getNumFields(); i != e; ++i) {
       TuplePatternElt &elt = TP->getFields()[i];
       Pattern *pattern = elt.getPattern();
+      bool isVararg = TP->hasVararg() && i == e-1;
 
       Type CoercionType;
       if (hadError)
@@ -619,7 +633,7 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type) {
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      hadError |= coerceToType(pattern, dc, CoercionType);
+      hadError |= coerceToType(pattern, dc, CoercionType, isVararg);
 
       // Type-check the initialization expression.
       if (ExprHandle *initHandle = elt.getInit()) {

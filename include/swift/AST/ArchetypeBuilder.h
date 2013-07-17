@@ -28,6 +28,7 @@ class Requirement;
 class SourceLoc;
 class Type;
 class TypeAliasDecl;
+class TypeRepr;
 class ASTContext;
 class DiagnosticEngine;
 
@@ -54,7 +55,7 @@ class ArchetypeBuilder {
   /// signature are fully resolved).
   ///
   /// For any type that cannot refer to an archetype, this routine returns null.
-  PotentialArchetype *resolveType(Type T);
+  PotentialArchetype *resolveType(TypeRepr *TyR);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.

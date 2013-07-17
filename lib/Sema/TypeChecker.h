@@ -195,7 +195,8 @@ public:
     return Diags.diagnose(Args...);
   }
 
-  Type getArraySliceType(SourceLoc loc, Type elementType);
+  Type getArraySliceType(SourceLoc loc, Type elementType,
+                         bool canonicalize = true);
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
@@ -217,15 +218,20 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, bool allowUnboundGenerics = false);
 
+  /// \brief Resolves a TypeRepr to a type.
+  ///
+  /// Performs name binding, checking of generic arguments, and so on in order
+  /// to create a well-formed type.
+  ///
+  /// \returns a well-formed type or an ErrorType in case of an error.
+  Type resolveType(TypeRepr *TyR, bool allowUnboundGenerics = false);
+
+  void validateTypeDecl(TypeDecl *D);
+
   /// \brief Validate the given type, which has no location information
   /// and shall not fail.
-  /// FIXME: This concept seems a bit broken.
-  void validateTypeSimple(Type T, bool allowUnboundGenerics = false) {
-    TypeLoc TL(T, SourceRange(), nullptr);
-    bool result = validateType(TL, allowUnboundGenerics);
-    assert(!result && "Validation cannot fail!");
-    (void)result;
-  }
+  /// FIXME: This is only necessary because of generic substitutions.
+  bool validateTypeSimple(Type T);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -274,7 +280,7 @@ public:
   /// error.
   Type applyGenericArguments(Type type,
                              SourceLoc loc,
-                             ArrayRef<TypeLoc> genericArgs);
+                             MutableArrayRef<TypeLoc> genericArgs);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.
@@ -468,7 +474,7 @@ public:
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
                         bool isFirstPass, bool allowUnknownTypes,
                         bool isVararg = false);
-  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty);
+  bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg =false);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
   

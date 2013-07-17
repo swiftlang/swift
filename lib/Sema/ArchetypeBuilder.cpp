@@ -226,20 +226,16 @@ ArchetypeBuilder::~ArchetypeBuilder() {
     delete PA.second;
 }
 
-auto ArchetypeBuilder::resolveType(Type T) -> PotentialArchetype * {
-  auto IdType = dyn_cast<IdentifierType>(T.getPointer());
+auto ArchetypeBuilder::resolveType(TypeRepr *TyR) -> PotentialArchetype * {
+  auto IdType = dyn_cast<IdentTypeRepr>(TyR);
   if (!IdType)
     return nullptr;
 
   PotentialArchetype *Current = nullptr;
-  if (!IdType->Components[0].Value.is<ValueDecl *>())
-    return nullptr;
-
   // The first type needs to be known as a potential archetype, e.g., a
   // generic parameter.
   TypeAliasDecl *FirstType
-    = dyn_cast_or_null<TypeAliasDecl>(
-        IdType->Components[0].Value.get<ValueDecl *>());
+    = dyn_cast_or_null<TypeAliasDecl>(IdType->Components[0].getBoundDecl());
   if (!FirstType)
     return nullptr;
 
@@ -251,7 +247,7 @@ auto ArchetypeBuilder::resolveType(Type T) -> PotentialArchetype * {
   // Resolve nested types.
   Current = Known->second;
   for (unsigned I = 1, N = IdType->Components.size(); I != N; ++I) {
-    Current = Current->getNestedType(IdType->Components[I].Id);
+    Current = Current->getNestedType(IdType->Components[I].getIdentifier());
   }
 
   return Current;
@@ -404,12 +400,12 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
 bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   switch (Req.getKind()) {
   case RequirementKind::Conformance: {
-    PotentialArchetype *PA = resolveType(Req.getSubject());
+    PotentialArchetype *PA = resolveType(Req.getSubjectRepr());
     if (!PA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
       Diags.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
-                     0, Req.getSubject(), 0);
+                     0, Req.getSubjectLoc(), 0);
       return true;
     }
 
@@ -436,21 +432,21 @@ bool ArchetypeBuilder::addRequirement(const Requirement &Req) {
   case RequirementKind::SameType: {
     // FIXME: Allow one of the types to not be a potential archetype, e.g.,
     // T.Element == Int?
-    PotentialArchetype *FirstPA = resolveType(Req.getFirstType());
+    PotentialArchetype *FirstPA = resolveType(Req.getFirstTypeRepr());
     if (!FirstPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
       Diags.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
-                     1, Req.getFirstType(), 1);
+                     1, Req.getFirstTypeLoc(), 1);
       return true;
     }
 
-    PotentialArchetype *SecondPA = resolveType(Req.getSecondType());
+    PotentialArchetype *SecondPA = resolveType(Req.getSecondTypeRepr());
     if (!SecondPA) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
       Diags.diagnose(Req.getEqualLoc(), diag::requires_not_suitable_archetype,
-                     2, Req.getSecondType(), 1);
+                     2, Req.getSecondTypeLoc(), 1);
       return true;
     }
     return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);

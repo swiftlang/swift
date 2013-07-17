@@ -52,12 +52,15 @@ static bool buildArraySliceType(TypeChecker &TC, ArraySliceType *sliceTy,
   return true;
 }
 
-Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
+Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType,
+                                    bool canonicalize) {
   ArraySliceType *sliceTy = ArraySliceType::get(elementType, Context);
   if (sliceTy->hasCanonicalTypeComputed()) return sliceTy;
   if (buildArraySliceType(*this, sliceTy, loc)) return Type();
-  sliceTy->getCanonicalType();
-  validateTypeSimple(sliceTy->getImplementationType());
+  if (canonicalize) {
+    sliceTy->getCanonicalType();
+    validateTypeSimple(sliceTy->getImplementationType());
+  }
   return sliceTy;
 }
 
@@ -160,7 +163,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
-                                        ArrayRef<TypeLoc> genericArgs) {
+                                        MutableArrayRef<TypeLoc> genericArgs) {
   auto unbound = type->getAs<UnboundGenericType>();
   if (!unbound) {
     // FIXME: Highlight generic arguments and introduce a Fix-It to remove
@@ -185,36 +188,61 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    // FIXME: Totally broken. We need GenericArgs to be mutable!
-    TypeLoc genericArgCopy = genericArg;
-    if (validateType(genericArgCopy)) {
-      genericArgCopy.setInvalidType(Context);
+    if (validateType(genericArg))
       return nullptr;
-    }
 
-    genericArgTypes.push_back(genericArgCopy.getType());
+    genericArgTypes.push_back(genericArg.getType());
   }
 
   // Form the bound generic type
-  type = BoundGenericType::get(unbound->getDecl(), unbound->getParent(),
-                               genericArgTypes);
+  BoundGenericType *BGT = BoundGenericType::get(unbound->getDecl(),
+                                                unbound->getParent(),
+                                                genericArgTypes);
+  // Check protocol conformance.
+  // FIXME: Should be able to check even when there are type variables
+  // present?
+  if (!BGT->hasSubstitutions() && !BGT->hasTypeVariable()) {
+    // FIXME: Record that we're checking substitutions, so we can't end up
+    // with infinite recursion.
+    TypeSubstitutionMap Substitutions;
+    ConformanceMap Conformance;
+    auto genericParams = BGT->getDecl()->getGenericParams();
+    unsigned Index = 0;
+    for (Type Arg : BGT->getGenericArgs()) {
+      auto GP = genericParams->getParams()[Index++];
+      auto Archetype = GP.getAsTypeParam()->getDeclaredType()
+                         ->getAs<ArchetypeType>();
+      Substitutions[Archetype] = Arg;
+    }
 
-  // FIXME: Total hack. We should do the checking of the arguments right
-  // here.
-  TypeLoc tl{type, loc, nullptr};
-  if (validateType(tl)) {
-    return nullptr;
+    if (checkSubstitutions(Substitutions, Conformance, loc, &Substitutions))
+      return nullptr;
+    else {
+      // Record these substitutions.
+      BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
+                                                Conformance, true));
+    }
   }
 
-  return type;
+  return BGT;
 }
 
+static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
+                                     MutableArrayRef<TypeRepr *> genericArgs) {
+  SmallVector<TypeLoc, 8> args;
+  for (auto tyR : genericArgs)
+    args.push_back(tyR);
+  Type ty = TC.applyGenericArguments(type, loc, args);
+  if (!ty)
+    return ErrorType::get(TC.Context);
+  return ty;
+}
+
+
 /// \brief Diagnose a use of an unbound generic type.
-static void diagnoseUnboundGenericType(TypeChecker &tc, TypeLoc tl) {
-  tc.diagnose(tl.getSourceRange().Start,
-              diag::generic_type_requires_arguments,
-              tl.getType());
-  auto unbound = tl.getType()->castTo<UnboundGenericType>();
+static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
+  tc.diagnose(loc, diag::generic_type_requires_arguments, ty);
+  auto unbound = ty->castTo<UnboundGenericType>();
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
               unbound->getDecl()->getName());
 }
@@ -239,289 +267,465 @@ LookupTypeResult TypeChecker::lookupMemberType(Module *module, Identifier name){
   return result;
 }
 
-/// \brief Validate the given identifier type.
-static bool validateIdentifierType(TypeChecker &TC, IdentifierType* IdType,
-                                   TypeLoc &Loc, bool allowUnboundGenerics) {
-  MutableArrayRef<IdentifierType::Component> Components = IdType->Components;
+/// \brief Returns a valid type or ErrorType in case of an error.
+static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
+                            DeclContext *dc,
+                            MutableArrayRef<TypeRepr *> genericArgs,
+                            bool allowUnboundGenerics) {
+  TC.validateTypeDecl(typeDecl);
 
-  // The currently-resolved result, which captures the result of name lookup
-  // for all components that have been considered thus far.
-  llvm::PointerUnion<Type, Module *> current;
+  Type type;
+  if (dc) {
+    // Resolve the type declaration to a specific type. How this occurs
+    // depends on the current context and where the type was found.
+    type = TC.resolveTypeInContext(typeDecl, dc, !genericArgs.empty());
+  } else {
+    type = typeDecl->getDeclaredType();
+  }
 
-  if (Components[0].Value.is<DeclContext *>()) {
-    // Resolve the first component, which is the only one that requires
-    // unqualified name lookup.
-    DeclContext *dc = Components[0].Value.get<DeclContext*>();
-    assert(dc);
+  if (type->is<UnboundGenericType>() &&
+      genericArgs.empty() && !allowUnboundGenerics) {
+    diagnoseUnboundGenericType(TC, type, loc);
+    return ErrorType::get(TC.Context);
+  }
 
-    // Perform an unqualified lookup.
-    UnqualifiedLookup Globals(Components[0].Id, dc, Components[0].Loc,
-                              /*TypeLookup*/true);
+  if (!genericArgs.empty()) {
+    // Apply the generic arguments to the type.
+    type = applyGenericTypeReprArgs(TC, type, loc, genericArgs);
+  }
 
-    // Process the names we found.
-    bool isAmbiguous = false;
-    for (const auto &result : Globals.Results) {
-      // If we found a module, record it.
-      if (result.Kind == UnqualifiedLookupResult::ModuleName) {
-        // If we already found a name of some sort, it's ambiguous.
-        if (!current.isNull()) {
+  assert(type);
+  return type;
+}
+
+static llvm::PointerUnion<Type, Module *>
+resolveIdentTypeComponent(TypeChecker &TC,
+                          MutableArrayRef<IdentTypeRepr::Component> components,
+                          bool allowUnboundGenerics) {
+  auto &comp = components.back();
+  if (!comp.isBound()) {
+    auto parentComps = components.slice(0, components.size()-1);
+    if (parentComps.empty()) {
+      // Resolve the first component, which is the only one that requires
+      // unqualified name lookup.
+      DeclContext *dc = comp.getUnboundContext();
+      assert(dc);
+
+      // Perform an unqualified lookup.
+      UnqualifiedLookup Globals(comp.getIdentifier(), dc, comp.getIdLoc(),
+                                /*TypeLookup*/true);
+
+      // Process the names we found.
+      llvm::PointerUnion<Type, Module *> current;
+      bool isAmbiguous = false;
+      for (const auto &result : Globals.Results) {
+        // If we found a module, record it.
+        if (result.Kind == UnqualifiedLookupResult::ModuleName) {
+          // If we already found a name of some sort, it's ambiguous.
+          if (!current.isNull()) {
+            isAmbiguous = true;
+            break;
+          }
+
+          // Save this result.
+          current = result.getNamedModule();
+          comp.setValue(result.getNamedModule());
+          continue;
+        }
+
+        // Ignore non-type declarations.
+        auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
+        if (!typeDecl)
+          continue;
+
+        Type type = resolveTypeDecl(TC, typeDecl, comp.getIdLoc(),
+                                    dc, comp.getGenericArgs(),
+                                    allowUnboundGenerics);
+        if (type->is<ErrorType>()) {
+          comp.setValue(type);
+          return type;
+        }
+
+        // If this is the first result we found, record it.
+        if (current.isNull()) {
+          current = type;
+          comp.setValue(type);
+          continue;
+        }
+
+        // Otherwise, check for an ambiguity.
+        if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
           isAmbiguous = true;
           break;
         }
 
-        // Save this result.
-        current = result.getNamedModule();
-        Components[0].setValue(result.getNamedModule());
-        continue;
+        // We have a found multiple type aliases that refer to the sam thing.
+        // Ignore the duplicate.
       }
 
-      // Ignore non-type declarations.
-      auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
-      if (!typeDecl)
-        continue;
-
-      // Resolve the type declaration to a specific type. How this occurs
-      // depends on the current context and where the type was found.
-      auto type = TC.resolveTypeInContext(typeDecl, dc,
-                                          !Components[0].GenericArgs.empty());
-      if (!type)
-        continue;
-
-      // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
-      // above.
-      {
-        TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start), nullptr);
-        if (TC.validateType(
-              tempLoc,
-              (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
-          return true;
-        }
-        type = tempLoc.getType();
-      }
-
-      // If this is the first result we found, record it.
+      // If we found nothing, complain and fail.
       if (current.isNull()) {
-        current = type;
-        Components[0].setValue(type);
-        continue;
+        TC.diagnose(comp.getIdLoc(), components.size() == 1 ?
+                    diag::use_undeclared_type : diag::unknown_name_in_type,
+                    comp.getIdentifier())
+          .highlight(SourceRange(comp.getIdLoc(),
+                                 components.back().getIdLoc()));
+        Type ty = ErrorType::get(TC.Context);
+        comp.setValue(ty);
+        return ty;
       }
 
-      // Otherwise, check for an ambiguity.
-      if (current.is<Module *>() || !current.get<Type>()->isEqual(type)) {
-        isAmbiguous = true;
-        break;
-      }
-
-      // We have a found multiple type aliases that refer to the sam thing.
-      // Ignore the duplicate.
-    }
-
-    // If we found nothing, complain and fail.
-    if (current.isNull()) {
-      TC.diagnose(Components[0].Loc, Components.size() == 1 ?
-                  diag::use_undeclared_type : diag::unknown_name_in_type,
-                  Components[0].Id)
-        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-      return true;
-    }
-
-    // Complain about any ambiguities we detected.
-    // FIXME: We could recover by looking at later components.
-    if (isAmbiguous) {
-      TC.diagnose(Components[0].Loc, diag::ambiguous_type_base, Components[0].Id)
-        .highlight(SourceRange(Components[0].Loc, Components.back().Loc));
-      for (auto Result : Globals.Results) {
-        if (Globals.Results[0].hasValueDecl())
-          TC.diagnose(Result.getValueDecl(), diag::found_candidate);
-        else
-          TC.diagnose(Components[0].Loc, diag::found_candidate);
-      }
-      return true;
-    }
-  } else {
-    auto VD = Components[0].Value.get<ValueDecl *>();
-    auto typeDecl = dyn_cast<TypeDecl>(VD);
-    if (!typeDecl) {
-      TC.diagnose(Components[0].Loc, diag::use_non_type_value, VD->getName());
-      TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
-      return true;
-    }
-    auto type = typeDecl->getDeclaredType();
-
-    // FIXME: Egregious hack. We should be type-checking the typeDecl we found,
-    // above.
-    {
-      TypeLoc tempLoc(type, SourceRange(Loc.getSourceRange().Start), nullptr);
-      if (TC.validateType(
-            tempLoc,
-            (allowUnboundGenerics || !Components[0].GenericArgs.empty()))) {
-        return true;
-      }
-      type = tempLoc.getType();
-    }
-
-    // If this is the first result we found, record it.
-    Components[0].setValue(type);
-    current = type;
-  }
-
-  // If the first component has generic arguments, apply them.
-  if (!Components[0].GenericArgs.empty()) {
-    if (current.is<Module *>()) {
-      // FIXME: Diagnose this and drop the arguments.
-    } else {
-      // Apply the generic arguments to the type.
-      auto type = TC.applyGenericArguments(current.get<Type>(),
-                                           Components[0].Loc,
-                                           Components[0].GenericArgs);
-      if (!type)
-        return true;
-
-      current = type;
-      Components[0].setValue(type);
-    }
-  }
-
-  // Resolve the remaining components.
-  SourceLoc previousLoc = Components[0].Loc;
-
-  for (auto &comp : Components.slice(1)) {
-    // If the last resolved component is a type, perform member type lookup.
-    if (current.is<Type>()) {
-      if (current.get<Type>()->is<UnboundGenericType>()) {
-        // FIXME: Awful source-location info, unsurprisingly.
-        diagnoseUnboundGenericType(TC, TypeLoc(current.get<Type>(),
-                                               SourceRange(previousLoc), nullptr));
-        return true;
-      }
-
-      // Look for member types with the given name.
-      auto memberTypes = TC.lookupMemberType(current.get<Type>(), comp.Id);
-
-      // If we didn't find anything, complain.
-      // FIXME: Typo correction!
-      if (!memberTypes) {
-        // FIXME: Highlight base range.
-        TC.diagnose(comp.Loc, diag::invalid_member_type, comp.Id,
-                    current.get<Type>());
-        return true;
-      }
-
-      // Name lookup was ambiguous. Complain.
-      // FIXME: Could try to apply generic arguments first, and see whether
-      // that resolves things. But do we really want that to succeed?
-      if (memberTypes.size() > 1) {
-        TC.diagnose(comp.Loc, diag::ambiguous_member_type, comp.Id,
-                    current.get<Type>());
-        for (const auto &member : memberTypes) {
-          TC.diagnose(member.first, diag::found_candidate_type,
-                      member.second);
+      // Complain about any ambiguities we detected.
+      // FIXME: We could recover by looking at later components.
+      if (isAmbiguous) {
+        TC.diagnose(comp.getIdLoc(), diag::ambiguous_type_base,
+                    comp.getIdentifier())
+          .highlight(SourceRange(comp.getIdLoc(),
+                                 components.back().getIdLoc()));
+        for (auto Result : Globals.Results) {
+          if (Globals.Results[0].hasValueDecl())
+            TC.diagnose(Result.getValueDecl(), diag::found_candidate);
+          else
+            TC.diagnose(comp.getIdLoc(), diag::found_candidate);
         }
-        return true;
+        Type ty = ErrorType::get(TC.Context);
+        comp.setValue(ty);
+        return ty;
       }
 
-      auto memberType = memberTypes.back().second;
+    } else {
+      llvm::PointerUnion<Type, Module *>
+        parent = resolveIdentTypeComponent(TC, parentComps,
+                                           allowUnboundGenerics);
+      // If the last resolved component is a type, perform member type lookup.
+      if (parent.is<Type>()) {
+        if (parent.get<Type>()->is<ErrorType>())
+          return parent.get<Type>();
+
+        // Look for member types with the given name.
+        auto memberTypes = TC.lookupMemberType(parent.get<Type>(),
+                                               comp.getIdentifier());
+
+        // If we didn't find anything, complain.
+        // FIXME: Typo correction!
+        if (!memberTypes) {
+          // FIXME: Highlight base range.
+          TC.diagnose(comp.getIdLoc(), diag::invalid_member_type,
+                      comp.getIdentifier(), parent.get<Type>());
+          Type ty = ErrorType::get(TC.Context);
+          comp.setValue(ty);
+          return ty;
+        }
+
+        // Name lookup was ambiguous. Complain.
+        // FIXME: Could try to apply generic arguments first, and see whether
+        // that resolves things. But do we really want that to succeed?
+        if (memberTypes.size() > 1) {
+          TC.diagnose(comp.getIdLoc(), diag::ambiguous_member_type,
+                      comp.getIdentifier(), parent.get<Type>());
+          for (const auto &member : memberTypes) {
+            TC.diagnose(member.first, diag::found_candidate_type,
+                        member.second);
+          }
+          Type ty = ErrorType::get(TC.Context);
+          comp.setValue(ty);
+          return ty;
+        }
+
+        auto memberType = memberTypes.back().second;
+
+        // If there are generic arguments, apply them now.
+        if (!comp.getGenericArgs().empty())
+          memberType = applyGenericTypeReprArgs(TC, memberType, comp.getIdLoc(),
+                                             comp.getGenericArgs());
+
+        comp.setValue(memberType);
+        return memberType;
+      }
+
+      // Lookup into a module.
+      auto module = parent.get<Module *>();
+      LookupTypeResult foundModuleTypes = TC.lookupMemberType(module,
+                                                          comp.getIdentifier());
+
+      // If we didn't find a type, complain.
+      if (!foundModuleTypes) {
+        // FIXME: Fully-qualified module name?
+        TC.diagnose(comp.getIdLoc(), diag::no_module_type, comp.getIdentifier(),
+                    module->Name);
+        Type ty = ErrorType::get(TC.Context);
+        comp.setValue(ty);
+        return ty;
+      }
+
+      // If lookup was ambiguous, complain.
+      if (foundModuleTypes.isAmbiguous()) {
+        TC.diagnose(comp.getIdLoc(), diag::ambiguous_module_type,
+                    comp.getIdentifier(), module->Name);
+        for (auto foundType : foundModuleTypes) {
+          // Only consider type declarations.
+          auto typeDecl = foundType.first;
+          if (!typeDecl)
+            continue;
+
+          TC.diagnose(typeDecl, diag::found_candidate_type,
+                      typeDecl->getDeclaredType());
+        }
+        Type ty = ErrorType::get(TC.Context);
+        comp.setValue(ty);
+        return ty;
+      }
+      Type foundType = foundModuleTypes[0].second;
 
       // If there are generic arguments, apply them now.
-      if (!comp.GenericArgs.empty()) {
-        memberType = TC.applyGenericArguments(memberType, comp.Loc,
-                                              comp.GenericArgs);
-        if (!memberType)
-          return true;
+      if (!comp.getGenericArgs().empty()) {
+        foundType = applyGenericTypeReprArgs(TC, foundType, comp.getIdLoc(),
+                                          comp.getGenericArgs());
       }
 
-      // Update our position with the type we just determined.
-      current = memberType;
-      comp.setValue(memberType);
-      previousLoc = comp.Loc;
-      continue;
+      comp.setValue(foundType);
     }
-
-    // Lookup into a module.
-    auto module = current.get<Module *>();
-    LookupTypeResult foundModuleTypes = TC.lookupMemberType(module, comp.Id);
-
-    // If we didn't find a type, complain.
-    if (!foundModuleTypes) {
-      // FIXME: Fully-qualified module name?
-      TC.diagnose(comp.Loc, diag::no_module_type, comp.Id, module->Name);
-      return true;
-    }
-
-    // If lookup was ambiguous, complain.
-    if (foundModuleTypes.isAmbiguous()) {
-      TC.diagnose(comp.Loc, diag::ambiguous_module_type, comp.Id, module->Name);
-      for (auto foundType : foundModuleTypes) {
-        // Only consider type declarations.
-        auto typeDecl = foundType.first;
-        if (!typeDecl)
-          continue;
-
-        TC.diagnose(typeDecl, diag::found_candidate_type,
-                    typeDecl->getDeclaredType());
-      }
-      return true;
-    }
-    Type foundType = foundModuleTypes[0].second;
-
-    // If there are generic arguments, apply them now.
-    if (!comp.GenericArgs.empty()) {
-      foundType = TC.applyGenericArguments(foundType, comp.Loc,
-                                           comp.GenericArgs);
-      if (!foundType)
-        return true;
-    }
-
-    // Update our position with the type we just determined.
-    current = foundType;
-    comp.setValue(foundType);
-    previousLoc = comp.Loc;
   }
 
-  if (auto mod = current.dyn_cast<Module*>()) {
-    TC.diagnose(previousLoc, diag::use_module_as_type, mod->Name);
-    return true;
+  assert(comp.isBound());
+  if (Type ty = comp.getBoundType())
+    return ty;
+  if (Module *mod = comp.getBoundModule())
+    return mod;
+
+  ValueDecl *VD = comp.getBoundDecl();
+  auto typeDecl = dyn_cast<TypeDecl>(VD);
+  if (!typeDecl) {
+    TC.diagnose(comp.getIdLoc(), diag::use_non_type_value, VD->getName());
+    TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
+    Type ty = ErrorType::get(TC.Context);
+    comp.setValue(ty);
+    return ty;
   }
 
-  return false;
+  Type type = resolveTypeDecl(TC, typeDecl, comp.getIdLoc(), nullptr,
+                              comp.getGenericArgs(), allowUnboundGenerics);
+  comp.setValue(type);
+  return type;
+}
+
+/// \brief Returns a valid type or ErrorType in case of an error.
+static Type resolveIdentifierType(TypeChecker &TC, IdentTypeRepr* IdType,
+                                  bool allowUnboundGenerics) {
+  llvm::PointerUnion<Type, Module *>
+    result = resolveIdentTypeComponent(TC, IdType->Components,
+                                       allowUnboundGenerics);
+  if (auto mod = result.dyn_cast<Module*>()) {
+    TC.diagnose(IdType->Components.back().getIdLoc(),
+                diag::use_module_as_type, mod->Name);
+    Type ty = ErrorType::get(TC.Context);
+    IdType->Components.back().setValue(ty);
+    return ty;
+  }
+
+  return result.get<Type>();
 }
 
 bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
-  Type InTy = Loc.getType();
+  // FIXME: Verify that these aren't circular and infinite size.
+  
+  // If we've already validated this type, don't do so again.
+  if (Loc.wasValidated())
+    return !Loc.isError();
+
+  if (Loc.getType().isNull()) {
+    Loc.setType(resolveType(Loc.getTypeRepr(), allowUnboundGenerics), true);
+    return !Loc.isError();
+  }
+
+  Type ty = Loc.getType();
+  if (validateTypeSimple(ty))
+    ty = ErrorType::get(Context);
+
+  Loc.setType(ty, true);
+  return !Loc.isError();
+}
+
+void TypeChecker::validateTypeDecl(TypeDecl *D) {
+  if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
+    // TypeAliasDecls may not have a type reference.
+    if (TAD->getUnderlyingTypeLoc().getTypeRepr())
+      validateType(TAD->getUnderlyingTypeLoc());
+  }
+}
+
+Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
+  assert(TyR && "Cannot validate null TypeReprs!");
+  switch (TyR->getKind()) {
+  case TypeReprKind::Attributed: {
+    Type Ty;
+    auto AttrTyR = cast<AttributedTypeRepr>(TyR);
+    DeclAttributes attrs = AttrTyR->getAttrs();
+    assert(!attrs.empty());
+    Ty = resolveType(AttrTyR->getTypeRepr());
+    if (Ty->is<ErrorType>())
+      return Ty;
+
+    if (attrs.isByref()) {
+      LValueType::Qual quals;
+      Ty = LValueType::get(Ty, quals, Context);
+      attrs.Byref = false; // so that the empty() check below works
+    }
+
+    // Handle the auto_closure, cc, and objc_block attributes for function types.
+    if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
+        attrs.isThin()) {
+      FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
+      TupleType *InputTy = 0;
+      if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
+      if (FT == 0) {
+        // auto_closures and objc_blocks require a syntactic function type.
+        if (attrs.isAutoClosure())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "auto_closure");
+        if (attrs.isObjCBlock())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "objc_block");
+        if (attrs.hasCC())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "cc");
+        if (attrs.isThin())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "thin");
+      } else if (attrs.isAutoClosure() &&
+                 (InputTy == 0 || !InputTy->getFields().empty())) {
+        // auto_closures must take () syntactically.
+        diagnose(attrs.LSquareLoc, diag::autoclosure_function_input_nonunit,
+                 FT->getInput());
+      } else {
+        // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
+        // bit.
+        Ty = FunctionType::get(FT->getInput(), FT->getResult(),
+                               attrs.isAutoClosure(),
+                               attrs.isObjCBlock(),
+                               attrs.isThin(),
+                               attrs.hasCC()
+                                ? attrs.getAbstractCC()
+                                : AbstractCC::Freestanding,
+                               Context);
+      }
+      attrs.AutoClosure = false;
+      attrs.ObjCBlock = false;
+      attrs.Thin = false;
+      attrs.cc = Nothing;
+    }
+
+    // FIXME: this is lame.
+    if (!attrs.empty())
+      diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
+
+    return Ty;
+  }
+
+  case TypeReprKind::Ident:
+    return resolveIdentifierType(*this, cast<IdentTypeRepr>(TyR),
+                                 allowUnboundGenerics);
+
+  case TypeReprKind::Function: {
+    auto FnTyR = cast<FunctionTypeRepr>(TyR);
+    Type inputTy = resolveType(FnTyR->getArgsTypeRepr());
+    if (inputTy->is<ErrorType>())
+      return inputTy;
+    Type outputTy = resolveType(FnTyR->getResultTypeRepr());
+    if (outputTy->is<ErrorType>())
+      return outputTy;
+    return FunctionType::get(inputTy, outputTy, Context);
+  }
+
+  case TypeReprKind::Array: {
+    // FIXME: diagnose non-materializability of element type!
+    auto ArrTyR = cast<ArrayTypeRepr>(TyR);
+    Type baseTy = resolveType(ArrTyR->getBase());
+    if (baseTy->is<ErrorType>())
+      return baseTy;
+
+    if (ExprHandle *sizeEx = ArrTyR->getSize()) {
+      // FIXME: We don't support fixed-length arrays yet.
+      // FIXME: We need to check Size! (It also has to be convertible to int).
+      diagnose(ArrTyR->getBrackets().Start, diag::unsupported_fixed_length_array)
+        .highlight(sizeEx->getExpr()->getSourceRange());
+      return ErrorType::get(Context);
+    }
+
+    auto sliceTy = ArraySliceType::get(baseTy, Context);
+    if (buildArraySliceType(*this, sliceTy, ArrTyR->getBrackets().Start))
+      return ErrorType::get(Context);
+
+    return sliceTy;
+  }
+
+  case TypeReprKind::Tuple: {
+    auto TupTyR = cast<TupleTypeRepr>(TyR);
+    SmallVector<TupleTypeElt, 8> Elements;
+    for (auto tyR : TupTyR->getElements()) {
+      if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
+        Type ty = resolveType(namedTyR->getTypeRepr());
+        if (ty->is<ErrorType>())
+          return ty;
+        Elements.push_back(TupleTypeElt(ty, namedTyR->getName(), nullptr));
+      } else {
+        Type ty = resolveType(tyR);
+        if (ty->is<ErrorType>())
+          return ty;
+        Elements.push_back(TupleTypeElt(ty));
+      }
+    }
+
+    if (TupTyR->hasEllipsis()) {
+      Type BaseTy = Elements.back().getType();
+      Type FullTy = ArraySliceType::get(BaseTy, Context);
+      Identifier Name = Elements.back().getName();
+      ExprHandle *Init = Elements.back().getInit();
+      Elements.back() = TupleTypeElt(FullTy, Name, Init, true);
+    }
+
+    return TupleType::get(Elements, Context);
+  }
+
+  case TypeReprKind::Named:
+    llvm_unreachable("NamedTypeRepr only shows up as an element of Tuple");
+
+  case TypeReprKind::ProtocolComposition: {
+    auto ProtTyR = cast<ProtocolCompositionTypeRepr>(TyR);
+    SmallVector<Type, 4> ProtocolTypes;
+    for (auto tyR : ProtTyR->getProtocols()) {
+      Type ty = resolveType(tyR);
+      if (ty->is<ErrorType>())
+        return ty;
+      if (!ty->isExistentialType()) {
+        diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
+                 ty);
+        return ErrorType::get(Context);
+      }
+      ProtocolTypes.push_back(ty);
+    }
+    return ProtocolCompositionType::get(Context, ProtocolTypes);
+  }
+
+  case TypeReprKind::MetaType: {
+    Type ty = resolveType(cast<MetaTypeTypeRepr>(TyR)->getBase());
+    if (ty->is<ErrorType>())
+      return ty;
+    return MetaTypeType::get(ty, Context);
+  }
+  }
+
+  llvm_unreachable("all cases should be handled");
+}
+
+bool TypeChecker::validateTypeSimple(Type InTy) {
   assert(InTy && "Cannot validate null types!");
 
   TypeBase *T = InTy.getPointer();
   // FIXME: Verify that these aren't circular and infinite size.
-  
-  // If we've already validated this type, don't do so again.
-  if (T->wasValidated()) {
-    if (!allowUnboundGenerics && T->is<UnboundGenericType>() && T->isValid()) {
-      diagnoseUnboundGenericType(*this, Loc);
-      return true;
-    }
-
-    return !T->isValid();
-  }
-
-  bool IsInvalid = false;
-  
-  // \brief RAII object that sets the validation pass on the type when it
-  // goes out of scope.
-  class SetValidation {
-    Type T;
-    bool &IsInvalid;
-
-  public:
-    SetValidation(Type T, bool &IsInvalid) : T(T), IsInvalid(IsInvalid) { }
-    ~SetValidation() {
-      T->setValidated(!IsInvalid);
-    }
-  } setValidation(T, IsInvalid);
 
   switch (T->getKind()) {
   case TypeKind::Error:
-    // Error already diagnosed.
-    return IsInvalid = true;
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinRawPointer:
@@ -535,174 +739,86 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
   case TypeKind::Archetype:
   case TypeKind::UnboundGeneric:
     // These types are already canonical anyway.
-    return IsInvalid = false;
-      
+    return false;
+
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::TypeVariable:
     // Nothing to validate.
-    break;
+    return false;
 
   case TypeKind::ReferenceStorage:
     llvm_unreachable("reference storage type in typechecker");
 
-  case TypeKind::Substituted: {
-    TypeLoc TL(cast<SubstitutedType>(T)->getReplacementType(),
-               Loc.getSourceRange(), nullptr);
-    return IsInvalid = validateType(TL, allowUnboundGenerics);
-  }
+  case TypeKind::Substituted:
+    return validateTypeSimple(cast<SubstitutedType>(T)->getReplacementType());
 
-  case TypeKind::NameAlias: {
-    TypeAliasDecl *D = cast<NameAliasType>(T)->getDecl();
-    IsInvalid = validateType(D->getUnderlyingTypeLoc());
-    if (IsInvalid)
-      D->getUnderlyingTypeLoc().setInvalidType(Context);
-    break;
-  }
-  case TypeKind::Identifier: {
-    IdentifierType *DNT = cast<IdentifierType>(T);
-    if (DNT->isMapped()) {
-      // FIXME: Refactor this to avoid fake TypeLoc
-      TypeLoc TempLoc = TypeLoc::withoutLoc(DNT->getMappedType());
-      IsInvalid = validateType(TempLoc);
-      break;
-    }
-    if (!IsInvalid &&
-        validateIdentifierType(*this, DNT, Loc, allowUnboundGenerics))
-      IsInvalid = true;
-    break;
-  }
-  case TypeKind::Paren: {
-    // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ cast<ParenType>(T)->getUnderlyingType(),
-                     Loc.getSourceRange(), nullptr };
-    return IsInvalid = validateType(TempLoc);
-  }
+  case TypeKind::NameAlias:
+    return validateTypeSimple(
+                        cast<NameAliasType>(T)->getDecl()->getUnderlyingType());
+
+  case TypeKind::Identifier:
+    llvm_unreachable("identifier in validateTypeSimple");
+
+  case TypeKind::Paren:
+    return validateTypeSimple(cast<ParenType>(T)->getUnderlyingType());
+
   case TypeKind::Tuple: {
     TupleType *TT = cast<TupleType>(T);
-    
+
     // Okay, we found an uncanonicalized tuple type, which might have default
     // values.  If so, we'll potentially have to update it.
     for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
       // The element has *at least* a type or an initializer, so we start by
       // verifying each individually.
       Type EltTy = TT->getFields()[i].getType();
-      // FIXME: Extract real typeloc info
-      TypeLoc TempLoc{ EltTy, Loc.getSourceRange(), nullptr };
-      if (EltTy && validateType(TempLoc)) {
-        IsInvalid = true;
-        break;
-      }
-
-      ExprHandle *EltInit = TT->getFields()[i].getInit();
-      if (EltInit == 0 || EltInit->alreadyChecked()) continue;
-
-      Expr *initExpr = EltInit->getExpr();
-      // FIXME: Should pass the DeclContext in which the tuple type appears.
-      if (typeCheckExpression(initExpr, &TU, EltTy)) {
-        diagnose(initExpr->getLoc(), diag::while_converting_default_tuple_value,
-                 EltTy);
-        IsInvalid = true;
-        break;
-      }
-
-      if (!EltTy)
-        initExpr = coerceToMaterializable(initExpr);
-
-      struct CheckForLocalRef : public ASTWalker {
-        TypeChecker &TC;
-
-        CheckForLocalRef(TypeChecker &TC) : TC(TC) {}
-
-        std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-          if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-            if (DRE->getDecl()->getDeclContext()->isLocalContext()) {
-              TC.diagnose(E->getLoc(), diag::tuple_default_local_ref);
-            }
-          }
-          return { true, E };
-        }
-      };
-
-      initExpr->walk(CheckForLocalRef(*this));
-
-      // If both a type and an initializer are specified, make sure the
-      // initializer's type agrees with the (redundant) type.
-      assert(EltTy.isNull() || EltTy->isEqual(initExpr->getType()));
-      EltTy = initExpr->getType();
-
-      EltInit->setExpr(initExpr, true);
-      TT->updateInitializedElementType(i, EltTy);
+      if (validateTypeSimple(EltTy))
+        return true;
     }
     break;
   }
 
-  case TypeKind::LValue: {
-    // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ cast<LValueType>(T)->getObjectType(),
-                     Loc.getSourceRange(), nullptr };
-    IsInvalid = validateType(TempLoc);
-    // FIXME: diagnose non-materializability of object type!
-    break;
-  }
-      
+  case TypeKind::LValue:
+    return validateTypeSimple(cast<LValueType>(T)->getObjectType());
+
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction: {
     AnyFunctionType *FT = cast<AnyFunctionType>(T);
-    // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ FT->getInput(), Loc.getSourceRange(), nullptr };
-    IsInvalid = validateType(TempLoc);
-    if (!IsInvalid) {
-      TempLoc = TypeLoc{ FT->getResult(), Loc.getSourceRange(), nullptr };
-      IsInvalid = validateType(TempLoc);
-    }
-    // FIXME: diagnose non-materializability of result type!
+    if (validateTypeSimple(FT->getInput()))
+      return true;
+    if (validateTypeSimple(FT->getResult()))
+      return true;
     break;
   }
   case TypeKind::Array: {
     ArrayType *AT = cast<ArrayType>(T);
-    // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange(), nullptr };
-    IsInvalid = validateType(TempLoc);
-    // FIXME: diagnose non-materializability of element type!
-    // FIXME: We need to check AT->Size! (It also has to be convertible to int).
+    if (validateTypeSimple(AT->getBaseType()))
+      return true;
     break;
   }
   case TypeKind::ArraySlice: {
     ArraySliceType *AT = cast<ArraySliceType>(T);
-    // FIXME: Extract real typeloc info.
-    TypeLoc TempLoc{ AT->getBaseType(), Loc.getSourceRange(), nullptr };
-    IsInvalid = validateType(TempLoc);
-    // FIXME: diagnose non-materializability of element type?
-    if (!IsInvalid && !AT->hasImplementationType()) {
-      IsInvalid = buildArraySliceType(*this, AT, Loc.getSourceRange().Start);
+    if (validateTypeSimple(AT->getBaseType()))
+      return true;
+    if (!AT->hasImplementationType()) {
+      buildArraySliceType(*this, AT, SourceLoc());
     }
     break;
   }
-      
+
   case TypeKind::ProtocolComposition: {
     ProtocolCompositionType *PC = cast<ProtocolCompositionType>(T);
     for (auto Proto : PC->getProtocols()) {
-      // FIXME: Extract real typeloc info.
-      TypeLoc TempLoc{ Proto, Loc.getSourceRange(), nullptr };
-      if (validateType(TempLoc))
-        IsInvalid = true;
-      else if (!Proto->isExistentialType()) {
-        SourceLoc DiagLoc = Loc.getSourceRange().Start;
-        diagnose(DiagLoc, diag::protocol_composition_not_protocol,
-                 Proto);
-        IsInvalid = true;
-      }
+      if (validateTypeSimple(Proto))
+        return true;
     }
     break;
   }
 
   case TypeKind::MetaType: {
     MetaTypeType *Meta = cast<MetaTypeType>(T);
-    // FIXME: Extract real typeloc info?  Should we be validating this type
-    // in the first place?
-    TypeLoc TempLoc{ Meta->getInstanceType(), Loc.getSourceRange(), nullptr };
-    IsInvalid = validateType(TempLoc);
+    if (validateTypeSimple(Meta->getInstanceType()))
+      return true;
     break;
   }
 
@@ -712,19 +828,14 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
     BoundGenericType *BGT = cast<BoundGenericType>(T);
     unsigned Index = 0;
     for (Type Arg : BGT->getGenericArgs()) {
-      // FIXME: Extract real typeloc info?  Should we be validating this type
-      // in the first place?
-      TypeLoc TempLoc = TypeLoc::withoutLoc(Arg);
-      if (validateType(TempLoc)) {
-        IsInvalid = true;
-        break;
-      }
+      if (validateTypeSimple(Arg))
+        return true;
     }
 
     // Check protocol conformance.
     // FIXME: Should be able to check even when there are type variables
     // present?
-    if (!IsInvalid && !BGT->hasSubstitutions() && !BGT->hasTypeVariable()) {
+    if (!BGT->hasSubstitutions() && !BGT->hasTypeVariable()) {
       // FIXME: Record that we're checking substitutions, so we can't end up
       // with infinite recursion.
       TypeSubstitutionMap Substitutions;
@@ -737,34 +848,17 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool allowUnboundGenerics) {
         Substitutions[Archetype] = Arg;
       }
 
-      if (checkSubstitutions(Substitutions, Conformance,
-                             Loc.getSourceRange().Start, &Substitutions))
-        IsInvalid = true;
-      else {
-        // Record these substitutions.
-        BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
-                                                  Conformance, true));
-      }
+      if (checkSubstitutions(Substitutions, Conformance, SourceLoc(),
+                             &Substitutions))
+        return true;
+      // Record these substitutions.
+      BGT->setSubstitutions(encodeSubstitutions(genericParams, Substitutions,
+                                                Conformance, true));
     }
     break;
   }
   }
 
-  // If we have an unbound generic type but aren't allowed to, complain.
-  if (!allowUnboundGenerics && !IsInvalid && T->is<UnboundGenericType>()) {
-    diagnoseUnboundGenericType(*this, Loc);
-    IsInvalid = true;
-    return true;
-  }
-
-  // If we determined that this type is invalid, erase it in the caller.
-  if (IsInvalid)
-    return true;
-
-  // FIXME: This isn't good enough: top-level stuff can have these as well and
-  // their types need to be resolved at the end of name binding.  Perhaps we
-  // should require them to have explicit types even if they have values and 
-  // let the value mismatch be detected at typechecking time? 
   return false;
 }
 
@@ -1145,9 +1239,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
       Substitutions[ParamTy->castTo<ArchetypeType>()] = Args[i];
     }
 
-    T = substType(T, Substitutions);
-    validateTypeSimple(T);
-    return T;
+    return substType(T, Substitutions);
   }
 
   auto BaseArchetype = BaseTy->getRValueType()->getAs<ArchetypeType>();
@@ -1164,9 +1256,7 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
   TypeSubstitutionMap Substitutions;
   Substitutions[ThisDecl->getDeclaredType()->castTo<ArchetypeType>()]
     = BaseArchetype;
-  T = substType(T, Substitutions);
-  validateTypeSimple(T);
-  return T;
+  return substType(T, Substitutions);
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

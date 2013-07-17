@@ -74,6 +74,7 @@ public:
 ///   [byref] Foo
 /// \endcode
 class AttributedTypeRepr : public TypeRepr {
+  // FIXME: DeclAttributes wastes space.
   DeclAttributes Attrs;
   TypeRepr *Ty;
 

@@ -378,7 +378,17 @@ public:
     return Types[0].getType();
   }
 
+  TypeRepr *getSubjectRepr() const {
+    assert(getKind() == RequirementKind::Conformance);
+    return Types[0].getTypeRepr();
+  }
+
   TypeLoc &getSubjectLoc() {
+    assert(getKind() == RequirementKind::Conformance);
+    return Types[0];
+  }
+
+  const TypeLoc &getSubjectLoc() const {
     assert(getKind() == RequirementKind::Conformance);
     return Types[0];
   }
@@ -409,7 +419,17 @@ public:
     return Types[0].getType();
   }
 
+  TypeRepr *getFirstTypeRepr() const {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[0].getTypeRepr();
+  }
+
   TypeLoc &getFirstTypeLoc() {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[0];
+  }
+
+  const TypeLoc &getFirstTypeLoc() const {
     assert(getKind() == RequirementKind::SameType);
     return Types[0];
   }
@@ -420,7 +440,17 @@ public:
     return Types[1].getType();
   }
 
+  TypeRepr *getSecondTypeRepr() const {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[1].getTypeRepr();
+  }
+
   TypeLoc &getSecondTypeLoc() {
+    assert(getKind() == RequirementKind::SameType);
+    return Types[1];
+  }
+
+  const TypeLoc &getSecondTypeLoc() const {
     assert(getKind() == RequirementKind::SameType);
     return Types[1];
   }

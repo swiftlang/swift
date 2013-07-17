@@ -851,5 +851,5 @@ ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
 }
 
 void TypeLoc::setInvalidType(ASTContext &C) {
-  T = ErrorType::get(C);
+  TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
 }

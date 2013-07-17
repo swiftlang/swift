@@ -430,7 +430,7 @@ public:
   bool parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
-  bool parseGetSet(bool HasContainerType, Pattern *Indices, Type ElementTy, 
+  bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc);
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
