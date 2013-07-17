@@ -56,17 +56,17 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     SmallVector<TypeLoc, 1> Inherited;
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
-      TypeLoc Ty;
+      TypeRepr *Ty = nullptr;
       if (Tok.getKind() == tok::identifier) {
-        parseTypeIdentifier(Ty);
+        Ty = parseTypeIdentifier();
       } else if (Tok.getKind() == tok::kw_protocol) {
-        parseTypeComposition(Ty);
+        Ty = parseTypeComposition();
       } else {
         diagnose(Tok.getLoc(), diag::expected_generics_type_restriction, Name);
         Invalid = true;
       }
 
-      if (Ty.hasLocation())
+      if (Ty)
         Inherited.push_back(Ty);
     }
 
@@ -150,8 +150,8 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
   do {
     // Parse the leading type-identifier.
     // FIXME: Dropping TypeLocs left and right.
-    TypeLoc FirstType;
-    if (parseTypeIdentifier(FirstType)) {
+    TypeRepr *FirstType = parseTypeIdentifier();
+    if (!FirstType) {
       Invalid = true;
       break;
     }
@@ -161,13 +161,13 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      TypeLoc Protocol;
+      TypeRepr *Protocol = nullptr;
       if (Tok.is(tok::kw_protocol)) {
-        if (parseTypeComposition(Protocol)) {
-          Invalid = true;
-          break;
-        }
-      } else if (parseTypeIdentifier(Protocol)) {
+        Protocol = parseTypeComposition();
+      } else {
+        Protocol = parseTypeIdentifier();   
+      }
+      if (!Protocol) {
         Invalid = true;
         break;
       }
@@ -186,8 +186,8 @@ bool Parser::parseGenericWhereClause(SourceLoc &WhereLoc,
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      TypeLoc SecondType;
-      if (parseTypeIdentifier(SecondType)) {
+      TypeRepr *SecondType = parseTypeIdentifier();
+      if (!SecondType) {
         Invalid = true;
         break;
       }

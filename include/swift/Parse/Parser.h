@@ -470,19 +470,19 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
   
-  bool parseType(TypeLoc &ResultLoc);
-  bool parseType(TypeLoc &ResultLoc, Diag<> ID);
-  bool parseTypeAnnotation(TypeLoc &ResultLoc);
-  bool parseTypeAnnotation(TypeLoc &ResultLoc, Diag<> ID);
-  bool parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
+  TypeRepr *parseType();
+  TypeRepr *parseType(Diag<> ID);
+  TypeRepr *parseTypeAnnotation();
+  TypeRepr *parseTypeAnnotation(Diag<> ID);
+  bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
-  bool parseTypeIdentifier(TypeLoc &ResultLoc);
-  bool parseTypeComposition(TypeLoc &ResultLoc);
-  bool parseTypeTupleBody(TypeLoc &ResultLoc);
-  bool parseTypeArray(TypeLoc &ResultLoc);
+  IdentTypeRepr *parseTypeIdentifier();
+  ProtocolCompositionTypeRepr *parseTypeComposition();
+  TupleTypeRepr *parseTypeTupleBody();
+  ArrayTypeRepr *parseTypeArray(TypeRepr *Base);
 
-  bool applyAttributeToType(TypeLoc &ResultLoc, DeclAttributes &Attr);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, DeclAttributes &Attr);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -491,7 +491,7 @@ public:
                               SmallVectorImpl<Pattern*> &bodyPatterns);
   bool parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
                               SmallVectorImpl<Pattern*> &bodyPatterns,
-                              TypeLoc &retLoc);
+                              TypeRepr *&retLoc);
 
   NullablePtr<Pattern> parsePattern();
 
@@ -608,7 +608,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(Pattern *&params,
                                       SourceLoc &arrowLoc,
-                                      TypeLoc &explicitResultType,
+                                      TypeRepr *&explicitResultType,
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();

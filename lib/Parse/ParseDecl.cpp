@@ -588,12 +588,12 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
   
   do {
     // Parse the inherited type (which must be a protocol).
-    TypeLoc Loc;
-    if (parseTypeIdentifier(Loc))
+    TypeRepr *Ty = parseTypeIdentifier();
+    if (!Ty)
       return true;
     
     // Record the type.
-    Inherited.push_back(Loc);
+    Inherited.push_back(Ty);
     
     // Check for a ',', which indicates that there are more protocols coming.
   } while (consumeIf(tok::comma));
@@ -608,10 +608,10 @@ bool Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited) {
 Decl *Parser::parseDeclExtension(unsigned Flags) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
-  TypeLoc Loc;
-  SourceLoc LBLoc, RBLoc;
-  if (parseTypeIdentifier(Loc))
+  TypeRepr *Ty = parseTypeIdentifier();
+  if (!Ty)
     return nullptr;
+  SourceLoc LBLoc, RBLoc;
   
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -622,7 +622,7 @@ Decl *Parser::parseDeclExtension(unsigned Flags) {
     return nullptr;
 
   ExtensionDecl *ED
-    = new (Context) ExtensionDecl(ExtensionLoc, Loc,
+    = new (Context) ExtensionDecl(ExtensionLoc, Ty,
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
   ContextChange CC(*this, ED);
@@ -657,7 +657,7 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   
   Identifier Id;
-  TypeLoc UnderlyingLoc;
+  TypeRepr *UnderlyingTy = nullptr;
   SourceLoc IdLoc;
   if (parseIdentifier(Id, IdLoc, diag::expected_identifier_in_decl,"typealias"))
     return nullptr;
@@ -669,17 +669,17 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
 
   if (WantDefinition || Tok.is(tok::equal)) {
     if (parseToken(tok::equal, diag::expected_equal_in_typealias) ||
-        parseType(UnderlyingLoc, diag::expected_type_in_typealias))
+        !(UnderlyingTy = parseType(diag::expected_type_in_typealias)))
       return nullptr;
     
     if (!WantDefinition) {
       diagnose(IdLoc, diag::associated_type_def, Id);
-      UnderlyingLoc = TypeLoc();
+      UnderlyingTy = nullptr;
     }
   }
 
   TypeAliasDecl *TAD =
-    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingLoc,
+    new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingTy,
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
   ScopeInfo.addToScope(TAD);
@@ -1276,7 +1276,7 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
     BodyParams.push_back(thisPattern);
   }
 
-  TypeLoc FuncRetTy;
+  TypeRepr *FuncRetTy;
   if (parseFunctionSignature(ArgParams, BodyParams, FuncRetTy))
     return 0;
 
@@ -1495,18 +1495,18 @@ bool Parser::parseDeclOneOfElement(unsigned Flags,
     return true;
   
   // See if there's a following argument type.
-  TypeLoc ArgType;
+  TypeRepr *ArgType = nullptr;
   if (Tok.isFollowingLParen()) {
-    if (parseTypeTupleBody(ArgType))
+    if (!(ArgType = parseTypeTupleBody()))
       return true;
   }
   
   // See if there's a result type.
   SourceLoc ArrowLoc;
-  TypeLoc ResultType;
+  TypeRepr *ResultType = nullptr;
   if (Tok.is(tok::arrow)) {
     ArrowLoc = consumeToken();
-    if (parseType(ResultType, diag::expected_type_oneof_element_result))
+    if (!(ResultType = parseType(diag::expected_type_oneof_element_result)))
       return true;
   }
   
@@ -1877,8 +1877,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
   SourceLoc ArrowLoc = consumeToken();
   
   // type
-  TypeLoc ElementTy;
-  if (parseTypeAnnotation(ElementTy, diag::expected_type_subscript))
+  TypeRepr *ElementTy = parseTypeAnnotation(diag::expected_type_subscript);
+  if (!ElementTy)
     return true;
   
   if (!NeedDefinition) {

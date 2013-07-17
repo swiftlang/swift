@@ -25,34 +25,32 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-bool Parser::parseTypeAnnotation(TypeLoc &result) {
-  return parseTypeAnnotation(result, diag::expected_type);
+TypeRepr *Parser::parseTypeAnnotation() {
+  return parseTypeAnnotation(diag::expected_type);
 }
 
 /// parseTypeAnnotation
 ///   type-annotation:
 ///     attribute-list type
-bool Parser::parseTypeAnnotation(TypeLoc &result, Diag<> message) {
+TypeRepr *Parser::parseTypeAnnotation(Diag<> message) {
   // Parse attributes.
   DeclAttributes attrs;
   parseAttributeList(attrs);
 
   // Parse the type.
-  if (parseType(result, message))
-    return true;
-  return applyAttributeToType(result, attrs);
+  TypeRepr *ty = parseType(message);
+  return applyAttributeToType(ty, attrs);
 }
 
-bool Parser::applyAttributeToType(TypeLoc &result, DeclAttributes &attrs) {
+TypeRepr *Parser::applyAttributeToType(TypeRepr *ty, DeclAttributes &attrs) {
   // Apply those attributes that do apply.
-  if (attrs.empty()) return false;
+  if (attrs.empty()) return ty;
 
-  result = new (Context) AttributedTypeRepr(attrs, result.getTypeRepr());
-  return false;
+  return new (Context) AttributedTypeRepr(attrs, ty);
 }
 
-bool Parser::parseType(TypeLoc &Result) {
-  return parseType(Result, diag::expected_type);
+TypeRepr *Parser::parseType() {
+  return parseType(diag::expected_type);
 }
 
 /// parseType
@@ -69,69 +67,62 @@ bool Parser::parseType(TypeLoc &Result) {
 ///     type-tuple
 ///     type-composition
 ///
-bool Parser::parseType(TypeLoc &Result, Diag<> MessageID) {
+TypeRepr *Parser::parseType(Diag<> MessageID) {
+  TypeRepr *ty = nullptr;
   // Parse type-simple first.
   switch (Tok.getKind()) {
   case tok::kw_This:
   case tok::identifier:
-    if (parseTypeIdentifier(Result))
-      return true;
+    ty = parseTypeIdentifier();
     break;
   case tok::kw_protocol:
-    if (parseTypeComposition(Result))
-      return true;
+    ty = parseTypeComposition();
     break;
   case tok::l_paren: {
-    if (parseTypeTupleBody(Result))
-      return true;
+    ty = parseTypeTupleBody();
     break;
   }
   default:
     diagnose(Tok.getLoc(), MessageID);
-    return true;
+    return nullptr;
   }
+
+  if (!ty)
+    return nullptr;
 
   // '.metatype' still leaves us with type-simple.
   while ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
          peekToken().is(tok::kw_metatype)) {
     consumeToken();
     SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
-    TypeRepr *metaTyR = new (Context) MetaTypeTypeRepr(Result.getTypeRepr(),
-                                                       metatypeLoc);
-    Result = metaTyR;
+    ty = new (Context) MetaTypeTypeRepr(ty, metatypeLoc);
   }
 
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
-    TypeLoc SecondHalf;
-    if (parseType(SecondHalf,
-                  diag::expected_type_function_result))
-      return true;
-    TypeRepr *FnTyR = new (Context) FunctionTypeRepr(Result.getTypeRepr(),
-                                                     SecondHalf.getTypeRepr());
-    Result = FnTyR;
-    return false;
+    TypeRepr *SecondHalf = parseType(diag::expected_type_function_result);
+    if (!SecondHalf)
+      return nullptr;
+    return new (Context) FunctionTypeRepr(ty, SecondHalf);
   }
 
   // If there is a square bracket without a newline, we have an array.
   if (Tok.isFollowingLSquare())
-    return parseTypeArray(Result);
+    return parseTypeArray(ty);
   
-  return false;
+  return ty;
 }
 
-bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
+bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                                    SourceLoc &LAngleLoc,
                                    SourceLoc &RAngleLoc) {
   // Parse the opening '<'.
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   LAngleLoc = consumeStartingLess();
 
-  SmallVector<TypeLoc, 4> GenericArgs;
-  
   do {
-    TypeLoc Result;
-    if (parseType(Result, diag::expected_type)) {
+    TypeRepr *Ty = parseType(diag::expected_type);
+    if (!Ty) {
       // Skip until we hit the '>'.
       skipUntilAnyOperator();
       if (startsWithGreater(Tok))
@@ -139,7 +130,7 @@ bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
       return true;
     }
 
-    GenericArgs.push_back(Result);
+    Args.push_back(Ty);
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));
 
@@ -156,7 +147,6 @@ bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
     RAngleLoc = consumeStartingGreater();
   }
 
-  Args = Context.AllocateCopy(GenericArgs);
   return false;
 }
 
@@ -165,10 +155,10 @@ bool Parser::parseGenericArguments(MutableArrayRef<TypeLoc> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-bool Parser::parseTypeIdentifier(TypeLoc &Result) {
+IdentTypeRepr *Parser::parseTypeIdentifier() {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_This)) {
     diagnose(Tok.getLoc(), diag::expected_identifier_for_type);
-    return true;
+    return nullptr;
   }
 
   SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
@@ -177,21 +167,17 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
     SourceLoc Loc;
     Identifier Name;
     if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-      return true;
+      return nullptr;
     SourceLoc LAngle, RAngle;
-    // FIXME: Wasted allocation.
-    MutableArrayRef<TypeLoc> GenericArgs;
+    SmallVector<TypeRepr*, 8> GenericArgs;
     if (startsWithLess(Tok)) {
       if (parseGenericArguments(GenericArgs, LAngle, RAngle))
-        return true;
+        return nullptr;
     }
     EndLoc = Loc;
       
-    SmallVector<TypeRepr *, 4> GenericArgsTyR;
-    for (auto &TyLoc : GenericArgs)
-      GenericArgsTyR.push_back(TyLoc.getTypeRepr());
     ComponentsR.push_back(IdentTypeRepr::Component(Loc, Name,
-                                           Context.AllocateCopy(GenericArgsTyR),
+                                              Context.AllocateCopy(GenericArgs),
                                                    CurDeclContext));
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -209,9 +195,7 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
   if (auto Entry = ScopeInfo.lookupValueName(ComponentsR[0].getIdentifier()))
     ComponentsR[0].setValue(Entry);
 
-  auto TyR = IdentTypeRepr::create(Context, ComponentsR);
-  Result = TyR;
-  return false;
+  return IdentTypeRepr::create(Context, ComponentsR);
 }
 
 /// parseTypeComposition
@@ -222,34 +206,32 @@ bool Parser::parseTypeIdentifier(TypeLoc &Result) {
 ///   type-composition-list:
 ///     type-identifier (',' type-identifier)*
 ///
-bool Parser::parseTypeComposition(TypeLoc &Result) {
+ProtocolCompositionTypeRepr *Parser::parseTypeComposition() {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
  
   // Check for the starting '<'.
   if (!startsWithLess(Tok)) {
     diagnose(Tok.getLoc(), diag::expected_langle_protocol);
-    return true;
+    return nullptr;
   }
   SourceLoc LAngleLoc = consumeStartingLess();
   
   // Check for empty protocol composition.
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
-    auto ResultTyR = new (Context) ProtocolCompositionTypeRepr(
+    return new (Context) ProtocolCompositionTypeRepr(
                                              MutableArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
                                              SourceRange(LAngleLoc, RAngleLoc));
-    Result = ResultTyR;
-    return false;
   }
   
   // Parse the type-composition-list.
   bool Invalid = false;
-  SmallVector<TypeLoc, 4> Protocols;
+  SmallVector<IdentTypeRepr*, 4> Protocols;
   do {
     // Parse the type-identifier.
-    TypeLoc Protocol;
-    if (parseTypeIdentifier(Protocol)) {
+    IdentTypeRepr *Protocol = parseTypeIdentifier();
+    if (!Protocol) {
       Invalid = true;
       break;
     }
@@ -273,14 +255,8 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
     EndLoc = consumeStartingGreater();
   }
 
-  SmallVector<IdentTypeRepr *, 4> ProtocolTypesR;
-  for (TypeLoc T : Protocols) {
-    ProtocolTypesR.push_back(cast<IdentTypeRepr>(T.getTypeRepr()));
-  }
-  Result =  ProtocolCompositionTypeRepr::create(Context, ProtocolTypesR,
-                                                ProtocolLoc,
-                                                SourceRange(LAngleLoc, EndLoc));
-  return false;
+  return ProtocolCompositionTypeRepr::create(Context, Protocols, ProtocolLoc,
+                                             SourceRange(LAngleLoc, EndLoc));
 }
 
 /// parseTypeTupleBody
@@ -291,7 +267,7 @@ bool Parser::parseTypeComposition(TypeLoc &Result) {
 ///   type-tuple-element:
 ///     identifier ':' type-annotation
 ///     type-annotation
-bool Parser::parseTypeTupleBody(TypeLoc &Result) {
+TupleTypeRepr *Parser::parseTypeTupleBody() {
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   SmallVector<TypeRepr *, 8> ElementsR;
@@ -314,18 +290,17 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
       consumeToken(tok::colon);
 
       // Parse the type annotation.
-      TypeLoc type;
-      if (parseTypeAnnotation(type, diag::expected_type))
+      TypeRepr *type = parseTypeAnnotation(diag::expected_type);
+      if (!type)
         return true;
 
-      ElementsR.push_back(new (Context) NamedTypeRepr(name, type.getTypeRepr(),
-                                                      nameLoc));
+      ElementsR.push_back(new (Context) NamedTypeRepr(name, type, nameLoc));
     } else {
       // Otherwise, this has to be a type.
-      TypeLoc type;
-      if (parseTypeAnnotation(type))
+      TypeRepr *type = parseTypeAnnotation();
+      if (!type)
         return true;
-      ElementsR.push_back(type.getTypeRepr());
+      ElementsR.push_back(type);
     }
 
     // Parse '= expr' here so we can complain about it directly, rather
@@ -352,13 +327,12 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
 
   if (HadEllipsis && ElementsR.empty()) {
     diagnose(EllipsisLoc, diag::empty_tuple_ellipsis);
-    return true;
+    return nullptr;
   }
 
-  Result = TupleTypeRepr::create(Context, ElementsR,
-                                 SourceRange(LPLoc, Tok.getLoc()),
-                                 HadEllipsis ? EllipsisLoc : SourceLoc());
-  return Invalid;
+  return TupleTypeRepr::create(Context, ElementsR,
+                               SourceRange(LPLoc, Tok.getLoc()),
+                               HadEllipsis ? EllipsisLoc : SourceLoc());
 }
 
 
@@ -371,7 +345,7 @@ bool Parser::parseTypeTupleBody(TypeLoc &Result) {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-bool Parser::parseTypeArray(TypeLoc &result) {
+ArrayTypeRepr *Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
   SourceLoc lsquareLoc = consumeToken();
 
@@ -380,33 +354,31 @@ bool Parser::parseTypeArray(TypeLoc &result) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
 
     // If we're starting another square-bracket clause, recur.
-    if (Tok.isFollowingLSquare() && parseTypeArray(result))
-      return true;
+    if (Tok.isFollowingLSquare() && !(Base = parseTypeArray(Base)))
+      return nullptr;
 
     // Just build a normal array slice type.
-    result = new (Context) ArrayTypeRepr(result.getTypeRepr(),
-                                         nullptr,
-                                         SourceRange(lsquareLoc, rsquareLoc));
-    return false;
+    return new (Context) ArrayTypeRepr(Base, nullptr,
+                                       SourceRange(lsquareLoc, rsquareLoc));
   }
 
   NullablePtr<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
-  if (sizeEx.isNull()) return true;
+  if (sizeEx.isNull()) return nullptr;
 
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type, lsquareLoc))
-    return true;
+    return nullptr;
 
   // If we're starting another square-bracket clause, recur.
-  if (Tok.isFollowingLSquare() && parseTypeArray(result))
-    return true;
+  if (Tok.isFollowingLSquare() && !(Base = parseTypeArray(Base)))
+    return nullptr;
   
   // FIXME: We don't supported fixed-length arrays yet.
   diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
     .highlight(sizeEx.get()->getSourceRange());
   
-  return true;
+  return nullptr;
 }
 
 //===--------------------------------------------------------------------===//

@@ -109,8 +109,8 @@ static bool parseSelectorArgument(Parser &P,
   }
   
   if (P.consumeIf(tok::colon)) {
-    TypeLoc type;
-    if (P.parseTypeAnnotation(type)) {
+    TypeRepr *type = P.parseTypeAnnotation();
+    if (!type) {
       P.skipUntil(tok::r_paren);
       return true;
     }
@@ -251,16 +251,18 @@ bool Parser::parseFunctionArguments(SmallVectorImpl<Pattern*> &argPatterns,
 /// Note that this leaves retType as null if unspecified.
 bool Parser::parseFunctionSignature(SmallVectorImpl<Pattern*> &argPatterns,
                                     SmallVectorImpl<Pattern*> &bodyPatterns,
-                                    TypeLoc &retType) {
+                                    TypeRepr *&retType) {
   if (parseFunctionArguments(argPatterns, bodyPatterns))
     return true;
 
   // If there's a trailing arrow, parse the rest as the result type.
   if (consumeIf(tok::arrow)) {
-    if (parseType(retType))
+    if (!(retType = parseType()))
       return true;
+  } else {
+    // Otherwise, we leave retType null.
+    retType = nullptr;
   }
-  // Otherwise, we leave retType null.
 
   return false;
 }
@@ -275,8 +277,8 @@ NullablePtr<Pattern> Parser::parsePattern() {
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
-    TypeLoc type;
-    if (parseTypeAnnotation(type))
+    TypeRepr *type = parseTypeAnnotation();
+    if (!type)
       return nullptr;
 
     pattern = new (Context) TypedPattern(pattern.get(), type);
@@ -481,8 +483,8 @@ NullablePtr<Pattern> Parser::parseMatchingPatternVar() {
 
 NullablePtr<Pattern> Parser::parseMatchingPatternIsa() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
-  TypeLoc castType;
-  if (parseType(castType))
+  TypeRepr *castType = parseType();
+  if (!castType)
     return nullptr;
   return new (Context) IsaPattern(isLoc, castType);
 }

@@ -280,8 +280,8 @@ NullablePtr<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
 NullablePtr<Expr> Parser::parseExprIs() {
   SourceLoc isLoc = consumeToken(tok::kw_is);
   
-  TypeLoc type;
-  if (parseType(type, diag::expected_type_after_is))
+  TypeRepr *type = parseType(diag::expected_type_after_is);
+  if (!type)
     return nullptr;
   
   return new (Context) IsaExpr(isLoc, type);
@@ -299,8 +299,8 @@ NullablePtr<Expr> Parser::parseExprAs() {
     bangLoc = consumeToken();
   }
   
-  TypeLoc type;
-  if (parseType(type, diag::expected_type_after_as))
+  TypeRepr *type = parseType(diag::expected_type_after_as);
+  if (!type)
     return nullptr;
   
   return bangLoc.isValid()
@@ -508,8 +508,8 @@ NullablePtr<Expr> Parser::parseExprNew() {
   consumeToken(tok::kw_new);
 
   // FIXME: this should probably be type-simple.
-  TypeLoc elementTy;
-  if (parseTypeIdentifier(elementTy))
+  TypeRepr *elementTy = parseTypeIdentifier();
+  if (!elementTy)
     return nullptr;
 
   bool hadInvalid = false;
@@ -838,15 +838,18 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       if (Tok.is(tok::identifier)) {
         consumeToken(tok::identifier);
         if (canParseAsGenericArgumentList()) {
-          MutableArrayRef<TypeLoc> args;
+          SmallVector<TypeRepr*, 8> args;
           SourceLoc LAngleLoc, RAngleLoc;
           if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
             diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
           }
-          
+
+          SmallVector<TypeLoc, 8> locArgs;
+          for (auto ty : args)
+            locArgs.push_back(ty);
           Result = new (Context) UnresolvedSpecializeExpr(Result.get(),
                                                           LAngleLoc,
-                                                          args,
+                                                  Context.AllocateCopy(locArgs),
                                                           RAngleLoc);
         }
       } else
@@ -970,12 +973,12 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
 
 bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
                                             SourceLoc &arrowLoc,
-                                            TypeLoc &explicitResultType,
+                                            TypeRepr *&explicitResultType,
                                             SourceLoc &inLoc) {
   // Clear out result parameters.
   params = nullptr;
   arrowLoc = SourceLoc();
-  explicitResultType = TypeLoc();
+  explicitResultType = nullptr;
   inLoc = SourceLoc();
 
   // Check whether we have a closure signature here.
@@ -1078,7 +1081,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     arrowLoc = consumeToken();
 
     // Parse the type.
-    if (parseType(explicitResultType, diag::expected_closure_result_type)) {
+    if (!(explicitResultType = parseType(diag::expected_closure_result_type))) {
       // If we couldn't parse the result type, clear out the arrow location.
       arrowLoc = SourceLoc();
       invalid = true;
@@ -1129,7 +1132,7 @@ Expr *Parser::parseExprClosure() {
   // Parse the closure-signature, if present.
   Pattern *params = nullptr;
   SourceLoc arrowLoc;
-  TypeLoc explicitResultType;
+  TypeRepr *explicitResultType;
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
@@ -1251,7 +1254,7 @@ Expr *Parser::parseExprAnonClosureArg() {
 }
 
 Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
-  MutableArrayRef<TypeLoc> args;
+  SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
   if (canParseAsGenericArgumentList()) {
@@ -1275,7 +1278,12 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   }
   
   if (hasGenericArgumentList) {
-    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc, args, RAngleLoc);
+    SmallVector<TypeLoc, 8> locArgs;
+    for (auto ty : args)
+      locArgs.push_back(ty);
+    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
+                                               Context.AllocateCopy(locArgs),
+                                               RAngleLoc);
   }
   return E;
 }
