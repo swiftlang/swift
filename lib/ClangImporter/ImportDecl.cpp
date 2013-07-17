@@ -49,12 +49,20 @@ static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
 
 /// \brief Map a well-known C type to a swift type from the standard library.
 ///
+/// \param IsError set to true when we know the corresponding swift type name,
+/// but we could not find it.  (For example, the type was not defined in the
+/// standard library or the required standard library module was not imported.)
+/// This should be a hard error, we don't want to map the type only sometimes.
+///
 /// \returns A pair of a swift type and its name that corresponds to a given
 /// C type.
 static std::pair<Type, StringRef>
 getSwiftStdlibType(const clang::TypedefNameDecl *D,
                    Identifier Name,
-                   ClangImporter::Implementation &Impl) {
+                   ClangImporter::Implementation &Impl,
+                   bool *IsError) {
+  *IsError = false;
+
   MappedCTypeKind CTypeKind;
   unsigned Bitwidth;
   StringRef SwiftModuleName;
@@ -161,13 +169,24 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
   }
 
-  Type SwiftType;
+  Module *M;
   if (IsSwiftModule)
-    SwiftType = Impl.getNamedSwiftType(Impl.getSwiftModule(), SwiftTypeName);
+    M = Impl.getSwiftModule();
   else
-    SwiftType = Impl.getNamedSwiftType(Impl.getNamedModule(SwiftModuleName),
-                                       SwiftTypeName);
-  assert(SwiftType || CanBeMissing);
+    M = Impl.getNamedModule(SwiftModuleName);
+  if (!M) {
+    // User did not import the library module that contains the type we want to
+    // substitute.
+    *IsError = true;
+    return std::make_pair(Type(), "");
+  }
+
+  Type SwiftType = Impl.getNamedSwiftType(M, SwiftTypeName);
+  if (!SwiftType && !CanBeMissing) {
+    // The required type is not defined in the standard library.
+    *IsError = true;
+    return std::make_pair(Type(), "");
+  }
   return std::make_pair(SwiftType, SwiftTypeName);
 }
 
@@ -225,9 +244,13 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
+        bool IsError;
         StringRef StdlibTypeName;
         std::tie(SwiftType, StdlibTypeName) =
-            getSwiftStdlibType(Decl, Name, Impl);
+            getSwiftStdlibType(Decl, Name, Impl, &IsError);
+
+        if (IsError)
+          return nullptr;
 
         if (SwiftType) {
           // Note that this typedef-name is special.
