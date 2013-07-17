@@ -436,3 +436,19 @@ bb0:
   %22 = tuple ()
   %23 = return %22 : $()
 }
+
+sil @_T5index5gep64FT1pBp1iBi64__Bp : $[thin] (p : Builtin.RawPointer, i : Builtin.Int64) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
+  %2 = alloc_box $Builtin.RawPointer              // CHECK: alloc_box
+  %3 = alloc_box $Builtin.Int64                   // CHECK: alloc_box
+  %4 = store %0 to %2#1 : $*Builtin.RawPointer
+  %5 = store %1 to %3#1 : $*Builtin.Int64
+  // %6 = module @Builtin
+  %7 = load %2#1 : $*Builtin.RawPointer           // CHECK: load
+  %8 = load %3#1 : $*Builtin.Int64                // CHECK: load
+  // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Int64
+  %9 = index_raw_pointer %7 : $Builtin.RawPointer, %8 : $Builtin.Int64
+  %10 = release %3#0 : $Builtin.ObjectPointer
+  %11 = release %2#0 : $Builtin.ObjectPointer
+  %12 = return %9 : $Builtin.RawPointer
+}

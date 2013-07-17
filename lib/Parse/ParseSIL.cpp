@@ -762,6 +762,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
+    .Case("index_addr", ValueKind::IndexAddrInst)
+    .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
     .Case("integer_literal", ValueKind::IntegerLiteralInst)
     .Case("is_nonnull", ValueKind::IsNonnullInst)
@@ -1464,6 +1466,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     auto BoolTy = SILType::getPrimitiveType(
                     lookupBoolType(Loc)->getCanonicalType());
     ResultVal = B.createIsNonnull(SILLocation(), Val, BoolTy);
+    break;
+  }
+  case ValueKind::IndexAddrInst: {
+    SILValue IndexVal;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(IndexVal))
+      return true;
+    ResultVal = B.createIndexAddr(SILLocation(), Val, IndexVal);
+    break;
+  }
+  case ValueKind::IndexRawPointerInst: {
+    SILValue IndexVal;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(IndexVal))
+      return true;
+    ResultVal = B.createIndexRawPointer(SILLocation(), Val, IndexVal);
     break;
   }
   }
