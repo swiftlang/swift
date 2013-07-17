@@ -143,9 +143,7 @@ public:
   /// isEqual - Return true if these two types are equal, ignoring sugar.
   bool isEqual(Type Other);
   
-  /// isSpelledLike - Return true if these two types share a sugared spelling,
-  /// for instance, two IdentifierTypes with the same spelling that map to the
-  /// same named type.
+  /// isSpelledLike - Return true if these two types share a sugared spelling.
   bool isSpelledLike(Type Other);
   
   /// getDesugaredType - If this type is a sugared type, remove all levels of
