@@ -1035,14 +1035,6 @@ namespace {
         return checkBoundGenericTypes(
                        cast<ReferenceStorageType>(typePtr)->getReferentType());
 
-      case TypeKind::Identifier: {
-        auto Id = cast<IdentifierType>(typePtr);
-        if (!Id->isMapped())
-          return;
-
-        return checkBoundGenericTypes(Id->getMappedType());
-      }
-
       case TypeKind::Paren:
         return checkBoundGenericTypes(
                                 cast<ParenType>(typePtr)->getUnderlyingType());

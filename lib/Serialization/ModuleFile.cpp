@@ -1495,15 +1495,6 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::IDENTIFIER_TYPE: {
-    TypeID mappedID;
-    decls_block::IdentifierTypeLayout::readRecord(scratch, mappedID);
-    // FIXME: Actually recreate the IdentifierType instead of just aliasing the
-    // underlying mapped type.
-    typeOrOffset = getType(mappedID);
-    break;
-  }
-
   case decls_block::FUNCTION_TYPE: {
     TypeID inputID;
     TypeID resultID;

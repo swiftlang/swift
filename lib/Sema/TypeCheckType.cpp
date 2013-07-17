@@ -757,9 +757,6 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     return validateTypeSimple(
                         cast<NameAliasType>(T)->getDecl()->getUnderlyingType());
 
-  case TypeKind::Identifier:
-    llvm_unreachable("identifier in validateTypeSimple");
-
   case TypeKind::Paren:
     return validateTypeSimple(cast<ParenType>(T)->getUnderlyingType());
 
@@ -975,21 +972,6 @@ Type TypeChecker::transformType(Type type,
       return type;
 
     return SubstitutedType::get(type, UnderlyingTy, Context);
-  }
-
-  case TypeKind::Identifier: {
-    auto Id = cast<IdentifierType>(base);
-    if (!Id->isMapped())
-      return type;
-
-    auto MappedTy = transformType(Id->getMappedType(), fn);
-    if (!MappedTy)
-      return Type();
-
-    if (MappedTy.getPointer() == Id->getMappedType().getPointer())
-      return type;
-
-    return SubstitutedType::get(type, MappedTy, Context);
   }
 
   case TypeKind::Paren: {

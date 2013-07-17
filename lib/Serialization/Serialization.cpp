@@ -416,7 +416,6 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, PAREN_TYPE);
   RECORD(decls_block, TUPLE_TYPE);
   RECORD(decls_block, TUPLE_TYPE_ELT);
-  RECORD(decls_block, IDENTIFIER_TYPE);
   RECORD(decls_block, FUNCTION_TYPE);
   RECORD(decls_block, METATYPE_TYPE);
   RECORD(decls_block, LVALUE_TYPE);
@@ -1281,15 +1280,6 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
-  case TypeKind::Identifier: {
-    auto identTy = cast<IdentifierType>(ty.getPointer());
-
-    unsigned abbrCode = DeclTypeAbbrCodes[IdentifierTypeLayout::Code];
-    IdentifierTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(identTy->getMappedType()));
-    return true;
-  }
-
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
 
@@ -1534,7 +1524,6 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ParenTypeLayout>();
     registerDeclTypeAbbr<TupleTypeLayout>();
     registerDeclTypeAbbr<TupleTypeEltLayout>();
-    registerDeclTypeAbbr<IdentifierTypeLayout>();
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetaTypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();

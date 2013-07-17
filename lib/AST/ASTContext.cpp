@@ -629,12 +629,6 @@ void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
   ID.AddPointer(Parent.getPointer());
 }
 
-IdentifierType *IdentifierType::getNew(ASTContext &C,
-                                       MutableArrayRef<Component> Components) {
-  Components = C.AllocateCopy(Components);
-  return new (C, AllocationArena::Permanent) IdentifierType(Components);
-}
-
 ProtocolCompositionType *
 ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   // Check to see if we've already seen this protocol composition before.

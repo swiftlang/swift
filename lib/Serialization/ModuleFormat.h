@@ -223,7 +223,6 @@ namespace decls_block {
     PAREN_TYPE,
     TUPLE_TYPE,
     TUPLE_TYPE_ELT,
-    IDENTIFIER_TYPE,
     FUNCTION_TYPE,
     METATYPE_TYPE,
     LVALUE_TYPE,
@@ -302,12 +301,6 @@ namespace decls_block {
     IdentifierIDField, // name
     TypeIDField,       // type
     BCFixed<1>         // vararg?
-  >;
-
-  using IdentifierTypeLayout = BCRecordLayout<
-    IDENTIFIER_TYPE,
-    TypeIDField  // underlying mapped type
-    // FIXME: Include the identifier chain for diagnostic purposes.
   >;
 
   using FunctionTypeLayout = BCRecordLayout<

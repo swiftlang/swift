@@ -37,7 +37,6 @@ namespace swift {
   class Decl;
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
-  class IdentifierType;
   class InfixOperatorDecl;
   class LookupCache;
   class ModuleLoader;
@@ -211,7 +210,6 @@ public:
 class TranslationUnit : public Module {
 public:
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
-  typedef std::pair<IdentifierType*, DeclContext*> IdentTypeAndContext;
 private:
 
   /// ImportedModules - This is the list of modules that are imported by this

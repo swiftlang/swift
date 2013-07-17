@@ -329,7 +329,6 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::NameAlias:
-  case TypeKind::Identifier:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::Archetype:
@@ -504,17 +503,6 @@ static Type getStrippedType(const ASTContext &context, Type type,
     }
     
     return type;
-      
-  case TypeKind::Identifier: {
-    IdentifierType *IdentTy = cast<IdentifierType>(type.getPointer());
-    if (IdentTy->isMapped()) {
-      Type MappedTy = getStrippedType(context, IdentTy->getMappedType(),
-                                      stripLabels, stripDefaultArgs);
-      if (MappedTy.getPointer() != IdentTy->getMappedType().getPointer())
-        return MappedTy;
-    }
-    return type;
-  }
   
   case TypeKind::Paren: {
     ParenType *ParenTy = cast<ParenType>(type.getPointer());
@@ -930,8 +918,6 @@ TypeBase *TypeBase::getDesugaredType() {
     return this;
   case TypeKind::Paren:
     return cast<ParenType>(this)->getDesugaredType();
-  case TypeKind::Identifier:
-    return cast<IdentifierType>(this)->getDesugaredType();
   case TypeKind::NameAlias:
     return cast<NameAliasType>(this)->getDesugaredType();
   case TypeKind::ArraySlice:
@@ -949,10 +935,6 @@ TypeBase *ParenType::getDesugaredType() {
 
 TypeBase *NameAliasType::getDesugaredType() {
   return getDecl()->getUnderlyingType()->getDesugaredType();
-}
-
-TypeBase *IdentifierType::getDesugaredType() {
-  return getMappedType()->getDesugaredType();
 }
 
 TypeBase *ArraySliceType::getDesugaredType() {
@@ -980,12 +962,6 @@ bool TypeBase::isSpelledLike(Type other) {
   TypeBase *me = this;
   TypeBase *them = other.getPointer();
   
-  // Skim any IdentifierTypes off the top.
-  while (IdentifierType *i = dyn_cast<IdentifierType>(me))
-    me = i->getMappedType().getPointer();
-  while (IdentifierType *i = dyn_cast<IdentifierType>(them))
-    them = i->getMappedType().getPointer();
-  
   if (me == them)
     return true;
   
@@ -997,9 +973,6 @@ bool TypeBase::isSpelledLike(Type other) {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::Identifier:
-    llvm_unreachable("should have dealt with this type already!");
-
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
@@ -1480,37 +1453,6 @@ static void printGenericArgs(raw_ostream &OS, ArrayRef<Type> Args) {
     Arg->print(OS);
   }
   OS << '>';
-}
-
-static void printGenericArgs(raw_ostream &OS, ArrayRef<TypeLoc> Args) {
-  if (Args.empty())
-    return;
-
-  OS << '<';
-  bool First = true;
-  for (TypeLoc Arg : Args) {
-    if (First)
-      First = false;
-    else
-      OS << ", ";
-    Arg.getType()->print(OS);
-  }
-  OS << '>';
-}
-
-void IdentifierType::print(raw_ostream &OS) const {
-  printComponents(OS, Components);
-}
-
-void IdentifierType::printComponents(raw_ostream &OS,
-                               ArrayRef<IdentifierType::Component> Components) {
-  OS << Components[0].Id.get();
-  printGenericArgs(OS, Components[0].GenericArgs);
-  
-  for (const Component &C : Components.slice(1, Components.size()-1)) {
-    OS << '.' << C.Id.get();
-    printGenericArgs(OS, C.GenericArgs);
-  }
 }
 
 void MetaTypeType::print(raw_ostream &OS) const {
