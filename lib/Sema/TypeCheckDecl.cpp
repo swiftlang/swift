@@ -977,10 +977,10 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) VarDecl(SourceLoc(),
                                         var->getName(),
-                                        var->getType(), structDecl);
+                                        var->getTypeOfRValue(), structDecl);
       allArgs.push_back(arg);
       Pattern *pattern = new (context) NamedPattern(arg);
-      TypeLoc tyLoc = TypeLoc::withoutLoc(var->getType());
+      TypeLoc tyLoc = TypeLoc::withoutLoc(var->getTypeOfRValue());
       pattern = new (context) TypedPattern(pattern, tyLoc);
       patternElts.push_back(TuplePatternElt(pattern));
     }
@@ -1161,8 +1161,10 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   case TypeKind::Module:
       return false;
 
-  case TypeKind::ReferenceStorage:
-    llvm_unreachable("reference storage type in typechecker");
+  case TypeKind::ReferenceStorage: {
+    auto referent = cast<ReferenceStorageType>(canTy)->getReferentType();
+    return isDefaultInitializable(referent, initializer);
+  }
 
   // Sugar types.
 #define TYPE(Id, Parent)

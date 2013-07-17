@@ -455,7 +455,7 @@ namespace {
         abort();
       }
       
-      checkSameType(E->getDecl()->getType(), ResultLV->getObjectType(),
+      checkSameType(E->getDecl()->getTypeOfRValue(), ResultLV->getObjectType(),
                     "member reference result type and referenced member");
       
       Type ContainerTy

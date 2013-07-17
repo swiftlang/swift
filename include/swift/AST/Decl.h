@@ -889,6 +889,10 @@ public:
     Ty = T;
   }
 
+  /// getTypeOfRValue - Returns the type would arise from an r-value
+  /// reference to this declaration.
+  Type getTypeOfRValue() const;
+
   /// getTypeOfReference - Returns the type that would arise from a
   /// normal reference to this declaration.  For isReferencedAsLValue()'d decls,
   /// this returns a reference to the value's type.  For non-lvalue decls, this

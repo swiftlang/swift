@@ -293,6 +293,32 @@ bool ValueDecl::isSettableOnBase(Type baseType) const {
           baseType->getRValueType()->hasReferenceSemantics());
 }
 
+static Type getRValueType(Type type) {
+  CanType canType = type->getCanonicalType();
+
+  // Strip l-valueness.
+  if (isa<LValueType>(canType)) {
+    return type->castTo<LValueType>()->getObjectType();
+
+  // Ignore ownership qualification.
+  } else if (isa<ReferenceStorageType>(canType)) {
+    return type->castTo<ReferenceStorageType>()->getReferentType();
+
+  // No other transforms necessary.
+  } else {
+    return type;
+  }
+}
+
+/// getTypeOfRValue - Return the type of an r-value reference to this value.
+Type ValueDecl::getTypeOfRValue() const {
+  Type type = getType();
+  if (isReferencedAsLValue()) {
+    type = getRValueType(type);
+  }
+  return type;
+}
+
 /// getTypeOfReference - Return the full type judgement for a non-member
 /// reference to this value.
 Type ValueDecl::getTypeOfReference(Type baseType) const {
@@ -304,25 +330,7 @@ Type ValueDecl::getTypeOfReference(Type baseType) const {
     if (!isSettableOnBase(baseType))
       quals |= LValueType::Qual::NonSettable;
 
-    Type type = Ty;
-
-    // We expect the type checks below to fail, and checking is faster
-    // on a canonical type.
-    CanType storageType = type->getCanonicalType();
-
-    // Strip and re-add l-valueness, changing any qualification to the default.
-    if (isa<LValueType>(storageType)) {
-      type = type->castTo<LValueType>()->getObjectType();
-
-    // Ignore ownership qualification when reporting the formal type
-    // of the reference.  Note that we can't get l-values of
-    // non-standard reference type in the AST at the present, so this
-    // is exclusive of the above.
-    } else if (isa<ReferenceStorageType>(storageType)) {
-      type = type->castTo<ReferenceStorageType>()->getReferentType();
-    }
-
-    return LValueType::get(type, quals, getASTContext());
+    return LValueType::get(getRValueType(getType()), quals, getASTContext());
   }
 
   return Ty;
