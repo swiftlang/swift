@@ -479,7 +479,8 @@ CondBranchInst::CondBranchInst(SILLocation Loc, SILValue Condition,
 }
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
-                                       SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
+                                       SILBasicBlock *TrueBB,
+                                       SILBasicBlock *FalseBB,
                                        SILFunction &F) {
   return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
 }
@@ -509,4 +510,49 @@ OperandValueArrayRef CondBranchInst::getTrueArgs() const {
 OperandValueArrayRef CondBranchInst::getFalseArgs() const {
   return Operands.asValueArray().slice(1 + getTrueBB()->bbarg_size(),
                                        getFalseBB()->bbarg_size());
+}
+
+SwitchOneofInst::SwitchOneofInst(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs)
+  : TermInst(ValueKind::SwitchOneofInst, Loc),
+    Operands(this, Operand),
+    NumCases(CaseBBs.size()),
+    HasDefault(bool(DefaultBB))
+{
+  // Initialize the case and successor arrays.
+  auto *cases = getCaseBuf();
+  auto *succs = getSuccessorBuf();
+  for (unsigned i = 0, size = CaseBBs.size(); i < size; ++i) {
+    cases[i] = CaseBBs[i].first;
+    ::new (succs + i) SILSuccessor(this, CaseBBs[i].second);
+  }
+  
+  if (HasDefault)
+    ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+}
+
+SwitchOneofInst::~SwitchOneofInst() {
+  // Destroy the successor records to keep the CFG up to date.
+  auto *succs = getSuccessorBuf();
+  for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
+    succs[i].~SILSuccessor();
+  }
+}
+
+SwitchOneofInst *SwitchOneofInst::create(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs,
+                SILFunction &F) {
+  // Allocate enough room for the instruction with tail-allocated
+  // OneOfElementDecl and SILSuccessor arrays. There are CaseBBs.size() decls
+  // CaseBBs.size() + (DefaultBB ? 1 : 0) successors.
+  unsigned numCases = CaseBBs.size();
+  unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
+  
+  void *buf = F.getModule().allocate(sizeof(SwitchOneofInst)
+                                       + sizeof(OneOfElementDecl*) * numCases
+                                       + sizeof(SILSuccessor) * numSuccessors,
+                                     alignof(SwitchOneofInst));
+  return ::new (buf) SwitchOneofInst(Loc, Operand, DefaultBB, CaseBBs);
 }

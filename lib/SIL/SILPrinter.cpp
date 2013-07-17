@@ -684,6 +684,19 @@ public:
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
     OS << "autorelease_return " << getIDAndType(RI->getOperand());
   }
+  
+  void visitSwitchOneofInst(SwitchOneofInst *SOI) {
+    OS << "switch_oneof " << getIDAndType(SOI->getOperand());
+    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+      OneOfElementDecl *elt;
+      SILBasicBlock *dest;
+      std::tie(elt, dest) = SOI->getCase(i);
+      OS << ", case " << SILConstant(elt, SILConstant::Kind::OneOfElement)
+         << ": " << getID(dest);
+    }
+    if (SOI->hasDefault())
+      OS << ", default " << getID(SOI->getDefaultBB());
+  }
 
   void printBranchArgs(OperandValueArrayRef args) {
     if (args.empty()) return;

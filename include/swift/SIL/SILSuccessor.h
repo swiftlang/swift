@@ -29,15 +29,15 @@ class SILSuccessor {
   friend class SILSuccessorIterator;
   /// ContainingInst - This is the Terminator instruction that contains this
   /// successor.
-  TermInst *ContainingInst;
+  TermInst *ContainingInst = nullptr;
   
   /// SuccessorBlock - If non-null, this is the BasicBlock that the terminator
   /// branches to.
-  SILBasicBlock *SuccessorBlock;
+  SILBasicBlock *SuccessorBlock = nullptr;
   
   /// This is the prev and next terminator reference to SuccessorBlock, or
   /// null if SuccessorBlock is null.
-  SILSuccessor **Prev, *Next;
+  SILSuccessor **Prev = nullptr, *Next = nullptr;
 public:
   SILSuccessor() {}
 
@@ -57,6 +57,7 @@ public:
   void operator=(SILBasicBlock *BB);
   
   operator SILBasicBlock*() const { return SuccessorBlock; }
+  SILBasicBlock *getBB() const { return SuccessorBlock; }
   
   // Do not copy or move these.
   SILSuccessor(const SILSuccessor &) = delete;

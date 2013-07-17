@@ -21,6 +21,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Basic/Range.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/DenseSet.h"
 
 using namespace swift;
 
@@ -1053,7 +1054,7 @@ public:
     DEBUG(RI->print(llvm::dbgs()));
     
     SILFunctionTypeInfo *ti =
-    F.getLoweredType().getFunctionTypeInfo(F.getModule());
+      F.getLoweredType().getFunctionTypeInfo(F.getModule());
     SILType functionResultType = ti->getResultType();
     SILType instResultType = RI->getOperand().getType();
     DEBUG(llvm::dbgs() << "function return type: ";
@@ -1066,6 +1067,72 @@ public:
             "autoreleased return value cannot be an address");
     require(instResultType.hasReferenceSemantics(),
             "autoreleased return value must be a reference type");
+  }
+  
+  void checkSwitchOneofInst(SwitchOneofInst *SOI) {
+    // Find the set of oneof elements for the type so we can verify
+    // exhaustiveness.
+    // FIXME: We also need to consider if the oneof is resilient, in which case
+    // we're never guaranteed to be exhaustive.
+    llvm::DenseSet<OneOfElementDecl*> unswitchedElts;
+    
+    OneOfDecl *oofDecl
+      = SOI->getOperand().getType().getSwiftRValueType()
+        ->getOneOfOrBoundGenericOneOf();
+    
+    require(oofDecl, "switch_oneof operand is not a oneof");
+    
+    for (auto *member : oofDecl->getMembers()) {
+      auto *elt = dyn_cast<OneOfElementDecl>(member);
+      if (!elt)
+        continue;
+      unswitchedElts.insert(elt);
+    }
+    
+    // Verify the set of oneofs we dispatch on.
+    for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
+      OneOfElementDecl *elt;
+      SILBasicBlock *dest;
+      std::tie(elt, dest) = SOI->getCase(i);
+      
+      require(elt->getDeclContext() != oofDecl,
+              "switch_oneof dispatches on oneof element that is not part of "
+              "its type");
+      require(unswitchedElts.count(elt),
+              "switch_oneof dispatches on same oneof element more than once");
+      unswitchedElts.erase(elt);
+      
+      // The destination BB can take the argument payload, if any, as a BB
+      // arguments, or it can ignore it and take no arguments.
+      if (elt->hasArgumentType()) {
+        require(dest->getBBArgs().size() == 0
+                  || dest->getBBArgs().size() == 1,
+                "switch_oneof destination for case w/ args must take 0 or 1 "
+                "arguments");
+
+        if (dest->getBBArgs().size() == 1) {
+          Type eltArgTy = elt->getArgumentType();
+          CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
+          require(eltArgTy->isEqual(bbArgTy),
+                  "switch_oneof destination bbarg must match case arg type");
+          require(SOI->getOperand().getType().isAddress()
+                    == dest->getBBArgs()[0]->getType().isAddress(),
+                  "switch_oneof destination bbarg type does not match case");
+        }
+        
+      } else {
+        require(dest->getBBArgs().size() == 0,
+                "switch_oneof destination for no-argument case must take no "
+                "arguments");
+      }
+    }
+    
+    // If the switch is non-exhaustive, we require a default.
+    require(unswitchedElts.empty() || SOI->hasDefault(),
+            "nonexhaustive switch_oneof must have a default destination");
+    if (SOI->hasDefault())
+      require(SOI->getDefaultBB()->bbarg_empty(),
+              "switch_oneof default destination must take no arguments");
   }
   
   void checkBranchInst(BranchInst *BI) {

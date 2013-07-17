@@ -1642,6 +1642,68 @@ public:
   }
 };
   
+/// A switch on a oneof discriminator. The data for each discriminator is passed
+/// into the corresponding destination block as block arguments.
+class SwitchOneofInst : public TermInst {
+  FixedOperandList<1> Operands;
+  unsigned NumCases : 31;
+  unsigned HasDefault : 1;
+  
+  SwitchOneofInst(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs);
+  
+  OneOfElementDecl **getCaseBuf() {
+    return reinterpret_cast<OneOfElementDecl**>(this + 1);
+    
+  }
+  OneOfElementDecl * const*getCaseBuf() const {
+    return reinterpret_cast<OneOfElementDecl* const*>(this + 1);
+    
+  }
+  
+  SILSuccessor *getSuccessorBuf() {
+    return reinterpret_cast<SILSuccessor*>(getCaseBuf() + NumCases);
+  }
+  const SILSuccessor *getSuccessorBuf() const {
+    return reinterpret_cast<const SILSuccessor*>(getCaseBuf() + NumCases);
+  }
+  
+public:
+  /// Clean up tail-allocated successor records for the switch cases.
+  ~SwitchOneofInst();
+  
+  static SwitchOneofInst *create(SILLocation Loc, SILValue Operand,
+                 SILBasicBlock *DefaultBB,
+                 ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs,
+                 SILFunction &F);
+  
+  SILValue getOperand() const { return Operands[0].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  SuccessorListTy getSuccessors() {
+    return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
+  }
+  
+  unsigned getNumCases() const { return NumCases; }
+  std::pair<OneOfElementDecl*, SILBasicBlock*>
+  getCase(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
+  }
+  
+  bool hasDefault() const { return HasDefault; }
+  SILBasicBlock *getDefaultBB() const {
+    assert(HasDefault && "doesn't have a default");
+    return getSuccessorBuf()[NumCases];
+  }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SwitchOneofInst;
+  }
+};
+  
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

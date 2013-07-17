@@ -149,7 +149,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(AutoreleaseReturnInst, TermInst)
     INST(BranchInst, TermInst)
     INST(CondBranchInst, TermInst)
-    VALUE_RANGE(TermInst, UnreachableInst, CondBranchInst)
+    INST(SwitchOneofInst, TermInst)
+    VALUE_RANGE(TermInst, UnreachableInst, SwitchOneofInst)
 
   VALUE_RANGE(SILInstruction, AllocVarInst, CondBranchInst)
 
