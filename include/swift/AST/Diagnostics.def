@@ -360,6 +360,8 @@ ERROR(expected_tuple_type_in_tuple,decl_parsing,none,
       "tuple instruction requires a tuple type", ())
 ERROR(sil_tuple_inst_wrong_value_count,decl_parsing,none,
       "tuple instruction requires %0 values", (unsigned))
+ERROR(sil_tuple_inst_wrong_field,decl_parsing,none,
+      "tuple instruction requires a field number", ())
 ERROR(sil_struct_inst_wrong_field,decl_parsing,none,
       "struct instruction requires a field name", ())
 ERROR(sil_expected_allocation_kind,decl_parsing,none,

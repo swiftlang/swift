@@ -542,11 +542,11 @@ public:
     }
   }
   void visitTupleExtractInst(TupleExtractInst *EI) {
-    OS << "tuple_extract " << getID(EI->getOperand()) << ", "
+    OS << "tuple_extract " << getIDAndType(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
-    OS << "tuple_element_addr " << getID(EI->getOperand()) << ", "
+    OS << "tuple_element_addr " << getIDAndType(EI->getOperand()) << ", "
        << EI->getFieldNo();
   }
   void visitStructExtractInst(StructExtractInst *EI) {

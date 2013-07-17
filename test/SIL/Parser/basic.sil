@@ -328,3 +328,36 @@ bb0(%0 : $Aleph.metatype):
   %17 = release %2#0 : $Builtin.ObjectPointer
   %18 = return %14 : $Aleph
 }
+
+sil @_T5tuple5floatFT1xSf_T_ : $[thin] (x : Float32) -> ()
+sil @_T5tuple5tupleFT_TSiSf_ : $[thin] () -> (Int64, Float32)
+
+// CHECK: $[thin] (x : (Int64, Float32)) -> ()
+sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $[thin] (x : (Int64, Float32)) -> () {
+bb0(%0 : $Int64, %1 : $Float32):
+  %2 = alloc_box $(Int64, Float32)
+  // CHECK: tuple ({{%.*}} : $Int64, {{%.*}} : $Float32)
+  %3 = tuple (%0 : $Int64, %1 : $Float32)
+  %4 = store %3 to %2#1 : $*(Int64, Float32)
+  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int64, Float32), 0
+  %6 = tuple_element_addr %2#1 : $*(Int64, Float32), 0
+  // CHECK: load
+  %7 = load %6 : $*Int64
+  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int64, Float32), 1
+  %10 = tuple_element_addr %2#1 : $*(Int64, Float32), 1
+  // CHECK: load
+  %11 = load %10 : $*Float32
+  // CHECK: function_ref
+  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $[thin] () -> (Int64, Float32)
+  // CHECK: apply
+  %15 = apply %14() : $[thin] () -> (Int64, Float32)
+  // CHECK: function_ref
+  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $[thin] (x : Float32) -> ()
+  // CHECK: tuple_extract {{%.*}} : $(Int64, Float32), 1
+  %17 = tuple_extract %15 : $(Int64, Float32), 1
+  // CHECK: apply
+  %24 = apply %19(%17) : $[thin] (x : Float32) -> ()
+  %25 = tuple ()
+  %26 = release %2#0 : $Builtin.ObjectPointer
+  %27 = return %25 : $()
+}

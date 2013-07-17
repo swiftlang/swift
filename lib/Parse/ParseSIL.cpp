@@ -785,6 +785,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
+    .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
+    .Case("tuple_extract", ValueKind::TupleExtractInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
@@ -1145,6 +1147,35 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     ResultVal = B.createTuple(SILLocation(), Ty, OpList);
+    break;
+  }
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::TupleExtractInst: {
+    Identifier ElemId;
+    SourceLoc NameLoc;
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    unsigned Field = 0;
+    TupleType *TT = Val.getType().getAs<TupleType>();
+    if (P.Tok.isNot(tok::integer_literal) ||
+        P.Tok.getText().getAsInteger(10, Field) ||
+        Field >= TT->getFields().size()) {
+      P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
+      return true;
+    }
+    P.consumeToken(tok::integer_literal);
+
+    auto ResultTy = SILType::getPrimitiveType(
+                      TT->getFields()[Field].getType()->getCanonicalType(),
+                      Opcode == ValueKind::TupleElementAddrInst);
+    if (Opcode == ValueKind::TupleElementAddrInst)
+      ResultVal = B.createTupleElementAddr(SILLocation(), Val, Field,
+                                           ResultTy);
+    else
+      ResultVal = B.createTupleExtract(SILLocation(), Val, Field,
+                                       ResultTy).getDef();
     break;
   }
   case ValueKind::ReturnInst: {
