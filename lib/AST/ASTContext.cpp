@@ -372,10 +372,8 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.getType().getPointer());
     ID.AddPointer(Elt.getName().get());
-    ID.AddInteger((unsigned)Elt.getDefaultArgKind());
-    ID.AddBoolean(Elt.isVararg());
+    ID.AddPointer(Elt.TyAndDefaultOrVarArg.getOpaqueValue());
   }
 }
 
@@ -384,19 +382,11 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
     return ParenType::get(C, Fields[0].getType());
 
-  bool HasAnyDefaultValues = false;
   bool HasTypeVariable = false;
-
   for (const TupleTypeElt &Elt : Fields) {
-    if (Elt.hasInit()) {
-      HasAnyDefaultValues = true;
-      if (HasTypeVariable)
-        break;
-    }
     if (Elt.getType() && Elt.getType()->hasTypeVariable()) {
       HasTypeVariable = true;
-      if (HasAnyDefaultValues)
-        break;
+      break;
     }
   }
 
@@ -404,15 +394,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
 
 
   void *InsertPos = 0;
-  if (!HasAnyDefaultValues) {
-    // Check to see if we've already seen this tuple before.
-    llvm::FoldingSetNodeID ID;
-    TupleType::Profile(ID, Fields);
+  // Check to see if we've already seen this tuple before.
+  llvm::FoldingSetNodeID ID;
+  TupleType::Profile(ID, Fields);
 
-    if (TupleType *TT
-          = C.Impl.getArena(arena).TupleTypes.FindNodeOrInsertPos(ID,InsertPos))
-      return TT;
-  }
+  if (TupleType *TT
+        = C.Impl.getArena(arena).TupleTypes.FindNodeOrInsertPos(ID,InsertPos))
+    return TT;
 
   // Make a copy of the fields list into ASTContext owned memory.
   TupleTypeElt *FieldsCopy =
@@ -430,9 +418,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   
   TupleType *New = new (C, arena) TupleType(Fields, IsCanonical ? &C : 0,
                                             HasTypeVariable);
-  if (!HasAnyDefaultValues)
-    C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
-
+  C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
 

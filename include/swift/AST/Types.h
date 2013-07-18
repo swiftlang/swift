@@ -538,7 +538,7 @@ class TupleTypeElt {
   /// Describes whether this element is variadic or what kind of default
   /// argument it stores.
   enum class DefaultArgOrVarArg : uint8_t {
-    /// Neither variadic nor
+    /// Neither variadic nor a default argument.
     None,
     /// Variadic.
     VarArg,
@@ -555,6 +555,8 @@ class TupleTypeElt {
   /// \brief This is the type of the field, which is mandatory, along with a bit
   /// indicating whether this is a vararg.
   llvm::PointerIntPair<Type, 3, DefaultArgOrVarArg> TyAndDefaultOrVarArg;
+
+  friend class TupleType;
 
 public:
   TupleTypeElt() = default;
