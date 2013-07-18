@@ -47,9 +47,13 @@ static void diagnoseUnreachable(const SILInstruction *I,
     Type ResTy;
 
     // Should be an Expr as it's the parent of the basic block.
-    if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>())
+    if (const FuncExpr *FExpr = FLoc.getAs<FuncExpr>()) {
       ResTy = FExpr->getResultType(Context);
-    else {
+      if (AnyFunctionType *T = FExpr->getType()->castTo<AnyFunctionType>()) {
+        if (T->isNoReturn())
+          return;
+      }
+    } else {
       // FIXME: Not all closure types have the result type getter right
       // now.
       return;
