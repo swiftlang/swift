@@ -574,7 +574,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
 
     // Handle the auto_closure, cc, and objc_block attributes for function types.
     if (attrs.isAutoClosure() || attrs.hasCC() || attrs.isObjCBlock() ||
-        attrs.isThin()) {
+        attrs.isThin() || attrs.isNoReturn()) {
       FunctionType *FT = dyn_cast<FunctionType>(Ty.getPointer());
       TupleType *InputTy = 0;
       if (FT) InputTy = dyn_cast<TupleType>(FT->getInput().getPointer());
@@ -592,6 +592,9 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
         if (attrs.isThin())
           diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
                    "thin");
+        if (attrs.isNoReturn())
+          diagnose(attrs.LSquareLoc, diag::attribute_requires_function_type,
+                   "noreturn");
       } else if (attrs.isAutoClosure() &&
                  (InputTy == 0 || !InputTy->getFields().empty())) {
         // auto_closures must take () syntactically.
@@ -604,6 +607,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
                                           ? attrs.getAbstractCC()
                                           : AbstractCC::Freestanding,
                                           attrs.isThin(),
+                                          attrs.isNoReturn(),
                                           attrs.isAutoClosure(),
                                           attrs.isObjCBlock());
         Ty = FunctionType::get(FT->getInput(), FT->getResult(),
@@ -613,6 +617,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       attrs.AutoClosure = false;
       attrs.ObjCBlock = false;
       attrs.Thin = false;
+      attrs.NoReturn = false;
       attrs.cc = Nothing;
     }
 

@@ -542,7 +542,8 @@ bool SILParser::parseSILType(SILType &Result) {
     auto Info = PolymorphicFunctionType::ExtInfo(attrs.hasCC()
                                                    ? attrs.getAbstractCC()
                                                    : AbstractCC::Freestanding,
-                                                 attrs.isThin());
+                                                 attrs.isThin(),
+                                                 attrs.isNoReturn());
     Type resultType = PolymorphicFunctionType::get(FT->getInput(),
                                              FT->getResult(), PList,
                                              Info,

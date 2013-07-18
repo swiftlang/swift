@@ -1505,11 +1505,13 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawCallingConvention;
     bool autoClosure;
     bool thin;
+    bool noreturn;
     bool blockCompatible;
 
     decls_block::FunctionTypeLayout::readRecord(scratch, inputID, resultID,
                                                 rawCallingConvention,
                                                 autoClosure, thin,
+                                                noreturn,
                                                 blockCompatible);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
@@ -1519,6 +1521,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
                                       thin,
+                                      noreturn,
                                       autoClosure,
                                       blockCompatible);
     
@@ -1731,13 +1734,16 @@ Type ModuleFile::getType(TypeID TID) {
     DeclID genericContextID;
     uint8_t rawCallingConvention;
     bool thin;
+    bool noreturn = false;
 
+    //todo add noreturn serialization.
     decls_block::PolymorphicFunctionTypeLayout::readRecord(scratch,
                                                            inputID,
                                                            resultID,
                                                            genericContextID,
                                                            rawCallingConvention,
-                                                           thin);
+                                                           thin,
+                                                           noreturn);
     auto callingConvention = getActualCC(rawCallingConvention);
     if (!callingConvention.hasValue()) {
       error();
@@ -1766,7 +1772,8 @@ Type ModuleFile::getType(TypeID TID) {
     assert(paramList && "missing generic params for polymorphic function");
 
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
-                                                 thin);
+                                                 thin,
+                                                 noreturn);
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
                                                 getType(resultID),

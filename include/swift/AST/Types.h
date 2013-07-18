@@ -92,9 +92,9 @@ protected:
 
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
-    unsigned ExtInfo : 7;
+    unsigned ExtInfo : 8;
   };
-  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 7 };
+  enum { NumAnyFunctionTypeBits = NumTypeBaseBits + 8 };
   static_assert(NumAnyFunctionTypeBits <= 32, "fits in an unsigned");
 
   union {
@@ -1089,13 +1089,14 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |isThin|isAutoClosure|isBlock|
-    //   |0 .. 3|   4  |      5      |   6   |
+    //   |  CC  |isThin|isAutoClosure|isBlock|noReturn|
+    //   |0 .. 3|   4  |      5      |   6   |   7    |
     //
     enum { CallConvMask = 0xF };
     enum { ThinMask = 0x10 };
     enum { AutoClosureMask = 0x20 };
     enum { BlockMask = 0x40 };
+    enum { NoReturnMask = 0x80 };
 
     uint16_t Bits;
 
@@ -1109,18 +1110,19 @@ public:
       assert(getCC() == AbstractCC::Freestanding);
     }
 
-    // Constructor with no defaults.
-    ExtInfo(AbstractCC CC, bool IsThin, bool IsAutoClosure, bool IsBlock) {
+    // Constructor for polymorphic type.
+    ExtInfo(AbstractCC CC, bool IsThin, bool IsNoReturn) {
       Bits = ((unsigned) CC) |
-      (IsThin ? ThinMask : 0) |
-      (IsAutoClosure ? AutoClosureMask : 0) |
-      (IsBlock ? BlockMask : 0);
+             (IsThin ? ThinMask : 0) |
+             (IsNoReturn ? NoReturnMask : 0);
     }
 
-    // Constructor for polymorphic type.
-    ExtInfo(AbstractCC CC, bool IsThin) {
-      Bits = ((unsigned) CC) |
-             (IsThin ? ThinMask : 0);
+    // Constructor with no defaults.
+    ExtInfo(AbstractCC CC, bool IsThin, bool IsNoReturn,
+            bool IsAutoClosure, bool IsBlock) : ExtInfo(CC, IsThin, IsNoReturn){
+      Bits = Bits |
+             (IsAutoClosure ? AutoClosureMask : 0) |
+             (IsBlock ? BlockMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -1129,6 +1131,7 @@ public:
 
     AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
     bool isThin() const { return Bits & ThinMask; }
+    bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isBlock() const { return Bits & BlockMask; }
 
@@ -1142,6 +1145,12 @@ public:
         return ExtInfo(Bits | ThinMask);
       else
         return ExtInfo(Bits & ~ThinMask);
+    }
+    ExtInfo withIsNoReturn(bool IsNoReturn) const {
+      if (IsNoReturn)
+        return ExtInfo(Bits | NoReturnMask);
+      else
+        return ExtInfo(Bits & ~NoReturnMask);
     }
     ExtInfo withIsAutoClosure(bool IsAutoClosure) const {
       if (IsAutoClosure)
@@ -1195,6 +1204,10 @@ public:
   /// be represented as simple function pointers without context.
   bool isThin() const {
     return getExtInfo().isThin();
+  }
+
+  bool isNoReturn() const {
+    return getExtInfo().isNoReturn();
   }
 
   /// \brief True if this type allows an implicit conversion from a function

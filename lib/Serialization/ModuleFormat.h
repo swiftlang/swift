@@ -311,6 +311,7 @@ namespace decls_block {
     AbstractCCField, // calling convention
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // thin?
+    BCFixed<1>,  // noreturn?
     BCFixed<1>  // block-compatible?
   >;
 
@@ -378,7 +379,8 @@ namespace decls_block {
     TypeIDField, // output
     DeclIDField, // decl that owns the generic params
     AbstractCCField, // calling convention
-    BCFixed<1>   // thin?
+    BCFixed<1>,  // thin?
+    BCFixed<1>   // noreturn?
   >;
 
   using ArraySliceTypeLayout = BCRecordLayout<

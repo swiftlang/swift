@@ -139,6 +139,14 @@ void PrintAST::printAttributes(const DeclAttributes &attrs) {
     comma();
     OS << "auto_closure";
   }
+  if (attrs.isThin()) {
+    comma();
+    OS << "thin";
+  }
+  if (attrs.isNoReturn()) {
+    comma();
+    OS << "noreturn";
+  }
   if (!attrs.AsmName.empty()) {
     comma();
     OS << "asmname=\"" << attrs.AsmName << "\"";

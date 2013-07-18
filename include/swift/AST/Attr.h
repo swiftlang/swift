@@ -143,6 +143,7 @@ public:
   bool Byref = false;
   bool AutoClosure = false;
   bool Thin = false;
+  bool NoReturn = false;
   bool Assignment = false;
   bool Conversion = false;
   bool ForceInline = false;
@@ -167,6 +168,7 @@ public:
   bool isByref() const { return Byref; }
   bool isAutoClosure() const { return AutoClosure; }
   bool isThin() const { return Thin; }
+  bool isNoReturn() const { return NoReturn; }
   bool isAssignment() const { return Assignment; }
   bool isConversion() const { return Conversion; }
   bool isForceInline() const { return ForceInline; }
@@ -192,7 +194,7 @@ public:
 
   bool empty() const {
     return !isInfix() && !getResilienceData().isValid() && !isByref() &&
-           !isAutoClosure() && !isThin() && !isAssignment() &&
+           !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
            !isClassProtocol() && !hasCC() && !isStdlib() &&

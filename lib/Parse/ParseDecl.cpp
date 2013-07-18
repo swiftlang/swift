@@ -124,6 +124,7 @@ static Resilience getResilience(AttrName attr) {
 ///     'stdlib'
 ///     'weak'
 ///     'unowned'
+///     'noreturn'
 bool Parser::parseAttribute(DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_weak)) {
     if (Attributes.hasOwnership()) {
@@ -303,6 +304,14 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     consumeToken(tok::identifier);
     
     Attributes.Thin = true;
+    return false;
+  }
+  case AttrName::noreturn: {
+    if (Attributes.isNoReturn())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    consumeToken(tok::identifier);
+
+    Attributes.NoReturn = true;
     return false;
   }
 

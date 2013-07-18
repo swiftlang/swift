@@ -1097,6 +1097,8 @@ bool Serializer::writeDecl(const Decl *D) {
     attrs.Assignment = false;
     attrs.Conversion = false;
     attrs.AsmName = {};
+    attrs.NoReturn = false;
+    attrs.Thin = false;
 
     // FIXME: Handle other attributes.
     if (!attrs.empty())
@@ -1393,6 +1395,7 @@ bool Serializer::writeType(Type ty) {
                                    getRawStableCC(fnTy->getAbstractCC()),
                                    fnTy->isAutoClosure(),
                                    fnTy->isThin(),
+                                   fnTy->isNoReturn(),
                                    fnTy->isBlock());
 
     return true;
@@ -1409,7 +1412,8 @@ bool Serializer::writeType(Type ty) {
                                               addTypeRef(fnTy->getResult()),
                                               addDeclRef(genericContext),
                                               getRawStableCC(callingConvention),
-                                              fnTy->isThin());
+                                              fnTy->isThin(),
+                                              fnTy->isNoReturn());
 
     return true;
   }

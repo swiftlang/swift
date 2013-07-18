@@ -672,7 +672,7 @@ public:
     return badType;
   }
 
-  void semaFuncExpr(FuncExpr *FE, bool isFirstPass) {
+  void semaFuncExpr(FuncExpr *FE, DeclAttributes &Attr, bool isFirstPass) {
     if (FE->getType())
       return;
 
@@ -710,17 +710,44 @@ public:
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
       Type argTy = patterns[e - i - 1]->getType();
+
+      GenericParamList *params = nullptr;
       if (e - i - 1 == isInstanceFunc && genericParams) {
-        funcTy = PolymorphicFunctionType::get(argTy, funcTy,
-                                              genericParams,
-                                              TC.Context);
+        params = genericParams;
       } else if (e - i - 1 == 0 && outerGenericParams) {
+        params = outerGenericParams;
+      }
+
+      if (params) {
+        // FIXME:
+        // We need to perform attribute checking here.
+        // Should this code be unified with Parser::applyAttributeToType?
+        // Not all of these attributes might be valid on a decl
+        // (such as CC, auto_closure, block)..
+        auto Info = PolymorphicFunctionType::ExtInfo(Attr.hasCC() ?
+                                                     Attr.getAbstractCC() :
+                                                     AbstractCC::Freestanding,
+                                                     Attr.isThin(),
+                                                     Attr.isNoReturn());
         funcTy = PolymorphicFunctionType::get(argTy, funcTy,
-                                              outerGenericParams,
+                                              params,
+                                              Info,
                                               TC.Context);
       } else {
-        funcTy = FunctionType::get(argTy, funcTy, TC.Context);
+        // FIXME:
+        // We need to perform attribute checking here.
+        // Should this code be unified with Parser::applyAttributeToType?
+        // Not all of these attributes might be valid on a decl.
+        auto Info = FunctionType::ExtInfo(Attr.hasCC() ?
+                                            Attr.getAbstractCC() :
+                                            AbstractCC::Freestanding,
+                                          Attr.isThin(),
+                                          Attr.isNoReturn(),
+                                          Attr.isAutoClosure(),
+                                          Attr.isObjCBlock());
+        funcTy = FunctionType::get(argTy, funcTy, Info, TC.Context);
       }
+      // FIXME: Reset the arttributes we consumed there.
     }
     FE->setType(funcTy);
   }
@@ -748,7 +775,7 @@ public:
       checkGenericParams(gp);
     }
 
-    semaFuncExpr(body, IsFirstPass);
+    semaFuncExpr(body, FD->getMutableAttrs(), IsFirstPass);
     FD->setType(body->getType());
 
     validateAttributes(FD);

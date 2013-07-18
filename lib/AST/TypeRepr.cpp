@@ -99,6 +99,7 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   if (Attrs.isByref()) AttrOS << "byref,";
   if (Attrs.isAutoClosure()) AttrOS << "auto_closure,";
   if (Attrs.isThin()) AttrOS << "thin,";
+  if (Attrs.isThin()) AttrOS << "noreturn,";
   if (Attrs.isAssignment()) AttrOS << "assignment,";
   if (Attrs.isConversion()) AttrOS << "conversion,";
   if (Attrs.isForceInline()) AttrOS << "force_inline,";

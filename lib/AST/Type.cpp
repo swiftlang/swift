@@ -1020,7 +1020,8 @@ bool TypeBase::isSpelledLike(Type other) {
     // Polymorphic function types should never be explicitly spelled.
     return false;
   }
-    
+
+  // TODO: change this to is same ExtInfo.
   case TypeKind::Function: {
     auto fMe = cast<FunctionType>(me);
     auto fThem = cast<FunctionType>(them);
@@ -1029,6 +1030,8 @@ bool TypeBase::isSpelledLike(Type other) {
     if (fMe->isBlock() != fThem->isBlock())
       return false;
     if (fMe->isThin() != fThem->isThin())
+      return false;
+    if (fMe->isNoReturn() != fThem->isNoReturn())
       return false;
     if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
       return false;
@@ -1522,6 +1525,8 @@ void FunctionType::print(raw_ostream &OS) const {
     attrs.next() << "objc_block";
   if (isThin())
     attrs.next() << "thin";
+  if (isNoReturn())
+    attrs.next() << "noreturn";
 
   attrs.finish();
   
@@ -1549,6 +1554,9 @@ void PolymorphicFunctionType::print(raw_ostream &OS) const {
   printCC(attrs, getAbstractCC());
   if (isThin())
     attrs.next() << "thin";
+  if (isNoReturn())
+    attrs.next() << "noreturn";
+
   attrs.finish();
     
   printGenericParams(OS);
