@@ -628,7 +628,7 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
 /// indirectly at the given level.
 llvm::PointerType *IRGenModule::isSingleIndirectValue(CanType type,
                                                       ExplosionKind kind) {
-  if (auto *archetype = dyn_cast<ArchetypeType>(type)) {
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     if (!archetype->requiresClass())
       return OpaquePtrTy;
   }

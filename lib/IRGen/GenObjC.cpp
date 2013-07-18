@@ -452,9 +452,9 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                                   unsigned uncurryLevel) {
 
   // Construct a callee and derive its ownership conventions.
-  auto *origFormalType
+  auto origFormalType
     = cast<AnyFunctionType>(method->getType()->getCanonicalType());
-  auto *origFnType
+  auto origFnType
     = cast<AnyFunctionType>(CanType(origFormalType->getResult()));
   auto callee = Callee::forMethod(CanType(origFormalType),
                                   CanType(origFnType->getResult()),

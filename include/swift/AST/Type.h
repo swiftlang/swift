@@ -71,16 +71,94 @@ public:
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
   bool operator!=(CanType T) const { return !operator==(T); }
-
 };
 
+template <class Proxied> class CanTypeWrapper;
+
+// Define a database of CanType wrapper classes for ease of metaprogramming.
+// By definition, this maps 'FOO' to 'CanFOO'.
+template <class Proxied> struct CanTypeWrapperTraits;
+template <> struct CanTypeWrapperTraits<Type> { typedef CanType type; };
+
+// A wrapper which preserves the fact that a type is canonical.
+//
+// Intended to be used as follows:
+//   DEFINE_LEAF_CAN_TYPE_WRAPPER(BuiltinObjectPointer, BuiltinType)
+// or
+//   BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+//     PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
+//   END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+#define BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                          \
+template <>                                                         \
+class CanTypeWrapper<TYPE> : public Can##BASE {                     \
+public:                                                             \
+  explicit CanTypeWrapper(TYPE *theType = nullptr)                  \
+    : Can##BASE(theType) {}                                         \
+                                                                    \
+  TYPE *getPointer() const {                                        \
+    return static_cast<TYPE*>(Type::getPointer());                  \
+  }                                                                 \
+  TYPE *operator->() const { return getPointer(); }                 \
+  operator TYPE *() const { return getPointer(); }
+
+#define PROXY_CAN_TYPE_SIMPLE_GETTER(METHOD)                        \
+  CanType METHOD() { return CanType(getPointer()->METHOD()); }
+
+#define END_CAN_TYPE_WRAPPER(TYPE, BASE)                            \
+};                                                                  \
+typedef CanTypeWrapper<TYPE> Can##TYPE;                             \
+template <> struct CanTypeWrapperTraits<TYPE> {                     \
+  typedef Can##TYPE type;                                           \
+};
+
+#define DEFINE_EMPTY_CAN_TYPE_WRAPPER(TYPE, BASE)                   \
+BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                                  \
+END_CAN_TYPE_WRAPPER(TYPE, BASE)
+
+// Disallow direct uses of isa/cast/dyn_cast on Type to eliminate a
+// certain class of bugs.
 template <class X> inline bool
 isa(const Type&) = delete; // Use TypeBase::is instead.
 template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
 cast(const Type&) = delete; // Use TypeBase::castTo instead.
 template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
 dyn_cast(const Type&) = delete; // Use TypeBase::getAs instead.
+template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
+dyn_cast_or_null(const Type&) = delete;
 
+// Permit direct uses of isa/cast/dyn_cast on CanType and preserve
+// canonicality.
+template <class X> inline bool isa(CanType type) {
+  return isa<X>(type.getPointer());
+}
+template <class X> inline CanTypeWrapper<X> cast(CanType type) {
+  return CanTypeWrapper<X>(cast<X>(type.getPointer()));
+}
+template <class X> inline CanTypeWrapper<X> dyn_cast(CanType type) {
+  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+}
+template <class X> inline CanTypeWrapper<X> dyn_cast_or_null(CanType type) {
+  return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
+}
+
+// Permit direct uses of isa/cast/dyn_cast on CanTypeWrapper<T> and
+// preserve canonicality.
+template <class X, class P>
+inline bool isa(CanTypeWrapper<P> type) {
+  return isa<X>(type.getPointer());
+}
+template <class X, class P>
+inline CanTypeWrapper<X> cast(CanTypeWrapper<P> type) {
+  return CanTypeWrapper<X>(cast<X>(type.getPointer()));
+}
+template <class X, class P>
+inline CanTypeWrapper<X> dyn_cast(CanTypeWrapper<P> type) {
+  return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
+}
+template <class X, class P>
+inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
+  return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
+}
 } // end namespace swift
 
 namespace llvm {
@@ -99,11 +177,7 @@ namespace llvm {
   };
   template<> struct simplify_type< ::swift::Type>
     : public simplify_type<const ::swift::Type> {};
-  template<> struct simplify_type<const ::swift::CanType>
-    : public simplify_type<const ::swift::Type> {};
-  template<> struct simplify_type< ::swift::CanType>
-    : public simplify_type<const ::swift::CanType> {};
-    
+  
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {

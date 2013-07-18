@@ -1258,7 +1258,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
       return;
     }
       
-    if (auto *origArchetype = dyn_cast<ArchetypeType>(CurOrigType)) {
+    if (auto origArchetype = dyn_cast<ArchetypeType>(CurOrigType)) {
       if (origArchetype->requiresClass()) {
         // Remap a class archetype to an instance.
         assert(substType->getClassOrBoundGenericClass() &&

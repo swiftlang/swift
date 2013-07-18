@@ -254,8 +254,8 @@ public:
                               GenericParamList *genericParams = nullptr) const;
   
   /// Convert a nested function type into an uncurried representation.
-  AnyFunctionType *getUncurriedFunctionType(AnyFunctionType *t,
-                                            unsigned uncurryLevel);
+  CanAnyFunctionType getUncurriedFunctionType(CanAnyFunctionType t,
+                                              unsigned uncurryLevel);
   
   /// Get the uncurried argument order for a calling convention.
   static UncurryDirection getUncurryDirection(AbstractCC cc);

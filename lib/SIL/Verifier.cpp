@@ -792,9 +792,9 @@ public:
             "thin_to_thick_function operand must be a function");
     require(TTFI->getType().is<AnyFunctionType>(),
             "thin_to_thick_function result must be a function");
-    if (auto *opFTy = dyn_cast<FunctionType>(
+    if (auto opFTy = dyn_cast<FunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
-      auto *resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
+      auto resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
       require(resFTy &&
               opFTy->getInput()->isEqual(resFTy->getInput()) &&
               opFTy->getResult()->isEqual(resFTy->getResult()) &&
@@ -807,9 +807,9 @@ public:
               "thin_to_thick_function result must not be thin");
       require(opFTy->isThin(),
               "thin_to_thick_function operand must be thin");
-    } else if (auto *opPTy = dyn_cast<PolymorphicFunctionType>(
+    } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
-      auto *resPTy = dyn_cast<PolymorphicFunctionType>(
+      auto resPTy = dyn_cast<PolymorphicFunctionType>(
                                                TTFI->getType().getSwiftType());
       require(resPTy &&
               opPTy->getInput()->isEqual(resPTy->getInput()) &&
@@ -835,9 +835,9 @@ public:
             "convert_cc operand must be a function");
     require(CCI->getType().is<AnyFunctionType>(),
             "convert_cc result must be a function");
-    if (auto *opFTy = dyn_cast<FunctionType>(
+    if (auto opFTy = dyn_cast<FunctionType>(
                                  CCI->getOperand().getType().getSwiftType())) {
-      auto *resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
+      auto resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
       require(resFTy &&
               opFTy->getInput()->isEqual(resFTy->getInput()) &&
               opFTy->getResult()->isEqual(resFTy->getResult()) &&
@@ -849,9 +849,9 @@ public:
               "convert_cc result must be thin");
       require(opFTy->isThin(),
               "convert_cc operand must be thin");
-    } else if (auto *opPTy = dyn_cast<PolymorphicFunctionType>(
+    } else if (auto opPTy = dyn_cast<PolymorphicFunctionType>(
                                  CCI->getOperand().getType().getSwiftType())) {
-      auto *resPTy = dyn_cast<PolymorphicFunctionType>(
+      auto resPTy = dyn_cast<PolymorphicFunctionType>(
                                                CCI->getType().getSwiftType());
       require(resPTy &&
               opPTy->getInput()->isEqual(resPTy->getInput()) &&

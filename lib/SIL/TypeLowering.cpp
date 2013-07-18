@@ -76,20 +76,18 @@ UncurryDirection TypeConverter::getUncurryDirection(AbstractCC cc) {
 }
 
 /// Bridge the elements of an input tuple type.
-static Type getBridgedInputType(TypeConverter &tc,
-                                AbstractCC cc,
-                                Type input) {
-  if (auto *tuple = input->getAs<TupleType>()) {
+static CanType getBridgedInputType(TypeConverter &tc,
+                                   AbstractCC cc,
+                                   CanType input) {
+  if (auto tuple = dyn_cast<TupleType>(input)) {
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
     for (TupleTypeElt const &field : tuple->getFields()) {
-      Type bridged = tc.getLoweredBridgedType(field.getType(), cc);
-      if (!bridged->isEqual(field.getType())) {
+      CanType bridged =
+        tc.getLoweredBridgedType(field.getType(), cc)->getCanonicalType();
+      if (bridged != CanType(field.getType())) {
         changed = true;
-        bridgedFields.push_back(TupleTypeElt(bridged,
-                                             field.getName(),
-                                             field.getDefaultArgKind(),
-                                             field.isVararg()));
+        bridgedFields.push_back(field.getWithType(bridged));
       } else {
         bridgedFields.push_back(field);
       }
@@ -97,22 +95,22 @@ static Type getBridgedInputType(TypeConverter &tc,
     
     if (!changed)
       return input;
-    return TupleType::get(bridgedFields, input->getASTContext());
+    return CanType(TupleType::get(bridgedFields, input->getASTContext()));
   }
   
-  return tc.getLoweredBridgedType(input, cc);
+  return tc.getLoweredBridgedType(input, cc)->getCanonicalType();
 }
 
 /// Bridge a result type.
-static Type getBridgedResultType(TypeConverter &tc,
-                                 AbstractCC cc,
-                                 Type result) {
-  return tc.getLoweredBridgedType(result, cc);
+static CanType getBridgedResultType(TypeConverter &tc,
+                                    AbstractCC cc,
+                                    CanType result) {
+  return tc.getLoweredBridgedType(result, cc)->getCanonicalType();
 }
 
 /// Fast path for bridging types in a function type without uncurrying.
-static AnyFunctionType *getBridgedFunctionType(TypeConverter &tc,
-                                               AnyFunctionType *t) {
+static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
+                                                 CanAnyFunctionType t) {
   switch (t->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -121,25 +119,25 @@ static AnyFunctionType *getBridgedFunctionType(TypeConverter &tc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    if (auto *pft = dyn_cast<PolymorphicFunctionType>(t)) {
-      return PolymorphicFunctionType::get(
-                  getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
-                  getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
+    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
+      return CanAnyFunctionType(PolymorphicFunctionType::get(
+                  getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
+                  getBridgedResultType(tc, t->getAbstractCC(), t.getResult()),
                   &pft->getGenericParams(),
                   t->getExtInfo(),
-                  t->getASTContext());
+                  t->getASTContext()));
     }
-    auto *ft = cast<FunctionType>(t);
-    return FunctionType::get(
-                getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
-                getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
+    auto ft = cast<FunctionType>(t);
+    return CanAnyFunctionType(FunctionType::get(
+                getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
+                getBridgedResultType(tc, t->getAbstractCC(), t.getResult()),
                 ft->getExtInfo(),
-                t->getASTContext());
+                t->getASTContext()));
   }
 }
 
-AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
-                                                       unsigned uncurryLevel) {
+CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
+                                                        unsigned uncurryLevel) {
   if (uncurryLevel == 0)
     return getBridgedFunctionType(*this, t);
 
@@ -162,7 +160,7 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   for (;;) {
     inputs.push_back(TupleTypeElt(t->getInput()));
     
-    if (auto *pft = dyn_cast<PolymorphicFunctionType>(t)) {
+    if (auto pft = dyn_cast<PolymorphicFunctionType>(t)) {
       isPolymorphic = true;
       GenericParamList &params = pft->getGenericParams();
       if (GenericParamList *outer = params.getOuterParameters()) {
@@ -180,10 +178,10 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
     
     if (uncurryLevel-- == 0)
       break;
-    t = t->getResult()->castTo<AnyFunctionType>();
+    t = cast<AnyFunctionType>(t.getResult());
   }
   
-  Type resultType = t->getResult();
+  CanType resultType = t.getResult();
   
   // Bridge input and result types.
   switch (outerCC) {
@@ -194,13 +192,15 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
   
   case AbstractCC::C:
     for (auto &input : inputs)
-      input = getBridgedInputType(*this, outerCC, input.getType());
+      input = input.getWithType(
+               getBridgedInputType(*this, outerCC, CanType(input.getType())));
     resultType = getBridgedResultType(*this, outerCC, resultType);
     break;
   case AbstractCC::ObjCMethod:
     // The "this" parameter should not get bridged.
     for (auto &input : make_range(inputs.begin()+1, inputs.end()))
-      input = getBridgedInputType(*this, outerCC, input.getType());
+      input = input.getWithType(
+                getBridgedInputType(*this, outerCC, CanType(input.getType())));
     resultType = getBridgedResultType(*this, outerCC, resultType);
     break;
   }
@@ -229,14 +229,15 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
     
     outerInfo.withIsAutoClosure(false);
     outerInfo.withIsBlock(false);
-    return PolymorphicFunctionType::get(inputType, resultType,
+    return CanPolymorphicFunctionType(
+           PolymorphicFunctionType::get(inputType, resultType,
                                         curriedGenericParams,
-                                        outerInfo, C);
+                                        outerInfo, C));
   } else {
     outerInfo.withIsAutoClosure(false);
     outerInfo.withIsBlock(false);
-    return FunctionType::get(inputType, resultType,
-                             outerInfo, C);
+    return CanFunctionType(FunctionType::get(inputType, resultType,
+                                             outerInfo, C));
   }    
 }
 
@@ -405,11 +406,10 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   }
 
   // Uncurry function types.
-  if (AnyFunctionType *ft = t->getAs<AnyFunctionType>()) {
+  if (auto ft = dyn_cast<AnyFunctionType>(t)) {
     assert(!addressOnly && "function types should never be address-only");
-    auto *uncurried = getUncurriedFunctionType(ft, uncurryLevel);
-    theInfo->loweredType = SILType(uncurried->getCanonicalType(),
-                                   /*address=*/ false);
+    auto uncurried = getUncurriedFunctionType(ft, uncurryLevel);
+    theInfo->loweredType = SILType(uncurried, /*address=*/ false);
   } else {
     // Otherwise, the Swift type maps directly to a SILType.
     assert(uncurryLevel == 0 &&

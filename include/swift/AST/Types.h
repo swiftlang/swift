@@ -318,6 +318,7 @@ public:
            T->getKind() <= TypeKind::Last_BuiltinType;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -332,6 +333,7 @@ public:
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
 
 /// BuiltinOpaquePointerType - The builtin opaque pointer type.  This
 /// pointer is completely unmanaged and is equivalent to %swift.opaque* in LLVM
@@ -348,6 +350,7 @@ public:
     return T->getKind() == TypeKind::BuiltinOpaquePointer;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinOpaquePointerType, BuiltinType);
 
 /// BuiltinObjectPointerType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
@@ -363,6 +366,7 @@ public:
     return T->getKind() == TypeKind::BuiltinObjectPointer;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinObjectPointerType, BuiltinType);
 
 /// BuiltinObjCPointerType - The builtin opaque Objective-C pointer type.
 /// Useful for pushing an Objective-C type through swift.
@@ -377,6 +381,7 @@ public:
     return T->getKind() == TypeKind::BuiltinObjCPointer;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinObjCPointerType, BuiltinType);
 
 /// \brief A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {
@@ -415,7 +420,9 @@ public:
     return T->getKind() == TypeKind::BuiltinVector;
   }
 };
-
+BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
+END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 
 /// BuiltinIntegerType - The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
@@ -440,6 +447,7 @@ public:
     return T->getKind() == TypeKind::BuiltinInteger;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
   
 class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
@@ -479,6 +487,7 @@ public:
     return T->getKind() == TypeKind::BuiltinFloat;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
   
 /// NameAliasType - An alias type is a name for another type, just like a
 /// typedef in C.
@@ -663,6 +672,11 @@ private:
   TupleType(ArrayRef<TupleTypeElt> fields, const ASTContext *CanCtx,
             bool hasTypeVariable);
 };
+BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
+  CanType getElementType(unsigned fieldNo) {
+    return CanType(getPointer()->getElementType(fieldNo));
+  }
+END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic nominal type where the
 /// type arguments have not yet been resolved.
@@ -710,6 +724,9 @@ public:
     return T->getKind() == TypeKind::UnboundGeneric;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+END_CAN_TYPE_WRAPPER(UnboundGenericType, Type)
 
 /// BoundGenericType - An abstract class for applying a generic
 /// nominal type to the given type arguments.
@@ -776,6 +793,11 @@ public:
            T->getKind() <= TypeKind::Last_BoundGenericType;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+  // Unfortunately, proxying getGenericArgs would be an aliasing violation.
+END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
+
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
@@ -806,6 +828,7 @@ public:
     return T->getKind() == TypeKind::BoundGenericClass;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
 /// BoundGenericOneOfType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic oneof type.
@@ -836,6 +859,7 @@ public:
     return T->getKind() == TypeKind::BoundGenericOneOf;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericOneOfType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
@@ -866,6 +890,7 @@ public:
     return T->getKind() == TypeKind::BoundGenericStruct;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericType)
 
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
@@ -907,6 +932,9 @@ public:
            T->getKind() <= TypeKind::Last_NominalType;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(NominalType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+END_CAN_TYPE_WRAPPER(NominalType, Type)
 
 /// OneOfType - This represents the type declared by a OneOfDecl.
 class OneOfType : public NominalType, public llvm::FoldingSetNode {
@@ -936,6 +964,7 @@ private:
   OneOfType(OneOfDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(OneOfType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
 class StructType : public NominalType, public llvm::FoldingSetNode {  
@@ -965,6 +994,7 @@ private:
   StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
              bool HasTypeVariable);
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
 class ClassType : public NominalType, public llvm::FoldingSetNode {  
@@ -994,6 +1024,7 @@ private:
   ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 
 /// MetaTypeType - This is the type given to a metatype value.  When a type is
 /// declared, a 'metatype' value is injected into the value namespace to
@@ -1021,6 +1052,9 @@ private:
   MetaTypeType(Type T, const ASTContext *Ctx, bool HasTypeVariable);
   friend class TypeDecl;
 };
+BEGIN_CAN_TYPE_WRAPPER(MetaTypeType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
+END_CAN_TYPE_WRAPPER(MetaTypeType, Type)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist
@@ -1048,6 +1082,7 @@ private:
       TheModule(M) {
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
   
 /// A high-level calling convention.
 enum class AbstractCC : unsigned char {
@@ -1227,6 +1262,10 @@ public:
            T->getKind() <= TypeKind::Last_AnyFunctionType;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getInput)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
+END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
 /// FunctionType - A monomorphic function type.
 ///
@@ -1257,6 +1296,7 @@ private:
                bool HasTypeVariable,
                const ExtInfo &Info);
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   
 /// PolymorphicFunctionType - A polymorphic function type.
 class PolymorphicFunctionType : public AnyFunctionType {
@@ -1291,6 +1331,7 @@ private:
                           const ExtInfo &Info,
                           const ASTContext &C);
 };  
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
   
 /// ArrayType - An array type has a base type and either an unspecified or a
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have
@@ -1318,6 +1359,9 @@ public:
 private:
   ArrayType(Type Base, uint64_t Size, bool HasTypeVariable);
 };
+BEGIN_CAN_TYPE_WRAPPER(ArrayType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
+END_CAN_TYPE_WRAPPER(ArrayType, Type)
   
 /// ArraySliceType - An array slice type is the type T[], which is
 /// always sugar for a library type.
@@ -1381,6 +1425,7 @@ private:
   friend class ProtocolDecl;
   ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 
 /// ProtocolCompositionType - A type that composes some number of protocols
 /// together to represent types that conform to all of the named protocols.
@@ -1433,6 +1478,7 @@ private:
                /*HasTypeVariable=*/false),
       Protocols(Protocols) { }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
@@ -1602,6 +1648,9 @@ public:
     return type->getKind() == TypeKind::LValue;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
+END_CAN_TYPE_WRAPPER(LValueType, Type)
 
 /// SubstitutableType - A reference to a type that can be substituted, i.e.,
 /// an archetype or a generic parameter.
@@ -1649,6 +1698,7 @@ public:
            T->getKind() <= TypeKind::Last_SubstitutableType;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 
 /// ArchetypeType - An archetype is a type that is a stand-in used to describe
 /// type parameters and associated types in generic definition and protocols.
@@ -1728,6 +1778,7 @@ private:
     : SubstitutableType(TypeKind::Archetype, &Ctx, ConformsTo, Superclass),
       Parent(Parent), Name(Name), IndexIfPrimary(Index? *Index + 1 : 0) { }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 
 /// SubstitutedType - A type that has been substituted for some other type,
 /// which implies that the replacement type meets all of the requirements of
@@ -1792,6 +1843,9 @@ public:
     return T->getKind() == TypeKind::ReferenceStorage;
   }
 };
+BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
+END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
@@ -1849,9 +1903,9 @@ inline bool TypeBase::isExistentialType() {
   
 inline bool TypeBase::isClassExistentialType() {
   CanType T = getCanonicalType();
-  if (auto *pt = dyn_cast<ProtocolType>(T))
+  if (auto pt = dyn_cast<ProtocolType>(T))
     return pt->requiresClass();
-  if (auto *pct = dyn_cast<ProtocolCompositionType>(T))
+  if (auto pct = dyn_cast<ProtocolCompositionType>(T))
     return pct->requiresClass();
   return false;
 }

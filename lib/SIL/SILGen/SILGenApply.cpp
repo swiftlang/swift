@@ -331,7 +331,7 @@ public:
       SILConstant constant = genericMethod.methodName.atUncurryLevel(level);
       CanType archetypeType
         = genericMethod.thisValue.getType().getSwiftRValueType();
-      if (auto *metatype = dyn_cast<MetaTypeType>(archetypeType))
+      if (auto metatype = dyn_cast<MetaTypeType>(archetypeType))
         archetypeType = CanType(metatype->getInstanceType());
       SILValue method = gen.B.createArchetypeMethod(SILLocation(),
                            gen.getLoweredType(archetypeType),

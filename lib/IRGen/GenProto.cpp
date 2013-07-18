@@ -2373,9 +2373,9 @@ namespace {
       // Find the This archetype.
       auto thisTy = SignatureTy;
       thisTy = stripLabel(CanType(cast<AnyFunctionType>(thisTy)->getInput()));
-      if (auto *lvalueTy = dyn_cast<LValueType>(thisTy)) {
+      if (auto lvalueTy = dyn_cast<LValueType>(thisTy)) {
         thisTy = CanType(lvalueTy->getObjectType());
-      } else if (auto *metaTy = dyn_cast<MetaTypeType>(thisTy)) {
+      } else if (auto metaTy = dyn_cast<MetaTypeType>(thisTy)) {
         thisTy = CanType(metaTy->getInstanceType());
       } else {
         assert(thisTy->hasReferenceSemantics() &&
@@ -3419,7 +3419,7 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   CanType replType = sub.Replacement->getCanonicalType();
 
   // If it's an archetype, we'll need to grab from the local context.
-  if (auto *archetype = dyn_cast<ArchetypeType>(replType)) {
+  if (auto archetype = dyn_cast<ArchetypeType>(replType)) {
     auto &archTI = getArchetypeInfo(IGF, archetype);
 
     for (auto proto : archetypeProtos) {
@@ -3546,7 +3546,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
         continue;
 
       // If the target is an archetype, go to the type info.
-      if (auto *archetype = dyn_cast<ArchetypeType>(argType)) {
+      if (auto archetype = dyn_cast<ArchetypeType>(argType)) {
         auto &archTI = getArchetypeInfo(IGF, archetype);
 
         ProtocolPath path(IGF.IGM, archTI.getProtocols(), protocol);
