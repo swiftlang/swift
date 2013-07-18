@@ -290,7 +290,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     if (FuncExpr *FE = dyn_cast<FuncExpr>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
-      if (Loc.isValid()) {
+      // FIXME: when we can parse and typecheck the function body partially for
+      // code completion, FE->getBody() check can be removed.
+      if (Loc.isValid() && FE->getBody()) {
         FindLocalVal localVal(Loc, Name);
         localVal.visit(FE->getBody());
         if (!localVal.MatchingValue) {

@@ -167,7 +167,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   TranslationUnit *const TU;
 
   template<typename ExprType>
-  void typecheckExpr(ExprType *&E) {
+  bool typecheckExpr(ExprType *&E) {
     assert(E && "should have an expression");
 
     DEBUG(llvm::dbgs() << "\nparsed:\n";
@@ -176,12 +176,13 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
     Expr *AsExpr = E;
     if (!typeCheckCompletionContextExpr(TU, AsExpr))
-      return;
+      return false;
     E = cast<ExprType>(AsExpr);
 
     DEBUG(llvm::dbgs() << "\type checked:\n";
           E->print(llvm::dbgs());
           llvm::dbgs() << "\n");
+    return true;
   }
 
 public:
@@ -568,7 +569,8 @@ public:
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
-  typecheckExpr(E);
+  if (!typecheckExpr(E))
+    return;
 
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.setHaveDot();
@@ -586,7 +588,8 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
-  typecheckExpr(E);
+  if (!typecheckExpr(E))
+    return;
 
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.getValueExprCompletions(E->getType());
@@ -595,7 +598,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
-  typecheckExpr(SRE);
+  if (!typecheckExpr(SRE))
+    return;
 
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.setIsSuperRefExpr();
@@ -605,7 +609,8 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
-  typecheckExpr(SRE);
+  if (!typecheckExpr(SRE))
+    return;
 
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.setIsSuperRefExpr();
