@@ -127,16 +127,15 @@ private:
          SILGenFunction &gen,
          SILValue archetype, SILConstant methodName, Type memberType)
     : kind(Kind::ArchetypeMethod),
-      genericMethod{archetype, methodName,
+      genericMethod{archetype,
+                    methodName,
                     FunctionType::get(archetype.getType().getSwiftType(),
-                                      memberType,
-                                      /*isAutoClosure*/ false,
-                                      /*isBlock*/ false,
-                                      /*isThin*/
-                                        getArchetypeType(archetype.getType())
-                                          ->requiresClass(),
-                                      gen.SGM.getConstantCC(methodName),
-                                      memberType->getASTContext())
+                          memberType,
+                          FunctionType::ExtInfo()
+                            .withIsThin(getArchetypeType(archetype.getType())
+                                          ->requiresClass())
+                            .withCallingConv(gen.SGM.getConstantCC(methodName)),
+                          memberType->getASTContext())
                       ->getCanonicalType()},
     specializedType(genericMethod.origType)
   {
@@ -166,12 +165,12 @@ private:
     
     // This is a method reference. Extract the method implementation from the
     // archetype and apply the "this" argument.
+    auto Info = FunctionType::ExtInfo()
+                  .withCallingConv(gen.SGM.getConstantCC(methodName))
+                  .withIsThin(isThin);
     return FunctionType::get(thisTy,
                              memberType,
-                             /*isAutoClosure*/ false,
-                             /*isBlock*/ false,
-                             /*isThin*/ isThin,
-                             gen.SGM.getConstantCC(methodName),
+                             Info,
                              memberType->getASTContext())
       ->getCanonicalType();
   }
@@ -235,12 +234,12 @@ public:
     } else {
       FunctionType *ft = cast<FunctionType>(specializedType);
       Type outerInput = ft->getInput();
+      auto Info = FunctionType::ExtInfo()
+                    .withCallingConv(cc)
+                    .withIsThin(true);
       specializedType = CanType(FunctionType::get(outerInput,
                                                   subType,
-                                                  /*isAutoClosure*/ false,
-                                                  /*isBlock*/ false,
-                                                  /*isThin*/ true,
-                                                  cc,
+                                                  Info,
                                                   outerInput->getASTContext()));
     }
     specializeLoc = loc;

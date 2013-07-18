@@ -212,9 +212,7 @@ namespace {
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       return FunctionType::get(fTy->getInput(),
                                fTy->getResult(),
-                               /*isAutoClosure*/ false,
-                               /*isBlock*/ true,
-                               /*isThin*/ false,
+                               AnyFunctionType::ExtInfo().withIsBlock(true),
                                fTy->getASTContext());
     }
 

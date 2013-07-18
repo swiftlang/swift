@@ -1051,15 +1051,15 @@ private:
   
 /// A high-level calling convention.
 enum class AbstractCC : unsigned char {
+  /// The calling convention used for calling a normal function.
+  Freestanding = 0,
+
   /// The C freestanding calling convention.
   C,
   
   /// The ObjC method calling convention.
   ObjCMethod,
-  
-  /// The calling convention used for calling a normal function.
-  Freestanding,
-  
+
   /// The calling convention used for calling an instance method.
   Method,
   
@@ -1105,14 +1105,22 @@ public:
     
   public:
     // Constructor with all defaults.
-    ExtInfo() : Bits(0) {}
+    ExtInfo() : Bits(0) {
+      assert(getCC() == AbstractCC::Freestanding);
+    }
 
     // Constructor with no defaults.
     ExtInfo(AbstractCC CC, bool IsThin, bool IsAutoClosure, bool IsBlock) {
       Bits = ((unsigned) CC) |
-             (IsThin ? ThinMask : 0) |
-             (IsAutoClosure ? AutoClosureMask : 0) |
-             (IsBlock ? BlockMask : 0);
+      (IsThin ? ThinMask : 0) |
+      (IsAutoClosure ? AutoClosureMask : 0) |
+      (IsBlock ? BlockMask : 0);
+    }
+
+    // Constructor for polymorphic type.
+    ExtInfo(AbstractCC CC, bool IsThin) {
+      Bits = ((unsigned) CC) |
+             (IsThin ? ThinMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -1148,6 +1156,9 @@ public:
         return ExtInfo(Bits & ~BlockMask);
     }
 
+    char getFuncAttrKey() const {
+      return Bits;
+    }
 
     bool operator==(ExtInfo Other) const {
       return Bits == Other.Bits;
@@ -1160,13 +1171,10 @@ public:
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, bool HasTypeVariable,
-                  bool isThin, AbstractCC cc,
-                  bool isAutoClosure = false, bool isBlock = false)
+                  const ExtInfo &Info)
   : TypeBase(Kind, CanTypeContext, HasTypeVariable),
-    Input(Input), Output(Output) {
-
-    TypeBits.AnyFunctionType.ExtInfo = ExtInfo(cc, isThin,
-                                               isAutoClosure, isBlock).Bits;
+  Input(Input), Output(Output) {
+    TypeBits.AnyFunctionType.ExtInfo = Info.Bits;
   }
 
 public:
@@ -1218,28 +1226,11 @@ class FunctionType : public AnyFunctionType {
 public:
   /// 'Constructor' Factory Function
   static FunctionType *get(Type Input, Type Result, const ASTContext &C) {
-    return get(Input, Result, false, false, false, C);
+    return get(Input, Result, ExtInfo(), C);
   }
-  static FunctionType *get(Type Input, Type Result, bool isAutoClosure,
-                           const ASTContext &C) {
-    return get(Input, Result, isAutoClosure, false, false,
-               AbstractCC::Freestanding, C);
-  }
+
   static FunctionType *get(Type Input, Type Result,
-                           bool isAutoClosure, bool isBlock,
-                           const ASTContext &C) {
-    return get(Input, Result, isAutoClosure, isBlock, false,
-               AbstractCC::Freestanding, C);
-  }
-  static FunctionType *get(Type Input, Type Result,
-                           bool isAutoClosure, bool isBlock, bool isThin,
-                           const ASTContext &C) {
-    return get(Input, Result, isAutoClosure, isBlock, isThin,
-               AbstractCC::Freestanding, C);
-  }
-  static FunctionType *get(Type Input, Type Result,
-                           bool isAutoClosure, bool isBlock, bool isThin,
-                           AbstractCC cc, const ASTContext &C);
+                           const ExtInfo &Info, const ASTContext &C);
 
   void print(raw_ostream &OS) const;
   
@@ -1250,11 +1241,8 @@ public:
   
 private:
   FunctionType(Type Input, Type Result,
-               bool isAutoClosure,
-               bool isBlock,
                bool HasTypeVariable,
-               bool isThin,
-               AbstractCC cc);
+               const ExtInfo &Info);
 };
   
 /// PolymorphicFunctionType - A polymorphic function type.
@@ -1267,20 +1255,12 @@ public:
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
                                       const ASTContext &C) {
-    return get(input, output, params, false, AbstractCC::Freestanding, C);
+    return get(input, output, params, ExtInfo(), C);
   }
 
   static PolymorphicFunctionType *get(Type input, Type output,
                                       GenericParamList *params,
-                                      bool isThin,
-                                      const ASTContext &C) {
-    return get(input, output, params, isThin, AbstractCC::Freestanding, C);
-  }
-  
-  static PolymorphicFunctionType *get(Type input, Type output,
-                                      GenericParamList *params,
-                                      bool isThin,
-                                      AbstractCC cc,
+                                      const ExtInfo &Info,
                                       const ASTContext &C);
 
   GenericParamList &getGenericParams() const { return *Params; }
@@ -1295,8 +1275,7 @@ public:
   
 private:
   PolymorphicFunctionType(Type input, Type output, GenericParamList *params,
-                          bool isThin,
-                          AbstractCC cc,
+                          const ExtInfo &Info,
                           const ASTContext &C);
 };  
   

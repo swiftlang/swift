@@ -555,9 +555,7 @@ Type constraints::adjustLValueForReference(Type type, bool isAssignment,
       }
 
       return FunctionType::get(inputTy, funcTy->getResult(),
-                               funcTy->isAutoClosure(),
-                               funcTy->isBlock(),
-                               funcTy->isThin(),
+                               funcTy->getExtInfo(),
                                context);
     }
   }

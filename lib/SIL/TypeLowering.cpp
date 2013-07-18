@@ -126,18 +126,14 @@ static AnyFunctionType *getBridgedFunctionType(TypeConverter &tc,
                   getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
                   getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
                   &pft->getGenericParams(),
-                  t->isThin(),
-                  t->getAbstractCC(),
+                  t->getExtInfo(),
                   t->getASTContext());
     }
     auto *ft = cast<FunctionType>(t);
     return FunctionType::get(
                 getBridgedInputType(tc, t->getAbstractCC(), t->getInput()),
                 getBridgedResultType(tc, t->getAbstractCC(), t->getResult()),
-                ft->isAutoClosure(),
-                ft->isBlock(),
-                t->isThin(),
-                t->getAbstractCC(),
+                ft->getExtInfo(),
                 t->getASTContext());
   }
 }
@@ -146,9 +142,9 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
                                                        unsigned uncurryLevel) {
   if (uncurryLevel == 0)
     return getBridgedFunctionType(*this, t);
-  
-  AbstractCC outerCC = t->getAbstractCC();
-  bool outerThinness = t->isThin();
+
+  AnyFunctionType::ExtInfo outerInfo = t->getExtInfo();
+  AbstractCC outerCC = outerInfo.getCC();
   assert(!t->isAutoClosure() && "auto_closures cannot be curried");
   assert(!t->isBlock() && "objc blocks cannot be curried");
   
@@ -231,30 +227,33 @@ AnyFunctionType *TypeConverter::getUncurriedFunctionType(AnyFunctionType *t,
     curriedGenericParams->setAllArchetypes(C.AllocateCopy(allArchetypes));
     curriedGenericParams->setOuterParameters(outerParameters);
     
+    outerInfo.withIsAutoClosure(false);
+    outerInfo.withIsBlock(false);
     return PolymorphicFunctionType::get(inputType, resultType,
                                         curriedGenericParams,
-                                        outerThinness, outerCC, C);
+                                        outerInfo, C);
   } else {
+    outerInfo.withIsAutoClosure(false);
+    outerInfo.withIsBlock(false);
     return FunctionType::get(inputType, resultType,
-                             /*autoClosure*/ false, /*block*/ false,
-                             outerThinness, outerCC, C);
+                             outerInfo, C);
   }    
 }
 
 Type Lowering::getThinFunctionType(Type t, AbstractCC cc) {
   if (auto *ft = t->getAs<FunctionType>())
     return FunctionType::get(ft->getInput(), ft->getResult(),
-                             ft->isAutoClosure(),
-                             ft->isBlock(),
-                             /*isThin*/ true,
-                             cc,
+                             ft->getExtInfo()
+                               .withIsThin(true)
+                               .withCallingConv(cc),
                              ft->getASTContext());
   
   if (auto *pft = t->getAs<PolymorphicFunctionType>())
     return PolymorphicFunctionType::get(pft->getInput(), pft->getResult(),
                                         &pft->getGenericParams(),
-                                        /*isThin*/ true,
-                                        cc,
+                                        pft->getExtInfo()
+                                               .withIsThin(true)
+                                               .withCallingConv(cc),
                                         pft->getASTContext());
 
   return t;
@@ -267,17 +266,17 @@ Type Lowering::getThinFunctionType(Type t) {
 Type Lowering::getThickFunctionType(Type t, AbstractCC cc) {
   if (auto *fTy = t->getAs<FunctionType>())
     return FunctionType::get(fTy->getInput(), fTy->getResult(),
-                             fTy->isAutoClosure(),
-                             fTy->isBlock(),
-                             /*isThin*/ false,
-                             cc,
+                             fTy->getExtInfo()
+                               .withIsThin(false)
+                               .withCallingConv(cc),
                              fTy->getASTContext());
   
   if (auto *pfTy = t->getAs<PolymorphicFunctionType>())
     return PolymorphicFunctionType::get(pfTy->getInput(), pfTy->getResult(),
                                         &pfTy->getGenericParams(),
-                                        /*isThin*/ false,
-                                        cc,
+                                        pfTy->getExtInfo()
+                                                .withIsThin(false)
+                                                .withCallingConv(cc),
                                         pfTy->getASTContext());
 
   return t;

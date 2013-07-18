@@ -570,8 +570,10 @@ static Type getStrippedType(const ASTContext &context, Type type,
     if (InputTy.getPointer() != FunctionTy->getInput().getPointer() ||
         ResultTy.getPointer() != FunctionTy->getResult().getPointer()) {
       if (auto monoFn = dyn_cast<FunctionType>(FunctionTy)) {
+        auto Info = FunctionType::ExtInfo()
+                      .withIsAutoClosure(monoFn->isAutoClosure());
         return FunctionType::get(InputTy, ResultTy,
-                                 monoFn->isAutoClosure(), context);
+                                 Info, context);
       } else {
         auto polyFn = cast<PolymorphicFunctionType>(FunctionTy);
         return PolymorphicFunctionType::get(InputTy, ResultTy,
@@ -822,8 +824,7 @@ CanType TypeBase::getCanonicalType() {
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
     Result = PolymorphicFunctionType::get(In, Out, &FT->getGenericParams(),
-                                          FT->isThin(),
-                                          FT->getAbstractCC(),
+                                          FT->getExtInfo(),
                                           In->getASTContext());
     break;
   }
@@ -832,10 +833,7 @@ CanType TypeBase::getCanonicalType() {
     Type In = FT->getInput()->getCanonicalType();
     Type Out = FT->getResult()->getCanonicalType();
     Result = FunctionType::get(In, Out,
-                               FT->isAutoClosure(),
-                               FT->isBlock(),
-                               FT->isThin(),
-                               FT->getAbstractCC(),
+                               FT->getExtInfo(),
                                In->getASTContext());
     break;
   }

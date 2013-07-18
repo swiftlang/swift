@@ -600,13 +600,14 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       } else {
         // Otherwise, we're ok, rebuild type, adding the AutoClosure and ObjcBlock
         // bit.
+        auto Info = FunctionType::ExtInfo(attrs.hasCC()
+                                          ? attrs.getAbstractCC()
+                                          : AbstractCC::Freestanding,
+                                          attrs.isThin(),
+                                          attrs.isAutoClosure(),
+                                          attrs.isObjCBlock());
         Ty = FunctionType::get(FT->getInput(), FT->getResult(),
-                               attrs.isAutoClosure(),
-                               attrs.isObjCBlock(),
-                               attrs.isThin(),
-                               attrs.hasCC()
-                                ? attrs.getAbstractCC()
-                                : AbstractCC::Freestanding,
+                               Info,
                                Context);
       }
       attrs.AutoClosure = false;
@@ -1074,10 +1075,9 @@ Type TypeChecker::transformType(Type type,
                                           Context);
     } else {
       auto fn = cast<FunctionType>(base);
+      
       return FunctionType::get(InputTy, ResultTy,
-                               fn->isAutoClosure(),
-                               fn->isBlock(),
-                               fn->isThin(),
+                               fn->getExtInfo(),
                                Context);
     }
   }

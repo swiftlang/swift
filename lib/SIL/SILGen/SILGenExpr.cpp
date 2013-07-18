@@ -711,13 +711,12 @@ ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                       innerPFT->getResult(),
                                       F.getASTContext());
   }
-  
+  auto Info = FunctionType::ExtInfo()
+                .withCallingConv(methodType.getAbstractCC())
+                .withIsThin(true);
   Type outerMethodTy = FunctionType::get(thisValue.getType().getSwiftType(),
                                          innerMethodTy,
-                                         /*isAutoClosure*/ false,
-                                         /*isBlock*/ false,
-                                         /*isThin*/ true,
-                                         methodType.getAbstractCC(),
+                                         Info,
                                          F.getASTContext());
 
   if (BoundGenericType *bgt = thisValue.getType().getAs<BoundGenericType>())
@@ -1129,12 +1128,13 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   auto *pft = SGM.getConstantType(constant).getAs<PolymorphicFunctionType>();
   
   if (pft && !forwardSubs.empty()) {
+    auto Info = FunctionType::ExtInfo()
+                  .withCallingConv(pft->getAbstractCC())
+                  .withIsThin(true);
+
     FunctionType *specialized = FunctionType::get(pft->getInput(),
                                                   pft->getResult(),
-                                                  /*autoClosure*/ false,
-                                                  /*isBlock*/ false,
-                                                  /*isThin*/ true,
-                                                  pft->getAbstractCC(),
+                                                  Info,
                                                   F.getASTContext());
     functionRef = B.createSpecialize(loc, functionRef, forwardSubs,
                                      getLoweredLoadableType(specialized));

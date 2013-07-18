@@ -1517,9 +1517,13 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
+    auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
+                                      thin,
+                                      autoClosure,
+                                      blockCompatible);
+    
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
-                                     autoClosure, blockCompatible, thin,
-                                     callingConvention.getValue(), ctx);
+                                     Info, ctx);
     break;
   }
 
@@ -1761,11 +1765,13 @@ Type ModuleFile::getType(TypeID TID) {
     }
     assert(paramList && "missing generic params for polymorphic function");
 
+    auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
+                                                 thin);
+
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
                                                 getType(resultID),
                                                 paramList,
-                                                thin,
-                                                callingConvention.getValue(),
+                                                Info,
                                                 ctx);
     break;
   }

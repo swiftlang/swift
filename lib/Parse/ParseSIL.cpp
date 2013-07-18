@@ -539,12 +539,13 @@ bool SILParser::parseSILType(SILType &Result) {
   // Build PolymorphicFunctionType if necessary.
   FunctionType *FT = dyn_cast<FunctionType>(Ty.getType().getPointer());
   if (FT && PList) {
+    auto Info = PolymorphicFunctionType::ExtInfo(attrs.hasCC()
+                                                   ? attrs.getAbstractCC()
+                                                   : AbstractCC::Freestanding,
+                                                 attrs.isThin());
     Type resultType = PolymorphicFunctionType::get(FT->getInput(),
                                              FT->getResult(), PList,
-                                             attrs.isThin(),
-                                             attrs.hasCC()
-                                             ? attrs.getAbstractCC()
-                                             : AbstractCC::Freestanding,
+                                             Info,
                                              P.Context);
     Ty.setType(resultType);
     // Reset attributes that are applied.
