@@ -513,43 +513,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
-                               bool IsTypeLookup) {
-  // Operate on a canonical type so that we don't need to unwrap the type
-  // sugar.
-  BaseTy = BaseTy->getCanonicalType();
-
-  // Outer LValueType does not affect name lookup, just skip it.
-  BaseTy = BaseTy->getRValueType();
-
-  if (auto *AT = BaseTy->getAs<ArchetypeType>()) {
-    for (auto *PD : AT->getConformsTo()) {
-      lookupVisibleDecls(Consumer, PD->getDeclaredType(), IsTypeLookup);
-    }
-    return;
-  }
-  if (auto *PCT = BaseTy->getAs<ProtocolCompositionType>()) {
-    for (Type P : PCT->getProtocols()) {
-      lookupVisibleDecls(Consumer, P, IsTypeLookup);
-    }
-    return;
-  }
-
-  // Try to find the module that defined the type.
-  Module *M = nullptr;
-  if (auto *MT = BaseTy->getAs<ModuleType>())
-    M = MT->getModule();
-  else {
-    NominalTypeDecl *NTD;
-    if (auto *MTT = BaseTy->getAs<MetaTypeType>())
-      NTD = MTT->getInstanceType()->getNominalOrBoundGenericNominal();
-    else
-      NTD = BaseTy->getNominalOrBoundGenericNominal();
-    if (NTD)
-      M = NTD->getParentModule();
-  }
-
-  if (!M)
-    return;
-
-  lookupVisibleMemberDecls(BaseTy, Consumer, *M, IsTypeLookup);
+                               const Module &CurrModule, bool IsTypeLookup) {
+  lookupVisibleMemberDecls(BaseTy, Consumer, CurrModule, IsTypeLookup);
 }

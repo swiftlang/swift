@@ -545,7 +545,7 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleDecls(*this, ExprType);
+      lookupVisibleDecls(*this, ExprType, *CurrDeclContext->getParentModule());
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.

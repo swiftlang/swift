@@ -42,10 +42,10 @@ struct CompletionContext {
     Unqualified,
     Qualified
   } Kind;
-  
+
+  DeclContext *DC;
   union {
     struct {
-      DeclContext *dc;
       SourceLoc loc;
     } Unqualified;
     struct {
@@ -60,19 +60,19 @@ struct CompletionContext {
   
   CompletionContext() : Kind(Kind::Invalid) {}
   
-  CompletionContext(DeclContext *dc, SourceLoc loc)
-    : Kind(Kind::Unqualified), Unqualified{dc, loc} {
+  CompletionContext(DeclContext *DC, SourceLoc loc)
+    : Kind(Kind::Unqualified), DC(DC), Unqualified{loc} {
   }
   
-  CompletionContext(Type baseTy)
-    : Kind(Kind::Qualified), Qualified{baseTy.getPointer()} {
+  CompletionContext(DeclContext *DC, Type baseTy)
+    : Kind(Kind::Qualified), DC(DC), Qualified{baseTy.getPointer()} {
   }
   
   explicit operator bool() { return Kind != Kind::Invalid; }
   
   DeclContext *getDeclContext() const {
-    assert(Kind == Kind::Unqualified);
-    return Unqualified.dc;
+    assert(Kind != Kind::Invalid);
+    return DC;
   }
   SourceLoc getLoc() const {
     assert(Kind == Kind::Unqualified);
@@ -179,7 +179,7 @@ static CompletionContext getCompletionContextFromDotExpression(
         llvm::dbgs() << "\n");
   
   // Use the type as the context for qualified lookup.
-  return CompletionContext(parsedExpr->getType());
+  return CompletionContext(dc, parsedExpr->getType());
 }
 
 /// Determine the DeclContext, lookup kind, and starting prefix in which to
@@ -342,7 +342,8 @@ public:
         static_cast<ClangImporter&>(*clangImporter).lookupVisibleDecls(*this);
 
     } else {
-      lookupVisibleDecls(*this, context.getBaseType());
+      lookupVisibleDecls(*this, context.getBaseType(),
+                         *context.getDeclContext()->getParentModule());
     
       // Add the special qualified keyword 'metatype' so that, for example,
       // 'Int.metatype' can be completed.
