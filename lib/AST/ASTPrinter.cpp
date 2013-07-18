@@ -215,10 +215,15 @@ void PrintAST::printPattern(const Pattern *pattern) {
     auto typed = cast<TypedPattern>(pattern);
     printPattern(typed->getSubPattern());
     OS << " : ";
-    if (typed->hasType())
-      typed->getType()->print(OS);
-    else
+    TypeLoc ty = typed->getTypeLoc();
+    if (!ty.isNull()) {
+      if (ty.getTypeRepr())
+        OS << ty.getTypeRepr();
+      else
+        OS << ty.getType();
+    } else {
       OS << "<<null type>>";
+    }
     break;
   }
       
