@@ -374,7 +374,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.getType().getPointer());
     ID.AddPointer(Elt.getName().get());
-    ID.AddPointer(Elt.getInit());
+    ID.AddInteger((unsigned)Elt.getDefaultArgKind());
     ID.AddBoolean(Elt.isVararg());
   }
 }

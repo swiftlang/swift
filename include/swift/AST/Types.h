@@ -18,6 +18,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -531,43 +532,79 @@ public:
 
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
-  /// Name - An optional name for the field.
+  /// An optional name for the field.
   Identifier Name;
+
+  /// Describes whether this element is variadic or what kind of default
+  /// argument it stores.
+  enum class DefaultArgOrVarArg : uint8_t {
+    /// Neither variadic nor
+    None,
+    /// Variadic.
+    VarArg,
+    /// It has a normal default argument.
+    DefaultArgument,
+    /// It has a caller-provided __FILE__ default argument.
+    FileArgument,
+    /// It has a caller-provided __LINE__ default argument.
+    LineArgument,
+    /// It has a caller-provided __COLUMN__ default argument.
+    ColumnArgument
+  };
 
   /// \brief This is the type of the field, which is mandatory, along with a bit
   /// indicating whether this is a vararg.
-  llvm::PointerIntPair<Type, 1, bool> TyAndVararg;
-
-  /// Init - This is a default value for the tuple element, used if an explicit
-  /// value is not specified.
-  ExprHandle *Init;
+  llvm::PointerIntPair<Type, 3, DefaultArgOrVarArg> TyAndDefaultOrVarArg;
 
 public:
   TupleTypeElt() = default;
   inline /*implicit*/ TupleTypeElt(Type ty,
                                    Identifier name = Identifier(),
-                                   ExprHandle *init = nullptr,
+                                   DefaultArgumentKind defaultArg =
+                                     DefaultArgumentKind::None,
                                    bool isVarArg = false);
+
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : Name(Identifier()), TyAndVararg(Ty, false), Init(nullptr) { }
+    : Name(Identifier()), TyAndDefaultOrVarArg(Ty, DefaultArgOrVarArg::None) { }
 
   bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
 
-  Type getType() const { return TyAndVararg.getPointer(); }
-  bool isVararg() const { return TyAndVararg.getInt(); }
+  Type getType() const { return TyAndDefaultOrVarArg.getPointer(); }
+
+  /// Determine whether this field is variadic.
+  bool isVararg() const {
+    return TyAndDefaultOrVarArg.getInt() == DefaultArgOrVarArg::VarArg;
+  }
+
+  /// Retrieve the kind of default argument available on this field.
+  DefaultArgumentKind getDefaultArgKind() const {
+    switch (TyAndDefaultOrVarArg.getInt()) {
+    case DefaultArgOrVarArg::None:
+    case DefaultArgOrVarArg::VarArg:
+      return DefaultArgumentKind::None;
+    case DefaultArgOrVarArg::DefaultArgument:
+      return DefaultArgumentKind::Normal;
+    case DefaultArgOrVarArg::FileArgument:
+      return DefaultArgumentKind::File;
+    case DefaultArgOrVarArg::LineArgument:
+      return DefaultArgumentKind::Line;
+    case DefaultArgOrVarArg::ColumnArgument:
+      return DefaultArgumentKind::Column;
+    }
+  }
+
   inline Type getVarargBaseTy() const;
 
-  /// \brief Retrieve a copy of this tuple type element with the type replaced.
+  /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    TupleTypeElt Result(*this);
-    Result.TyAndVararg.setPointerAndInt(T, false);
-    return Result;
+    return TupleTypeElt(T, getName(), getDefaultArgKind());
   }
-  
-  bool hasInit() const { return Init != nullptr; }
-  ExprHandle *getInit() const { return Init; }
-  void setInit(ExprHandle *E) { Init = E; }
+
+  /// Determine whether this tuple element has an initializer.
+  bool hasInit() const {
+    return getDefaultArgKind() != DefaultArgumentKind::None;
+  }
 };
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an
@@ -606,13 +643,7 @@ public:
   /// scalar, return the field number that the scalar is assigned to.  If not,
   /// return -1.
   int getFieldForScalarInit() const;
-  
-  
-  /// updateInitializedElementType - This methods updates the element type and
-  /// initializer for a non-canonical TupleType that has an initializer for the
-  /// specified element.  This should only be used by TypeChecker.
-  void updateInitializedElementType(unsigned EltNo, Type NewTy);
-  
+
   void print(raw_ostream &OS) const;
 
   // Implement isa/cast/dyncast/etc.
@@ -1858,12 +1889,39 @@ inline bool TypeBase::mayHaveSuperclass() {
 
 inline TupleTypeElt::TupleTypeElt(Type ty,
                                   Identifier name,
-                                  ExprHandle *init,
+                                  DefaultArgumentKind defArg,
                                   bool isVarArg)
-  : Name(name), TyAndVararg(ty, isVarArg), Init(init) {
+  : Name(name), TyAndDefaultOrVarArg(ty.getPointer(),
+                                     DefaultArgOrVarArg::None) {
   assert(!isVarArg || isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
+
+  if (isVarArg) {
+    assert(defArg == DefaultArgumentKind::None && "Defaulted vararg");
+    TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::VarArg);
+  } else {
+    switch (defArg) {
+    case DefaultArgumentKind::None:
+      break;
+
+    case DefaultArgumentKind::Normal:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::DefaultArgument);
+      break;
+
+    case DefaultArgumentKind::File:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::FileArgument);
+      break;
+
+    case DefaultArgumentKind::Line:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::LineArgument);
+      break;
+
+    case DefaultArgumentKind::Column:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::ColumnArgument);
+      break;
+    }
+  }
 }
 
 inline Type TupleTypeElt::getVarargBaseTy() const {

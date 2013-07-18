@@ -298,9 +298,10 @@ namespace decls_block {
 
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
-    IdentifierIDField, // name
-    TypeIDField,       // type
-    BCFixed<1>         // vararg?
+    IdentifierIDField,    // name
+    TypeIDField,          // type
+    DefaultArgumentField, // default argument
+    BCFixed<1>            // vararg?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<

@@ -667,7 +667,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
         Type ty = resolveType(namedTyR->getTypeRepr());
         if (ty->is<ErrorType>())
           return ty;
-        Elements.push_back(TupleTypeElt(ty, namedTyR->getName(), nullptr));
+        Elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
       } else {
         Type ty = resolveType(tyR);
         if (ty->is<ErrorType>())
@@ -680,8 +680,10 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       Type BaseTy = Elements.back().getType();
       Type FullTy = ArraySliceType::get(BaseTy, Context);
       Identifier Name = Elements.back().getName();
-      ExprHandle *Init = Elements.back().getInit();
-      Elements.back() = TupleTypeElt(FullTy, Name, Init, true);
+      // FIXME: Where are we rejecting default arguments for variadic
+      // parameters?
+      Elements.back() = TupleTypeElt(FullTy, Name, DefaultArgumentKind::None,
+                                     true);
     }
 
     return TupleType::get(Elements, Context);
@@ -1012,7 +1014,7 @@ Type TypeChecker::transformType(Type type,
         for (unsigned I = 0; I != Index; ++I) {
           const TupleTypeElt &FromElt =Tuple->getFields()[I];
           Elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.getInit(),
+                                          FromElt.getDefaultArgKind(),
                                           FromElt.isVararg()));
         }
 
@@ -1020,8 +1022,8 @@ Type TypeChecker::transformType(Type type,
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      Elements.push_back(TupleTypeElt(EltTy, Elt.getName(), Elt.getInit(),
-                                      Elt.isVararg()));
+      Elements.push_back(TupleTypeElt(EltTy, Elt.getName(),
+                                      Elt.getDefaultArgKind(), Elt.isVararg()));
       ++Index;
     }
 

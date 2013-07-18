@@ -522,14 +522,16 @@ static Type getStrippedType(const ASTContext &context, Type type,
       Type EltTy = getStrippedType(context, Elt.getType(),
                                    stripLabels, stripDefaultArgs);
       if (Rebuild || EltTy.getPointer() != Elt.getType().getPointer() ||
-          (Elt.getInit() && stripDefaultArgs) || 
+          (Elt.hasInit() && stripDefaultArgs) ||
           (!Elt.getName().empty() && stripLabels)) {
         if (!Rebuild) {
           Elements.reserve(TupleTy->getFields().size());
           for (unsigned I = 0; I != Idx; ++I) {
             const TupleTypeElt &Elt = TupleTy->getFields()[I];
             Identifier newName = stripLabels? Identifier() : Elt.getName();
-            ExprHandle *newDefArg = stripDefaultArgs? nullptr : Elt.getInit();
+            DefaultArgumentKind newDefArg
+              = stripDefaultArgs? DefaultArgumentKind::None
+                                : Elt.getDefaultArgKind();
             Elements.push_back(TupleTypeElt(Elt.getType(), newName, newDefArg,
                                             Elt.isVararg()));
           }
@@ -537,7 +539,9 @@ static Type getStrippedType(const ASTContext &context, Type type,
         }
 
         Identifier newName = stripLabels? Identifier() : Elt.getName();
-        ExprHandle *newDefArg = stripDefaultArgs? nullptr : Elt.getInit();
+        DefaultArgumentKind newDefArg
+          = stripDefaultArgs? DefaultArgumentKind::None
+                            : Elt.getDefaultArgKind();
         Elements.push_back(TupleTypeElt(EltTy, newName, newDefArg,
                                         Elt.isVararg()));
       }
@@ -794,7 +798,7 @@ CanType TypeBase::getCanonicalType() {
              "Cannot get canonical type of un-typechecked TupleType!");
       CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
                                      field.getName(),
-                                     field.getInit(),
+                                     field.getDefaultArgKind(),
                                      field.isVararg()));
     }
 
@@ -1144,15 +1148,6 @@ int TupleType::getFieldForScalarInit() const {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
-
-/// updateInitializedElementType - This methods updates the element type and
-/// initializer for a non-canonical TupleType that has an initializer for the
-/// specified element.  This should only be used by TypeChecker.
-void TupleType::updateInitializedElementType(unsigned EltNo, Type NewTy) {
-  TupleTypeElt &Elt = const_cast<TupleTypeElt&>(Fields[EltNo]);
-  assert(Elt.hasInit() && "Can only update elements with default values");
-  Elt = TupleTypeElt(NewTy, Elt.getName(), Elt.getInit());
-}
 
 bool SubstitutableType::requiresClass() const {
   if (Superclass)

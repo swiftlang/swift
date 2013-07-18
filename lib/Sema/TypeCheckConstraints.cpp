@@ -2423,7 +2423,7 @@ static Type stripInitializers(TypeChecker &tc, Type origType) {
                for (const auto &field : tupleTy->getFields()) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
-                                               nullptr,
+                                               DefaultArgumentKind::None,
                                                field.isVararg()));
                                                
                }

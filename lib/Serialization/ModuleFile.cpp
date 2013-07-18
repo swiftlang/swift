@@ -1480,14 +1480,18 @@ Type ModuleFile::getType(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
+      uint8_t rawDefArg;
       bool isVararg;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  isVararg);
+                                                  rawDefArg, isVararg);
 
       {
         BCOffsetRAII restoreOffset(DeclTypeCursor);
-        elements.push_back({getType(typeID), getIdentifier(nameID),
-                            /*initializer=*/nullptr, isVararg});
+        DefaultArgumentKind defArg = DefaultArgumentKind::None;
+        if (auto actualDefArg = getActualDefaultArgKind(rawDefArg))
+          defArg = *actualDefArg;
+        elements.push_back({getType(typeID), getIdentifier(nameID), defArg,
+                            isVararg});
       }
     }
 

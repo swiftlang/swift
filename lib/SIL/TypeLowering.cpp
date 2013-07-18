@@ -88,7 +88,7 @@ static Type getBridgedInputType(TypeConverter &tc,
         changed = true;
         bridgedFields.push_back(TupleTypeElt(bridged,
                                              field.getName(),
-                                             field.getInit(),
+                                             field.getDefaultArgKind(),
                                              field.isVararg()));
       } else {
         bridgedFields.push_back(field);

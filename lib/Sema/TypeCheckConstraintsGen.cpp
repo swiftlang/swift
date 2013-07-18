@@ -472,8 +472,8 @@ namespace {
       Type arrayEltsTy = tc.getArraySliceType(expr->getLoc(), arrayElementTy);
       TupleTypeElt arrayEltsElt{arrayEltsTy,
                                 /*name=*/ Identifier(),
-                                /*init=*/ nullptr,
-                                arrayElementTy};
+                                DefaultArgumentKind::None,
+                                /*isVararg=*/true};
       Type arrayEltsTupleTy = TupleType::get(arrayEltsElt, C);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(),
@@ -531,8 +531,8 @@ namespace {
       Type dictionaryEltsTy = tc.getArraySliceType(expr->getLoc(), elementTy);
       TupleTypeElt dictionaryEltsElt(dictionaryEltsTy,
                                      /*name=*/ Identifier(),
-                                     /*init=*/ nullptr,
-                                     /*isVarArg=*/ true);
+                                     DefaultArgumentKind::None,
+                                     /*isVararg=*/true);
       Type dictionaryEltsTupleTy = TupleType::get(dictionaryEltsElt, C);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(),
@@ -606,7 +606,8 @@ namespace {
                                            LocatorPathElt::getTupleElement(i)));
           auto name = findPatternName(tupleElt.getPattern());
           Type varArgBaseTy;
-          tupleTypeElts.push_back(TupleTypeElt(eltTy, name, tupleElt.getInit(),
+          tupleTypeElts.push_back(TupleTypeElt(eltTy, name,
+                                               tupleElt.getDefaultArgKind(),
                                                isVararg));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());

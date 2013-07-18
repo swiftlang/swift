@@ -1112,11 +1112,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
     llvm::SmallVector<Expr *, 4> eltInits;
     llvm::SmallVector<Identifier, 4> eltNames;
     for (auto &elt : ty->castTo<TupleType>()->getFields()) {
-      // If the element has an initializer, we're all set.
-      if (elt.getInit()) {
-        // FIXME: Add a DefaultTupleArgumentExpr node here?
-        continue;
-      }
+      assert(!elt.hasInit() && "Initializers can't appear here");
 
       // Check whether the element is default-initializable.
       Expr *eltInit = nullptr;
@@ -1195,7 +1191,7 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
     // Check whether any of the tuple elements are missing an initializer.
     bool missingInit = false;
     for (auto &elt : paramTuple->getFields()) {
-      if (elt.getInit())
+      if (elt.hasInit())
         continue;
 
       missingInit = true;

@@ -1297,10 +1297,12 @@ bool Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getFields()) {
-      // FIXME: Handle initializers.
+      uint8_t rawDefaultArg
+        = getRawStableDefaultArgumentKind(elt.getDefaultArgKind());
       TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addIdentifierRef(elt.getName()),
                                      addTypeRef(elt.getType()),
+                                     rawDefaultArg,
                                      elt.isVararg());
     }
 
