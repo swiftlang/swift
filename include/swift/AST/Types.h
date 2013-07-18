@@ -600,7 +600,7 @@ public:
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), getDefaultArgKind());
+    return TupleTypeElt(T, getName(), getDefaultArgKind(), isVararg());
   }
 
   /// Determine whether this tuple element has an initializer.
