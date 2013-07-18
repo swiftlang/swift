@@ -623,15 +623,16 @@ public:
     OS << "deinit_existential " << getID(DEI->getOperand());
   }
   void visitClassMetatypeInst(ClassMetatypeInst *MI) {
-    OS << "class_metatype " << MI->getType() << ", " << getID(MI->getOperand());
+    OS << "class_metatype " << MI->getType() << ", "
+       << getIDAndType(MI->getOperand());
   }
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
     OS << "archetype_metatype " << MI->getType() << ", "
-       << getID(MI->getOperand());
+       << getIDAndType(MI->getOperand());
   }
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
     OS << "protocol_metatype " << MI->getType() << ", "
-       << getID(MI->getOperand());
+       << getIDAndType(MI->getOperand());
   }
   void visitMetatypeInst(MetatypeInst *MI) {
     OS << "metatype " << MI->getType();
@@ -640,7 +641,7 @@ public:
     OS << "module @" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
-    OS << "associated_metatype " << getID(MI->getOperand())
+    OS << "associated_metatype " << getIDAndType(MI->getOperand())
        << ", " << MI->getType();
   }
   

@@ -469,3 +469,62 @@ bb0:
   %6 = tuple ()
   %7 = return %6 : $()
 }
+
+protocol SomeProtocol {
+}
+class SomeClass : SomeProtocol {
+}
+class SomeSubclass : SomeClass {}
+
+sil @test_class_metatype : $[thin] (c : SomeClass, s : SomeSubclass) -> (SomeClass.metatype, SomeClass.metatype) {
+bb0(%0 : $SomeClass, %1 : $SomeSubclass):
+  %2 = alloc_box $SomeClass                       // CHECK: alloc_box
+  %3 = alloc_box $SomeSubclass                    // CHECK: alloc_box
+  %4 = store %0 to %2#1 : $*SomeClass
+  %5 = store %1 to %3#1 : $*SomeSubclass
+  %7 = load %2#1 : $*SomeClass                    // CHECK: load
+  %8 = retain %7 : $SomeClass
+  // CHECK: class_metatype $SomeClass.metatype, {{%.*}} : $SomeClass
+  %9 = class_metatype $SomeClass.metatype, %7 : $SomeClass
+  %11 = load %3#1 : $*SomeSubclass                // CHECK: load
+  %12 = retain %11 : $SomeSubclass
+  // CHECK: class_metatype $SomeSubclass.metatype, {{%.*}} : $SomeSubclass
+  %13 = class_metatype $SomeSubclass.metatype, %11 : $SomeSubclass
+  %14 = upcast %13 : $SomeSubclass.metatype to $SomeClass.metatype  // CHECK: upcast
+  %15 = tuple (%9 : $SomeClass.metatype, %14 : $SomeClass.metatype) // CHECK: tuple
+  %16 = release %11 : $SomeSubclass
+  %17 = release %7 : $SomeClass
+  %18 = release %3#0 : $Builtin.ObjectPointer
+  %19 = release %2#0 : $Builtin.ObjectPointer
+  %20 = return %15 : $(SomeClass.metatype, SomeClass.metatype)
+}
+
+sil @test_archetype_metatype : $[thin] <T> (t : T) -> (T.metatype, T.metatype) {
+bb0(%0 : $*T):
+  %1 = alloc_box $T                               // CHECK: alloc_box
+  %2 = copy_addr [take] %0 to [initialization] %1#1 : $*T
+  %3 = metatype $T.metatype                       // CHECK: metatype
+  %5 = alloc_var $T                               // CHECK: alloc_var
+  %6 = copy_addr %1#1 to [initialization] %5 : $*T
+  // CHECK: archetype_metatype $T.metatype, {{%.*}} : $*T
+  %7 = archetype_metatype $T.metatype, %5 : $*T
+  %8 = tuple (%3 : $T.metatype, %7 : $T.metatype) // CHECK: tuple
+  %9 = destroy_addr %5 : $*T
+  %10 = dealloc_var %5 : $*T
+  %11 = release %1#0 : $Builtin.ObjectPointer
+  %12 = return %8 : $(T.metatype, T.metatype)
+}
+
+sil @test_protocol_metatype : $[thin] (p : SomeProtocol) -> SomeProtocol.metatype {
+bb0(%0 : $*SomeProtocol):
+  %1 = alloc_box $SomeProtocol                    // CHECK: alloc_box
+  %2 = copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
+  %4 = alloc_var $SomeProtocol                    // CHECK: alloc_var
+  %5 = copy_addr %1#1 to [initialization] %4 : $*SomeProtocol
+  // CHECK: protocol_metatype $SomeProtocol.metatype, {{%.*}} : $*SomeProtocol
+  %6 = protocol_metatype $SomeProtocol.metatype, %4 : $*SomeProtocol
+  %7 = destroy_addr %4 : $*SomeProtocol
+  %8 = dealloc_var %4 : $*SomeProtocol
+  %9 = release %1#0 : $Builtin.ObjectPointer
+  %10 = return %6 : $SomeProtocol.metatype
+}

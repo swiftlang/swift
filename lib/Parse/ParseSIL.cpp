@@ -743,12 +743,15 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_var", ValueKind::AllocVarInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
+    .Case("archetype_metatype", ValueKind::ArchetypeMetatypeInst)
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
     .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
+    .Case("associated_metatype", ValueKind::AssociatedMetatypeInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
     .Case("builtin_zero", ValueKind::BuiltinZeroInst)
+    .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("coerce", ValueKind::CoerceInst)
     .Case("condbranch", ValueKind::CondBranchInst)
@@ -778,6 +781,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
           ValueKind::ProjectDowncastExistentialAddrInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
+    .Case("protocol_metatype", ValueKind::ProtocolMetatypeInst)
     .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
@@ -1141,6 +1145,37 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILType(Ty))
       return true;
     ResultVal = B.createMetatype(SILLocation(), Ty);
+    break;
+  }
+  case ValueKind::ArchetypeMetatypeInst:
+  case ValueKind::ClassMetatypeInst:
+  case ValueKind::ProtocolMetatypeInst: {
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(Val))
+      return true;
+    switch (Opcode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::ArchetypeMetatypeInst:
+      ResultVal = B.createArchetypeMetatype(SILLocation(), Ty, Val);
+      break;
+    case ValueKind::ClassMetatypeInst:
+      ResultVal = B.createClassMetatype(SILLocation(), Ty, Val);
+      break;
+    case ValueKind::ProtocolMetatypeInst:
+      ResultVal = B.createProtocolMetatype(SILLocation(), Ty, Val);
+      break;
+    }
+    break;
+  }
+  case ValueKind::AssociatedMetatypeInst: {
+    SILType Ty;
+    if (parseTypedValueRef(Val) || 
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(Ty))
+      return true;
+    ResultVal = B.createAssociatedMetatype(SILLocation(), Val, Ty);
     break;
   }
   case ValueKind::TupleInst: {
