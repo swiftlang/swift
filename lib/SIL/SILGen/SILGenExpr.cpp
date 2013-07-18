@@ -922,7 +922,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
                                       ScalarToTupleExpr *E,
                                       Initialization *I) {
   auto outerFields = E->getType()->castTo<TupleType>()->getFields();
-  bool isScalarFieldVariadic = outerFields[E->getScalarField()].isVararg();
+  unsigned scalarField = E->getScalarField();
+  bool isScalarFieldVariadic = outerFields[scalarField].isVararg();
 
   // Decompose the initialization.
   SmallVector<InitializationPtr, 4> subInitializationBuf;
@@ -948,6 +949,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
     if (i == E->getScalarField())
       continue;
+
     // Fill the vararg field with an empty array.
     if (outerFields[i].isVararg()) {
       assert(i == e - 1 && "vararg isn't last?!");
@@ -955,14 +957,31 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
                                          {}, E->getVarargsInjectionFunction());
       varargs.forwardInto(gen, E, subInitializations[i]->getAddress());
       subInitializations[i]->finishInitialization(gen);
+      continue;
     }
-    // Evaluate default initializers in-place.
-    else {
-      assert(outerFields[i].hasInit() &&
-             "no default initializer in non-scalar field of scalar-to-tuple?!");
-      gen.emitExprInto(outerFields[i].getInit()->getExpr(),
-                       subInitializations[i].get());
+
+    auto &element = E->getElements()[i];
+    // If this element comes from a default argument generator, emit a call to
+    // that generator in-place.
+    assert(outerFields[i].hasInit() &&
+           "no default initializer in non-scalar field of scalar-to-tuple?!");
+    if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
+      SILConstant generator
+      = SILConstant::getDefaultArgGenerator(defaultArgOwner, i);
+      auto fnRef = gen.emitFunctionRef(E, generator);
+      auto generatorTy = gen.SGM.getConstantType(generator);
+      auto resultTy = generatorTy.getFunctionResultType();
+      auto apply = gen.emitApply(E, fnRef, { }, resultTy,
+                                 OwnershipConventions::getDefault(gen,
+                                                                  generatorTy));
+      apply.forwardInto(gen, E,
+                        subInitializations[i].get()->getAddressOrNull());
+      continue;
     }
+
+    // We have an caller-side default argument. Emit it in-place.
+    Expr *defArg = element.get<Expr *>();
+    gen.emitExprInto(defArg, subInitializations[i].get());
   }
   
   // Finish the aggregate initialization.
@@ -977,15 +996,14 @@ RValue SILGenFunction::visitScalarToTupleExpr(ScalarToTupleExpr *E,
     emitScalarToTupleExprInto(*this, E, I);
     return RValue();
   }
-  
+
   // Emit the scalar member.
   RValue scalar = visit(E->getSubExpr());
 
   // Prepare a tuple rvalue to house the result.
   RValue result(E->getType()->getCanonicalType());
   
-  // Create a tuple around the scalar along with any
-  // default values or varargs.
+  // Create a tuple from the scalar along with any default values or varargs.
   auto outerFields = E->getType()->castTo<TupleType>()->getFields();
   for (unsigned i = 0, e = outerFields.size(); i != e; ++i) {
     // Handle the variadic argument. If we didn't emit the scalar field yet,
@@ -1004,16 +1022,35 @@ RValue SILGenFunction::visitScalarToTupleExpr(ScalarToTupleExpr *E,
       break;
     }
 
-    // Add the scalar to the tuple in the right place.
-    else if (i == E->getScalarField()) {
+    auto &element = E->getElements()[i];
+
+    // A null element indicates that this is the position of the scalar. Add
+    // the scalar here.
+    if (element.isNull()) {
       result.addElement(std::move(scalar));
+      continue;
     }
-    // Fill in the other fields with their default initializers.
-    else {
-      assert(outerFields[i].hasInit() &&
-             "no default initializer in non-scalar field of scalar-to-tuple?!");
-      result.addElement(visit(outerFields[i].getInit()->getExpr()));
+
+    // If this element comes from a default argument generator, emit a call to
+    // that generator.
+    assert(outerFields[i].hasInit() &&
+           "no default initializer in non-scalar field of scalar-to-tuple?!");
+    if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
+      SILConstant generator
+        = SILConstant::getDefaultArgGenerator(defaultArgOwner, i);
+      auto fnRef = emitFunctionRef(E, generator);
+      auto generatorTy = SGM.getConstantType(generator);
+      auto resultTy = generatorTy.getFunctionResultType();
+      auto apply = emitApply(E, fnRef, { }, resultTy,
+                             OwnershipConventions::getDefault(*this,
+                                                              generatorTy));
+      result.addElement(*this, apply);
+      continue;
     }
+
+    // We have an caller-side default argument. Emit it.
+    Expr *defArg = element.get<Expr *>();
+    result.addElement(visit(defArg));
   }
 
   return result;

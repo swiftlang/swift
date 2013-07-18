@@ -1733,6 +1733,43 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
   return nullptr;
 }
 
+/// Produce the caller-side default argument for this default argument, or
+/// null if the default argument will be provided by the callee.
+static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
+                                 SourceLoc loc, ValueDecl *owner,
+                                 unsigned index) {
+  auto defArg = owner->getDefaultArg(index);
+  MagicIdentifierLiteralExpr::KindTy magicKind;
+  switch (defArg.first) {
+    case DefaultArgumentKind::None:
+      llvm_unreachable("No default argument here?");
+
+    case DefaultArgumentKind::Normal:
+      return nullptr;
+
+    case DefaultArgumentKind::Column:
+      magicKind = MagicIdentifierLiteralExpr::Column;
+      break;
+
+    case DefaultArgumentKind::File:
+      magicKind = MagicIdentifierLiteralExpr::File;
+      break;
+
+
+    case DefaultArgumentKind::Line:
+      magicKind = MagicIdentifierLiteralExpr::Line;
+      break;
+  }
+
+  // Create the default argument, which is a converted magic identifier
+  // literal expression.
+  Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc);
+  bool invalid = tc.typeCheckExpression(init, dc, defArg.second);
+  assert(!invalid && "conversion cannot fail");
+  (void)invalid;
+  return init;
+}
+
 Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
@@ -1777,39 +1814,12 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       hasInits = true;
       toSugarFields.push_back(toElt);
 
-      auto defArg = defaultArgsOwner->getDefaultArg(i);
-      MagicIdentifierLiteralExpr::KindTy magicKind;
-      switch (defArg.first) {
-      case DefaultArgumentKind::None:
-        llvm_unreachable("No default argument here?");
-
-      case DefaultArgumentKind::Normal:
-        // Argument filled in by callee.
-        continue;
-
-      case DefaultArgumentKind::Column:
-        magicKind = MagicIdentifierLiteralExpr::Column;
-        break;
-
-      case DefaultArgumentKind::File:
-        magicKind = MagicIdentifierLiteralExpr::File;
-        break;
-
-
-      case DefaultArgumentKind::Line:
-        magicKind = MagicIdentifierLiteralExpr::Line;
-        break;
+      // Create a caller-side default argument, if we need one.
+      if (auto defArg = getCallerDefaultArg(tc, cs.DC, expr->getLoc(),
+                                            defaultArgsOwner, i)) {
+        callerDefaultArgs.push_back(defArg);
+        sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
       }
-
-      // Create the default argument, which is a converted magic identifier
-      // literal expression.
-      Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind,
-                                                               expr->getLoc());
-      bool invalid = tc.typeCheckExpression(init, cs.DC, defArg.second);
-      assert(!invalid && "conversion cannot fail");
-      (void)invalid;
-      callerDefaultArgs.push_back(init);
-      sources[i] = TupleShuffleExpr::CallerDefaultInitialize;
       continue;
     }
 
@@ -1971,6 +1981,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   return shuffle;
 }
 
+
+
 Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                         int toScalarIdx,
                                         ConstraintLocatorBuilder locator) {
@@ -1983,7 +1995,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   if (lastField.isVararg()) {
     // Find the appropriate injection function.
     ArraySliceType *sliceType
-    = cast<ArraySliceType>(lastField.getType().getPointer());
+      = cast<ArraySliceType>(lastField.getType().getPointer());
     Type boundType = BuiltinIntegerType::get(64, tc.Context);
     injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
                                               sliceType, boundType,
@@ -2018,6 +2030,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
       hasInit = true;
       break;
     }
+
     if (i == toScalarIdx) {
       if (field.isVararg()) {
         assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
@@ -2034,16 +2047,63 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
         sugarFields.push_back(TupleTypeElt(expr->getType(),
                                            field.getName()));
       }
+
+      // Record the
     } else {
       sugarFields.push_back(field);
     }
     ++i;
   }
 
+  // Compute the elements of the resulting tuple.
+  SmallVector<ScalarToTupleExpr::Element, 4> elements;
+  ValueDecl *defaultArgsOwner = nullptr;
+  i = 0;
+  for (auto &field : toTuple->getFields()) {
+    // Use a null entry to indicate that this is the scalar field.
+    if (i == toScalarIdx) {
+      elements.push_back(ScalarToTupleExpr::Element());
+      ++i;
+      continue;
+    }
+
+    if (field.isVararg()) {
+      ++i;
+      continue;
+    }
+
+    assert(field.hasInit() && "Expected a default argument");
+
+    // Dig out the owner of the default arguments.
+    if (!defaultArgsOwner) {
+      defaultArgsOwner
+      = findDefaultArgsOwner(cs, solution,
+                             cs.getConstraintLocator(locator));
+      assert(defaultArgsOwner && "Missing default arguments owner?");
+    } else {
+      assert(findDefaultArgsOwner(cs, solution,
+                                  cs.getConstraintLocator(locator))
+             == defaultArgsOwner);
+    }
+
+    // Create a caller-side default argument, if we need one.
+    if (auto defArg = getCallerDefaultArg(tc, cs.DC, expr->getLoc(),
+                                          defaultArgsOwner, i)) {
+      // Record the caller-side default argument expression.
+      // FIXME: Do we need to record what this was synthesized from?
+      elements.push_back(defArg);
+    } else {
+      // Record the owner of the default argument.
+      elements.push_back(defaultArgsOwner);
+    }
+
+    ++i;
+  }
+
   Type destSugarTy = hasInit? toTuple
                             : TupleType::get(sugarFields, tc.Context);
 
-  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy, toScalarIdx,
+  return new (tc.Context) ScalarToTupleExpr(expr, destSugarTy,                                            tc.Context.AllocateCopy(elements),
                                             injectionFn);
 }
 

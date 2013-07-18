@@ -1519,21 +1519,37 @@ public:
 
 /// ScalarToTupleExpr - Convert a scalar to tuple type.
 class ScalarToTupleExpr : public ImplicitConversionExpr {
-  unsigned ScalarField;
+public:
+  /// Describes an element of the destination tuple, which can be the
+  /// caller-side default argument expression, the declaration from which the
+  /// callee-side default argument should be produced, or null to indicate the
+  /// 'hole' where the scalar expression should be placed.
+  typedef llvm::PointerUnion<Expr *, ValueDecl *> Element;
 
+private:
   /// If we're doing a varargs shuffle, this is the function to build the
   /// destination slice type.
   Expr *InjectionFn;
 
+  /// The elements of the destination tuple.
+  MutableArrayRef<Element> Elements;
+
 public:
-  ScalarToTupleExpr(Expr *subExpr, Type type, unsigned ScalarField,
+  ScalarToTupleExpr(Expr *subExpr, Type type,
+                    MutableArrayRef<Element> elements,
                     Expr *InjectionFn = nullptr)
     : ImplicitConversionExpr(ExprKind::ScalarToTuple, subExpr, type),
-      ScalarField(ScalarField), InjectionFn(InjectionFn) {}
+      InjectionFn(InjectionFn), Elements(elements) {}
 
-  unsigned getScalarField() { return ScalarField; }
+  /// Retrieve the index of the scalar field within the destination tuple.
+  unsigned getScalarField() const;
 
+  /// Retrieve the expression that refers to the injection function.
   Expr *getVarargsInjectionFunction() { return InjectionFn; }
+
+  /// Retrieve the elements of the destination tuple.
+  MutableArrayRef<Element> getElements() { return Elements; }
+  ArrayRef<Element> getElements() const { return Elements; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ScalarToTuple;

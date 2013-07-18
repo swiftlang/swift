@@ -443,3 +443,10 @@ SourceRange UnresolvedPatternExpr::getSourceRange() const {
   return subPattern->getSourceRange();
 }
 
+unsigned ScalarToTupleExpr::getScalarField() const {
+  unsigned result = std::find(Elements.begin(), Elements.end(), Element())
+                      - Elements.begin();
+  assert(result != Elements.size()
+         && "Tuple elements are missing the scalar 'hole'");
+  return result;
+}
