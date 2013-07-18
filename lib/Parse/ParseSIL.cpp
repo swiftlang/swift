@@ -762,6 +762,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("downcast_archetype_ref", ValueKind::DowncastArchetypeRefInst)
     .Case("downcast_existential_ref", ValueKind::DowncastExistentialRefInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
+    .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
     .Case("initialize_var", ValueKind::InitializeVarInst)
@@ -1484,6 +1485,25 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(IndexVal))
       return true;
     ResultVal = B.createIndexRawPointer(SILLocation(), Val, IndexVal);
+    break;
+  }
+  case ValueKind::GlobalAddrInst: {
+    Identifier GlobalName;
+    SILType Ty;
+    if (parseGlobalName(GlobalName) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(Ty))
+      return true;
+    // Find VarDecl for GlobalName.
+    ValueDecl *VD;
+    llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
+    // Perform a module level lookup on the first component of the fully-qualified
+    // name.
+    P.TU->lookupValue(Module::AccessPathTy(), GlobalName,
+                      NLKind::UnqualifiedLookup, CurModuleResults);
+    assert(CurModuleResults.size() == 1);
+    VD = CurModuleResults[0];
+    ResultVal = B.createGlobalAddr(SILLocation(), cast<VarDecl>(VD), Ty);
     break;
   }
   }

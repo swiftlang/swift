@@ -319,6 +319,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool DelayCheckingPattern =
       TC.TU.Kind != TranslationUnit::Library &&
+      TC.TU.Kind != TranslationUnit::SIL &&
       PBD->getDeclContext()->isModuleContext();
     if (IsSecondPass && !DelayCheckingPattern) {
       if (PBD->getInit() && PBD->getPattern()->hasType()) {

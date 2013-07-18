@@ -452,3 +452,20 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %11 = release %2#0 : $Builtin.ObjectPointer
   %12 = return %9 : $Builtin.RawPointer
 }
+
+var x : Int = 0
+sil @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+
+// CHECK: $() -> ()
+sil internal @global_code : $() -> () {
+bb0:
+  // CHECK: global_addr @x : $*Int64
+  %0 = global_addr @x : $*Int64
+  %1 = function_ref @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %2 = metatype $Int64.metatype
+  %3 = integer_literal $Builtin.Int128, 0         // CHECK: integer_literal
+  %4 = apply %1(%3, %2) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
+  %5 = store %4 to %0 : $*Int64
+  %6 = tuple ()
+  %7 = return %6 : $()
+}
