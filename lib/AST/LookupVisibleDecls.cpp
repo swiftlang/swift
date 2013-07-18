@@ -518,31 +518,38 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   // sugar.
   BaseTy = BaseTy->getCanonicalType();
 
-  swift::NominalTypeDecl *ntd = nullptr;
-  
-  if (LValueType *lvt = BaseTy->getAs<LValueType>()) {
-    Type ObjectType = lvt->getObjectType();
-    if (auto *AT = ObjectType->getAs<ArchetypeType>()) {
-      for (auto *PD : AT->getConformsTo()) {
-        lookupVisibleDecls(Consumer, PD->getDeclaredType(), IsTypeLookup);
-      }
-      return;
-    }
-    if (auto *PCT = ObjectType->getAs<ProtocolCompositionType>()) {
-      for (Type P : PCT->getProtocols()) {
-        lookupVisibleDecls(Consumer, P, IsTypeLookup);
-      }
-      return;
-    }
-    ntd = ObjectType->getNominalOrBoundGenericNominal();
-  } else if (MetaTypeType *mtt = BaseTy->getAs<MetaTypeType>())
-    ntd = mtt->getInstanceType()->getNominalOrBoundGenericNominal();
-  else
-    ntd = BaseTy->getNominalOrBoundGenericNominal();
+  // Outer LValueType does not affect name lookup, just skip it.
+  BaseTy = BaseTy->getRValueType();
 
-  if (!ntd)
+  if (auto *AT = BaseTy->getAs<ArchetypeType>()) {
+    for (auto *PD : AT->getConformsTo()) {
+      lookupVisibleDecls(Consumer, PD->getDeclaredType(), IsTypeLookup);
+    }
     return;
-  
-  lookupVisibleMemberDecls(BaseTy, Consumer, *ntd->getParentModule(),
-                           IsTypeLookup);
+  }
+  if (auto *PCT = BaseTy->getAs<ProtocolCompositionType>()) {
+    for (Type P : PCT->getProtocols()) {
+      lookupVisibleDecls(Consumer, P, IsTypeLookup);
+    }
+    return;
+  }
+
+  // Try to find the module that defined the type.
+  Module *M = nullptr;
+  if (auto *MT = BaseTy->getAs<ModuleType>())
+    M = MT->getModule();
+  else {
+    NominalTypeDecl *NTD;
+    if (auto *MTT = BaseTy->getAs<MetaTypeType>())
+      NTD = MTT->getInstanceType()->getNominalOrBoundGenericNominal();
+    else
+      NTD = BaseTy->getNominalOrBoundGenericNominal();
+    if (NTD)
+      M = NTD->getParentModule();
+  }
+
+  if (!M)
+    return;
+
+  lookupVisibleMemberDecls(BaseTy, Consumer, *M, IsTypeLookup);
 }
