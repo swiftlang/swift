@@ -8,20 +8,11 @@ add_swift_library(swift_runtime INSTALL
   Stubs.cpp
   SwiftObject.mm)
 
-if(SWIFT_OPTIMIZED)
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swift_runtime PROPERTIES
-                                      COMPILE_FLAGS "-momit-leaf-frame-pointer")
-  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swift_runtime PROPERTIES
-                                      COMPILE_FLAGS "-momit-leaf-frame-pointer")
- endif()
-endif()
+add_swift_optimization_flags(swift_runtime)
 
 set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS OFF
     CACHE BOOL "Overwrite memory for deallocated Swift objects")
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
-  set_target_properties(swift_runtime PROPERTIES
-                        COMPILE_FLAGS "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
+  add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
 

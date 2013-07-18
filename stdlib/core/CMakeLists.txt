@@ -42,15 +42,7 @@ add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE
   DEPENDS swift_runtime)
 add_dependencies(swift_stdlib_core swift)
 
-if(SWIFT_OPTIMIZED)
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swift_stdlib_core PROPERTIES
-                                           COMPILE_FLAGS "-momit-leaf-frame-pointer")
-  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swift_stdlib_core PROPERTIES
-                                           COMPILE_FLAGS "-momit-leaf-frame-pointer")
- endif()
-endif()
+add_swift_optimization_flags(swift_stdlib_core)
 
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_stdlib_core PROPERTIES

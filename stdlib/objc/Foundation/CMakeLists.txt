@@ -4,15 +4,7 @@ add_swift_library(swiftFoundation INSTALL
   BridgeNSString.mm
   DEPENDS swift_stdlib_core swiftObjectiveC)
 
-if(SWIFT_OPTIMIZED)
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swiftFoundation PROPERTIES
-                         COMPILE_FLAGS "-momit-leaf-frame-pointer")
-  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swiftFoundation PROPERTIES
-                         COMPILE_FLAGS "-momit-leaf-frame-pointer")
- endif()
-endif()
+add_swift_optimization_flags(swiftFoundation)
 
 # Link against frameworks
 target_link_libraries(swiftFoundation

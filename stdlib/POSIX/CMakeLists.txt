@@ -17,13 +17,4 @@ add_swift_library(swift_stdlib_posix INSTALL
   ${POSIXLIB_SOURCES}
   DEPENDS swift_stdlib_core)
 
-if(SWIFT_OPTIMIZED)
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swift_stdlib_posix PROPERTIES
-                                            COMPILE_FLAGS "-momit-leaf-frame-pointer")
-  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swift_stdlib_posix PROPERTIES
-                                            COMPILE_FLAGS "-momit-leaf-frame-pointer")
- endif()
-endif()
-
+add_swift_optimization_flags(swift_stdlib_posix)

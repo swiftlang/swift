@@ -550,6 +550,29 @@ macro(add_swift_executable name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")  
 endmacro(add_swift_executable)
 
+# Add compiler flags for a target.
+#
+# Usage:
+#   add_swift_compiler_flags(name # Name of the target
+#     flags                     ) # compiler flags string
+function(add_swift_compiler_flags name flags)
+  set_property(TARGET ${name} APPEND_STRING PROPERTY COMPILE_FLAGS " ${flags}")
+endfunction()
+
+# Add compiler flags for a target when SWIFT_OPTIMIZED is enabled.
+#
+# Usage:
+#   add_swift_optimization_flags(name) # Name of the target
+macro(add_swift_optimization_flags name)
+  if(SWIFT_OPTIMIZED)
+    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
+     add_swift_compiler_flags(${name} "-momit-leaf-frame-pointer")
+    elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+     add_swift_compiler_flags(${name} "-momit-leaf-frame-pointer")
+   endif()
+  endif()
+endmacro(add_swift_optimization_flags)
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(MODULES_SDK "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk" CACHE PATH
       "Path to the modules-enabled SDK to use")

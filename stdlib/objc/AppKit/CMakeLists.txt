@@ -3,15 +3,7 @@ add_swift_library(swiftAppKit INSTALL
   AppKit.swift
   DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation)
 
-if(SWIFT_OPTIMIZED)
-  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
-   set_target_properties(swiftAppKit PROPERTIES
-                         COMPILE_FLAGS "-momit-leaf-frame-pointer")
-  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-   set_target_properties(swiftAppKit PROPERTIES
-                         COMPILE_FLAGS "-momit-leaf-frame-pointer")
- endif()
-endif()
+add_swift_optimization_flags(swiftAppKit)
 
 # Link against frameworks
 target_link_libraries(swiftAppKit
