@@ -663,27 +663,17 @@ bool LinkEntity::isClangThunk() const {
 
   if (isDeclKind(getKind())) {
     ValueDecl *D = static_cast<ValueDecl *>(Pointer);
-    DeclContext *DC = D->getDeclContext();
-    while (!DC->isModuleContext()) {
-      DC = DC->getParent();
-    }
-
-    return isa<ClangModule>(DC) &&
+    return isa<ClangModule>(D->getDeclContext()->getParentModule()) &&
       (isa<ConstructorDecl>(D) || isa<SubscriptDecl>(D) ||
        (isa<VarDecl>(D) && cast<VarDecl>(D)->isProperty()));
   } else { // isTypeKind(getKind())
     CanType ty = CanType(static_cast<TypeBase*>(Pointer));
     NominalTypeDecl *decl = ty->getNominalOrBoundGenericNominal();
-    
+
     if (!decl)
       return false;
 
-    DeclContext *DC = decl->getDeclContext();
-    while (!DC->isModuleContext()) {
-      DC = DC->getParent();
-    }
-    
-    return isa<ClangModule>(DC);
+    return isa<ClangModule>(decl->getDeclContext()->getParentModule());
   }
 }
 

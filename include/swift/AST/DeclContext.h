@@ -27,6 +27,7 @@ namespace swift {
   class DeclContext;
   class GenericParamList;
   class Type;
+  class Module;
 }
 
 namespace llvm {
@@ -146,6 +147,9 @@ public:
   DeclContext *getParent() const {
     return ParentAndKind.getPointer();
   }
+
+  /// Returns the module context that contains this context.
+  Module *getParentModule() const;
   
   /// getASTContext - Return the ASTContext for a specified DeclContext by
   /// walking up to the enclosing module and returning its ASTContext.

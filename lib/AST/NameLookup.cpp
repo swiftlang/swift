@@ -270,15 +270,11 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
 
-  DeclContext *ModuleDC = DC;
-  while (!ModuleDC->isModuleContext())
-    ModuleDC = ModuleDC->getParent();
-
-  Module &M = *cast<Module>(ModuleDC);
+  Module &M = *DC->getParentModule();
 
   // Never perform local lookup for operators.
   if (Name.isOperator())
-    DC = ModuleDC;
+    DC = &M;
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.

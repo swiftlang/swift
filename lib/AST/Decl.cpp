@@ -146,6 +146,13 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   llvm_unreachable("Unhandled declaration context kind");
 }
 
+Module *DeclContext::getParentModule() const {
+  const DeclContext *DC = this;
+  while (!DC->isModuleContext())
+    DC = DC->getParent();
+  return const_cast<Module *>(cast<Module>(DC));
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
@@ -165,10 +172,7 @@ void *Module::operator new(size_t Bytes, ASTContext &C,
 }
 
 Module *Decl::getModuleContext() const {
-  DeclContext *dc = getDeclContext();
-  while (!dc->isModuleContext())
-    dc = dc->getParent();
-  return cast<Module>(dc);
+  return getDeclContext()->getParentModule();
 }
 
 // Helper functions to verify statically whether source-location

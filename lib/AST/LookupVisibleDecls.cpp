@@ -232,12 +232,8 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
       BaseMembersStorage.push_back(param.getDecl());
   BaseMembers = BaseMembersStorage;
 
-  DeclContext *DC = D->getDeclContext();
-  while (!DC->isModuleContext())
-    DC = DC->getParent();
-
   DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers, &M,
-                          cast<Module>(DC), IsTypeLookup);
+                          D->getParentModule(), IsTypeLookup);
 }
 
 namespace {
@@ -371,11 +367,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                const DeclContext *DC,
                                SourceLoc Loc,
                                bool IsTypeLookup) {
-  const DeclContext *ModuleDC = DC;
-  while (!ModuleDC->isModuleContext())
-    ModuleDC = ModuleDC->getParent();
-
-  const Module &M = *cast<Module>(ModuleDC);
+  const Module &M = *DC->getParentModule();
 
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
@@ -551,11 +543,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   if (!ntd)
     return;
   
-  DeclContext *ModuleDC = ntd->getDeclContext();
-  while (!ModuleDC->isModuleContext())
-    ModuleDC = ModuleDC->getParent();
-  
-  Module &M = *cast<Module>(ModuleDC);
-
-  lookupVisibleMemberDecls(BaseTy, Consumer, M, IsTypeLookup);
+  lookupVisibleMemberDecls(BaseTy, Consumer, *ntd->getParentModule(),
+                           IsTypeLookup);
 }

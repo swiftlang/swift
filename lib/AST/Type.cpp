@@ -729,17 +729,12 @@ static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
 static int compareProtocols(const void *V1, const void *V2) {
   const ProtocolDecl *P1 = *reinterpret_cast<const ProtocolDecl *const *>(V1);
   const ProtocolDecl *P2 = *reinterpret_cast<const ProtocolDecl *const *>(V2);
- 
-  DeclContext *DC1 = P1->getDeclContext();
-  while (!DC1->isModuleContext())
-    DC1 = DC1->getParent();
-  DeclContext *DC2 = P2->getDeclContext();
-  while (!DC2->isModuleContext())
-    DC2 = DC2->getParent();
-  
+
+  Module *M1 = P1->getParentModule();
+  Module *M2 = P2->getParentModule();
+
   // Try ordering based on module name, first.
-  if (int result
-        = cast<Module>(DC1)->Name.str().compare(cast<Module>(DC2)->Name.str()))
+  if (int result = M1->Name.str().compare(M2->Name.str()))
     return result;
   
   // Order based on protocol name.
