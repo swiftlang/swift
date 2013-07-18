@@ -18,6 +18,8 @@
 #ifndef SWIFT_IRGEN_GENPOLY_H
 #define SWIFT_IRGEN_GENPOLY_H
 
+#include "llvm/ADT/DenseMap.h"
+
 namespace llvm {
   class Type;
   template <class T> class ArrayRef;
@@ -35,6 +37,17 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
+  
+  /// A struct to hold type metadata and witnesses from an existential
+  /// container used to fulfill an archetype substitution.
+  struct ExistentialSubstitution {
+    CanType protocolType;
+    llvm::Value *metadata;
+    std::vector<llvm::Value *> witnesses;
+  };
+  
+  using ExistentialSubstitutionMap
+    = llvm::DenseMap<ArchetypeType*, ExistentialSubstitution>;
 
   /// Do the given types differ by abstraction when laid out as memory?
   bool differsByAbstractionInMemory(IRGenModule &IGM,
@@ -60,11 +73,15 @@ namespace irgen {
   /// representation of an (Int, Float), consume that and produce the
   /// representation of an (Int, T).
   ///
-  /// The substitutions must carry origTy to substTy.
+  /// The substitutions must carry origTy to substTy. If existential type
+  /// variables are used to substitute for archetypes, the runtime type and
+  /// witness information from the existential will be added to the
+  /// ExistentialSubstitutionMap given.
   void reemitAsUnsubstituted(IRGenFunction &IGF,
                              CanType origTy, CanType substTy,
                              ArrayRef<Substitution> subs,
-                             Explosion &src, Explosion &dest);
+                             Explosion &src, Explosion &dest,
+                             ExistentialSubstitutionMap &existentialSubs);
 
   /// Given an unsubstituted explosion, re-emit it as a substituted one.
   ///

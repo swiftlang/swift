@@ -1524,11 +1524,17 @@ void CallEmission::addSubstitutedArg(CanType substInputType, Explosion &arg) {
     origInputType = CurOrigType;
   }
   
-  reemitAsUnsubstituted(IGF, origInputType, substInputType, subs, arg, argE);
+  // Create a map to save archetype metadata extracted from existential
+  // containers.
+  ExistentialSubstitutionMap existentialSubstitutions;
+  
+  reemitAsUnsubstituted(IGF, origInputType, substInputType, subs, arg, argE,
+                        existentialSubstitutions);
   
   // FIXME: this doesn't handle instantiating at a generic type.
   if (auto polyFn = dyn_cast_or_null<PolymorphicFunctionType>(fnType)) {
-    emitPolymorphicArguments(IGF, polyFn, substInputType, subs, argE);
+    emitPolymorphicArguments(IGF, polyFn, substInputType, subs, argE,
+                             existentialSubstitutions);
   }
   
   addArg(argE);
@@ -1742,10 +1748,13 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   
   if (PolymorphicFunctionType *pft = origType.getAs<PolymorphicFunctionType>()) {
     assert(!subs.empty() && "no substitutions for polymorphic argument?!");
+    // FIXME: Handle existential substitutions in partial applications.
+    ExistentialSubstitutionMap existentialSubs;
     emitPolymorphicArguments(IGF, pft,
                          CanType(substType.castTo<FunctionType>()->getInput()),
                          subs,
-                         polymorphicArgs);
+                         polymorphicArgs,
+                         existentialSubs);
 
     const TypeInfo &metatypeTI = IGF.IGM.getTypeMetadataPtrTypeInfo(),
                    &witnessTI = IGF.IGM.getWitnessTablePtrTypeInfo();
