@@ -203,8 +203,14 @@ const TypeInfo *TypeConverter::convertStructType(StructDecl *D) {
   SmallVector<VarDecl*, 8> fields;
   for (Decl *D : D->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(D))
-      if (!VD->isProperty())
+      if (!VD->isProperty()) {
+        // FIXME: Type-parameter-dependent field layout isn't implemented yet.
+        if (!IGM.getFragileTypeInfo(VD->getType()).isFixedSize()) {
+          IGM.unimplemented(VD->getLoc(), "dynamic field layout in structs");
+          exit(1);
+        }
         fields.push_back(VD);
+      }
 
   // Create the struct type.
   auto ty = IGM.createNominalType(D);

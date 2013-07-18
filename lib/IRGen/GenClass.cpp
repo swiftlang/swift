@@ -298,7 +298,7 @@ namespace {
         auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
         assert(baseClass);
 
-        // Recurse.
+        // Recur.
         addFieldsForClass(baseClass);
 
         // Forget about the fields from the base class.
@@ -316,6 +316,12 @@ namespace {
         if (!var || var->isProperty()) continue;
 
         auto &eltType = IGM.getFragileTypeInfo(var->getType());
+        // FIXME: Type-parameter-dependent field layout isn't implemented yet.
+        if (!eltType.isFixedSize()) {
+          IGM.unimplemented(var->getLoc(), "non-fixed class layout");
+          exit(1);
+        }
+        
         LastElements.push_back(ElementLayout::getIncomplete(eltType));
       }
 
