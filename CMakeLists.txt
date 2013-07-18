@@ -220,7 +220,7 @@ function(compile_swift_files)
     list(APPEND swift_flags -parse-as-library)
   endif()
   if(SWIFTFILE_IS_STDLIB_CORE)
-    list(APPEND swift_flags -parse-stdlib)
+    list(APPEND swift_flags -parse-stdlib -module-name swift)
   endif()
 
   set(objfile ${SWIFTFILE_OUTPUT})
