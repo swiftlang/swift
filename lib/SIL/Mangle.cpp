@@ -318,7 +318,7 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
 }
 
 void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
-                                    Type T, ExplosionKind explosion,
+                                    CanType T, ExplosionKind explosion,
                                     unsigned uncurryLevel,
                                     bool mangleAsFunction) {
   // FIXME: Prefix?
@@ -326,7 +326,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
   bindGenericParameters(genericParams, /*mangle*/ true);
 
   if (mangleAsFunction)
-    mangleFunctionType(T->castTo<AnyFunctionType>(), explosion, uncurryLevel);
+    mangleFunctionType(cast<AnyFunctionType>(T), explosion, uncurryLevel);
   else
     mangleType(T, explosion, uncurryLevel);
 }
@@ -412,7 +412,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 
   // Mangle the type if requested.
   if (result.first) {
-    mangleType(decl->getType(), explosion, uncurryLevel);
+    mangleType(decl->getType()->getCanonicalType(), explosion, uncurryLevel);
   }
 }
 
@@ -447,11 +447,9 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <index> ::= <natural> _          # N+1
 ///
 /// <tuple-element> ::= <identifier>? <type>
-void Mangler::mangleType(Type type, ExplosionKind explosion,
+void Mangler::mangleType(CanType type, ExplosionKind explosion,
                          unsigned uncurryLevel) {
-  TypeBase *base = type->getCanonicalType().getPointer();
-
-  switch (base->getKind()) {
+  switch (type->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("mangling error type");
   case TypeKind::TypeVariable:
@@ -463,7 +461,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   // We don't care about these types being a bit verbose because we
   // don't expect them to come up that often in API names.
   case TypeKind::BuiltinFloat:
-    switch (cast<BuiltinFloatType>(base)->getFPKind()) {
+    switch (cast<BuiltinFloatType>(type)->getFPKind()) {
     case BuiltinFloatType::IEEE16: Buffer << "Bf16_"; return;
     case BuiltinFloatType::IEEE32: Buffer << "Bf32_"; return;
     case BuiltinFloatType::IEEE64: Buffer << "Bf64_"; return;
@@ -473,7 +471,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     }
     llvm_unreachable("bad floating-point kind");
   case TypeKind::BuiltinInteger:
-    Buffer << "Bi" << cast<BuiltinIntegerType>(base)->getBitWidth() << '_';
+    Buffer << "Bi" << cast<BuiltinIntegerType>(type)->getBitWidth() << '_';
     return;
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";
@@ -488,42 +486,41 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     Buffer << "BO";
     return;
   case TypeKind::BuiltinVector:
-    Buffer << "Bv" << cast<BuiltinVectorType>(base)->getNumElements();
-    mangleType(cast<BuiltinVectorType>(base)->getElementType(), explosion,
+    Buffer << "Bv" << cast<BuiltinVectorType>(type)->getNumElements();
+    mangleType(cast<BuiltinVectorType>(type).getElementType(), explosion,
                uncurryLevel);
     return;
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
-    return mangleType(cast<id##Type>(base)->getDesugaredType(), \
-                      explosion, uncurryLevel);
+    llvm_unreachable("expect canonical type");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
   case TypeKind::MetaType:
     Buffer << 'M';
-    return mangleType(cast<MetaTypeType>(base)->getInstanceType(),
+    return mangleType(cast<MetaTypeType>(type).getInstanceType(),
                       ExplosionKind::Minimal, 0);
 
   case TypeKind::LValue:
     Buffer << 'R';
-    return mangleType(cast<LValueType>(base)->getObjectType(),
+    return mangleType(cast<LValueType>(type).getObjectType(),
                       ExplosionKind::Minimal, 0);
 
   case TypeKind::ReferenceStorage: {
-    auto ref = cast<ReferenceStorageType>(base);
+    auto ref = cast<ReferenceStorageType>(type);
     Buffer << 'X';
     switch (ref->getOwnership()) {
     case Ownership::Strong: llvm_unreachable("strong reference storage");
     case Ownership::Unowned: Buffer << 'o'; break;
     case Ownership::Weak: Buffer << 'w'; break;
     }
-    return mangleType(ref->getReferentType(),
+    return mangleType(ref.getReferentType(),
                       ExplosionKind::Minimal, 0);
   }
 
   case TypeKind::Tuple: {
-    TupleType *tuple = cast<TupleType>(base);
+    auto tuple = cast<TupleType>(type);
     // type ::= 'T' tuple-field+ '_'  // tuple
     // type ::= 't' tuple-field+ '_'  // variadic tuple
     // tuple-field ::= identifier? type
@@ -535,14 +532,14 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     for (auto &field : tuple->getFields()) {
       if (field.hasName())
         mangleIdentifier(field.getName());
-      mangleType(field.getType(), explosion, 0);
+      mangleType(CanType(field.getType()), explosion, 0);
     }
     Buffer << '_';
     return;
   }
 
   case TypeKind::OneOf:
-    return mangleNominalType(cast<OneOfType>(base)->getDecl(), explosion);
+    return mangleNominalType(cast<OneOfType>(type)->getDecl(), explosion);
 
   case TypeKind::Protocol:
     // Protocol type manglings have a variable number of protocol names
@@ -554,27 +551,27 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     return;
 
   case TypeKind::Struct:
-    return mangleNominalType(cast<StructType>(base)->getDecl(), explosion);
+    return mangleNominalType(cast<StructType>(type)->getDecl(), explosion);
 
   case TypeKind::Class:
-    return mangleNominalType(cast<ClassType>(base)->getDecl(), explosion);
+    return mangleNominalType(cast<ClassType>(type)->getDecl(), explosion);
 
   case TypeKind::UnboundGeneric:
     // We normally reject unbound types in IR-generation, but there
     // are several occasions in which we'd like to mangle them in the
     // abstract.
-    mangleNominalType(cast<UnboundGenericType>(base)->getDecl(), explosion);
+    mangleNominalType(cast<UnboundGenericType>(type)->getDecl(), explosion);
     return;
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct: {
     // type ::= 'G' <type> <type>+ '_'
-    auto type = cast<BoundGenericType>(base);
+    auto boundType = cast<BoundGenericType>(type);
     Buffer << 'G';
-    mangleNominalType(type->getDecl(), explosion);
-    for (auto arg : type->getGenericArgs()) {
-      mangleType(arg, ExplosionKind::Minimal, /*uncurry*/ 0);
+    mangleNominalType(boundType->getDecl(), explosion);
+    for (auto arg : boundType->getGenericArgs()) {
+      mangleType(CanType(arg), ExplosionKind::Minimal, /*uncurry*/ 0);
     }
     Buffer << '_';
     return;
@@ -584,7 +581,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // <type> ::= U <generic-parameter>+ _ <type>
     // 'U' is for "universal qualification".
     // The nested type is always a function type.
-    PolymorphicFunctionType *fn = cast<PolymorphicFunctionType>(base);
+    auto fn = cast<PolymorphicFunctionType>(type);
     Buffer << 'U';
     manglePolymorphicType(&fn->getGenericParams(), fn, explosion, uncurryLevel,
                           /*mangleAsFunction=*/true);
@@ -599,7 +596,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // fail for local declarations --- that might be okay; it means we
     // probably need to insert contexts for all the enclosing contexts.
     // And of course, linkage is not critical for such things.
-    auto it = Archetypes.find(cast<ArchetypeType>(base));
+    auto it = Archetypes.find(cast<ArchetypeType>(type));
     assert(it != Archetypes.end());
     auto &info = it->second;
     assert(ArchetypesDepth >= info.Depth);
@@ -614,15 +611,15 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
   }
 
   case TypeKind::Function:
-    mangleFunctionType(cast<FunctionType>(base), explosion, uncurryLevel);
+    mangleFunctionType(cast<FunctionType>(type), explosion, uncurryLevel);
     return;
 
   case TypeKind::Array: {
     // type ::= 'A' integer type
-    ArrayType *array = cast<ArrayType>(base);
+    auto array = cast<ArrayType>(type);
     Buffer << 'A';
     Buffer << array->getSize();
-    mangleType(array->getBaseType(), ExplosionKind::Minimal, 0);
+    mangleType(array.getBaseType(), ExplosionKind::Minimal, 0);
     return;
   };
 
@@ -631,7 +628,7 @@ void Mangler::mangleType(Type type, ExplosionKind explosion,
     // same production:
     //   <type> ::= P <protocol-list> _
 
-    auto protocols = cast<ProtocolCompositionType>(base)->getProtocols();
+    auto protocols = cast<ProtocolCompositionType>(type)->getProtocols();
     Buffer << 'P';
     mangleProtocolList(protocols);
     Buffer << '_';
@@ -742,7 +739,7 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   }
 }
 
-void Mangler::mangleFunctionType(AnyFunctionType *fn,
+void Mangler::mangleFunctionType(CanAnyFunctionType fn,
                                  ExplosionKind explosion,
                                  unsigned uncurryLevel) {
   // type ::= 'F' type type (curried)
@@ -752,8 +749,8 @@ void Mangler::mangleFunctionType(AnyFunctionType *fn,
     Buffer << 'b';
   else
     Buffer << (uncurryLevel > 0 ? 'f' : 'F');
-  mangleType(fn->getInput(), explosion, 0);
-  mangleType(fn->getResult(), explosion,
+  mangleType(fn.getInput(), explosion, 0);
+  mangleType(fn.getResult(), explosion,
              (uncurryLevel > 0 ? uncurryLevel - 1 : 0));
 }
 

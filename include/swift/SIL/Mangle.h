@@ -74,11 +74,11 @@ public:
   void mangleEntity(ValueDecl *decl, ExplosionKind kind,
                     unsigned uncurryingLevel);
   void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
-  void mangleType(Type type, ExplosionKind kind, unsigned uncurryingLevel);
+  void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   
 private:
-  void mangleFunctionType(AnyFunctionType *fn, ExplosionKind explosionKind,
+  void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,
                           unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
@@ -88,7 +88,7 @@ private:
   void mangleGetterOrSetterContext(FuncDecl *fn);
   void bindGenericParameters(const GenericParamList *genericParams,
                              bool mangleParameters);
-  void manglePolymorphicType(const GenericParamList *genericParams, Type T,
+  void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
                              ExplosionKind explosion, unsigned uncurryLevel,
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(NominalTypeDecl *type);
