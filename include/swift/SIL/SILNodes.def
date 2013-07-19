@@ -49,9 +49,9 @@ VALUE(SILArgument, ValueBase)
 
 ABSTRACT_VALUE(SILInstruction, ValueBase)
   ABSTRACT_VALUE(AllocInst, SILInstruction)
-    INST(AllocVarInst, AllocInst)
+    INST(AllocStackInst, AllocInst)
     INST(AllocRefInst, AllocInst)
-    VALUE_RANGE(AllocInst, AllocVarInst, AllocRefInst)
+    VALUE_RANGE(AllocInst, AllocStackInst, AllocRefInst)
   INST(AllocBoxInst, SILInstruction)
   INST(AllocArrayInst, SILInstruction)
   INST(FunctionRefInst, SILInstruction)
@@ -107,7 +107,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(RetainInst, SILInstruction)
   INST(RetainAutoreleasedInst, SILInstruction)
   INST(ReleaseInst, SILInstruction)
-  INST(DeallocVarInst, SILInstruction)
+  INST(DeallocStackInst, SILInstruction)
   INST(DeallocRefInst, SILInstruction)
   INST(DestroyAddrInst, SILInstruction)
   
@@ -152,7 +152,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(SwitchOneofInst, TermInst)
     VALUE_RANGE(TermInst, UnreachableInst, SwitchOneofInst)
 
-  VALUE_RANGE(SILInstruction, AllocVarInst, CondBranchInst)
+  VALUE_RANGE(SILInstruction, AllocStackInst, CondBranchInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE

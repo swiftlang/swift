@@ -30,7 +30,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   return false;
 }
 
-static bool optimizeAllocVar(AllocVarInst *ABI) {
+static bool optimizeAllocStack(AllocStackInst *ASI) {
   return false;
 }
 
@@ -50,8 +50,8 @@ void swift::performSILMemoryPromotion(SILModule *M) {
             Inst->eraseFromParent();
             continue;
           }
-        } else if (auto *AVI = dyn_cast<AllocVarInst>(Inst)) {
-          if (optimizeAllocVar(AVI)) {
+        } else if (auto *ASI = dyn_cast<AllocStackInst>(Inst)) {
+          if (optimizeAllocStack(ASI)) {
             ++NumRegPromoted;
 
             // Carefully move iterator to avoid invalidation problems.

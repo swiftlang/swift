@@ -482,7 +482,7 @@ public:
 
   void visitSILBasicBlock(SILBasicBlock *BB);
   
-  void visitAllocVarInst(AllocVarInst *i);
+  void visitAllocStackInst(AllocStackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
   void visitAllocArrayInst(AllocArrayInst *i);
@@ -532,7 +532,7 @@ public:
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
-  void visitDeallocVarInst(DeallocVarInst *i);
+  void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
 
   void visitInitializeVarInst(InitializeVarInst *i);
@@ -1698,7 +1698,7 @@ void IRGenSILFunction::visitRetainAutoreleasedInst(
   emitObjCRetainAutoreleasedReturnValue(*this, value);
 }
 
-void IRGenSILFunction::visitAllocVarInst(swift::AllocVarInst *i) {
+void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
   SILValue v(i, 0);
 
@@ -1729,7 +1729,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
-void IRGenSILFunction::visitDeallocVarInst(swift::DeallocVarInst *i) {
+void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   // Nothing to do. We could emit a lifetime.end here maybe.
 }
 

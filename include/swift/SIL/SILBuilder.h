@@ -136,8 +136,8 @@ public:
   // SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
 
-  AllocVarInst *createAllocVar(SILLocation Loc, SILType elementType) {
-    return insert(new (F.getModule()) AllocVarInst(Loc, elementType, F));
+  AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType) {
+    return insert(new (F.getModule()) AllocStackInst(Loc, elementType, F));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType) {
@@ -585,8 +585,8 @@ public:
   createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
   }
-  DeallocVarInst *createDeallocVar(SILLocation loc, SILValue operand) {
-    return insert(new (F.getModule()) DeallocVarInst(loc, operand));
+  DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) DeallocStackInst(loc, operand));
   }
   DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocRefInst(loc, operand));

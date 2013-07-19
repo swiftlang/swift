@@ -423,7 +423,7 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& Builder,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
                                                   const llvm::Twine &Name,
-                                                  swift::AllocVarInst *i) {
+                                                  AllocStackInst *i) {
   // Make a best effort to find out if this variable is actually an
   // argument of the current function. This is done by looking at the
   // source of the first store to this alloca.  Unless we start

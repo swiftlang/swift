@@ -42,7 +42,7 @@ class SILArgument;
 class SILDebugScope;
 class SILModule;
 class SILFunctionTypeInfo;
-class AllocVarInst;
+class AllocStackInst;
 
 namespace irgen {
 
@@ -128,7 +128,7 @@ public:
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
                                     const llvm::Twine &Name,
-                                    swift::AllocVarInst *i);
+                                    swift::AllocStackInst *i);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder& Builder,

@@ -124,13 +124,13 @@ ArrayRef<Operand> SILInstruction::getAllOperands() const {
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-AllocVarInst::AllocVarInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : AllocInst(ValueKind::AllocVarInst, loc, elementType.getAddressType()) {
+AllocStackInst::AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F)
+  : AllocInst(ValueKind::AllocStackInst, loc, elementType.getAddressType()) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
 /// allocation, or null if this is a temporary allocation.
-VarDecl *AllocVarInst::getDecl() const {
+VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAs<VarDecl>();
 }
 
@@ -141,7 +141,7 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
 
 /// getElementType - Get the type of the allocated memory (as opposed to the
 /// type of the instruction itself, which will be an address type).
-Type AllocVarInst::getElementType() const {
+Type AllocStackInst::getElementType() const {
   return getType().getSwiftRValueType();
 }
 

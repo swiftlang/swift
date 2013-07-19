@@ -166,12 +166,11 @@ public:
   }
 };
 
-/// AllocVarInst - This represents the allocation of an unboxed stack memory.
-/// The memory is provided uninitialized.
-class AllocVarInst : public AllocInst {
+/// AllocStackInst - This represents the allocation of an unboxed (i.e., no
+/// reference count) stack memory.  The memory is provided uninitialized.
+class AllocStackInst : public AllocInst {
 public:
-  AllocVarInst(SILLocation loc, SILType elementType,
-               SILFunction &F);
+  AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F);
 
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -182,7 +181,7 @@ public:
   Type getElementType() const;
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::AllocVarInst;
+    return V->getKind() == ValueKind::AllocStackInst;
   }
 };
   
@@ -1270,7 +1269,7 @@ public:
 /// has not been initialized, deinitializes the existential and deallocates
 /// the value buffer. This should only be used for partially-initialized
 /// existentials; a fully-initialized existential can be destroyed with
-/// DestroyAddrInst and deallocated with DeallocVarInst.
+/// DestroyAddrInst and deallocated with DeallocStackInst.
 class DeinitExistentialInst
   : public UnaryInstructionBase<ValueKind::DeinitExistentialInst,
                                 SILInstruction,
@@ -1356,12 +1355,13 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// DeallocVarInst - Deallocate stack memory allocated by alloc_var.
-class DeallocVarInst : public UnaryInstructionBase<ValueKind::DeallocVarInst,
-                                                   SILInstruction,
-                                                   /*HAS_RESULT*/ false> {
+/// DeallocStackInst - Deallocate stack memory allocated by alloc_stack.
+class DeallocStackInst
+  : public UnaryInstructionBase<ValueKind::DeallocStackInst, SILInstruction,
+                                /*HAS_RESULT*/ false>
+{
 public:
-  DeallocVarInst(SILLocation Loc, SILValue Operand)
+  DeallocStackInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
   

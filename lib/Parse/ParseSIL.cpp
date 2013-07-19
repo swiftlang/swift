@@ -743,7 +743,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   Opcode = llvm::StringSwitch<ValueKind>(OpcodeName)
     .Case("alloc_box", ValueKind::AllocBoxInst)
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
-    .Case("alloc_var", ValueKind::AllocVarInst)
+    .Case("alloc_var", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("archetype_metatype", ValueKind::ArchetypeMetatypeInst)
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
@@ -760,7 +760,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
-    .Case("dealloc_var", ValueKind::DeallocVarInst)
+    .Case("dealloc_var", ValueKind::DeallocStackInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
     .Case("downcast_archetype_addr", ValueKind::DowncastArchetypeAddrInst)
@@ -1121,25 +1121,25 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createStore(SILLocation(), FromVal, AddrVal);
     break;
   }
-  case ValueKind::AllocVarInst:
+  case ValueKind::AllocStackInst:
   case ValueKind::AllocRefInst: {
     SILType Ty;
     if (parseSILType(Ty))
       return true;
     
-    if (Opcode == ValueKind::AllocVarInst)
-      ResultVal = B.createAllocVar(SILLocation(), Ty);
+    if (Opcode == ValueKind::AllocStackInst)
+      ResultVal = B.createAllocStack(SILLocation(), Ty);
     else {
       assert(Opcode == ValueKind::AllocRefInst);
       ResultVal = B.createAllocRef(SILLocation(), Ty);
     }
     break;
   }
-  case ValueKind::DeallocVarInst: {
+  case ValueKind::DeallocStackInst: {
     if (parseTypedValueRef(Val))
       return true;
     
-    ResultVal = B.createDeallocVar(SILLocation(), Val);
+    ResultVal = B.createDeallocStack(SILLocation(), Val);
     break;
   }
   case ValueKind::MetatypeInst: {

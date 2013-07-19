@@ -315,7 +315,7 @@ public:
     OS << "argument of " << getID(A->getParent());
   }
   
-  void visitAllocVarInst(AllocVarInst *AVI) {
+  void visitAllocStackInst(AllocStackInst *AVI) {
     OS << "alloc_var $" << AVI->getElementType().getString();
     if (VarDecl *vd = AVI->getDecl())
       OS << "  // var " << vd->getName();
@@ -654,7 +654,7 @@ public:
   void visitReleaseInst(ReleaseInst *RI) {
     OS << "release " << getIDAndType(RI->getOperand());
   }
-  void visitDeallocVarInst(DeallocVarInst *DI) {
+  void visitDeallocStackInst(DeallocStackInst *DI) {
     OS << "dealloc_var " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {

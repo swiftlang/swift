@@ -48,7 +48,7 @@ namespace {
     CleanupTemporaryAllocation(SILValue alloc) : alloc(alloc) {}
     
     void emit(SILGenFunction &gen) override {
-      gen.B.createDeallocVar(SILLocation(), alloc);
+      gen.B.createDeallocStack(SILLocation(), alloc);
     }
   };
   
@@ -287,7 +287,7 @@ RValue SILGenFunction::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
-  SILValue tmpMem = B.createAllocVar(loc, ty);
+  SILValue tmpMem = B.createAllocStack(loc, ty);
   Cleanups.pushCleanup<CleanupTemporaryAllocation>(tmpMem);
   return tmpMem;
 }
@@ -1395,7 +1395,7 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
     gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
     gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
   } else {
-    SILValue addr = gen.B.createAllocVar(ctor, thisTy);
+    SILValue addr = gen.B.createAllocStack(ctor, thisTy);
     gen.B.createInitializeVar(ctor, addr, /*canDefaultConstruct*/ false);
     SILValue result = gen.B.createLoad(ctor, addr);
     gen.B.createReturn(ctor, result);
@@ -1555,7 +1555,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   } else {
     // We can just take ownership from the stack slot and consider it
     // deinitialized.
-    B.createDeallocVar(ctor, thisLV);
+    B.createDeallocStack(ctor, thisLV);
   }
   B.createReturn(ctor, thisValue);
 }
@@ -1757,7 +1757,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   } else {
     // We can just take ownership from the stack slot and consider it
     // deinitialized.
-    B.createDeallocVar(ctor, thisLV);
+    B.createDeallocStack(ctor, thisLV);
   }
   B.createReturn(ctor, thisValue);
 }

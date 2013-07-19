@@ -138,7 +138,7 @@ public:
     return false;
   }
 
-  void checkAllocVarInst(AllocVarInst *AI) {
+  void checkAllocStackInst(AllocStackInst *AI) {
     require(AI->getType().isAddress(), "alloc_var must return address");
   }
   
@@ -415,7 +415,7 @@ public:
     require(RI->getOperand().getType().hasReferenceSemantics(),
             "Operand of dealloc_ref must be reference type");
   }
-  void checkDeallocVarInst(DeallocVarInst *DI) {
+  void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isAddress(),
             "Operand of dealloc_var must be address");
   }
