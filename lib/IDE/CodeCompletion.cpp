@@ -230,6 +230,12 @@ class CompletionLookup : swift::VisibleDeclConsumer,
   bool HaveDot = false;
   bool IsSuperRefExpr = false;
 
+  /// \brief True if we are code completing inside a static method.
+  bool InsideStaticMethod = false;
+
+  /// \brief DeclContext of the inner method of the code completion point.
+  const DeclContext *CurrMethodDC = nullptr;
+
   bool needDot() const {
     return Kind == LookupKind::ValueExpr && !HaveDot;
   }
@@ -240,6 +246,23 @@ public:
                    const DeclContext *CurrDeclContext)
       : CompletionContext(CompletionContext), SwiftContext(SwiftContext),
         CurrDeclContext(CurrDeclContext) {
+    // Determine if we are doing code completion inside a static method.
+    if (CurrDeclContext->isLocalContext()) {
+      const DeclContext *FunctionDC = CurrDeclContext;
+      while (FunctionDC->isLocalContext()) {
+        const DeclContext *Parent = FunctionDC->getParent();
+        if (!Parent->isLocalContext())
+          break;
+        FunctionDC = Parent;
+      }
+      if (auto *FE = dyn_cast<FuncExpr>(FunctionDC)) {
+        auto *FD = FE->getDecl();
+        if (FD->getDeclContext()->isTypeContext()) {
+          CurrMethodDC = FunctionDC;
+          InsideStaticMethod = FD->isStatic();
+        }
+      }
+    }
   }
 
   void setHaveDot() {
@@ -260,6 +283,14 @@ public:
   void addSwiftVarDeclRef(const VarDecl *VD) {
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
+
+    if (InsideStaticMethod &&
+        VD->getDeclContext() == CurrMethodDC->getParent()) {
+      // Can not refer to an instance variable from a static function.
+      // FIXME: this should be probably handled by name lookup.
+      // FIXME: static variables.
+      return;
+    }
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -312,6 +343,16 @@ public:
   void addSwiftMethodCall(const FuncDecl *FD) {
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
+
+    if (InsideStaticMethod && !FD->isStatic() &&
+        FD->getDeclContext() == CurrMethodDC->getParent()) {
+      // If we got an instance function while code completing in a static
+      // function, then don't display the result.
+      // FIXME: referencing an instance function from a static function is
+      // allowed by the language, but the compiler crashes on this right now.
+      // rdar://14432081
+      return;
+    }
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
