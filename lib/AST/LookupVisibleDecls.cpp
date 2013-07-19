@@ -116,9 +116,6 @@ static void lookupVisibleMemberDecls(Type BaseTy,
 /// of a given module 'M'.  This operation corresponds to a standard "dot"
 /// lookup operation like "a.b" where 'this' is the type of 'a'.  This
 /// operation is only valid after name binding.
-///
-/// \param OnlyInstanceMembers Only instance members should be found by
-/// name lookup.
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
                            const DeclContext *CurrDC,
