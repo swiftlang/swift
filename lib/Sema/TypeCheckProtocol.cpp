@@ -215,8 +215,8 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   // FIXME: Pass the nominal/extension context in as the DeclContext?
   constraints::ConstraintSystem cs(tc, &tc.TU);
 
-  // Open up the type of the requirement, replacing any unresolved archetypes
-  // with type variables.
+  // Open up the type of the requirement and witness, replacing any unresolved
+  // archetypes with type variables.
   llvm::DenseMap<ArchetypeType *, TypeVariableType *> replacements;
   SmallVector<ArchetypeType *, 4> unresolvedArchetypes;
   if (!unresolvedAssocTypes.empty()) {
@@ -226,14 +226,15 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
     reqType = cs.openType(reqType, unresolvedArchetypes, replacements);
   }
+  auto openWitnessType = cs.openType(witnessType);
 
   bool anyRenaming = false;
   if (decomposeFunctionType) {
     // Decompose function types into parameters and result type.
     auto reqInputType = reqType->castTo<AnyFunctionType>()->getInput();
     auto reqResultType = reqType->castTo<AnyFunctionType>()->getResult();
-    auto witnessInputType = witnessType->castTo<AnyFunctionType>()->getInput();
-    auto witnessResultType = witnessType->castTo<AnyFunctionType>()->getResult();
+    auto witnessInputType = openWitnessType->castTo<AnyFunctionType>()->getInput();
+    auto witnessResultType = openWitnessType->castTo<AnyFunctionType>()->getResult();
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
@@ -286,7 +287,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
   } else {
     // Simple case: remove labels and add the constraint.
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     witnessType->getUnlabeledType(tc.Context),
+                     openWitnessType->getUnlabeledType(tc.Context),
                      reqType->getUnlabeledType(tc.Context));
   }
 
