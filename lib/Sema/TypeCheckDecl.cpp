@@ -667,7 +667,48 @@ public:
     return badType;
   }
 
-  void semaFuncExpr(FuncExpr *FE, DeclAttributes &Attr) {
+  /// \brief Validate and consume the attributes that are applicable to the
+  /// AnyFunctionType.
+  ///
+  /// Currently, we only allow 'noreturn' to be applied on a FuncDecl.
+  AnyFunctionType::ExtInfo
+  validateAndConsumeFunctionTypeAttributes(FuncDecl *FD) {
+    DeclAttributes &Attrs = FD->getMutableAttrs();
+    auto Info = AnyFunctionType::ExtInfo();
+
+    if (Attrs.hasCC()) {
+      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute, "cc");
+      Attrs.cc = {};
+    }
+
+    if (Attrs.isThin()) {
+      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
+                  "thin");
+      Attrs.Thin = false;
+    }
+
+    // 'noreturn' is allowed on a function declaration.
+    Info = Info.withIsNoReturn(Attrs.isNoReturn());
+    Attrs.NoReturn = false;
+
+    if (Attrs.isAutoClosure()) {
+      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
+                  "auto_closure");
+      Attrs.AutoClosure = false;
+    }
+
+    if (Attrs.isObjCBlock()) {
+      TC.diagnose(FD->getStartLoc(), diag::invalid_decl_attribute,
+                  "objc_block");
+      Attrs.ObjCBlock = false;
+    }
+
+    return Info;
+  }
+
+  void semaFuncExpr(FuncDecl *FD) {
+    FuncExpr *FE = FD->getBody();
+
     if (FE->getType())
       return;
 
@@ -711,36 +752,17 @@ public:
         params = outerGenericParams;
       }
 
+      // Validate and consume the function type attributes.
+      auto Info = validateAndConsumeFunctionTypeAttributes(FD);
       if (params) {
-        // FIXME:
-        // We need to perform attribute checking here.
-        // Should this code be unified with Parser::applyAttributeToType?
-        // Not all of these attributes might be valid on a decl
-        // (such as CC, auto_closure, block)..
-        auto Info = PolymorphicFunctionType::ExtInfo(Attr.hasCC() ?
-                                                     Attr.getAbstractCC() :
-                                                     AbstractCC::Freestanding,
-                                                     Attr.isThin(),
-                                                     Attr.isNoReturn());
         funcTy = PolymorphicFunctionType::get(argTy, funcTy,
                                               params,
                                               Info,
                                               TC.Context);
       } else {
-        // FIXME:
-        // We need to perform attribute checking here.
-        // Should this code be unified with Parser::applyAttributeToType?
-        // Not all of these attributes might be valid on a decl.
-        auto Info = FunctionType::ExtInfo(Attr.hasCC() ?
-                                            Attr.getAbstractCC() :
-                                            AbstractCC::Freestanding,
-                                          Attr.isThin(),
-                                          Attr.isNoReturn(),
-                                          Attr.isAutoClosure(),
-                                          Attr.isObjCBlock());
         funcTy = FunctionType::get(argTy, funcTy, Info, TC.Context);
       }
-      // FIXME: Reset the arttributes we consumed there.
+
     }
     FE->setType(funcTy);
   }
@@ -768,7 +790,7 @@ public:
       checkGenericParams(gp);
     }
 
-    semaFuncExpr(body, FD->getMutableAttrs());
+    semaFuncExpr(FD);
     FD->setType(body->getType());
 
     validateAttributes(FD);
@@ -1632,4 +1654,15 @@ void DeclChecker::validateAttributes(ValueDecl *VD) {
     TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "cc");
     VD->getMutableAttrs().cc = {};
   }
+
+  if (Attrs.isThin()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "thin");
+    VD->getMutableAttrs().Thin = false;
+  }
+
+  if (Attrs.isNoReturn()) {
+    TC.diagnose(VD->getStartLoc(), diag::invalid_decl_attribute, "noreturn");
+    VD->getMutableAttrs().NoReturn = false;
+  }
+
 }
