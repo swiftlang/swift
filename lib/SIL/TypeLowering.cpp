@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -20,7 +21,6 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/TypeVisitor.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -313,7 +313,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
 /// This is only invoked on loadable types.
 ///
 class Lowering::LoadableTypeLoweringInfoVisitor
-  : public Lowering::TypeVisitor<LoadableTypeLoweringInfoVisitor> {
+  : public CanTypeVisitor<LoadableTypeLoweringInfoVisitor> {
   TypeLoweringInfo &theInfo;
   ReferenceTypePath currentElement;
 public:
@@ -326,7 +326,7 @@ public:
     currentElement.path.back() = c;
   }
   
-  void visitType(TypeBase *t) {
+  void visitType(CanType t) {
     if (t->hasReferenceSemantics())
       theInfo.referenceTypeElements.push_back(currentElement);
   }
@@ -343,21 +343,21 @@ public:
     popPath();
   }
   
-  void visitBoundGenericType(BoundGenericType *gt) {
+  void visitBoundGenericType(CanBoundGenericType gt) {
     if (StructDecl *sd = dyn_cast<StructDecl>(gt->getDecl()))
       walkStructDecl(sd);
     else
       visitType(gt);
   }
   
-  void visitNominalType(NominalType *t) {
+  void visitNominalType(CanNominalType t) {
     if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl()))
       walkStructDecl(sd);
     else
       this->visitType(t);
   }
   
-  void visitTupleType(TupleType *t) {
+  void visitTupleType(CanTupleType t) {
     pushPath();
     unsigned i = 0;
     for (TupleTypeElt const &elt : t->getFields()) {
@@ -389,9 +389,9 @@ TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
   
   // LValue types are a special case for lowering, because they get completely
   // removed, represented as 'address' SILTypes.
-  if (LValueType *lvt = t->getAs<LValueType>()) {
+  if (auto lvt = dyn_cast<LValueType>(t)) {
     // Derive SILType for LValueType from the object type.
-    t = lvt->getObjectType()->getCanonicalType();
+    t = lvt.getObjectType();
     theInfo->loweredType = getLoweredType(t, uncurryLevel).getAddressType();
     return *theInfo;
   }

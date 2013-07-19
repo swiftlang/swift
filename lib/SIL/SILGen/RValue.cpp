@@ -21,7 +21,7 @@
 #include "SILGen.h"
 #include "RValue.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/TypeVisitor.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include <deque>
 
 using namespace swift;
@@ -36,9 +36,9 @@ static unsigned getTupleSize(CanType t) {
 }
 
 class ExplodeTupleValue
-  : public Lowering::TypeVisitor<ExplodeTupleValue,
-                                 /*RetTy=*/ void,
-                                 /*Args...=*/ ManagedValue>
+  : public CanTypeVisitor<ExplodeTupleValue,
+                          /*RetTy=*/ void,
+                          /*Args...=*/ ManagedValue>
 {
 public:
   std::vector<ManagedValue> &values;
@@ -56,39 +56,37 @@ public:
     elementOffsets.push_back(0);
   }
   
-  void visitType(TypeBase *t, ManagedValue v) {
+  void visitType(CanType t, ManagedValue v) {
     values.push_back(v);
   }
   
-  void visitTupleType(TupleType *t, ManagedValue mv) {
+  void visitTupleType(CanTupleType t, ManagedValue mv) {
     ++depth;
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
       for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
-        auto &field = t->getFields()[i];
-        SILType fieldTy = gen.getLoweredType(field.getType());
+        CanType fieldCanTy = t.getElementType(i);
+        SILType fieldTy = gen.getLoweredType(fieldCanTy);
         SILValue member = gen.B.createTupleElementAddr(SILLocation(),
                                                      v, i,
                                                      fieldTy.getAddressType());
         if (!fieldTy.isAddressOnly(gen.F.getModule())
-            && !field.getType()->is<LValueType>())
+            && !isa<LValueType>(fieldCanTy))
           member = gen.B.createLoad(SILLocation(), member);
-        visit(CanType(field.getType()),
-              gen.emitManagedRValueWithCleanup(member));
+        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
         if (depth == 1)
           elementOffsets.push_back(values.size());
       }
     } else {
       // Extract the elements from loadable tuples.
       for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
-        auto &field = t->getFields()[i];
-        SILType fieldTy = gen.getLoweredLoadableType(field.getType());
+        CanType fieldCanTy = t.getElementType(i);
+        SILType fieldTy = gen.getLoweredLoadableType(fieldCanTy);
         SILValue member = gen.B.createTupleExtract(SILLocation(),
                                                    v, i,
                                                    fieldTy);
-        visit(CanType(field.getType()),
-              gen.emitManagedRValueWithCleanup(member));
+        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
         if (depth == 1)
           elementOffsets.push_back(values.size());
       }
@@ -101,8 +99,8 @@ enum class ImplodeKind { Unmanaged, Forward };
 
 template<ImplodeKind KIND>
 class ImplodeLoadableTupleValue
-  : public Lowering::TypeVisitor<ImplodeLoadableTupleValue<KIND>,
-                                 /*RetTy=*/ SILValue>
+  : public CanTypeVisitor<ImplodeLoadableTupleValue<KIND>,
+                          /*RetTy=*/ SILValue>
 {
 public:
   ArrayRef<ManagedValue> values;
@@ -122,13 +120,13 @@ public:
     : values(values), gen(gen)
   {}
   
-  SILValue visitType(TypeBase *t) {
+  SILValue visitType(CanType t) {
     SILValue result = getValue(gen, values[0]);
     values = values.slice(1);
     return result;
   }
   
-  SILValue visitTupleType(TupleType *t) {
+  SILValue visitTupleType(CanTupleType t) {
     SmallVector<SILValue, 4> elts;
     for (auto &field : t->getFields())
       elts.push_back(this->visit(CanType(field.getType())));
@@ -142,9 +140,9 @@ public:
 };
   
 class ImplodeAddressOnlyTuple
-  : public Lowering::TypeVisitor<ImplodeAddressOnlyTuple,
-                                 /*RetTy=*/ void,
-                                 /*Args...=*/ SILValue>
+  : public CanTypeVisitor<ImplodeAddressOnlyTuple,
+                          /*RetTy=*/ void,
+                          /*Args...=*/ SILValue>
 {
 public:
   ArrayRef<ManagedValue> values;
@@ -155,20 +153,20 @@ public:
     : values(values), gen(gen)
   {}
   
-  void visitType(TypeBase *t, SILValue address) {
+  void visitType(CanType t, SILValue address) {
     ManagedValue v = values[0];
     v.forwardInto(gen, SILLocation(), address);
     values = values.slice(1);
   }
   
-  void visitTupleType(TupleType *t, SILValue address) {
+  void visitTupleType(CanTupleType t, SILValue address) {
     for (unsigned n = 0, size = t->getFields().size(); n < size; ++n) {
-      auto &field = t->getFields()[n];
-      SILType fieldTy = gen.getLoweredType(field.getType());
+      CanType fieldCanTy = t.getElementType(n);
+      SILType fieldTy = gen.getLoweredType(fieldCanTy);
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
                                                       address, n,
                                                       fieldTy.getAddressType());
-      this->visit(CanType(field.getType()), fieldAddr);
+      this->visit(fieldCanTy, fieldAddr);
     }
   }
   
@@ -204,17 +202,16 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   return ImplodeLoadableTupleValue<KIND>(values, gen).visit(tupleType);
 }
   
-class ComputeElementOffsets
-  : public Lowering::TypeVisitor<ComputeElementOffsets>
+class ComputeElementOffsets : public CanTypeVisitor<ComputeElementOffsets>
 {
 public:
   unsigned offset = 0;
   
-  void visitType(TypeBase *t) {
+  void visitType(CanType t) {
     ++offset;
   }
   
-  void visitTupleType(TupleType *t) {
+  void visitTupleType(CanTupleType t) {
     for (auto &field : t->getFields())
       visit(CanType(field.getType()));
   }
@@ -224,7 +221,7 @@ static void computeElementOffsets(std::vector<unsigned> &offsets,
                                   CanType type) {
   // The first element is always at offset zero.
   offsets.push_back(0);
-  TupleType *tuple = dyn_cast<TupleType>(type);
+  CanTupleType tuple = dyn_cast<TupleType>(type);
   // Non-tuples always have a single value.
   if (!tuple) {
     offsets.push_back(1);
@@ -240,9 +237,9 @@ static void computeElementOffsets(std::vector<unsigned> &offsets,
 }
   
 class InitializeTupleValues
-  : public Lowering::TypeVisitor<InitializeTupleValues,
-                                 /*RetTy=*/ void,
-                                 /*Args...=*/ Initialization*>
+  : public CanTypeVisitor<InitializeTupleValues,
+                          /*RetTy=*/ void,
+                          /*Args...=*/ Initialization*>
 {
 public:
   ArrayRef<ManagedValue> values;
@@ -252,7 +249,7 @@ public:
     : values(values), gen(gen)
   {}
   
-  void visitType(TypeBase *t, Initialization *I) {
+  void visitType(CanType t, Initialization *I) {
     // Pop a result off.
     ManagedValue result = values[0];
     values = values.slice(1);
@@ -283,7 +280,7 @@ public:
     }
   }
   
-  void visitTupleType(TupleType *t, Initialization *I) {
+  void visitTupleType(CanTupleType t, Initialization *I) {
     // Break up the aggregate initialization.
     SmallVector<InitializationPtr, 4> subInitBuf;
     auto subInits = I->getSubInitializations(gen, subInitBuf);
@@ -292,14 +289,14 @@ public:
            "initialization does not match tuple?!");
     
     for (unsigned i = 0, e = subInits.size(); i < e; ++i)
-      visit(CanType(t->getFields()[i].getType()), subInits[i].get());
+      visit(t.getElementType(i), subInits[i].get());
     
     I->finishInitialization(gen);
   }
 };
   
-class EmitBBArguments : public Lowering::TypeVisitor<EmitBBArguments,
-                                                     /*RetTy*/ RValue>
+class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
+                                              /*RetTy*/ RValue>
 {
 public:
   SILGenFunction &gen;
@@ -308,16 +305,16 @@ public:
   EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent)
     : gen(gen), parent(parent) {}
   
-  RValue visitType(TypeBase *t) {
+  RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M) SILArgument(gen.getLoweredType(t), parent);
-    ManagedValue mv = t->is<LValueType>()
+    ManagedValue mv = isa<LValueType>(t)
       ? ManagedValue(arg, ManagedValue::LValue)
       : gen.emitManagedRValueWithCleanup(arg);
     return RValue(gen, mv);
   }
   
-  RValue visitTupleType(TupleType *t) {
-    RValue rv{CanType(t)};
+  RValue visitTupleType(CanTupleType t) {
+    RValue rv{t};
     
     for (auto &field : t->getFields())
       rv.addElement(visit(CanType(field.getType())));

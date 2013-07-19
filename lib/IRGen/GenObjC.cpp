@@ -40,7 +40,6 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "ScalarTypeInfo.h"
-#include "TypeVisitor.h"
 
 #include "GenObjC.h"
 

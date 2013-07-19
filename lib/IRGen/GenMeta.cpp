@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
@@ -37,7 +38,6 @@
 #include "IRGenModule.h"
 #include "ScalarTypeInfo.h"
 #include "StructMetadataLayout.h"
-#include "TypeVisitor.h"
 
 #include "GenMeta.h"
 
@@ -263,7 +263,7 @@ static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
 namespace {
   /// A visitor class for emitting a reference to a metatype object.
   class EmitTypeMetadataRef
-    : public irgen::TypeVisitor<EmitTypeMetadataRef, llvm::Value *> {
+    : public CanTypeVisitor<EmitTypeMetadataRef, llvm::Value *> {
   private:
     IRGenFunction &IGF;
   public:
@@ -298,28 +298,28 @@ namespace {
       return emitDirectMetadataRef(CanType(intTy));
     }
 
-    llvm::Value *visitBuiltinObjectPointerType(BuiltinObjectPointerType *type) {
-      return emitDirectMetadataRef(CanType(type));
+    llvm::Value *visitBuiltinObjectPointerType(CanBuiltinObjectPointerType type) {
+      return emitDirectMetadataRef(type);
     }
 
-    llvm::Value *visitBuiltinObjCPointerType(BuiltinObjCPointerType *type) {
-      return emitDirectMetadataRef(CanType(type));
+    llvm::Value *visitBuiltinObjCPointerType(CanBuiltinObjCPointerType type) {
+      return emitDirectMetadataRef(type);
     }
 
-    llvm::Value *visitBuiltinVectorType(BuiltinVectorType *type) {
-      return emitDirectMetadataRef(CanType(type));
+    llvm::Value *visitBuiltinVectorType(CanBuiltinVectorType type) {
+      return emitDirectMetadataRef(type);
     }
 
-    llvm::Value *visitNominalType(NominalType *type) {
-      return emitNominalMetadataRef(IGF, type->getDecl(), CanType(type));
+    llvm::Value *visitNominalType(CanNominalType type) {
+      return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }
 
-    llvm::Value *visitBoundGenericType(BoundGenericType *type) {
-      return emitNominalMetadataRef(IGF, type->getDecl(), CanType(type));
+    llvm::Value *visitBoundGenericType(CanBoundGenericType type) {
+      return emitNominalMetadataRef(IGF, type->getDecl(), type);
     }
 
-    llvm::Value *visitTupleType(TupleType *type) {
-      if (auto cached = tryGetLocal(CanType(type)))
+    llvm::Value *visitTupleType(CanTupleType type) {
+      if (auto cached = tryGetLocal(type))
         return cached;
 
       // I think the sanest thing to do here is drop labels, but maybe
@@ -345,12 +345,12 @@ namespace {
       case 1:
           // For metadata purposes, we consider a singleton tuple to be
           // isomorphic to its element type.
-        return visit(CanType(elements[0].getType()));
+        return visit(type.getElementType(0));
 
       case 2: {
         // Find the metadata pointer for this element.
-        llvm::Value *elt0Metadata = visit(CanType(elements[0].getType()));
-        llvm::Value *elt1Metadata = visit(CanType(elements[1].getType()));
+        llvm::Value *elt0Metadata = visit(type.getElementType(0));
+        llvm::Value *elt1Metadata = visit(type.getElementType(1));
 
         llvm::Value *args[] = {
           elt0Metadata, elt1Metadata,
@@ -367,9 +367,9 @@ namespace {
 
       case 3: {
         // Find the metadata pointer for this element.
-        llvm::Value *elt0Metadata = visit(CanType(elements[0].getType()));
-        llvm::Value *elt1Metadata = visit(CanType(elements[1].getType()));
-        llvm::Value *elt2Metadata = visit(CanType(elements[2].getType()));
+        llvm::Value *elt0Metadata = visit(type.getElementType(0));
+        llvm::Value *elt1Metadata = visit(type.getElementType(1));
+        llvm::Value *elt2Metadata = visit(type.getElementType(2));
 
         llvm::Value *args[] = {
           elt0Metadata, elt1Metadata, elt2Metadata,
@@ -395,7 +395,7 @@ namespace {
                                           "tuple-elements");
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
-          llvm::Value *eltMetadata = visit(CanType(elements[i].getType()));
+          llvm::Value *eltMetadata = visit(type.getElementType(i));
 
           // GEP to the appropriate element and store.
           Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
@@ -422,21 +422,21 @@ namespace {
       }
     }
 
-    llvm::Value *visitPolymorphicFunctionType(PolymorphicFunctionType *type) {
+    llvm::Value *visitPolymorphicFunctionType(CanPolymorphicFunctionType type) {
       IGF.unimplemented(SourceLoc(),
                         "metadata ref for polymorphic function type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitFunctionType(FunctionType *type) {
-      if (auto metatype = tryGetLocal(CanType(type)))
+    llvm::Value *visitFunctionType(CanFunctionType type) {
+      if (auto metatype = tryGetLocal(type))
         return metatype;
 
       // TODO: use a caching entrypoint (with all information
       // out-of-line) for non-dependent functions.
 
-      auto argMetadata = visit(CanType(type->getInput()));
-      auto resultMetadata = visit(CanType(type->getResult()));
+      auto argMetadata = visit(type.getInput());
+      auto resultMetadata = visit(type.getResult());
 
       auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetFunctionMetadataFn(),
                                           argMetadata, resultMetadata);
@@ -446,44 +446,44 @@ namespace {
       return setLocal(CanType(type), call);
     }
 
-    llvm::Value *visitArrayType(ArrayType *type) {
+    llvm::Value *visitArrayType(CanArrayType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for array type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitMetaTypeType(MetaTypeType *type) {
-      if (auto metatype = tryGetLocal(CanType(type)))
+    llvm::Value *visitMetaTypeType(CanMetaTypeType type) {
+      if (auto metatype = tryGetLocal(type))
         return metatype;
 
-      auto instMetadata = visit(CanType(type->getInstanceType()));
+      auto instMetadata = visit(type.getInstanceType());
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetMetatypeMetadataFn(),
                                          instMetadata);
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
 
-      return setLocal(CanType(type), call);
+      return setLocal(type, call);
     }
 
-    llvm::Value *visitModuleType(ModuleType *type) {
+    llvm::Value *visitModuleType(CanModuleType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for module type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitProtocolCompositionType(ProtocolCompositionType *type) {
+    llvm::Value *visitProtocolCompositionType(CanProtocolCompositionType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for protocol comp type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitReferenceStorageType(ReferenceStorageType *type) {
+    llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for ref storage type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitArchetypeType(ArchetypeType *type) {
-      return IGF.getLocalTypeData(CanType(type), LocalTypeData::Metatype);
+    llvm::Value *visitArchetypeType(CanArchetypeType type) {
+      return IGF.getLocalTypeData(type, LocalTypeData::Metatype);
     }
 
-    llvm::Value *visitLValueType(LValueType *type) {
+    llvm::Value *visitLValueType(CanLValueType type) {
       IGF.unimplemented(SourceLoc(), "metadata ref for l-value type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
@@ -538,30 +538,30 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, SILType type) {
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
   /// has trivial representation.
-  struct HasTrivialMetatype : irgen::TypeVisitor<HasTrivialMetatype, bool> {
+  struct HasTrivialMetatype : CanTypeVisitor<HasTrivialMetatype, bool> {
     /// Class metatypes have non-trivial representation due to the
     /// possibility of subclassing.
-    bool visitClassType(ClassType *type) {
+    bool visitClassType(CanClassType type) {
       return false;
     }
-    bool visitBoundGenericClassType(BoundGenericClassType *type) {
+    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
       return false;
     }
 
     /// Archetype metatypes have non-trivial representation in case
     /// they instantiate to a class metatype.
-    bool visitArchetypeType(ArchetypeType *type) {
+    bool visitArchetypeType(CanArchetypeType type) {
       return false;
     }
     
     /// All levels of class metatypes support subtyping.
-    bool visitMetaTypeType(MetaTypeType *type) {
-      return visit(CanType(type->getInstanceType()));
+    bool visitMetaTypeType(CanMetaTypeType type) {
+      return visit(type.getInstanceType());
     }
 
     /// Existential metatypes have non-trivial representation because
     /// they can refer to an arbitrary metatype. Everything else is trivial.
-    bool visitType(TypeBase *type) {
+    bool visitType(CanType type) {
       return !type->isExistentialType();
     }
   };
@@ -1004,7 +1004,7 @@ namespace {
   /// substitution of 'overridden'; this is because dependent
   /// overrides are not allowed by the language.
   class IsIncompatibleOverride :
-      public irgen::TypeVisitor<IsIncompatibleOverride, bool, CanType> {
+      public CanTypeVisitor<IsIncompatibleOverride, bool, CanType> {
 
     IRGenModule &IGM;
     ExplosionKind ExplosionLevel;
@@ -1018,17 +1018,17 @@ namespace {
     bool visit(CanType overridden, CanType override) {
       if (override == overridden) return false;
 
-      return TypeVisitor::visit(overridden, override);
+      return CanTypeVisitor::visit(overridden, override);
     }
 
     /// Differences in class types must be subtyping related.
-    bool visitClassType(ClassType *overridden, CanType override) {
+    bool visitClassType(CanClassType overridden, CanType override) {
       assert(override->getClassOrBoundGenericClass());
       return false;
     }
 
     /// Differences in bound generic class types must be subtyping related.
-    bool visitBoundGenericType(BoundGenericType *overridden, CanType override) {
+    bool visitBoundGenericType(CanBoundGenericType overridden, CanType override) {
       if (isa<ClassDecl>(overridden->getDecl())) {
         assert(override->getClassOrBoundGenericClass());
         return false;
@@ -1036,12 +1036,11 @@ namespace {
       return visitType(overridden, override);
     }
 
-    bool visitTupleType(TupleType *overridden, CanType overrideTy) {
-      TupleType *override = cast<TupleType>(overrideTy);
+    bool visitTupleType(CanTupleType overridden, CanType overrideTy) {
+      CanTupleType override = cast<TupleType>(overrideTy);
       assert(overridden->getFields().size() == override->getFields().size());
       for (unsigned i = 0, e = overridden->getFields().size(); i != e; ++i) {
-        if (visit(CanType(overridden->getElementType(i)),
-                  CanType(override->getElementType(i))))
+        if (visit(overridden.getElementType(i), override.getElementType(i)))
           return true;
       }
       return false;
@@ -1050,11 +1049,11 @@ namespace {
     /// Any other difference (unless we add implicit
     /// covariance/contravariance to generic types?) must be a
     /// substitution difference.
-    bool visitType(TypeBase *overridden, CanType override) {
+    bool visitType(CanType overridden, CanType override) {
       if (AsExplosion)
-        return differsByAbstractionInExplosion(IGM, CanType(overridden),
+        return differsByAbstractionInExplosion(IGM, overridden,
                                                override, ExplosionLevel);
-      return differsByAbstractionInMemory(IGM, CanType(overridden), override);
+      return differsByAbstractionInMemory(IGM, overridden, override);
     }
   };
 }

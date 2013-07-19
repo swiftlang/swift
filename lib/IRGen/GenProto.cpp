@@ -28,6 +28,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILConstant.h"
@@ -57,7 +58,6 @@
 #include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
-#include "TypeVisitor.h"
 #include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
 
@@ -3302,48 +3302,48 @@ void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
 namespace {
   /// A CRTP class for finding the archetypes we need to bind in order
   /// to perform value operations on the given type.
-  struct FindArchetypesToBind : irgen::TypeVisitor<FindArchetypesToBind> {
+  struct FindArchetypesToBind : CanTypeVisitor<FindArchetypesToBind> {
     llvm::SetVector<ArchetypeType*> &Types;
   public:
     FindArchetypesToBind(llvm::SetVector<ArchetypeType*> &types)
       : Types(types) {}
 
     // We're collecting archetypes.
-    void visitArchetypeType(ArchetypeType *type) {
+    void visitArchetypeType(CanArchetypeType type) {
       Types.insert(type);
     }
 
     // We need to walk into tuples.
-    void visitTupleType(TupleType *tuple) {
+    void visitTupleType(CanTupleType tuple) {
       for (auto &elt : tuple->getFields())
         visit(CanType(elt.getType()));
     }
 
     // We need to walk into constant-sized arrays.
-    void visitArrayType(ArrayType *type) {
-      visit(CanType(type->getBaseType()));
+    void visitArrayType(CanArrayType type) {
+      visit(type.getBaseType());
     }
 
     // We do not need to walk into any of these types, because their
     // value operations do not depend on the specifics of their
     // sub-structure (or they have none).
-    void visitAnyFunctionType(AnyFunctionType *fn) {}
-    void visitBuiltinType(BuiltinType *type) {}
-    void visitMetaTypeType(MetaTypeType *type) {}
-    void visitModuleType(ModuleType *type) {}
-    void visitProtocolCompositionType(ProtocolCompositionType *type) {}
-    void visitReferenceStorageType(ReferenceStorageType *type) {}
+    void visitAnyFunctionType(CanAnyFunctionType fn) {}
+    void visitBuiltinType(CanBuiltinType type) {}
+    void visitMetaTypeType(CanMetaTypeType type) {}
+    void visitModuleType(CanModuleType type) {}
+    void visitProtocolCompositionType(CanProtocolCompositionType type) {}
+    void visitReferenceStorageType(CanReferenceStorageType type) {}
 
     // L-values are impossible.
-    void visitLValueType(LValueType *type) {
+    void visitLValueType(CanLValueType type) {
       llvm_unreachable("cannot store l-value type directly");
     }
 
     // For now, assume we don't need to add anything for nominal and
     // generic-nominal types.  We might actually need to bind all the
     // argument archetypes from this type and its parent.
-    void visitNominalType(NominalType *type) {}
-    void visitBoundGenericType(BoundGenericType *type) {}
+    void visitNominalType(CanNominalType type) {}
+    void visitBoundGenericType(CanBoundGenericType type) {}
   };
 }
 

@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/TypeVisitor.h"
 #include "llvm/ADT/FoldingSet.h"
 using namespace swift;
 
@@ -90,7 +90,7 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
 namespace {
   /// Recursively destructure tuple-type arguments into SIL argument types.
   class LoweredFunctionInputTypeVisitor
-    : public Lowering::TypeVisitor<LoweredFunctionInputTypeVisitor>
+    : public CanTypeVisitor<LoweredFunctionInputTypeVisitor>
   {
     SILModule &M;
     SmallVectorImpl<SILType> &inputTypes;
@@ -99,13 +99,13 @@ namespace {
                                     SmallVectorImpl<SILType> &inputTypes)
       : M(M), inputTypes(inputTypes) {}
     
-    void visitType(TypeBase *t) {
+    void visitType(CanType t) {
       inputTypes.push_back(M.Types.getLoweredType(t));
     }
     
-    void visitTupleType(TupleType *tt) {
+    void visitTupleType(CanTupleType tt) {
       for (auto &field : tt->getFields()) {
-        visit(field.getType()->getCanonicalType());
+        visit(CanType(field.getType()));
       }
     }
   };

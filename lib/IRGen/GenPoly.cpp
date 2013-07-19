@@ -314,28 +314,28 @@ bool irgen::differsByAbstractionInExplosion(IRGenModule &IGM,
 
 /// A class for testing whether a type directly stores an archetype.
 struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
-                         irgen::TypeVisitor<EmbedsArchetype, bool> {
+                         CanTypeVisitor<EmbedsArchetype, bool> {
   IRGenModule &IGM;
   EmbedsArchetype(IRGenModule &IGM) : IGM(IGM) {}
 
   using irgen::DeclVisitor<EmbedsArchetype, bool>::visit;
-  using irgen::TypeVisitor<EmbedsArchetype, bool>::visit;
+  using CanTypeVisitor<EmbedsArchetype, bool>::visit;
 
-  bool visitTupleType(TupleType *type) {
+  bool visitTupleType(CanTupleType type) {
     for (auto &field : type->getFields())
       if (visit(CanType(field.getType())))
         return true;
     return false;
   }
-  bool visitArchetypeType(ArchetypeType *type) {
+  bool visitArchetypeType(CanArchetypeType type) {
     return true;
   }
-  bool visitBoundGenericType(BoundGenericType *type) {
+  bool visitBoundGenericType(CanBoundGenericType type) {
     return visit(type->getDecl());
   }
-#define FOR_NOMINAL_TYPE(Kind)                 \
-  bool visit##Kind##Type(Kind##Type *type) {   \
-    return visit##Kind##Decl(type->getDecl()); \
+#define FOR_NOMINAL_TYPE(Kind)                     \
+  bool visit##Kind##Type(Can##Kind##Type type) {   \
+    return visit##Kind##Decl(type->getDecl());     \
   }
   FOR_NOMINAL_TYPE(Protocol)
   FOR_NOMINAL_TYPE(Struct)
@@ -343,22 +343,22 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   FOR_NOMINAL_TYPE(OneOf)
 #undef FOR_NOMINAL_TYPE
 
-  bool visitArrayType(ArrayType *type) {
-    return visit(CanType(type->getBaseType()));
+  bool visitArrayType(CanArrayType type) {
+    return visit(type.getBaseType());
   }
 
   // All these types are leaves, in the sense that they don't directly
   // store any other types.
-  bool visitBuiltinType(BuiltinType *type) { return false; }
-  bool visitMetaTypeType(MetaTypeType *type) { return false; }
-  bool visitModuleType(ModuleType *type) { return false; }
-  bool visitAnyFunctionType(AnyFunctionType *type) { return false; }
-  bool visitLValueType(LValueType *type) { return false; }
-  bool visitProtocolCompositionType(ProtocolCompositionType *type) {
+  bool visitBuiltinType(CanBuiltinType type) { return false; }
+  bool visitMetaTypeType(CanMetaTypeType type) { return false; }
+  bool visitModuleType(CanModuleType type) { return false; }
+  bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
+  bool visitLValueType(CanLValueType type) { return false; }
+  bool visitProtocolCompositionType(CanProtocolCompositionType type) {
     return false;
   }
-  bool visitReferenceStorageType(ReferenceStorageType *type) {
-    return visit(CanType(type->getReferentType()));
+  bool visitReferenceStorageType(CanReferenceStorageType type) {
+    return visit(type.getReferentType());
   }
 
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
@@ -412,7 +412,7 @@ namespace {
       In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
     }
     
-    void emitExistentialSubstitution(ArchetypeType *origTy,
+    void emitExistentialSubstitution(CanArchetypeType origTy,
                                      CanType substTy) {
       if (substTy->isClassExistentialType()) {
         // Decompose the container.
@@ -478,7 +478,7 @@ namespace {
                                                 sub.witnesses);
     }
 
-    void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+    void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
       // If we used an existential type to fulfill the type variable, then
       // project the value out of the container.
       if (substTy->isExistentialType()) {
@@ -537,12 +537,12 @@ namespace {
       Out.add(addr.getAddress());
     }
 
-    void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
+    void visitArrayType(CanArrayType origTy, CanArrayType substTy) {
       llvm_unreachable("remapping values of array type");
     }
 
-    void visitBoundGenericType(BoundGenericType *origTy,
-                               BoundGenericType *substTy) {
+    void visitBoundGenericType(CanBoundGenericType origTy,
+                               CanBoundGenericType substTy) {
       assert(origTy->getDecl() == substTy->getDecl());
 
       // If the base type has reference semantics, we can just copy
@@ -557,12 +557,12 @@ namespace {
 
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
-      auto n = IGF.IGM.getExplosionSize(CanType(origTy), In.getKind());
+      auto n = IGF.IGM.getExplosionSize(origTy, In.getKind());
       In.transferInto(Out, n);
     }
 
-    void visitAnyFunctionType(AnyFunctionType *origTy,
-                              AnyFunctionType *substTy) {
+    void visitAnyFunctionType(CanAnyFunctionType origTy,
+                              CanAnyFunctionType substTy) {
       if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
                                          ExplosionKind::Minimal,
                                          /*uncurry*/ 0))
@@ -570,9 +570,9 @@ namespace {
       In.transferInto(Out, 2);
     }
 
-    void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      CanType origObjectTy = CanType(origTy->getObjectType());
-      CanType substObjectTy = CanType(substTy->getObjectType());
+    void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
+      CanType origObjectTy = origTy.getObjectType();
+      CanType substObjectTy = substTy.getObjectType();
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
 
@@ -591,9 +591,9 @@ namespace {
       Out.add(origValue);
     }
 
-    void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
-      CanType origInstanceTy = CanType(origTy->getInstanceType());
-      CanType substInstanceTy = CanType(substTy->getInstanceType());
+    void visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
+      CanType origInstanceTy = origTy.getInstanceType();
+      CanType substInstanceTy = substTy.getInstanceType();
 
       // The only metatypes with non-trivial representations are those
       // for archetypes and class types.  A type can't lose the class
@@ -614,18 +614,16 @@ namespace {
       In.transferInto(Out, 1);
     }
 
-    void visitTupleType(TupleType *origTy, TupleType *substTy) {
+    void visitTupleType(CanTupleType origTy, CanTupleType substTy) {
       assert(origTy->getFields().size() == substTy->getFields().size());
       for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
-        visit(CanType(origTy->getElementType(i)),
-              CanType(substTy->getElementType(i)));
+        visit(origTy.getElementType(i), substTy.getElementType(i));
       }
     }
 
-    void visitReferenceStorageType(ReferenceStorageType *origTy,
-                                   ReferenceStorageType *substTy) {
-      In.transferInto(Out, IGF.IGM.getExplosionSize(CanType(origTy),
-                                                    Out.getKind()));
+    void visitReferenceStorageType(CanReferenceStorageType origTy,
+                                   CanReferenceStorageType substTy) {
+      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
     }
   };
 }
@@ -657,7 +655,7 @@ namespace {
     Explosion &Out;
   public:
     ReemitAsSubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
-                          Explosion &in, Explosion &out)
+                        Explosion &in, Explosion &out)
       : IGF(IGF), Subs(subs), In(in), Out(out) {
       assert(in.getKind() == out.getKind());
     }
@@ -669,7 +667,7 @@ namespace {
 
     /// The unsubstituted type is an archetype.  In explosion terms,
     /// that makes it a single pointer-to-opaque.
-    void visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+    void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
       auto &substTI = IGF.getFragileTypeInfo(substTy);
 
       llvm::Value *inValue = In.claimNext();
@@ -688,12 +686,12 @@ namespace {
       substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
     }
     
-    void visitArrayType(ArrayType *origTy, ArrayType *substTy) {
+    void visitArrayType(CanArrayType origTy, CanArrayType substTy) {
       llvm_unreachable("remapping values of array type");
     }
 
-    void visitBoundGenericType(BoundGenericType *origTy,
-                               BoundGenericType *substTy) {
+    void visitBoundGenericType(CanBoundGenericType origTy,
+                               CanBoundGenericType substTy) {
       assert(origTy->getDecl() == substTy->getDecl());
 
       // If the base type has reference semantics, we can just copy
@@ -708,12 +706,12 @@ namespace {
 
       // FIXME: This is my first shot at implementing this, but it doesn't
       // handle cases which actually need remapping.
-      auto n = IGF.IGM.getExplosionSize(CanType(origTy), In.getKind());
+      auto n = IGF.IGM.getExplosionSize(origTy, In.getKind());
       In.transferInto(Out, n);
     }
 
-    void visitAnyFunctionType(AnyFunctionType *origTy,
-                              AnyFunctionType *substTy) {
+    void visitAnyFunctionType(CanAnyFunctionType origTy,
+                              CanAnyFunctionType substTy) {
       if (differsByAbstractionAsFunction(IGF.IGM, origTy, substTy,
                                          ExplosionKind::Minimal,
                                          /*uncurry*/ 0))
@@ -721,9 +719,9 @@ namespace {
       In.transferInto(Out, 2);
     }
 
-    void visitLValueType(LValueType *origTy, LValueType *substTy) {
-      CanType origObjectTy = CanType(origTy->getObjectType());
-      CanType substObjectTy = CanType(substTy->getObjectType());
+    void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
+      CanType origObjectTy = origTy.getObjectType();
+      CanType substObjectTy = substTy.getObjectType();
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
         IGF.unimplemented(SourceLoc(), "remapping l-values");
 
@@ -741,9 +739,9 @@ namespace {
       Out.add(substValue);
     }
 
-    void visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
-      CanType origInstanceTy = CanType(origTy->getInstanceType());
-      CanType substInstanceTy = CanType(substTy->getInstanceType());
+    void visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
+      CanType origInstanceTy = origTy.getInstanceType();
+      CanType substInstanceTy = substTy.getInstanceType();
 
       // The only metatypes with non-trivial representations are those
       // for archetypes and class types.  A type can't lose the class
@@ -764,18 +762,16 @@ namespace {
       In.transferInto(Out, 1);
     }
 
-    void visitTupleType(TupleType *origTy, TupleType *substTy) {
+    void visitTupleType(CanTupleType origTy, CanTupleType substTy) {
       assert(origTy->getFields().size() == substTy->getFields().size());
       for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
-        visit(CanType(origTy->getElementType(i)),
-              CanType(substTy->getElementType(i)));
+        visit(origTy.getElementType(i), substTy.getElementType(i));
       }
     }
 
-    void visitReferenceStorageType(ReferenceStorageType *origTy,
-                                   ReferenceStorageType *substTy) {
-      In.transferInto(Out, IGF.IGM.getExplosionSize(CanType(origTy),
-                                                    Out.getKind()));
+    void visitReferenceStorageType(CanReferenceStorageType origTy,
+                                   CanReferenceStorageType substTy) {
+      In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
     }
   };
 }

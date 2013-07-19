@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -31,7 +32,6 @@
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
-#include "TypeVisitor.h"
 #include "UnownedTypeInfo.h"
 #include "WeakTypeInfo.h"
 
@@ -663,7 +663,7 @@ bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
 
 
 namespace {
-  struct ClassifyTypeSize : irgen::TypeVisitor<ClassifyTypeSize, ObjectSize> {
+  struct ClassifyTypeSize : CanTypeVisitor<ClassifyTypeSize, ObjectSize> {
     IRGenModule &IGM;
     ResilienceScope Scope;
     ClassifyTypeSize(IRGenModule &IGM, ResilienceScope scope)
@@ -681,13 +681,13 @@ namespace {
     ALWAYS(LValue, Dependent)
 #undef ALWAYS
     
-    ObjectSize visitArchetypeType(ArchetypeType *archetype) {
+    ObjectSize visitArchetypeType(CanArchetypeType archetype) {
       if (archetype->requiresClass())
         return ObjectSize::Fixed;
       return ObjectSize::Dependent;
     }
     
-    ObjectSize visitTupleType(TupleType *tuple) {
+    ObjectSize visitTupleType(CanTupleType tuple) {
       ObjectSize result = ObjectSize::Fixed;
       for (auto &field : tuple->getFields()) {
         result = std::max(result, visit(CanType(field.getType())));
@@ -695,11 +695,11 @@ namespace {
       return result;
     }
 
-    ObjectSize visitArrayType(ArrayType *array) {
-      return visit(CanType(array->getBaseType()));
+    ObjectSize visitArrayType(CanArrayType array) {
+      return visit(array.getBaseType());
     }
 
-    ObjectSize visitType(TypeBase *type) {
+    ObjectSize visitType(CanType type) {
       // FIXME: resilience!
       return ObjectSize::Fixed;
     }

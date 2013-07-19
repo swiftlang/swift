@@ -10,48 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines swift::irgen::TypeVisitor.
+// This file defines various type visitors that are useful in
+// IR-generation.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_IRGEN_TYPEVISITOR_H
 #define SWIFT_IRGEN_TYPEVISITOR_H
 
-#include "swift/AST/TypeVisitor.h"
+#include "swift/AST/CanTypeVisitor.h"
 
 namespace swift {
 namespace irgen {
 
-/// irgen::TypeVisitor - This is a specialization of
-/// swift::TypeVisitor which works only on canonical types and
-/// which automatically ignores certain AST node kinds.
-template<typename ImplClass, typename RetTy = void, typename... Args>
-class TypeVisitor : public swift::TypeVisitor<ImplClass, RetTy, Args...> {
-public:
-
-  template <class... As> RetTy visit(CanType type, Args... args) {
-    return swift::TypeVisitor<ImplClass, RetTy, Args...>
-                            ::visit(Type(type), std::forward<Args>(args)...);
-  }
-
-#define TYPE(Id, Parent)
-#define UNCHECKED_TYPE(Id, Parent) \
-  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
-    llvm_unreachable(#Id "Type should not survive to IR-gen"); \
-  }
-#define SUGARED_TYPE(Id, Parent) \
-  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
-    llvm_unreachable(#Id "Type should not survive canonicalization"); \
-  }
-#include "swift/AST/TypeNodes.def"
-};
-
 /// ReferenceTypeVisitor - This is a specialization of irgen::TypeVisitor
 /// which automatically ignores non-reference types.
 template <typename ImplClass, typename RetTy = void, typename... Args>
-class ReferenceTypeVisitor : public TypeVisitor<ImplClass, RetTy, Args...> {
+class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
 #define TYPE(Id) \
-  RetTy visit##Id##Type(Id##Type *T, Args... args) { \
+  RetTy visit##Id##Type(Can##Id##Type T, Args... args) { \
     llvm_unreachable(#Id "Type is not a reference type"); \
   }
   TYPE(Array)
@@ -153,8 +130,9 @@ public:
     llvm_unreachable("bad type kind");
   }
 
-#define DEFER_TO_SUPERTYPE(Concrete, Abstract) \
-  RetTy visit##Concrete##Type(Concrete##Type *origTy, Concrete##Type *substTy) { \
+#define DEFER_TO_SUPERTYPE(Concrete, Abstract)                               \
+  RetTy visit##Concrete##Type(Can##Concrete##Type origTy,                    \
+                              Can##Concrete##Type substTy) {                 \
     return static_cast<Impl*>(this)->visit##Abstract##Type(origTy, substTy); \
   }
   DEFER_TO_SUPERTYPE(Function, AnyFunction)
