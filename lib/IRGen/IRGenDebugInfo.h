@@ -153,6 +153,7 @@ private:
   llvm::DIFile getOrCreateFile(const char *Filename);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
+  StringRef getMangledName(CanType CanTy);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
                                      SILType SILTy,
                                      llvm::FunctionType *IRTy,

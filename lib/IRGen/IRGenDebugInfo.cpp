@@ -34,6 +34,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
 #include "GenType.h"
+#include "Linking.h"
 
 using namespace swift;
 using namespace irgen;
@@ -519,12 +520,23 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
+/// Return the mangled name of any nominal type.
+StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
+  llvm::SmallString<128> Buffer;
+  LinkEntity::forTypeMangling(CanTy).mangle(Buffer);
+  return BumpAllocatedString(Buffer, DebugInfoNames);
+}
+
 /// Construct a DIType from a DebugTypeInfo object.
 ///
 /// At this point we do not plan to emit full DWARF for all swift
 /// types, the goal is to emit only the name and provenance of the
 /// type, where possible. A consumer would then load the type
 /// definition directly from the "module" the type is specified in.
+///
+/// The final goal, once we forked LLVM, is to emit something like a
+/// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
+/// local reference to the type.
 llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                         llvm::DIDescriptor Scope,
                                         llvm::DIFile File) {
@@ -542,14 +554,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   case TypeKind::BuiltinInteger: {
     auto IntTy = BaseTy->castTo<BuiltinIntegerType>();
     Size = IntTy->getBitWidth();
-    Name = "Int";
+    Name = "int";
     break;
   }
 
   case TypeKind::BuiltinFloat: {
     auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     Size = FloatTy->getBitWidth();
-    Name = "Float";
+    Name = "float";
     break;
   }
 
@@ -557,8 +569,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   case TypeKind::Struct: {
     auto StructTy = BaseTy->castTo<StructType>();
     if (auto Decl = StructTy->getDecl()) {
-      Name = Decl->getName().str();
       Location L = getStartLoc(SM, Decl);
+      Name = getMangledName(Ty.CanTy);
       return DBuilder.createStructType(Scope,
                                        Name,
                                        getOrCreateFile(L.Filename),
@@ -577,7 +589,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // used to differentiate them from C++ and ObjC classes.
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto Decl = ClassTy->getDecl()) {
-      Name = Decl->getName().str();
+      Name = getMangledName(Ty.CanTy);
       Location L = getStartLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
@@ -596,12 +608,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   // Handle everything else that is based off NominalType.
   case TypeKind::OneOf:
   case TypeKind::Protocol: {
-    auto NominalTy = BaseTy->castTo<NominalType>();
-    if (auto Decl = NominalTy->getDecl()) {
-      Name = Decl->getName().str();
-      break;
-    }
-    return llvm::DIType();
+    Name = getMangledName(Ty.CanTy);
+    break;
   }
   default:
     return llvm::DIType();
