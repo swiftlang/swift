@@ -44,11 +44,6 @@ public:
     llvm_unreachable(#Id "Type should not survive canonicalization"); \
   }
 #include "swift/AST/TypeNodes.def"
-
-  template <class... As>
-  RetTy visitUnboundGenericType(UnboundGenericType *T, Args... args) {
-    llvm_unreachable("UnboundGenericType should not survive Sema");
-  }
 };
   
 } // end namespace Lowering

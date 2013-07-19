@@ -172,10 +172,11 @@ bool TypeBase::isSpecialized() {
     return CT->isSpecialized();
 
   switch (getKind()) {
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::TypeVariable:
       return false;
 
   case TypeKind::UnboundGeneric:
@@ -246,11 +247,14 @@ bool TypeBase::isUnspecializedGeneric() {
     return CT->isUnspecializedGeneric();
 
   switch (getKind()) {
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
     return false;
+
+  case TypeKind::Error:
+  case TypeKind::TypeVariable:
+    llvm_unreachable("querying invalid type");
 
   case TypeKind::UnboundGeneric:
     return true;
@@ -760,10 +764,11 @@ CanType TypeBase::getCanonicalType() {
   TypeBase *Result = 0;
   switch (getKind()) {
 #define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
-#define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
   case TypeKind::Protocol:
+  case TypeKind::TypeVariable:
     llvm_unreachable("these types are always canonical");
 
 #define SUGARED_TYPE(id, parent) \
@@ -902,7 +907,6 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::LValue:
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
-  case TypeKind::UnboundGeneric:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct:
@@ -976,7 +980,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::Protocol:
   case TypeKind::NameAlias:
   case TypeKind::Substituted:
-  case TypeKind::UnboundGeneric:
     return false;
 
   case TypeKind::BoundGenericClass:

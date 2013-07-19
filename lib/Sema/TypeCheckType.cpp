@@ -882,11 +882,12 @@ Type TypeChecker::transformType(Type type,
   TypeBase *base = type.getPointer();
   switch (type->getKind()) {
 #define ALWAYS_CANONICAL_TYPE(Id, Parent) \
-  case TypeKind::Id:                      \
-    return type;
-#define UNCHECKED_TYPE(Id, Parent) ALWAYS_CANONICAL_TYPE(Id, Parent)
+  case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::Error:
+  case TypeKind::TypeVariable:
+    return type;
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:

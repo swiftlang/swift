@@ -1002,10 +1002,6 @@ namespace {
       case TypeKind::Class:
         return checkBoundGenericTypes(cast<NominalType>(typePtr)->getParent());
 
-      case TypeKind::UnboundGeneric:
-        return checkBoundGenericTypes(
-                 cast<UnboundGenericType>(typePtr)->getParent());
-
       case TypeKind::BoundGenericClass:
       case TypeKind::BoundGenericOneOf:
       case TypeKind::BoundGenericStruct: {

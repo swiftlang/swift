@@ -44,11 +44,6 @@ public:
     llvm_unreachable(#Id "Type should not survive canonicalization"); \
   }
 #include "swift/AST/TypeNodes.def"
-
-  template <class... As>
-  RetTy visitUnboundGenericType(UnboundGenericType *T, Args... args) {
-    llvm_unreachable("UnboundGenericType should not survive Sema");
-  }
 };
 
 /// ReferenceTypeVisitor - This is a specialization of irgen::TypeVisitor
@@ -117,9 +112,6 @@ public:
     case TypeKind::Id: \
       llvm_unreachable(#Id "Type should not survive canonicalization");
 #include "swift/AST/TypeNodes.def"
-
-    case TypeKind::UnboundGeneric:
-      llvm_unreachable("UnboundGeneric should not survive Sema");
 
     case TypeKind::BuiltinFloat:
     case TypeKind::BuiltinInteger:

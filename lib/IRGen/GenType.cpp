@@ -401,9 +401,6 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::UnboundGeneric:
-    llvm_unreachable("unbound generic type");
-
   case TypeKind::MetaType:
     return convertMetaTypeType(cast<MetaTypeType>(ty));
   case TypeKind::Module:
