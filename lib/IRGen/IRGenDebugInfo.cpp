@@ -21,7 +21,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/config/config.h"
+#include "llvm/Config/config.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
