@@ -521,7 +521,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
   llvm::DIDescriptor DContext = Unit;
   DBuilder.createStaticVariable(DContext, Name, LinkageName, Unit,
                                 L.Line, getOrCreateType(DebugType, Unit),
-                                Var->hasInternalLinkage(), Var, nullptr)->dump();
+                                Var->hasInternalLinkage(), Var, nullptr);
 }
 
 /// Return the mangled name of any nominal type.
