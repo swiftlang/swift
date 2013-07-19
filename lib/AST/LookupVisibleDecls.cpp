@@ -75,8 +75,8 @@ static void doMemberLookup(Type BaseTy,
 static void lookupTypeMembers(Type BaseType,
                               VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC,
-                              bool IsTypeLookup);
-
+                              bool IsTypeLookup,
+                              bool OnlyInstanceMembers);
 
 static void lookupVisibleMemberDecls(Type BaseTy,
                                      VisibleDeclConsumer &Consumer,
@@ -138,20 +138,8 @@ static void doMemberLookup(Type BaseTy,
     for (auto Inherited : PT->getDecl()->getInherited())
       doMemberLookup(Inherited.getType(), Consumer, CurrDC, IsTypeLookup,
                      OnlyInstanceMembers, Visited);
-    
-    for (auto Member : PT->getDecl()->getMembers()) {
-      if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-        if (isa<VarDecl>(VD) || isa<SubscriptDecl>(VD) || isa<FuncDecl>(VD)) {
-          if (OnlyInstanceMembers && !VD->isInstanceMember())
-            continue;
 
-          Consumer.foundDecl(VD);
-        } else {
-          assert(isa<TypeDecl>(VD) && "Unhandled protocol member");
-          Consumer.foundDecl(VD);
-        }
-      }
-    }
+    lookupTypeMembers(PT, Consumer, CurrDC, IsTypeLookup, OnlyInstanceMembers);
     return;
   }
   
@@ -179,7 +167,8 @@ static void doMemberLookup(Type BaseTy,
   do {
     // Look in for members of a nominal type.
     SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupTypeMembers(BaseTy, Consumer, CurrDC, IsTypeLookup);
+    lookupTypeMembers(BaseTy, Consumer, CurrDC, IsTypeLookup,
+                      /*OnlyInstanceMembers=*/false);
 
     for (ValueDecl *VD : ExtensionMethods) {
       assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
@@ -207,7 +196,8 @@ static void doMemberLookup(Type BaseTy,
 }
 
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
-                              const DeclContext *CurrDC, bool IsTypeLookup) {
+                              const DeclContext *CurrDC, bool IsTypeLookup,
+                              bool OnlyInstanceMembers) {
   NominalTypeDecl *D;
   SmallVector<ValueDecl*, 2> BaseMembers;
   if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
@@ -221,21 +211,35 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     return;
   }
 
+  bool LookupFromChildDeclContext = false;
   const DeclContext *TempDC = CurrDC;
   while (!TempDC->isModuleContext()) {
     if (TempDC == D) {
-      // Current decl context is contained inside 'D', so generic parameters
-      // are visible.
-      if (D->getGenericParams())
-        for (auto param : *D->getGenericParams())
-          BaseMembers.push_back(param.getDecl());
+      LookupFromChildDeclContext = true;
       break;
     }
     TempDC = TempDC->getParent();
   }
 
+  if (LookupFromChildDeclContext) {
+    // Current decl context is contained inside 'D', so generic parameters
+    // are visible.
+    if (D->getGenericParams())
+      for (auto Param : *D->getGenericParams())
+        BaseMembers.push_back(Param.getDecl());
+  }
+
   for (Decl* Member : D->getMembers()) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
+      if (OnlyInstanceMembers && !VD->isInstanceMember())
+        continue;
+
+      if (!LookupFromChildDeclContext) {
+        // Current decl context is outside 'D', so 'This' decl is not visible.
+        if (auto TAD = dyn_cast<TypeAliasDecl>(VD))
+          if (TAD->getName().str() == "This")
+            continue;
+      }
       BaseMembers.push_back(VD);
     }
   }
