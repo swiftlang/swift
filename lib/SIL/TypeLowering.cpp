@@ -142,8 +142,8 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
 
   AnyFunctionType::ExtInfo outerInfo = t->getExtInfo();
   AbstractCC outerCC = outerInfo.getCC();
-  assert(!t->isAutoClosure() && "auto_closures cannot be curried");
-  assert(!t->isBlock() && "objc blocks cannot be curried");
+  assert(!outerInfo.isAutoClosure() && "auto_closures cannot be curried");
+  assert(!outerInfo.isBlock() && "objc blocks cannot be curried");
   
   // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
@@ -226,15 +226,11 @@ CanAnyFunctionType TypeConverter::getUncurriedFunctionType(CanAnyFunctionType t,
     curriedGenericParams->setAllArchetypes(C.AllocateCopy(allArchetypes));
     curriedGenericParams->setOuterParameters(outerParameters);
     
-    outerInfo.withIsAutoClosure(false);
-    outerInfo.withIsBlock(false);
     return CanPolymorphicFunctionType(
            PolymorphicFunctionType::get(inputType, resultType,
                                         curriedGenericParams,
                                         outerInfo, C));
   } else {
-    outerInfo.withIsAutoClosure(false);
-    outerInfo.withIsBlock(false);
     return CanFunctionType(FunctionType::get(inputType, resultType,
                                              outerInfo, C));
   }    
