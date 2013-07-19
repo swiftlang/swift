@@ -344,7 +344,6 @@ public:
       // Type-check the pattern.
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
-                              /*isFirstPass*/false,
                               /*allowUnknownTypes*/false))
         return;
 
@@ -369,7 +368,6 @@ public:
       if (isa<TypedPattern>(PBD->getPattern())) {
         if (TC.typeCheckPattern(PBD->getPattern(),
                                 PBD->getDeclContext(),
-                                /*isFirstPass*/false,
                                 /*allowUnknownTypes*/false))
           return;
         DestTy = PBD->getPattern()->getType();
@@ -396,7 +394,6 @@ public:
     } else if (!IsFirstPass || !DelayCheckingPattern) {
       if (TC.typeCheckPattern(PBD->getPattern(),
                               PBD->getDeclContext(),
-                              IsFirstPass,
                               /*allowUnknownTypes*/false))
         return;
     }
@@ -415,7 +412,6 @@ public:
     bool isInvalid = TC.validateType(SD->getElementTypeLoc());
     isInvalid |= TC.typeCheckPattern(SD->getIndices(),
                                      SD->getDeclContext(),
-                                     IsFirstPass,
                                      /*allowUnknownTypes*/false);
 
     if (isInvalid) {
@@ -658,13 +654,12 @@ public:
   }
 
   bool semaFuncParamPatterns(DeclContext *dc,
-                             ArrayRef<Pattern*> paramPatterns,
-                             bool isFirstPass) {
+                             ArrayRef<Pattern*> paramPatterns) {
     bool badType = false;
     for (Pattern *P : paramPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, dc, isFirstPass, false)) {
+      if (TC.typeCheckPattern(P, dc, false)) {
         badType = true;
         continue;
       }
@@ -672,7 +667,7 @@ public:
     return badType;
   }
 
-  void semaFuncExpr(FuncExpr *FE, DeclAttributes &Attr, bool isFirstPass) {
+  void semaFuncExpr(FuncExpr *FE, DeclAttributes &Attr) {
     if (FE->getType())
       return;
 
@@ -683,10 +678,8 @@ public:
       }
     }
 
-    badType = badType || semaFuncParamPatterns(FE, FE->getArgParamPatterns(),
-                                               isFirstPass);
-    badType = badType || semaFuncParamPatterns(FE, FE->getBodyParamPatterns(),
-                                               isFirstPass);
+    badType = badType || semaFuncParamPatterns(FE, FE->getArgParamPatterns());
+    badType = badType || semaFuncParamPatterns(FE, FE->getBodyParamPatterns());
 
     if (badType) {
       FE->setType(ErrorType::get(TC.Context));
@@ -775,7 +768,7 @@ public:
       checkGenericParams(gp);
     }
 
-    semaFuncExpr(body, FD->getMutableAttrs(), IsFirstPass);
+    semaFuncExpr(body, FD->getMutableAttrs());
     FD->setType(body->getType());
 
     validateAttributes(FD);
@@ -906,7 +899,6 @@ public:
 
     if (TC.typeCheckPattern(CD->getArguments(),
                             CD,
-                            IsFirstPass,
                             /*allowUnknownTypes*/false)) {
       CD->setType(ErrorType::get(TC.Context));
     } else {

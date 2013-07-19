@@ -2850,7 +2850,7 @@ namespace {
       // we've determine the complete function type.
       if (auto closure = dyn_cast<PipeClosureExpr>(expr)) {
         // Validate the parameters.
-        if (TC.typeCheckPattern(closure->getParams(), DC, true, true)) {
+        if (TC.typeCheckPattern(closure->getParams(), DC, true)) {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
         }

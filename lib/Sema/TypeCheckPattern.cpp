@@ -456,7 +456,6 @@ static bool validateTypedPattern(TypeChecker &TC, TypedPattern *TP,
 /// true, then this accepts "any" and "named" patterns, setting their type to
 /// UnresolvedType.
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
-                                   bool isFirstPass,
                                    bool allowUnknownTypes,
                                    bool isVararg) {
   switch (P->getKind()) {
@@ -464,7 +463,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   // propagating that type out.
   case PatternKind::Paren: {
     Pattern *SP = cast<ParenPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, isFirstPass, allowUnknownTypes)) {
+    if (typeCheckPattern(SP, dc, allowUnknownTypes)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -487,8 +486,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Any:
   case PatternKind::Named:
     // If we're type checking this pattern in a context that can provide type
-    // information, then the lack of type information is not an error.  Just set
-    // our type to UnresolvedType.
+    // information, then the lack of type information is not an error.
     if (allowUnknownTypes) {
       return false;
     }
@@ -511,22 +509,14 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getFields()[i];
       Type type;
-      ExprHandle *init = elt.getInit();
       Pattern *pattern = elt.getPattern();
       bool isVararg = tuplePat->hasVararg() && i == e-1;
-      if (typeCheckPattern(pattern, dc, isFirstPass, allowUnknownTypes,
-                           isVararg)) {
+      if (typeCheckPattern(pattern, dc, allowUnknownTypes, isVararg)) {
         hadError = true;
       } else if (pattern->hasType()) {
         type = pattern->getType();
       } else {
         missingType = true;
-      }
-
-      if (init && !isFirstPass && !init->alreadyChecked() && type) {
-        Expr *e = init->getExpr();
-        typeCheckExpression(e, dc, type);
-        init->setExpr(e, true);
       }
 
       typeElts.push_back(TupleTypeElt(type, pattern->getBoundName(),

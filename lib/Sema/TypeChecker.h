@@ -472,7 +472,7 @@ public:
   Pattern *resolvePattern(Pattern *P, DeclContext *dc);
   
   bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                        bool isFirstPass, bool allowUnknownTypes,
+                        bool allowUnknownTypes,
                         bool isVararg = false);
   bool coerceToType(Pattern *P, DeclContext *dc, Type Ty, bool isVararg =false);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,

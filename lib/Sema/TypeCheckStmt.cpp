@@ -538,12 +538,49 @@ void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   }
 }
 
+/// Check the default arguments that occur within this pattern.
+static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
+                                  DeclContext *dc) {
+  switch (pattern->getKind()) {
+  case PatternKind::Tuple:
+    for (auto &field : cast<TuplePattern>(pattern)->getFields()) {
+      if (field.getInit()) {
+        assert(!field.getInit()->alreadyChecked() &&
+               "Expression already checked");
+        Expr *e = field.getInit()->getExpr();
+        tc.typeCheckExpression(e, dc, field.getPattern()->getType());
+        field.getInit()->setExpr(e, true);
+      }
+    }
+    return;
+  case PatternKind::Paren:
+    return checkDefaultArguments(tc,
+                                 cast<ParenPattern>(pattern)->getSubPattern(),
+                                 dc);
+  case PatternKind::Typed:
+  case PatternKind::Named:
+  case PatternKind::Any:
+    return;
+
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    llvm_unreachable("pattern can't appear in argument list!");
+  }
+  llvm_unreachable("bad pattern kind!");
+}
+
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
 void TypeChecker::typeCheckFunctionBody(FuncExpr *FE) {
   if (FE->getDecl() && FE->getDecl()->isInvalid())
     return;
-  
+
+  // Check the default argument definitions.
+  for (auto pattern : FE->getBodyParamPatterns()) {
+    checkDefaultArguments(*this, pattern, FE->getParent());
+  }
+
   BraceStmt *BS = FE->getBody();
   if (!BS)
     return;
@@ -619,6 +656,9 @@ void TypeChecker::typeCheckConstructorBody(ConstructorDecl *ctor) {
     if (!typeCheckExpression(allocThis, ctor))
       ctor->setAllocThisExpr(allocThis);
   }
+
+  // Check the default argument definitions.
+  checkDefaultArguments(*this, ctor->getArguments(), ctor->getDeclContext());
 
   BraceStmt *body = ctor->getBody();
 

@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ExprHandle.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
 
@@ -644,6 +645,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         field.setPattern(newField);
       else
         return nullptr;
+
+      if (auto handle = field.getInit()) {
+        if (auto init = doIt(handle->getExpr())) {
+          handle->setExpr(init, handle->alreadyChecked());
+        } else {
+          return nullptr;
+        }
+      }
     }
     return P;
   }
@@ -857,6 +866,13 @@ public:
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
         TLCD->setBody(S);
     } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
+      // Visit arguments.
+      auto *arguments = doIt(CD->getArguments());
+      if (!arguments)
+        return nullptr;
+
+      CD->setArguments(arguments);
+
       Stmt *S = CD->getBody();
       if (S) {
         S = doIt(S);

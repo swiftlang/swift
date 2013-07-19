@@ -520,7 +520,6 @@ static void generatePrintOfExpression(StringRef NameStr, Expr *E,
   }
   TC->typeCheckPattern(ParamPat,
                        Arg->getDeclContext(),
-                       /*isFirstPass*/false,
                        /*allowUnknownTypes*/false);
   FuncExpr *FE = FuncExpr::create(C, Loc, ParamPat, ParamPat, TypeLoc(), &TC->TU);
   Type FuncTy = FunctionType::get(ParamPat->getType(), TupleType::getEmpty(C),

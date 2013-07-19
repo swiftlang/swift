@@ -919,63 +919,6 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
   // pass, which means we can't completely analyze everything. Perform the
   // second pass now.
 
-  // Check default arguments in patterns.
-  // FIXME: This is an ugly hack to keep default arguments working for the
-  // moment; I don't really want to invest more time into them until we're
-  // sure how they are actually supposed to work.
-  struct PatternDefaultArgChecker : public ASTWalker {
-    TypeChecker &TC;
-    ExprPrePassWalker &PrePass;
-
-    PatternDefaultArgChecker(TypeChecker &TC,
-                             ExprPrePassWalker &PrePass)
-      : TC(TC), PrePass(PrePass) {}
-
-    void visitPattern(Pattern *P, DeclContext *DC) {
-      switch (P->getKind()) {
-      case PatternKind::Tuple:
-        for (auto &field : cast<TuplePattern>(P)->getFields()) {
-          if (field.getInit() && field.getPattern()->hasType() &&
-              !field.getInit()->alreadyChecked()) {
-            Expr *e = field.getInit()->getExpr();
-            e = PrePass.doWalk(e, DC);
-            TC.typeCheckExpression(e, DC, field.getPattern()->getType());
-            field.getInit()->setExpr(e, true);
-          }
-        }
-        return;
-      case PatternKind::Paren:
-        return visitPattern(cast<ParenPattern>(P)->getSubPattern(), DC);
-      case PatternKind::Typed:
-      case PatternKind::Named:
-      case PatternKind::Any:
-        return;
-          
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-        llvm_unreachable("pattern can't appear in argument list!");
-      }
-      llvm_unreachable("bad pattern kind!");
-    }
-
-    virtual bool walkToDeclPre(Decl *D) {
-      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (CD->getArguments())
-          visitPattern(CD->getArguments(), D->getDeclContext());
-      } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
-        visitPattern(SD->getIndices(), D->getDeclContext());
-      } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        for (Pattern *p : FD->getBody()->getArgParamPatterns())
-          visitPattern(p, D->getDeclContext());
-      }
-      return true;
-    }
-  };
-  PatternDefaultArgChecker pdac(TC, prePass);
-  for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i)
-    TU->Decls[i]->walk(pdac);
-
   for (unsigned i = StartElem, e = TU->Decls.size(); i != e; ++i) {
     Decl *D = TU->Decls[i];
     if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
