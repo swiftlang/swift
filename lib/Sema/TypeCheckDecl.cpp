@@ -848,12 +848,24 @@ public:
     }
 
     if (!IsSecondPass) {
-      Type ExtendedTy = ED->getExtendedType()->getCanonicalType();
-      if (!ExtendedTy->is<OneOfType>() && !ExtendedTy->is<StructType>() &&
-          !ExtendedTy->is<ClassType>() && !ExtendedTy->is<ErrorType>() &&
-          !ExtendedTy->is<UnboundGenericType>()) {
+      CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
+
+      // FIXME: we should require generic parameter clauses here
+      if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
+        auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
+        ED->getExtendedTypeLoc() = TypeLoc::withoutLoc(boundType);
+        ExtendedTy = boundType->getCanonicalType();
+      }
+
+      if (!isa<OneOfType>(ExtendedTy) &&
+          !isa<StructType>(ExtendedTy) &&
+          !isa<ClassType>(ExtendedTy) &&
+          !isa<BoundGenericOneOfType>(ExtendedTy) &&
+          !isa<BoundGenericStructType>(ExtendedTy) &&
+          !isa<BoundGenericClassType>(ExtendedTy) &&
+          !isa<ErrorType>(ExtendedTy)) {
         TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
-                    ExtendedTy->is<ProtocolType>(), ExtendedTy);
+                    isa<ProtocolType>(ExtendedTy), ExtendedTy);
         // FIXME: It would be nice to point out where we found the named type
         // declaration, if any.
       }

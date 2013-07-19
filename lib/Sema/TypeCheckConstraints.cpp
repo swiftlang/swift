@@ -751,9 +751,9 @@ Type ConstraintSystem::openTypeOfContext(
     if (auto nominal = extendedTy->getAs<NominalType>()) {
       result = nominal->getDecl()->getDeclaredTypeInContext();
       dcGenericParams = nominal->getDecl()->getGenericParamsOfContext();
-    } else if (auto unbound = extendedTy->getAs<UnboundGenericType>()) {
-      result = unbound->getDecl()->getDeclaredTypeInContext();
-      dcGenericParams = unbound->getDecl()->getGenericParamsOfContext();
+    } else if (auto bound = extendedTy->getAs<BoundGenericType>()) {
+      result = bound->getDecl()->getDeclaredTypeInContext();
+      dcGenericParams = bound->getDecl()->getGenericParamsOfContext();
     } else
       llvm_unreachable("unknown owner for type member");
   }

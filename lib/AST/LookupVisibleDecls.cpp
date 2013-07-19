@@ -404,10 +404,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (FD && FD->getExtensionType()) {
         ExtendedType = FD->getExtensionType();
         BaseDecl = FD->getImplicitThisDecl();
-        if (NominalType *NT = ExtendedType->getAs<NominalType>())
-          MetaBaseDecl = NT->getDecl();
-        else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
-          MetaBaseDecl = UGT->getDecl();
+        MetaBaseDecl = ExtendedType->getAnyNominal();
         DC = DC->getParent();
 
         if (FD->isStatic())
@@ -423,10 +420,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
-      if (NominalType *NT = ExtendedType->getAs<NominalType>())
-        BaseDecl = NT->getDecl();
-      else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
-        BaseDecl = UGT->getDecl();
+      BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
       MetaBaseDecl = BaseDecl;
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
       ExtendedType = ND->getDeclaredType();

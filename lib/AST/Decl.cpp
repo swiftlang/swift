@@ -43,8 +43,10 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::DestructorDecl:
     return Type();
     
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->getExtendedType();
+  case DeclContextKind::ExtensionDecl: {
+    auto type = cast<ExtensionDecl>(this)->getExtendedType();
+    return type->getNominalOrBoundGenericNominal()->getDeclaredType();
+  }
     
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredType();
@@ -63,17 +65,8 @@ Type DeclContext::getDeclaredTypeInContext() {
     case DeclContextKind::DestructorDecl:
       return Type();
 
-    case DeclContextKind::ExtensionDecl: {
-      auto ty = cast<ExtensionDecl>(this)->getExtendedType();
-      if (auto unbound = ty->getAs<UnboundGenericType>())
-        return unbound->getDecl()->getDeclaredTypeInContext();
-
-      if (auto nominal = ty->getAs<NominalType>())
-        return nominal->getDecl()->getDeclaredTypeInContext();
-
-      return Type();
-    }
-
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(this)->getExtendedType();
     case DeclContextKind::NominalTypeDecl:
       return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();
   }
@@ -126,19 +119,13 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(this);
       auto extendedType = extension->getExtendedType();
-      if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
-        return unbound->getDecl()->getGenericParams();
+      if (auto bound = extendedType->getAs<BoundGenericType>()) {
+        return bound->getDecl()->getGenericParams();
       }
       if (auto nominalTy = extendedType->getAs<NominalType>()) {
         auto nominalDecl = nominalTy->getDecl();
-        if (auto gp = nominalDecl->getGenericParams())
-          return gp;
         return nominalDecl->getDeclContext()->getGenericParamsOfContext();
       }
-
-      // FIXME: Eventually, extensions will be able to have their own
-      // generic parameters.
-
       return nullptr;
     }
   }
