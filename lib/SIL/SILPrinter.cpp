@@ -316,7 +316,7 @@ public:
   }
   
   void visitAllocStackInst(AllocStackInst *AVI) {
-    OS << "alloc_var $" << AVI->getElementType().getString();
+    OS << "alloc_stack $" << AVI->getElementType().getString();
     if (VarDecl *vd = AVI->getDecl())
       OS << "  // var " << vd->getName();
   }
@@ -655,7 +655,7 @@ public:
     OS << "release " << getIDAndType(RI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
-    OS << "dealloc_var " << getIDAndType(DI->getOperand());
+    OS << "dealloc_stack " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
     OS << "dealloc_ref " << getIDAndType(DI->getOperand());
