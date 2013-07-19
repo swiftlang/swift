@@ -545,7 +545,8 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleDecls(*this, ExprType, *CurrDeclContext->getParentModule());
+      lookupVisibleDecls(*this, ExprType, CurrDeclContext,
+                         /*IsTypeLookup=*/ExprType->is<MetaTypeType>());
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.

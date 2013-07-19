@@ -238,10 +238,10 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 /// Finds decls visible as members of the given type and feeds them to the given
 /// VisibleDeclConsumer.
 ///
-/// \param CurrModule the module from which the lookup is done.
+/// \param CurrDC the DeclContext from which the lookup is done.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         Type BaseTy,
-                        const Module &CurrModule,
+                        const DeclContext *CurrDC,
                         bool IsTypeLookup = false);
 
 } // end namespace swift

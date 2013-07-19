@@ -343,7 +343,7 @@ public:
 
     } else {
       lookupVisibleDecls(*this, context.getBaseType(),
-                         *context.getDeclContext()->getParentModule());
+                         context.getDeclContext());
     
       // Add the special qualified keyword 'metatype' so that, for example,
       // 'Int.metatype' can be completed.

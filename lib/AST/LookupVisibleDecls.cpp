@@ -68,22 +68,22 @@ namespace {
 
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
-                           const Module &M,
+                           const DeclContext *CurrDC,
                            bool IsTypeLookup,
                            bool OnlyInstanceMembers,
                            VisitedSet &Visited);
 static void lookupTypeMembers(Type BaseType,
                               VisibleDeclConsumer &Consumer,
-                              const Module &M,
+                              const DeclContext *CurrDC,
                               bool IsTypeLookup);
 
 
 static void lookupVisibleMemberDecls(Type BaseTy,
                                      VisibleDeclConsumer &Consumer,
-                                     const Module &M,
+                                     const DeclContext *CurrDC,
                                      bool IsTypeLookup) {
   VisitedSet Visited;
-  doMemberLookup(BaseTy, Consumer, M,
+  doMemberLookup(BaseTy, Consumer, CurrDC,
                  IsTypeLookup,
                  /*OnlyInstanceMembers=*/!IsTypeLookup,
                  Visited);
@@ -98,7 +98,7 @@ static void lookupVisibleMemberDecls(Type BaseTy,
 /// name lookup.
 static void doMemberLookup(Type BaseTy,
                            VisibleDeclConsumer &Consumer,
-                           const Module &M,
+                           const DeclContext *CurrDC,
                            bool IsTypeLookup,
                            bool OnlyInstanceMembers,
                            VisitedSet &Visited) {
@@ -116,7 +116,7 @@ static void doMemberLookup(Type BaseTy,
     // member name to see if we find extensions or anything else.  For example,
     // type SomeTy.SomeMember can look up static functions, and can even look
     // up non-static functions as well (thus getting the address of the member).
-    doMemberLookup(Ty, Consumer, M, IsTypeLookup,
+    doMemberLookup(Ty, Consumer, CurrDC, IsTypeLookup,
                    /*OnlyInstanceMembers=*/false, Visited);
     return;
   }
@@ -136,7 +136,7 @@ static void doMemberLookup(Type BaseTy,
       return;
       
     for (auto Inherited : PT->getDecl()->getInherited())
-      doMemberLookup(Inherited.getType(), Consumer, M, IsTypeLookup,
+      doMemberLookup(Inherited.getType(), Consumer, CurrDC, IsTypeLookup,
                      OnlyInstanceMembers, Visited);
     
     for (auto Member : PT->getDecl()->getMembers()) {
@@ -159,7 +159,7 @@ static void doMemberLookup(Type BaseTy,
   // declared protocol member in any of the protocols.
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Proto : PC->getProtocols())
-      doMemberLookup(Proto, Consumer, M, IsTypeLookup,
+      doMemberLookup(Proto, Consumer, CurrDC, IsTypeLookup,
                      OnlyInstanceMembers, Visited);
     return;
   }
@@ -167,11 +167,11 @@ static void doMemberLookup(Type BaseTy,
   // Check to see if any of an archetype's requirements have the member.
   if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
     for (auto Proto : Archetype->getConformsTo())
-      doMemberLookup(Proto->getDeclaredType(), Consumer, M, IsTypeLookup,
+      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, IsTypeLookup,
                      OnlyInstanceMembers, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
-      doMemberLookup(superclass, Consumer, M, IsTypeLookup,
+      doMemberLookup(superclass, Consumer, CurrDC, IsTypeLookup,
                      OnlyInstanceMembers, Visited);
     return;
   }
@@ -179,7 +179,7 @@ static void doMemberLookup(Type BaseTy,
   do {
     // Look in for members of a nominal type.
     SmallVector<ValueDecl*, 8> ExtensionMethods;
-    lookupTypeMembers(BaseTy, Consumer, M, IsTypeLookup);
+    lookupTypeMembers(BaseTy, Consumer, CurrDC, IsTypeLookup);
 
     for (ValueDecl *VD : ExtensionMethods) {
       assert((isa<VarDecl>(VD) || isa<SubscriptDecl>(VD)) &&
@@ -207,10 +207,9 @@ static void doMemberLookup(Type BaseTy,
 }
 
 static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
-                              const Module &M, bool IsTypeLookup) {
+                              const DeclContext *CurrDC, bool IsTypeLookup) {
   NominalTypeDecl *D;
-  ArrayRef<ValueDecl*> BaseMembers;
-  SmallVector<ValueDecl*, 2> BaseMembersStorage;
+  SmallVector<ValueDecl*, 2> BaseMembers;
   if (BoundGenericType *BGT = BaseType->getAs<BoundGenericType>()) {
     BaseType = BGT->getDecl()->getDeclaredType();
     D = BGT->getDecl();
@@ -222,17 +221,26 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     return;
   }
 
+  const DeclContext *TempDC = CurrDC;
+  while (!TempDC->isModuleContext()) {
+    if (TempDC == D) {
+      // Current decl context is contained inside 'D', so generic parameters
+      // are visible.
+      if (D->getGenericParams())
+        for (auto param : *D->getGenericParams())
+          BaseMembers.push_back(param.getDecl());
+      break;
+    }
+    TempDC = TempDC->getParent();
+  }
+
   for (Decl* Member : D->getMembers()) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(Member)) {
-      BaseMembersStorage.push_back(VD);
+      BaseMembers.push_back(VD);
     }
   }
-  if (D->getGenericParams())
-    for (auto param : *D->getGenericParams())
-      BaseMembersStorage.push_back(param.getDecl());
-  BaseMembers = BaseMembersStorage;
-
-  DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers, &M,
+  DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers,
+                          CurrDC->getParentModule(),
                           D->getParentModule(), IsTypeLookup);
 }
 
@@ -451,7 +459,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
 
     if (BaseDecl) {
-      lookupVisibleMemberDecls(ExtendedType, Consumer, M, IsTypeLookup);
+      lookupVisibleMemberDecls(ExtendedType, Consumer, DC, IsTypeLookup);
     }
 
     // Check the generic parameters for something with the given name.
@@ -513,6 +521,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
-                               const Module &CurrModule, bool IsTypeLookup) {
-  lookupVisibleMemberDecls(BaseTy, Consumer, CurrModule, IsTypeLookup);
+                               const DeclContext *CurrDC, bool IsTypeLookup) {
+  lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, IsTypeLookup);
 }
