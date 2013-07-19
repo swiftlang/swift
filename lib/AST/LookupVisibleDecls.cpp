@@ -376,8 +376,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // If we are inside of a method, check to see if there are any ivars in scope,
   // and if so, whether this is a reference to one of them.
   while (!DC->isModuleContext()) {
-    const ValueDecl *BaseDecl = 0;
-    const ValueDecl *MetaBaseDecl = 0;
+    const ValueDecl *BaseDecl = nullptr;
+    const ValueDecl *MetaBaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
     if (auto FE = dyn_cast<FuncExpr>(DC)) {
