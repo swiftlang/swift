@@ -109,10 +109,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
 
   // FIXME.
   StringRef SplitName = StringRef();
-  DBuilder.createCompileUnit(Lang, Filename, Dir, Producer,
-                             IsOptimized, Flags, RuntimeVersion,
-                             SplitName);
-  TheCU = llvm::DICompileUnit(DBuilder.getCU());
+  TheCU = DBuilder.createCompileUnit(Lang, Filename, Dir, Producer,
+                                     IsOptimized, Flags, RuntimeVersion,
+                                     SplitName);
 }
 
 void IRGenDebugInfo::finalize() {
