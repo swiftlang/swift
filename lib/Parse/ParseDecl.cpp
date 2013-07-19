@@ -1274,11 +1274,13 @@ FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
   SmallVector<Pattern*, 8> ArgParams;
   SmallVector<Pattern*, 8> BodyParams;
   
-  // If we're within a container and this isn't a static method, add an
-  // implicit first pattern to match the container type as an element
-  // named 'this'.  This turns "(int)->int" on FooTy into "(this :
-  // [byref] FooTy)->((int)->int)".  Note that we can't actually compute the
-  // type here until Sema.
+  // If we're within a container, add an implicit first pattern to match the
+  // container type as an element named 'this'.
+  //
+  // This turns an instance function "(int)->int" on FooTy into
+  // "(this: [byref] FooTy)->(int)->int", and a static function
+  // "(int)->int" on FooTy into "(this: [byref] FooTy.metatype)->(int)->int".
+  // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *thisPattern = buildImplicitThisParameter();
     ArgParams.push_back(thisPattern);
