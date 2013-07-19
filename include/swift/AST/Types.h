@@ -306,6 +306,7 @@ public:
     return T->getKind() == TypeKind::Error;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
@@ -1890,6 +1891,7 @@ public:
     return T->getKind() == TypeKind::TypeVariable;
   }
 };
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
 inline bool TypeBase::hasTypeVariable() const {
   return TypeBits.TypeBase.HasTypeVariable;
