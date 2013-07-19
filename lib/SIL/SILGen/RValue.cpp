@@ -31,7 +31,7 @@ namespace {
 
 static unsigned getTupleSize(CanType t) {
   if (TupleType *tt = dyn_cast<TupleType>(t))
-    return tt->getFields().size();
+    return tt->getNumElements();
   return 1;
 }
 
@@ -65,7 +65,7 @@ public:
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
-      for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
+      for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
         CanType fieldCanTy = t.getElementType(i);
         SILType fieldTy = gen.getLoweredType(fieldCanTy);
         SILValue member = gen.B.createTupleElementAddr(SILLocation(),
@@ -80,7 +80,7 @@ public:
       }
     } else {
       // Extract the elements from loadable tuples.
-      for (unsigned i = 0, size = t->getFields().size(); i < size; ++i) {
+      for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
         CanType fieldCanTy = t.getElementType(i);
         SILType fieldTy = gen.getLoweredLoadableType(fieldCanTy);
         SILValue member = gen.B.createTupleExtract(SILLocation(),
@@ -128,8 +128,8 @@ public:
   
   SILValue visitTupleType(CanTupleType t) {
     SmallVector<SILValue, 4> elts;
-    for (auto &field : t->getFields())
-      elts.push_back(this->visit(CanType(field.getType())));
+    for (auto fieldTy : t.getElementTypes())
+      elts.push_back(this->visit(fieldTy));
     SILType ty = gen.getLoweredLoadableType(t);
     return gen.B.createTuple(SILLocation(), ty, elts);
   }
@@ -160,7 +160,7 @@ public:
   }
   
   void visitTupleType(CanTupleType t, SILValue address) {
-    for (unsigned n = 0, size = t->getFields().size(); n < size; ++n) {
+    for (unsigned n = 0, size = t->getNumElements(); n < size; ++n) {
       CanType fieldCanTy = t.getElementType(n);
       SILType fieldTy = gen.getLoweredType(fieldCanTy);
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
@@ -212,8 +212,8 @@ public:
   }
   
   void visitTupleType(CanTupleType t) {
-    for (auto &field : t->getFields())
-      visit(CanType(field.getType()));
+    for (auto fieldType : t.getElementTypes())
+      visit(fieldType);
   }
 };
   
@@ -230,8 +230,8 @@ static void computeElementOffsets(std::vector<unsigned> &offsets,
   
   // Visit each field and record its ending value offset.
   ComputeElementOffsets visitor;
-  for (auto &field : tuple->getFields()) {
-    visitor.visit(CanType(field.getType()));
+  for (auto fieldType : tuple.getElementTypes()) {
+    visitor.visit(fieldType);
     offsets.push_back(visitor.offset);
   }
 }
@@ -285,7 +285,7 @@ public:
     SmallVector<InitializationPtr, 4> subInitBuf;
     auto subInits = I->getSubInitializations(gen, subInitBuf);
     
-    assert(subInits.size() == t->getFields().size() &&
+    assert(subInits.size() == t->getNumElements() &&
            "initialization does not match tuple?!");
     
     for (unsigned i = 0, e = subInits.size(); i < e; ++i)
@@ -316,8 +316,8 @@ public:
   RValue visitTupleType(CanTupleType t) {
     RValue rv{t};
     
-    for (auto &field : t->getFields())
-      rv.addElement(visit(CanType(field.getType())));
+    for (auto fieldType : t.getElementTypes())
+      rv.addElement(visit(fieldType));
     
     return rv;
   }
@@ -431,7 +431,7 @@ RValue RValue::extractElement(unsigned n) && {
   assert(isComplete() && "rvalue is not complete");
   
   unsigned from = elementOffsets[n], to = elementOffsets[n+1];
-  CanType eltTy(cast<TupleType>(type)->getFields()[n].getType());
+  CanType eltTy = cast<TupleType>(type).getElementType(n);
   
   RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltTy);
   makeUsed();
@@ -441,12 +441,12 @@ RValue RValue::extractElement(unsigned n) && {
 void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   assert(isComplete() && "rvalue is not complete");
 
-  auto fields = cast<TupleType>(type)->getFields();
+  auto elementTypes = cast<TupleType>(type).getElementTypes();
   
-  for (unsigned n = 0, size = fields.size(); n < size; ++n) {
+  for (unsigned n = 0, size = elementTypes.size(); n < size; ++n) {
     unsigned from = elementOffsets[n], to = elementOffsets[n+1];
     elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
-                        CanType(fields[n].getType())});
+                        elementTypes[n]});
   }
   makeUsed();
 }

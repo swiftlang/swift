@@ -209,24 +209,24 @@ namespace {
 
     // We assume that all reference storage types have equivalent
     // representation.  This may not be true.
-    bool visitReferenceStorageType(ReferenceStorageType *origTy,
-                                   ReferenceStorageType *substTy) {
+    bool visitReferenceStorageType(CanReferenceStorageType origTy,
+                                   CanReferenceStorageType substTy) {
       return false;
     }
         
-    CanType getArchetypeReprType(ArchetypeType *a) {
+    CanType getArchetypeReprType(CanArchetypeType a) {
       if (Type super = a->getSuperclass())
-        return super->getCanonicalType();
+        return CanType(super);
       return CanType(IGM.Context.TheObjCPointerType);
     }
 
-    bool visitArchetypeType(ArchetypeType *origTy, CanType substTy) {
+    bool visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
       // Archetypes vary by what we're considering this for.
 
       if (origTy->requiresClass()) {
         // Class archetypes are represented as some refcounted
         // pointer type that needs to be bitcast.
-        return CanType(origTy) != substTy;
+        return origTy != substTy;
       }
       
       // Archetypes are laid out in memory in the same way as a
@@ -239,13 +239,12 @@ namespace {
       return !IGM.isSingleIndirectValue(substTy, ExplosionLevel);
     }
 
-    bool visitArrayType(ArrayType *origTy, ArrayType *substTy) {
-      return visit(CanType(origTy->getBaseType()),
-                   CanType(substTy->getBaseType()));
+    bool visitArrayType(CanArrayType origTy, CanArrayType substTy) {
+      return visit(origTy.getBaseType(), substTy.getBaseType());
     }
 
-    bool visitBoundGenericType(BoundGenericType *origTy,
-                               BoundGenericType *substTy) {
+    bool visitBoundGenericType(CanBoundGenericType origTy,
+                               CanBoundGenericType substTy) {
       assert(origTy->getDecl() == substTy->getDecl());
 
       // Bound generic types with reference semantics will never
@@ -258,8 +257,8 @@ namespace {
 
     /// Functions use a more complicated algorithm which calls back
     /// into this.
-    bool visitAnyFunctionType(AnyFunctionType *origTy,
-                              AnyFunctionType *substTy) {
+    bool visitAnyFunctionType(CanAnyFunctionType origTy,
+                              CanAnyFunctionType substTy) {
       return differsByAbstractionAsFunction(IGM, origTy, substTy,
                                             ExplosionKind::Minimal,
                                             /*uncurry*/ 0);
@@ -267,17 +266,17 @@ namespace {
 
     // L-values go by the object type;  note that we ask the ordinary
     // question, not the argument question.
-    bool visitLValueType(LValueType *origTy, LValueType *substTy) {
+    bool visitLValueType(CanLValueType origTy, CanLValueType substTy) {
       return differsByAbstractionInMemory(IGM,
-                                          CanType(origTy->getObjectType()),
-                                          CanType(substTy->getObjectType()));
+                                          origTy.getObjectType(),
+                                          substTy.getObjectType());
     }
 
-    bool visitMetaTypeType(MetaTypeType *origTy, MetaTypeType *substTy) {
+    bool visitMetaTypeType(CanMetaTypeType origTy, CanMetaTypeType substTy) {
       // Metatypes can differ by abstraction if the substitution
       // reveals that the type is actually not a class type.
-      return (IGM.hasTrivialMetatype(CanType(substTy->getInstanceType())) &&
-              !IGM.hasTrivialMetatype(CanType(origTy->getInstanceType())));
+      return (IGM.hasTrivialMetatype(substTy.getInstanceType()) &&
+              !IGM.hasTrivialMetatype(origTy.getInstanceType()));
     }
 
     /// Whether we're checking for memory or for an explosion, tuples
@@ -286,11 +285,10 @@ namespace {
     /// TODO: unless the original tuple contains a variadic explosion,
     /// in which case that portion of the tuple is passed indirectly
     /// in an explosion!
-    bool visitTupleType(TupleType *origTy, TupleType *substTy) {
-      assert(origTy->getFields().size() == substTy->getFields().size());
-      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i)
-        if (visit(CanType(origTy->getElementType(i)),
-                  CanType(substTy->getElementType(i))))
+    bool visitTupleType(CanTupleType origTy, CanTupleType substTy) {
+      assert(origTy->getNumElements() == substTy->getNumElements());
+      for (unsigned i = 0, e = origTy->getNumElements(); i != e; ++i)
+        if (visit(origTy.getElementType(i), substTy.getElementType(i)))
           return true;
       return false;
     }
@@ -322,8 +320,8 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   using CanTypeVisitor<EmbedsArchetype, bool>::visit;
 
   bool visitTupleType(CanTupleType type) {
-    for (auto &field : type->getFields())
-      if (visit(CanType(field.getType())))
+    for (auto eltType : type.getElementTypes())
+      if (visit(eltType))
         return true;
     return false;
   }
@@ -615,8 +613,8 @@ namespace {
     }
 
     void visitTupleType(CanTupleType origTy, CanTupleType substTy) {
-      assert(origTy->getFields().size() == substTy->getFields().size());
-      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
+      assert(origTy->getNumElements() == substTy->getNumElements());
+      for (unsigned i = 0, e = origTy->getNumElements(); i != e; ++i) {
         visit(origTy.getElementType(i), substTy.getElementType(i));
       }
     }
@@ -763,8 +761,8 @@ namespace {
     }
 
     void visitTupleType(CanTupleType origTy, CanTupleType substTy) {
-      assert(origTy->getFields().size() == substTy->getFields().size());
-      for (unsigned i = 0, e = origTy->getFields().size(); i != e; ++i) {
+      assert(origTy->getNumElements() == substTy->getNumElements());
+      for (unsigned i = 0, e = origTy->getNumElements(); i != e; ++i) {
         visit(origTy.getElementType(i), substTy.getElementType(i));
       }
     }

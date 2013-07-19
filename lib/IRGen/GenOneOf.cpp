@@ -259,8 +259,8 @@ namespace {
 
   bool isObviouslyEmptyType(CanType type) {
     if (auto tuple = dyn_cast<TupleType>(type)) {
-      for (auto &field : tuple->getFields())
-        if (!isObviouslyEmptyType(CanType(field.getType())))
+      for (auto eltType : tuple.getElementTypes())
+        if (!isObviouslyEmptyType(eltType))
           return false;
       return true;
     }

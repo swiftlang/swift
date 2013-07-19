@@ -237,7 +237,7 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod) {
 
 /// Emit a string encoding the labels in the given tuple type.
 static llvm::Constant *getTupleLabelsString(IRGenModule &IGM,
-                                            TupleType *type) {
+                                            CanTupleType type) {
   bool hasLabels = false;
   llvm::SmallString<128> buffer;
   for (auto &elt : type->getFields()) {
@@ -329,9 +329,7 @@ namespace {
       // Er, varargs bit?  Should that go in?
 
 
-      auto elements = type->getFields();
-
-      switch (elements.size()) {
+      switch (type->getNumElements()) {
       case 0: {// Special case the empty tuple, just use the global descriptor.
         llvm::Constant *fullMetadata = IGF.IGM.getEmptyTupleMetadata();
         llvm::Constant *indices[] = {
@@ -389,13 +387,14 @@ namespace {
 
         llvm::Value *pointerToFirst = nullptr; // appease -Wuninitialized
 
+        auto elements = type.getElementTypes();
         auto arrayTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
                                             elements.size());
         Address buffer = IGF.createAlloca(arrayTy,IGF.IGM.getPointerAlignment(),
                                           "tuple-elements");
         for (unsigned i = 0, e = elements.size(); i != e; ++i) {
           // Find the metadata pointer for this element.
-          llvm::Value *eltMetadata = visit(type.getElementType(i));
+          llvm::Value *eltMetadata = visit(elements[i]);
 
           // GEP to the appropriate element and store.
           Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
@@ -418,7 +417,7 @@ namespace {
         call->setDoesNotThrow();
         call->setCallingConv(IGF.IGM.RuntimeCC);
 
-        return setLocal(CanType(type), call);
+        return setLocal(type, call);
       }
     }
 
@@ -1038,8 +1037,8 @@ namespace {
 
     bool visitTupleType(CanTupleType overridden, CanType overrideTy) {
       CanTupleType override = cast<TupleType>(overrideTy);
-      assert(overridden->getFields().size() == override->getFields().size());
-      for (unsigned i = 0, e = overridden->getFields().size(); i != e; ++i) {
+      assert(overridden->getNumElements() == override->getNumElements());
+      for (unsigned i = 0, e = overridden->getNumElements(); i != e; ++i) {
         if (visit(overridden.getElementType(i), override.getElementType(i)))
           return true;
       }

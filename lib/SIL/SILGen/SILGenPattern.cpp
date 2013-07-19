@@ -88,8 +88,7 @@ static SILBasicBlock *emitBranchAndDestructure(SILGenFunction &gen,
     auto tupleSILTy = gen.getLoweredType(tupleTy);
     if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
       for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-        auto &field = tupleTy->getFields()[i];
-        SILType fieldTy = gen.getLoweredType(field.getType());
+        SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
         SILValue member = gen.B.createTupleElementAddr(SILLocation(),
                                              v, i, fieldTy.getAddressType());
         if (!fieldTy.isAddressOnly(gen.F.getModule()))
@@ -98,8 +97,8 @@ static SILBasicBlock *emitBranchAndDestructure(SILGenFunction &gen,
       }
     } else {
       for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-        auto &field = tupleTy->getFields()[i];
-        SILType fieldTy = gen.getLoweredLoadableType(field.getType());
+        auto fieldType = tupleTy->getElementType(i);
+        SILType fieldTy = gen.getLoweredLoadableType(fieldType);
         SILValue member = gen.B.createTupleExtract(SILLocation(),
                                                    v, i, fieldTy);
         destructured.push_back(member);

@@ -104,8 +104,8 @@ namespace {
     }
     
     void visitTupleType(CanTupleType tt) {
-      for (auto &field : tt->getFields()) {
-        visit(CanType(field.getType()));
+      for (auto eltType : tt.getElementTypes()) {
+        visit(eltType);
       }
     }
   };

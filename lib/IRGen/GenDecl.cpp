@@ -522,17 +522,14 @@ static bool isLocalLinkageGenericClause(const GenericParamList &params) {
 }
 
 static bool isLocalLinkageType(CanType type) {
-  TypeBase *base = type.getPointer();
-
-  switch (base->getKind()) {
+  switch (type->getKind()) {
   case TypeKind::Error:
     llvm_unreachable("error type in IRGen");
   case TypeKind::TypeVariable:
     llvm_unreachable("type variable in IRgen");
       
   case TypeKind::MetaType:
-    return isLocalLinkageType(CanType(cast<MetaTypeType>(base)
-                                        ->getInstanceType()));
+    return isLocalLinkageType(cast<MetaTypeType>(type).getInstanceType());
   case TypeKind::Module:
     return false;
 
@@ -557,29 +554,28 @@ static bool isLocalLinkageType(CanType type) {
 #include "swift/AST/TypeNodes.def"
 
   case TypeKind::LValue:
-    return isLocalLinkageType(CanType(cast<LValueType>(base)
-                                        ->getObjectType()));
+    return isLocalLinkageType(cast<LValueType>(type).getObjectType());
 
   case TypeKind::Tuple: {
-    TupleType *tuple = cast<TupleType>(base);
-    for (auto &field : tuple->getFields()) {
-      if (isLocalLinkageType(CanType(field.getType())))
+    CanTupleType tuple = cast<TupleType>(type);
+    for (auto fieldType : tuple.getElementTypes()) {
+      if (isLocalLinkageType(fieldType))
         return true;
     }
     return false;
   }
 
   case TypeKind::UnboundGeneric:
-    return isLocalLinkageDecl(cast<UnboundGenericType>(base)->getDecl());
+    return isLocalLinkageDecl(cast<UnboundGenericType>(type)->getDecl());
 
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct: {
-    BoundGenericType *BGT = cast<BoundGenericType>(base);
+    CanBoundGenericType BGT = cast<BoundGenericType>(type);
     if (isLocalLinkageDecl(BGT->getDecl()))
       return true;
-    for (Type Arg : BGT->getGenericArgs()) {
-      if (isLocalLinkageType(CanType(Arg)))
+    for (Type arg : BGT->getGenericArgs()) {
+      if (isLocalLinkageType(CanType(arg)))
         return true;
     }
     return false;
@@ -589,30 +585,30 @@ static bool isLocalLinkageType(CanType type) {
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Protocol:
-    return isLocalLinkageDecl(cast<NominalType>(base)->getDecl());
+    return isLocalLinkageDecl(cast<NominalType>(type)->getDecl());
 
   case TypeKind::PolymorphicFunction: {
-    auto fn = cast<PolymorphicFunctionType>(base);
+    auto fn = cast<PolymorphicFunctionType>(type);
     if (isLocalLinkageGenericClause(fn->getGenericParams()))
       return true;
     SWIFT_FALLTHROUGH;
   }
   case TypeKind::Function: {
-    AnyFunctionType *fn = cast<AnyFunctionType>(base);
-    return isLocalLinkageType(CanType(fn->getInput())) ||
-           isLocalLinkageType(CanType(fn->getResult()));
+    CanAnyFunctionType fn = cast<AnyFunctionType>(type);
+    return isLocalLinkageType(fn.getInput()) ||
+           isLocalLinkageType(fn.getResult());
   }
 
   case TypeKind::ReferenceStorage: {
-    auto ref = cast<ReferenceStorageType>(base);
-    return isLocalLinkageType(CanType(ref->getReferentType()));
+    auto ref = cast<ReferenceStorageType>(type);
+    return isLocalLinkageType(ref.getReferentType());
   }
 
   case TypeKind::Array:
-    return isLocalLinkageType(CanType(cast<ArrayType>(base)->getBaseType()));
+    return isLocalLinkageType(cast<ArrayType>(type).getBaseType());
 
   case TypeKind::ProtocolComposition:
-    for (Type t : cast<ProtocolCompositionType>(base)->getProtocols())
+    for (Type t : cast<ProtocolCompositionType>(type)->getProtocols())
       if (isLocalLinkageType(CanType(t)))
         return true;
     return false;

@@ -37,15 +37,15 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   // AddressOnly.
 
   // Structs and tuples are address-only if any of their elements are.
-  if (TupleType *TTy = Ty->getAs<TupleType>()) {
+  if (CanTupleType TTy = dyn_cast<TupleType>(Ty)) {
     // Check to see if we've computed this property for this tuple yet.
     auto Entry = M.AddressOnlyTypeCache.find(TTy);
     // If we got a hit, then return the precomputed value.
     if (Entry != M.AddressOnlyTypeCache.end())
       return Entry->second;
     
-    for (const TupleTypeElt &elt : TTy->getFields())
-      if (isAddressOnly(elt.getType()->getCanonicalType(), M))
+    for (auto eltType : TTy.getElementTypes())
+      if (isAddressOnly(eltType, M))
         return M.AddressOnlyTypeCache[TTy] = true;
     
     return M.AddressOnlyTypeCache[TTy] = false;

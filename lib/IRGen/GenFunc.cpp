@@ -546,9 +546,9 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 
   // Explode the argument.
   auto decomposeTopLevelArg = [&](CanType inputTy) {
-    if (TupleType *tupleTy = inputTy->getAs<TupleType>()) {
-      for (auto &field : tupleTy->getFields()) {
-        decomposeFunctionArg(IGM, CanType(field.getType()), cc, explosionKind,
+    if (auto tupleTy = dyn_cast<TupleType>(inputTy)) {
+      for (auto fieldType : tupleTy.getElementTypes()) {
+        decomposeFunctionArg(IGM, fieldType, cc, explosionKind,
                              argTypes, byvals, attrs);
       }
     } else {
@@ -557,7 +557,7 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
     }
   };
 
-  CanType inputTy = CanType(fn->getInput());
+  CanType inputTy = fn.getInput();
   switch (cc) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -567,11 +567,11 @@ static CanType decomposeFunctionType(IRGenModule &IGM, CanType type,
 
   case AbstractCC::ObjCMethod: {
     // ObjC methods take an implicit _cmd argument after the self argument.
-    TupleType *inputTuple = cast<TupleType>(inputTy);
-    assert(inputTuple->getFields().size() == 2 && "invalid objc method type");
-    decomposeTopLevelArg(CanType(inputTuple->getFields()[0].getType()));
+    CanTupleType inputTuple = cast<TupleType>(inputTy);
+    assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
+    decomposeTopLevelArg(inputTuple.getElementType(0));
     argTypes.push_back(IGM.Int8PtrTy);
-    decomposeTopLevelArg(CanType(inputTuple->getFields()[1].getType()));
+    decomposeTopLevelArg(inputTuple.getElementType(1));
     break;
   }
   }
@@ -1408,10 +1408,9 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
 void CallEmission::externalizeArguments(Explosion &out, Explosion &arg,
                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
                     CanType inputsTy) {
-  if (TupleType *tupleTy = inputsTy->getAs<TupleType>()) {
-    for (auto &elt : tupleTy->getFields()) {
-      externalizeArgument(out, arg, newByvals,
-                          elt.getType()->getCanonicalType());
+  if (CanTupleType tupleType = dyn_cast<TupleType>(inputsTy)) {
+    for (auto eltType : tupleType.getElementTypes()) {
+      externalizeArgument(out, arg, newByvals, eltType);
     }
   } else {
     externalizeArgument(out, arg, newByvals, inputsTy);
@@ -1443,11 +1442,11 @@ void CallEmission::addArg(Explosion &arg) {
     // _cmd
     externalized.add(arg.claimNext());
     // method args
-    TupleType *inputTuple = CurOrigType->castTo<AnyFunctionType>()->getInput()
-      ->castTo<TupleType>();
-    assert(inputTuple->getFields().size() == 2 && "invalid objc method type");
+    CanTupleType inputTuple =
+      cast<TupleType>(cast<AnyFunctionType>(CurOrigType).getInput());
+    assert(inputTuple->getNumElements() == 2 && "invalid objc method type");
     externalizeArguments(externalized, arg, newByvals,
-                         CanType(inputTuple->getFields()[1].getType()));
+                         inputTuple.getElementType(1));
     arg = std::move(externalized);
     break;
   }

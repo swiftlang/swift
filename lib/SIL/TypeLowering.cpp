@@ -82,14 +82,13 @@ static CanType getBridgedInputType(TypeConverter &tc,
   if (auto tuple = dyn_cast<TupleType>(input)) {
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
-    for (TupleTypeElt const &field : tuple->getFields()) {
-      CanType bridged =
-        tc.getLoweredBridgedType(field.getType(), cc)->getCanonicalType();
-      if (bridged != CanType(field.getType())) {
+    for (auto &elt : tuple->getFields()) {
+      CanType bridged = CanType(tc.getLoweredBridgedType(elt.getType(), cc));
+      if (bridged != CanType(elt.getType())) {
         changed = true;
-        bridgedFields.push_back(field.getWithType(bridged));
+        bridgedFields.push_back(elt.getWithType(bridged));
       } else {
-        bridgedFields.push_back(field);
+        bridgedFields.push_back(elt);
       }
     }
     
@@ -360,10 +359,9 @@ public:
   void visitTupleType(CanTupleType t) {
     pushPath();
     unsigned i = 0;
-    for (TupleTypeElt const &elt : t->getFields()) {
-      CanType ct = elt.getType()->getCanonicalType();
-      setPath(ReferenceTypePath::Component::forTupleElement(ct, i++));
-      visit(ct);
+    for (auto eltType : t.getElementTypes()) {
+      setPath(ReferenceTypePath::Component::forTupleElement(eltType, i++));
+      visit(eltType);
     }
     popPath();
   }

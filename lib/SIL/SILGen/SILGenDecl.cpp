@@ -73,18 +73,17 @@ ArrayRef<InitializationPtr> Initialization::getSubInitializations(
     return getSubInitializations();
   case Kind::Ignored: {
     // "Destructure" an ignored binding into multiple ignored bindings.
-    for (auto &field : tupleTy->getFields()) {
-      buf.push_back(InitializationPtr(
-                                new BlackHoleInitialization(field.getType())));
+    for (auto fieldType : tupleTy->getElementTypes()) {
+      buf.push_back(InitializationPtr(new BlackHoleInitialization(fieldType)));
     }
     return buf;
   }
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
     SILValue baseAddr = getAddress();
-    for (unsigned i = 0, size = tupleTy->getFields().size(); i < size; ++i) {
-      auto &field = tupleTy->getFields()[i];
-      SILType fieldTy = gen.getLoweredType(field.getType()).getAddressType();
+    for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
+      auto fieldType = tupleTy->getElementType(i);
+      SILType fieldTy = gen.getLoweredType(fieldType).getAddressType();
       SILValue fieldAddr = gen.B.createTupleElementAddr(SILLocation(),
                                                         baseAddr, i,
                                                         fieldTy);

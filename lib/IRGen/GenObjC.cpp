@@ -555,8 +555,8 @@ static bool isObjCSetterSignature(IRGenModule &IGM,
   if (hasObjCClassRepresentation(IGM, methodType->getInput()))
     return true;
   if (TupleType *inputTuple = methodType->getInput()->getAs<TupleType>()) {
-    return inputTuple->getFields().size() == 1
-      && hasObjCClassRepresentation(IGM, inputTuple->getFields()[0].getType());
+    return inputTuple->getNumElements() == 1
+      && hasObjCClassRepresentation(IGM, inputTuple->getElementType(0));
   }
   return false;
 }

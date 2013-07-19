@@ -339,7 +339,7 @@ public:
     
     for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
       require(TI->getElements()[i].getType().getSwiftType()
-               ->isEqual(ResTy->getFields()[i].getType()),
+               ->isEqual(ResTy->getElementType(i)),
               "Tuple element arguments do not match tuple type!");
     }
   }

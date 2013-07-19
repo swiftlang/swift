@@ -618,6 +618,83 @@ public:
     return getDefaultArgKind() != DefaultArgumentKind::None;
   }
 };
+
+/// An adapter for iterating over a range of the elements of a tuple
+/// type and returning their types.
+class TupleEltTypeArrayRef {
+  ArrayRef<TupleTypeElt> Array;
+public:
+  TupleEltTypeArrayRef(ArrayRef<TupleTypeElt> array) : Array(array) {}
+
+  class iterator {
+    friend class TupleEltTypeArrayRef;
+    const TupleTypeElt *Ptr;
+    iterator(const TupleTypeElt *ptr) : Ptr(ptr) {}
+  public:
+    Type operator*() const { return Ptr->getType(); }
+    iterator &operator++() { Ptr++; return *this; }
+    iterator operator++(int) { return iterator(Ptr++); }
+    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
+    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
+  };
+  iterator begin() const { return iterator(Array.begin()); }
+  iterator end() const { return iterator(Array.end()); }
+
+  bool empty() const { return Array.empty(); }
+  size_t size() const { return Array.size(); }
+  Type operator[](unsigned i) const { return Array[i].getType(); }
+  Type front() const { return Array.front().getType(); }
+  Type back() const { return Array.back().getType(); }
+
+  TupleEltTypeArrayRef slice(unsigned start) const {
+    return TupleEltTypeArrayRef(Array.slice(start));
+  }
+  TupleEltTypeArrayRef slice(unsigned start, unsigned length) const {
+    return TupleEltTypeArrayRef(Array.slice(start, length));
+  }
+};
+
+/// An adapter for iterating over a range of the elements of a
+/// canonical tuple type and returning their types.
+///
+/// This class just assumes that it's given the elements of a
+/// canonical type.
+class CanTupleEltTypeArrayRef {
+  ArrayRef<TupleTypeElt> Array;
+public:
+  CanTupleEltTypeArrayRef(ArrayRef<TupleTypeElt> array) : Array(array) {}
+
+  class iterator {
+    friend class CanTupleEltTypeArrayRef;
+    const TupleTypeElt *Ptr;
+    iterator(const TupleTypeElt *ptr) : Ptr(ptr) {}
+  public:
+    CanType operator*() const { return CanType(Ptr->getType()); }
+    iterator &operator++() { Ptr++; return *this; }
+    iterator operator++(int) { return iterator(Ptr++); }
+    bool operator==(iterator rhs) { return Ptr == rhs.Ptr; }
+    bool operator!=(iterator rhs) { return Ptr != rhs.Ptr; }
+  };
+  iterator begin() const { return iterator(Array.begin()); }
+  iterator end() const { return iterator(Array.end()); }
+
+  bool empty() const { return Array.empty(); }
+  size_t size() const { return Array.size(); }
+  CanType operator[](unsigned i) const { return CanType(Array[i].getType()); }
+  CanType front() const { return CanType(Array.front().getType()); }
+  CanType back() const { return CanType(Array.back().getType()); }
+
+  CanTupleEltTypeArrayRef slice(unsigned start) const {
+    return CanTupleEltTypeArrayRef(Array.slice(start));
+  }
+  CanTupleEltTypeArrayRef slice(unsigned start, unsigned length) const {
+    return CanTupleEltTypeArrayRef(Array.slice(start, length));
+  }
+
+  operator TupleEltTypeArrayRef() const {
+    return TupleEltTypeArrayRef(Array);
+  }
+};
   
 /// TupleType - A tuple is a parenthesized list of types where each name has an
 /// optional name.
@@ -637,11 +714,17 @@ public:
 
   /// getFields - Return the fields of this tuple.
   ArrayRef<TupleTypeElt> getFields() const { return Fields; }
+
+  unsigned getNumElements() const { return Fields.size(); }
   
   /// getElementType - Return the type of the specified field.
   Type getElementType(unsigned FieldNo) const {
     return Fields[FieldNo].getType();
   }
+
+  TupleEltTypeArrayRef getElementTypes() const {
+    return TupleEltTypeArrayRef(getFields());
+  };
   
   /// getNamedElementId - If this tuple has a field with the specified name,
   /// return the field index, otherwise return -1.
@@ -677,6 +760,9 @@ BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   CanType getElementType(unsigned fieldNo) {
     return CanType(getPointer()->getElementType(fieldNo));
   }
+  CanTupleEltTypeArrayRef getElementTypes() const {
+    return CanTupleEltTypeArrayRef(getPointer()->getFields());
+  };  
 END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic nominal type where the

@@ -595,9 +595,9 @@ void IRGenModule::getSchema(CanType type, ExplosionSchema &schema) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
-  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
-    for (const TupleTypeElt &field : tuple->getFields())
-      getSchema(CanType(field.getType()), schema);
+  if (CanTupleType tuple = dyn_cast<TupleType>(type)) {
+    for (auto eltType : tuple.getElementTypes())
+      getSchema(eltType, schema);
     return;
   }
 
@@ -610,10 +610,10 @@ unsigned IRGenModule::getExplosionSize(CanType type, ExplosionKind kind) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
-  if (TupleType *tuple = dyn_cast<TupleType>(type)) {
+  if (auto tuple = dyn_cast<TupleType>(type)) {
     unsigned count = 0;
-    for (const TupleTypeElt &field : tuple->getFields())
-      count += getExplosionSize(CanType(field.getType()), kind);
+    for (auto eltType : tuple.getElementTypes())
+      count += getExplosionSize(eltType, kind);
     return count;
   }
 
@@ -653,8 +653,8 @@ bool IRGenModule::isPOD(CanType type, ResilienceScope scope) {
   if (isa<ClassType>(type)) return false;
   if (isa<BoundGenericClassType>(type)) return false;
   if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto &elt : tuple->getFields())
-      if (!isPOD(CanType(elt.getType()), scope))
+    for (auto eltType : tuple.getElementTypes())
+      if (!isPOD(eltType, scope))
         return false;
     return true;
   }
@@ -689,8 +689,8 @@ namespace {
     
     ObjectSize visitTupleType(CanTupleType tuple) {
       ObjectSize result = ObjectSize::Fixed;
-      for (auto &field : tuple->getFields()) {
-        result = std::max(result, visit(CanType(field.getType())));
+      for (auto eltType : tuple.getElementTypes()) {
+        result = std::max(result, visit(eltType));
       }
       return result;
     }

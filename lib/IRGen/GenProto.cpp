@@ -2212,8 +2212,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 /// FIXME: We could get fulfillments from any tuple element.
 static CanType stripLabel(CanType input) {
   if (auto tuple = dyn_cast<TupleType>(input))
-    if (tuple->getFields().size() > 0)
-      return stripLabel(CanType(tuple->getFields().back().getType()));
+    if (tuple->getNumElements() > 0)
+      return stripLabel(tuple.getElementTypes().back());
   return input;
 }
 
@@ -3315,8 +3315,9 @@ namespace {
 
     // We need to walk into tuples.
     void visitTupleType(CanTupleType tuple) {
-      for (auto &elt : tuple->getFields())
-        visit(CanType(elt.getType()));
+      for (auto eltType : tuple.getElementTypes()) {
+        visit(eltType);
+      }
     }
 
     // We need to walk into constant-sized arrays.

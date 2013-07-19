@@ -1356,9 +1356,8 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
   // Restructure tuple arguments.
   if (TupleType *tupleTy = argTy.getAs<TupleType>()) {
     RValue tuple(tupleTy->getCanonicalType());
-    for (auto &field : tupleTy->getFields())
-      tuple.addElement(
-                   emitImplicitValueConstructorArg(gen, loc, field.getType()));
+    for (auto fieldType : tupleTy->getElementTypes())
+      tuple.addElement(emitImplicitValueConstructorArg(gen, loc, fieldType));
 
     return tuple;
   } else {
@@ -1579,8 +1578,8 @@ namespace {
       assert(ty && "no type?!");
       // Destructure tuple arguments.
       if (TupleType *tupleTy = ty->getAs<TupleType>()) {
-        for (auto &field : tupleTy->getFields())
-          makeArgument(field.getType());
+        for (auto fieldType : tupleTy->getElementTypes())
+          makeArgument(fieldType);
       } else {
         SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
                                                        gen.F.begin());
