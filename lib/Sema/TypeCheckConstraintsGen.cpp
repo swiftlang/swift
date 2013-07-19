@@ -794,7 +794,13 @@ namespace {
       auto outputTy
         = CS.createTypeVariable(
             CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
-      auto funcTy = FunctionType::get(inputTy, outputTy, Context);
+
+      auto FTy = expr->getFn()->getType()->getAs<AnyFunctionType>();
+      auto funcTy = FunctionType::get(inputTy, outputTy,
+                                      FTy ? FTy->getExtInfo() :
+                                            FunctionType::ExtInfo(),
+                                      Context);
+
       CS.addConstraint(ConstraintKind::EqualRvalue, funcTy,
         expr->getFn()->getType(),
         CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));

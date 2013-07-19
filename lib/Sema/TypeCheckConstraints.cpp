@@ -1139,6 +1139,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  // A [noreturn] function type can be a subtype of a non-[noreturn] function
+  // type.
+  if (func1->isNoReturn() != func2->isNoReturn()) {
+    if (func2->isNoReturn() || kind < TypeMatchKind::SameType) {
+      // Record this failure.
+      if (shouldRecordFailures()) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::FunctionNoReturnMismatch, func1, func2);
+      }
+
+      return SolutionKind::Error;
+    }
+  }
+
   // Determine how we match up the input/result types.
   TypeMatchKind subKind;
   switch (kind) {

@@ -736,6 +736,8 @@ public:
     TupleUnused,
     /// \brief Autoclosure function type mismatch.
     FunctionAutoclosureMismatch,
+    /// \brief Noreturn attribute function type mismatch.
+    FunctionNoReturnMismatch,
     /// \brief Types are not the same.
     TypesNotEqual,
     /// \brief Types are not trivial subtypes.
@@ -806,6 +808,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) {
     switch (kind) {
     case FunctionAutoclosureMismatch:
+    case FunctionNoReturnMismatch:
     case LValueQualifiers:
     case TupleNameMismatch:
     case TupleNamePositionMismatch:

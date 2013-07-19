@@ -43,6 +43,11 @@ void Failure::dump(llvm::SourceMgr *sm) {
         << getSecondType().getString();
     break;
 
+  case FunctionNoReturnMismatch:
+    out << "noreturn attribute mismatch " << getFirstType().getString()
+    << " vs. " << getSecondType().getString();
+    break;
+
   case IsNotArchetype:
     out << getFirstType().getString() << " is not an archetype";
     break;
