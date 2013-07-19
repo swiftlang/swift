@@ -75,6 +75,7 @@ class IRGenDebugInfo {
   StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
   llvm::DICompileUnit TheCU;
+  llvm::DIFile MainFile;
 
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
@@ -159,6 +160,7 @@ private:
                                      llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope);
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
+  llvm::DIFile getFile(llvm::DIDescriptor Scope);
 };
 
 } // irgen

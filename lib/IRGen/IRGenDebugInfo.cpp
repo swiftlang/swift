@@ -91,6 +91,9 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
     Filename = BumpAllocatedString(File, DebugInfoNames);
     Dir = BumpAllocatedString(Path, DebugInfoNames);
   }
+  // The fallback file.
+  MainFile = getOrCreateFile(BumpAllocatedString((Dir+Filename).str(),
+                                                 DebugInfoNames).data());
 
   unsigned Lang = DW_LANG_Swift;
 
@@ -181,7 +184,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
 /// getOrCreateScope - Translate a SILDebugScope into an llvm::DIDescriptor.
 llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   if (DS == 0)
-    return llvm::DIDescriptor();
+    return MainFile;
 
   // Try to find it in the cache first.
   auto CachedScope = ScopeCache.find(DS);
@@ -218,7 +221,7 @@ StringRef IRGenDebugInfo::getCurrentDirname() {
 /// getOrCreateFile - Translate filenames into DIFiles.
 llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   if (!Filename)
-    return llvm::DIFile();
+    return MainFile;
 
   // Look in the cache first.
   auto CachedFile = DIFileCache.find(Filename);
@@ -237,7 +240,9 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   // Basically ignore any error.
   assert(ec == llvm::errc::success);
   (void)ec; // Silence the unused variable warning
-  llvm::DIFile F = DBuilder.createFile(File, Path);
+  llvm::DIFile F =
+    DBuilder.createFile(BumpAllocatedString(File, DebugInfoNames),
+                        BumpAllocatedString(Path, DebugInfoNames));
 
   // Cache it.
   DIFileCache[Filename] = F;
@@ -451,7 +456,7 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
 }
 
 /// Return the DIFile that is the ancestor of Scope.
-static llvm::DIFile getFile(llvm::DIDescriptor Scope) {
+llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
   while (!Scope.isFile()) {
     switch (Scope.getTag()) {
     case llvm::dwarf::DW_TAG_lexical_block:
@@ -461,10 +466,10 @@ static llvm::DIFile getFile(llvm::DIDescriptor Scope) {
       Scope = llvm::DISubprogram(Scope).getContext();
       break;
     default:
-      return llvm::DIFile();
+      return MainFile;
     }
     if (Scope.Verify())
-      return llvm::DIFile();
+      return MainFile;
   }
   llvm::DIFile File(Scope);
   assert(File.Verify());
@@ -516,7 +521,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
   llvm::DIDescriptor DContext = Unit;
   DBuilder.createStaticVariable(DContext, Name, LinkageName, Unit,
                                 L.Line, getOrCreateType(DebugType, Unit),
-                                Var->hasInternalLinkage(), Var, nullptr);
+                                Var->hasInternalLinkage(), Var, nullptr)->dump();
 }
 
 /// Return the mangled name of any nominal type.
@@ -539,15 +544,19 @@ StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
 llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                         llvm::DIDescriptor Scope,
                                         llvm::DIFile File) {
-  TypeBase* BaseTy = Ty.CanTy.getPointer();
-  if (!BaseTy)
-    return llvm::DIType();
-
   StringRef Name;
   uint64_t Size = Ty.SizeInBits;
   uint64_t Align = Ty.AlignmentInBits;
   unsigned Encoding = 0;
   unsigned Flags = 0;
+
+  TypeBase* BaseTy = Ty.CanTy.getPointer();
+  if (!BaseTy) {
+    DEBUG(llvm::dbgs() << "Type without TypeBase: "; Ty.CanTy.dump();
+          llvm::dbgs() << "\n");
+    Name = "<null>";
+    return DBuilder.createBasicType(Name, Size, Align, Encoding);
+  }
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
@@ -579,6 +588,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        llvm::DIArray(), // Elements
                                        DW_LANG_Swift);
     }
+    DEBUG(llvm::dbgs() << "Struct without Decl: "; Ty.CanTy.dump();
+          llvm::dbgs() << "\n");
     return llvm::DIType();
   }
 
@@ -601,6 +612,27 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                       llvm::DIArray(), // Elements
                                       RuntimeLang);
     }
+    DEBUG(llvm::dbgs() << "Class without Decl: "; Ty.CanTy.dump();
+          llvm::dbgs() << "\n");
+    return llvm::DIType();
+  }
+
+  case TypeKind::BoundGenericStruct: {
+    auto StructTy = BaseTy->castTo<BoundGenericStructType>();
+    if (auto Decl = StructTy->getDecl()) {
+      Location L = getStartLoc(SM, Decl);
+      Name = Decl->getName().str();
+      return DBuilder.createStructType(Scope,
+                                       Name,
+                                       getOrCreateFile(L.Filename),
+                                       L.Line,
+                                       Size, Align, Flags,
+                                       llvm::DIType(),  // DerivedFrom
+                                       llvm::DIArray(), // Elements
+                                       DW_LANG_Swift);
+    }
+    DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
+          Ty.CanTy.dump(); llvm::dbgs() << "\n");
     return llvm::DIType();
   }
 
@@ -610,7 +642,35 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     Name = getMangledName(Ty.CanTy);
     break;
   }
+
+  case TypeKind::LValue: {
+    // FIXME: handle LValueTy->getQualifiers();
+    auto LValueTy = BaseTy->castTo<LValueType>();
+    return getOrCreateType(DebugTypeInfo(CanType(LValueTy->getObjectType()),
+                                         Size, Align), Scope);
+  }
+  case TypeKind::Archetype: {
+    // FIXME
+    auto Archetype = BaseTy->castTo<ArchetypeType>();
+    Name = Archetype->getName().str();
+    break;
+  }
+  case TypeKind::MetaType: {
+    // FIXME
+    auto Metatype = BaseTy->castTo<MetaTypeType>();
+    return getOrCreateType(DebugTypeInfo(CanType(Metatype->getInstanceType()),
+                                         Size, Align), Scope);
+    break;
+  }
+  case TypeKind::Function: {
+    // FIXME: auto Function = BaseTy->castTo<AnyFunctionType>();
+    // FIXME: handle parameters.
+    auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
+    return DBuilder.createPointerType(FnTy, Size, Align);
+  }
   default:
+    DEBUG(llvm::dbgs() << "Unhandled type: "; Ty.CanTy.dump();
+          llvm::dbgs() << "\n");
     return llvm::DIType();
   }
   // FIXME: For Size, clang uses the actual size of the type on the
@@ -629,18 +689,23 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
                                              llvm::DIDescriptor Scope) {
   // Is this an empty type?
   if (Ty.CanTy.isNull())
-    return llvm::DIType();
+    // We use the empty type as an index into DenseMap.
+    return createType(Ty, Scope, getFile(Scope));
 
   // Look in the cache first.
   auto CachedType = DITypeCache.find(Ty);
 
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
-    if (llvm::Value *DITy = CachedType->second)
-      return llvm::DIType(cast<llvm::MDNode>(DITy));
+    if (llvm::Value *Val = CachedType->second) {
+      auto DITy = llvm::DIType(cast<llvm::MDNode>(Val));
+      if (DITy.Verify())
+        return DITy;
+    }
   }
 
   llvm::DIType DITy = createType(Ty, Scope, getFile(Scope));
+  DITy.Verify();
 
   DITypeCache[Ty] = DITy;
   return DITy;
