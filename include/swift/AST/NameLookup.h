@@ -232,17 +232,15 @@ void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 /// SourceLoc is used to determine which declarations in that FuncExpr's
 /// context are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
-                        const DeclContext *DC, SourceLoc Loc = SourceLoc(),
-                        bool IsTypeLookup = false);
-  
+                        const DeclContext *DC, SourceLoc Loc = SourceLoc());
+
 /// Finds decls visible as members of the given type and feeds them to the given
 /// VisibleDeclConsumer.
 ///
 /// \param CurrDC the DeclContext from which the lookup is done.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         Type BaseTy,
-                        const DeclContext *CurrDC,
-                        bool IsTypeLookup = false);
+                        const DeclContext *CurrDC);
 
 } // end namespace swift
 

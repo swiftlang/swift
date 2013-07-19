@@ -284,13 +284,11 @@ public:
     StringRef Name = VD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
-    if (InsideStaticMethod &&
-        VD->getDeclContext() == CurrMethodDC->getParent()) {
-      // Can not refer to an instance variable from a static function.
-      // FIXME: this should be probably handled by name lookup.
-      // FIXME: static variables.
-      return;
-    }
+    assert(!(InsideStaticMethod &&
+            VD->getDeclContext() == CurrMethodDC->getParent()) &&
+           "name lookup bug -- can not see an instance variable "
+           "in a static function");
+    // FIXME: static variables.
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -343,16 +341,6 @@ public:
   void addSwiftMethodCall(const FuncDecl *FD) {
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
-
-    if (InsideStaticMethod && !FD->isStatic() &&
-        FD->getDeclContext() == CurrMethodDC->getParent()) {
-      // If we got an instance function while code completing in a static
-      // function, then don't display the result.
-      // FIXME: referencing an instance function from a static function is
-      // allowed by the language, but the compiler crashes on this right now.
-      // rdar://14432081
-      return;
-    }
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
@@ -477,8 +465,7 @@ public:
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         // Swift does not have class variables.
         // FIXME: add code completion results when class variables are added.
-        if (ExprType->is<MetaTypeType>())
-          return;
+        assert(!ExprType->is<MetaTypeType>() && "name lookup bug");
         addSwiftVarDeclRef(VD);
         return;
       }
@@ -490,10 +477,6 @@ public:
         if (FD->isGetterOrSetter())
           return;
 
-        // Don't complete class methods of instances; don't complete instance
-        // methods of metatypes.
-        if (FD->isStatic() != ExprType->is<MetaTypeType>())
-          return;
         addSwiftMethodCall(FD);
         return;
       }
@@ -586,8 +569,7 @@ public:
       }
     }
     if (!Done) {
-      lookupVisibleDecls(*this, ExprType, CurrDeclContext,
-                         /*IsTypeLookup=*/ExprType->is<MetaTypeType>());
+      lookupVisibleDecls(*this, ExprType, CurrDeclContext);
     }
     // Add the special qualified keyword 'metatype' so that, for example,
     // 'Int.metatype' can be completed.
