@@ -215,7 +215,7 @@ public:
   void print(raw_ostream &OS) const;
 };
 
-inline raw_ostream &operator<<(raw_ostream &OS, SILType T) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);
   return OS;
 }

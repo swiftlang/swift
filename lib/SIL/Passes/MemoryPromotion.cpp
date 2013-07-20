@@ -14,6 +14,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Debug.h"
 //#include "swift/SIL/Dominance.h"
 using namespace swift;
 
@@ -42,9 +43,10 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
     // TODO: [byref] arguments also.
     
     
-    //DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
-    //      << "\n    Due to user: " << *User << "\n\n");
     // Otherwise, this looks like it escapes.
+    DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
+          << "\n    Due to user: " << *User << "\n\n");
+    
     return false;
   }
   

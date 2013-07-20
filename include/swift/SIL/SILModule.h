@@ -157,6 +157,12 @@ public:
     return BPA.Allocate(Size, Align);
   }
 };
+  
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
+  M.print(OS);
+  return OS;
+}
+
 
 } // end swift namespace
 

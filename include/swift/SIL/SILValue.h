@@ -82,6 +82,12 @@ public:
   static bool classof(const ValueBase *V) { return true; }
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const ValueBase &V) {
+  V.print(OS);
+  return OS;
+}
+
 enum {
   /// The number of bits required to store a ResultNumber.
   /// This is primarily here as a way to allow everything that

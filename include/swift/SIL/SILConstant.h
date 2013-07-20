@@ -199,6 +199,11 @@ struct SILConstant {
   {}
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILConstant C) {
+  C.print(OS);
+  return OS;
+}
+
 } // end swift namespace
 
 namespace llvm {

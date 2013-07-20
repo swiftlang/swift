@@ -144,6 +144,11 @@ private:
 void WriteAsOperand(raw_ostream &out, swift::SILBasicBlock *BB,
                     bool printType = true);
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SILBasicBlock &BB) {
+  BB.print(OS);
+  return OS;
+}
 } // end swift namespace
 
 namespace llvm {

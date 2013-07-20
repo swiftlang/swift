@@ -151,6 +151,12 @@ public:
   
   ASTContext &getASTContext() const;
 };
+  
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const SILFunction &F) {
+  F.print(OS);
+  return OS;
+}
 
 /// Observe that we are processing a specific SIL function.
 class PrettyStackTraceSILFunction : public llvm::PrettyStackTraceEntry {

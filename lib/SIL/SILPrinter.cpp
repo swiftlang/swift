@@ -195,11 +195,6 @@ void SILType::dump() const {
   llvm::errs() << '\n';
 }
 
-raw_ostream &operator<<(raw_ostream &OS, SILConstant t) {
-  t.print(OS);
-  return OS;
-}
-
 namespace {
   
 /// SILPrinter class - This holds the internal implementation details of
