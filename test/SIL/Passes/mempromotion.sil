@@ -18,3 +18,18 @@ bb0(%0 : $Int64):
 // CHECK-NOT: release
 // CHECK: return
 }
+
+sil @init_var : $() -> Int64 {
+// CHECK: sil @init_var : $() -> Int64
+bb0:
+  %1 = alloc_box $Int64
+  %2 = initialize_var %1#1 : $*Int64
+  %3 = load %1#1 : $*Int64
+  %4 = release %1#0 : $Builtin.ObjectPointer
+  %5 = return %3 : $Int64
+
+// CHECK: alloc_stack
+// CHECK-NOT: alloc_box
+// CHECK-NOT: release
+// CHECK: return
+}

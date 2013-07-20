@@ -37,6 +37,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
         isa<RetainInst>(User) ||
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
+        isa<InitializeVarInst>(User) ||
         (isa<StoreInst>(User) && UI->getOperandNumber() == 1))
       continue;
     
