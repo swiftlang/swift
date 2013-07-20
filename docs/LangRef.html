@@ -2849,9 +2849,8 @@ ill-formed if the type does not conform to the protocol.</p>
   <div class="commentary">
     It's not really clear what the behavior of multiple bounds should be.
 
-    <br/><br/>We should probably allow an initializer, which would
-    have to start with an lparen-following; the semantics would be to
-    evaluate that constructor for each element constructed.
+    <br/><br/>We should probably allow an initializer. The semantics would be
+    to evaluate that constructor for each element constructed.
   </div>
 
   <pre class="grammar">
@@ -2859,12 +2858,13 @@ ill-formed if the type does not conform to the protocol.</p>
   
     expr-new-bounds ::= expr-new-bound
     expr-new-bounds ::= expr-new-bounds expr-new-bound
-    expr-new-bound  ::= lsquare-following <a href="#expr">expr?</a> ']'
+    expr-new-bound  ::= '[' <a href="#expr">expr?</a> ']'
   </pre>
     
   <p>Allocates and initializes a new array of objects. The first clause must
     be an expression; subsequent bounds, if present, must be constant under
-    the <a href="#type-array">usual rules for array types</a>.</p>
+    the <a href="#type-array">usual rules for array types</a>. The opening
+    square bracket must be on the same line as the type name.</p>
 
   <!-- ===================================================================== -->
   <h3 id="expr-call">Function Application</h3>
