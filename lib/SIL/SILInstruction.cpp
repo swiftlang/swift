@@ -120,6 +120,13 @@ ArrayRef<Operand> SILInstruction::getAllOperands() const {
   return AllOperandsAccessor().visit(const_cast<SILInstruction*>(this));
 }
 
+/// getOperandNumber - Return which operand this is in the operand list of the
+/// using instruction.
+unsigned Operand::getOperandNumber() const {
+  return this - &cast<SILInstruction>(getUser())->getAllOperands()[0];
+}
+
+
 //===----------------------------------------------------------------------===//
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//

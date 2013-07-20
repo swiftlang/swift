@@ -197,6 +197,10 @@ public:
   /// Return the user that owns this use.
   ValueBase *getUser() { return Owner; }
   const ValueBase *getUser() const { return Owner; }
+  
+  /// getOperandNumber - Return which operand this is in the operand list of the
+  /// using instruction.
+  unsigned getOperandNumber() const;
 
 private:
   void removeFromCurrent() {
@@ -304,7 +308,8 @@ inline Range<ValueBaseUseIterator> ValueBase::getUses() {
 
 /// An iterator over all uses of a specific result of a ValueBase.
 class ValueUseIterator  : public std::iterator<std::forward_iterator_tag,
-                                               Operand*, ptrdiff_t> {
+                                               Operand*, ptrdiff_t>
+{
   llvm::PointerIntPair<Operand*, ValueResultNumberBits> CurAndResultNumber;
 public:
   ValueUseIterator() = default;
@@ -318,6 +323,10 @@ public:
 
   Operand *operator*() const { return CurAndResultNumber.getPointer(); }
 
+  ValueBase *getUser() const {
+    return CurAndResultNumber.getPointer()->getUser();
+  }
+                                                 
   ValueUseIterator &operator++() {
     Operand *next = CurAndResultNumber.getPointer();
     assert(next && "incrementing past end()!");
