@@ -840,9 +840,16 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                  if (auto archetype = type->getAs<ArchetypeType>()) {
                    return getTypeForArchetype(*this, archetype, mappedTypes);
                  }
+                 
+                 if (auto polyTy = type->getAs<PolymorphicFunctionType>()) {
+                   // Preserve generic method archetypes.
+                   for (auto archetype :
+                          polyTy->getGenericParams().getAllArchetypes())
+                     mappedTypes[archetype] = archetype;
+                 }
 
                  return type;
-             });
+               });
     }
   }
 
