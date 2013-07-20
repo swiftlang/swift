@@ -1758,7 +1758,7 @@ void IRGenSILFunction::visitAllocArrayInst(swift::AllocArrayInst *i) {
   
   Explosion lengthEx = getLoweredExplosion(i->getNumElements());
   llvm::Value *lengthValue = lengthEx.claimNext();
-  HeapArrayInfo arrayInfo(*this, i->getElementType()->getCanonicalType());
+  HeapArrayInfo arrayInfo(*this, i->getElementType().getSwiftType());
   Address ptr;
   llvm::Value *box = arrayInfo.emitUnmanagedAlloc(*this, lengthValue, ptr, "");
   Explosion boxEx(ExplosionKind::Maximal);

@@ -178,7 +178,9 @@ public:
   
   /// getElementType - Get the type of the allocated memory (as opposed to the
   /// type of the instruction itself, which will be an address type).
-  Type getElementType() const;
+  SILType getElementType() const {
+    return getType().getObjectType();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocStackInst;
@@ -206,7 +208,9 @@ class AllocBoxInst : public SILInstruction {
 public:
   AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F);
 
-  Type getElementType() const;
+  SILType getElementType() const {
+    return getType(1).getObjectType();
+  }
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
@@ -232,7 +236,9 @@ public:
   AllocArrayInst(SILLocation Loc, SILType ElementType, SILValue NumElements,
                  SILFunction &F);
 
-  Type getElementType() const;
+  SILType getElementType() const {
+    return getType(1).getObjectType();
+  }
   SILValue getNumElements() const { return Operands[NumElements].get(); }
 
 

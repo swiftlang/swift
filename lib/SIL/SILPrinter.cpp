@@ -316,7 +316,7 @@ public:
   }
   
   void visitAllocStackInst(AllocStackInst *AVI) {
-    OS << "alloc_stack $" << AVI->getElementType().getString();
+    OS << "alloc_stack " << AVI->getElementType();
     if (VarDecl *vd = AVI->getDecl())
       OS << "  // var " << vd->getName();
   }
@@ -326,11 +326,11 @@ public:
   }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
-    OS << "alloc_box $" << ABI->getElementType().getString();
+    OS << "alloc_box " << ABI->getElementType();
   }
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
-    OS << "alloc_array $" << AAI->getElementType().getString()
+    OS << "alloc_array " << AAI->getElementType()
        << ", " << getIDAndType(AAI->getNumElements());
   }
   

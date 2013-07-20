@@ -139,12 +139,6 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
 }
 
 
-/// getElementType - Get the type of the allocated memory (as opposed to the
-/// type of the instruction itself, which will be an address type).
-Type AllocStackInst::getElementType() const {
-  return getType().getSwiftRValueType();
-}
-
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
 static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
   const ASTContext &Ctx = EltTy.getASTContext();
@@ -161,18 +155,10 @@ AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
   : SILInstruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
-Type AllocBoxInst::getElementType() const {
-  return getType(1).getSwiftRValueType();
-}
-
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
                                SILValue NumElements, SILFunction &F)
   : SILInstruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
     Operands(this, NumElements) {
-}
-
-Type AllocArrayInst::getElementType() const {
-  return getType(1).getSwiftRValueType();
 }
 
 FunctionInst::FunctionInst(ValueKind kind,
