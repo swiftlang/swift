@@ -23,6 +23,77 @@ the Swift programming language. SIL accommodates the following use cases:
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
 
+SIL in the Swift Compiler
+-------------------------
+
+At a high level, the Swift compiler follows a strict pipeline architecture:
+
+- The *Parse* module constructs an AST from Swift source code.
+- The *Sema* module type-checks the AST and annotates it with type information.
+- The *SILGen* module generates "raw" SIL from an AST.
+- SIL *Passes* run over the raw SIL to emit diagnostics and apply optimizations
+  to produce canonical SIL.
+- *IRGen* lowers optimized SIL to LLVM IR.
+- The LLVM backend applies LLVM optimizations and emits binary code.
+
+The different stages pertaining especially to SIL processing are as follows:
+
+SILGen
+~~~~~~
+
+SILGen produces "raw" SIL by walking a type-checked Swift AST. The form of SIL
+emitted by SILGen has the following properties:
+
+- Variables are represented by loading and storing mutable memory locations
+  instead of being in strict SSA form. This is similar to the LLVM IR emitted
+  by frontends such as Clang. However, Swift represents variables as
+  reference-counted "boxes" in the most general case, which can be retained,
+  released, and shared.
+- Dataflow requirements, such as definitive assignment, function returns,
+  switch coverage, etc. have not yet been enforced.
+- ``always_inline``, ``always_instantiate``, and other function optimization
+  attributes have not yet been honored.
+
+These properties are addressed by subsequent guaranteed optimization and
+diagnostic passes which are always run against the raw SIL.
+
+Guaranteed Optimization Passes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After SILGen, a deterministic sequence of optimization passes is run over the
+raw SIL, as follows:
+
+- Memory promotion. This is a combination of an LLVM-style "mem2reg" pass to
+  reduce in-memory variables to SSA values with a capture analysis mechanism
+  for eliminating reference-counted boxes.
+
+TODO:
+
+- Always inline
+- Constant folding/guaranteed simplifications (including constant overflow
+  warnings)
+
+Diagnostic Passes
+~~~~~~~~~~~~~~~~~
+
+The following passes are run after guaranteed optimization to diagnose the
+validity of the Swift program that generated the SIL:
+
+- Return analysis. This verifies that functions always return a value on every
+  code path and don't "fall of the end" of their definition, which is an error.
+
+TODO:
+
+- Noreturn verification as a part of return analysis.
+- Switch statement coverage.
+- Dead code detection/elimination. Non-implicit dead code is an error.
+- Definitive assignment of local variables, and of instance variables in
+  constructors.
+
+If the diagnostic passes all succeed, the final result is the canonical SIL for
+the program. Performance optimization, native code generation, and module
+distribution are derived from the form.
+
 Structure
 ---------
 
