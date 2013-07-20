@@ -51,9 +51,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
-  SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI),
-                // FIXME: Drop this argument.
-                *ABI->getParent()->getParent());
+  SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
   auto *AllocVar = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
    
   // Replace all uses of the pointer operand with the spiffy new AllocVar.

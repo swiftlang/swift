@@ -40,8 +40,8 @@ public:
     setInsertionPoint(BB);
   }
 
-  SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt,
-             SILFunction &F) : F(F) {
+  SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt)
+    : F(*BB->getParent()) {
     setInsertionPoint(BB, InsertPt);
   }
 
