@@ -1,0 +1,20 @@
+// RUN: %swift %s -emit-sil | FileCheck %s
+
+import Builtin
+import swift
+
+
+sil @simple_promotion : $(x : Int64) -> Int64 {
+// CHECK: sil @simple_promotion : $(x : Int64) -> Int64
+bb0(%0 : $Int64):
+  %1 = alloc_box $Int64
+  %2 = store %0 to %1#1 : $*Int64
+  %3 = load %1#1 : $*Int64
+  %4 = release %1#0 : $Builtin.ObjectPointer
+  %5 = return %3 : $Int64
+
+// CHECK: alloc_stack
+// CHECK-NOT: alloc_box
+// CHECK-NOT: release
+// CHECK: return
+}
