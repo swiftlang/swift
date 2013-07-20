@@ -124,6 +124,9 @@ namespace {
 
     /// \brief Associated types determined by matching this requirement.
     SmallVector<std::pair<TypeAliasDecl *, Type>, 2> AssociatedTypeDeductions;
+    
+    /// \brief Associated type substitutions needed to match the witness.
+    SmallVector<Substitution, 2> WitnessSubstitutions;
   };
 }
 
@@ -226,7 +229,11 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
     reqType = cs.openType(reqType, unresolvedArchetypes, replacements);
   }
-  auto openWitnessType = cs.openType(witnessType);
+  
+  llvm::DenseMap<ArchetypeType *, TypeVariableType *> witnessReplacements;
+  SmallVector<ArchetypeType *, 4> witnessArchetypes;
+  auto openWitnessType = cs.openType(witnessType, witnessArchetypes,
+                                     witnessReplacements);
 
   bool anyRenaming = false;
   if (decomposeFunctionType) {
@@ -322,6 +329,31 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
       result.AssociatedTypeDeductions.push_back({assocType, replacement});
     }
+  }
+  
+  // Save archetype mappings we deduced for the witness.
+  for (auto &witnessReplacement : witnessReplacements) {
+    auto archetype = witnessReplacement.first;
+    auto typeVar = witnessReplacement.second;
+    
+    auto sub = solution.simplifyType(tc, typeVar);
+    assert(sub && "couldn't simplify type variable?");
+    
+    assert(!sub->hasTypeVariable() && "type variable in witness sub");
+    
+    // Produce conformances for the substitution.
+    SmallVector<ProtocolConformance*, 2> conformances;
+    for (auto archetypeProto : archetype->getConformsTo()) {
+      ProtocolConformance *conformance = nullptr;
+      bool conformed = tc.conformsToProtocol(sub, archetypeProto, &conformance);
+      assert(conformed &&
+             "archetype substitution did not conform to requirement?");
+      (void)conformed;
+      conformances.push_back(conformance);
+    }
+    
+    result.WitnessSubstitutions.push_back({archetype, sub,
+                                        tc.Context.AllocateCopy(conformances)});
   }
 
   return result;
@@ -685,6 +717,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
         // Record the match.
         Mapping[Requirement].Decl = best.Witness;
+        Mapping[Requirement].Substitutions
+          = TC.Context.AllocateCopy(best.WitnessSubstitutions);
 
         // If we deduced any associated types, record them now.
         if (!best.AssociatedTypeDeductions.empty()) {
