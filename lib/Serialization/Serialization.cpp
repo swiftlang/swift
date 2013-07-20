@@ -695,8 +695,9 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
 
     SmallVector<DeclID, 16> data;
     for (auto valueMapping : conf->Mapping) {
+      // FIXME: Serialize witness substitutions.
       data.push_back(addDeclRef(valueMapping.first));
-      data.push_back(addDeclRef(valueMapping.second));
+      data.push_back(addDeclRef(valueMapping.second.Decl));
     }
     for (auto typeMapping : conf->TypeMapping) {
       data.push_back(addTypeRef(typeMapping.first));

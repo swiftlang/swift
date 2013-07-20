@@ -2653,32 +2653,40 @@ namespace {
     }
 
     void addStaticMethod(FuncDecl *iface) {
-      FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
+      auto &witness = Conformance.Mapping.find(iface)->second;
+      
+      FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getStaticMethodWitness(impl,
-                                      iface->getType()->getCanonicalType()));
+                                      iface->getType()->getCanonicalType(),
+                                      witness.Substitutions));
     }
 
     void addInstanceMethod(FuncDecl *iface) {
-      FuncDecl *impl = cast<FuncDecl>(Conformance.Mapping.find(iface)->second);
+      auto &witness = Conformance.Mapping.find(iface)->second;
+
+      FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getInstanceMethodWitness(impl,
-                                      iface->getType()->getCanonicalType()));
+                                      iface->getType()->getCanonicalType(),
+                                      witness.Substitutions));
     }
 
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getInstanceMethodWitness(FuncDecl *impl,
-                                             CanType ifaceType) {
+                                           CanType ifaceType,
+                                           ArrayRef<Substitution> witnessSubs) {
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
                               ExtraData::None);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
-                        ifaceType, 1);
+                        ifaceType, 1, witnessSubs);
     }
 
     /// Returns a function which calls the given implementation under
     /// the given interface.
     llvm::Constant *getStaticMethodWitness(FuncDecl *impl,
-                                           CanType ifaceType) {
+                                           CanType ifaceType,
+                                           ArrayRef<Substitution> witnessSubs) {
       if (impl->getDeclContext()->isModuleContext()) {
         llvm::Constant *implPtr =
           IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 0),
@@ -2689,18 +2697,25 @@ namespace {
         Type concreteMeta = MetaTypeType::get(ConcreteType, IGM.Context);
         Type implTy = 
           FunctionType::get(concreteMeta, impl->getType(), IGM.Context);
-        return getWitness(implPtr, implTy->getCanonicalType(), ifaceType, 1);
+        return getWitness(implPtr, implTy->getCanonicalType(), ifaceType, 1,
+                          witnessSubs);
       }
       llvm::Constant *implPtr =
         IGM.getAddrOfFunction(FunctionRef(impl, ExplosionKind::Minimal, 1),
                               ExtraData::None);
       return getWitness(implPtr, impl->getType()->getCanonicalType(),
-                        ifaceType, 1);
+                        ifaceType, 1, witnessSubs);
     }
 
     llvm::Constant *getWitness(llvm::Constant *fn, CanType fnTy,
-                               CanType ifaceTy, unsigned uncurryLevel) {
-      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, Substitutions,
+                               CanType ifaceTy, unsigned uncurryLevel,
+                               ArrayRef<Substitution> witnessSubs) {
+      // Combine the substitutions for the type and the individual witness.
+      llvm::SmallVector<Substitution, 4> combinedSubs;
+      combinedSubs.append(Substitutions.begin(), Substitutions.end());
+      combinedSubs.append(witnessSubs.begin(), witnessSubs.end());
+      
+      return WitnessBuilder(IGM, fn, fnTy, ifaceTy, combinedSubs,
                             ExplosionKind::Minimal, uncurryLevel).get();
     }
   };

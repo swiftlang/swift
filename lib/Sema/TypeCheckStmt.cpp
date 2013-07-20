@@ -350,7 +350,7 @@ public:
         ElementTy = TC.substMemberTypeWithBase(ElementTy, Value, RangeTy);
       } else if (Name.equals("next") && isa<FuncDecl>(Value)) {
         if (Conformance)
-          nextFn = cast<FuncDecl>(Conformance->Mapping[Value]);
+          nextFn = cast<FuncDecl>(Conformance->Mapping[Value].Decl);
         else
           nextFn = cast<FuncDecl>(Value);
       }

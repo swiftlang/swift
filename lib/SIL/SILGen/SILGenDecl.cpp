@@ -902,7 +902,7 @@ public:
     assert(conformance);
     if (protocol->isObjC())
       for (auto &mapping : conformance->Mapping) {
-        ValueDecl *vd = mapping.second;
+        ValueDecl *vd = mapping.second.Decl;
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);
         else if (auto *prop = cast<VarDecl>(vd))

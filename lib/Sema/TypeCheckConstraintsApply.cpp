@@ -127,7 +127,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, Type type,
 
   assert(conformance && "Missing conformance information");
   assert(conformance->Mapping.count(requirement) && "Missing conformance");
-  return cast<FuncDecl>(conformance->Mapping[requirement]);
+  return cast<FuncDecl>(conformance->Mapping[requirement].Decl);
 }
 
 /// \brief Perform the substitutions required to convert a given object type

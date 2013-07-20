@@ -72,6 +72,17 @@ namespace swift {
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
+/// \brief Describes a declaration used to satisfy, or "witness", a protocol
+/// requirement.
+struct ProtocolConformanceWitness {
+  /// The declaration that satisfies the requirement.
+  ValueDecl *Decl;
+  
+  /// The substitutions necessary to map the declaration's type to the
+  /// requirement.
+  ArrayRef<Substitution> Substitutions;
+};
+  
 /// \brief Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
@@ -79,7 +90,7 @@ class ProtocolConformance {
 public:
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
-  llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
+  llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> Mapping;
   
   /// \brief The mapping of individual archetypes in the protocol over to
   /// the types used to satisy the type requirements.

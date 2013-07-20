@@ -261,7 +261,9 @@ ModuleFile::maybeReadConformance() {
   while (valueCount--) {
     auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
     auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
-    conformance->Mapping.insert(std::make_pair(first, second));
+    // FIXME: Deserialize witness substitutions.
+    ProtocolConformanceWitness witness{second, {}};
+    conformance->Mapping.insert(std::make_pair(first, witness));
   }
   while (typeCount--) {
     auto first = getType(*rawIDIter++)->castTo<SubstitutableType>();

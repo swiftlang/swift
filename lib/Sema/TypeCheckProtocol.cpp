@@ -423,7 +423,7 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
-  llvm::DenseMap<ValueDecl *, ValueDecl *> Mapping;
+  llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> Mapping;
   TypeSubstitutionMap TypeMapping;
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
@@ -684,7 +684,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         auto &best = matches[bestIdx];
 
         // Record the match.
-        Mapping[Requirement] = best.Witness;
+        Mapping[Requirement].Decl = best.Witness;
 
         // If we deduced any associated types, record them now.
         if (!best.AssociatedTypeDeductions.empty()) {
