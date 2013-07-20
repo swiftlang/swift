@@ -32,6 +32,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -2269,8 +2270,8 @@ namespace {
         NeedsExtraMetatype = true;
       }
       
-      // The first argument isn't necessarily a simple substitution.
-      // If so, we don't need to compute difference by abstraction.
+      // The first argument isn't necessarily a simple substitution,
+      // but if it is, we don't need to compute difference by abstraction.
       if (isa<LValueType>(CanType(sigFnTy->getInput())) &&
           !isa<LValueType>(CanType(implFnTy->getInput()))) {
         HasAbstractedThis = true;
@@ -2278,7 +2279,7 @@ namespace {
         return;
       }
 
-      // Otherwise, do so.
+      // If we need an abstraction, do so.
       // FIXME: the HACK here makes protocols work on generic types
       // because we're emitting the witness table for the bound generic
       // type rather than the unbound.  It's definitely not the right
@@ -2353,18 +2354,6 @@ namespace {
       }
     };
 
-    void collectArgSites(AnyFunctionType *sigType,
-                         AnyFunctionType *implType,
-                         unsigned uncurryLevel,
-                         SmallVectorImpl<ArgSite> &out) {
-      out.push_back(ArgSite(sigType, implType));
-      if (uncurryLevel > 0) {
-        collectArgSites(cast<AnyFunctionType>(CanType(sigType->getResult())),
-                        cast<AnyFunctionType>(CanType(implType->getResult())),
-                        uncurryLevel - 1, out);
-      }
-    }
-
     /// Bind the metatype for 'This' in this witness.
     void bindThisArchetype(IRGenFunction &IGF, llvm::Value *metadata) {
       // Set a name for the metadata value.
@@ -2388,12 +2377,19 @@ namespace {
     }
 
     void emitThunk(IRGenFunction &IGF) {
+      // FIXME: Ask SIL's TypeConverter to uncurry the signature and impl types
+      // so we emit calling conventions consistent with lowered SILFunctions.
+      // Witness thunks ultimately should just be built in SILGen.
+      auto &tc = IGF.IGM.SILMod->Types;
+      auto sigUncurriedTy
+        = tc.getUncurriedFunctionType(cast<AnyFunctionType>(SignatureTy),
+                                      UncurryLevel);
+      auto implUncurriedTy
+        = tc.getUncurriedFunctionType(cast<AnyFunctionType>(ImplTy),
+                                      UncurryLevel);
+      
       // Collect the types for the arg sites.
-      SmallVector<ArgSite, 4> argSites;
-      collectArgSites(cast<AnyFunctionType>(SignatureTy),
-                      cast<AnyFunctionType>(ImplTy),
-                      UncurryLevel,
-                      argSites);
+      ArgSite argSite(sigUncurriedTy, implUncurriedTy);
 
       // Collect the parameters.
       Explosion sigParams = IGF.collectParameters();
@@ -2407,30 +2403,23 @@ namespace {
 
       // Peel off the result address if necessary.
       auto &sigResultTI =
-        IGF.getFragileTypeInfo(argSites.back().getSigResultType());
+        IGF.getFragileTypeInfo(argSite.getSigResultType());
       llvm::Value *sigResultAddr = nullptr;
       if (sigResultTI.getSchema(ExplosionLevel).requiresIndirectResult()) {
         sigResultAddr = sigParams.claimNext();
       }
 
-      // Collect the parameter clauses and bind polymorphic parameters.
-      std::vector<Explosion> sigParamClauses;
-      sigParamClauses.reserve(UncurryLevel + 1);
-      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i)
-        sigParamClauses.emplace_back(ExplosionLevel);
+      // Collect the parameter clause and bind polymorphic parameters.
+      Explosion sigClause(ExplosionLevel);
 
-      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i) {
-        ArgSite &argSite = argSites[e - 1 - i];
-        Explosion &sigClause = sigParamClauses[e - 1 - i];
+      auto implInputType = argSite.getImplInputType();
+      auto sigInputType = argSite.getSigInputType();
+      unsigned numParams = IGM.getExplosionSize(sigInputType, ExplosionLevel);
+      sigParams.transferInto(sigClause, numParams);
 
-        auto sigInputType = argSite.getSigInputType();
-        unsigned numParams = IGM.getExplosionSize(sigInputType, ExplosionLevel);
-        sigParams.transferInto(sigClause, numParams);
-
-        // Bind polymorphic parameters.
-        if (auto sigPoly = dyn_cast<PolymorphicFunctionType>(argSite.SigFnType))
-          emitPolymorphicParameters(IGF, sigPoly, sigParams);
-      }
+      // Bind polymorphic parameters.
+      if (auto sigPoly = dyn_cast<PolymorphicFunctionType>(argSite.SigFnType))
+        emitPolymorphicParameters(IGF, sigPoly, sigParams);
 
       assert(sigParams.empty() && "didn't drain all the parameters");
 
@@ -2442,71 +2431,83 @@ namespace {
       // FIXME: virtual calls!
       CallEmission emission(IGF,
           Callee::forFreestandingFunction(AbstractCC::Freestanding,
-                                          ImplTy,
-                                          argSites.back().getImplResultType(),
+                                          implUncurriedTy,
+                                          argSite.getImplResultType(),
                                           ArrayRef<Substitution>(),
                                           ImplPtr,
                                           ExplosionLevel,
-                                          UncurryLevel));
+                                          0));
 
       // Now actually pass the arguments.
-      for (unsigned i = 0, e = UncurryLevel + 1; i != e; ++i) {
-        ArgSite &argSite = argSites[i];
-        auto implInputType = argSite.getImplInputType();
-        auto sigInputType = argSite.getSigInputType();
+      Explosion implArgs(ExplosionLevel);
 
-        Explosion &sigClause = sigParamClauses[i];
-        Explosion implArgs(ExplosionLevel);
-
-        // The input type we're going to pass to the implementation,
-        // expressed in terms of signature archetypes.
-        CanType sigInputTypeForImpl;
+      // The input type we're going to pass to the implementation,
+      // expressed in terms of signature archetypes.
+      CanType sigInputTypeForImpl = sigInputType;
+      
+      // We need some special treatment for 'this'.
+      if (HasAbstractedThis) {
+        auto sigTupleType = cast<TupleType>(sigInputType);
         
-        // We need some special treatment for 'this'.
-        if (i == 0 && HasAbstractedThis) {
-          assert(isa<ClassType>(implInputType));
-          assert(isa<LValueType>(sigInputType));
+        CanType implThisType
+          = CanType(cast<TupleType>(implInputType)->getFields().back().getType());
+        CanType sigThisType
+          = CanType(sigTupleType->getFields().back().getType());
+        
+        assert(isa<ClassType>(implThisType));
+        assert(isa<LValueType>(sigThisType));
 
-          sigInputTypeForImpl =
-            CanType(cast<LValueType>(sigInputType)->getObjectType());
-          assert(isa<ArchetypeType>(sigInputTypeForImpl));
+        CanType sigThisTypeForImpl =
+          CanType(cast<LValueType>(sigThisType)->getObjectType());
+        assert(isa<ArchetypeType>(sigThisTypeForImpl));
 
-          auto &implTI = IGF.getFragileTypeInfo(implInputType);
+        auto &remappedThisTI = IGF.getFragileTypeInfo(implThisType);
 
-          // It's an l-value, so the next value is the address.  Cast to T*.
+        // It's an l-value, so the final value is the address.  Cast to T*.
+        auto sigThisValue = sigClause.takeLast();
+        auto implPtrTy = remappedThisTI.getStorageType()->getPointerTo();
+        sigThisValue = IGF.Builder.CreateBitCast(sigThisValue, implPtrTy);
+        auto sigThis = remappedThisTI.getAddressForPointer(sigThisValue);
 
-          auto sigThisValue = sigClause.claimNext();
-          auto implPtrTy = implTI.getStorageType()->getPointerTo();
-          sigThisValue = IGF.Builder.CreateBitCast(sigThisValue, implPtrTy);
-          auto sigThis = implTI.getAddressForPointer(sigThisValue);
+        Explosion sigClauseForImpl(ExplosionLevel);
+        sigClause.transferInto(sigClauseForImpl, sigClause.size());
+        
+        // Load.  In theory this might require
+        // remapping, but in practice the constraints (which we
+        // assert just above) don't permit that.
+        remappedThisTI.load(IGF, sigThis, sigClauseForImpl);
+        sigClause = std::move(sigClauseForImpl);
+        
+        // Respecify the signature type with the remapped 'This' type.
+        SmallVector<TupleTypeElt, 4> sigInputFieldsForImpl;
+        std::copy(sigTupleType->getFields().begin(),
+                  sigTupleType->getFields().end() - 1,
+                  std::back_inserter(sigInputFieldsForImpl));
+        sigInputFieldsForImpl.push_back(TupleTypeElt(implThisType));
+        sigInputTypeForImpl = TupleType::get(sigInputFieldsForImpl,
+                                             sigInputType->getASTContext())
+          ->getCanonicalType();
 
-          // Load.  In theory this might require
-          // remapping, but in practice the constraints (which we
-          // assert just above) don't permit that.
-          implTI.load(IGF, sigThis, implArgs);
-
-        // Otherwise, the impl type is the result of some substitution
-        // on the sig type.
-        } else {
-          reemitAsSubstituted(IGF, sigInputType, implInputType, Substitutions,
-                              sigClause, implArgs);
-          sigInputTypeForImpl = sigInputType;
-        }
-
-        // Pass polymorphic arguments.
-        if (auto implPoly =
-              dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
-          emitPolymorphicArguments(IGF, implPoly, sigInputTypeForImpl,
-                                   Substitutions, implArgs,
-                                   ExistentialSubstitutionMap());
-        }
-
-        emission.addArg(implArgs);
       }
+      
+      // The impl type is the result of some substitution
+      // on the sig type.
+      reemitAsSubstituted(IGF, sigInputTypeForImpl, implInputType, Substitutions,
+                          sigClause, implArgs);
+      
+      // Pass polymorphic arguments.
+      if (auto implPoly =
+            dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
+        emitPolymorphicArguments(IGF, implPoly, sigInputTypeForImpl,
+                                 Substitutions, implArgs,
+                                 ExistentialSubstitutionMap());
+      }
+      
+      emission.addArg(implArgs);
 
       // Emit the call.
-      CanType sigResultType = argSites.back().getSigResultType();
-      CanType implResultType = argSites.back().getImplResultType();
+      CanType sigResultType = argSite.getSigResultType();
+      CanType implResultType = argSite.getImplResultType();
       auto &implResultTI = IGM.getFragileTypeInfo(implResultType);
 
       // If we have a result address, emit to memory.
