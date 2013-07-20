@@ -531,6 +531,18 @@ StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
   return BumpAllocatedString(Buffer, DebugInfoNames);
 }
 
+/// Return an array with the DITypes for each of a tuple's elements.
+llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
+                                               llvm::DIDescriptor Scope) {
+  llvm::SmallVector<llvm::Value *, 16> Elements;
+  for (auto Elem : TupleTy->getElementTypes()) {
+    CanType CTy = Elem->getCanonicalType();
+    DebugTypeInfo DTy(CTy, Types.getCompleteTypeInfo(CTy));
+    Elements.push_back(getOrCreateType(DTy, Scope));
+  }
+  return DBuilder.getOrCreateArray(Elements);
+}
+
 /// Construct a DIType from a DebugTypeInfo object.
 ///
 /// At this point we do not plan to emit full DWARF for all swift
@@ -573,16 +585,37 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     break;
   }
 
+  case TypeKind::BuiltinObjCPointer: {
+    // The builtin opaque Objective-C pointer type. Useful for pushing
+    // an Objective-C type through swift.
+    auto IdTy = DBuilder.
+      createStructType(Scope, "objc_object", MainFile, 0, 0, 0, 0,
+                       llvm::DIType(), llvm::DIArray(), DW_LANG_ObjC);
+    return DBuilder.createPointerType(IdTy, Size, Align);
+  }
+
+  case TypeKind::BuiltinObjectPointer: {
+    Name = getMangledName(Ty.CanTy);
+    auto PTy = DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+    return DBuilder.createObjectPointerType(PTy);
+  }
+
+  case TypeKind::BuiltinOpaquePointer:
+    Name = getMangledName(Ty.CanTy);
+    return DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+
+  case TypeKind::BuiltinRawPointer:
+    Name = getMangledName(Ty.CanTy);
+    return DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
     auto StructTy = BaseTy->castTo<StructType>();
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       Name = getMangledName(Ty.CanTy);
-      return DBuilder.createStructType(Scope,
-                                       Name,
-                                       getOrCreateFile(L.Filename),
-                                       L.Line,
+      return DBuilder.createStructType(Scope, Name,
+                                       getOrCreateFile(L.Filename), L.Line,
                                        Size, Align, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
@@ -603,14 +636,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
       Location L = getStartLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
-      return DBuilder.createStructType(Scope,
-                                      Name,
-                                      getOrCreateFile(L.Filename),
-                                      L.Line,
-                                      Size, Align, Flags,
-                                      llvm::DIType(),  // DerivedFrom
-                                      llvm::DIArray(), // Elements
-                                      RuntimeLang);
+      return DBuilder.createStructType(Scope, Name,
+                                       getOrCreateFile(L.Filename), L.Line,
+                                       Size, Align, Flags,
+                                       llvm::DIType(),  // DerivedFrom
+                                       llvm::DIArray(), // Elements
+                                       RuntimeLang);
     }
     DEBUG(llvm::dbgs() << "Class without Decl: "; Ty.CanTy.dump();
           llvm::dbgs() << "\n");
@@ -622,10 +653,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
       Name = Decl->getName().str();
-      return DBuilder.createStructType(Scope,
-                                       Name,
-                                       getOrCreateFile(L.Filename),
-                                       L.Line,
+      return DBuilder.createStructType(Scope, Name,
+                                       getOrCreateFile(L.Filename), L.Line,
                                        Size, Align, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
@@ -636,18 +665,47 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     return llvm::DIType();
   }
 
-  // Handle everything else that is based off NominalType.
-  case TypeKind::OneOf:
-  case TypeKind::Protocol: {
-    Name = getMangledName(Ty.CanTy);
-    break;
+  case TypeKind::BoundGenericClass: {
+    auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
+    if (auto Decl = ClassTy->getDecl()) {
+      Location L = getStartLoc(SM, Decl);
+      Name = Decl->getName().str();
+      auto Attrs = Decl->getAttrs();
+      auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
+      return DBuilder.createStructType(Scope, Name,
+                                       getOrCreateFile(L.Filename), L.Line,
+                                       Size, Align, Flags,
+                                       llvm::DIType(),  // DerivedFrom
+                                       llvm::DIArray(), // Elements
+                                       RuntimeLang);
+    }
+    DEBUG(llvm::dbgs() << "Bound Generic class without Decl: ";
+          Ty.CanTy.dump(); llvm::dbgs() << "\n");
+    return llvm::DIType();
+  }
+
+  case TypeKind::Tuple: {
+    auto TupleTy = BaseTy->castTo<TupleType>();
+    // Tuples are represented as structs. In contrast to actual
+    // structs, we do emit all the element types of a tuple, since
+    // tuples typiclly don't have any declaration associated with
+    // them.
+    Name = "<tuple>";
+    // FIXME: getMangledName(Ty.CanTy) crashes if one of the elements
+    // is an ArcheType.
+    return DBuilder.createStructType(Scope, Name,
+                                     MainFile, 0,
+                                     Size, Align, Flags,
+                                     llvm::DIType(),  // DerivedFrom
+                                     getTupleElements(TupleTy, Scope),
+                                     DW_LANG_Swift);
   }
 
   case TypeKind::LValue: {
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
-    return getOrCreateType(DebugTypeInfo(CanType(LValueTy->getObjectType()),
-                                         Size, Align), Scope);
+    auto CanTy = LValueTy->getObjectType()->getCanonicalType();
+    return getOrCreateType(DebugTypeInfo(CanTy, Size, Align), Scope);
   }
   case TypeKind::Archetype: {
     // FIXME
@@ -658,8 +716,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   case TypeKind::MetaType: {
     // FIXME
     auto Metatype = BaseTy->castTo<MetaTypeType>();
-    return getOrCreateType(DebugTypeInfo(CanType(Metatype->getInstanceType()),
-                                         Size, Align), Scope);
+    auto CanTy = Metatype->getInstanceType()->getCanonicalType();
+    return getOrCreateType(DebugTypeInfo(CanTy, Size, Align), Scope);
     break;
   }
   case TypeKind::Function: {
@@ -668,10 +726,17 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
     return DBuilder.createPointerType(FnTy, Size, Align);
   }
+  // Handle everything else that is based off NominalType.
+  case TypeKind::OneOf:
+  case TypeKind::Protocol: {
+    Name = getMangledName(Ty.CanTy);
+    break;
+  }
+
   default:
     DEBUG(llvm::dbgs() << "Unhandled type: "; Ty.CanTy.dump();
           llvm::dbgs() << "\n");
-    return llvm::DIType();
+    Name = "<unknown>";
   }
   // FIXME: For Size, clang uses the actual size of the type on the
   // target machine instead of the storage size that is alloca'd in
