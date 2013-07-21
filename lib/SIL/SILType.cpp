@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/ErrorHandling.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "llvm/Support/ErrorHandling.h"
 using namespace swift;
 
 /// True if the type, or the referenced type of an address
@@ -119,3 +120,50 @@ SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
          sizeof(SILType) * inputTypes.size());
   return fi;
 }
+
+namespace {
+  /// Recursively destructure tuple-type arguments into SIL argument types.
+  class LoweredFunctionInputTypeVisitor
+  : public CanTypeVisitor<LoweredFunctionInputTypeVisitor>
+  {
+    SILModule &M;
+    SmallVectorImpl<SILType> &inputTypes;
+  public:
+    LoweredFunctionInputTypeVisitor(SILModule &M,
+                                    SmallVectorImpl<SILType> &inputTypes)
+    : M(M), inputTypes(inputTypes) {}
+    
+    void visitType(CanType t) {
+      inputTypes.push_back(M.Types.getLoweredType(t));
+    }
+    
+    void visitTupleType(CanTupleType tt) {
+      for (auto eltType : tt.getElementTypes()) {
+        visit(eltType);
+      }
+    }
+  };
+} // end anonymous namespace
+
+SILFunctionTypeInfo *SILModule::makeFunctionTypeInfo(AnyFunctionType *ft) {
+  SmallVector<SILType, 8> inputTypes;
+  
+  // If the result type lowers to an address-only type, add it as an indirect
+  // return argument.
+  SILType resultType = Types.getLoweredType(ft->getResult());
+  bool hasIndirectReturn = resultType.isAddressOnly(*this);
+  if (hasIndirectReturn) {
+    inputTypes.push_back(resultType);
+    resultType = Types.getEmptyTupleType();
+  }
+  
+  // Destructure the input tuple type.
+  LoweredFunctionInputTypeVisitor(*this, inputTypes)
+  .visit(ft->getInput()->getCanonicalType());
+  
+  return SILFunctionTypeInfo::create(CanType(ft), inputTypes, resultType,
+                                     hasIndirectReturn, *this);
+}
+
+
+
