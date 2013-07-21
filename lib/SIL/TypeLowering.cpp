@@ -374,54 +374,82 @@ TypeConverter::~TypeConverter() {
     ti.second->~TypeLoweringInfo();
   }
 }
-  
-const TypeLoweringInfo &
-TypeConverter::makeTypeLoweringInfo(CanType t, unsigned uncurryLevel) {
-  void *infoBuffer = TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
-  TypeLoweringInfo *theInfo = ::new (infoBuffer) TypeLoweringInfo();
-  types[getTypeKey(t, uncurryLevel)] = theInfo;
-  
-  // LValue types are a special case for lowering, because they get completely
-  // removed, represented as 'address' SILTypes.
-  if (auto lvt = dyn_cast<LValueType>(t)) {
-    // Derive SILType for LValueType from the object type.
-    t = lvt.getObjectType();
-    theInfo->loweredType = getLoweredType(t, uncurryLevel).getAddressType();
-    return *theInfo;
-  }
-  
-  bool addressOnly = SILType::isAddressOnly(t, M);
-  if (t->hasReferenceSemantics()) {
-    // Reference types need only to retain/release themselves.
-    theInfo->referenceTypeElements.push_back(ReferenceTypePath());
-  } else if (!addressOnly) {
-    // Walk aggregate types to find reference type elements.
-    LoadableTypeLoweringInfoVisitor(*theInfo).visit(t);
-  }
 
-  // Uncurry function types.
-  if (auto ft = dyn_cast<AnyFunctionType>(t)) {
-    assert(!addressOnly && "function types should never be address-only");
-    auto uncurried = getUncurriedFunctionType(ft, uncurryLevel);
-    theInfo->loweredType = SILType(uncurried, /*address=*/ false);
-  } else {
-    // Otherwise, the Swift type maps directly to a SILType.
-    assert(uncurryLevel == 0 &&
-           "non-function type cannot have an uncurry level");
-    theInfo->loweredType = SILType(t, /*address=*/ addressOnly);
-  }
-  
-  return *theInfo;
+void *TypeLoweringInfo::operator new(size_t size, TypeConverter &tc) {
+  return tc.TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
 }
   
 const TypeLoweringInfo &
 TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   CanType ct = t->getCanonicalType();
   auto existing = types.find(getTypeKey(ct, uncurryLevel));
-  if (existing == types.end())
-    return makeTypeLoweringInfo(ct, uncurryLevel);
+  if (existing != types.end()) {
+    assert(existing->second && "reentered getTypeLoweringInfo");
+    return *existing->second;
+  }
+  
+  // Catch reentrancy bugs.
+  types[getTypeKey(ct, uncurryLevel)] = nullptr;
+  
+  // LValue types are a special case for lowering, because they get completely
+  // removed and represented as 'address' SILTypes.
+  if (auto lvt = dyn_cast<LValueType>(ct)) {
+    // Derive SILType for LValueType from the object type.
+    CanType obj = lvt.getObjectType();
+    SILType loweredType = getLoweredType(obj, uncurryLevel).getAddressType();
+    auto *theInfo = new (*this) TypeLoweringInfo(loweredType);
+    types[getTypeKey(ct, uncurryLevel)] = theInfo;
+    return *theInfo;
+  }
+  
+  bool addressOnly = SILType::isAddressOnly(ct, M);
+  SILType loweredType;
+  
+  // Uncurry function types.
+  if (auto ft = dyn_cast<AnyFunctionType>(ct)) {
+    assert(!addressOnly && "function types should never be address-only");
+    auto uncurried = getUncurriedFunctionType(ft, uncurryLevel);
+    loweredType = SILType(uncurried, /*address=*/ false);
+  } else {
+    // Otherwise, the Swift type maps directly to a SILType.
+    assert(uncurryLevel == 0 &&
+           "non-function type cannot have an uncurry level");
+    loweredType = SILType(ct, /*address=*/ addressOnly);
+  }
+  
+  // Emit the lowering info for the SIL type.
+  auto *theInfo
+    = &const_cast<TypeLoweringInfo&>(getTypeLoweringInfo(loweredType));
+  assert(theInfo->loweredType == loweredType);
+  types[getTypeKey(ct, uncurryLevel)] = theInfo;
+  return *theInfo;
+}
 
-  return *existing->second;
+const TypeLoweringInfo &
+TypeConverter::getTypeLoweringInfo(SILType loweredType) {
+  bool addressOnly = loweredType.isAddressOnly(M);
+  // Address types don't have interesting type info independent of their
+  // object type.
+  if (!addressOnly && loweredType.isAddress())
+    loweredType = loweredType.getObjectType();
+  
+  auto existing = silTypes.find(loweredType);
+  if (existing != silTypes.end())
+    return *existing->second;
+  
+  auto *theInfo = new (*this) TypeLoweringInfo(loweredType);
+  silTypes[loweredType] = theInfo;
+  
+  if (loweredType.hasReferenceSemantics()) {
+    // Reference types need only to retain/release themselves.
+    theInfo->referenceTypeElements.push_back(ReferenceTypePath());
+  } else if (!addressOnly) {
+    // Walk aggregate types to find reference type elements.
+    LoadableTypeLoweringInfoVisitor(*theInfo)
+      .visit(loweredType.getSwiftRValueType());
+  }
+  
+  return *theInfo;
 }
 
 static bool isClassOrProtocolMethod(ValueDecl *vd) {

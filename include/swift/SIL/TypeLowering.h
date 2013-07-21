@@ -134,7 +134,9 @@ class TypeLoweringInfo {
   SILType loweredType;
   
 public:
-  TypeLoweringInfo() = default;
+  TypeLoweringInfo(SILType loweredType)
+    : loweredType(loweredType)
+  {}
 
   TypeLoweringInfo(const TypeLoweringInfo &) = delete;
   TypeLoweringInfo &operator=(const TypeLoweringInfo &) = delete;
@@ -168,6 +170,12 @@ public:
   SILType getLoweredType() const {
     return loweredType;
   }
+  
+  /// Allocate a new TypeLoweringInfo using the TypeConverter's allocator.
+  void *operator new(size_t size, TypeConverter &tc);
+  
+  void *operator new(size_t) = delete;
+  void operator delete(void*) = delete;
 };
   
 /// Argument order of uncurried functions.
@@ -178,6 +186,8 @@ enum class UncurryDirection {
 
 /// TypeConverter - helper class for creating and managing TypeLoweringInfos.
 class TypeConverter {
+  friend class TypeLoweringInfo;
+
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
   
   using TypeKey = std::pair<TypeBase *, unsigned>;
@@ -186,11 +196,9 @@ class TypeConverter {
   }
   
   llvm::DenseMap<TypeKey, TypeLoweringInfo *> types;
+  llvm::DenseMap<SILType, TypeLoweringInfo *> silTypes;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
-  const TypeLoweringInfo &makeTypeLoweringInfo(CanType t,
-                                               unsigned uncurryLevel);
-
   Type makeConstantType(SILConstant constant);
   
   // Types converted during foreign bridging.
@@ -208,8 +216,14 @@ public:
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
 
-  /// Returns the SIL TypeLoweringInfo for a SIL type.
+  /// Lowers a Swift type to a SILType, and returns the SIL TypeLoweringInfo
+  /// for that type.
   const TypeLoweringInfo &getTypeLoweringInfo(Type t,unsigned uncurryLevel = 0);
+  
+  /// Returns the SIL TypeLoweringInfo for an already lowered SILType. If the
+  /// SILType is an address, returns the TypeLoweringInfo for the pointed-to
+  /// type.
+  const TypeLoweringInfo &getTypeLoweringInfo(SILType t);
   
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
