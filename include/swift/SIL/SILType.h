@@ -236,7 +236,9 @@ class SILFunctionTypeInfo {
   SILType const *getInputTypeBuffer() const {
     return reinterpret_cast<SILType const *>(this+1);
   }
-  
+
+  friend class SILType;
+
   SILFunctionTypeInfo(CanType swiftType,
                       unsigned inputTypeCount,
                       SILType resultType,
@@ -248,12 +250,7 @@ class SILFunctionTypeInfo {
   {}
 
 public:
-  static SILFunctionTypeInfo *create(CanType swiftType,
-                                     ArrayRef<SILType> inputTypes,
-                                     SILType resultType,
-                                     bool hasIndirectReturn,
-                                     SILModule &M);
-  
+
   CanType getSwiftType() const { return swiftType; }
   
   /// Returns the list of input types needed to fully apply a function of

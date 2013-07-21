@@ -88,39 +88,6 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
   return false;
 }
 
-SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
-  AnyFunctionType *ft = cast<AnyFunctionType>(getSwiftRValueType());
-  
-  auto found = M.FunctionTypeInfoCache.find(ft);
-  if (found != M.FunctionTypeInfoCache.end())
-    return found->second;
-  
-  SILFunctionTypeInfo *info = M.makeFunctionTypeInfo(ft);
-  M.FunctionTypeInfoCache[ft] = info;
-  return info;
-}
-
-SILFunctionTypeInfo *SILFunctionTypeInfo::create(CanType swiftType,
-                                                 ArrayRef<SILType> inputTypes,
-                                                 SILType resultType,
-                                                 bool hasIndirectReturn,
-                                                 SILModule &M) {
-  // We allocate room for an extra unsigned in the uncurriedInputCounts array,
-  // so that we can stuff a leading zero in there and be able to efficiently
-  // return both the begins and ends of each uncurried argument group.
-  void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
-                              + sizeof(SILType)*inputTypes.size(),
-                            alignof(SILFunctionTypeInfo));
-  SILFunctionTypeInfo *fi
-    = ::new (buffer) SILFunctionTypeInfo(swiftType,
-                                         inputTypes.size(),
-                                         resultType,
-                                         hasIndirectReturn);
-  memcpy(fi->getInputTypeBuffer(), inputTypes.data(),
-         sizeof(SILType) * inputTypes.size());
-  return fi;
-}
-
 namespace {
   /// Recursively destructure tuple-type arguments into SIL argument types.
   class LoweredFunctionInputTypeVisitor
@@ -145,25 +112,46 @@ namespace {
   };
 } // end anonymous namespace
 
-SILFunctionTypeInfo *SILModule::makeFunctionTypeInfo(AnyFunctionType *ft) {
+
+SILFunctionTypeInfo *SILType::getFunctionTypeInfo(SILModule &M) const {
+  AnyFunctionType *ft = cast<AnyFunctionType>(getSwiftRValueType());
+  
+  auto found = M.FunctionTypeInfoCache.find(ft);
+  if (found != M.FunctionTypeInfoCache.end())
+    return found->second;
+
+  
   SmallVector<SILType, 8> inputTypes;
   
   // If the result type lowers to an address-only type, add it as an indirect
   // return argument.
-  SILType resultType = Types.getLoweredType(ft->getResult());
-  bool hasIndirectReturn = resultType.isAddressOnly(*this);
+  SILType resultType = M.Types.getLoweredType(ft->getResult());
+  bool hasIndirectReturn = resultType.isAddressOnly(M);
   if (hasIndirectReturn) {
     inputTypes.push_back(resultType);
-    resultType = Types.getEmptyTupleType();
+    resultType = M.Types.getEmptyTupleType();
   }
   
   // Destructure the input tuple type.
-  LoweredFunctionInputTypeVisitor(*this, inputTypes)
+  LoweredFunctionInputTypeVisitor(M, inputTypes)
   .visit(ft->getInput()->getCanonicalType());
   
-  return SILFunctionTypeInfo::create(CanType(ft), inputTypes, resultType,
-                                     hasIndirectReturn, *this);
-}
+  
+  // We allocate room for an extra unsigned in the uncurriedInputCounts array,
+  // so that we can stuff a leading zero in there and be able to efficiently
+  // return both the begins and ends of each uncurried argument group.
+  void *buffer = M.allocate(sizeof(SILFunctionTypeInfo)
+                            + sizeof(SILType)*inputTypes.size(),
+                            alignof(SILFunctionTypeInfo));
+  SILFunctionTypeInfo *info
+  = ::new (buffer) SILFunctionTypeInfo(CanType(ft), inputTypes.size(),
+                                       resultType, hasIndirectReturn);
+  memcpy(info->getInputTypeBuffer(), inputTypes.data(),
+         sizeof(SILType) * inputTypes.size());
 
+  
+  M.FunctionTypeInfoCache[ft] = info;
+  return info;
+}
 
 

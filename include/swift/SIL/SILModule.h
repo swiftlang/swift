@@ -53,9 +53,9 @@ public:
 private:
   friend class SILBasicBlock;
   friend class SILFunction;
+  friend class SILType;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
-  friend class SILType;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
@@ -76,9 +76,6 @@ private:
   
   /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
   llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
-  
-  /// Derive the SILFunctionTypeInfo for a type.
-  SILFunctionTypeInfo *makeFunctionTypeInfo(AnyFunctionType *ft);
   
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
