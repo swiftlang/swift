@@ -131,7 +131,7 @@ public:
   SILFunction *lookup(StringRef Name) {
     // FIXME: Linear lookup is ridiculous here.
     for (SILFunction &F : *this)
-      if (F.getMangledName() == Name)
+      if (F.getName() == Name)
         return &F;
     return nullptr;
   }

@@ -52,7 +52,7 @@ private:
   
   /// MangledName - This is the mangled name of the SIL function, which will
   /// be propagated into LLVM IR.
-  std::string MangledName;
+  std::string Name;
 
   /// The lowered type of the function.
   SILType LoweredType;
@@ -87,12 +87,12 @@ public:
     return getLoweredType().getAbstractCC();
   }
 
-  StringRef getMangledName() const { return MangledName; }
-  void setMangledName(StringRef N) {
-    MangledName = N;
+  StringRef getName() const { return Name; }
+  void setName(StringRef N) {
+    Name = N;
   }
   
-  std::string &getMutableMangledName() { return MangledName; }
+  std::string &getMutableName() { return Name; }
 
   /// True if this is a declaration of a function defined in another module.
   bool isExternalDeclaration() const { return BlockList.empty(); }

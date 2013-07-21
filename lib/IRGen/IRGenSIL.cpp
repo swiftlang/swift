@@ -929,7 +929,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ExplosionKind level) {
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
-  llvm::Function *fn = Module.getFunction(f->getMangledName());
+  llvm::Function *fn = Module.getFunction(f->getName());
   if (fn) return fn;
     
   LinkEntity entity = LinkEntity::forSILFunction(f, level);

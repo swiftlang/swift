@@ -41,7 +41,7 @@ static char mangleConstructorKind(SILConstant::Kind kind) {
 
 /// Mangle this entity into the given stream.
 void SILGenModule::mangleConstant(SILConstant c, SILFunction *f) {
-  llvm::raw_string_ostream buffer(f->getMutableMangledName());
+  llvm::raw_string_ostream buffer(f->getMutableName());
   
   Mangler mangler(buffer);
 

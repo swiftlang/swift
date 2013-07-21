@@ -222,9 +222,9 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
     return;
   case Kind::SILFunction:
-    assert(!getSILFunction()->getMangledName().empty() &&
+    assert(!getSILFunction()->getName().empty() &&
            "Direct SILFunction references should be premangled");
-    buffer << getSILFunction()->getMangledName();
+    buffer << getSILFunction()->getName();
     return;
   }
   llvm_unreachable("bad entity kind!");

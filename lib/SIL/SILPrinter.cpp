@@ -821,7 +821,7 @@ void SILFunction::print(llvm::raw_ostream &OS) const {
 /// Pretty-print the SILFunction's name using SIL syntax,
 /// '@function_mangled_name'.
 void SILFunction::printName(raw_ostream &OS) const {
-  OS << "@" << MangledName;  
+  OS << "@" << Name;  
 }
 
 /// Verify the module.
@@ -829,8 +829,8 @@ void SILModule::verify() const {
 #ifndef NDEBUG
   llvm::StringSet<> functionNames;
   for (SILFunction const &f : *this) {
-    if (!functionNames.insert(f.getMangledName())) {
-      llvm::errs() << "Function redefined: " << f.getMangledName() << "!\n";
+    if (!functionNames.insert(f.getName())) {
+      llvm::errs() << "Function redefined: " << f.getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     f.verify();
