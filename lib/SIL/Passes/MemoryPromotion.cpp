@@ -138,12 +138,17 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     }
     
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through [byref] arguments.
+    // it is passed through [byref] arguments or for indirect returns.
     if (isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) {
+      unsigned ArgumentNumber = UI->getOperandNumber()-1;
       SILType FnTy = User->getOperand(0).getType();
       SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*ABI->getModule());
-      Type ArgTy = FTI->getSwiftArgumentType(UI->getOperandNumber()-1);
       
+      // If this is an indirect return slot, it isn't captured.
+      if (ArgumentNumber == 0 && FTI->hasIndirectReturn())
+        continue;
+      
+      Type ArgTy = FTI->getSwiftArgumentType(ArgumentNumber);
       if (ArgTy->is<LValueType>())
         continue;
     }

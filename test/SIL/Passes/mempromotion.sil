@@ -97,5 +97,23 @@ bb0:
 }
 
 
+protocol P {
+}
+
+sil @returns_protocol : $[thin] () -> P
+
+// CHECK: sil @test_indirect_return
+sil @test_indirect_return : $[thin] () -> () {
+bb0:
+  // CHECK: alloc_stack
+  %1 = function_ref @returns_protocol : $[thin] () -> P
+  %2 = alloc_box $P
+  %3 = apply %1(%2#1) : $[thin] () -> P
+  %5 = release %2#0 : $Builtin.ObjectPointer
+  %6 = return %0 : $()
+  %0 = tuple ()
+  // CHECK: return
+}
+
 
 
