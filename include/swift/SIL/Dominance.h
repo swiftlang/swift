@@ -37,6 +37,13 @@ public:
   using DominatorTreeBase::properlyDominates;
 };
 
+/// A class for computing basic post-dominance information.
+class PostDominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
+public:
+  PostDominanceInfo(SILFunction *F);
+};
+
+
 }  // end namespace swift
 
 #endif

@@ -45,3 +45,9 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
 
   return false;
 }
+
+/// Compute the immmediate-post-dominators map.
+PostDominanceInfo::PostDominanceInfo(SILFunction *F)
+  : DominatorTreeBase(/*isPostDom*/ true) {
+  recalculate(*F);
+}
