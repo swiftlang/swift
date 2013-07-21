@@ -1,7 +1,7 @@
 .. @raise litre.TestsAreMissing
 
-Swift Intermediate Language
-===========================
+Swift Intermediate Language (SIL)
+=================================
 
 .. contents::
 
@@ -94,136 +94,71 @@ If the diagnostic passes all succeed, the final result is the canonical SIL for
 the program. Performance optimization, native code generation, and module
 distribution are derived from the form.
 
-Structure
----------
+Syntax
+------
 
-SIL is an SSA-form IR similar to LLVM assembly language. Values represent
-virtual registers and are immutable once instantiated. Mutation is represented
-by loading and storing to allocated memory as in LLVM. However, unlike LLVM,
-SIL represents branches using functional representation; rather than use phi
-nodes to reconcile values in branches, basic blocks resemble functions that
-implicitly close over their dominating blocks, and branch instructions look
-like function calls. Every SIL instruction also carries a reference back into
-the originating Swift AST for diagnostic purposes. The first basic block of a
-function takes the function's arguments as its own. For example, the following
-Swift code::
+SIL is reliant on Swift's type system and declarations, so SIL syntax is
+an extension of Swift's. A ``.sil`` file is a Swift source file with added
+SIL definitions. The Swift source is parsed only for its declarations;
+Swift ``func`` bodies and top-level code are ignored except for nested
+declarations. In a ``.sil`` file, there are no implicit imports; the ``swift``
+and/or ``Builtin`` standard modules must be imported explicitly if used.
 
-  func fizzbuzz(fizz:Bool, buzz:Bool) {
-    var s:String
-    if fizz && buzz {
-      s = "FizzBuzz"
-    } else if fizz {
-      s = "Fizz"
-    } else {
-      s = "Buzz"
-    }
-    println(s)
+Here is an example of a ``.sil`` file::
+
+  import swift
+
+  // Define a type used by the SIL function.
+  struct Point {
+    var x : Double
+    var y : Double
   }
 
-might get optimized down to the following SIL::
-
-  func @fizzbuzz : $(Bool, Bool) -> () {
-  entry(%fizz:$Bool, %buzz:$Bool):
-    %fizzandbuzz = apply @Builtin.and(%fizz, %buzz)
-    cond_branch %fizzandbuzz, fizzandbuzz(), notfizzandbuzz()
-
-  fizzandbuzz():
-    %s1 = string_literal ascii "FizzBuzz"
-    branch print(%s1)
-
-  notfizzandbuzz():
-    cond_branch %fizz, fizz(), buzz()
-
-  fizz():
-    %s2 = string_literal ascii "Fizz"
-    branch print(%s2)
-
-  buzz():
-    %s3 = string_literal ascii "Buzz"
-    branch print(%s3)
-
-  print(%s:RawPointer):
-    %string = apply @convertFromStringLiteral<String>(%s)
-    %void = apply @println(%string)
+  // Declare a Swift function. The body is ignored by SIL.
+  func taxicabNorm(a:Point) -> Double {
+    return a.x + a.y
   }
 
-In Swift, memory management is almost always implicit, but in SIL, it is always
-explicit. Allocation, deallocation, destruction, and reference counting have
-explicit instructions in SIL, and instructions such as aggregate construction
-and function calls in SIL never implicitly retain or release objects even if
-the analogous high-level operations in Swift do.
+  // Define a SIL function.
+  // The name @_T5norms11taxicabNormfT1aV5norms5Point_Sd is the mangled name
+  // of the taxicabNorm Swift function.
+  sil @_T5norms11taxicabNormfT1aV5norms5Point_Sd : $(Point) -> Double {
+  bb0(%0 : $Point):
+    // func swift.+(Double, Double) -> Double
+    %1 = function_ref @_TSsoi1pfTSdSd_Sd
+    %2 = struct_extract %0 : $Point, #Point.x
+    %3 = struct_extract %0 : $Point, #Point.y
+    %4 = apply %1(%2 : $Double, %3 : $Double) : $(Double, Double) -> Double
+    %5 = return %4 : Double
+  }
 
-Notation
---------
+SIL Types
+~~~~~~~~~
+::
 
-SIL notation uses a scheme similar to LLVM assembly language, in which program
-identifiers are prefixed with sigils and bare keywords are reserved for IR
-syntax. Comments are introduced with ``;`` and go to the end of the line::
+  sil-type ::= '$' '*'? generic-parameter-list? type
 
-  ; This is a comment
-  This isn't
+SIL types are introduced with the ``$`` sigil. SIL's type system is a superset
+of Swift's, and so the type after the ``$`` is parsed using Swift's
+type grammar. SIL adds some additional kinds of type of its own:
 
-Operand names are preceded by a ``%``. An operand may represent multiple
-values, in which case a value must be selected with ``#`` followed by an
-integer index (starting from 0). Operand names may consist of an integer or
-Swift dotted name::
+- The *address of T* ``$*T``, a pointer to memory containing a
+  value of any reference or value type ``$T``.  This can be an internal pointer
+  into a data structure. Addresses of loadable types can be loaded and stored
+  to access values of those types.
+  Addresses of address-only types (see below) can only be used with
+  instructions that manipulate their operands indirectly by address, such
+  as ``copy_addr``, ``destroy_addr``, and ``dealloc_var``, or as arguments
+  to functions. Addresses cannot be retained or released.
+- Values of *generic function type* such as
+  ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
+  function with ``function_ref`` will give a value of a generic function type.
+  Its type variables can be bound with a ``specialize`` instruction to
+  give a value of a *concrete function type* ``$(A...) -> R``.
 
-  ; These are operands:
-  %0
-  %1
-  %zero
-  %one
-  %a.b.c
+SIL classifies types into additional subgroups based on ABI stability:
 
-  ; These are multiple-value operands:
-  %multi#0
-  %multi#1
-
-Global names are preceded by an ``@`` and follow Swift dotted-name parsing
-rules. Specialized instances of generic names may be referenced by putting
-the generic parameters in angle brackets::
-
-  ; These are globals:
-  @abort
-  @exit
-  @Builtin.add
-  @Builtin.add<Builtin.Int64>
-
-Type names are preceded by a ``$``  and follow Swift type parsing rules::
-
-  ; These are types:
-  $Int
-  $Builtin.Int64
-  $Slice<Int>
-  $Int[]
-  $(Int, Int)
-  $(Int, Int) -> Int
-
-Some instructions take integer, floating-point, or string literals as
-operands; these follow the same parsing rules as literals in Swift.
-
-Operands
---------
-
-Most instructions take only local ``%`` operands. Special instructions
-are needed to load a local operand value referencing a global constant or
-literal value, for example ``constant_ref`` for globals or ``integer_literal`` 
-for integers.
-
-Types
------
-
-SIL's type system is Swift's with some additional aspects. Like Swift, there
-are two broad categories of types based on value semantics:
-
-* *reference types*, which are handles to reference-counted boxes and are
-  stored and passed around by reference, for example, classes and functions.
-* *value types*, which are stored in-line and passed by value, for example,
-  structs, tuples, and primitive types.
-
-SIL classifies types into two additional subgroups based on ABI stability:
-
-* *Loadable types* are types with a fully exposed concrete representation:
+- *Loadable types* are types with a fully exposed concrete representation:
 
   * Reference types
   * Builtin value types
@@ -232,9 +167,9 @@ SIL classifies types into two additional subgroups based on ABI stability:
 
   A *loadable aggregate type* is a tuple or struct type that is loadable.
 
-* *Address-only types* are value types for which the compiler cannot access a
-  full concrete representation:
-  
+- *Address-only types* are restricted value types for which the compiler
+  cannot access a full concrete representation:
+
   * Resilient value types
   * Fragile struct or tuple types that contain resilient types as elements at
     any depth
@@ -246,81 +181,154 @@ SIL classifies types into two additional subgroups based on ABI stability:
   stored to. SIL provides special instructions for indirectly accessing
   address-only values.
 
-SIL adds some additional types of its own, which are not first-class Swift
-types but are needed for some operations:
-
-* The *address of T* ``$*T``, a pointer to memory containing a
-  value of any reference or value type ``$T``.  This can be an internal pointer
-  into a data structure. Addresses of loadable types can be loaded and stored
-  to access values of those types.
-  Addresses of address-only types can only be used with instructions that
-  manipulate their operands indirectly by address, such as ``copy_addr``,
-  ``destroy_addr``, and ``dealloc_var``, or as arguments to functions.
-  Addresses cannot be retained or released.
-* The primitive ``$Builtin.ObjectPointer`` type is used to represent the
-  *box*, a typeless reference to a reference-counted block
-  of memory. A box can be either an instance of a reference type or a
-  reference-counted storage area for a value type. The contents of a box are not
-  accessible through the object pointer; boxes can only be retained, released,
-  or passed around as opaque operands. Operations that allocate retainable
-  memory generally return both a box and a typed address pointing
-  into the box.
-* Unlike Swift, values of unbound *generic function types* such as
-  ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
-  function with ``constant_ref`` will give a value of a generic function type.
-  Its type variables can be bound with a ``specialize`` instruction to
-  give a value of a *concrete function type* ``$(A...) -> R`` that can then
-  be ``apply``-ed.
-* Unlike Swift, *uncurried function types* are distinct in SIL. An uncurry
-  level is denoted using juxtaposition. For a curried function of type
-  ``(T) -> (U) -> (V) -> W``, the first uncurried entry point will be of type
-  ``(T)(U) -> (V) -> W``, and the second uncurried entry point will be of
-  type ``(T)(U)(V) -> W``. Function types cannot return uncurried function
-  types, so ``(A)(B) -> (C) -> D`` is a valid SIL type, but
-  ``(A) -> (B)(C) -> D`` is not. Any or all of the uncurry levels may
-  individually be generic, as in ``<T> (A)(B) -> C``,
-  ``<T> (A) <U> (B) -> C``, or ``(A) <U> (B) -> C``.
-
 Swift types may not translate one-to-one to SIL types. In particular, tuple
 types are canonicalized, and function types are canonicalized and mangled in
-order to encode calling convention and resilience rules. Loadable struct types
-are assigned an ordering for their fields which is used to numerically index
-the fields in aggregate manipulation instructions.
+order to encode calling convention and resilience rules. Function input argument
+tuples are flattened.
 
-Functions
----------
+Values and Operands
+~~~~~~~~~~~~~~~~~~~
 ::
 
-  func @function_name : $<T,U,V> (A1, A2, ...) -> R {
-  entry(%a1:$A1, %a2:$A2, ...):
-    insn1
-    insn2
-    return
+  sil-identifier ::= [A-Za-z_0-9]+
+  sil-value ::= '%' sil-identifier
+  sil-operand ::= sil-value ('#' [0-9]+)? ':' sil-type
+
+SIL values are introduced with the ``%`` sigil and named by an
+alphanumeric identifier, which references the instruction or basic block
+argument that produces the value. When used as an operand, the reference
+is always followed by a ``:`` and the SIL type of the value. For example::
+
+  // Produce a function and integer value with builtin and integer_literal
+  %negate = builtin_function_ref #Builtin.neg_Int64
+  %five = integer_literal 5 : $Builtin.Int64
+  // Use the values as operands
+  %neg_five = apply %negate(%five : $Builtin.Int64) : (Builtin.Int64) -> Builtin.Int64
+
+In SIL, a single instruction may produce multiple values. Operands that refer
+to multiple-value instructions choose the value by following the ``%name`` with
+``#`` and the index of the value. For example::
+
+  // alloc_box produces two values--the refcounted pointer %box#0, and the
+  // value address %box#1
+  %box = alloc_box $Int64
+  // Refer to the refcounted pointer
+  %1 = retain %box#0
+  // Refer to the address
+  store %box#1, %value
+
+Unlike LLVM IR, SIL instructions that take value operands *only* accept
+value operands. References to literal constants, functions, global variables, or
+other entities require specialized instructions such as ``integer_literal``,
+``function_ref``, ``global_addr``, etc.
+
+Functions
+~~~~~~~~~
+::
+
+  sil-function ::= 'sil' sil-function-name ':' sil-type '{' sil-basic-block+ '}'
+  sil-function-name ::= '@' [A-Za-z_0-9]+
+
+SIL functions are introduced at the top level with the ``sil`` keyword. SIL
+function names are introduced with the ``@`` sigil and named by an
+alphanumeric identifier. This name is usually the mangled name of a Swift
+function. The ``sil`` syntax declares the function's name and SIL type then
+defines the body of the function inside braces. The declared type must be a
+function type, which may be generic.
+
+Basic Blocks
+~~~~~~~~~~~~
+::
+
+  sil-basic-block ::= sil-label sil-instruction* sil-terminator
+  sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
+
+A function body consists of one or more basic blocks. These form the nodes of
+the control flow graph. Each basic block contains one or more instructions and
+is terminated by a terminator instructor—either a branch to another block,
+a return, or an ``unreachable`` marker. The entry point for the function is
+always the first basic block in its body.
+
+Basic blocks can take arguments. The entry point block's argument values are
+received from the function caller::
+
+  sil @foo : $(Int) -> Int {
+  bb0(%x : $Int):
+    return %x : $Int
   }
 
-A SIL function definition gives the function's name as a global symbol, its
-generic parameters (if any), and the types of its inputs and outputs. The
-arguments are bound to parameters of the first basic block in left-to-right
-order. For an uncurried function, the arguments of each clause are bound
-to the first basic block's parameters in outer-to-inner order::
-
-  func @uncurried : $(A1, A2)(B1, B2) -> R {
-  entry(%a1:$A1, %a2:$A2, %b1:$B1, %b2:$B2):
-    ...
+  sil @bar : $(Int, Int) -> () {
+  bb0(%x : $Int, %y : $Int):
+    %foo = function_ref @foo
+    %1 = apply %foo(%x : $Int) : $(Int) -> Int
+    %2 = apply %foo(%y : $Int) : $(Int) -> Int
+    %3 = tuple ()
+    return %3 : $()
   }
 
-For a local function or closure with context, the context values become
-an extra uncurry level of the closure function.
+Arguments for other basic blocks are bound by the branch instructions that
+transfer control to that block. This is how SIL expresses branching dataflow in
+SSA as an alternative to phi instructions::
 
-Basic blocks
-------------
+  sil @iif : $(Builtin.Int1, Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+  bb0(%cond : $Builtin.Int1, %then : $Builtin.Int64, %else : $Builtin.Int64):
+    condbranch %cond : $Builtin.Int1, then, else
+  then:
+    br finish(%then : $Builtin.Int64)
+  else:
+    br finish(%else : $Builtin.Int64)
+  finish(%result : $Builtin.Int64):
+    ret %result : $Builtin.Int64
+  }
 
-The body of a function consists of one or more basic blocks. Each basic block
-is introduced with a label name followed by zero or more arguments and ends
-with a branch instruction. Label names are local to the function body.
+Declaration References
+~~~~~~~~~~~~~~~~~~~~~~
+::
 
-Instructions
-------------
+  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
+  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)? ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-lang
+  sil-decl-subref-part ::= 'getter'
+  sil-decl-subref-part ::= 'setter'
+  sil-decl-subref-part ::= 'allocator'
+  sil-decl-subref-part ::= 'initializer'
+  sil-decl-subref-part ::= 'oneofelt'
+  sil-decl-subref-part ::= 'destroyer'
+  sil-decl-subref-part ::= 'globalaccessor'
+  sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
+  sil-decl-uncurry-level ::= [0-9]+
+  sil-decl-lang ::= 'objc'
+
+Some SIL instructions need to reference Swift declarations directly. These
+references are introduced with the ``#`` sigil followed by the fully qualified
+dotted path naming the Swift declaration. Some Swift declarations are
+decomposed into multiple entities at the SIL level. These are discriminated by
+following the qualified name with a ``!`` then naming the component entity::
+
+- ``getter`` references the getter function for a ``var`` declaration.
+- ``setter`` references the setter function for a ``var`` declaration.
+- ``allocator`` references the allocating constructor for a class's
+  ``constructor`` declaration, or the constructor for a struct or oneof's
+  ``constructor``.
+- ``initializer`` references the allocating constructor for a class's
+  ``constructor`` declaration.
+- ``oneofelt`` references a member of a oneof type.
+- ``destroyer`` references the destroying destructor for a class's
+  ``destructor`` declaration.
+- ``globalaccessor`` references the addressor function for a global variable.
+- ``defaultarg.<n>`` references the default argument generating function for
+  the ``<n>``-th argument of a Swift ``func``.
+
+Methods and curried function definitions in Swift also have multiple "uncurry
+levels" in SIL, representing the function at each possible partial application
+level.
+
+Functions may also have multiple entry points for foreign language interop which
+can be discriminated. Currently ``objc`` is the only such discriminator.
+
+Instruction Set
+---------------
 
 In the instruction descriptions, ``[optional attributes]`` appear in square
 brackets, and ``{required|attribute|choices}`` appear in curly braces with
