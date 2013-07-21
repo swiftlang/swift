@@ -287,7 +287,12 @@ public:
   /// present.
   SILType getSemanticResultType() const {
     return hasIndirectReturn() ? getIndirectReturnType() : getResultType();
-  }  
+  }
+  
+  /// getSwiftArgumentType - Return the swift type of the argument, numbered by
+  /// the arguments to an apply or partial_apply instruction.  If the function
+  /// has an indirect return, this cannot ask about its argument slot.
+  CanType getSwiftArgumentType(unsigned ArgNo) const;
 };
   
 } // end swift namespace

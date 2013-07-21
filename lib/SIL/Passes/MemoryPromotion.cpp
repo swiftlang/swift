@@ -137,7 +137,16 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
       continue;
     }
     
-    // TODO: [byref] arguments also.
+    // apply and partial_apply instructions do not capture the pointer when
+    // it is passed through [byref] arguments.
+    if (isa<ApplyInst>(User) || isa<PartialApplyInst>(User)) {
+      SILType FnTy = User->getOperand(0).getType();
+      SILFunctionTypeInfo *FTI = FnTy.getFunctionTypeInfo(*ABI->getModule());
+      Type ArgTy = FTI->getSwiftArgumentType(UI->getOperandNumber()-1);
+      
+      if (ArgTy->is<LValueType>())
+        continue;
+    }
     
     // Otherwise, this looks like it escapes.
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
