@@ -21,36 +21,82 @@ using namespace swift;
 STATISTIC(NumStackPromoted, "Number of heap allocations promoted to the stack");
 STATISTIC(NumRegPromoted, "Number of heap allocations promoted to registers");
 
+/// getLastRelease - Determine if there is a single ReleaseInst that
+/// post-dominates all of the uses of the specified AllocBox.  If so, return it.
+/// If not, return null.
+static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
+                                   SmallVectorImpl<ReleaseInst*> &Releases) {
+  // If there is a single release, it must be the last release.  The calling
+  // conventions used in SIL (at least in the case where the ABI doesn't escape)
+  // are such that the value is live until it is explicitly released: there are
+  // no calls in this case that pass ownership and release for us.
+  if (Releases.size() == 1)
+    return Releases.back();
+  
+  // FIXME: implement this.
+  return nullptr;
+}
+
+
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
 /// alloc_stack.  On success, this updates the IR and returns true, but does not
 /// remove the alloc_box itself.
 static bool optimizeAllocBox(AllocBoxInst *ABI) {
+  SmallVector<ReleaseInst*, 4> Releases;
   
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
   // not, we can turn it into an alloc_stack.
   for (auto UI : ABI->getUses()) {
-    auto *User = dyn_cast<SILInstruction>(UI->getUser());
+    auto *User = cast<SILInstruction>(UI->getUser());
     
     // These instructions do not cause the box's address to escape.
-    if (isa<ReleaseInst>(User) ||
-        isa<RetainInst>(User) ||
+    if (isa<RetainInst>(User) ||
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
         isa<InitializeVarInst>(User) ||
         (isa<StoreInst>(User) && UI->getOperandNumber() == 1))
       continue;
     
-    // TODO: [byref] arguments also.
+    // Release doesn't either, but we want to keep track of where this value
+    // gets released.
+    if (auto *RI = dyn_cast<ReleaseInst>(User)) {
+      Releases.push_back(cast<ReleaseInst>(RI));
+      continue;
+    }
     
+    // TODO: [byref] arguments also.
     
     // Otherwise, this looks like it escapes.
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
-          << "\n    Due to user: " << *User << "\n\n");
+          << "    Due to user: " << *User << "\n");
     
     return false;
   }
   
+  
+  // Okay, the value doesn't escape.  Determine where the last release is.  This
+  // code only handles the case where there is a single "last release".  This
+  // should work for us, because we don't expect code duplication that can
+  // introduce different releases for different codepaths.  If this ends up
+  // mattering in the future, this can be generalized.
+  ReleaseInst *LastRelease = getLastRelease(ABI, Releases);
+  
+  bool isTrivial = false;  // FIXME: Dtor required?
+  
+  if (LastRelease == nullptr && !isTrivial) {
+    // If we can't tell where the last release is, we don't know where to insert
+    // the destroy_addr for this box.
+    DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
+          << "    Don't know where the last release is!\n\n");
+    return false;
+  }
+
+  DEBUG({
+    llvm::errs() << "*** Promoting alloc_box to stack: " << *ABI;
+    for (auto UI : ABI->getUses())
+      llvm::errs() << "    User: " << *UI->getUser();
+  });
   
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
@@ -59,6 +105,20 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
    
   // Replace all uses of the pointer operand with the spiffy new AllocVar.
   SILValue(ABI, 1).replaceAllUsesWith(AllocVar);
+  
+  // If we found a 'last release', insert a dealloc_stack instruction and a
+  // destroy_addr if its type is non-trivial.
+  if (LastRelease) {
+    SILBuilder B2(LastRelease);
+
+    if (!isTrivial) {
+      // FIXME: If this is a non-address-only type, use a load and the
+      // "emitReleaseRValue" logic.
+      B2.createDestroyAddr(ABI->getLoc(), AllocVar);
+    }
+
+    B2.createDeallocStack(ABI->getLoc(), AllocVar);
+  }
   
   // Remove any retain and release instructions.  Since all uses of result #1
   // are gone, this only walks through uses of result #0 (the retain count
@@ -70,8 +130,6 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
     User->eraseFromParent();
   }
   
-  // TODO: Determine where to insert a dealloc_var instruction (at the "last"
-  // release).
   
   return true;
 }

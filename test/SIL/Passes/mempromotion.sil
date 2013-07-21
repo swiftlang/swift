@@ -28,8 +28,10 @@ bb0:
   %4 = release %1#0 : $Builtin.ObjectPointer
   %5 = return %3 : $Int64
 
-// CHECK: alloc_stack
+// CHECK: %0 = alloc_stack
 // CHECK-NOT: alloc_box
 // CHECK-NOT: release
+// CHECK: destroy_addr %0 : $*Int64
+// CHECK: dealloc_stack %0 : $*Int64
 // CHECK: return
 }
