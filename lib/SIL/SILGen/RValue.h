@@ -87,7 +87,7 @@ public:
                            /*isTake*/ false, /*isInitialize*/ true);
       return gen.emitManagedRValueWithCleanup(buf);
     }
-    gen.emitRetainRValue(SILLocation(), getValue());
+    gen.B.emitRetainValue(SILLocation(), getValue());
     return gen.emitManagedRValueWithCleanup(getValue());
   }
   
@@ -99,7 +99,7 @@ public:
                            /*isTake*/ false, /*isInitialize*/ true);
       return;
     }
-    gen.emitRetainRValue(SILLocation(), getValue());
+    gen.B.emitRetainValue(SILLocation(), getValue());
     gen.B.createStore(SILLocation(), getValue(), dest);
   }
   
@@ -175,13 +175,13 @@ public:
       
       SILValue old;
       
-      if (!ti.isTrivial(gen.F.getModule()))
+      if (!ti.isTrivial())
         old = gen.B.createLoad(loc, address);
       
       gen.emitStore(loc, *this, address);
       
       if (old)
-        gen.emitReleaseRValue(loc, old);
+        gen.B.emitReleaseValue(loc, old);
     }
   }
   

@@ -130,12 +130,13 @@ class TypeLoweringInfo {
   /// released.
   llvm::SmallVector<ReferenceTypePath, 4> referenceTypeElements;
   
-  /// loweredType - The SIL type of values with this Swift type.
-  SILType loweredType;
+  /// loweredTypeAndIsAddressOnly - The SIL type of values with this Swift type,
+  /// and whether it is an address-only type.
+  llvm::PointerIntPair<SILType, 1, bool> loweredTypeAndIsAddressOnly;
   
 public:
-  TypeLoweringInfo(SILType loweredType)
-    : loweredType(loweredType)
+  TypeLoweringInfo(SILType loweredType, SILModule &M)
+    : loweredTypeAndIsAddressOnly(loweredType, loweredType.isAddressOnly(M))
   {}
 
   TypeLoweringInfo(const TypeLoweringInfo &) = delete;
@@ -147,16 +148,20 @@ public:
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
-  bool isAddressOnly(SILModule &M) const { return loweredType.isAddressOnly(M);}
+  bool isAddressOnly() const {
+    return loweredTypeAndIsAddressOnly.getInt();
+  }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
   /// isAddressOnly.
-  bool isLoadable(SILModule &M) const { return loweredType.isLoadable(M); }
+  bool isLoadable() const {
+    return !isAddressOnly();
+  }
   
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
-  bool isTrivial(SILModule &M) const {
-    return loweredType.isLoadable(M) && referenceTypeElements.empty();
+  bool isTrivial() const {
+    return isLoadable() && referenceTypeElements.empty();
   }
   
   /// getReferenceTypeElements - For a nontrivial loadable value type, returns
@@ -168,7 +173,7 @@ public:
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
   SILType getLoweredType() const {
-    return loweredType;
+    return loweredTypeAndIsAddressOnly.getPointer();
   }
   
   /// Allocate a new TypeLoweringInfo using the TypeConverter's allocator.
@@ -227,7 +232,7 @@ public:
   
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, uncurryLevel).loweredType;
+    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
   }
   
   /// Returns the SIL type of a constant reference.

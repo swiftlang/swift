@@ -129,7 +129,7 @@ public:
     assert(DebugScopeStack.size());
     DebugScopeStack.pop_back();
   }
-
+  
   SILFunction& getFunction() const { return F; }
   
   //===--------------------------------------------------------------------===//
@@ -655,6 +655,31 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Memory management helpers
+  //===--------------------------------------------------------------------===//
+  
+  /// Emit the instruction sequence needed to destroy (but not deallocate)
+  /// a value in memory.
+  void emitDestroyAddress(SILLocation Loc, SILValue addr) {
+    auto &ti = F.getModule().getTypeLoweringInfo(addr.getType());
+    if (ti.isTrivial())
+      return;
+    if (ti.isAddressOnly())
+      return (void)createDestroyAddr(Loc, addr);
+    SILValue v = createLoad(Loc, addr);
+    emitReleaseValueImpl(Loc, v, ti);
+  }
+  
+  /// Emit the instruction sequence needed to retain a value, which must not
+  /// be an address.
+  void emitRetainValue(SILLocation Loc, SILValue v) {
+    emitRetainValueImpl(Loc, v, F.getModule().getTypeLoweringInfo(v.getType()));
+  }
+  void emitReleaseValue(SILLocation Loc, SILValue v) {
+    emitReleaseValueImpl(Loc, v, F.getModule().getTypeLoweringInfo(v.getType()));
+  }
+  
+  //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//
 
@@ -684,6 +709,11 @@ private:
 
     BB->getInsts().insert(InsertPt, TheInst);
   }
+  
+  void emitRetainValueImpl(SILLocation Loc, SILValue v,
+                           const Lowering::TypeLoweringInfo &ti);
+  void emitReleaseValueImpl(SILLocation Loc, SILValue v,
+                            const Lowering::TypeLoweringInfo &ti);
 };
 
 } // end swift namespace

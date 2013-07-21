@@ -498,7 +498,7 @@ struct ArgumentInitVisitor :
            "any pattern should match a black-hole Initialization");
     SILValue arg = makeArgument(P->getType(), f.begin());
     if (arg.getType().isLoadable(gen.F.getModule()))
-      gen.emitReleaseRValue(SILLocation(), arg);
+      gen.B.emitReleaseValue(SILLocation(), arg);
     return arg;
   }
 
@@ -530,7 +530,7 @@ class CleanupCaptureValue : public Cleanup {
 public:
   CleanupCaptureValue(SILValue v) : v(v) {}
   void emit(SILGenFunction &gen) override {
-    gen.emitReleaseRValue(SILLocation(), v);
+    gen.B.emitReleaseValue(SILLocation(), v);
   }
 };
   
@@ -609,7 +609,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
   // If the return type is address-only, emit the indirect return argument.
   const TypeLoweringInfo &returnTI = getTypeLoweringInfo(resultType);
-  if (returnTI.isAddressOnly(SGM.M)) {
+  if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                     F.begin());
   }
@@ -680,52 +680,6 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     Cleanups.pushCleanup<CleanupDestructorThis>(thisDecl);
   }
   return thisValue;
-}
-
-static void rrLoadableValueElement(SILGenFunction &gen, SILLocation loc,
-                                   SILValue v,
-                                   void (SILBuilder::*createRR)(SILLocation,
-                                                                SILValue),
-                                   ReferenceTypePath const &elt) {
-  for (auto &comp : elt.path) {
-    SILType silTy = gen.getLoweredLoadableType(comp.getType());
-    switch (comp.getKind()) {
-    case ReferenceTypePath::Component::Kind::StructField:
-      v = gen.B.createStructExtract(loc, v, comp.getStructField(), silTy);
-      break;
-    case ReferenceTypePath::Component::Kind::TupleElement:
-      v = gen.B.createTupleExtract(loc, v, comp.getTupleElement(), silTy);
-      break;
-    }
-  }
-  (gen.B.*createRR)(loc, v);
-}
-
-static void rrLoadableValue(SILGenFunction &gen, SILLocation loc, SILValue v,
-                            void (SILBuilder::*createRR)(SILLocation, SILValue),
-                            ArrayRef<ReferenceTypePath> elts) {
-  for (auto &elt : elts)
-    rrLoadableValueElement(gen, loc, v, createRR, elt);
-}
-
-void SILGenFunction::emitRetainRValue(SILLocation loc, SILValue v) {
-  assert(!v.getType().isAddress() &&
-         "emitRetainRValue cannot retain an address");
-
-  const TypeLoweringInfo &ti
-    = getTypeLoweringInfo(v.getType().getSwiftRValueType());
-  rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
-                  ti.getReferenceTypeElements());
-}
-
-void SILGenFunction::emitReleaseRValue(SILLocation loc, SILValue v) {
-  assert(!v.getType().isAddress() &&
-         "emitReleaseRValue cannot release an address");
-
-  const TypeLoweringInfo &ti
-    = getTypeLoweringInfo(v.getType().getSwiftRValueType());
-  rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
-                  ti.getReferenceTypeElements());
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
@@ -1005,12 +959,12 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
     // it's address-only) then deallocate the variable.
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
     const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
-    if (!ti.isTrivial(SGM.M)) {
-      if (ti.isAddressOnly(SGM.M)) {
+    if (!ti.isTrivial()) {
+      if (ti.isAddressOnly()) {
         B.createDestroyAddr(vd, loc.address);
       } else {
         SILValue value = B.createLoad(vd, loc.address);
-        emitReleaseRValue(vd, value);
+        B.emitReleaseValue(vd, value);
       }
     }
     B.createDeallocStack(vd, loc.address);
@@ -1074,7 +1028,7 @@ static void emitObjCReturnValue(SILGenFunction &gen,
     gen.B.createAutoreleaseReturn(loc, result);
     return;
   case OwnershipConventions::Return::Unretained:
-    gen.emitReleaseRValue(loc, result);
+    gen.B.emitReleaseValue(loc, result);
     SWIFT_FALLTHROUGH;
   case OwnershipConventions::Return::Retained:
     gen.B.createReturn(loc, result);
@@ -1094,7 +1048,7 @@ static void emitObjCUnconsumedArgument(SILGenFunction &gen,
     return;
   }
   
-  gen.emitRetainRValue(loc, arg);
+  gen.B.emitRetainValue(loc, arg);
 }
 
 /// Reorder arguments from ObjC method order (self-first) to Swift method order
@@ -1219,7 +1173,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
   SILValue result = B.createLoad(var, addr);
   B.createRelease(getter.getDecl(), thisValue);
   
-  emitRetainRValue(getter.getDecl(), result);
+  B.emitRetainValue(getter.getDecl(), result);
   return emitObjCReturnValue(*this, getter.getDecl(), result, objcResultTy,
                              ownership);
 }
@@ -1255,7 +1209,7 @@ void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
   } else {
     SILValue old = B.createLoad(var, addr);
     B.createStore(var, setValue, addr);
-    emitReleaseRValue(var, old);
+    B.emitReleaseValue(var, old);
   }
   
   B.createRelease(setter.getDecl(), thisValue);

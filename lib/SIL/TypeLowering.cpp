@@ -397,7 +397,7 @@ TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
     // Derive SILType for LValueType from the object type.
     CanType obj = lvt.getObjectType();
     SILType loweredType = getLoweredType(obj, uncurryLevel).getAddressType();
-    auto *theInfo = new (*this) TypeLoweringInfo(loweredType);
+    auto *theInfo = new (*this) TypeLoweringInfo(loweredType, M);
     types[getTypeKey(ct, uncurryLevel)] = theInfo;
     return *theInfo;
   }
@@ -420,7 +420,7 @@ TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
   // Emit the lowering info for the SIL type.
   auto *theInfo
     = &const_cast<TypeLoweringInfo&>(getTypeLoweringInfo(loweredType));
-  assert(theInfo->loweredType == loweredType);
+  assert(theInfo->getLoweredType() == loweredType);
   types[getTypeKey(ct, uncurryLevel)] = theInfo;
   return *theInfo;
 }
@@ -437,7 +437,7 @@ TypeConverter::getTypeLoweringInfo(SILType loweredType) {
   if (existing != silTypes.end())
     return *existing->second;
   
-  auto *theInfo = new (*this) TypeLoweringInfo(loweredType);
+  auto *theInfo = new (*this) TypeLoweringInfo(loweredType, M);
   silTypes[loweredType] = theInfo;
   
   if (loweredType.hasReferenceSemantics()) {

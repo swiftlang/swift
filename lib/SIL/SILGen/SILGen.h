@@ -365,7 +365,7 @@ public:
   }
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
     const TypeLoweringInfo &ti = getTypeLoweringInfo(t, uncurryLevel);
-    assert(ti.isLoadable(F.getModule()) && "unexpected address-only type");
+    assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
 
@@ -456,27 +456,6 @@ public:
   /// argument. Returns the 'this' argument SILValue.
   SILValue emitDestructorProlog(ClassDecl *CD, DestructorDecl *DD);
   
-  /// emitRetainRValue - Emits the instructions necessary to increase the
-  /// retain count of a temporary, in order to use it as part of another
-  /// independent temporary.
-  /// - For trivial loadable types, this is a no-op.
-  /// - For reference types, 'v' is retained.
-  /// - For loadable types with reference type members, the reference type
-  ///   members are all retained.
-  /// - FIXME For address-only types, this currently crashes. It should instead
-  ///   allocate and return a copy made using copy_addr.
-  void emitRetainRValue(SILLocation loc, SILValue v);
-    
-  /// emitReleaseRValue - Emits the instructions necessary to clean up a
-  /// temporary value.
-  /// - For trivial loadable types, this is a no-op.
-  /// - For reference types, 'v' is released.
-  /// - For loadable types with reference type members, the reference type
-  ///   members are all released.
-  /// - For address-only types, the value at the address is destroyed using
-  ///   a destroy_addr instruction.
-  void emitReleaseRValue(SILLocation loc, SILValue v);
-
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
   SILValue emitTemporaryAllocation(SILLocation loc, SILType ty);

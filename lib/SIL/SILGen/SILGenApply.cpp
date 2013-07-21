@@ -587,7 +587,7 @@ public:
     if (super.isLValue()) {
       super = gen.emitManagedRValueWithCleanup(
                                        gen.B.createLoad(arg, super.getValue()));
-      gen.emitRetainRValue(arg, super.getValue());
+      gen.B.emitRetainValue(arg, super.getValue());
     }
     
     // The callee for a super call has to be either a method or constructor.
@@ -662,7 +662,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
 
   // Prepare a buffer for an indirect return if needed.
   SILValue indirectReturn;
-  if (resultTI.isAddressOnly(F.getModule())) {
+  if (resultTI.isAddressOnly()) {
     indirectReturn = getBufferForExprResult(Loc, resultTI.getLoweredType(), C);
     instructionTy = SGM.Types.getEmptyTupleType();
     argValues.push_back(indirectReturn);
@@ -704,7 +704,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     
     case OwnershipConventions::Return::Unretained:
       // Unretained. Retain the value.
-      emitRetainRValue(Loc, result);
+      B.emitRetainValue(Loc, result);
       break;
     }
   
@@ -989,7 +989,7 @@ namespace {
     auto &ti = gen.getTypeLoweringInfo(substitutions[0].Replacement);
     
     // Destroy is a no-op for trivial types.
-    if (ti.isTrivial(gen.F.getModule()))
+    if (ti.isTrivial())
       return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
     
     SILType destroyType = ti.getLoweredType();
@@ -1004,7 +1004,7 @@ namespace {
     } else {
       // Otherwise, load and release the value.
       SILValue value = gen.B.createLoad(loc, addr);
-      gen.emitReleaseRValue(loc, value);
+      gen.B.emitReleaseValue(loc, value);
     }
     
     return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
@@ -1156,7 +1156,7 @@ namespace {
     SILValue result = gen.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
                                                   destType);
     // The result has ownership semantics, so retain it with a cleanup.
-    gen.emitRetainRValue(loc, result);
+    gen.B.emitRetainValue(loc, result);
     return gen.emitManagedRValueWithCleanup(result);
   }
 
@@ -1310,7 +1310,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   // FIXME: Can local properties ever be generic?
   if (gen.LocalConstants.count(constant)) {
     SILValue v = gen.LocalConstants[constant];
-    gen.emitRetainRValue(loc, v);
+    gen.B.emitRetainValue(loc, v);
     return Callee::forIndirect(gen.emitManagedRValueWithCleanup(v));
   }
   

@@ -38,7 +38,7 @@ namespace {
     CleanupRValue(SILValue rv) : rv(rv) {}
     
     void emit(SILGenFunction &gen) override {
-      gen.emitReleaseRValue(SILLocation(), rv);
+      gen.B.emitReleaseValue(SILLocation(), rv);
     }
   };
   
@@ -59,7 +59,7 @@ namespace {
     
     void emit(SILGenFunction &gen) override {
       SILValue tmpValue = gen.B.createLoad(SILLocation(), address);
-      gen.emitReleaseRValue(SILLocation(), tmpValue);
+      gen.B.emitReleaseValue(SILLocation(), tmpValue);
     }
   };
   
@@ -75,7 +75,7 @@ namespace {
 } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial(SGM.M)) {
+  if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial()) {
     return ManagedValue(v, ManagedValue::Unmanaged);
   } else if (v.getType().isAddressOnly(SGM.M)) {
     Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
@@ -138,7 +138,7 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
     SILValue v = LocalConstants[constant];
-    emitRetainRValue(loc, v);
+    B.emitRetainValue(loc, v);
     return emitManagedRValueWithCleanup(v);
   }
   
@@ -272,7 +272,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
   // Load the loadable value, and retain it if we aren't taking it.
   SILValue loadedV = B.createLoad(loc, addr);
   if (!isTake)
-    emitRetainRValue(loc, loadedV);
+    B.emitRetainValue(loc, loadedV);
   return emitManagedRValueWithCleanup(loadedV);
 }
 
@@ -338,7 +338,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   v.forwardInto(*this, loc, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial(SGM.M)) {
+  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
     valueCleanup = getCleanupsDepth();
   }
@@ -1298,14 +1298,14 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       if (vd->isProperty())
         continue;
       const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
-      if (!ti.isTrivial(SGM.M)) {
+      if (!ti.isTrivial()) {
         SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());
-        if (ti.isAddressOnly(SGM.M)) {
+        if (ti.isAddressOnly()) {
           B.createDestroyAddr(dd, addr);
         } else {
           SILValue field = B.createLoad(dd, addr);
-          emitReleaseRValue(dd, field);
+          B.emitReleaseValue(dd, field);
         }
       }
     }
@@ -1550,7 +1550,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILValue thisValue = B.createLoad(ctor, thisLV);
   if (SILValue thisBox = VarLocs[thisDecl].box) {
     // We have to do a retain because someone else may be using the box.
-    emitRetainRValue(ctor, thisValue);
+    B.emitRetainValue(ctor, thisValue);
     B.createRelease(ctor, thisBox);
   } else {
     // We can just take ownership from the stack slot and consider it
@@ -1752,7 +1752,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILValue thisValue = B.createLoad(ctor, thisLV);
   if (SILValue thisBox = VarLocs[thisDecl].box) {
     // We have to do a retain because someone else may be using the box.
-    emitRetainRValue(ctor, thisValue);
+    B.emitRetainValue(ctor, thisValue);
     B.createRelease(ctor, thisBox);
   } else {
     // We can just take ownership from the stack slot and consider it

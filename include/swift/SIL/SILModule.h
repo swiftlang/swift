@@ -93,6 +93,11 @@ public:
   /// Types - This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;
   
+  /// Look up the TypeLoweringInfo for a SILType.
+  const Lowering::TypeLoweringInfo &getTypeLoweringInfo(SILType t) {
+    return Types.getTypeLoweringInfo(t);
+  }
+  
   /// Construct a SIL module from a translation unit.  It is the caller's
   /// responsibility to 'delete' this object.
   static SILModule *constructSIL(TranslationUnit *tu,

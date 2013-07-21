@@ -3,10 +3,11 @@ add_subdirectory(Passes)
 add_swift_library(swiftSIL
   Dominance.cpp
   Mangle.cpp
+  SIL.cpp
   SILBasicBlock.cpp
+  SILBuilder.cpp
   SILInstruction.cpp
   SILFunction.cpp
-  SIL.cpp
   SILLocation.cpp
   SILModule.cpp
   SILPrinter.cpp
