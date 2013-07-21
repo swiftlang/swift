@@ -15,7 +15,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-//#include "swift/SIL/Dominance.h"
+#include "swift/SIL/Dominance.h"
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of heap allocations promoted to the stack");
@@ -25,7 +25,8 @@ STATISTIC(NumRegPromoted, "Number of heap allocations promoted to registers");
 /// post-dominates all of the uses of the specified AllocBox.  If so, return it.
 /// If not, return null.
 static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
-                                   SmallVectorImpl<ReleaseInst*> &Releases) {
+                                   SmallVectorImpl<ReleaseInst*> &Releases,
+                                   llvm::OwningPtr<PostDominanceInfo> &PDI) {
   // If there is a single release, it must be the last release.  The calling
   // conventions used in SIL (at least in the case where the ABI doesn't escape)
   // are such that the value is live until it is explicitly released: there are
@@ -33,15 +34,80 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
   if (Releases.size() == 1)
     return Releases.back();
   
-  // FIXME: implement this.
-  return nullptr;
+  // If there are multiple releases of the value, we only support the case where
+  // there is a single ultimate release that post-dominates all of the rest of
+  // them.
+  
+  // Determine the most-post-dominating release by doing a linear scan over all
+  // of the releases to find one that post-dominates them all.  Because we don't
+  // want to do multiple scans of the block (which could be large) just keep
+  // track of whether there are multiple releases in the ultimate block we find.
+  bool MultipleReleasesInBlock = false;
+  ReleaseInst *LastRelease = Releases[0];
+  
+  for (unsigned i = 1, e = Releases.size(); i != e; ++i) {
+    ReleaseInst *RI = Releases[i];
+    
+    // If this release is in the same block as our candidate, keep track of the
+    // multiple release nature of that block, but don't try to determine an
+    // ordering between them yet.
+    if (RI->getParent() == LastRelease->getParent()) {
+      MultipleReleasesInBlock = true;
+      continue;
+    }
+    
+    // Otherwise, we need to order them.  Make sure we've computed PDI.
+    if (!PDI.isValid())
+      PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
+    
+    if (PDI->properlyDominates(RI->getParent(), LastRelease->getParent())) {
+      // RI post-dom's LastRelease, so it is our new LastRelease.
+      LastRelease = RI;
+      MultipleReleasesInBlock = false;
+    }
+  }
+  
+  // Okay, we found the most-post-dominating release.  If it doesn't postdom
+  // all of our uses, it would be unsafe to use it though, so check this.
+  for (auto UI : ABI->getUses()) {
+    auto *User = cast<SILInstruction>(UI->getUser());
+    
+    if (User->getParent() == LastRelease->getParent())
+      continue;
+    
+    // Make sure we've computed PDI.
+    if (!PDI.isValid())
+      PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
+    
+    if (!PDI->properlyDominates(LastRelease->getParent(), User->getParent()))
+      return nullptr;
+  }
+
+  // Okay, the LastRelease block postdoms all users.  If there are multiple
+  // releases in the block, make sure we're looking at the last one.
+  if (MultipleReleasesInBlock) {
+    for (auto MBBI = --LastRelease->getParent()->end(); ; --MBBI) {
+      auto *RI = dyn_cast<ReleaseInst>(MBBI);
+      if (RI == nullptr ||
+          RI->getOperand() != SILValue(ABI, 1)) {
+        assert(MBBI != LastRelease->getParent()->begin() &&
+               "Didn't find any release in this block?");
+        continue;
+      }
+      LastRelease = RI;
+      break;
+    }
+  }
+  
+  return LastRelease;
 }
 
 
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
 /// alloc_stack.  On success, this updates the IR and returns true, but does not
 /// remove the alloc_box itself.
-static bool optimizeAllocBox(AllocBoxInst *ABI) {
+static bool optimizeAllocBox(AllocBoxInst *ABI,
+                             llvm::OwningPtr<PostDominanceInfo> &PDI) {
   SmallVector<ReleaseInst*, 4> Releases;
   
   // Scan all of the uses of the alloc_box to see if any of them cause the
@@ -80,7 +146,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   // should work for us, because we don't expect code duplication that can
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
-  ReleaseInst *LastRelease = getLastRelease(ABI, Releases);
+  ReleaseInst *LastRelease = getLastRelease(ABI, Releases, PDI);
   
   bool isTrivial = false;  // FIXME: Dtor required?
   
@@ -88,7 +154,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
     // If we can't tell where the last release is, we don't know where to insert
     // the destroy_addr for this box.
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
-          << "    Don't know where the last release is!\n\n");
+          << "    Cannot determine location of the last release!\n"
+          << *ABI->getParent()->getParent() << "\n");
     return false;
   }
 
@@ -140,14 +207,19 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
 
 
 void swift::performSILMemoryPromotion(SILModule *M) {
-  for (auto &Fn : *M)
+  
+  for (auto &Fn : *M) {
+    // PostDomInfo - This is the post dominance information for the specified
+    // function.  It is lazily generated only if needed.
+    llvm::OwningPtr<PostDominanceInfo> PostDomInfo;
+
     for (auto &BB : Fn) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
         SILInstruction *Inst = I;
 
         if (auto *ABI = dyn_cast<AllocBoxInst>(Inst)) {
-          if (optimizeAllocBox(ABI)) {
+          if (optimizeAllocBox(ABI, PostDomInfo)) {
             ++NumStackPromoted;
             // Carefully move iterator to avoid invalidation problems.
             ++I;
@@ -169,6 +241,7 @@ void swift::performSILMemoryPromotion(SILModule *M) {
         ++I;
       }
     }
+  }
 }
 
 

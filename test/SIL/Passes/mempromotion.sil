@@ -4,8 +4,8 @@ import Builtin
 import swift
 
 
+// CHECK: sil @simple_promotion
 sil @simple_promotion : $(x : Int64) -> Int64 {
-// CHECK: sil @simple_promotion : $(x : Int64) -> Int64
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
   %2 = store %0 to %1#1 : $*Int64
@@ -19,8 +19,8 @@ bb0(%0 : $Int64):
 // CHECK: return
 }
 
+// CHECK: sil @init_var
 sil @init_var : $() -> Int64 {
-// CHECK: sil @init_var : $() -> Int64
 bb0:
   %1 = alloc_box $Int64
   %2 = initialize_var %1#1 : $*Int64
@@ -32,6 +32,26 @@ bb0:
 // CHECK-NOT: alloc_box
 // CHECK-NOT: release
 // CHECK: destroy_addr %0 : $*Int64
+// CHECK: dealloc_stack %0 : $*Int64
+// CHECK: return
+}
+
+// CHECK: sil @multi_release
+sil @multi_release : $() -> Int64 {
+bb0:
+  %1 = alloc_box $Int64
+  %2 = initialize_var %1#1 : $*Int64
+  %3 = load %1#1 : $*Int64
+  %x = retain %1#0 : $Builtin.ObjectPointer
+  %y = release %1#0 : $Builtin.ObjectPointer
+  %b = br bb1
+bb1:
+
+  %4 = release %1#0 : $Builtin.ObjectPointer
+  %5 = return %3 : $Int64
+
+// CHECK: %0 = alloc_stack
+// CHECK: bb1:
 // CHECK: dealloc_stack %0 : $*Int64
 // CHECK: return
 }
