@@ -17,6 +17,8 @@
 
 namespace swift {
   class SILBasicBlock;
+  class SILFunction;
+  class SILModule;
 
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
@@ -31,6 +33,12 @@ public:
 
   SILBasicBlock *getParent() { return ParentBB; }
   const SILBasicBlock *getParent() const { return ParentBB; }
+
+  SILFunction *getFunction();
+  const SILFunction *getFunction() const;
+
+  SILModule *getModule();
+  const SILModule *getModule() const;
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SILArgument;

@@ -74,6 +74,12 @@ public:
 
   const SILBasicBlock *getParent() const { return ParentBB; }
   SILBasicBlock *getParent() { return ParentBB; }
+  
+  SILFunction *getFunction();
+  const SILFunction *getFunction() const;
+  
+  SILModule *getModule();
+  const SILModule *getModule() const;
 
   SILLocation getLoc() const { return Loc; }
   SILDebugScope *getDebugScope() const { return DebugScope; }
@@ -92,6 +98,9 @@ public:
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
+  SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
+
+  
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
            V->getKind() <= ValueKind::Last_SILInstruction;

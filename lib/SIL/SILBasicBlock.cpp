@@ -28,6 +28,22 @@ SILArgument::SILArgument(SILType Ty, SILBasicBlock *ParentBB)
   ParentBB->addArgument(this);
 }
 
+
+SILFunction *SILArgument::getFunction() {
+  return getParent()->getParent();
+}
+const SILFunction *SILArgument::getFunction() const {
+  return getParent()->getParent();
+}
+
+SILModule *SILArgument::getModule() {
+  return getFunction()->getParent();
+}
+const SILModule *SILArgument::getModule() const {
+  return getFunction()->getParent();
+}
+
+
 //===----------------------------------------------------------------------===//
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
@@ -38,6 +54,12 @@ SILBasicBlock::SILBasicBlock(SILFunction *Parent)
 }
 SILBasicBlock::~SILBasicBlock() {}
 
+SILModule *SILBasicBlock::getModule() {
+  return getParent()->getParent();
+}
+const SILModule *SILBasicBlock::getModule() const {
+  return getParent()->getParent();
+}
 
 /// eraseFromParent - This method unlinks 'this' from the containing SIL and
 /// deletes it.

@@ -59,6 +59,9 @@ public:
   SILFunction *getParent() { return Parent; }
   const SILFunction *getParent() const { return Parent; }
 
+  SILModule *getModule();
+  const SILModule *getModule() const;
+
   /// eraseFromParent - This method unlinks 'this' from the containing
   /// SILFunction and deletes it.
   ///
