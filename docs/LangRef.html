@@ -2793,30 +2793,6 @@ ill-formed if the type does not conform to the protocol.</p>
   allows looking up members in modules, metatypes, etc.</p>
 
   <!-- ===================================================================== -->
-  <h3 id="expr-metatype">Metatype Expressions</h3>
-  <!-- ===================================================================== -->
-
-  <pre class="grammar">
-    expr-metatype ::= <a href="#expr">expr-postfix</a> '.' 'metatype'
-  </pre>
-
-  <p>A metatype expression produces the metatype for the dynamic type
-    of the value of the base expression.  The base expression is
-    converted to an rvalue and evaluated, and then the result is
-    calculated as follows:</p>
-
-  <ul compact>
-    <li>If the static type of the expression is a class type, the
-      result of the base expression must be an object of that class,
-      and the result of the expression is the metatype object for the
-      dynamic type of the base object.</li>
-    <li>TODO: metatype of class type?</li>
-    <li>TODO: existential type?</li>
-    <li>Otherwise, the result of the expression is the metatype for
-      the static type of the base expression.</li>
-  </ul>
-
-  <!-- ===================================================================== -->
   <h3 id="expr-subscript">Subscript Expressions</h3>
   <!-- ===================================================================== -->
   
