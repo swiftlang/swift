@@ -25,6 +25,7 @@ STATISTIC(NumRegPromoted, "Number of heap allocations promoted to registers");
 /// post-dominates all of the uses of the specified AllocBox.  If so, return it.
 /// If not, return null.
 static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
+                                   SmallVectorImpl<SILInstruction*> &Users,
                                    SmallVectorImpl<ReleaseInst*> &Releases,
                                    llvm::OwningPtr<PostDominanceInfo> &PDI) {
   // If there is a single release, it must be the last release.  The calling
@@ -69,9 +70,7 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
   
   // Okay, we found the most-post-dominating release.  If it doesn't postdom
   // all of our uses, it would be unsafe to use it though, so check this.
-  for (auto UI : ABI->getUses()) {
-    auto *User = cast<SILInstruction>(UI->getUser());
-    
+  for (auto *User : Users) {
     if (User->getParent() == LastRelease->getParent())
       continue;
     
@@ -102,18 +101,12 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
   return LastRelease;
 }
 
-
-/// optimizeAllocBox - Try to promote an alloc_box instruction to an
-/// alloc_stack.  On success, this updates the IR and returns true, but does not
-/// remove the alloc_box itself.
-static bool optimizeAllocBox(AllocBoxInst *ABI,
-                             llvm::OwningPtr<PostDominanceInfo> &PDI) {
-  SmallVector<ReleaseInst*, 4> Releases;
-  
-  // Scan all of the uses of the alloc_box to see if any of them cause the
-  // allocated memory to escape.  If so, we can't promote it to the stack.  If
-  // not, we can turn it into an alloc_stack.
-  for (auto UI : ABI->getUses()) {
+/// checkAllocBoxUses - Scan all of the uses (recursively) of the specified
+/// alloc_box, validating that they don't allow the ABI to escape.
+static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
+                              SmallVectorImpl<SILInstruction*> &Users,
+                              SmallVectorImpl<ReleaseInst*> &Releases) {
+  for (auto UI : V->getUses()) {
     auto *User = cast<SILInstruction>(UI->getUser());
     
     // These instructions do not cause the box's address to escape.
@@ -121,13 +114,26 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
         isa<InitializeVarInst>(User) ||
-        (isa<StoreInst>(User) && UI->getOperandNumber() == 1))
+        (isa<StoreInst>(User) && UI->getOperandNumber() == 1)) {
+      Users.push_back(User);
       continue;
+    }
     
     // Release doesn't either, but we want to keep track of where this value
     // gets released.
     if (auto *RI = dyn_cast<ReleaseInst>(User)) {
       Releases.push_back(cast<ReleaseInst>(RI));
+      Users.push_back(User);
+      continue;
+    }
+
+    // struct_element_addr project the address of a struct to the address of an
+    // element.  Recursively check that the sub-element doesn't escape and
+    // collect all of the uses of the value.
+    if (auto *SEI = dyn_cast<StructElementAddrInst>(User)) {
+      Users.push_back(User);
+      if (checkAllocBoxUses(ABI, SEI, Users, Releases))
+        return true;
       continue;
     }
     
@@ -137,16 +143,33 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
           << "    Due to user: " << *User << "\n");
     
-    return false;
+    return true;
   }
   
+  return false;
+}
+
+
+/// optimizeAllocBox - Try to promote an alloc_box instruction to an
+/// alloc_stack.  On success, this updates the IR and returns true, but does not
+/// remove the alloc_box itself.
+static bool optimizeAllocBox(AllocBoxInst *ABI,
+                             llvm::OwningPtr<PostDominanceInfo> &PDI) {
+  SmallVector<SILInstruction*, 32> Users;
+  SmallVector<ReleaseInst*, 4> Releases;
+  
+  // Scan all of the uses of the alloc_box to see if any of them cause the
+  // allocated memory to escape.  If so, we can't promote it to the stack.  If
+  // not, we can turn it into an alloc_stack.
+  if (checkAllocBoxUses(ABI, ABI, Users, Releases))
+    return false;
   
   // Okay, the value doesn't escape.  Determine where the last release is.  This
   // code only handles the case where there is a single "last release".  This
   // should work for us, because we don't expect code duplication that can
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
-  ReleaseInst *LastRelease = getLastRelease(ABI, Releases, PDI);
+  ReleaseInst *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
   
   bool isTrivial = false;  // FIXME: Dtor required?
   

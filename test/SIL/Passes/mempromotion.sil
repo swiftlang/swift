@@ -55,3 +55,28 @@ bb1:
 // CHECK: dealloc_stack %0 : $*Int64
 // CHECK: return
 }
+
+struct TestStruct {
+  var Elt : Int
+}
+
+// CHECK: sil @struct_element_addr
+sil @struct_element_addr : $(x : Int64) -> Int64 {
+bb1(%0 : $Int64):
+  %1 = alloc_box $TestStruct
+  
+  %2 = struct_element_addr %1#1 : $*TestStruct, @Elt
+  %3 = store %0 to %2 : $*Int64
+
+  %6 = struct_element_addr %1#1 : $*TestStruct, @Elt
+  %7 = load %6 : $*Int64
+  %8 = release %1#0 : $Builtin.ObjectPointer
+  %9 = return %7 : $Int64
+
+// CHECK: %1 = alloc_stack
+// CHECK: dealloc_stack %1
+// CHECK: return
+}
+
+
+
