@@ -241,8 +241,10 @@ Basic Blocks
 ~~~~~~~~~~~~
 ::
 
-  sil-basic-block ::= sil-label sil-instruction* sil-terminator
+  sil-basic-block ::= sil-label sil-instruction-def* sil-terminator-def
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
+  sil-instruction-def ::= sil-value '=' sil-instruction
+  sil-terminator-def ::= sil-value '=' sil-terminator
 
 A function body consists of one or more basic blocks. These form the nodes of
 the control flow graph. Each basic block contains one or more instructions and
@@ -255,7 +257,7 @@ received from the function caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
-    return %x : $Int
+    %1 = return %x : $Int
   }
 
   sil @bar : $(Int, Int) -> () {
@@ -264,7 +266,7 @@ received from the function caller::
     %1 = apply %foo(%x : $Int) : $(Int) -> Int
     %2 = apply %foo(%y : $Int) : $(Int) -> Int
     %3 = tuple ()
-    return %3 : $()
+    %4 = return %3 : $()
   }
 
 Arguments for other basic blocks are bound by the branch instructions that
@@ -335,106 +337,114 @@ In the instruction descriptions, ``[optional attributes]`` appear in square
 brackets, and ``{required|attribute|choices}`` appear in curly braces with
 options separated by pipes. Variadic operands are indicated with ``...``.
 
-alloc_var
-`````````
+Allocation and Deallocation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+alloc_stack
+```````````
 ::
 
-  %1 = alloc_var {heap|stack|pseudo} $T
-  ; %1 has type $*T
+  sil-instruction ::= 'alloc_stack' sil-type
 
-Allocates enough uninitialized memory to contain a value of type ``T``, either
-from the heap or from the stack. The result of the instruction is the address
-of the allocated memory. The memory must be deallocated with a ``dealloc_var``
-instruction of the matching ``heap`` or ``stack`` type. The memory will not be
-retainable; to allocate a retainable box for a value type, use ``alloc_box``.
+  %1 = alloc_stack $T
+  // %1 has type $*T
 
-An ``alloc_var`` may also perform a ``pseudo`` allocation, which is a stack
-allocation for debugging or tooling purposes. A pseudo-allocation does not
-need to be deallocated or destroyed and should only be stored to by the program.
+Allocates enough uninitialized memory on the stack to contain a value of type
+``T``. The result of the instruction is the address
+of the allocated memory. ``alloc_stack`` marks the start of the lifetime of
+the value; the allocation must be balanced with a ``dealloc_stack``
+instruction to mark the end of its lifetime. The memory is not retainable;
+to allocate a retainable box for a value type, use ``alloc_box``.
 
 alloc_ref
 `````````
 ::
 
-  %1 = alloc_ref {heap|stack} $T
-  ; $T must be a reference type
-  ; %1 has type $T
+  sil-instruction ::= 'alloc_ref' sil-type
+
+  %1 = alloc_ref $T
+  // $T must be a reference type
+  // %1 has type $T
 
 Allocates an object of reference type ``T``. The object will be initialized
-with retain count 1; its state will be otherwise uninitialized. The object
-may be allocated on the heap or stack; although reference types are normally
-heap-allocated and released with a ``release`` instruction, optimization
-may lower the allocation to a stack allocation and the release to a
-``dealloc_ref``.
+with retain count 1; its state will be otherwise uninitialized.
 
 alloc_box
 `````````
 ::
+ 
+  sil-instruction ::= 'alloc_box' sil-type
 
-  %1 = alloc_box {heap|stack} $T1, $T2, ..., $TN
-  ; %1 is N+1 values:
-  ;   %1#0 has type SIL.Box
-  ;   %1#1 has type *T1
-  ;   %1#2 has type *T2
-  ;               ⋮
-  ;   %1#N has type *TN
-  ; TODO: alloc_box is only implemented for a single type argument
+  %1 = alloc_box $T
+  // %1 has two values:
+  //   %1#0 has type Builtin.ObjectPointer
+  //   %1#1 has type *T
 
-Allocates a box large enough to hold ``N`` values of types ``T1`` through
-``TN``. The result of the instruction is a multiple-value operand consisting of
-an object pointer to the box as its first element followed by addresses of type
-``*T1`` through ``*TN`` pointing into the
-storage for the values inside the box. The box will be initialized
-with a retain count of 1; the storage will be uninitialized and must
-be initialized with ``store`` instructions before the address can be
-``load``-ed or the box can be ``release``-d. When the box's retain count
-reaches zero, the values inside the box will all be ``release``-d if necessary.
-Boxes are normally heap-allocated and released with a ``release`` instruction,
-but optimization may lower the allocation to a stack allocation and the
-release to a ``dealloc_ref``.
+Allocates a reference-counted "box" on the heap large enough to hold a value of
+type ``T``. The result of the instruction is a two-value operand;
+the first value is the reference-counted ``ObjectPointer`` that owns the box,
+and the second value is the address of the value inside the box.
+The box will be initialized with a retain count of 1; the storage will be
+uninitialized. The box owns the contained value, and releasing it to a retain
+count of zero destroys the contained value as if by ``destroy_addr``. Releasing
+a box is thus invalid if the box's value is uninitialized. To deallocate a box
+whose value has not been initialized, ``dealloc_ref`` should be used.
 
 alloc_array
 ```````````
 ::
 
-  %1 = alloc_array $T, %0
-  ; $T must be a type
-  ; %0 must be of a builtin integer type
-  ; %1 has type $(SIL.Box,*T)
+  sil-instruction ::= 'alloc_array' sil-type ',' sil-operand
+
+  %1 = alloc_array $T, %0 : Builtin.Int<n>
+  // $T must be a type
+  // %0 must be of a builtin integer type
+  // %1 has two values:
+  //   %1#0 has type Builtin.ObjectPointer
+  //   %1#1 has type *T
 
 Allocates a box large enough to hold an array of ``%0`` values of type ``T``.
-The result of the instruction is a pair containing an object pointer to the box
-as its first element and an address of type ``T`` pointing to the storage for
-the first element of the array inside the box as its second. The box will be
-initialized with a retain count of 1; the storage will be uninitialized. The
-storage must be initialized before the address can be ``load``-ed or the box
-can be ``release``-d. When the box's retain count reaches zero, the values
-inside the box will be ``release``-d.
+The result of the instruction is a two-value operand; the first value is the
+reference-counted ``ObjectPointer`` that owns the box,
+and the second value is the address of the first value inside the box.
+The box will be initialized with a retain count of 1; the storage will be
+uninitialized. The box owns the contained array of values, and releasing it
+to a retain count of zero destroys all of the contained values as if by
+``destroy_addr``. Releasing the array is thus invalid unless all of the array's
+value have been uninitialized. To deallocate a box
+whose value has not been initialized, ``dealloc_ref`` should be used.
 
-dealloc_var
-```````````
+dealloc_stack
+`````````````
 ::
 
-  dealloc_var {heap|stack} %0
-  ; %0 must be of a $*T type
+  sil-instruction ::= 'dealloc_stack' sil-operand
 
-Deallocates memory previously allocated by ``alloc_var``. The value in memory
-must be destroyed prior to being deallocated, and the ``heap`` or ``stack``
-attribute must match the corresponding ``alloc_var`` instruction.
+  dealloc_stack %0 : $*T
+  // %0 must be of an address $*T type
+
+Deallocates memory previously allocated by ``alloc_stack``. The value in memory
+must be uninitialized or destroyed prior to being deallocated. This instruction
+marks the end of the lifetime for the value created by the corresponding
+``alloc_stack`` instruction.
 
 dealloc_ref
 ```````````
 ::
 
-  dealloc_ref {heap|stack} %0
-  ; %0 must be of a box or reference type
+  sil-instruction ::= 'dealloc_ref' sil-operand
 
-Deallocates a box or reference type instance. The box must have a
-retain count of one, and the ``heap`` or ``stack`` attribute must match the
-corresponding ``alloc_box`` or ``alloc_ref`` instruction. This does not
-destroy the reference type instance or the values inside the box; this must
-be done manually by ``release``-ing any releasable values inside the
-value and calling its destructor function before the value is deallocated.
+  dealloc_ref %0 : $T
+  // %0 must be of a box or reference type
+
+Deallocates a box or reference type instance, bypassing the reference counting
+mechanism. The box must have a retain count of one. This does not
+destroy the reference type instance or the values inside the box. The contents
+of the reference-counted instance must be fully initialized or destroyed before
+``dealloc_ref`` is applied.
+
+TODO To Be Updated
+~~~~~~~~~~~~~~~~~~
 
 function_ref
 ````````````
