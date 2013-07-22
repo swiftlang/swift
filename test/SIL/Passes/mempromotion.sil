@@ -1,4 +1,4 @@
-// RUN: %swift %s -emit-sil -enable-stack-promotion | FileCheck %s
+// RUN: %sil-opt %s -allocbox-promotion | FileCheck %s
 
 import Builtin
 import swift
@@ -140,21 +140,5 @@ bb0(%0 : $SomeClass):
 // CHECK-NOT: release
 // CHECK: release {{.*}} : $SomeClass
 // CHECK: return
-}
-
-
-// CHECK: sil @simple_reg_promotion
-sil @simple_reg_promotion : $[thin] (a : Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64
-  %2 = store %0 to %1 : $*Int64
-  %3 = alloc_stack $Int64
-  %4 = load %1 : $*Int64
-  %5 = store %4 to %3 : $*Int64
-  %6 = load %3 : $*Int64
-  %7 = dealloc_stack %3 : $*Int64
-  %8 = dealloc_stack %1 : $*Int64
-  %9 = return %6 : $Int64
-  // CHECK: return %0 : $Int64
 }
 

@@ -129,9 +129,12 @@ namespace swift {
   SILModule *performSILGeneration(TranslationUnit *TU,
                                   unsigned StartElem = 0);
 
-  /// performSILMemoryPromotion - Promote alloc_box into stack allocations, and
-  /// "alloc_var stack" allocations into SSA registers where possible.
-  void performSILMemoryPromotion(SILModule *M);
+  /// performSILAllocBoxPromotion - Promote alloc_box into stack allocations.
+  void performSILAllocBoxPromotion(SILModule *M);
+
+  /// performSILStackToSSA - Promote alloc_stack instructions into SSA
+  /// registers.
+  void performSILStackToSSA(SILModule *M);
 
   /// \brief Analyze the SIL module for correcntess and generate user
   /// diagnostics if any.

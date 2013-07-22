@@ -24,13 +24,8 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "llvm/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/Assembly/PrintModulePass.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -50,7 +45,8 @@
 using namespace swift;
 
 enum class PassKind {
-  MemoryPromotion,
+  AllocBoxPromotion,
+  StackToSSA,
   DataflowDiagnostics
 };
 
@@ -60,7 +56,8 @@ UseMalloc("use-malloc",
                          "(for memory debugging)"));
 
 static llvm::cl::opt<std::string>
-InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"));
+InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
+              llvm::cl::Positional);
 
 static llvm::cl::opt<std::string>
 OutputFilename("o", llvm::cl::desc("output filename"), llvm::cl::init("-"));
@@ -70,8 +67,10 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
-       llvm::cl::values(clEnumValN(PassKind::MemoryPromotion,
-                                   "memory-promotion", "Promote memory"),
+       llvm::cl::values(clEnumValN(PassKind::AllocBoxPromotion,
+                                   "allocbox-promotion", "Promote memory"),
+                        clEnumValN(PassKind::StackToSSA,
+                                   "stacktossa", "alloc_stack to SSA"),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
@@ -109,7 +108,7 @@ int main(int argc, char **argv) {
 
   PrintingDiagnosticConsumer PrintDiags;
   Invocation->addDiagnosticConsumer(&PrintDiags);
-
+  Invocation->setModuleName("main");
   Invocation->setTUKind(TranslationUnit::SIL);
   CompilerInstance CI(Invocation);
 
@@ -130,13 +129,13 @@ int main(int argc, char **argv) {
 
   for (auto Pass : Passes) {
     switch (Pass) {
-    case PassKind::MemoryPromotion:
-      // Perform "stable" optimizations that are invariant across compiler
-      // version.
-      performSILMemoryPromotion(CI.getSILModule());
+    case PassKind::AllocBoxPromotion:
+      performSILAllocBoxPromotion(CI.getSILModule());
+      break;
+    case PassKind::StackToSSA:
+      performSILStackToSSA(CI.getSILModule());
       break;
     case PassKind::DataflowDiagnostics:
-      // Generate diagnostics.
       emitSILDataflowDiagnostics(CI.getSILModule());
       break;
     }
