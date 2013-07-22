@@ -2730,7 +2730,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="grammar">
     expr-paren      ::= '(' ')'
     expr-paren      ::= '(' expr-paren-element (',' expr-paren-element)* ')'
-    expr-paren-element ::= (<a href="#identifier">identifier</a> '=')? <a href="#expr">expr</a>
+    expr-paren-element ::= (<a href="#identifier">identifier</a> ':')? <a href="#expr">expr</a>
   </pre>
 
   <p>Parentheses expressions contain an (optionally empty) list of optionally
@@ -2756,11 +2756,11 @@ ill-formed if the type does not conform to the protocol.</p>
     
     <i>// Tuple literals.</i>
     var c = ()               <i>// Type = ()</i>
-    var d = (4, 5)           <i>// Type = (:Int,:Int)</i>
-    var e = (c, d)           <i>// Type = ((), (:Int, :Int))</i>
+    var d = (4, 5)           <i>// Type = (Int, Int)</i>
+    var e = (c, d)           <i>// Type = ((), (Int, Int))</i>
     
-    var f = (x = 4, y = 5)   <i>// Type = (x : Int, y : Int)</i>
-    var g = (4, y = 5, 6)    <i>// Type = (:Int, y : Int, :Int)</i>
+    var f = (x : 4, y : 5)   <i>// Type = (x : Int, y : Int)</i>
+    var g = (4, y : 5, 6)    <i>// Type = (Int, y : Int, Int)</i>
     
     <i>// Named arguments to functions.</i>
     func foo(a : Int, b : Int)
