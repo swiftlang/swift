@@ -305,7 +305,7 @@ Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
 dotted path naming the Swift declaration. Some Swift declarations are
 decomposed into multiple entities at the SIL level. These are discriminated by
-following the qualified name with a ``!`` then naming the component entity::
+following the qualified name with a ``!`` then naming the component entity:
 
 - ``getter`` references the getter function for a ``var`` declaration.
 - ``setter`` references the setter function for a ``var`` declaration.
