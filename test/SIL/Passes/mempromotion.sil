@@ -31,7 +31,7 @@ bb0:
 // CHECK: %0 = alloc_stack
 // CHECK-NOT: alloc_box
 // CHECK-NOT: release
-// CHECK: destroy_addr %0 : $*Int64
+// CHECK-NOT: destroy_addr
 // CHECK: dealloc_stack %0 : $*Int64
 // CHECK: return
 }

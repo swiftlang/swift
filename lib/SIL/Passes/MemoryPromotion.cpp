@@ -28,6 +28,12 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
                                    SmallVectorImpl<SILInstruction*> &Users,
                                    SmallVectorImpl<ReleaseInst*> &Releases,
                                    llvm::OwningPtr<PostDominanceInfo> &PDI) {
+  // If there are no releases, then the box is leaked.  Don't transform it. This
+  // can only happen in hand-written SIL code, not compiler generated code.
+  if (Releases.empty())
+    return nullptr;
+  
+  
   // If there is a single release, it must be the last release.  The calling
   // conventions used in SIL (at least in the case where the ABI doesn't escape)
   // are such that the value is live until it is explicitly released: there are
@@ -186,7 +192,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // mattering in the future, this can be generalized.
   ReleaseInst *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
   
-  bool isTrivial = false;  // FIXME: Dtor required?
+  bool isTrivial = ABI->getModule()->Types.
+          getTypeLoweringInfo(ABI->getElementType()).isTrivial();
   
   if (LastRelease == nullptr && !isTrivial) {
     // If we can't tell where the last release is, we don't know where to insert
