@@ -1176,7 +1176,11 @@ namespace {
                                           simplifyType(expr->getType()));
       }
 
-      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::BaseType: {
+        // FIXME: Losing ".0" sugar here.
+        return expr->getBase();
+      }
+
       case OverloadChoiceKind::FunctionReturningBaseType:
       case OverloadChoiceKind::IdentityFunction:
         llvm_unreachable("Nonsensical overload choice");

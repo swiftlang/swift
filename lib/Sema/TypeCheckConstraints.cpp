@@ -2278,6 +2278,21 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Look for members within the base.
   LookupResult &lookup = lookupMember(baseObjTy, name);
   if (!lookup) {
+    // Check whether we actually performed a lookup with an integer value.
+    unsigned index;
+    if (!name.str().getAsInteger(10, index)) {
+      // ".0" on a scalar just refers to the underlying scalar value.
+      if (index == 0) {
+        OverloadChoice identityChoice(baseTy, OverloadChoiceKind::BaseType);
+        addOverloadSet(OverloadSet::getNew(*this, memberTy,
+                                           constraint.getLocator(),
+                                           identityChoice));
+        return SolutionKind::Solved;
+      }
+
+      // FIXME: Specialize diagnostic here?
+    }
+
     recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                   baseObjTy, name);
 
