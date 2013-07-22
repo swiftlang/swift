@@ -1,4 +1,4 @@
-//===--- AllocBoxPromotion.cpp - Promote alloc_box to alloc_stack ---------===//
+//===--- AllocBoxToStack.cpp - Promote alloc_box to alloc_stack -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "allocbox-promotion"
+#define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/Subsystems.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/Statistic.h"
@@ -258,7 +258,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILAllocBoxPromotion(SILModule *M) {
+void swift::performSILAllocBoxToStackPromotion(SILModule *M) {
   
   for (auto &Fn : *M) {
     // PostDomInfo - This is the post dominance information for the specified

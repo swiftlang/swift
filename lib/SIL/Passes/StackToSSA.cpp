@@ -204,7 +204,7 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILStackToSSA(SILModule *M) {
+void swift::performSILStackToSSAPromotion(SILModule *M) {
   
   for (auto &Fn : *M) {
     for (auto &BB : Fn) {

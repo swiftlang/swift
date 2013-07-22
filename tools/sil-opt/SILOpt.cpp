@@ -24,7 +24,7 @@
 using namespace swift;
 
 enum class PassKind {
-  AllocBoxPromotion,
+  AllocBoxToStack,
   StackToSSA,
   DataflowDiagnostics
 };
@@ -41,10 +41,10 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
-       llvm::cl::values(clEnumValN(PassKind::AllocBoxPromotion,
-                                   "allocbox-promotion", "Promote memory"),
+       llvm::cl::values(clEnumValN(PassKind::AllocBoxToStack,
+                                   "allocbox-to-stack", "Promote memory"),
                         clEnumValN(PassKind::StackToSSA,
-                                   "stacktossa", "alloc_stack to SSA"),
+                                   "stack-to-ssa", "alloc_stack to SSA"),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
@@ -103,11 +103,11 @@ int main(int argc, char **argv) {
 
   for (auto Pass : Passes) {
     switch (Pass) {
-    case PassKind::AllocBoxPromotion:
-      performSILAllocBoxPromotion(CI.getSILModule());
+    case PassKind::AllocBoxToStack:
+      performSILAllocBoxToStackPromotion(CI.getSILModule());
       break;
     case PassKind::StackToSSA:
-      performSILStackToSSA(CI.getSILModule());
+      performSILStackToSSAPromotion(CI.getSILModule());
       break;
     case PassKind::DataflowDiagnostics:
       emitSILDataflowDiagnostics(CI.getSILModule());
