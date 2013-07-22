@@ -435,8 +435,6 @@ public:
 
   void visitOneOfDecl(OneOfDecl *OOD) {
     if (!IsSecondPass) {
-      checkInherited(OOD, OOD->getInherited());
-
       if (auto gp = OOD->getGenericParams()) {
         gp->setOuterParameters(
                             OOD->getDeclContext()->getGenericParamsOfContext());
@@ -450,6 +448,8 @@ public:
       TC.validateTypeSimple(OOD->getDeclaredTypeInContext());
 
       validateAttributes(OOD);
+
+      checkInherited(OOD, OOD->getInherited());
     }
     
     for (Decl *member : OOD->getMembers())
@@ -461,8 +461,6 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     if (!IsSecondPass) {
-      checkInherited(SD, SD->getInherited());
-
       if (auto gp = SD->getGenericParams()) {
         gp->setOuterParameters(
                              SD->getDeclContext()->getGenericParamsOfContext());
@@ -476,6 +474,8 @@ public:
       TC.validateTypeSimple(SD->getDeclaredTypeInContext());
 
       validateAttributes(SD);
+
+      checkInherited(SD, SD->getInherited());
     }
 
     // Visit each of the members.

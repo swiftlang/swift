@@ -1445,30 +1445,33 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     GenericParams = maybeParseGenericParams();
   }
 
-  // Parse optional inheritance clause.
-  SmallVector<TypeLoc, 2> Inherited;
-  if (Tok.is(tok::colon))
-    parseInheritance(Inherited);
-  
-  SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
-    return true;
-
   OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc,
                                            /*isEnum*/ false,
                                            OneOfName, OneOfNameLoc,
-                                           Context.AllocateCopy(Inherited),
+                                           { },
                                            GenericParams, CurDeclContext);
   Decls.push_back(OOD);
-
-  if (Attributes.isValid()) OOD->getMutableAttrs() = Attributes;
 
   // Now that we have a context, update the generic parameters with that
   // context.
   if (GenericParams)
     for (auto Param : *GenericParams)
       Param.setDeclContext(OOD);
-  
+
+  if (Attributes.isValid()) OOD->getMutableAttrs() = Attributes;
+
+  // Parse optional inheritance clause.
+  if (Tok.is(tok::colon)) {
+    ContextChange CC(*this, OOD);
+    SmallVector<TypeLoc, 2> Inherited;
+    parseInheritance(Inherited);
+    OOD->setInherited(Context.AllocateCopy(Inherited));
+  }
+
+  SourceLoc LBLoc, RBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
+    return true;
+
   bool Invalid = false;
   // Parse the body.
   SmallVector<Decl*, 8> MemberDecls;
@@ -1621,18 +1624,9 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     GenericParams = maybeParseGenericParams();
   }
 
-  // Parse optional inheritance clause.
-  SmallVector<TypeLoc, 2> Inherited;
-  if (Tok.is(tok::colon))
-    parseInheritance(Inherited);
-
-  SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
-    return true;
-
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
-                                            Context.AllocateCopy(Inherited),
+                                            { },
                                             GenericParams,
                                             CurDeclContext);
   Decls.push_back(SD);
@@ -1646,6 +1640,18 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
       Param.setDeclContext(SD);
     }
   }
+
+  // Parse optional inheritance clause.
+  if (Tok.is(tok::colon)) {
+    ContextChange CC(*this, SD);
+    SmallVector<TypeLoc, 2> Inherited;
+    parseInheritance(Inherited);
+    SD->setInherited(Context.AllocateCopy(Inherited));
+  }
+
+  SourceLoc LBLoc, RBLoc;
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct))
+    return true;
 
   bool Invalid = false;
 
