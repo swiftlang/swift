@@ -340,6 +340,8 @@ options separated by pipes. Variadic operands are indicated with ``...``.
 Allocation and Deallocation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+These instructions allocate and deallocate memory.
+
 alloc_stack
 ```````````
 ::
@@ -372,7 +374,7 @@ with retain count 1; its state will be otherwise uninitialized.
 alloc_box
 `````````
 ::
- 
+  
   sil-instruction ::= 'alloc_box' sil-type
 
   %1 = alloc_box $T
@@ -443,27 +445,114 @@ destroy the reference type instance or the values inside the box. The contents
 of the reference-counted instance must be fully initialized or destroyed before
 ``dealloc_ref`` is applied.
 
-TODO To Be Updated
-~~~~~~~~~~~~~~~~~~
+Literals
+~~~~~~~~
+
+These instructions bind SIL values to literal constants or to global entities.
 
 function_ref
 ````````````
 ::
 
-  %1 = function_ref $T, @global
-  ; %1 has type $T
+  sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-Loads a reference to the global object of type ``T`` represented by the
-declaration ``identifier``, such as a function, method, constructor, or
-property declaration. If the definition is generic, the result will be of a
-generic function type; the generic variables of such a result will need to be
-bound with a ``specialize`` instruction before the object can be ``apply``-ed.
+  %1 = function_ref @function : $T -> U
+  // %1 has type $T -> U
+
+Creates a reference to a SIL function.
 
 builtin_function_ref
 ````````````````````
+::
+
+  sil-instruction ::= 'builtin_function_ref' sil-decl-ref ':' sil-type
+
+  %1 = builtin_function_ref #Builtin.foo : $T -> U
+  // #Builtin.foo must name a function in the Builtin module
+  // %1 has type $T -> U
+
+Creates a reference to a compiler builtin function.
 
 global_addr
 ```````````
+::
+
+  sil-instruction ::= 'global_addr' sil-decl-ref ':' sil-type
+
+  %1 = global_addr #foo.bar : $*T
+  // #foo.bar must name a physical global variable declaration
+  // $*T must be an address type
+  // %1 has type $*T
+
+TODO: Design of global variables subject to change.
+
+Creates a reference to the address of a global variable.
+
+integer_literal
+```````````````
+::
+
+  sil-instruction ::= 'integer_literal' sil-type ',' int-literal
+
+  %1 = integer_literal $Builtin.Int<n>, 123
+  // $Builtin.Int<n> must be a builtin integer type
+  // %1 has type $Builtin.Int<n>
+
+Creates an integer literal value. The result will be of type
+``Builtin.Int<n>``, which must be a builtin integer type.
+
+float_literal
+`````````````
+::
+
+  sil-instruction ::= 'float_literal' sil-type ',' float-literal
+
+  %1 = float_literal $Builtin.FP<n>, 1.23
+  // $Builtin.FP<n> must be a builtin floating-point type
+  // %1 has type $Builtin.FP<n>
+
+Creates a floating-point literal value. The result will be of type ``
+``Builtin.FP<n>``, which must be a builtin floating-point type.
+
+string_literal
+``````````````
+::
+
+  sil-instruction ::= 'string_literal' sil-type ',' string-literal
+
+  %1 = string_literal $T, "asdf"
+  // $T must be either $Builtin.RawPointer,
+  //   or $(Builtin.RawPointer, Builtin.Int64)
+  // %1 has type $T
+
+Creates a reference to a string in the global string table. The value can be
+either a lone ``Builtin.RawPointer`` referencing the start of the string, or
+a ``(Builtin.RawPointer, Builtin.Int64)`` pair of both the start of
+the string and its length. In either case, the referenced string is
+null-terminated.
+
+builtin_zero
+````````````
+::
+
+  sil-instruction ::= 'builtin_zero' sil-type
+
+  %1 = builtin_zero $T
+  // $T must be either a reference type, or a Builtin type.
+  // %1 has type $T
+
+Creates the "zero" value of a builtin or reference type:
+
+- For builtin integer types, this is equivalent to 0.
+- For builtin floating-point types, this is equivalent to +0.0.
+- For ``Builtin.RawPointer`` and ``Builtin.ObjectPointer``, this produces a
+  null pointer.
+- For reference types, this produces a null reference.
+
+TODO: Design type-safe nullability for reference types.
+
+TODO To Be Updated
+~~~~~~~~~~~~~~~~~~
 
 apply
 `````
@@ -565,41 +654,6 @@ lowers to an uncurried entry point and is curried by the enclosing function::
     release %bar
     return %ret
   }
-
-integer_literal
-```````````````
-::
-
-  %1 = integer_literal $T, 123
-  ; $T must be a builtin integer type
-  ; %1 has type $T
-
-Creates an integer literal value. The result will be of type ``T``, which must
-be a builtin integer type.
-
-float_literal
-`````````````
-::
-
-  %1 = float_literal $T, 1.23
-  ; $T must be a builtin floating-point type
-  ; %1 has type $T
-
-Creates a floating-point literal value. The result will be of type ``T``, which
-must be a builtin floating-point type.
-
-string_literal
-``````````````
-::
-
-  %1 = string_literal {ascii|utf8} "asdf"
-  ; %1 has type $(Builtin.RawPointer, Builtin.Int64)
-
-Retrieves a pointer to a string literal in the string table. The result will
-be a pair, the first element of which is a ``Builtin.RawPointer`` pointing to
-the first byte of a zero-terminated string in the specified ``ascii`` or
-``utf8`` encoding, and the second element of which is a ``Builtin.Int64`` value
-representing the size in bytes of the encoded string.
 
 load
 ````

@@ -47,28 +47,33 @@
 
 VALUE(SILArgument, ValueBase)
 
+// Please keep the order of instructions consistent with the order of their
+// descriptions in the SIL reference in docs/SIL.rst.
+
 ABSTRACT_VALUE(SILInstruction, ValueBase)
+  // Allocation and Deallocation
   ABSTRACT_VALUE(AllocInst, SILInstruction)
     INST(AllocStackInst, AllocInst)
     INST(AllocRefInst, AllocInst)
     VALUE_RANGE(AllocInst, AllocStackInst, AllocRefInst)
   INST(AllocBoxInst, SILInstruction)
   INST(AllocArrayInst, SILInstruction)
+  INST(DeallocStackInst, SILInstruction)
+  INST(DeallocRefInst, SILInstruction)
+
+  // Literals
   INST(FunctionRefInst, SILInstruction)
   INST(BuiltinFunctionRefInst, SILInstruction)
   INST(GlobalAddrInst, SILInstruction)
-  INST(DeallocStackInst, SILInstruction)
-  INST(DeallocRefInst, SILInstruction)
+  INST(IntegerLiteralInst, SILInstruction)
+  INST(FloatLiteralInst, SILInstruction)
+  INST(StringLiteralInst, SILInstruction)
+  INST(BuiltinZeroInst, SILInstruction)
 
   ABSTRACT_VALUE(FunctionInst, SILInstruction)
     INST(ApplyInst, FunctionInst)
     INST(PartialApplyInst, FunctionInst)
     VALUE_RANGE(FunctionInst, ApplyInst, PartialApplyInst)
-
-  // Literals
-  INST(IntegerLiteralInst, SILInstruction)
-  INST(FloatLiteralInst, SILInstruction)
-  INST(StringLiteralInst, SILInstruction)
 
   INST(LoadInst, SILInstruction)
   INST(StoreInst, SILInstruction)
@@ -77,7 +82,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(SpecializeInst, SILInstruction)
   INST(StructInst, SILInstruction)
   INST(TupleInst, SILInstruction)
-  INST(BuiltinZeroInst, SILInstruction)
   INST(MetatypeInst, SILInstruction)
   INST(ClassMetatypeInst, SILInstruction)
   INST(ArchetypeMetatypeInst, SILInstruction)
