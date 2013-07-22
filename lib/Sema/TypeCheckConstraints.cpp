@@ -1404,17 +1404,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-        if (desugar1 == desugar2) {
-          return SolutionKind::TriviallySolved;
-        }
+    case TypeKind::Module:
+      if (desugar1 == desugar2) {
+        return SolutionKind::TriviallySolved;
+      }
 
-        // Record this failure.
-        if (shouldRecordFailures()) {
-          recordFailure(getConstraintLocator(locator),
-                        getRelationalFailureKind(kind), type1, type2);
-        }
+      // Record this failure.
+      if (shouldRecordFailures()) {
+        recordFailure(getConstraintLocator(locator),
+                      getRelationalFailureKind(kind), type1, type2);
+      }
 
-        return SolutionKind::Error;
+      return SolutionKind::Error;
 
     case TypeKind::Error:
       return SolutionKind::Error;
@@ -1423,7 +1424,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       llvm_unreachable("reference storage type in typechecker");
 
     case TypeKind::TypeVariable:
-      // Nothing to do here; handle type variables below.
+    case TypeKind::Archetype:
+      // Nothing to do here; handle type variables and archetypes below.
       break;
 
     case TypeKind::Tuple: {
@@ -2020,6 +2022,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericOneOf:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::Archetype:
     // Break out to handle the actual construction below.
     break;
 
@@ -2038,6 +2041,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
   case TypeKind::Protocol:
+  case TypeKind::Module:
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
       recordFailure(locator, Failure::TypesNotConstructible,

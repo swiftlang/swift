@@ -767,7 +767,6 @@ CanType TypeBase::getCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
-  case TypeKind::Protocol:
   case TypeKind::TypeVariable:
     llvm_unreachable("these types are always canonical");
 
@@ -913,7 +912,6 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::Protocol:
   case TypeKind::ReferenceStorage:
     // None of these types have sugar at the outer level.
     return this;
@@ -977,7 +975,6 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::OneOf:
   case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::Protocol:
   case TypeKind::NameAlias:
   case TypeKind::Substituted:
     return false;

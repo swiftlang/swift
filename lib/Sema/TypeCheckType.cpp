@@ -895,8 +895,7 @@ Type TypeChecker::transformType(Type type,
     return type;
   case TypeKind::OneOf:
   case TypeKind::Struct:
-  case TypeKind::Class:
-  case TypeKind::Protocol: {
+  case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
       parentTy = transformType(parentTy, fn);
