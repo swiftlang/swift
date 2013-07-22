@@ -374,23 +374,24 @@ namespace {
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
           ArrayRef<TypeLoc> specializations = expr->getUnresolvedParams();
-          
-          // FIXME: We could potentially allow unspecified type parameters
-          // to be deduced if there are fewer parameters than type variables.
-          if (typeVars.size() != specializations.size()) {
+
+          // If we have too many generic arguments, complain.
+          if (specializations.size() > typeVars.size()) {
             tc.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
                         bgt->getDecl()->getName(),
                         typeVars.size(), specializations.size(),
-                        specializations.size() < typeVars.size())
+                        false)
               .highlight(SourceRange(expr->getLAngleLoc(),
                                      expr->getRAngleLoc()));
             tc.diagnose(bgt->getDecl(), diag::generic_type_declared_here,
                         bgt->getDecl()->getName());
             return Type();
           }
-          
-          for (size_t i = 0, size = typeVars.size(); i < size; ++i) {
+
+          // Bind the specified generic arguments to the type variables in the
+          // open type.
+          for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             CS.addConstraint(ConstraintKind::Equal,
                              typeVars[i], specializations[i].getType());
           }

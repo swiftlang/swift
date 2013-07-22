@@ -175,6 +175,8 @@ Type TypeChecker::applyGenericArguments(Type type,
   }
 
   // Make sure we have the right number of generic arguments.
+  // FIXME: If we have fewer arguments than we need, that might be okay, if
+  // we're allowed to deduce the remaining arguments from context.
   auto genericParams = unbound->getDecl()->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
     // FIXME: Highlight <...>.
