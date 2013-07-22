@@ -2715,13 +2715,6 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
   return rewriter.visit(expr);
 }
 
-Expr *Solution::coerceToType(Expr *expr, Type toType) const {
-  auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this);
-  return rewriter.coerceToType(expr, toType,
-                               cs.getConstraintLocator(expr, { }));
-}
-
 Expr *Solution::coerceToType(Expr *expr, Type toType,
                              ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();

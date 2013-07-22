@@ -1304,16 +1304,6 @@ public:
   ///
   /// \param expr The expression to coerce.
   /// \param toType The type to coerce the expression to.
-  ///
-  /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType) const;
-
-  /// \brief Coerce the given expression to the given type.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce.
-  /// \param toType The type to coerce the expression to.
   /// \param locator Locator used to describe the location of this expression.
   ///
   /// \returns the coerced expression, which will have type \c ToType.

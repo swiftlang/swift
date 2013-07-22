@@ -3123,7 +3123,8 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
-    result = solution.coerceToType(result, convertType);
+    result = solution.coerceToType(result, convertType,
+                                   cs.getConstraintLocator(expr, { }));
     if (!result) {
       return true;
     }
@@ -3217,7 +3218,8 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   // If we're supposed to convert the expression to some particular type,
   // do so now.
   if (convertType) {
-    result = solution.coerceToType(result, convertType);
+    result = solution.coerceToType(result, convertType,
+                                   cs.getConstraintLocator(expr, { }));
     if (!result) {
       return true;
     }
@@ -3715,7 +3717,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   }
 
   // Perform the conversion.
-  Expr *result = solution.coerceToType(expr, type);
+  Expr *result = solution.coerceToType(expr, type,
+                                       cs.getConstraintLocator(expr, { }));
   if (!result) {
     return true;
   }
