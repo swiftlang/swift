@@ -543,6 +543,21 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
   return DBuilder.getOrCreateArray(Elements);
 }
 
+/// Return an array with the DITypes for each of a enum-sugared oneof's members.
+llvm::DIArray IRGenDebugInfo::getEnumElems(OneOfDecl *EnumDecl,
+                                           llvm::DIDescriptor Scope) {
+  llvm::SmallVector<llvm::Value *, 16> Elements;
+  int Value = 0;
+  for (auto Elem : EnumDecl->getMembers()) {
+    auto EElem = dyn_cast<OneOfElementDecl>(Elem);
+    assert(EElem);
+    assert(EElem->isEnumElement() && "Enum with non-enumerator elements.");
+    StringRef Name = EElem->getName().str();
+    Elements.push_back(DBuilder.createEnumerator(Name, Value++));
+  }
+  return DBuilder.getOrCreateArray(Elements);
+}
+
 /// Construct a DIType from a DebugTypeInfo object.
 ///
 /// At this point we do not plan to emit full DWARF for all swift
@@ -726,8 +741,23 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
     return DBuilder.createPointerType(FnTy, Size, Align);
   }
+  case TypeKind::OneOf: {
+    // FIXME: (post-LLVM-fork)
+    // OneOfs that are not enums should be represented by DW_TAG_variant_type.
+    Name = getMangledName(Ty.CanTy);
+    auto OneOfTy = BaseTy->castTo<OneOfType>();
+    if (auto Decl = OneOfTy->getDecl()) {
+      Location L = getStartLoc(SM, Decl);
+      if (Decl->isEnum())
+        return DBuilder.createEnumerationType(Scope, Name, getFile(Scope),
+                                              L.Line, Size, Align,
+                                              getEnumElems(Decl, Scope),
+                         /* UnderlyingType */ llvm::DIType());
+    }
+    break;
+  }
+
   // Handle everything else that is based off NominalType.
-  case TypeKind::OneOf:
   case TypeKind::Protocol: {
     Name = getMangledName(Ty.CanTy);
     break;

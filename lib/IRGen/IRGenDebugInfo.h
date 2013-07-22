@@ -160,6 +160,8 @@ private:
                                      llvm::FunctionType *IRTy,
                                      llvm::DIDescriptor Scope);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope);
+  llvm::DIArray getEnumElems(OneOfDecl *EnumDecl, llvm::DIDescriptor Scope);
+
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
 };
