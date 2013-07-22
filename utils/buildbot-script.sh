@@ -110,6 +110,7 @@ fi
 # Run the Swift tests.
 if [ \! "$SKIP_TEST_SWIFT" ]; then
   export SWIFT="$WORKSPACE/swift/build/bin/swift"
+  export SIL_OPT="$WORKSPACE/swift/build/bin/sil-opt"
   export SWIFT_IDE_TEST="$WORKSPACE/swift/build/bin/swift-ide-test"
   echo "--- Running Swift Tests ---"
   (cd "$WORKSPACE/swift/build" &&
