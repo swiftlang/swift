@@ -380,7 +380,8 @@ namespace {
           if (typeVars.size() != specializations.size()) {
             tc.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
-                        typeVars.size(), specializations.size());
+                        typeVars.size(), specializations.size(),
+                        specializations.size() < typeVars.size());
             tc.diagnose(expr->getLAngleLoc(),
                         diag::while_parsing_as_left_angle_bracket);
             return Type();

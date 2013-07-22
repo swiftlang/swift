@@ -180,7 +180,8 @@ Type TypeChecker::applyGenericArguments(Type type,
     // FIXME: Show the type name here.
     // FIXME: Point at the actual declaration of the underlying type.
     diagnose(loc, diag::type_parameter_count_mismatch,
-             genericArgs.size(), genericParams->size());
+             genericParams->size(), genericArgs.size(),
+             genericArgs.size() < genericParams->size());
     return nullptr;
   }
 
