@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   }
 
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  CI.setBufferID(CI.getSourceMgr().AddNewSourceBuffer(InputFile.take(),
+  CI.addBufferID(CI.getSourceMgr().AddNewSourceBuffer(InputFile.take(),
                                                       llvm::SMLoc()));
   CI.setup();
   CI.doIt();

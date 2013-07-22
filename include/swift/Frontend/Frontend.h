@@ -188,9 +188,9 @@ public:
   llvm::SourceMgr &getSourceMgr() { return SourceMgr; }
 
   void setBufferIDs(std::vector<unsigned> &IDs) {
-    BufferIDs = std::move(IDs);
+    BufferIDs = IDs;
   }
-  void setBufferID(unsigned ID) {
+  void addBufferID(unsigned ID) {
     BufferIDs.push_back(ID);
   }
 
