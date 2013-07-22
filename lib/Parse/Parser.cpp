@@ -193,6 +193,10 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
     Context(TU->getASTContext()),
     ScopeInfo(*this),
     IsMainModule(IsMainModule) {
+
+  // Set the token to a sentinel so that we know the lexer isn't primed yet.
+  // This cannot be tok::unknown, since that is a token the lexer could produce.
+  Tok.setKind(tok::NUM_TOKENS);
 }
 
 Parser::Parser(TranslationUnit *TU,
@@ -208,6 +212,9 @@ Parser::Parser(TranslationUnit *TU,
     ScopeInfo(*this),
     IsMainModule(false)
 {
+  // Set the token to a sentinel so that we know the lexer isn't primed yet.
+  // This cannot be tok::unknown, since that is a token the lexer could produce.
+  Tok.setKind(tok::NUM_TOKENS);
 }
 
 
