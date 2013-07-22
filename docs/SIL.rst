@@ -89,6 +89,7 @@ TODO:
 - Dead code detection/elimination. Non-implicit dead code is an error.
 - Definitive assignment of local variables, and of instance variables in
   constructors.
+- Basic ARC optimization for decent performance at -O0.
 
 If the diagnostic passes all succeed, the final result is the *canonical SIL*
 for the program. Performance optimization, native code generation, and module

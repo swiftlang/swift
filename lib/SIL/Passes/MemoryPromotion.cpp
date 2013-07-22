@@ -127,10 +127,11 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
       continue;
     }
 
-    // struct_element_addr project the address of a struct to the address of an
-    // element.  Recursively check that the sub-element doesn't escape and
-    // collect all of the uses of the value.
-    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User)) {
+    // These instructions only cause the alloc_box to escape if they are used in
+    // a way that escapes.  Recursively check that the uses of the instruction
+    // don't escape and collect all of the uses of the value.
+    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
+        isa<ProjectExistentialInst>(User)) {
       Users.push_back(User);
       if (checkAllocBoxUses(ABI, User, Users, Releases))
         return true;
