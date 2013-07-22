@@ -60,21 +60,30 @@ struct TestStruct {
   var Elt : Int
 }
 
-// CHECK: sil @struct_element_addr
-sil @struct_element_addr : $(x : Int64) -> Int64 {
+// CHECK: sil @struct_tuple_element_addr
+sil @struct_tuple_element_addr : $(x : Int64) -> Int64 {
 bb1(%0 : $Int64):
   %1 = alloc_box $TestStruct
+  %a = alloc_box $(Int, Int)
   
   %2 = struct_element_addr %1#1 : $*TestStruct, @Elt
   %3 = store %0 to %2 : $*Int64
 
+  %b = tuple_element_addr %a#1 : $*(Int, Int), 0
+  %c = store %0 to %b : $*Int
+
   %6 = struct_element_addr %1#1 : $*TestStruct, @Elt
   %7 = load %6 : $*Int64
   %8 = release %1#0 : $Builtin.ObjectPointer
+  %x = release %a#0 : $Builtin.ObjectPointer
+
+
   %9 = return %7 : $Int64
 
-// CHECK: %1 = alloc_stack
+// CHECK: %1 = alloc_stack $TestStruct
+// CHECK: %2 = alloc_stack $(Int64, Int64)
 // CHECK: dealloc_stack %1
+// CHECK: dealloc_stack %2
 // CHECK: return
 }
 

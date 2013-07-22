@@ -130,9 +130,9 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     // struct_element_addr project the address of a struct to the address of an
     // element.  Recursively check that the sub-element doesn't escape and
     // collect all of the uses of the value.
-    if (auto *SEI = dyn_cast<StructElementAddrInst>(User)) {
+    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User)) {
       Users.push_back(User);
-      if (checkAllocBoxUses(ABI, SEI, Users, Releases))
+      if (checkAllocBoxUses(ABI, User, Users, Releases))
         return true;
       continue;
     }
