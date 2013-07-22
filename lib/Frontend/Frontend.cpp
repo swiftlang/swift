@@ -20,7 +20,6 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -62,11 +61,12 @@ void swift::CompilerInstance::setup() {
   // If the user has specified an SDK, wire up the Clang module importer
   // and point it at that SDK.
   if (!Invocation->getSDKPath().empty()) {
+    auto ImporterCtor = Invocation->getClangImporterCtor();
     auto clangImporter =
-        ClangImporter::create(*Context, Invocation->getSDKPath(),
-                              Invocation->getTargetTriple(),
-                              Invocation->getClangModuleCachePath(),
-                              Invocation->getImportSearchPaths());
+        ImporterCtor(*Context, Invocation->getSDKPath(),
+                     Invocation->getTargetTriple(),
+                     Invocation->getClangModuleCachePath(),
+                     Invocation->getImportSearchPaths());
     if (!clangImporter)
       return; // FIXME: error reporting
 

@@ -15,13 +15,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -35,8 +35,6 @@ namespace llvm {
 }
 
 namespace swift {
-  class ASTContext;
-  class SILModule;
 
 class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
   std::string TargetTriple;
@@ -59,6 +57,9 @@ class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
+  ClangImporter* (*ImporterCtor)(ASTContext &, StringRef, StringRef, StringRef,
+                                 ArrayRef<std::string>) = nullptr;
+
 public:
   CompilerInvocation();
 
@@ -78,7 +79,7 @@ public:
     return ClangModuleCachePath;
   }
 
-  void setImportSearchPaths(std::vector<std::string> Paths) {
+  void setImportSearchPaths(std::vector<std::string> &Paths) {
     ImportSearchPaths = std::move(Paths);
   }
 
@@ -86,14 +87,22 @@ public:
     return ImportSearchPaths;
   }
 
-  void setMainExecutablePath(std::string Path) {
+  void setMainExecutablePath(const std::string &Path) {
     MainExecutablePath = Path;
   }
 
   std::string getRuntimeIncludePath() const;
 
-  void setSDKPath(std::string Path) {
+  void setSDKPath(const std::string &Path) {
+    // Capture the clang importer entrypoint here, so that clients that don't
+    // want to link in clang don't have to.
+    ImporterCtor = &ClangImporter::create;
     SDKPath = Path;
+  }
+
+  ClangImporter* (*getClangImporterCtor())
+  (ASTContext &, StringRef, StringRef, StringRef, ArrayRef<std::string>) {
+    return ImporterCtor;
   }
 
   StringRef getSDKPath() const {
@@ -178,8 +187,11 @@ public:
 
   llvm::SourceMgr &getSourceMgr() { return SourceMgr; }
 
-  void setBufferIDs(std::vector<unsigned> IDs) {
+  void setBufferIDs(std::vector<unsigned> &IDs) {
     BufferIDs = std::move(IDs);
+  }
+  void setBufferID(unsigned ID) {
+    BufferIDs.push_back(ID);
   }
 
   ASTContext &getASTContext() {
