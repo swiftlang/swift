@@ -13,6 +13,7 @@
 #ifndef SWIFT_IDE_CODE_COMPLETION_H
 #define SWIFT_IDE_CODE_COMPLETION_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -83,8 +84,15 @@ class CodeCompletionString {
       CallParameterBegin,
       /// Function call parameter name.  Can be omitted in the editor buffer.
       CallParameterName,
-      /// A colon between parameter name and value.
+      /// Function call parameter name.  Only for exposition, may *not* be
+      /// inserted in the editor buffer.
+      CallParameterNameAnnotation,
+      /// A colon between parameter name and value.  Should be inserted in the
+      /// editor buffer if the preceding CallParameterName was inserted.
       CallParameterColon,
+      /// A colon between parameter name and value.  Only for exposition,
+      /// may *not* be inserted in the editor buffer.
+      CallParameterColonAnnotation,
       /// Required parameter type.
       CallParameterType,
 
@@ -105,7 +113,9 @@ class CodeCompletionString {
              Kind == ChunkKind::Dot ||
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::CallParameterName ||
+             Kind == ChunkKind::CallParameterNameAnnotation ||
              Kind == ChunkKind::CallParameterColon ||
+             Kind == ChunkKind::CallParameterColonAnnotation ||
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::TypeAnnotation;
     }
@@ -288,14 +298,27 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Comma, Text);
   }
 
-  void addCallParameter(StringRef Name, StringRef Type) {
+  void addCallParameter(Identifier Name, StringRef Type) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
     if (!Name.empty()) {
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterName, Name);
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+      StringRef NameStr = Name.str();
+      if (NameStr == "this") {
+        // 'this' is a keyword, we can not allow to insert it into the source
+        // buffer.
+        addChunkWithText(
+            CodeCompletionString::Chunk::ChunkKind::CallParameterNameAnnotation,
+            Name.str());
+        addChunkWithText(
+            CodeCompletionString::Chunk::ChunkKind::CallParameterColonAnnotation,
+            ": ");
+      } else {
+        addChunkWithText(
+            CodeCompletionString::Chunk::ChunkKind::CallParameterName,
+            Name.str());
+        addChunkWithText(
+            CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+      }
     }
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);

@@ -66,7 +66,9 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::Dot:
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::CallParameterName:
+    case Chunk::ChunkKind::CallParameterNameAnnotation:
     case Chunk::ChunkKind::CallParameterColon:
+    case Chunk::ChunkKind::CallParameterColonAnnotation:
     case Chunk::ChunkKind::CallParameterType:
       OS << C.getText();
       break;
@@ -308,17 +310,18 @@ public:
         if (NeedComma)
           Builder.addComma(", ");
         StringRef BoundNameStr;
-        Identifier BoundName = TupleElt.getPattern()->getBoundName();
-        if (BoundName.get())
-          BoundNameStr = BoundName.str();
-        Builder.addCallParameter(BoundNameStr,
+        Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
                                  TupleElt.getPattern()->getType().getString());
         NeedComma = true;
       }
       return;
     }
-    auto *PP = cast<ParenPattern>(P);
-    Builder.addCallParameter("", PP->getSubPattern()->getType().getString());
+    if (auto *PP = dyn_cast<ParenPattern>(P)) {
+      Builder.addCallParameter(PP->getBoundName(), PP->getType().getString());
+      return;
+    }
+    auto *TP = cast<TypedPattern>(P);
+    Builder.addCallParameter(TP->getBoundName(), TP->getType().getString());
   }
 
   void addSwiftFunctionCall(const AnyFunctionType *AFT) {
@@ -330,7 +333,7 @@ public:
     for (auto TupleElt : AFT->getInput()->castTo<TupleType>()->getFields()) {
       if (NeedComma)
         Builder.addComma(", ");
-      Builder.addCallParameter(TupleElt.getName().str(),
+      Builder.addCallParameter(TupleElt.getName(),
                                TupleElt.getType().getString());
       NeedComma = true;
     }
@@ -339,6 +342,20 @@ public:
   }
 
   void addSwiftMethodCall(const FuncDecl *FD) {
+    bool IsImlicitlyCurriedInstanceMethod;
+    switch (Kind) {
+    case LookupKind::ValueExpr:
+      IsImlicitlyCurriedInstanceMethod = ExprType->is<MetaTypeType>() &&
+                                         !FD->isStatic();
+      break;
+    case LookupKind::DeclContext:
+      IsImlicitlyCurriedInstanceMethod =
+          CurrMethodDC &&
+          FD->getDeclContext() == CurrMethodDC->getParent() &&
+          InsideStaticMethod && !FD->isStatic();
+      break;
+    }
+
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
 
@@ -353,7 +370,7 @@ public:
     auto *FE = FD->getBody();
     auto Patterns = FE->getArgParamPatterns();
     unsigned FirstIndex = 0;
-    if (Patterns[0]->isImplicit())
+    if (!IsImlicitlyCurriedInstanceMethod && Patterns[0]->isImplicit())
       FirstIndex = 1;
     addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();
@@ -361,10 +378,22 @@ public:
     llvm::SmallString<32> TypeStr;
     for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
       TypeStr += "(";
-      for (auto TupleElt : cast<TuplePattern>(Patterns[i])->getFields()) {
-        TypeStr += TupleElt.getPattern()->getBoundName().str();
-        TypeStr += ": ";
-        TypeStr += TupleElt.getPattern()->getType().getString();
+      bool NeedComma = false;
+      if (auto *PP = dyn_cast<ParenPattern>(Patterns[i])) {
+        TypeStr += PP->getType().getString();
+      } else {
+        auto *TP = cast<TuplePattern>(Patterns[i]);
+        for (auto TupleElt : TP->getFields()) {
+          if (NeedComma)
+            TypeStr += ", ";
+          Identifier BoundName = TupleElt.getPattern()->getBoundName();
+          if (!BoundName.empty()) {
+            TypeStr += BoundName.str();
+            TypeStr += ": ";
+          }
+          TypeStr += TupleElt.getPattern()->getType().getString();
+          NeedComma = true;
+        }
       }
       TypeStr += ") -> ";
     }
