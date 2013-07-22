@@ -2263,8 +2263,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coerce via conversion function or constructor.
-  if (fromType->getNominalOrBoundGenericNominal() ||
-      toType->getNominalOrBoundGenericNominal()) {
+  if (fromType->getNominalOrBoundGenericNominal()||
+      fromType->is<ArchetypeType>() ||
+      toType->getNominalOrBoundGenericNominal() ||
+      toType->is<ArchetypeType>()) {
     // Determine the locator that corresponds to the conversion member.
     auto storedLocator
       = cs.getConstraintLocator(

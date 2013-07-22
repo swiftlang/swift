@@ -23,6 +23,10 @@
 /// ALWAYS_CANONICAL_TYPE(id, parent)
 ///   This type is always canonical.  The default behavior is TYPE(id, parent).
 
+/// BUILTIN_TYPE(id, parent)
+///   This type is a builtin type. The default behavior is 
+///   ALWAYS_CANONICAL_TYPE(id, parent).
+
 /// SUGARED_TYPE(id, parent)
 ///   This type is never canonical.  It provides an efficient accessor,
 ///   getDesugaredType(), which removes one level of sugar.  This process
@@ -35,6 +39,10 @@
 
 #ifndef ALWAYS_CANONICAL_TYPE
 #define ALWAYS_CANONICAL_TYPE(id, parent) TYPE(id, parent)
+#endif
+
+#ifndef BUILTIN_TYPE
+#define BUILTIN_TYPE(id, parent) ALWAYS_CANONICAL_TYPE(id, parent)
 #endif
 
 /// Most metaprograms do not care about abstract types, so the default
@@ -103,5 +111,6 @@ UNCHECKED_TYPE(TypeVariable, Type)
 #undef UNCHECKED_TYPE
 #undef SUGARED_TYPE
 #undef ABSTRACT_TYPE
+#undef BUILTIN_TYPE
 #undef ALWAYS_CANONICAL_TYPE
 #undef TYPE

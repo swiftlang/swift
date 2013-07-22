@@ -1401,7 +1401,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("Type has not been desugared completely");
 
-#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
         if (desugar1 == desugar2) {
@@ -1792,7 +1792,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
   if (concrete && kind >= TypeMatchKind::Conversion &&
-      type1->getNominalOrBoundGenericNominal()) {
+      (type1->getNominalOrBoundGenericNominal() || type1->is<ArchetypeType>())){
     auto &context = getASTContext();
     // FIXME: lame name!
     auto name = context.getIdentifier("__conversion");
@@ -2029,7 +2029,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::UnboundGeneric:
     llvm_unreachable("Unbound generic type should have been opened");
 
-#define ALWAYS_CANONICAL_TYPE(id, parent) case TypeKind::id:
+#define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::MetaType:
