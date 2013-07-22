@@ -335,80 +335,6 @@ In the instruction descriptions, ``[optional attributes]`` appear in square
 brackets, and ``{required|attribute|choices}`` appear in curly braces with
 options separated by pipes. Variadic operands are indicated with ``...``.
 
-Literal values
-~~~~~~~~~~~~~~
-
-constant_ref
-````````````
-::
-
-  %1 = constant_ref $T, @global
-  ; %1 has type $T
-
-Loads a reference to the global object of type ``T`` represented by the
-declaration ``identifier``, such as a function, method, constructor, or
-property declaration. If the definition is generic, the result will be of a
-generic function type; the generic variables of such a result will need to be
-bound with a ``specialize`` instruction before the object can be ``apply``-ed.
-
-integer_literal
-```````````````
-::
-
-  %1 = integer_literal $T, 123
-  ; $T must be a builtin integer type
-  ; %1 has type $T
-
-Creates an integer literal value. The result will be of type ``T``, which must
-be a builtin integer type.
-
-float_literal
-`````````````
-::
-
-  %1 = float_literal $T, 1.23
-  ; $T must be a builtin floating-point type
-  ; %1 has type $T
-
-Creates a floating-point literal value. The result will be of type ``T``, which
-must be a builtin floating-point type.
-
-string_literal
-``````````````
-::
-
-  %1 = string_literal {ascii|utf8} "asdf"
-  ; %1 has type $(Builtin.RawPointer, Builtin.Int64)
-
-Retrieves a pointer to a string literal in the string table. The result will
-be a pair, the first element of which is a ``Builtin.RawPointer`` pointing to
-the first byte of a zero-terminated string in the specified ``ascii`` or
-``utf8`` encoding, and the second element of which is a ``Builtin.Int64`` value
-representing the size in bytes of the encoded string.
-
-metatype
-````````
-::
-
-  %1 = metatype $T
-  ; $T must be a type
-  ; %1 has type $T.metatype
-
-Retrieves the metatype object for type ``T``.
-
-module
-``````
-::
-
-  %1 = module @M
-  ; @M must be a module name
-  ; %1 has type $module<M>
-
-Creates a module value referencing module ``M``.
-
-Memory Management
-~~~~~~~~~~~~~~~~~
-
 alloc_var
 `````````
 ::
@@ -510,510 +436,45 @@ destroy the reference type instance or the values inside the box; this must
 be done manually by ``release``-ing any releasable values inside the
 value and calling its destructor function before the value is deallocated.
 
-retain
-``````
-::
-
-  retain %0
-  ; %0 must be of a box or reference type
-
-Retains the box or reference type instance represented by ``%0``. Retaining
-an address or value type is an error.
-
-release
-```````
-::
-
-  release %0
-  ; %0 must be of a box or reference type
-
-Releases the box or reference type represented by ``%0``. If the release
-operation brings the retain count of the value to zero, the referenced object
-is destroyed and its memory is deallocated. A stack-allocated box must not
-be released to reference count zero; it must instead be destroyed manually and
-then deallocated with a ``dealloc_ref stack`` instruction. Releasing an
-address or value type is an error.
-
-destroy_addr
+function_ref
 ````````````
 ::
 
-  destroy_addr %0
-  ; %0 must be of a $*T type
+  %1 = function_ref $T, @global
+  ; %1 has type $T
 
-Destroys the value in memory at address ``%0``. This is equivalent to::
+Loads a reference to the global object of type ``T`` represented by the
+declaration ``identifier``, such as a function, method, constructor, or
+property declaration. If the definition is generic, the result will be of a
+generic function type; the generic variables of such a result will need to be
+bound with a ``specialize`` instruction before the object can be ``apply``-ed.
 
-  %1 = load %0
-  release %1
+builtin_function_ref
+````````````````````
 
-except that ``destroy_addr`` must be used if ``%0`` is of an address-only type.
-This only destroys the referenced value; the memory may additionally need to be
-deallocated with a separate ``dealloc_var`` instruction.
+global_addr
+```````````
 
-load
-````
-::
-
-  %1 = load %0
-  ; %0 must be of a $*T type for a loadable type $T
-  ; %1 will be of type $T
-
-Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
-This does not affect the reference count, if any, of the loaded value; the
-value must be retained explicitly if necessary.
-
-store
+apply
 `````
 ::
 
-  store %0 to %1
-  ; Given a %0 of loadable type $T,
-  ; %1 must be of type $*T
-
-Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
-loadable type. This will overwrite the memory at ``%1``; any existing value at
-``%1`` must be released or destroyed before being overwritten.
-
-copy_addr
-`````````
-::
-
-  copy_addr [take] %0 to [assign] %1
-  ; %0 and %1 must be of the same $*T type
-
-Loads the value at address ``%0`` from memory and stores it back into memory at
-address ``%1``. A bare ``copy_addr`` instruction::
-
-  copy_addr %0 to %1
-
-is equivalent to::
-
-  %tmp = load %0
-  retain %tmp ; if %tmp is of a box or reference type
-  store %tmp to %1
-
-except that ``copy`` must be used if ``%0`` is of an address-only type. The
-operands of ``copy`` may be given one or both of the ``take`` or ``assign``
-attributes:
-
-* ``take`` indicates that ownership of resources may be taken from the source
-  value at ``%0`` and given to ``%1``, invalidating ``%0``. Without ``take``,
-  ``copy_addr`` will retain resources in ``%0`` so that both ``%0`` and ``%1``
-  are valid after the instruction.
-* ``assign`` indicates that ``%1`` already contains a valid value which must be
-  ``release``-d before being replaced with the value at ``%0``. Without
-  ``assign``, ``copy_addr`` will overwrite the memory at ``%1`` as if it is
-  uninitialized.
-
-The three attributed forms thus behave like the following loadable type
-operations::
-
-  ;;; take-initialization
-    copy_addr take %0 to %1
-  ;;; is equivalent to:
-    %tmp = load %0
-    ; no retain!
-    store %tmp to %1
-
-  ;;; assignment
-    copy_addr %0 to assign %1
-  ;;; is equivalent to:
-    %tmp_src = load %0
-    retain %tmp_src
-    %tmp_dest = load %1
-    store %tmp_src to %1
-    release %tmp_dest
-
-  ;;; take-assignment
-    copy_addr take %0 to assign %1
-  ;;; is equivalent to:
-    %tmp_src = load %0
-    ; no retain %tmp_src!
-    %tmp_dest = load %1
-    store %tmp_src to %1
-    release %tmp_dest
-
-Data manipulation
-~~~~~~~~~~~~~~~~~
-
-construct
-`````````
-::
-
-  %N = construct $T, (%0, %1, ...)
-  ; $T must be a loadable aggregate type
-  ; %0, %1, etc. must be of the types of the fields of $T in order
-  ; %N will be of type $T
-  ; TODO: not implemented
-
-Creates a value of a loadable aggregate type with zero or more elements.
-This does not allocate any memory or retain any inputs.
-
-extract
-```````
-::
-
-  %1 = extract %0, 123
-  ; %0 must be of a loadable aggregate type
-  ; %1 will be of the type of the 123rd element of %0
-
-Extracts an element of a loadable aggregate value.
-
-insert
-``````
-::
-
-  %2 = insert %0, 123, %1
-  ; %0 must be of a loadable aggregate type
-  ; %1 must be of the type of the 123rd element of %0
-  ; %2 will be of the same type as %0
-  ; TODO: not implemented
-
-Create a new value of a loadable aggregate value equal to another value of
-that type with a single element replaced.
-
-element_addr
-````````````
-::
-
-  %1 = element_addr %0, 123
-  ; %0 must of a $*T type for a loadable aggregate type T
-  ; %1 will be of type $*U where U is the type of the 123rd
-  ;   element of T
-
-Given the address of a loadable aggregate value in memory, creates a
-value representing the address of an element within that value.
-
-ref_element_addr
-````````````````
-::
-
-  %1 = ref_element_addr %0, @T.x
-  ; %0 must be of a reference type $T
-  ; @T.x must be an instance field of $T
-  ; %1 will be of type $*U where U is the type of the 123rd
-  ;   element of T
-
-Given a value of a reference type, creates a value representing the address
-of an element within the referenced instance.
-
-index_addr
-``````````
-::
-
-  %2 = index_addr %0, %1
-  ; %0 must be of a $*T type
-  ; %1 must be of a builtin integer type
-  ; %2 will be of the same $*T type as %0
-
-Given a pointer into an array of values, returns the address of the
-``%1``-th element relative to ``%0``.
-
-convert_function
-````````````````
-::
-
-  %1 = convert_function %0, $T
-  ; %0 must be of a function type $U ABI-compatible with $T
-  ; %1 will be of type $T
-
-Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
-compatible with the type of ``%0``. Function types are ABI-compatible if their
-input and/or result types are tuple types that differ only in label names or
-default values.
-
-downcast
-````````
-::
-
-  %1 = downcast %0, $T
-  ; %0 must be of a reference type that is a subclass of $T
-  ; $T must be a class type
-  ; %1 will be of type T
-
-Performs a checked downcast conversion of ``%0`` to subclass ``T``.
-
-FIXME: if it fails...
-
-coerce
-``````
-::
-
-  %1 = coerce %0, $T
-  ; %0 must be of type $T
-  ; %1 will be of type $T
-
-Represents an explicit type coercion with no runtime effect. ``%1`` will be
-equivalent to ``%0``.
-
-address_to_pointer
-``````````````````
-::
-
-  %1 = address_to_pointer %0
-  ; %0 must be of an address type $*T
-  ; %1 will be of type Builtin.RawPointer
-
-Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
-
-Generics
-~~~~~~~~
-
-specialize
-``````````
-::
-
-  %1 = specialize %0, $T
-  ; %0 must be of a generic function type $<T1, T2, ...> (A) -> R
-  ; $T must be of either the concrete function type $(A) -> R or a generic
-  ; function type $<T3, ...> A -> R with some type variables removed.
-  ; %1 will be of the function type $T
-
-Specializes a generic function ``%0`` to the generic or concrete function type
-``T``, binding its generic type variables. ``%0`` may be of an uncurried
-function type, in which case ``specialize`` must bind all of its generic
-parameters at every uncurry level.
-
-generalize
-``````````
-::
-
-  %1 = generalize %0, $T
-  ; $T must be a generic type
-  ; %1 will be of type $T
-  ; TODO: not implemented
-
-Performs a representation conversion of ``%0`` to type ``T``, which must be a
-generic type compatible with the type of ``%0``.
-
-archetype_to_super
-``````````````````
-::
-
-  %1 = archetype_to_super %0, $T
-  ; %0 must be an address of an archetype $*U with base class constraint U : B
-  ; $T must be the base constraint type B or a superclass of B
-  ; %1 will be of the base type $T
-
-Performs an upcast operation on the archetype value referenced by ``%0``.
-
-super_to_archetype
-``````````````````
-::
-
-  super_to_archetype %0 to %1
-  ; %0 must be of a reference type $T
-  ; %1 must be the address of an archetype $*U with base class constraint U : B
-  ;   where B is T or a subclass of T
-
-Performs a checked downcast operation on the class instance referenced by
-``%0``, initializing the archetype referenced by ``%1`` with a reference to
-the class instance if the check succeeds.
-
-FIXME: if it fails...
-
-archetype_method
-````````````````
-::
-
-  %1 = archetype_method %0, @method
-  ; %0 must be the address of an archetype $*T
-  ;   or an archetype metatype $T.metatype
-  ; @method must be a reference to a method of one of the constraints of T
-  ; %1 will be of uncurried type (T)(U') -> V' for method type U -> V,
-  ;   where self and associated types in U and V are bound relative to T in
-  ;   U' and V'
-  ;   e.g. method `(This)(Foo) -> Protocol.Bar` becomes `(T)(Foo) -> T.Bar`
-
-Obtains a reference to the function implementing ``@method`` for the archetype
-referenced by ``%0``. In the type of the resulting function, self and
-associated types in the signature of ``@method`` are bound relative to
-the type pointed to by ``%0``. The returned function reference is uncurried.
-
-archetype_metatype
-``````````````````
-::
-
-  %1 = archetype_metatype %0
-  ; %0 must be the address of an archetype $*T
-  ; %1 will be of type $T.metatype
-
-Obtains a reference to the metatype of the archetype value ``%0``.
-
-associated_metatype
-```````````````````
-::
-
-  %1 = associated_metatype %0, $U
-  ; %0 must be a metatype value of type $T.metatype
-  ; $U must be an associated type of $T
-
-Obtains the metatype object for the associated type ``$U`` of the type with
-metatype ``%0``.
-
-Protocol and protocol composition types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-From SIL's perspective, protocol and protocol composition types consist of 
-an *existential container*, which gets allocated when
-``alloc_var`` or ``alloc_box`` is applied to a protocol or protocol composition
-type. An existential container is a generic container for
-a value of unknown runtime type, referred to as an "existential type" in
-type theory. The existential container consists of a reference to the *witness
-table(s)* for the protocol(s) referred to by the protocol type and a reference
-to the underlying *concrete value*, which may be either stored in-line inside
-the existential container for small values or allocated separately into a
-buffer owned and managed by the existential container for larger values.
-
-Existential containers are always address-only. The value semantics of
-the existential container propagate to the contained concrete value. Applying
-``copy_addr`` to an existential container copies the
-contained concrete value, deallocating or reallocating the destination's
-owned buffer if necessary. Applying ``destroy_addr`` to an existential
-container destroys the concrete value and deallocates any buffers owned by
-the existential container.
-
-An existential container's witness tables and concrete value buffer
-are prepared by applying the ``init_existential`` instruction to an
-uninitialized existential container. ``init_existential`` takes a
-concrete type parameter and returns an address of the given type that can then
-be stored to in order to fully initialize the existential container.
-For example, creating a protocol value from a value type in Swift::
-
-  protocol SomeProtocol
-  struct SomeInstance : SomeProtocol
-
-  var x:SomeInstance
-  var p:SomeProtocol = x
-
-compiles to this SIL::
-
-  ; allocate the existential container for a SomeProtocol
-  %p = alloc_var $SomeProtocol
-  ; initialize the existential container to contain a SomeInstance
-  %p_instance = init_existential $SomeInstance, %p
-  ; store the SomeInstance inside the existential container
-  store %x to %p_instance
-
-init_existential
-````````````````
-::
-
-  %1 = init_existential $T, %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-  ; $T must be a type that fulfills protocol(s) P
-  ; %1 will be of type $*T
-
-Prepares the uninitialized existential container pointed to by ``%0`` to
-contain a value of type ``$T``. ``%0`` must point to uninitialized storage
-for an existential container. The result of the instruction is the address
-of the concrete value inside the container; this storage is uninitialized and
-must be initialized by a ``store`` or ``copy_addr`` to ``%1``. If the concrete
-value must be deallocated without be initialized (for instance, if its
-constructor fails), ``deinit_existential`` can do so. Once the concrete value
-is initialized, the entire existential container can be destroyed with
-``destroy_addr``.
-
-deinit_existential
-``````````````````
-::
-
-  deinit_existential %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-
-Undoes the internal allocation (if any) performed by
-``init_existential``.  This does not destroy the value referenced by
-the existential container, which must be uninitialized.
-``deinit_existential`` is only necessary for existential
-containers that have been partially initialized by ``init_existential``
-but haven't had their value initialized. A fully initialized existential can
-be destroyed with ``destroy_addr`` like a normal address-only value.
-
-protocol_ref
-````````````
-::
-
-  %1 = protocol_ref $T
-  ; $T must be a protocol type
-  ; %0 will be of type $T.metatype
-  ; FIXME: Should be of "Protocol" type
-
-Obtains a reference to the protocol value for protocol ``T``.
-
-protocol_method
-```````````````
-::
-
-  %1 = protocol_method %0, @method
-  ; %0 must be of an address type $*P for protocol or protocol composition
-  ;   type P, or a metatype-of-protocol-type $P.metatype
-  ; @method must be a reference to a method of (one of the) protocol(s) P
-  ;
-  ; If %0 is a protocol address, then %1 will be of uncurried type
-  ;   (OpaquePointer)(T...) -> U
-  ;   for method type (T...) -> U
-  ; If %1 is a protocol metatype, then %1 will be of uncurried type
-  ;   (P.metatype)(T...) -> U
-  ;   for method type (T...) -> U
-
-Obtains a reference to the function implementing protocol method ``@method``
-for the concrete value referenced by the existential container
-referenced by ``%0``. If ``@method`` is an instance method, the resulting
-function value will take a pointer to the ``this`` value as an
-``OpaquePointer``, which must be derived from the existential container with
-a ``project_existential`` instruction. If ``@method`` is a static method, the
-resulting function value will take ``This`` as a protocol metatype value.
-
-protocol_metatype
-`````````````````
-::
-
-  %1 = protocol_metatype %0
-  ; %0 must be of an address type $*P for protocol or protocol composition
-  ;   type P
-  ; %1 will be a $P.metatype value referencing the metatype of the
-  ;   concrete value of %0
-
-Obtains the metatype of the concrete value
-referenced by the existential container referenced by ``%0``. This pointer
-can be passed to protocol static methods obtained by ``protocol_method`` from
-the same existential container.
-
-project_existential
-```````````````````
-::
-
-  %1 = project_existential %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-  ; %1 will be of type $Builtin.OpaquePointer
-
-Obtains an ``OpaquePointer`` pointing to the concrete value referenced by the
-existential container referenced by ``%0``. This pointer can be passed to
-protocol instance methods obtained by ``protocol_method`` from the same
-existential container. A method call on a protocol-type value in Swift::
-
-  protocol Foo {
-    func bar(x:Int)
-  }
-
-  var foo:Foo
-  // ... initialize foo
-  foo.bar(123)
-
-compiles to this SIL::
-
-  ; ... initialize %foo
-  %bar = protocol_method %foo, @Foo.bar
-  %foo_p = project_existential %foo
-  %one_two_three = integer_literal $Builtin.Int64, 123
-  %_ = apply %bar(%foo_p, %one_two_three)
-
-It is an error if the result of ``project_existential`` is used as anything
-other than the "this" argument of an instance method reference obtained by
-``protocol_method`` from the same existential container.
-
-Functions
-~~~~~~~~~
+  %R = apply %0(%1, %2, ...)
+  ; %0 must be of a concrete function type $(A...)(B...) ... -> R
+  ; %1, %2, etc. must be of the argument types $A..., $B..., etc.
+  ; %R will be of the return type $R
+
+Transfers control to function ``%0``, passing in the given arguments. The
+``apply`` instruction does no retaining or releasing of its arguments by
+itself; the calling convention's retain/release policy must be handled by
+separate explicit ``retain`` and ``release`` instructions. The return value
+will likewise not be implicitly retained or released. ``%0`` must be an object
+of a concrete function type; generic functions must have all of their generic
+parameters bound with ``specialize`` instructions before they can be applied.
+If ``%0`` is an uncurried function, the arguments for the uncurried clauses
+are specified in outer-to-inner (that is, left-to-right) order.
+
+TODO: should have normal/unwind branch targets like LLVM ``invoke``
 
 partial_apply
 `````````````
@@ -1095,140 +556,64 @@ lowers to an uncurried entry point and is curried by the enclosing function::
     return %ret
   }
 
-apply
-`````
+integer_literal
+```````````````
 ::
 
-  %R = apply %0(%1, %2, ...)
-  ; %0 must be of a concrete function type $(A...)(B...) ... -> R
-  ; %1, %2, etc. must be of the argument types $A..., $B..., etc.
-  ; %R will be of the return type $R
+  %1 = integer_literal $T, 123
+  ; $T must be a builtin integer type
+  ; %1 has type $T
 
-Transfers control to function ``%0``, passing in the given arguments. The
-``apply`` instruction does no retaining or releasing of its arguments by
-itself; the calling convention's retain/release policy must be handled by
-separate explicit ``retain`` and ``release`` instructions. The return value
-will likewise not be implicitly retained or released. ``%0`` must be an object
-of a concrete function type; generic functions must have all of their generic
-parameters bound with ``specialize`` instructions before they can be applied.
-If ``%0`` is an uncurried function, the arguments for the uncurried clauses
-are specified in outer-to-inner (that is, left-to-right) order.
+Creates an integer literal value. The result will be of type ``T``, which must
+be a builtin integer type.
 
-TODO: should have normal/unwind branch targets like LLVM ``invoke``
-
-Classes
-~~~~~~~
-
-Classes provide inheritance with dynamically-dispatched methods and thus have
-additional instructions for referencing methods and metatypes of their runtime
-types.
-
-class_method
-````````````
+float_literal
+`````````````
 ::
 
-  %1 = class_method %0, @method
-  ; %0 must be of a class type or class metatype $T
-  ; @method must be a reference to a dynamically-dispatched method of T or
-  ; of one of its superclasses
-  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
+  %1 = float_literal $T, 1.23
+  ; $T must be a builtin floating-point type
+  ; %1 has type $T
 
-Obtains a reference to the function that implements the specified method for
-the runtime type of ``%0``. The returned function reference is uncurried.
+Creates a floating-point literal value. The result will be of type ``T``, which
+must be a builtin floating-point type.
 
-super_method
-````````````
-::
-
-  %1 = super_method %0, @method
-  ; %0 must be of a non-root class type or class metatype $T
-  ; @method must be a reference to a dynamically-dispatched method of T or
-  ; of one of its superclasses
-  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
-
-Obtains a reference to the function that implements the specified method for
-the immediate superclass of the *static* type of ``%0``. The returned function
-reference is uncurried.
-
-Note that for native Swift methods, ``super_method`` lowers equivalently to a
-static reference to the (uncurried) superclass method implementation using
-``constant_ref``. However, interop with external object systems such as
-Objective-C may require dynamic dispatch even for super calls.
-
-class_metatype
+string_literal
 ``````````````
 ::
 
-  %1 = class_metatype %0
-  ; %0 must be of a class type $T
-  ; %1 will be of type $T.metatype and reference the runtime metatype of %0
+  %1 = string_literal {ascii|utf8} "asdf"
+  ; %1 has type $(Builtin.RawPointer, Builtin.Int64)
 
-Obtains a reference to the runtime metatype of ``%0``.
+Retrieves a pointer to a string literal in the string table. The result will
+be a pair, the first element of which is a ``Builtin.RawPointer`` pointing to
+the first byte of a zero-terminated string in the specified ``ascii`` or
+``utf8`` encoding, and the second element of which is a ``Builtin.Int64`` value
+representing the size in bytes of the encoded string.
 
-Branching
-~~~~~~~~~
-
-Branching instructions terminate a basic block. Every basic block must end
-with a branching instruction.
-
-unreachable
-```````````
+load
+````
 ::
 
-  unreachable
+  %1 = load %0
+  ; %0 must be of a $*T type for a loadable type $T
+  ; %1 will be of type $T
 
-Indicates that control flow must not reach the end of the current basic block.
+Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
+This does not affect the reference count, if any, of the loaded value; the
+value must be retained explicitly if necessary.
 
-return
-``````
+store
+`````
 ::
 
-  return %0
-  ; %0 must be of the return type of the current function
+  store %0 to %1
+  ; Given a %0 of loadable type $T,
+  ; %1 must be of type $*T
 
-Exits the current function and returns control to the calling function. The
-result of the ``apply`` instruction that invoked the current function will be
-the operand of this ``return`` instruction.  ``return`` does not retain or
-release its operand or any other values.
-
-branch
-``````
-::
-
-  branch label (%0, %1, ...)
-  ; `label` must refer to a block label within the current function
-  ; %0, %1, etc. must be of the types of `label`'s arguments
-
-Unconditionally transfers control from the current basic block to the block
-labeled ``label``, passing the given values as arguments to ``label``.
-
-cond_branch
-```````````
-::
-
-  cond_branch %0, true_label (%T1, %T2, ...),
-                  false_label (%F1, %F2, ...)
-  ; %0 must be of the builtin Int1 type
-  ; `true_label` and `false_label` must refer to block labels within the
-  ;   current function
-  ; %T1, %T2, etc. must be of the types of `true_label`'s arguments
-  ; %F1, %F2, etc. must be of the types of `false_label`'s arguments
-
-Conditionally branches to ``true_label`` if ``%0`` is equal to one or to
-``false_label`` if ``%0`` is equal to zero, passing the corresponding set of
-values as arguments to the chosen block. ``%0`` must be of the builtin ``Int1``
-type.
-
-unwind
-``````
-TBD
-
-Dataflow pseudo-instructions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-These instructions are emitted by Swift-to-SIL lowering in order to inform
-SIL dataflow analysis passes. They must be processed and transformed by
-dataflow analysis before SIL is further lowered to an executable representation.
+Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
+loadable type. This will overwrite the memory at ``%1``; any existing value at
+``%1`` must be released or destroyed before being overwritten.
 
 initialize_var
 ``````````````
@@ -1312,6 +697,625 @@ Dataflow analysis must replace this instruction in one of the following ways:
 If neither definitive assignment nor default construction are possible, then
 dataflow analysis of ``initialize_var`` raises an error. ``initialize_var``
 cannot be lowered to IR.
+
+copy_addr
+`````````
+::
+
+  copy_addr [take] %0 to [assign] %1
+  ; %0 and %1 must be of the same $*T type
+
+Loads the value at address ``%0`` from memory and stores it back into memory at
+address ``%1``. A bare ``copy_addr`` instruction::
+
+  copy_addr %0 to %1
+
+is equivalent to::
+
+  %tmp = load %0
+  retain %tmp ; if %tmp is of a box or reference type
+  store %tmp to %1
+
+except that ``copy`` must be used if ``%0`` is of an address-only type. The
+operands of ``copy`` may be given one or both of the ``take`` or ``assign``
+attributes:
+
+* ``take`` indicates that ownership of resources may be taken from the source
+  value at ``%0`` and given to ``%1``, invalidating ``%0``. Without ``take``,
+  ``copy_addr`` will retain resources in ``%0`` so that both ``%0`` and ``%1``
+  are valid after the instruction.
+* ``assign`` indicates that ``%1`` already contains a valid value which must be
+  ``release``-d before being replaced with the value at ``%0``. Without
+  ``assign``, ``copy_addr`` will overwrite the memory at ``%1`` as if it is
+  uninitialized.
+
+The three attributed forms thus behave like the following loadable type
+operations::
+
+  ;;; take-initialization
+    copy_addr take %0 to %1
+  ;;; is equivalent to:
+    %tmp = load %0
+    ; no retain!
+    store %tmp to %1
+
+  ;;; assignment
+    copy_addr %0 to assign %1
+  ;;; is equivalent to:
+    %tmp_src = load %0
+    retain %tmp_src
+    %tmp_dest = load %1
+    store %tmp_src to %1
+    release %tmp_dest
+
+  ;;; take-assignment
+    copy_addr take %0 to assign %1
+  ;;; is equivalent to:
+    %tmp_src = load %0
+    ; no retain %tmp_src!
+    %tmp_dest = load %1
+    store %tmp_src to %1
+    release %tmp_dest
+
+specialize
+``````````
+::
+
+  %1 = specialize %0, $T
+  ; %0 must be of a generic function type $<T1, T2, ...> (A) -> R
+  ; $T must be of either the concrete function type $(A) -> R or a generic
+  ; function type $<T3, ...> A -> R with some type variables removed.
+  ; %1 will be of the function type $T
+
+Specializes a generic function ``%0`` to the generic or concrete function type
+``T``, binding its generic type variables. ``%0`` may be of an uncurried
+function type, in which case ``specialize`` must bind all of its generic
+parameters at every uncurry level.
+
+struct
+``````
+
+tuple
+`````
+
+builtin_zero
+````````````
+
+metatype
+````````
+::
+
+  %1 = metatype $T
+  ; $T must be a type
+  ; %1 has type $T.metatype
+
+Retrieves the metatype object for type ``T``.
+
+class_metatype
+``````````````
+::
+
+  %1 = class_metatype %0
+  ; %0 must be of a class type $T
+  ; %1 will be of type $T.metatype and reference the runtime metatype of %0
+
+Obtains a reference to the runtime metatype of ``%0``.
+
+archetype_metatype
+``````````````````
+::
+
+  %1 = archetype_metatype %0
+  ; %0 must be the address of an archetype $*T
+  ; %1 will be of type $T.metatype
+
+Obtains a reference to the metatype of the archetype value ``%0``.
+
+protocol_metatype
+`````````````````
+::
+
+  %1 = protocol_metatype %0
+  ; %0 must be of an address type $*P for protocol or protocol composition
+  ;   type P
+  ; %1 will be a $P.metatype value referencing the metatype of the
+  ;   concrete value of %0
+
+Obtains the metatype of the concrete value
+referenced by the existential container referenced by ``%0``. This pointer
+can be passed to protocol static methods obtained by ``protocol_method`` from
+the same existential container.
+
+associated_metatype
+```````````````````
+::
+
+  %1 = associated_metatype %0, $U
+  ; %0 must be a metatype value of type $T.metatype
+  ; $U must be an associated type of $T
+
+Obtains the metatype object for the associated type ``$U`` of the type with
+metatype ``%0``.
+
+module
+``````
+::
+
+  %1 = module @M
+  ; @M must be a module name
+  ; %1 has type $module<M>
+
+Creates a module value referencing module ``M``.
+
+tuple_extract
+`````````````
+::
+
+  %1 = tuple_extract %0, 123
+  ; %0 must be of a loadable aggregate type
+  ; %1 will be of the type of the 123rd element of %0
+
+Extracts an element of a loadable aggregate value.
+
+tuple_element_addr
+``````````````````
+::
+
+  %1 = tuple_element_addr %0, 123
+  ; %0 must of a $*T type for a loadable aggregate type T
+  ; %1 will be of type $*U where U is the type of the 123rd
+  ;   element of T
+
+Given the address of a loadable aggregate value in memory, creates a
+value representing the address of an element within that value.
+
+struct_extract
+``````````````
+
+struct_element_addr
+```````````````````
+
+ref_element_addr
+````````````````
+::
+
+  %1 = ref_element_addr %0, @T.x
+  ; %0 must be of a reference type $T
+  ; @T.x must be an instance field of $T
+  ; %1 will be of type $*U where U is the type of the 123rd
+  ;   element of T
+
+Given a value of a reference type, creates a value representing the address
+of an element within the referenced instance.
+
+archetype_method
+````````````````
+::
+
+  %1 = archetype_method %0, @method
+  ; %0 must be the address of an archetype $*T
+  ;   or an archetype metatype $T.metatype
+  ; @method must be a reference to a method of one of the constraints of T
+  ; %1 will be of uncurried type (T)(U') -> V' for method type U -> V,
+  ;   where self and associated types in U and V are bound relative to T in
+  ;   U' and V'
+  ;   e.g. method `(This)(Foo) -> Protocol.Bar` becomes `(T)(Foo) -> T.Bar`
+
+Obtains a reference to the function implementing ``@method`` for the archetype
+referenced by ``%0``. In the type of the resulting function, self and
+associated types in the signature of ``@method`` are bound relative to
+the type pointed to by ``%0``. The returned function reference is uncurried.
+
+protocol_method
+```````````````
+::
+
+  %1 = protocol_method %0, @method
+  ; %0 must be of an address type $*P for protocol or protocol composition
+  ;   type P, or a metatype-of-protocol-type $P.metatype
+  ; @method must be a reference to a method of (one of the) protocol(s) P
+  ;
+  ; If %0 is a protocol address, then %1 will be of uncurried type
+  ;   (OpaquePointer)(T...) -> U
+  ;   for method type (T...) -> U
+  ; If %1 is a protocol metatype, then %1 will be of uncurried type
+  ;   (P.metatype)(T...) -> U
+  ;   for method type (T...) -> U
+
+Obtains a reference to the function implementing protocol method ``@method``
+for the concrete value referenced by the existential container
+referenced by ``%0``. If ``@method`` is an instance method, the resulting
+function value will take a pointer to the ``this`` value as an
+``OpaquePointer``, which must be derived from the existential container with
+a ``project_existential`` instruction. If ``@method`` is a static method, the
+resulting function value will take ``This`` as a protocol metatype value.
+
+class_method
+````````````
+::
+
+  %1 = class_method %0, @method
+  ; %0 must be of a class type or class metatype $T
+  ; @method must be a reference to a dynamically-dispatched method of T or
+  ; of one of its superclasses
+  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
+
+Obtains a reference to the function that implements the specified method for
+the runtime type of ``%0``. The returned function reference is uncurried.
+
+super_method
+````````````
+::
+
+  %1 = super_method %0, @method
+  ; %0 must be of a non-root class type or class metatype $T
+  ; @method must be a reference to a dynamically-dispatched method of T or
+  ; of one of its superclasses
+  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
+
+Obtains a reference to the function that implements the specified method for
+the immediate superclass of the *static* type of ``%0``. The returned function
+reference is uncurried.
+
+Note that for native Swift methods, ``super_method`` lowers equivalently to a
+static reference to the (uncurried) superclass method implementation using
+``constant_ref``. However, interop with external object systems such as
+Objective-C may require dynamic dispatch even for super calls.
+
+project_existential
+```````````````````
+::
+
+  %1 = project_existential %0
+  ; %0 must be of a $*P type for protocol or protocol composition type P
+  ; %1 will be of type $Builtin.OpaquePointer
+
+Obtains an ``OpaquePointer`` pointing to the concrete value referenced by the
+existential container referenced by ``%0``. This pointer can be passed to
+protocol instance methods obtained by ``protocol_method`` from the same
+existential container. A method call on a protocol-type value in Swift::
+
+  protocol Foo {
+    func bar(x:Int)
+  }
+
+  var foo:Foo
+  // ... initialize foo
+  foo.bar(123)
+
+compiles to this SIL::
+
+  ; ... initialize %foo
+  %bar = protocol_method %foo, @Foo.bar
+  %foo_p = project_existential %foo
+  %one_two_three = integer_literal $Builtin.Int64, 123
+  %_ = apply %bar(%foo_p, %one_two_three)
+
+It is an error if the result of ``project_existential`` is used as anything
+other than the "this" argument of an instance method reference obtained by
+``protocol_method`` from the same existential container.
+
+init_existential
+````````````````
+::
+
+  %1 = init_existential $T, %0
+  ; %0 must be of a $*P type for protocol or protocol composition type P
+  ; $T must be a type that fulfills protocol(s) P
+  ; %1 will be of type $*T
+
+Prepares the uninitialized existential container pointed to by ``%0`` to
+contain a value of type ``$T``. ``%0`` must point to uninitialized storage
+for an existential container. The result of the instruction is the address
+of the concrete value inside the container; this storage is uninitialized and
+must be initialized by a ``store`` or ``copy_addr`` to ``%1``. If the concrete
+value must be deallocated without be initialized (for instance, if its
+constructor fails), ``deinit_existential`` can do so. Once the concrete value
+is initialized, the entire existential container can be destroyed with
+``destroy_addr``.
+
+upcast_existential
+``````````````````
+
+deinit_existential
+``````````````````
+::
+
+  deinit_existential %0
+  ; %0 must be of a $*P type for protocol or protocol composition type P
+
+Undoes the internal allocation (if any) performed by
+``init_existential``.  This does not destroy the value referenced by
+the existential container, which must be uninitialized.
+``deinit_existential`` is only necessary for existential
+containers that have been partially initialized by ``init_existential``
+but haven't had their value initialized. A fully initialized existential can
+be destroyed with ``destroy_addr`` like a normal address-only value.
+
+project_existential_ref
+```````````````````````
+
+init_existential_ref
+````````````````````
+
+upcast_existential_ref
+``````````````````````
+retain
+``````
+::
+
+  retain %0
+  ; %0 must be of a box or reference type
+
+Retains the box or reference type instance represented by ``%0``. Retaining
+an address or value type is an error.
+
+release
+```````
+::
+
+  release %0
+  ; %0 must be of a box or reference type
+
+Releases the box or reference type represented by ``%0``. If the release
+operation brings the retain count of the value to zero, the referenced object
+is destroyed and its memory is deallocated. A stack-allocated box must not
+be released to reference count zero; it must instead be destroyed manually and
+then deallocated with a ``dealloc_ref stack`` instruction. Releasing an
+address or value type is an error.
+
+destroy_addr
+````````````
+::
+
+  destroy_addr %0
+  ; %0 must be of a $*T type
+
+Destroys the value in memory at address ``%0``. This is equivalent to::
+
+  %1 = load %0
+  release %1
+
+except that ``destroy_addr`` must be used if ``%0`` is of an address-only type.
+This only destroys the referenced value; the memory may additionally need to be
+deallocated with a separate ``dealloc_var`` instruction.
+
+convert_function
+````````````````
+::
+
+  %1 = convert_function %0, $T
+  ; %0 must be of a function type $U ABI-compatible with $T
+  ; %1 will be of type $T
+
+Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
+compatible with the type of ``%0``. Function types are ABI-compatible if their
+input and/or result types are tuple types that differ only in label names or
+default values.
+
+coerce
+``````
+::
+
+  %1 = coerce %0, $T
+  ; %0 must be of type $T
+  ; %1 will be of type $T
+
+Represents an explicit type coercion with no runtime effect. ``%1`` will be
+equivalent to ``%0``.
+
+upcast
+``````
+
+address_to_pointer
+``````````````````
+::
+
+  %1 = address_to_pointer %0
+  ; %0 must be of an address type $*T
+  ; %1 will be of type Builtin.RawPointer
+
+Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
+
+pointer_to_address
+``````````````````
+
+ref_to_object_pointer
+`````````````````````
+
+object_pointer_to_ref
+`````````````````````
+
+ref_to_raw_pointer
+``````````````````
+
+raw_pointer_to_ref
+``````````````````
+
+thin_to_thick_function
+``````````````````````
+
+convert_cc
+``````````
+
+bridge_to_block
+```````````````
+
+archetype_ref_to_super
+``````````````````
+::
+
+  %1 = archetype_to_super %0, $T
+  ; %0 must be an address of an archetype $*U with base class constraint U : B
+  ; $T must be the base constraint type B or a superclass of B
+  ; %1 will be of the base type $T
+
+Performs an upcast operation on the archetype value referenced by ``%0``.
+
+super_to_archetype_ref
+``````````````````````
+::
+
+  super_to_archetype %0 to %1
+  ; %0 must be of a reference type $T
+  ; %1 must be the address of an archetype $*U with base class constraint U : B
+  ;   where B is T or a subclass of T
+
+Performs a checked downcast operation on the class instance referenced by
+``%0``, initializing the archetype referenced by ``%1`` with a reference to
+the class instance if the check succeeds.
+
+FIXME: if it fails...
+
+downcast
+````````
+::
+
+  %1 = downcast %0, $T
+  ; %0 must be of a reference type that is a subclass of $T
+  ; $T must be a class type
+  ; %1 will be of type T
+
+Performs a checked downcast conversion of ``%0`` to subclass ``T``.
+
+FIXME: if it fails...
+
+downcast_archetype_addr
+```````````````````````
+
+downcast_archetype_ref
+``````````````````````
+
+project_downcast_existential_addr
+`````````````````````````````````
+
+downcast_existential_ref
+````````````````````````
+
+is_nonnull
+``````````
+
+index_addr
+``````````
+::
+
+  %2 = index_addr %0, %1
+  ; %0 must be of a $*T type
+  ; %1 must be of a builtin integer type
+  ; %2 will be of the same $*T type as %0
+
+Given a pointer into an array of values, returns the address of the
+``%1``-th element relative to ``%0``.
+
+index_raw_pointer
+`````````````````
+
+Terminators
+~~~~~~~~~~~
+
+These instructions terminate a basic block. Every basic block must end
+with a terminator.
+
+unreachable
+```````````
+::
+
+  unreachable
+
+Indicates that control flow must not reach the end of the current basic block.
+
+return
+``````
+::
+
+  return %0
+  ; %0 must be of the return type of the current function
+
+Exits the current function and returns control to the calling function. The
+result of the ``apply`` instruction that invoked the current function will be
+the operand of this ``return`` instruction.  ``return`` does not retain or
+release its operand or any other values.
+
+autorelease_return
+``````````````````
+
+br
+``
+::
+
+  br label (%0, %1, ...)
+  ; `label` must refer to a block label within the current function
+  ; %0, %1, etc. must be of the types of `label`'s arguments
+
+Unconditionally transfers control from the current basic block to the block
+labeled ``label``, passing the given values as arguments to ``label``.
+
+condbranch
+``````````
+::
+
+  condbranch %0, true_label (%T1, %T2, ...),
+                 false_label (%F1, %F2, ...)
+  ; %0 must be of the builtin Int1 type
+  ; `true_label` and `false_label` must refer to block labels within the
+  ;   current function
+  ; %T1, %T2, etc. must be of the types of `true_label`'s arguments
+  ; %F1, %F2, etc. must be of the types of `false_label`'s arguments
+
+Conditionally branches to ``true_label`` if ``%0`` is equal to one or to
+``false_label`` if ``%0`` is equal to zero, passing the corresponding set of
+values as arguments to the chosen block. ``%0`` must be of the builtin ``Int1``
+type.
+
+switch_oneof
+````````````
+
+Protocol and protocol composition types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FIXME: Re-section instructions.
+
+From SIL's perspective, protocol and protocol composition types consist of 
+an *existential container*, which gets allocated when
+``alloc_var`` or ``alloc_box`` is applied to a protocol or protocol composition
+type. An existential container is a generic container for
+a value of unknown runtime type, referred to as an "existential type" in
+type theory. The existential container consists of a reference to the *witness
+table(s)* for the protocol(s) referred to by the protocol type and a reference
+to the underlying *concrete value*, which may be either stored in-line inside
+the existential container for small values or allocated separately into a
+buffer owned and managed by the existential container for larger values.
+
+Existential containers are always address-only. The value semantics of
+the existential container propagate to the contained concrete value. Applying
+``copy_addr`` to an existential container copies the
+contained concrete value, deallocating or reallocating the destination's
+owned buffer if necessary. Applying ``destroy_addr`` to an existential
+container destroys the concrete value and deallocates any buffers owned by
+the existential container.
+
+An existential container's witness tables and concrete value buffer
+are prepared by applying the ``init_existential`` instruction to an
+uninitialized existential container. ``init_existential`` takes a
+concrete type parameter and returns an address of the given type that can then
+be stored to in order to fully initialize the existential container.
+For example, creating a protocol value from a value type in Swift::
+
+  protocol SomeProtocol
+  struct SomeInstance : SomeProtocol
+
+  var x:SomeInstance
+  var p:SomeProtocol = x
+
+compiles to this SIL::
+
+  ; allocate the existential container for a SomeProtocol
+  %p = alloc_var $SomeProtocol
+  ; initialize the existential container to contain a SomeInstance
+  %p_instance = init_existential $SomeInstance, %p
+  ; store the SomeInstance inside the existential container
+  store %x to %p_instance
+
 
 Calling convention
 ------------------
