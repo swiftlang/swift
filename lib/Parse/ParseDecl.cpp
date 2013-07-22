@@ -1683,20 +1683,10 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     GenericParams = maybeParseGenericParams();
   }
 
-  // Parse optional inheritance clause.
-  SmallVector<TypeLoc, 2> Inherited;
-  if (Tok.is(tok::colon))
-    parseInheritance(Inherited);
-  
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
-    return true;
-
+  // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          Context.AllocateCopy(Inherited),
-                                          GenericParams, CurDeclContext);
+                                          { }, GenericParams, CurDeclContext);
   Decls.push_back(CD);
-
-  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
 
   // Now that we have a context, update the generic parameters with that
   // context.
@@ -1705,6 +1695,21 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
       Param.setDeclContext(CD);
     }
   }
+
+  // Attach attributes.
+  if (Attributes.isValid()) CD->getMutableAttrs() = Attributes;
+
+  // Parse optional inheritance clause within the context of the class.
+  SmallVector<TypeLoc, 2> Inherited;
+  if (Tok.is(tok::colon)) {
+    ContextChange CC(*this, CD);    
+    parseInheritance(Inherited);
+    CD->setInherited(Context.AllocateCopy(Inherited));
+  }
+
+  // Parse the class body.
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_class))
+    return true;
 
   bool Invalid = false;
 
