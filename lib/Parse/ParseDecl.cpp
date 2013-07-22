@@ -469,6 +469,14 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 ///     decl-operator
 ///
 bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
+  // If we see the 'static' keyword, parse it now.
+  SourceLoc StaticLoc;
+  bool UnhandledStatic = false;
+  if (Tok.is(tok::kw_static)) {
+    StaticLoc = consumeToken();
+    UnhandledStatic = true;
+  }
+
   bool HadParseError = false;
   switch (Tok.getKind()) {
   case tok::kw_import:
@@ -478,6 +486,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Entries.push_back(parseDeclExtension(Flags));
     break;
   case tok::kw_var:
+    if (StaticLoc.isValid()) {
+      diagnose(Tok, diag::unimplemented_static_var)
+        .highlight(SourceRange(StaticLoc));
+      UnhandledStatic = false;
+    }
     HadParseError = parseDeclVar(Flags, Entries);
     break;
   case tok::kw_typealias:
@@ -505,15 +518,17 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
     Entries.push_back(parseDeclProtocol(Flags));
     break;
       
-  case tok::kw_static:
-    if (peekToken().isNot(tok::kw_func))
-      goto ParseError;
-    SWIFT_FALLTHROUGH;
   case tok::kw_func:
-    Entries.push_back(parseDeclFunc(Flags));
+    Entries.push_back(parseDeclFunc(StaticLoc, Flags));
+    UnhandledStatic = false;
     break;
 
   case tok::kw_subscript:
+    if (StaticLoc.isValid()) {
+      diagnose(Tok, diag::subscript_static)
+        .fixItRemove(SourceRange(StaticLoc));
+      UnhandledStatic = false;
+    }
     HadParseError = parseDeclSubscript(Flags & PD_HasContainerType,
                                        !(Flags & PD_DisallowFuncDef),
                                        Entries);
@@ -525,8 +540,8 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
       break;
     }
     SWIFT_FALLTHROUGH;
+
   default:
-  ParseError:
     diagnose(Tok, diag::expected_decl);
     HadParseError = true;
     break;
@@ -541,6 +556,12 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   else if (Entries.back() == 0) {
     Entries.pop_back();
     HadParseError = true;
+  }
+
+  // If we parsed 'static' but didn't handle it above, complain about it.
+  if (!HadParseError && UnhandledStatic) {
+    diagnose(Entries.back()->getLoc(), diag::decl_not_static)
+      .fixItRemove(SourceRange(StaticLoc));
   }
 
   return HadParseError;
@@ -1215,18 +1236,14 @@ Parser::consumeFunctionBody(unsigned Flags) {
 /// NOTE: The caller of this method must ensure that the token sequence is
 /// either 'func' or 'static' 'func'.
 ///
-FuncDecl *Parser::parseDeclFunc(unsigned Flags) {
+FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   bool HasContainerType = Flags & PD_HasContainerType;
-  SourceLoc StaticLoc;
-  if (Tok.is(tok::kw_static)) {
-    StaticLoc = consumeToken(tok::kw_static);
 
-    // Reject 'static' functions at global scope.
-    if (!HasContainerType) {
-      diagnose(Tok, diag::static_func_decl_global_scope)
-        .fixItRemove(Diagnostic::Range(StaticLoc, Tok.getLoc()));
-      StaticLoc = SourceLoc();
-    }
+  // Reject 'static' functions at global scope.
+  if (StaticLoc.isValid() && !HasContainerType) {
+    diagnose(Tok, diag::static_func_decl_global_scope)
+      .fixItRemove(Diagnostic::Range(StaticLoc, Tok.getLoc()));
+    StaticLoc = SourceLoc();
   }
   
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
@@ -1954,7 +1971,6 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
                                     SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy, SourceRange(LBLoc, RBLoc),
                                     Get, Set, CurDeclContext);
-    Decls.push_back(Subscript);
 
     // FIXME: Order of get/set not preserved.
     if (Set) {
@@ -1968,6 +1984,8 @@ bool Parser::parseDeclSubscript(bool HasContainerType,
       Get->makeGetter(Subscript);
       Decls.push_back(Get);
     }
+
+    Decls.push_back(Subscript);
   }
   return Invalid;
 }

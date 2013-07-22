@@ -436,7 +436,7 @@ public:
   
   Pattern *buildImplicitThisParameter();
   Optional<ParserTokenRange> consumeFunctionBody(unsigned Flags);
-  FuncDecl *parseDeclFunc(unsigned Flags);
+  FuncDecl *parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   Decl *parseDeclProtocol(unsigned Flags);
   

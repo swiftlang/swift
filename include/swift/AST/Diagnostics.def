@@ -173,6 +173,9 @@ ERROR(disallowed_oneof_element,decl_parsing,none,
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
+ERROR(decl_not_static,decl_parsing,none,
+      "declaration can not be 'static'", ())
+
 // Var Name
 ERROR(expected_lparen_var_name,decl_parsing,none,
       "expected identifier or '(' in var name", ())
@@ -180,7 +183,9 @@ ERROR(expected_rparen_var_name,decl_parsing,none,
       "expected ')' at end of var name", ())
 ERROR(invalid_index_in_var_name_path,decl_parsing,none,
       "%0 is an invalid index for %1", (Identifier, Type))
-      
+ERROR(unimplemented_static_var,decl_parsing,none,
+     "static variables not yet supported", ())
+
 // Variable getters/setters
 ERROR(getset_missing_type,decl_parsing,none,
       "variable with getter/setter must have an explicit type", ())
@@ -257,8 +262,6 @@ ERROR(expected_rbrace_class,decl_parsing,none,
 // Protocol
 ERROR(expected_rbrace_protocol,decl_parsing,none,
       "expected '}' in protocol", ())
-ERROR(protocol_static_func,decl_parsing,none,
-      "static methods are not permitted in a protocol", ())
 ERROR(protocol_func_def,decl_parsing,none,
       "methods may not be defined in a protocol", ())
 
@@ -275,6 +278,8 @@ ERROR(expected_lbrace_subscript,decl_parsing,none,
       "expected '{' for subscripting", ())
 ERROR(subscript_without_get,decl_parsing,none,
       "subscripting must have a getter", ())
+ERROR(subscript_static,decl_parsing,none,
+     "subscript can not be 'static'", ())
 
 // Constructor
 ERROR(constructor_decl_wrong_scope,decl_parsing,none,

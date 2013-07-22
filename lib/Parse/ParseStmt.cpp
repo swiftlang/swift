@@ -51,7 +51,6 @@ bool Parser::isStartOfStmt(const Token &Tok) {
 bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   switch (Tok.getKind()) {
   case tok::kw_static:
-    return Tok2.is(tok::kw_func);
   case tok::kw_extension:
   case tok::kw_var:
   case tok::kw_typealias:
