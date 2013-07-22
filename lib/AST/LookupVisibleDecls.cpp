@@ -39,11 +39,31 @@ enum class LookupKind {
 };
 } // unnamed namespace
 
+static void
+GlobalExtensionLookupFoundMember(SmallVectorImpl<ValueDecl *> &Found,
+                                 ValueDecl *Member, LookupKind LK) {
+  if (auto *FD = dyn_cast<FuncDecl>(Member)) {
+    // Can not call static functions on non-metatypes.
+    if (LK != LookupKind::QualifiedOnMetatype && FD->isStatic())
+      return;
+  }
+  if (LK == LookupKind::QualifiedOnMetatype && isa<VarDecl>(Member)) {
+    // FIXME: static variables
+    return;
+  }
+  if (LK == LookupKind::Qualified && isa<TypeAliasDecl>(Member)) {
+    // Can only access nested typealiases with unqualified lookup or on
+    // metatypes.
+    // FIXME: other nominal types?  rdar://14489286
+    return;
+  }
+  Found.push_back(Member);
+}
+
 static void DoGlobalExtensionLookup(Type BaseType,
                                     VisibleDeclConsumer &Consumer,
                                     ArrayRef<ValueDecl*> BaseMembers,
                                     const Module *CurModule,
-                                    const Module *BaseModule,
                                     LookupKind LK) {
   SmallVector<ValueDecl *, 4> found;
   
@@ -53,22 +73,7 @@ static void DoGlobalExtensionLookup(Type BaseType,
 
   // Add the members from the type itself to the list of results.
   for (auto member : BaseMembers) {
-    if (auto *FD = dyn_cast<FuncDecl>(member)) {
-      // Can not call static functions on non-metatypes.
-      if (LK != LookupKind::QualifiedOnMetatype && FD->isStatic())
-        continue;
-    }
-    if (LK == LookupKind::QualifiedOnMetatype && isa<VarDecl>(member)) {
-      // FIXME: static variables
-      continue;
-    }
-    if (LK == LookupKind::Qualified && isa<TypeAliasDecl>(member)) {
-      // Can only access nested typealiases with unqualified lookup or on
-      // metatypes.
-      // FIXME: other nominal types?  rdar://14489286
-      continue;
-    }
-    found.push_back(member);
+    GlobalExtensionLookupFoundMember(found, member, LK);
   }
 
   // Look in each extension of this type.
@@ -77,8 +82,7 @@ static void DoGlobalExtensionLookup(Type BaseType,
       auto vd = dyn_cast<ValueDecl>(member);
       if (!vd)
         continue;
-
-      found.push_back(vd);
+      GlobalExtensionLookupFoundMember(found, vd, LK);
     }
   }
 
@@ -258,7 +262,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     }
   }
   DoGlobalExtensionLookup(BaseType, Consumer, BaseMembers,
-                          CurrDC->getParentModule(), D->getParentModule(), LK);
+                          CurrDC->getParentModule(), LK);
 }
 
 namespace {

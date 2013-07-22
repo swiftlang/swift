@@ -27,8 +27,9 @@ using namespace swift;
 void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const Module *curModule) {
   // Category declarations by their signatures.
-  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>>
-    declsBySignature;
+  llvm::SmallDenseMap<std::pair<CanType, Identifier>,
+                      llvm::TinyPtrVector<ValueDecl *>>
+    CollidingDeclGroups;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Determine the signature of this declaration.
@@ -42,7 +43,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       signature = decl->getType()->getCanonicalType();
 
     // If we've seen a declaration with this signature before, note it.
-    auto &knownDecls = declsBySignature[signature];
+    auto &knownDecls = CollidingDeclGroups[std::make_pair(signature, decl->getName())];
     if (!knownDecls.empty())
       anyCollisions = true;
 
@@ -55,7 +56,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   // Determine the set of declarations that are shadowed by other declarations.
   llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
-  for (auto &collidingDecls : declsBySignature) {
+  for (auto &collidingDecls : CollidingDeclGroups) {
     // If only one declaration has this signature, it isn't shadowed by
     // anything.
     if (collidingDecls.second.size() == 1)
