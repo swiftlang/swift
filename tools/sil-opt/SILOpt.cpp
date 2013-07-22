@@ -10,38 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the entry point to the swift app.
+// This is the entry point.
 //
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/IRGen/Options.h"
-#include "swift/AST/AST.h"
-#include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Diagnostics.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/SIL/SILModule.h"
-#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/system_error.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/ToolOutputFile.h"
-#include "llvm/ADT/OwningPtr.h"
-#include "llvm/ADT/Triple.h"
 using namespace swift;
 
 enum class PassKind {
@@ -49,11 +28,6 @@ enum class PassKind {
   StackToSSA,
   DataflowDiagnostics
 };
-
-static llvm::cl::opt<bool>
-UseMalloc("use-malloc",
-          llvm::cl::desc("allocate internal data structures using malloc "
-                         "(for memory debugging)"));
 
 static llvm::cl::opt<std::string>
 InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
