@@ -831,7 +831,18 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
         diagnose(Tok, diag::expected_field_name);
         return nullptr;
       }
-        
+
+      // Don't allow '.<integer literal>' following a numeric literal
+      // expression.
+      if (Tok.is(tok::integer_literal) && Result.isNonNull() &&
+          (isa<FloatLiteralExpr>(Result.get()) ||
+           isa<IntegerLiteralExpr>(Result.get()))) {
+        diagnose(Tok, diag::numeric_literal_numeric_member)
+          .highlight(Result.get()->getSourceRange());
+        consumeToken();
+        continue;
+      }
+
       Identifier Name = Context.getIdentifier(Tok.getText());
       Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
                                                Tok.getLoc());
@@ -852,9 +863,10 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
                                                   Context.AllocateCopy(locArgs),
                                                           RAngleLoc);
         }
-      } else
+      } else {
         consumeToken(tok::integer_literal);
-      
+      }
+
       continue;
     }
     

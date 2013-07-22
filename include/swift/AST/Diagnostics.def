@@ -627,6 +627,8 @@ ERROR(expected_dollar_numeric,expr_parsing,none,
       "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,expr_parsing,none,
       "numeric value following '$' is too large", ())
+ERROR(numeric_literal_numeric_member,expr_parsing,none,
+   "expected named member of numeric literal", ())
 
 ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
       "anonymous closure argument not contained in a closure", ())
