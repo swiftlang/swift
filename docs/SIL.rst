@@ -165,6 +165,8 @@ SIL classifies types into additional subgroups based on ABI stability:
   * Builtin value types
   * Fragile struct types in which all element types are loadable
   * Tuple types in which all element types are loadable
+  * Class protocol types
+  * Archetypes constrained by a class protocol
 
   A *loadable aggregate type* is a tuple or struct type that is loadable.
 
@@ -174,8 +176,8 @@ SIL classifies types into additional subgroups based on ABI stability:
   * Resilient value types
   * Fragile struct or tuple types that contain resilient types as elements at
     any depth
-  * Protocol types
-  * Generic archetypes
+  * Archetypes not constrained by a class protocol
+  * Non-class protocol types
 
   Values of address-only types must reside in memory and can only be referenced
   in SIL by address. Address-only type addresses cannot be loaded from or
@@ -456,7 +458,8 @@ function_ref
 
   sil-instruction ::= 'function_ref' sil-function-name ':' sil-type
 
-  %1 = function_ref @function : $T -> U
+  %1 = function_ref @function : $[thin] T -> U
+  // $[thin] T -> U must be a thin function type
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
@@ -467,9 +470,10 @@ builtin_function_ref
 
   sil-instruction ::= 'builtin_function_ref' sil-decl-ref ':' sil-type
 
-  %1 = builtin_function_ref #Builtin.foo : $T -> U
+  %1 = builtin_function_ref #Builtin.foo : $[thin] T -> U
   // #Builtin.foo must name a function in the Builtin module
-  // %1 has type $T -> U
+  // $[thin] T -> U must be a thin function type
+  // %1 has type $[thin] T -> U
 
 Creates a reference to a compiler builtin function.
 
@@ -550,6 +554,115 @@ Creates the "zero" value of a builtin or reference type:
 - For reference types, this produces a null reference.
 
 TODO: Design type-safe nullability for reference types.
+
+Dynamic Dispatch
+~~~~~~~~~~~~~~~~
+
+These instructions perform dynamic lookup of class and generic methods. They
+share a common set of attributes::
+
+  sil-method-attributes ::= '[' 'volatile'? ']'
+
+The ``volatile`` attribute on a dynamic dispatch instruction indicates that
+the method lookup is semantically required (as, for example, in Objective-C).
+When the type of a dynamic dispatch instruction's operand is known,
+optimization passes can promote non-``volatile`` dispatch instructions
+into static ``function_ref`` instructions.
+
+If a dynamic dispatch instruction references an Objective-C method
+(indicated by the ``objc`` language marker on a method reference, as in
+``#NSObject.description!1.objc``), then the instruction
+represents an ``objc_msgSend`` invocation. ``objc_msgSend`` invocations can
+only be used as the callee of an ``apply`` instruction. They cannot be stored,
+used as ``apply`` or ``partial_apply`` arguments, or as the callee of a
+``partial_apply``. ``objc_msgSend`` invocations additionally must always be
+``volatile``.
+
+class_method
+````````````
+::
+
+  sil-instruction ::= 'class_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = class_method %0 : $T, #T.method!1 : $[thin] U -> V
+  // %0 must be of a class type or class metatype $T
+  // #T.method!1 must be a reference to a dynamically-dispatched method of T or
+  // of one of its superclasses, at uncurry level >= 1
+  // %1 will be of type $U -> V
+
+Looks up a method based on the dynamic type of a class or class metatype
+instance.
+
+super_method
+````````````
+::
+
+  sil-instruction ::= 'super_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+  
+  %1 = super_method %0 : $T, #Super.method!1.objc : $[thin] U -> V
+  // %0 must be of a non-root class type or class metatype $T
+  // #Super.method!1.objc must be a reference to an ObjC method of T's
+  // superclass or ; of one of its ancestor classes, at uncurry level >= 1
+  // %1 will be of type $[thin] U -> V
+
+Looks up a method in the superclass of a class or class metatype instance.
+Note that for native Swift methods, ``super.method`` calls are statically
+dispatched, so this instruction is only valid for Objective-C methods.
+
+archetype_method
+````````````````
+::
+
+  sil-instruction ::= 'archetype_method' sil-method-attributes?
+                        sil-type ',' sil-decl-ref ':' sil-type
+
+  %1 = archetype_method $T, #Proto.method!1 : $[thin] U -> V
+  // $T must be an archetype
+  // #Proto.method!1 must be a reference to a method of one of the protocol
+  // constraints on T
+  // $U -> V must be the type of the referenced method with "This == T"
+  // substitution applied
+  // %1 will be of type $[thin] U -> V
+
+Looks up the implementation of a protocol method for a generic type variable
+constrained by that protocol.
+
+protocol_method
+```````````````
+::
+
+  sil-instruction ::= 'protocol_method' sil-method-attributes?
+                        sil-operand ',' sil-decl-ref ':' sil-type
+
+  %1 = protocol_method %0 : $P, #P.method!1 : $[thin] U -> V
+  // %0 must be of a protocol or protocol composition type $P,
+  //   address of address-only protocol type $*P,
+  //   or metatype of protocol type $P.metatype
+  // #P.method!1 must be a reference to a method of one of the protocols of P
+  //
+  // If %0 is an address-only protocol address, then the "this" argument of
+  //   the method type $[thin] U -> V must be Builtin.OpaquePointer
+  // If %0 is a class protocol value, then the "this" argument of
+  //   the method type $[thin] U -> V must be Builtin.ObjCPointer
+  // If %0 is a protocol metatype, then the "this" argument of
+  //   the method type $[thin] U -> V must be P.metatype
+
+Looks up the implementation of a protocol method for the dynamic type of the
+value inside an existential container. The "this" operand of the result
+function value is represented using an opaque type, the value for which must
+be projected out of the same existential container as the ``protocol_method``
+operand::
+
+- If the operand is the address of an address-only protocol type, then the
+  "this" argument of the method is of type ``Builtin.OpaquePointer``, and
+  can be projected using the ``project_existential`` instruction.
+- If the operand is a value of a class protocol type, then the "this"
+  argument of the method is of type ``Builtin.ObjCPointer``, and can be
+  projected using the ``project_existential_ref`` instruction.
+- If the operand is a protocol metatype, it does not need to be projected, and
+  the "this" argument of the method is the protocol metatype itself.
 
 TODO To Be Updated
 ~~~~~~~~~~~~~~~~~~
@@ -842,9 +955,6 @@ struct
 tuple
 `````
 
-builtin_zero
-````````````
-
 metatype
 ````````
 ::
@@ -951,80 +1061,6 @@ ref_element_addr
 
 Given a value of a reference type, creates a value representing the address
 of an element within the referenced instance.
-
-archetype_method
-````````````````
-::
-
-  %1 = archetype_method %0, @method
-  ; %0 must be the address of an archetype $*T
-  ;   or an archetype metatype $T.metatype
-  ; @method must be a reference to a method of one of the constraints of T
-  ; %1 will be of uncurried type (T)(U') -> V' for method type U -> V,
-  ;   where self and associated types in U and V are bound relative to T in
-  ;   U' and V'
-  ;   e.g. method `(This)(Foo) -> Protocol.Bar` becomes `(T)(Foo) -> T.Bar`
-
-Obtains a reference to the function implementing ``@method`` for the archetype
-referenced by ``%0``. In the type of the resulting function, self and
-associated types in the signature of ``@method`` are bound relative to
-the type pointed to by ``%0``. The returned function reference is uncurried.
-
-protocol_method
-```````````````
-::
-
-  %1 = protocol_method %0, @method
-  ; %0 must be of an address type $*P for protocol or protocol composition
-  ;   type P, or a metatype-of-protocol-type $P.metatype
-  ; @method must be a reference to a method of (one of the) protocol(s) P
-  ;
-  ; If %0 is a protocol address, then %1 will be of uncurried type
-  ;   (OpaquePointer)(T...) -> U
-  ;   for method type (T...) -> U
-  ; If %1 is a protocol metatype, then %1 will be of uncurried type
-  ;   (P.metatype)(T...) -> U
-  ;   for method type (T...) -> U
-
-Obtains a reference to the function implementing protocol method ``@method``
-for the concrete value referenced by the existential container
-referenced by ``%0``. If ``@method`` is an instance method, the resulting
-function value will take a pointer to the ``this`` value as an
-``OpaquePointer``, which must be derived from the existential container with
-a ``project_existential`` instruction. If ``@method`` is a static method, the
-resulting function value will take ``This`` as a protocol metatype value.
-
-class_method
-````````````
-::
-
-  %1 = class_method %0, @method
-  ; %0 must be of a class type or class metatype $T
-  ; @method must be a reference to a dynamically-dispatched method of T or
-  ; of one of its superclasses
-  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
-
-Obtains a reference to the function that implements the specified method for
-the runtime type of ``%0``. The returned function reference is uncurried.
-
-super_method
-````````````
-::
-
-  %1 = super_method %0, @method
-  ; %0 must be of a non-root class type or class metatype $T
-  ; @method must be a reference to a dynamically-dispatched method of T or
-  ; of one of its superclasses
-  ; %1 will be of uncurried type (T)(U) -> V for method type (U) -> V
-
-Obtains a reference to the function that implements the specified method for
-the immediate superclass of the *static* type of ``%0``. The returned function
-reference is uncurried.
-
-Note that for native Swift methods, ``super_method`` lowers equivalently to a
-static reference to the (uncurried) superclass method implementation using
-``constant_ref``. However, interop with external object systems such as
-Objective-C may require dynamic dispatch even for super calls.
 
 project_existential
 ```````````````````

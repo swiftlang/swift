@@ -70,6 +70,14 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StringLiteralInst, SILInstruction)
   INST(BuiltinZeroInst, SILInstruction)
 
+  // Dynamic Dispatch
+  ABSTRACT_VALUE(DynamicMethodInst, SILInstruction)
+    INST(ClassMethodInst, DynamicMethodInst)
+    INST(SuperMethodInst, DynamicMethodInst)
+    INST(ArchetypeMethodInst, DynamicMethodInst)
+    INST(ProtocolMethodInst, DynamicMethodInst)
+    VALUE_RANGE(DynamicMethodInst, ClassMethodInst, ProtocolMethodInst)
+
   ABSTRACT_VALUE(FunctionInst, SILInstruction)
     INST(ApplyInst, FunctionInst)
     INST(PartialApplyInst, FunctionInst)
@@ -94,13 +102,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StructElementAddrInst, SILInstruction)
   INST(RefElementAddrInst, SILInstruction)
   
-  ABSTRACT_VALUE(DynamicMethodInst, SILInstruction)
-    INST(ArchetypeMethodInst, DynamicMethodInst)
-    INST(ProtocolMethodInst, DynamicMethodInst)
-    INST(ClassMethodInst, DynamicMethodInst)
-    INST(SuperMethodInst, DynamicMethodInst)
-    VALUE_RANGE(DynamicMethodInst, ArchetypeMethodInst, SuperMethodInst)
-    
   INST(ProjectExistentialInst, SILInstruction)
   INST(InitExistentialInst, SILInstruction)
   INST(UpcastExistentialInst, SILInstruction)
