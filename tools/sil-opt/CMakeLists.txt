@@ -6,7 +6,7 @@ add_swift_executable(sil-opt
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
-target_link_libraries(swift edit ${CORE_FOUNDATION})
+target_link_libraries(sil-opt edit ${CORE_FOUNDATION})
 
 install(TARGETS sil-opt
   RUNTIME DESTINATION bin)
