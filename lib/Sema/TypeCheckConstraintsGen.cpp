@@ -380,10 +380,13 @@ namespace {
           if (typeVars.size() != specializations.size()) {
             tc.diagnose(expr->getSubExpr()->getLoc(),
                         diag::type_parameter_count_mismatch,
+                        bgt->getDecl()->getName(),
                         typeVars.size(), specializations.size(),
-                        specializations.size() < typeVars.size());
-            tc.diagnose(expr->getLAngleLoc(),
-                        diag::while_parsing_as_left_angle_bracket);
+                        specializations.size() < typeVars.size())
+              .highlight(SourceRange(expr->getLAngleLoc(),
+                                     expr->getRAngleLoc()));
+            tc.diagnose(bgt->getDecl(), diag::generic_type_declared_here,
+                        bgt->getDecl()->getName());
             return Type();
           }
           

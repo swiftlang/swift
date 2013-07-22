@@ -1369,9 +1369,9 @@ ERROR(not_a_generic_definition,tce_sema,none,
 ERROR(not_a_generic_type,tce_sema,none,
       "cannot specialize non-generic type %0", (Type))
 ERROR(type_parameter_count_mismatch,tce_sema,none,
-      "generic type specialized with %select{too many|too few}2 type "
-      "parameters (got %1, but expected %0)",
-      (unsigned, unsigned, bool))
+      "generic type %0 specialized with %select{too many|too few}3 type "
+      "parameters (got %2, but expected %1)",
+      (Identifier, unsigned, unsigned, bool))
 ERROR(generic_type_requires_arguments,tce_sema,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(generic_type_declared_here,tce_sema,none,

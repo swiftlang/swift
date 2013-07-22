@@ -177,11 +177,13 @@ Type TypeChecker::applyGenericArguments(Type type,
   // Make sure we have the right number of generic arguments.
   auto genericParams = unbound->getDecl()->getGenericParams();
   if (genericParams->size() != genericArgs.size()) {
-    // FIXME: Show the type name here.
-    // FIXME: Point at the actual declaration of the underlying type.
+    // FIXME: Highlight <...>.
     diagnose(loc, diag::type_parameter_count_mismatch,
+             unbound->getDecl()->getName(),
              genericParams->size(), genericArgs.size(),
              genericArgs.size() < genericParams->size());
+    diagnose(unbound->getDecl(), diag::generic_type_declared_here,
+             unbound->getDecl()->getName());
     return nullptr;
   }
 
