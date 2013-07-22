@@ -57,8 +57,8 @@ class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
-  ClangImporter* (*ImporterCtor)(ASTContext &, StringRef, StringRef, StringRef,
-                                 ArrayRef<std::string>) = nullptr;
+  typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
+  ClangImporterCtorTy ImporterCtor = nullptr;
 
 public:
   CompilerInvocation();
@@ -79,8 +79,8 @@ public:
     return ClangModuleCachePath;
   }
 
-  void setImportSearchPaths(std::vector<std::string> &Paths) {
-    ImportSearchPaths = std::move(Paths);
+  void setImportSearchPaths(const std::vector<std::string> &Paths) {
+    ImportSearchPaths = Paths;
   }
 
   std::vector<std::string> getImportSearchPaths() const {
@@ -100,8 +100,7 @@ public:
     SDKPath = Path;
   }
 
-  ClangImporter* (*getClangImporterCtor())
-  (ASTContext &, StringRef, StringRef, StringRef, ArrayRef<std::string>) {
+  ClangImporterCtorTy getClangImporterCtor() {
     return ImporterCtor;
   }
 
@@ -187,7 +186,7 @@ public:
 
   llvm::SourceMgr &getSourceMgr() { return SourceMgr; }
 
-  void setBufferIDs(std::vector<unsigned> &IDs) {
+  void setBufferIDs(const std::vector<unsigned> &IDs) {
     BufferIDs = IDs;
   }
   void addBufferID(unsigned ID) {
