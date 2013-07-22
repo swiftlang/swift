@@ -4,7 +4,8 @@ add_swift_executable(swift-ide-test
   COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
 
 if(HAVE_DARWIN_MODULES_SDK)
-  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
+  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
+                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
 install(TARGETS swift-ide-test
