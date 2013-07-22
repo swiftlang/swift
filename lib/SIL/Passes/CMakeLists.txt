@@ -1,5 +1,6 @@
 add_swift_library(swiftSILPasses
   DataflowDiagnostics.cpp
-  MemoryPromotion.cpp
+  AllocBoxPromotion.cpp
+  StackToSSA.cpp
   DEPENDS swiftSIL)
 
