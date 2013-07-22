@@ -223,11 +223,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   if (LastRelease) {
     SILBuilder B2(LastRelease);
 
-    if (!isTrivial) {
-      // FIXME: If this is a non-address-only type, use a load and the
-      // "emitReleaseRValue" logic.
-      B2.createDestroyAddr(ABI->getLoc(), AllocVar);
-    }
+    if (!isTrivial)
+      B2.emitDestroyAddress(ABI->getLoc(), AllocVar);
 
     B2.createDeallocStack(ABI->getLoc(), AllocVar);
   }
