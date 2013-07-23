@@ -61,7 +61,7 @@ public:
 Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                   SILLocation loc,
                                                   SILValue base) const {
-  ManagedValue value = get(gen, loc, base);
+  ManagedValue value = get(gen, loc, base, SGFContext());
   Materialize temp = gen.emitMaterialize(loc, value);
   if (isSettable())
     gen.pushWritebackIfInScope(loc, *this, base, temp);
@@ -352,14 +352,14 @@ namespace {
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     SILValue base) const override
+                     SILValue base, SGFContext c) const override
     {
       auto args = prepareAccessorArgs(gen, loc, base);
       
       return gen.emitGetProperty(loc, getter, substitutions,
                                  std::move(args.base),
                                  std::move(args.subscripts),
-                                 substType);
+                                 substType, c);
     }
     
     Type getObjectType() const override {

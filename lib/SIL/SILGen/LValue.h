@@ -131,7 +131,7 @@ public:
 
   /// Get the property.
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                           SILValue base) const = 0;
+                           SILValue base, SGFContext c) const = 0;
   
   /// Get the property, materialize a temporary lvalue for it, and if
   /// we're in a writeback scope, register a writeback.

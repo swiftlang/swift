@@ -360,6 +360,46 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
   emitSwitchFallthrough(S);
 }
 
+ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
+                                              const LValue &src,
+                                              SGFContext C) {
+  // No need to write back to a loaded lvalue.
+  DisableWritebackScope scope(*this);
+
+  SILValue addr;
+  for (auto i = src.begin(), e = src.end(); ; ) {
+    assert(i != e && "ran out of lvalue components!");
+    assert((!addr ||
+            addr.getType().isAddress() ||
+            addr.getType().hasReferenceSemantics()) &&
+           "resolving lvalue component did not give an address "
+           "or reference type");
+
+    auto &component = *i;
+    ++i;
+    bool isLastComponent = (i == e);
+
+    // If the component is physical, just drill down.
+    if (component.isPhysical()) {
+      addr = component.asPhysical().offset(*this, loc, addr);
+      if (!isLastComponent) continue;
+
+      // Load from the final component.
+      return emitLoad(loc, addr, C, /*isTake*/ false);
+    }
+
+    // If the component is logical, and this isn't the final component,
+    // materialize and continue.
+    if (!isLastComponent) {
+      addr = component.asLogical().getMaterialized(*this, loc, addr).address;
+      continue;
+    }
+
+    // Otherwise, load from that.
+    return component.asLogical().get(*this, loc, addr, C);
+  }
+}
+
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  LValue const &src) {
   SILValue addr;

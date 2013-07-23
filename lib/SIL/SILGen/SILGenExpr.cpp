@@ -357,12 +357,8 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
-  // No need to write back to a loaded lvalue.
-  DisableWritebackScope scope(SGF);
-  
   LValue lv = SGF.emitLValue(E->getSubExpr());
-  SILValue addr = SGF.emitAddressOfLValue(E, lv).getUnmanagedValue();  
-  return RValue(SGF, SGF.emitLoad(E, addr, C, /*isTake*/ false));
+  return RValue(SGF, SGF.emitLoadOfLValue(E, lv, C));
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,

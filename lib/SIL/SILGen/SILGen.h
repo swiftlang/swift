@@ -554,7 +554,8 @@ public:
                                ArrayRef<Substitution> substitutions,
                                RValue &&optionalthisValue,
                                RValue &&optionalSubscripts,
-                               Type resultType);
+                               Type resultType,
+                               SGFContext C);
   void emitSetProperty(SILLocation loc,
                        SILConstant setter,
                        ArrayRef<Substitution> substitutions,
@@ -569,8 +570,9 @@ public:
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);
-  ManagedValue emitAddressOfLValue(SILLocation loc,
-                                              LValue const &src);
+  ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
+  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
+                                SGFContext C);
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,
                              SILConstant methodConstant,

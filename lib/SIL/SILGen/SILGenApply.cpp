@@ -1338,7 +1338,8 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
                                              ArrayRef<Substitution> substitutions,
                                              RValue &&thisValue,
                                              RValue &&subscripts,
-                                             Type resultType) {
+                                             Type resultType,
+                                             SGFContext c) {
   // Derive the specialized type of the accessor.
   auto &tc = SGM.Types;
   Type propType;
@@ -1370,7 +1371,7 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
   // () ->
   emission.addCallSite(loc, emitEmptyTupleRValue(loc), propFnTy->getResult());
   // T
-  return emission.apply();
+  return emission.apply(c);
 }
 
 void SILGenFunction::emitSetProperty(SILLocation loc,
