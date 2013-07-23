@@ -807,6 +807,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
+    .Case("weak_retain", ValueKind::WeakRetainInst)
+    .Case("weak_release", ValueKind::WeakReleaseInst)
     .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
@@ -967,6 +969,14 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RetainAutoreleasedInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createRetainAutoreleased(SILLocation(), Val);
+    break;
+  case ValueKind::WeakRetainInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createWeakRetainInst(SILLocation(), Val);
+    break;
+  case ValueKind::WeakReleaseInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createWeakReleaseInst(SILLocation(), Val);
     break;
   case ValueKind::DestroyAddrInst:
     if (parseTypedValueRef(Val)) return true;

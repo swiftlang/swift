@@ -433,6 +433,16 @@ namespace {
       e.claimNext();
       IGF.emitRelease(e.claimNext());
     }
+
+    void weakRetain(IRGenFunction &IGF, Explosion &e) const {
+      e.claimNext();
+      IGF.emitWeakRetain(e.claimNext());
+    }
+
+    void weakRelease(IRGenFunction &IGF, Explosion &e) const {
+      e.claimNext();
+      IGF.emitWeakRelease(e.claimNext());
+    }
     
     void destroy(IRGenFunction &IGF, Address addr) const {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));

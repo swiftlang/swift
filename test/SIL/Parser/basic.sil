@@ -535,3 +535,13 @@ bb0:
   %0 = unreachable
 // CHECK: %0 = unreachable
 }
+
+sil @test_weak_retain : $[thin] (p : SomeClass) -> () {
+bb0(%0 : $SomeClass):
+// CHECK: weak_retain %0 : $SomeClass
+  %1 = weak_retain %0 : $SomeClass
+// CHECK: weak_release %0 : $SomeClass
+  %2 = weak_release %0 : $SomeClass
+  %3 = tuple ()
+  %4 = return %3 : $()
+}

@@ -69,9 +69,13 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(DestroyAddrInst, SILInstruction)
 
   // Reference Counting
-  INST(RetainInst, SILInstruction)
-  INST(RetainAutoreleasedInst, SILInstruction)
-  INST(ReleaseInst, SILInstruction)
+  ABSTRACT_VALUE(RefCountingInst, SILInstruction)
+    INST(RetainInst, RefCountingInst)
+    INST(RetainAutoreleasedInst, RefCountingInst)
+    INST(ReleaseInst, RefCountingInst)
+    INST(WeakRetainInst, RefCountingInst)
+    INST(WeakReleaseInst, RefCountingInst)
+    VALUE_RANGE(RefCountingInst, RetainInst, WeakReleaseInst)
 
   // Literals
   INST(FunctionRefInst, SILInstruction)

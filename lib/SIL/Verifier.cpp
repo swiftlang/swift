@@ -415,6 +415,18 @@ public:
     require(RI->getOperand().getType().hasReferenceSemantics(),
             "Operand of dealloc_ref must be reference type");
   }
+  void checkWeakRetainInst(WeakRetainInst *RI) {
+    require(!RI->getOperand().getType().isAddress(),
+            "Operand of weak_retain must not be address");
+    require(RI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of weak_retain must be reference type");
+  }
+  void checkWeakReleaseInst(WeakReleaseInst *RI) {
+    require(!RI->getOperand().getType().isAddress(),
+            "Operand of weak_release must not be address");
+    require(RI->getOperand().getType().hasReferenceSemantics(),
+            "Operand of weak_release must be reference type");
+  }
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isAddress(),
             "Operand of dealloc_var must be address");

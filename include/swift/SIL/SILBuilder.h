@@ -585,6 +585,12 @@ public:
   createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
   }
+  WeakRetainInst *createWeakRetainInst(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) WeakRetainInst(Loc, Operand));
+  }
+  WeakReleaseInst *createWeakReleaseInst(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) WeakReleaseInst(Loc, Operand));
+  }
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));
   }

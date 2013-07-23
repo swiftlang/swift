@@ -1337,10 +1337,25 @@ public:
     : UnaryInstructionBase(Loc, Operand, DestTy)
   {}
 };
-  
-/// RetainInst - Increase the retain count of a value.
+
+/// RefCountingInst - An abstract class of instructions which
+/// manipulate the reference count of their object operand.
+class RefCountingInst : public SILInstruction {
+protected:
+  RefCountingInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
+                  SILDebugScope *DS=0)
+    : SILInstruction(Kind, Loc, TypeList, DS) {}
+
+public:
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_RefCountingInst &&
+           V->getKind() <= ValueKind::Last_RefCountingInst;
+  }
+};
+
+/// RetainInst - Increase the strong reference count of an object.
 class RetainInst : public UnaryInstructionBase<ValueKind::RetainInst,
-                                               SILInstruction,
+                                               RefCountingInst,
                                                /*HAS_RESULT*/ false>
 {
 public:
@@ -1352,21 +1367,44 @@ public:
 /// an ObjC method.
 class RetainAutoreleasedInst
   : public UnaryInstructionBase<ValueKind::RetainAutoreleasedInst,
-                                SILInstruction, /*HAS_RESULT*/ false>
+                                RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
   RetainAutoreleasedInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// ReleaseInst - Decrease the retain count of a value, and dealloc the value
-/// if its retain count is zero.
+/// ReleaseInst - Decrease the strong reference count of an object.
+///
+/// An object can be destroyed when its strong reference count is
+/// zero.  It can be deallocated when both its strong reference and
+/// weak reference counts reach zero.
 class ReleaseInst
   : public UnaryInstructionBase<ValueKind::ReleaseInst,
-                                SILInstruction, /*HAS_RESULT*/ false>
+                                RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
   ReleaseInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
+};
+
+/// WeakRetainInst - Increase the weak reference count of an object.
+class WeakRetainInst : public UnaryInstructionBase<ValueKind::WeakRetainInst,
+                                                   RefCountingInst,
+                                                   /*HAS_RESULT*/ false>
+{
+public:
+  WeakRetainInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
+};
+
+/// WeakReleaseInst - Decrease the weak reference count of an object.
+class WeakReleaseInst : public UnaryInstructionBase<ValueKind::WeakReleaseInst,
+                                                    RefCountingInst,
+                                                    /*HAS_RESULT*/ false>
+{
+public:
+  WeakReleaseInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 

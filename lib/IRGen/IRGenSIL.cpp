@@ -532,6 +532,8 @@ public:
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
+  void visitWeakRetainInst(WeakRetainInst *i);
+  void visitWeakReleaseInst(WeakReleaseInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
 
@@ -996,7 +998,7 @@ static void getMetatypeUses(ValueBase *i,
   isUsedAsSwiftMetatype = isUsedAsObjCClass = false;
   for (auto *use : i->getUses()) {
     // Ignore retains or releases of metatypes.
-    if (isa<RetainInst>(use->getUser()) || isa<ReleaseInst>(use->getUser()))
+    if (isa<RefCountingInst>(use->getUser()))
       continue;
     
     // If a class_method lookup of an ObjC method is done on us, we'll need the
@@ -1696,6 +1698,21 @@ void IRGenSILFunction::visitRetainAutoreleasedInst(
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *value = lowered.claimNext();
   emitObjCRetainAutoreleasedReturnValue(*this, value);
+}
+
+void IRGenSILFunction::visitWeakRetainInst(swift::WeakRetainInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  auto &ti =
+    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+  ti.weakRetain(*this, lowered);
+}
+
+
+void IRGenSILFunction::visitWeakReleaseInst(swift::WeakReleaseInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  auto &ti =
+    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
+  ti.weakRelease(*this, lowered);
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {

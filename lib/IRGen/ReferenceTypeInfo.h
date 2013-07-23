@@ -40,10 +40,20 @@ public:
   /// Releases a value.
   virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
+  /// Weakly retains a value.
+  virtual void weakRetain(IRGenFunction &IGF, Explosion &explosion) const = 0;
+
+  /// Weak releases a value.
+  virtual void weakRelease(IRGenFunction &IGF, Explosion &explosion) const = 0;
+
   /// Produce the storage information for [weak] storage.
   virtual const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const = 0;
 
   /// Produce the storage information for [unowned] storage.
+  ///
+  /// The reference-counting operations done by the value operations
+  /// on the [unowned] storage type are assumed to be basically the
+  /// same operations as weakRetain and weakRelease.
   virtual const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC) const = 0;
 
   static bool classof(const ReferenceTypeInfo *type) { return true; }

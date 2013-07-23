@@ -877,6 +877,18 @@ namespace {
       IGF.emitUnknownRelease(e.claimNext());
     }
 
+    void weakRetain(IRGenFunction &IGF, Explosion &e) const override {
+      e.claim(NumProtocols);
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownWeakRetain(e.claimNext());
+    }
+
+    void weakRelease(IRGenFunction &IGF, Explosion &e) const override {
+      e.claim(NumProtocols);
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownWeakRelease(e.claimNext());
+    }
+
     void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownRetainCall(value);
     }
