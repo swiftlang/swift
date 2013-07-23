@@ -21,8 +21,11 @@
 
 using namespace swift;
 using namespace swift::serialization;
+
 static constexpr const auto AF_DontPopBlockAtEnd =
   llvm::BitstreamCursor::AF_DontPopBlockAtEnd;
+
+using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
 
 /// Declares a member \c type that is a std::function compatible with the given
 /// callable type.
@@ -223,8 +226,25 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
-ModuleFile::maybeReadConformance() {
+/// Returns the equivalent archetype in the given protocol.
+static ArchetypeType *getActualArchetype(ProtocolDecl *proto,
+                                         ArchetypeType *ty) {
+  if (!ty->isPrimary()) {
+    auto parent = getActualArchetype(proto, ty->getParent());
+    return parent->getNestedType(ty->getName());
+  }
+
+  auto matchingNames = proto->lookupDirect(ty->getName());
+  for (auto member : matchingNames) {
+    if (auto associatedType = dyn_cast<TypeAliasDecl>(member))
+      return associatedType->getUnderlyingType()->castTo<ArchetypeType>();
+  }
+
+  // Failed to find actual type?
+  return ty;
+}
+
+Optional<ConformancePair> ModuleFile::maybeReadConformance() {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(DeclTypeCursor);
@@ -253,8 +273,7 @@ ModuleFile::maybeReadConformance() {
                                         inheritedCount, defaultedCount,
                                         rawIDs);
 
-  ProtocolConformance *conformance =
-    ModuleContext->Ctx.Allocate<ProtocolConformance>(1);
+  std::unique_ptr<ProtocolConformance> conformance(new ProtocolConformance);
 
   while (inheritedCount--) {
     auto inherited = maybeReadConformance();
@@ -266,6 +285,7 @@ ModuleFile::maybeReadConformance() {
   // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
+  auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
@@ -276,7 +296,10 @@ ModuleFile::maybeReadConformance() {
     conformance->Mapping.insert(std::make_pair(first, witness));
   }
   while (typeCount--) {
-    auto first = getType(*rawIDIter++)->castTo<SubstitutableType>();
+    // FIXME: We don't actually want to allocate an archetype here; we just
+    // want to get an access path within the protocol.
+    auto first = getType(*rawIDIter++)->castTo<ArchetypeType>();
+    first = getActualArchetype(proto, first);
     auto second = getType(*rawIDIter++);
     conformance->TypeMapping.insert(std::make_pair(first, second));
   }
@@ -285,9 +308,7 @@ ModuleFile::maybeReadConformance() {
     conformance->DefaultedDefinitions.insert(decl);
   }
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
-
-  return std::make_pair(proto, conformance);
+  return std::make_pair(proto, conformance.release());
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
@@ -424,6 +445,61 @@ MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs,
   }
 
   return result;
+}
+
+/// Uniques a single protocol conformance and any inherited conformances, and
+/// records the conformances in the ASTContext.
+///
+/// If a conformance has already been recorded, the given record \p conformance
+/// will be deleted.
+///
+/// \returns The canonical conformance for this (\p decl, \p canTy) pair.
+///
+/// \sa processConformances
+template <typename T>
+ProtocolConformance *processConformance(ASTContext &ctx, T *decl, CanType canTy,
+                                        ProtocolDecl *proto,
+                                        ProtocolConformance *conformance) {
+  if (!conformance)
+    return nullptr;
+
+  auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
+
+  if (conformanceRecord && conformanceRecord != conformance) {
+    delete conformance;
+    conformance = conformanceRecord;
+  } else {
+    conformanceRecord = conformance;
+  }
+
+  ctx.recordConformance(proto, decl);
+
+  for (auto &inherited : conformance->InheritedMapping) {
+    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
+                                          inherited.second);
+  }
+
+  return conformance;
+}
+
+/// Uniques and applies protocol conformances to a decl, as well as recording
+/// the conformances in the ASTContext.
+template <typename T>
+void processConformances(ASTContext &ctx, T *decl, CanType canTy,
+                         ArrayRef<ConformancePair> conformances) {
+  SmallVector<ProtocolDecl *, 16> protoBuf;
+  SmallVector<ProtocolConformance *, 16> conformanceBuf;
+  for (auto conformancePair : conformances) {
+    auto proto = conformancePair.first;
+    auto conformance = conformancePair.second;
+    conformance = processConformance(ctx, decl, canTy, proto, conformance);
+
+    protoBuf.push_back(proto);
+    conformanceBuf.push_back(conformance);
+  }
+
+  decl->setProtocols(ctx.AllocateCopy(protoBuf));
+  decl->setConformances(ctx.AllocateCopy(conformanceBuf));
 }
 
 Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
@@ -618,14 +694,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isGeneric)
       alias->setGenericParameter();
 
-    SmallVector<ProtocolDecl *, 16> protoBuf;
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance()) {
-      protoBuf.push_back(conformance.getValue().first);
-      conformanceBuf.push_back(conformance.getValue().second);
-    }
-    alias->setProtocols(ctx.AllocateCopy(protoBuf));
-    alias->setConformances(ctx.AllocateCopy(conformanceBuf));
+    CanType canBaseTy = underlyingType.getType()->getCanonicalType();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance = maybeReadConformance())
+      conformances.push_back(*conformance);
+    processConformances(ctx, alias, canBaseTy, conformances);
 
     break;
   }
@@ -668,14 +742,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *theStruct->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theStruct);
 
-    SmallVector<ProtocolDecl *, 16> protoBuf;
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance()) {
-      protoBuf.push_back(conformance.getValue().first);
-      conformanceBuf.push_back(conformance.getValue().second);
-    }
-    theStruct->setProtocols(ctx.AllocateCopy(protoBuf));
-    theStruct->setConformances(ctx.AllocateCopy(conformanceBuf));
+    CanType canTy = theStruct->getDeclaredTypeInContext()->getCanonicalType();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance = maybeReadConformance())
+      conformances.push_back(*conformance);
+    processConformances(ctx, theStruct, canTy, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
@@ -1016,14 +1088,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *theClass->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theClass);
 
-    SmallVector<ProtocolDecl *, 16> protoBuf;
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance()) {
-      protoBuf.push_back(conformance.getValue().first);
-      conformanceBuf.push_back(conformance.getValue().second);
-    }
-    theClass->setProtocols(ctx.AllocateCopy(protoBuf));
-    theClass->setConformances(ctx.AllocateCopy(conformanceBuf));
+    CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance = maybeReadConformance())
+      conformances.push_back(*conformance);
+    processConformances(ctx, theClass, canTy, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read class members");
@@ -1073,14 +1143,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       for (auto &genericParam : *oneOf->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(oneOf);
 
-    SmallVector<ProtocolDecl *, 16> protoBuf;
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance()) {
-      protoBuf.push_back(conformance.getValue().first);
-      conformanceBuf.push_back(conformance.getValue().second);
-    }
-    oneOf->setProtocols(ctx.AllocateCopy(protoBuf));
-    oneOf->setConformances(ctx.AllocateCopy(conformanceBuf));
+    CanType canTy = oneOf->getDeclaredTypeInContext()->getCanonicalType();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance = maybeReadConformance())
+      conformances.push_back(*conformance);
+    processConformances(ctx, oneOf, canTy, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read oneof members");
@@ -1199,14 +1267,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       extension->setImplicit();
 
-    SmallVector<ProtocolDecl *, 16> protoBuf;
-    SmallVector<ProtocolConformance *, 16> conformanceBuf;
-    while (auto conformance = maybeReadConformance()) {
-      protoBuf.push_back(conformance.getValue().first);
-      conformanceBuf.push_back(conformance.getValue().second);
-    }
-    extension->setProtocols(ctx.AllocateCopy(protoBuf));
-    extension->setConformances(ctx.AllocateCopy(conformanceBuf));
+    CanType canBaseTy = baseTy.getType()->getCanonicalType();
+
+    SmallVector<ConformancePair, 16> conformances;
+    while (auto conformance = maybeReadConformance())
+      conformances.push_back(*conformance);
+    processConformances(ctx, extension, canBaseTy, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read extension members");
