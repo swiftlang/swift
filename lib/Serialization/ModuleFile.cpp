@@ -1554,6 +1554,12 @@ Type ModuleFile::getType(TypeID TID) {
     // Record the type as soon as possible. Members of a nominal type often
     // try to refer back to the type.
     getDecl(declID, Nothing, makeStackLambda([&](Decl *D) {
+      // FIXME: Hack for "typedef struct CGRect CGRect". In the long run we need
+      // something less brittle that would also handle pointer typedefs and
+      // typedefs that just /happen/ to match a tagged name but don't actually
+      // point to the tagged type.
+      if (auto alias = dyn_cast<TypeAliasDecl>(D))
+        D = alias->getUnderlyingType()->getAnyNominal();
       auto nominal = cast<NominalTypeDecl>(D);
       typeOrOffset = NominalType::get(nominal, parentTy, ctx);
     }));
