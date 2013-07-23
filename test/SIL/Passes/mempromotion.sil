@@ -4,7 +4,7 @@ import Builtin
 import swift
 
 
-// CHECK: sil @simple_promotion
+// CHECK-LABEL: sil @simple_promotion
 sil @simple_promotion : $(x : Int64) -> Int64 {
 bb0(%0 : $Int64):
   %1 = alloc_box $Int64
@@ -19,7 +19,7 @@ bb0(%0 : $Int64):
 // CHECK: return
 }
 
-// CHECK: sil @init_var
+// CHECK-LABEL: sil @init_var
 sil @init_var : $() -> Int64 {
 bb0:
   %1 = alloc_box $Int64
@@ -36,7 +36,7 @@ bb0:
 // CHECK: return
 }
 
-// CHECK: sil @multi_release
+// CHECK-LABEL: sil @multi_release
 sil @multi_release : $() -> Int64 {
 bb0:
   %1 = alloc_box $Int64
@@ -60,7 +60,7 @@ struct TestStruct {
   var Elt : Int
 }
 
-// CHECK: sil @struct_tuple_element_addr
+// CHECK-LABEL: sil @struct_tuple_element_addr
 sil @struct_tuple_element_addr : $(x : Int64) -> Int64 {
 bb1(%0 : $Int64):
   %1 = alloc_box $TestStruct
@@ -92,7 +92,7 @@ bb1(%0 : $Int64):
 
 sil @callee : $[thin] (a : [byref] Int64) -> ()
 
-// CHECK: sil @byref_nocapture
+// CHECK-LABEL: sil @byref_nocapture
 sil @byref_nocapture : $[thin] () -> Int64 {
 bb0:
   // CHECK: alloc_stack
@@ -111,7 +111,7 @@ protocol P {
 
 sil @returns_protocol : $[thin] () -> P
 
-// CHECK: sil @test_indirect_return
+// CHECK-LABEL: sil @test_indirect_return
 sil @test_indirect_return : $[thin] () -> () {
 bb0:
   // CHECK: alloc_stack
@@ -126,7 +126,7 @@ bb0:
 
 class SomeClass {}
 
-// CHECK: sil @class_promotion
+// CHECK-LABEL: sil @class_promotion
 sil @class_promotion : $(x : SomeClass) -> SomeClass {
 bb0(%0 : $SomeClass):
   %1 = alloc_box $SomeClass
