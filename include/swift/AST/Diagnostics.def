@@ -1511,6 +1511,10 @@ ERROR(irgen_failure,irgen,none, "IR generation failure: %0", (StringRef))
 
 ERROR(cannot_open_serialized_file,frontend,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
+ERROR(error_open_input_file,frontend,none,
+  "error opening input file '%0' (%1)", (StringRef, StringRef))
+ERROR(error_clang_importer_create_fail,frontend,none,
+  "clang importer creation failed", ())
 
 
 #if defined(DIAG)

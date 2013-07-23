@@ -46,7 +46,7 @@ void swift::CompilerInstance::createSILModule() {
   TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
 }
 
-void swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
+bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
   Context.reset(new ASTContext(Invocation.getLangOptions(), SourceMgr, Diagnostics));
@@ -66,8 +66,10 @@ void swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                      Invocation.getTargetTriple(),
                      Invocation.getClangModuleCachePath(),
                      Invocation.getImportSearchPaths());
-    if (!clangImporter)
-      return; // FIXME: error reporting
+    if (!clangImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
 
     Context->addModuleLoader(clangImporter, /*isClang*/true);
   }
@@ -79,6 +81,30 @@ void swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   if (Invocation.getTUKind() == TranslationUnit::SIL)
     createSILModule();
+
+  for (auto &File : Invocation.getInputFilenames()) {
+    // Open the input file.
+    llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
+    if (llvm::error_code Err =
+          llvm::MemoryBuffer::getFileOrSTDIN(File, InputFile)) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                           File, Err.message());
+      return true;
+    }
+    // Transfer ownership of the MemoryBuffer to the SourceMgr.
+    BufferIDs.push_back(SourceMgr.AddNewSourceBuffer(InputFile.take(),
+                                                     llvm::SMLoc()));
+  }
+
+  for (auto Buf : Invocation.getInputBuffers()) {
+    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
+    BufferIDs.push_back(SourceMgr.AddNewSourceBuffer(
+        llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
+                                             Buf->getBufferIdentifier()),
+                                                     llvm::SMLoc()));
+  }
+
+  return false;
 }
 
 void swift::CompilerInstance::doIt() {

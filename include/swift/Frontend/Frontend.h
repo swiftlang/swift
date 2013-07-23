@@ -51,6 +51,9 @@ class CompilerInvocation {
 
   std::string ModuleName;
 
+  std::vector<std::string> InputFilenames;
+  std::vector<llvm::MemoryBuffer *> InputBuffers;
+
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
   typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
@@ -140,6 +143,22 @@ public:
     return ModuleName;
   }
 
+  void addInputFilename(StringRef Filename) {
+    InputFilenames.push_back(Filename);
+  }
+
+  void addInputBuffer(llvm::MemoryBuffer *Buf) {
+    InputBuffers.push_back(Buf);
+  }
+
+  void clearInputs() {
+    InputFilenames.clear();
+    InputBuffers.clear();
+  }
+
+  ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
+  ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const { return InputBuffers; }
+
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
   }
@@ -174,13 +193,6 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void setBufferIDs(const std::vector<unsigned> &IDs) {
-    BufferIDs = IDs;
-  }
-  void addBufferID(unsigned ID) {
-    BufferIDs.push_back(ID);
-  }
-
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -201,7 +213,10 @@ public:
     return TU;
   }
 
-  void setup(const CompilerInvocation &Invocation);
+  ArrayRef<unsigned> getInputBufferIDs() const { return BufferIDs; }
+
+  /// \brief Returns true if there was an error during setup.
+  bool setup(const CompilerInvocation &Invocation);
 
   void doIt();
 };

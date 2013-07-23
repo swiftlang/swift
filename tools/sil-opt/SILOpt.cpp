@@ -81,24 +81,15 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("main");
   Invocation.setTUKind(TranslationUnit::SIL);
+  
+  Invocation.addInputFilename(InputFilename);
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  // Open the input file.
-  llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
-        llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
-    llvm::errs() << "swift: error opening input file: " << Err.message()
-                 << '\n';
+  if (CI.setup(Invocation))
     return 1;
-  }
-
-  // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  CI.addBufferID(CI.getSourceMgr().AddNewSourceBuffer(InputFile.take(),
-                                                      llvm::SMLoc()));
-  CI.setup(Invocation);
   CI.doIt();
 
   for (auto Pass : Passes) {
