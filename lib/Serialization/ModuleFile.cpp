@@ -117,12 +117,16 @@ Pattern *ModuleFile::maybeReadPattern() {
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
+    bool isImplicit;
+    ParenPatternLayout::readRecord(scratch, isImplicit);
+
     Pattern *subPattern = maybeReadPattern();
     assert(subPattern);
 
     auto result = new (ModuleContext->Ctx) ParenPattern(SourceLoc(),
                                                         subPattern,
-                                                        SourceLoc());
+                                                        SourceLoc(),
+                                                        isImplicit);
     result->setType(subPattern->getType());
     return result;
   }
@@ -130,8 +134,10 @@ Pattern *ModuleFile::maybeReadPattern() {
     TypeID tupleTypeID;
     unsigned count;
     bool hasVararg;
+    bool isImplicit;
 
-    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, hasVararg);
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, hasVararg,
+                                   isImplicit);
 
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
@@ -162,7 +168,7 @@ Pattern *ModuleFile::maybeReadPattern() {
 
     auto result = TuplePattern::create(ModuleContext->Ctx, SourceLoc(),
                                        elements, SourceLoc(), hasVararg,
-                                       SourceLoc());
+                                       SourceLoc(), isImplicit);
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       result->setType(getType(tupleTypeID));
@@ -170,23 +176,24 @@ Pattern *ModuleFile::maybeReadPattern() {
     return result;
   }
   case decls_block::NAMED_PATTERN: {
-
     DeclID varID;
-    NamedPatternLayout::readRecord(scratch, varID);
+    bool isImplicit;
+    NamedPatternLayout::readRecord(scratch, varID, isImplicit);
 
     BCOffsetRAII restoreOffset(DeclTypeCursor);
 
     auto var = cast<VarDecl>(getDecl(varID));
-    auto result = new (ModuleContext->Ctx) NamedPattern(var);
+    auto result = new (ModuleContext->Ctx) NamedPattern(var, isImplicit);
     if (var->hasType())
       result->setType(var->getType());
     return result;
   }
   case decls_block::ANY_PATTERN: {
     TypeID typeID;
+    bool isImplicit;
 
-    AnyPatternLayout::readRecord(scratch, typeID);
-    auto result = new (ModuleContext->Ctx) AnyPattern(SourceLoc());
+    AnyPatternLayout::readRecord(scratch, typeID, isImplicit);
+    auto result = new (ModuleContext->Ctx) AnyPattern(SourceLoc(), isImplicit);
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       result->setType(getType(typeID));
@@ -195,13 +202,15 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
   case decls_block::TYPED_PATTERN: {
     TypeID typeID;
+    bool isImplicit;
 
-    TypedPatternLayout::readRecord(scratch, typeID);
+    TypedPatternLayout::readRecord(scratch, typeID, isImplicit);
     Pattern *subPattern = maybeReadPattern();
     assert(subPattern);
 
     TypeLoc typeInfo = TypeLoc::withoutLoc(getType(typeID));
-    auto result = new (ModuleContext->Ctx) TypedPattern(subPattern, typeInfo);
+    auto result = new (ModuleContext->Ctx) TypedPattern(subPattern, typeInfo,
+                                                        isImplicit);
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
       result->setType(typeInfo.getType());

@@ -527,9 +527,18 @@ namespace decls_block {
     // Trailed by conformance info (if any), then the decl context record.
   >;
 
+  using DestructorLayout = BCRecordLayout<
+    DESTRUCTOR_DECL,
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    TypeIDField, // type (signature)
+    DeclIDField  // implicit this decl
+  >;
+
   
   using ParenPatternLayout = BCRecordLayout<
-    PAREN_PATTERN
+    PAREN_PATTERN,
+    BCFixed<1> // implicit?
     // The sub-pattern trails the record.
   >;
 
@@ -537,6 +546,7 @@ namespace decls_block {
     TUPLE_PATTERN,
     TypeIDField, // type
     BCVBR<5>,    // arity
+    BCFixed<1>, // implicit?
     BCFixed<1>  // has vararg?
     // The elements trail the record.
   >;
@@ -549,43 +559,41 @@ namespace decls_block {
 
   using NamedPatternLayout = BCRecordLayout<
     NAMED_PATTERN,
-    DeclIDField // associated VarDecl
+    DeclIDField, // associated VarDecl
+    BCFixed<1>   // implicit?
   >;
 
   using AnyPatternLayout = BCRecordLayout<
     ANY_PATTERN,
-    TypeIDField // type
+    TypeIDField, // type
+    BCFixed<1>   // implicit?
     // FIXME: is the type necessary?
   >;
 
   using TypedPatternLayout = BCRecordLayout<
     TYPED_PATTERN,
-    TypeIDField // associated type
+    TypeIDField, // associated type
+    BCFixed<1>   // implicit?
     // The sub-pattern trails the record.
   >;
   
   using IsaPatternLayout = BCRecordLayout<
     ISA_PATTERN,
-    TypeIDField // type
+    TypeIDField, // type
+    BCFixed<1>   // implicit?
   >;
   
   using NominalTypePatternLayout = BCRecordLayout<
     NOMINAL_TYPE_PATTERN,
-    TypeIDField
+    TypeIDField,
+    BCFixed<1>  // implicit?
     // The sub-pattern trails the record.
   >;
 
   using VarPatternLayout = BCRecordLayout<
-    VAR_PATTERN
+    VAR_PATTERN,
+    BCFixed<1>  // implicit?
     // The sub-pattern trails the record.
-  >;
-
-  using DestructorLayout = BCRecordLayout<
-    DESTRUCTOR_DECL,
-    DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    TypeIDField, // type (signature)
-    DeclIDField  // implicit this decl
   >;
 
 

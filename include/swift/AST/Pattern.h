@@ -140,11 +140,12 @@ class ParenPattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
   Pattern *SubPattern;
 public:
-  ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp)
+  ParenPattern(SourceLoc lp, Pattern *sub, SourceLoc rp,
+               Optional<bool> implicit = {})
     : Pattern(PatternKind::Paren),
       LPLoc(lp), RPLoc(rp), SubPattern(sub) {
     assert(lp.isValid() == rp.isValid());
-    if (!lp.isValid())
+    if (implicit.hasValue() ? *implicit : !lp.isValid())
       setImplicit();
   }
 
@@ -209,14 +210,14 @@ class TuplePattern : public Pattern {
   }
 
   TuplePattern(SourceLoc lp, unsigned numFields, SourceLoc rp, bool hasVararg,
-               SourceLoc ellipsis)
+               SourceLoc ellipsis, bool implicit)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
     TuplePatternBits.NumFields = numFields;
     TuplePatternBits.HasVararg = hasVararg;
     if (hasVararg)
       *getEllipsisLocPtr() = ellipsis;
     assert(lp.isValid() == rp.isValid());
-    if (!lp.isValid())
+    if (implicit)
       setImplicit();
   }
 
@@ -224,7 +225,8 @@ public:
   static TuplePattern *create(ASTContext &C, SourceLoc lp,
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
                               bool hasVararg = false,
-                              SourceLoc ellipsis = SourceLoc());
+                              SourceLoc ellipsis = SourceLoc(),
+                              Optional<bool> implicit = {});
 
   /// \brief Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
@@ -267,8 +269,9 @@ class NamedPattern : public Pattern {
   VarDecl *const Var;
 
 public:
-  explicit NamedPattern(VarDecl *Var) : Pattern(PatternKind::Named), Var(Var) {
-    if (!Var->getLoc().isValid())
+  explicit NamedPattern(VarDecl *Var, Optional<bool> implicit = {})
+      : Pattern(PatternKind::Named), Var(Var) {
+    if (implicit.hasValue() ? *implicit : !Var->getLoc().isValid())
       setImplicit();
   }
 
@@ -289,8 +292,9 @@ class AnyPattern : public Pattern {
   SourceLoc Loc;
 
 public:
-  AnyPattern(SourceLoc Loc) : Pattern(PatternKind::Any), Loc(Loc) {
-    if (!Loc.isValid())
+  explicit AnyPattern(SourceLoc Loc, Optional<bool> implicit = {})
+      : Pattern(PatternKind::Any), Loc(Loc) {
+    if (implicit.hasValue() ? *implicit : !Loc.isValid())
       setImplicit();
   }
 
@@ -311,9 +315,9 @@ class TypedPattern : public Pattern {
   TypeLoc PatType;
 
 public:
-  TypedPattern(Pattern *pattern, TypeLoc tl)
+  TypedPattern(Pattern *pattern, TypeLoc tl, Optional<bool> implicit = {})
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
-    if (pattern->isImplicit())
+    if (implicit.hasValue() ? *implicit : !tl.hasLocation())
       setImplicit();
   }
 
@@ -348,13 +352,14 @@ class IsaPattern : public Pattern {
   
 public:
   IsaPattern(SourceLoc IsLoc, TypeLoc CastTy,
-             CheckedCastKind Kind = CheckedCastKind::Unresolved)
+             CheckedCastKind Kind = CheckedCastKind::Unresolved,
+             Optional<bool> implicit = {})
     : Pattern(PatternKind::Isa),
       IsLoc(IsLoc),
       CastKind(Kind),
       CastType(CastTy) {
     assert(IsLoc.isValid() == CastTy.hasLocation());
-    if (!IsLoc.isValid())
+    if (implicit.hasValue() ? *implicit : !IsLoc.isValid())
       setImplicit();
   }
 
@@ -383,11 +388,11 @@ class NominalTypePattern : public Pattern {
   Pattern *SubPattern;
   CheckedCastKind Kind;
 public:
-  NominalTypePattern(TypeLoc CastTy, Pattern *Sub,
-                     CheckedCastKind Kind = CheckedCastKind::Unresolved)
+  NominalTypePattern(TypeLoc CastTy, Pattern *Sub, CheckedCastKind Kind,
+                     Optional<bool> implicit = {})
     : Pattern(PatternKind::NominalType), CastType(CastTy), SubPattern(Sub),
       Kind(Kind) {
-    if (Sub->isImplicit())
+    if (implicit.hasValue() ? *implicit : !CastTy.hasLocation())
       setImplicit();
   }
 
@@ -424,15 +429,15 @@ class OneOfElementPattern : public Pattern {
   
 public:
   OneOfElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                      Identifier Name,
-                      OneOfElementDecl *Element, Pattern *SubPattern)
+                      Identifier Name, OneOfElementDecl *Element,
+                      Pattern *SubPattern, Optional<bool> Implicit = {})
     : Pattern(PatternKind::OneOfElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
-    if (SubPattern && SubPattern->isImplicit())
+    if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
       setImplicit();
   }
-  
+
   bool hasSubPattern() const { return SubPattern; }
   
   const Pattern *getSubPattern() const {
@@ -484,11 +489,12 @@ class ExprPattern : public Pattern {
   
 public:
   /// Construct an ExprPattern.
-  ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar)
+  ExprPattern(Expr *e, bool isResolved, Expr *matchExpr, VarDecl *matchVar,
+              Optional<bool> implicit = {})
     : Pattern(PatternKind::Expr), SubExprAndIsResolved(e, isResolved),
       MatchExpr(matchExpr), MatchVar(matchVar) {
     assert(!matchExpr || e->isImplicit() == matchExpr->isImplicit());
-    if (e->isImplicit())
+    if (implicit.hasValue() ? *implicit : e->isImplicit())
       setImplicit();
   }
   
@@ -537,10 +543,10 @@ class VarPattern : public Pattern {
   SourceLoc VarLoc;
   Pattern *SubPattern;
 public:
-  VarPattern(SourceLoc loc, Pattern *sub)
+  VarPattern(SourceLoc loc, Pattern *sub, Optional<bool> implicit = {})
     : Pattern(PatternKind::Var), VarLoc(loc), SubPattern(sub) {
     assert(loc.isValid() == !sub->isImplicit());
-    if (sub->isImplicit())
+    if (implicit.hasValue() ? *implicit : !loc.isValid())
       setImplicit();
   }
   

@@ -560,7 +560,8 @@ void Serializer::writePattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
   case PatternKind::Paren: {
     unsigned abbrCode = DeclTypeAbbrCodes[ParenPatternLayout::Code];
-    ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    ParenPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   pattern->isImplicit());
     writePattern(cast<ParenPattern>(pattern)->getSubPattern());
     break;
   }
@@ -570,7 +571,8 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
     TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(tuple->getType()),
-                                   tuple->getNumFields(), tuple->hasVararg());
+                                   tuple->getNumFields(), tuple->hasVararg(),
+                                   tuple->isImplicit());
 
     abbrCode = DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
     for (auto &elt : tuple->getFields()) {
@@ -587,13 +589,15 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NamedPatternLayout::Code];
     NamedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addDeclRef(named->getDecl()));
+                                   addDeclRef(named->getDecl()),
+                                   named->isImplicit());
     break;
   }
   case PatternKind::Any: {
     unsigned abbrCode = DeclTypeAbbrCodes[AnyPatternLayout::Code];
     AnyPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(pattern->getType()));
+                                 addTypeRef(pattern->getType()),
+                                 pattern->isImplicit());
     break;
   }
   case PatternKind::Typed: {
@@ -601,7 +605,8 @@ void Serializer::writePattern(const Pattern *pattern) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[TypedPatternLayout::Code];
     TypedPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(typed->getType()));
+                                   addTypeRef(typed->getType()),
+                                   typed->isImplicit());
     writePattern(typed->getSubPattern());
     break;
   }
@@ -610,15 +615,17 @@ void Serializer::writePattern(const Pattern *pattern) {
     
     unsigned abbrCode = DeclTypeAbbrCodes[IsaPatternLayout::Code];
     IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(isa->getCastTypeLoc().getType()));
+                                 addTypeRef(isa->getCastTypeLoc().getType()),
+                                 isa->isImplicit());
     break;
   }
   case PatternKind::NominalType: {
     auto nom = cast<NominalTypePattern>(pattern);
 
     unsigned abbrCode = DeclTypeAbbrCodes[NominalTypePatternLayout::Code];
+    auto castTy = nom->getCastTypeLoc().getType();
     NominalTypePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(nom->getCastTypeLoc().getType()));
+                                         addTypeRef(castTy), nom->isImplicit());
     writePattern(nom->getSubPattern());
     break;
   }
@@ -630,7 +637,8 @@ void Serializer::writePattern(const Pattern *pattern) {
     auto var = cast<VarPattern>(pattern);
     
     unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
-    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode);
+    VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 var->isImplicit());
     writePattern(var->getSubPattern());
     break;
   }

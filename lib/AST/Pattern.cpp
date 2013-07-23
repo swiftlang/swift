@@ -276,13 +276,17 @@ Identifier Pattern::getBoundName() const {
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts, SourceLoc rp,
-                                   bool hasVararg, SourceLoc ellipsis) {
+                                   bool hasVararg, SourceLoc ellipsis,
+                                   Optional<bool> implicit) {
+  if (!implicit.hasValue())
+    implicit = !lp.isValid();
+
   unsigned n = elts.size();
   void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt) +
                             (hasVararg ? sizeof(SourceLoc) : 0),
                             alignof(TuplePattern));
   TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp, hasVararg,
-                                                     ellipsis);
+                                                     ellipsis, *implicit);
   memcpy(pattern->getFieldsBuffer(), elts.data(), n * sizeof(TuplePatternElt));
   return pattern;
 }
