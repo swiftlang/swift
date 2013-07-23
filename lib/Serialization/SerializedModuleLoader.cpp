@@ -26,20 +26,6 @@
 using namespace swift;
 
 namespace {
-class SerializedModule : public LoadedModule {
-public:
-  ModuleFile *File;
-
-  SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
-                   Identifier name, Component *comp, ModuleFile *file)
-    : LoadedModule(DeclContextKind::SerializedModule, name, comp, ctx, owner),
-      File(file) {}
-
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SerializedModule;
-  }
-};
-
 typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 }
 
@@ -248,8 +234,8 @@ OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
 }
 
 void SerializedModuleLoader::getReexportedModules(
-    Module *module,
-    SmallVectorImpl<swift::Module *> &exports) {
+    const Module *module,
+    SmallVectorImpl<Module::ImportedModule> &exports) {
 
   ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
   if (!moduleFile)

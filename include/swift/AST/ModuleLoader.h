@@ -100,8 +100,9 @@ public:
   }
 
   /// \brief Look for modules re-exported by the given module.
-  virtual void getReexportedModules(Module *module,
-                                    SmallVectorImpl<Module *> &exports) { }
+  virtual void
+  getReexportedModules(const Module *module,
+                       SmallVectorImpl<Module::ImportedModule> &exports) { }
 };
 
 }

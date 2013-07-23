@@ -124,6 +124,7 @@ protected:
 
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
+  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
 
   Component *getComponent() const {
     assert(Comp && "fetching component for the builtin module");
@@ -189,6 +190,9 @@ public:
   Optional<PostfixOperatorDecl *> lookupPostfixOperator(Identifier name,
                                               SourceLoc diagLoc = SourceLoc());
 
+  /// Looks up which modules are re-exported by this module.
+  void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
+
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
   }
@@ -208,8 +212,6 @@ public:
 /// TranslationUnit - This contains information about all of the decls and
 /// external references in a translation unit, which is one file.
 class TranslationUnit : public Module {
-public:
-  typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
 private:
 
   /// ImportedModules - This is the list of modules that are imported by this
@@ -335,7 +337,7 @@ public:
   }
 
   /// Adds any modules re-exported by this module to the given vector.
-  void getReexportedModules(SmallVectorImpl<Module *> &modules);
+  void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
 
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&

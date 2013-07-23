@@ -504,15 +504,13 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                        NLKind::UnqualifiedLookup);
   searchedClangModule = isa<ClangModule>(&M);
 
-  // The builtin module has no imports.
-  if (isa<BuiltinModule>(M)) return;
-  
-  const TranslationUnit &TU = cast<TranslationUnit>(M);
+  SmallVector<Module::ImportedModule, 8> Imports;
+  M.getReexportedModules(Imports);
 
   // Scrape through all of the imports looking for additional results.
   // FIXME: Implement DAG-based shadowing rules.
   llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : TU.getImportedModules()) {
+  for (auto &ImpEntry : Imports) {
     if (!Visited.insert(ImpEntry.second))
       continue;
 
@@ -531,7 +529,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // Look for a module with the given name.
   // FIXME: Modules aren't ValueDecls
   //Consumer.foundDecl(&M);
-  //for (const auto &ImpEntry : TU.getImportedModules())
+  //for (const auto &ImpEntry : Imports)
   //  Consumer.foundDecl(&ImpEntry.second);
 }
 

@@ -309,6 +309,20 @@ Optional<InfixOperatorDecl *> Module::lookupInfixOperator(Identifier name,
                                    &TranslationUnit::InfixOperators);
 }
 
+void
+Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
+  if (isa<BuiltinModule>(this))
+    return;
+
+  if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    modules.append(TU->getImportedModules().begin(),
+                   TU->getImportedModules().end());
+    return;
+  }
+
+  return cast<LoadedModule>(this)->getReexportedModules(modules);
+}
+
 //===----------------------------------------------------------------------===//
 // TranslationUnit Implementation
 //===----------------------------------------------------------------------===//
@@ -368,7 +382,8 @@ LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
   return cast_or_null<InfixOperatorDecl>(result);
 }
 
-void LoadedModule::getReexportedModules(SmallVectorImpl<Module *> &exports) {
+void LoadedModule::getReexportedModules(
+    SmallVectorImpl<ImportedModule> &exports) const {
   auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
   return owner->getReexportedModules(this, exports);
 }

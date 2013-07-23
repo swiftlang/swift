@@ -82,9 +82,9 @@ public:
   virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
                                        DeclKind fixity) override;
 
-  virtual void
-  getReexportedModules(Module *module,
-                       SmallVectorImpl<Module *> &exports) override;
+  virtual void getReexportedModules(
+    const Module *module,
+    SmallVectorImpl<Module::ImportedModule> &exports) override;
 };
 
 } // end namespace swift

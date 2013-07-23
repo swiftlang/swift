@@ -516,17 +516,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   // Scrape through all of the imports looking for additional results.
   // FIXME: Implement DAG-based shadowing rules.
   SmallVector<TranslationUnit::ImportedModule, 16> Imported;
-  if (auto TU = dyn_cast<TranslationUnit>(&M)) {
-    Imported.append(TU->getImportedModules().begin(),
-                    TU->getImportedModules().end());
-  } else if (auto LM = dyn_cast<LoadedModule>(&M)) {
-    SmallVector<Module *, 16> Reexported;
-    LM->getReexportedModules(Reexported);
-    for (auto Next : Reexported) {
-      // FIXME: Include a proper access path here.
-      Imported.push_back(std::make_pair(Module::AccessPathTy(), Next));
-    }
-  }
+  M.getReexportedModules(Imported);
 
   llvm::SmallPtrSet<Module *, 16> Visited;
   for (auto &ImpEntry : Imported) {

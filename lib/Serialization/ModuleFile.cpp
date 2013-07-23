@@ -1272,6 +1272,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                               getIdentifier(rawAccessPath.front()),
                               NLKind::QualifiedLookup,
                               values);
+      // FIXME: Yuck. The concept of a shadowed module needs to be moved up
+      // higher, and it needs to be clear whether they are always reexported.
+      if (auto loadedModule = dyn_cast<SerializedModule>(baseModule)) {
+        if (loadedModule->File && loadedModule->File->ShadowedModule) {
+          Module *shadowed = loadedModule->File->ShadowedModule;
+          shadowed->lookupValue(Module::AccessPathTy(),
+                                getIdentifier(rawAccessPath.front()),
+                                NLKind::QualifiedLookup, values);
+        }
+      }
       rawAccessPath = rawAccessPath.slice(1);
 
       // Then, follow the chain of nested ValueDecls until we run out of
@@ -2123,9 +2133,11 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
   return Operators.lookup(OperatorKey(name, getOperatorKind(fixity)));
 }
 
-void ModuleFile::getReexportedModules(SmallVectorImpl<Module*> &results) {
-  // FIXME: Generalized re-exports.
-  if (ShadowedModule)
-    results.push_back(ShadowedModule);
+void ModuleFile::getReexportedModules(
+    SmallVectorImpl<Module::ImportedModule> &results) {
+  // FIXME: Lock down on re-exports.
+  // FIXME: Handle imports with access paths.
+  for (auto &dep : Dependencies)
+    results.push_back({Module::AccessPathTy(), dep.Mod});
 }
 

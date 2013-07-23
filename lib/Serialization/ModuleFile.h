@@ -16,7 +16,9 @@
 #include "ModuleFormat.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -32,7 +34,6 @@ namespace llvm {
 }
 
 namespace swift {
-class Module;
 class Pattern;
 class ProtocolConformance;
 
@@ -302,7 +303,21 @@ public:
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
 
   /// Adds any reexported modules to the given vector.
-  void getReexportedModules(SmallVectorImpl<Module*> &results);
+  void getReexportedModules(SmallVectorImpl<Module::ImportedModule> &results);
+};
+
+class SerializedModule : public LoadedModule {
+public:
+  ModuleFile *File;
+
+  SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
+                   Identifier name, Component *comp, ModuleFile *file)
+    : LoadedModule(DeclContextKind::SerializedModule, name, comp, ctx, owner),
+      File(file) {}
+
+  static bool classof(const DeclContext *DC) {
+    return DC->getContextKind() == DeclContextKind::SerializedModule;
+  }
 };
 
 } // end namespace swift

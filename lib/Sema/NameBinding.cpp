@@ -56,8 +56,7 @@ namespace {
         
         Module *&ref = Context.LoadedModules[M.second->Name.str()];
         if (ref)
-          assert(ref == M.second ||
-                 isa<TranslationUnit>(ref) && isa<ClangModule>(M.second));
+          assert(ref == M.second || isa<ClangModule>(M.second));
         else
           ref = M.second;
       }
@@ -135,11 +134,14 @@ void NameBinder::addImport(ImportDecl *ID,
   
   Result.push_back(ImportedModule(Path.slice(1), M));
 
-  // If the module we loaded is a translation unit that imports a Clang
-  // module with the same name, add that Clang module to our own set of imports.
-  // FIXME: This is a horrible, horrible way to provide transitive inclusion.
-  // We really need a re-export syntax.
-  if (Context.getClangModuleLoader()) {
+  if (auto loaded = dyn_cast<LoadedModule>(M)) {
+    loaded->getReexportedModules(Result);
+
+  } else if (Context.getClangModuleLoader()) {
+    // If the module we loaded is a translation unit that imports a Clang
+    // module with the same name, add that Clang module to our own set of imports.
+    // FIXME: This is a horrible, horrible way to provide transitive inclusion.
+    // We really need a re-export syntax.
     if (auto tu = dyn_cast<TranslationUnit>(M)) {
       for (auto imported : tu->getImportedModules()) {
         // Only check for Clang modules.
