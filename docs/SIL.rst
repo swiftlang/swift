@@ -64,8 +64,8 @@ After SILGen, a deterministic sequence of optimization passes is run over the
 raw SIL, as follows:
 
 - Memory promotion: this is implemented as two optimization phases, the first
-  of which performance capture analysis to promote alloc_box instructions to
-  alloc_stack, and the second which promotes non-address exposed alloc_stack
+  of which performs capture analysis to promote alloc_box instructions to
+  alloc_stack, and the second of which promotes non-address-exposed alloc_stack
   instructions to SSA registers.
 
 TODO:
