@@ -112,7 +112,7 @@ public:
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.
   ///
-  /// \param consumer The VisibleDeclConsumer that will be fed decls as they
+  /// \param Consumer The VisibleDeclConsumer that will be fed decls as they
   /// are found and imported.
   void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
 
