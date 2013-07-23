@@ -887,6 +887,119 @@ metatype ``%0``.
 
 TODO: This doesn't need to be different from ``metatype``.
 
+Aggregate Types
+~~~~~~~~~~~~~~~
+
+These instructions construct and project elements from structs, tuples, and
+class instances.
+
+tuple
+`````
+::
+  
+  sil-instruction ::= 'tuple' sil-tuple-elements
+  sil-tuple-elements ::= '(' (sil-operand (',' sil-operand)*)? ')'
+  sil-tuple-elements ::= sil-type '(' (sil-value (',' sil-value)*)? ')'
+
+  %1 = tuple (%a : $A, %b : $B, ...)
+  // $A, $B, etc. must be loadable non-address types
+  // %1 will be of the "simple" tuple type $(A, B, ...)
+
+  %1 = tuple $(a:A, b:B, ...) (%a, %b, ...)
+  // (a:A, b:B, ...) must be a loadable tuple type
+  // %1 will be of the type $(a:A, b:B, ...)
+
+Creates a loadable tuple value by aggregating multiple loadable values.
+
+If the
+destination type is a "simple" tuple type, that is, it has no keyword argument
+labels or variadic arguments, then the first notation can be used, which
+interleaves the element values and types. If keyword names or variadic fields
+are specified, then the second notation must be used, which spells out the
+tuple type before the fields.
+
+tuple_extract
+`````````````
+::
+
+  sil-instruction ::= 'tuple_extract' sil-operand ',' int-literal
+
+  %1 = tuple_extract %0 : $(T...), 123
+  // %0 must be of a loadable tuple type $(T...)
+  // %1 will be of the type of the selected element of %0
+
+Extracts an element from a loadable tuple value.
+
+tuple_element_addr
+``````````````````
+::
+
+  sil-instruction ::= 'tuple_element_addr' sil-operand ',' int-literal
+
+  %1 = tuple_element_addr %0 : $*(T...), 123
+  // %0 must of a $*(T...) address-of-tuple type
+  // %1 will be of address type $*U where U is the type of the 123rd
+  //   element of T
+
+Given the address of a tuple in memory, derives the
+address of an element within that value.
+
+struct
+``````
+::
+
+  sil-instruction ::= 'struct' sil-type '(' (sil-operand (',' sil-operand)*)? ')'
+
+  %1 = struct $S (%a : $A, %b : $B, ...)
+  // $S must be a loadable struct type
+  // $A, $B, ... must be the types of the physical 'var' fields of $S in order
+  // %1 will be of type $S
+
+Creates a value of a loadable struct type by aggregating multiple loadable
+values.
+
+struct_extract
+``````````````
+::
+
+  sil-instruction ::= 'struct_extract' sil-operand ',' sil-decl-ref
+
+  %1 = struct_extract %0 : $S, #S.field
+  // %0 must be of a loadable struct type $S
+  // #S.field must be a physical 'var' field of $S
+  // %1 will be of the type of the selected field of %0
+
+Extracts a physical field from a loadable struct value.
+
+struct_element_addr
+```````````````````
+::
+
+  sil-instruction ::= 'struct_element_addr' sil-operand ',' sil-decl-ref
+
+  %1 = struct_element_addr %0 : $*S, #S.field
+  // %0 must be of a struct type $S
+  // #S.field must be a physical 'var' field of $S
+  // %1 will be the address of the selected field of %0
+
+Given the address of a struct value in memory, derives the address of a
+physical field within the value.
+
+ref_element_addr
+````````````````
+::
+
+  sil-instruction ::= 'ref_element_addr' sil-operand ',' sil-decl-ref
+
+  %1 = ref_element_addr %0 : $C, #C.field
+  // %0 must be a value of class type $C
+  // #C.field must be a non-static physical field of $C
+  // %1 will be of type $*U where U is the type of the selected field
+  //   of C
+
+Given an instance of a class, derives the address of a physical instance
+variable inside the instance.
+
 TODO To Be Updated
 ~~~~~~~~~~~~~~~~~~
 
@@ -1056,53 +1169,6 @@ operations::
     store %tmp_src to %1
     release %tmp_dest
 
-struct
-``````
-
-tuple
-`````
-
-tuple_extract
-`````````````
-::
-
-  %1 = tuple_extract %0, 123
-  ; %0 must be of a loadable aggregate type
-  ; %1 will be of the type of the 123rd element of %0
-
-Extracts an element of a loadable aggregate value.
-
-tuple_element_addr
-``````````````````
-::
-
-  %1 = tuple_element_addr %0, 123
-  ; %0 must of a $*T type for a loadable aggregate type T
-  ; %1 will be of type $*U where U is the type of the 123rd
-  ;   element of T
-
-Given the address of a loadable aggregate value in memory, creates a
-value representing the address of an element within that value.
-
-struct_extract
-``````````````
-
-struct_element_addr
-```````````````````
-
-ref_element_addr
-````````````````
-::
-
-  %1 = ref_element_addr %0, @T.x
-  ; %0 must be of a reference type $T
-  ; @T.x must be an instance field of $T
-  ; %1 will be of type $*U where U is the type of the 123rd
-  ;   element of T
-
-Given a value of a reference type, creates a value representing the address
-of an element within the referenced instance.
-
 project_existential
 ```````````````````
 ::
@@ -1181,6 +1247,7 @@ init_existential_ref
 
 upcast_existential_ref
 ``````````````````````
+
 retain
 ``````
 ::
@@ -1190,6 +1257,9 @@ retain
 
 Retains the box or reference type instance represented by ``%0``. Retaining
 an address or value type is an error.
+
+retain_autoreleased
+```````````````````
 
 release
 ```````

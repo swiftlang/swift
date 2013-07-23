@@ -93,16 +93,18 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProtocolMetatypeInst, SILInstruction)
   INST(AssociatedMetatypeInst, SILInstruction)
 
-  INST(LoadInst, SILInstruction)
-  INST(StoreInst, SILInstruction)
-  INST(InitializeVarInst, SILInstruction)
-  INST(StructInst, SILInstruction)
+  // Aggregate Types
   INST(TupleInst, SILInstruction)
   INST(TupleExtractInst, SILInstruction)
   INST(TupleElementAddrInst, SILInstruction)
+  INST(StructInst, SILInstruction)
   INST(StructExtractInst, SILInstruction)
   INST(StructElementAddrInst, SILInstruction)
   INST(RefElementAddrInst, SILInstruction)
+
+  INST(LoadInst, SILInstruction)
+  INST(StoreInst, SILInstruction)
+  INST(InitializeVarInst, SILInstruction)
   
   INST(ProjectExistentialInst, SILInstruction)
   INST(InitExistentialInst, SILInstruction)
