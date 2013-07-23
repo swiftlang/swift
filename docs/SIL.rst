@@ -555,6 +555,18 @@ Creates the "zero" value of a builtin or reference type:
 
 TODO: Design type-safe nullability for reference types.
 
+module
+``````
+::
+
+  sil-instruction ::= 'module' sil-decl-ref
+
+  %1 = module #M
+  // #M must be a module name
+  // %1 has type $module<M>
+
+Creates a module value for the module ``M``.
+
 Dynamic Dispatch
 ~~~~~~~~~~~~~~~~
 
@@ -1049,16 +1061,6 @@ struct
 
 tuple
 `````
-
-module
-``````
-::
-
-  %1 = module @M
-  ; @M must be a module name
-  ; %1 has type $module<M>
-
-Creates a module value referencing module ``M``.
 
 tuple_extract
 `````````````
