@@ -78,7 +78,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
-  std::string MainFilename = Opts.MainInputFilename;
+  StringRef MainFilename = Opts.MainInputFilename;
   if (MainFilename.empty()) {
     Filename = "<unknown>";
     Dir = getCurrentDirname();
@@ -92,8 +92,10 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
     Dir = BumpAllocatedString(Path, DebugInfoNames);
   }
   // The fallback file.
-  MainFile = getOrCreateFile(BumpAllocatedString((Dir+Filename).str(),
-                                                 DebugInfoNames).data());
+
+  llvm::SmallString<512> MainFileBuf;
+  llvm::sys::path::append(MainFileBuf, Dir, Filename);
+  MainFile = getOrCreateFile(MainFileBuf.c_str());
 
   unsigned Lang = DW_LANG_Swift;
 
