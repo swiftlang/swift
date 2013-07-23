@@ -109,6 +109,13 @@ public:
   ///   are found.
   void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const;
 
+  /// \brief Look for visible declarations in the Clang translation unit and
+  /// import them as Swift decls.
+  ///
+  /// \param consumer The VisibleDeclConsumer that will be fed decls as they
+  /// are found and imported.
+  void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
+
   /// \brief Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.

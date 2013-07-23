@@ -1,5 +1,6 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -8,7 +9,6 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "clang/Sema/Lookup.h"
 #include <algorithm>
 #include <string>
 
@@ -95,11 +95,8 @@ void CodeCompletionString::dump() const {
 
 void CodeCompletionResult::print(raw_ostream &OS) const {
   switch (Kind) {
-  case ResultKind::SwiftDeclaration:
+  case ResultKind::Declaration:
     OS << "SwiftDecl: ";
-    break;
-  case ResultKind::ClangDeclaration:
-    OS << "ClangDecl: ";
     break;
   case ResultKind::Keyword:
     OS << "Keyword: ";
@@ -127,14 +124,10 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
                 llvm::alignOf<CodeCompletionString>());
   switch (Kind) {
-  case CodeCompletionResult::ResultKind::SwiftDeclaration:
+  case CodeCompletionResult::ResultKind::Declaration:
     return new (Context.Allocator)
         CodeCompletionResult(new (Mem) CodeCompletionString(Chunks),
-                             AssociatedDecl.get<const Decl *>());
-  case CodeCompletionResult::ResultKind::ClangDeclaration:
-    return new (Context.Allocator)
-        CodeCompletionResult(new (Mem) CodeCompletionString(Chunks),
-                             AssociatedDecl.get<const clang::Decl *>());
+                             AssociatedDecl);
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
     return new (Context.Allocator)
@@ -143,7 +136,12 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 }
 
 void CodeCompletionResultBuilder::finishResult() {
-  Context.CurrentCompletionResults.push_back(takeResult());
+  auto *Result = takeResult();
+  if (Kind == CodeCompletionResult::ResultKind::Declaration &&
+      AssociatedDecl->hasClangNode())
+    Context.ClangCompletionResults.push_back(Result);
+  else
+    Context.CurrentCompletionResults.push_back(Result);
 }
 
 StringRef CodeCompletionContext::copyString(StringRef String) {
@@ -152,21 +150,40 @@ StringRef CodeCompletionContext::copyString(StringRef String) {
   return StringRef(Mem, String.size());
 }
 
+void CodeCompletionContext::clearClangCache() {
+  ClangCompletionResults.clear();
+}
+
 ArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
+  if (IncludeClangResults) {
+    CurrentCompletionResults.reserve(CurrentCompletionResults.size() +
+                                     ClangCompletionResults.size());
+    // Add Clang results from the cache.
+    for (auto R : ClangCompletionResults)
+      CurrentCompletionResults.push_back(R);
+  }
+
+  // Copy pointers to the results.
   const size_t Count = CurrentCompletionResults.size();
   CodeCompletionResult **Results =
       Allocator.Allocate<CodeCompletionResult *>(Count);
   std::copy(CurrentCompletionResults.begin(), CurrentCompletionResults.end(),
             Results);
   CurrentCompletionResults.clear();
+  IncludeClangResults = false;
   return llvm::makeArrayRef(Results, Count);
 }
 
 namespace {
-class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
+class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
+                                    public ModuleLoadListener {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   TranslationUnit *const TU;
+
+  /// \brief Set to true when we have delivered code completion results
+  /// to the \c Consumer.
+  bool DeliveredResults = false;
 
   template<typename ExprType>
   bool typecheckExpr(ExprType *&E) {
@@ -193,6 +210,11 @@ public:
                               CodeCompletionConsumer &Consumer)
       : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
         Consumer(Consumer), TU(P.TU) {
+    P.Context.addModuleLoadListener(*this);
+  }
+
+  ~CodeCompletionCallbacksImpl() {
+    P.Context.removeModuleLoadListener(*this);
   }
 
   void completeExpr() override;
@@ -201,22 +223,29 @@ public:
   void completePostfixExpr(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
+
+  void deliverCompletionResults();
+
+  // Implement swift::ModuleLoadListener.
+  void loadedModule(ModuleLoader *Loader, Module *M) override;
 };
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeExpr() {
+  if (DeliveredResults)
+    return;
+
   Parser::ParserPositionRAII RestorePosition(P);
   P.restoreParserPosition(ExprBeginPosition);
 
   // FIXME: implement fallback code completion.
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
 }
 
 namespace {
 /// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : swift::VisibleDeclConsumer,
-                         clang::VisibleDeclConsumer
+class CompletionLookup : swift::VisibleDeclConsumer
 {
   CodeCompletionContext &CompletionContext;
   ASTContext &SwiftContext;
@@ -294,8 +323,8 @@ public:
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(VD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(VD);
     if (needDot())
       Builder.addDot();
     Builder.addTextChunk(Name);
@@ -361,8 +390,8 @@ public:
 
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(FD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(FD);
     if (needDot())
       Builder.addDot();
     Builder.addTextChunk(Name);
@@ -370,7 +399,7 @@ public:
     auto *FE = FD->getBody();
     auto Patterns = FE->getArgParamPatterns();
     unsigned FirstIndex = 0;
-    if (!IsImlicitlyCurriedInstanceMethod && Patterns[0]->isImplicit())
+    if (!IsImlicitlyCurriedInstanceMethod && FE->getImplicitThisDecl())
       FirstIndex = 1;
     addPatternParameters(Builder, Patterns[FirstIndex]);
     Builder.addRightParen();
@@ -411,8 +440,8 @@ public:
     assert(!HaveDot && "can not add a constructor call after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(CD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(CD);
     if (IsSuperRefExpr && isa<ConstructorDecl>(CurrDeclContext)) {
       Builder.addTextChunk("constructor");
     }
@@ -426,8 +455,8 @@ public:
     assert(!HaveDot && "can not add a subscript after a dot");
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(SD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(SD);
     Builder.addLeftBracket();
     addPatternParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
@@ -437,8 +466,8 @@ public:
   void addSwiftNominalTypeRef(const NominalTypeDecl *NTD) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(NTD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(NTD);
     if (needDot())
       Builder.addDot();
     Builder.addTextChunk(NTD->getName().str());
@@ -449,8 +478,8 @@ public:
   void addSwiftTypeAliasRef(const TypeAliasDecl *TAD) {
     CodeCompletionResultBuilder Builder(
         CompletionContext,
-        CodeCompletionResult::ResultKind::SwiftDeclaration);
-    Builder.setAssociatedSwiftDecl(TAD);
+        CodeCompletionResult::ResultKind::Declaration);
+    Builder.setAssociatedDecl(TAD);
     if (needDot())
       Builder.addDot();
     Builder.addTextChunk(TAD->getName().str());
@@ -461,19 +490,6 @@ public:
     else
       TypeAnnotation = MetaTypeType::get(TAD->getDeclaredType(), SwiftContext);
     addTypeAnnotation(Builder, TypeAnnotation);
-  }
-
-  void addClangDecl(const clang::NamedDecl *ND) {
-    // FIXME: Eventually, we'll import the Clang Decl and format it as a Swift
-    // declaration.  Right now we don't do this because of performance reasons.
-    StringRef Name = ND->getName();
-    if (Name.empty())
-      return;
-    CodeCompletionResultBuilder Builder(
-        CompletionContext,
-        CodeCompletionResult::ResultKind::ClangDeclaration);
-    Builder.setAssociatedClangDecl(ND);
-    Builder.addTextChunk(Name);
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation) {
@@ -576,13 +592,6 @@ public:
     }
   }
 
-  // Implement clang::VisibleDeclConsumer
-  void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
-                 clang::DeclContext *Ctx,
-                 bool InBaseClass) override {
-    addClangDecl(ND);
-  }
-
   void getValueExprCompletions(Type ExprType) {
     Kind = LookupKind::ValueExpr;
     this->ExprType = ExprType;
@@ -614,8 +623,11 @@ public:
     Kind = LookupKind::DeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
 
-    if (auto Importer = SwiftContext.getClangModuleLoader())
-      static_cast<ClangImporter&>(*Importer).lookupVisibleDecls(*this);
+    if (!CompletionContext.haveClangResults())
+      if (auto Importer = SwiftContext.getClangModuleLoader())
+        static_cast<ClangImporter&>(*Importer).lookupVisibleDecls(*this);
+
+    CompletionContext.includeUnqualifiedClangResults();
   }
 };
 
@@ -629,7 +641,7 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
   Lookup.setHaveDot();
   Lookup.getValueExprCompletions(E->getType());
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
@@ -637,7 +649,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning() {
   assert(P.Tok.is(tok::code_complete));
   Lookup.getCompletionsInDeclContext(P.Tok.getLoc());
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
@@ -647,7 +659,7 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   CompletionLookup Lookup(CompletionContext, TU->Ctx, P.CurDeclContext);
   Lookup.getValueExprCompletions(E->getType());
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
@@ -658,7 +670,7 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
   Lookup.setIsSuperRefExpr();
   Lookup.getValueExprCompletions(SRE->getType());
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
@@ -670,7 +682,20 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   Lookup.setHaveDot();
   Lookup.getValueExprCompletions(SRE->getType());
 
-  Consumer.handleResults(CompletionContext.takeResults());
+  deliverCompletionResults();
+}
+
+void CodeCompletionCallbacksImpl::deliverCompletionResults() {
+  ArrayRef<CodeCompletionResult *> Results = CompletionContext.takeResults();
+  if (!Results.empty()) {
+    Consumer.handleResults(Results);
+    DeliveredResults = true;
+  }
+}
+
+void CodeCompletionCallbacksImpl::loadedModule(ModuleLoader *Loader,
+                                               Module *M) {
+  CompletionContext.clearClangCache();
 }
 
 void PrintingCodeCompletionConsumer::handleResults(

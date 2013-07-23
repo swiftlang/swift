@@ -23,10 +23,6 @@
 #include <string>
 #include <vector>
 
-namespace clang {
-  class Decl;
-} // namespace clang
-
 namespace swift {
 class CodeCompletionCallbacksFactory;
 class Decl;
@@ -181,8 +177,7 @@ class CodeCompletionResult {
 
 public:
   enum ResultKind {
-    SwiftDeclaration,
-    ClangDeclaration,
+    Declaration,
     Keyword,
     Pattern
   };
@@ -190,7 +185,7 @@ public:
 private:
   const ResultKind Kind;
   CodeCompletionString *const CompletionString;
-  llvm::PointerUnion<const Decl *, const clang::Decl *> AssociatedDecl;
+  const Decl *AssociatedDecl;
 
   CodeCompletionResult(ResultKind Kind,
                        CodeCompletionString *CompletionString)
@@ -198,17 +193,10 @@ private:
   }
 
   CodeCompletionResult(CodeCompletionString *CompletionString,
-                       const Decl *AssociatedSwiftDecl)
-    : CodeCompletionResult(ResultKind::SwiftDeclaration, CompletionString) {
-    assert(AssociatedSwiftDecl && "should have a decl");
-    AssociatedDecl = AssociatedSwiftDecl;
-  }
-
-  CodeCompletionResult(CodeCompletionString *CompletionString,
-                       const clang::Decl *AssociatedClangDecl)
-    : CodeCompletionResult(ResultKind::ClangDeclaration, CompletionString) {
-    assert(AssociatedClangDecl && "should have a decl");
-    AssociatedDecl = AssociatedClangDecl;
+                       const Decl *AssociatedDecl)
+    : CodeCompletionResult(ResultKind::Declaration, CompletionString) {
+    this->AssociatedDecl = AssociatedDecl;
+    assert(AssociatedDecl && "should have a decl");
   }
 
 public:
@@ -216,12 +204,8 @@ public:
     return CompletionString;
   }
 
-  const Decl *getAssociatedSwiftDecl() const {
-    return AssociatedDecl.get<const Decl *>();
-  }
-
-  const clang::Decl *getAssociatedClangDecl() const {
-    return AssociatedDecl.get<const clang::Decl *>();
+  const Decl *getAssociatedDecl() const {
+    return AssociatedDecl;
   }
 
   /// Print a debug representation of the code completion result to \p OS.
@@ -232,7 +216,7 @@ public:
 class CodeCompletionResultBuilder {
   CodeCompletionContext &Context;
   CodeCompletionResult::ResultKind Kind;
-  llvm::PointerUnion<const Decl *, const clang::Decl *> AssociatedDecl;
+  const Decl *AssociatedDecl;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
 
@@ -258,13 +242,8 @@ public:
     finishResult();
   }
 
-  void setAssociatedSwiftDecl(const Decl *D) {
-    assert(Kind == CodeCompletionResult::ResultKind::SwiftDeclaration);
-    AssociatedDecl = D;
-  }
-
-  void setAssociatedClangDecl(const clang::Decl *D) {
-    assert(Kind == CodeCompletionResult::ResultKind::ClangDeclaration);
+  void setAssociatedDecl(const Decl *D) {
+    assert(Kind == CodeCompletionResult::ResultKind::Declaration);
     AssociatedDecl = D;
   }
 
@@ -334,13 +313,37 @@ public:
 class CodeCompletionContext {
   friend class CodeCompletionResultBuilder;
   llvm::BumpPtrAllocator Allocator;
+
+  /// \brief Cached unqualified Clang completion results.
+  ///
+  /// These results persist between multiple code completion requests.
+  std::vector<CodeCompletionResult *> ClangCompletionResults;
+
+  /// \brief A set of current completion results, not yet delivered to the
+  /// consumer.
   std::vector<CodeCompletionResult *> CurrentCompletionResults;
+  bool IncludeClangResults = false;
 
 public:
   /// \brief Allocate a string owned by the code completion context.
   StringRef copyString(StringRef String);
 
+  /// \brief Return current code completion results.
   ArrayRef<CodeCompletionResult *> takeResults();
+
+  /// \brief Clean the cache of Clang completion results.
+  void clearClangCache();
+
+  /// \brief Return true if we have already cached Clang completion results.
+  bool haveClangResults() {
+    return !ClangCompletionResults.empty();
+  }
+
+  /// \brief If called, the current set of completion results will include
+  /// unqualified Clang completion results.
+  void includeUnqualifiedClangResults() {
+    IncludeClangResults = true;
+  }
 };
 
 /// \brief An abstract base class for consumers of code completion results.

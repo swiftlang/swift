@@ -442,6 +442,43 @@ ClangImporter::lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const {
                           consumer);
 }
 
+namespace {
+class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
+  ClangImporter &TheClangImporter;
+  ClangImporter::Implementation &Impl;
+  swift::VisibleDeclConsumer &NextConsumer;
+
+public:
+  ImportingVisibleDeclConsumer(ClangImporter &TheClangImporter,
+                               ClangImporter::Implementation &Impl,
+                               swift::VisibleDeclConsumer &NextConsumer)
+      : TheClangImporter(TheClangImporter), Impl(Impl),
+        NextConsumer(NextConsumer) {}
+
+  void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
+                 clang::DeclContext *Ctx,
+                 bool InBaseClass) override {
+    if (ND->getName().empty())
+      return;
+
+    SmallVector<ValueDecl *, 4> Results;
+    TheClangImporter.lookupValue(/*module*/ nullptr,
+                                 Module::AccessPathTy(),
+                                 Impl.SwiftContext.getIdentifier(ND->getName()),
+                                 NLKind::UnqualifiedLookup,
+                                 Results);
+    for (auto *VD : Results)
+      NextConsumer.foundDecl(VD);
+  }
+};
+} // unnamed namespace
+
+void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
+  ImportingVisibleDeclConsumer ImportingConsumer(
+      const_cast<ClangImporter &>(*this), Impl, Consumer);
+  lookupVisibleDecls(ImportingConsumer);
+}
+
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
                                    unsigned previousGeneration) {
   auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(

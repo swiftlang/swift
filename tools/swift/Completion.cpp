@@ -339,7 +339,8 @@ public:
       // Doing so now makes REPL interaction too slow.
       ASTContext &ast = context.getDeclContext()->getASTContext();
       if (auto clangImporter = ast.getClangModuleLoader())
-        static_cast<ClangImporter&>(*clangImporter).lookupVisibleDecls(*this);
+        static_cast<ClangImporter&>(*clangImporter).lookupVisibleDecls(
+            static_cast<clang::VisibleDeclConsumer &>(*this));
 
     } else {
       lookupVisibleDecls(*this, context.getBaseType(),
