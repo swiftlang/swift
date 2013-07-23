@@ -398,9 +398,9 @@ whose value has not been initialized, ``dealloc_ref`` should be used.
 alloc_array
 ```````````
 ::
-
+  
   sil-instruction ::= 'alloc_array' sil-type ',' sil-operand
-
+  
   %1 = alloc_array $T, %0 : Builtin.Int<n>
   // $T must be a type
   // %0 must be of a builtin integer type
@@ -1188,16 +1188,103 @@ ref_element_addr
 Given an instance of a class, derives the address of a physical instance
 variable inside the instance.
 
-TODO To Be Updated
-~~~~~~~~~~~~~~~~~~
+Protocol and Protocol Composition Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These instructions create and manipulate values of protocol and protocol
+composition type.  From SIL's perspective, protocol and protocol composition
+types consist of an *existential container*, which is a generic container for
+a value of unknown runtime type, referred to as an "existential type" in type
+theory. The existential container consists of a reference to the
+*witness table(s)* for the protocol(s) referred to by the protocol type and a
+reference to the underlying *concrete value*, which may be either stored
+in-line inside the existential container for small values or allocated
+separately into a buffer owned and managed by the existential container for
+larger values.
+
+If none of the protocols in a protocol type are class protocols, then
+the existential container for that type is address-only and referred to in
+the implementation as an *opaque existential container*. The value semantics of
+the existential container propagate to the contained concrete value. Applying
+``copy_addr`` to an opaque existential container copies the
+contained concrete value, deallocating or reallocating the destination
+container's owned buffer if necessary. Applying ``destroy_addr`` to an
+opaque existential container destroys the concrete value and deallocates any
+buffers owned by the existential container.
+
+If a protocol type is constrained by one or more class protocols, then the
+existential container for that type is loadable and referred to in the
+implementation as a *class existential container*. Class existential containers
+have reference semantics and can be ``retain``-ed and ``release``-d.
+
+init_existential
+````````````````
+::
+  
+  sil-instruction ::= 'init_existential' sil-operand ',' sil-type
+
+  %1 = init_existential %0 : $*P, $T
+  // %0 must be of a $*P address type for non-class protocol or protocol
+  //   composition type P
+  // $T must be a type that fulfills protocol(s) P
+  // %1 will be of type $*T
+
+Partially initializes the memory referenced by ``%0`` with an existential
+container prepared to contain a value of type ``$T``. The result of the
+instruction is an address referencing the storage for the contained value, which
+remains uninitialized. The contained value must be ``store``-d or
+``copy_addr``-ed to in order for the existential value to be fully initialized.
+If the existential container needs to be destroyed while the contained value
+is uninitialized, ``deinit_existential`` must be used to do so. A fully
+initialized existential container can be destroyed with ``destroy_addr`` as
+usual.
+
+upcast_existential
+``````````````````
+::
+
+  sil-instruction ::= 'upcast_existential' '[take]'? sil-operand
+                        'to' sil-operand
+
+  %_ = upcast_existential %0 : $*protocol<P, Q> to %1 : $*P
+  // %0 must be the address of a non-class protocol or protocol composition
+  //   type
+  // %1 must be the address of a non-class protocol or protocol composition
+  //   type that is a supertype of %0
+
+Initializes the memory referenced by the destination ``%1`` with the value
+contained in the existing existential container referenced by ``%0``. 
+The ``[take]`` attribute may be applied to the instruction, in which case,
+the source existential container is destroyed and ownership of the contained
+value is taken by the destination. Without the ``[take]`` attribute, the
+destination receives an independently-owned copy of the value.
+
+deinit_existential
+``````````````````
+::
+
+  sil-instruction ::= 'deinit_existential' sil-operand
+
+  %_ = deinit_existential %0 : $*P
+  // %0 must be of a $*P address type for non-class protocol or protocol
+  // composition type P
+
+Undoes the partial initialization performed by
+``init_existential``.  ``deinit_existential`` is only valid for
+existential containers that have been partially initialized by
+``init_existential`` but haven't had their contained value initialized.
+A fully initialized existential must be destroyed with ``destroy_addr``.
 
 project_existential
 ```````````````````
 ::
 
-  %1 = project_existential %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-  ; %1 will be of type $Builtin.OpaquePointer
+  sil-instruction ::= 'project_existential' sil-operand
+
+  %1 = project_existential %0 : $*P
+  // %0 must be of a $*P type for non-class protocol or protocol composition
+  //   type P
+  // %1 will be of type $Builtin.OpaquePointer
 
 Obtains an ``OpaquePointer`` pointing to the concrete value referenced by the
 existential container referenced by ``%0``. This pointer can be passed to
@@ -1212,63 +1299,83 @@ existential container. A method call on a protocol-type value in Swift::
   // ... initialize foo
   foo.bar(123)
 
-compiles to this SIL::
+compiles to this SIL sequence::
 
-  ; ... initialize %foo
-  %bar = protocol_method %foo, @Foo.bar
-  %foo_p = project_existential %foo
-  %one_two_three = integer_literal $Builtin.Int64, 123
-  %_ = apply %bar(%foo_p, %one_two_three)
+  // ... initialize %foo
+  %bar = protocol_method %foo : $*Foo, #Foo.bar!1
+  %foo_p = project_existential %foo : $*Foo
+  %one_two_three = integer_literal $Int, 123
+  %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.OpaquePointer) : $(Int, Builtin.OpaquePointer) -> ()
 
-It is an error if the result of ``project_existential`` is used as anything
+It is invalid for the result of ``project_existential`` is used as anything
 other than the "this" argument of an instance method reference obtained by
 ``protocol_method`` from the same existential container.
 
-init_existential
-````````````````
-::
-
-  %1 = init_existential $T, %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-  ; $T must be a type that fulfills protocol(s) P
-  ; %1 will be of type $*T
-
-Prepares the uninitialized existential container pointed to by ``%0`` to
-contain a value of type ``$T``. ``%0`` must point to uninitialized storage
-for an existential container. The result of the instruction is the address
-of the concrete value inside the container; this storage is uninitialized and
-must be initialized by a ``store`` or ``copy_addr`` to ``%1``. If the concrete
-value must be deallocated without be initialized (for instance, if its
-constructor fails), ``deinit_existential`` can do so. Once the concrete value
-is initialized, the entire existential container can be destroyed with
-``destroy_addr``.
-
-upcast_existential
-``````````````````
-
-deinit_existential
-``````````````````
-::
-
-  deinit_existential %0
-  ; %0 must be of a $*P type for protocol or protocol composition type P
-
-Undoes the internal allocation (if any) performed by
-``init_existential``.  This does not destroy the value referenced by
-the existential container, which must be uninitialized.
-``deinit_existential`` is only necessary for existential
-containers that have been partially initialized by ``init_existential``
-but haven't had their value initialized. A fully initialized existential can
-be destroyed with ``destroy_addr`` like a normal address-only value.
-
-project_existential_ref
-```````````````````````
-
 init_existential_ref
 ````````````````````
+::
+
+  sil-instruction ::= 'init_existential_ref' sil-operand ',' sil-type
+
+  %1 = init_existential_ref %0 : $C, $P
+  // %0 must be of class type $C conforming to protocol(s) $P
+  // $P must be a class protocol or protocol composition type
+  // %1 will be of type $P
+
+Creates a class existential container of type ``$P`` containing a reference to
+the class instance ``%0``.
 
 upcast_existential_ref
 ``````````````````````
+::
+
+  sil-instruction ::= 'upcast_existential_ref' sil-operand 'to' sil-type
+
+  %1 = upcast_existential_ref %0 : $protocol<P, Q> to $P
+  // %0 must be of a class protocol or protocol composition type
+  // $P must be a class protocol or protocol composition type that is a
+  //   supertype of %0's type
+
+Converts a class existential container to a more general protocol or protocol
+composition type.
+
+project_existential_ref
+```````````````````````
+::
+
+  sil-instruction ::= 'project_existential_ref' sil-operand
+
+  %1 = project_existential_ref %0 : $P
+  // %0 must be of a class protocol or protocol composition type $P
+  // %1 will be of type $Builtin.ObjCPointer
+
+Extracts the class instance reference from a class existential container as a
+``Builtin.ObjCPointer``. This value can be passed to protocol instance methods
+obtained by ``protocol_method`` from the same existential container. A method
+call on a class-protocol-type value in Swift::
+
+  protocol [class_protocol] Foo {
+    func bar(x:Int)
+  }
+
+  var foo:Foo
+  // ... initialize foo
+  foo.bar(123)
+
+compiles to this SIL sequence::
+
+  // ... initialize %foo
+  %bar = protocol_method %foo : $Foo, #Foo.bar!1
+  %foo_p = project_existential_ref %foo : $Foo
+  %one_two_three = integer_literal $Int, 123
+  %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.ObjCPointer) : $(Int, Builtin.ObjCPointer) -> ()
+
+It is invalid for the result of ``project_existential_ref`` is used as anything
+other than the "this" argument of an instance method reference obtained by
+``protocol_method`` from the same existential container.
+
+TODO To Be Updated
+~~~~~~~~~~~~~~~~~~
 
 convert_function
 ````````````````
@@ -1462,49 +1569,6 @@ switch_oneof
 
 Protocol and protocol composition types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-FIXME: Re-section instructions.
-
-From SIL's perspective, protocol and protocol composition types consist of 
-an *existential container*, which gets allocated when
-``alloc_var`` or ``alloc_box`` is applied to a protocol or protocol composition
-type. An existential container is a generic container for
-a value of unknown runtime type, referred to as an "existential type" in
-type theory. The existential container consists of a reference to the *witness
-table(s)* for the protocol(s) referred to by the protocol type and a reference
-to the underlying *concrete value*, which may be either stored in-line inside
-the existential container for small values or allocated separately into a
-buffer owned and managed by the existential container for larger values.
-
-Existential containers are always address-only. The value semantics of
-the existential container propagate to the contained concrete value. Applying
-``copy_addr`` to an existential container copies the
-contained concrete value, deallocating or reallocating the destination's
-owned buffer if necessary. Applying ``destroy_addr`` to an existential
-container destroys the concrete value and deallocates any buffers owned by
-the existential container.
-
-An existential container's witness tables and concrete value buffer
-are prepared by applying the ``init_existential`` instruction to an
-uninitialized existential container. ``init_existential`` takes a
-concrete type parameter and returns an address of the given type that can then
-be stored to in order to fully initialize the existential container.
-For example, creating a protocol value from a value type in Swift::
-
-  protocol SomeProtocol
-  struct SomeInstance : SomeProtocol
-
-  var x:SomeInstance
-  var p:SomeProtocol = x
-
-compiles to this SIL::
-
-  ; allocate the existential container for a SomeProtocol
-  %p = alloc_var $SomeProtocol
-  ; initialize the existential container to contain a SomeInstance
-  %p_instance = init_existential $SomeInstance, %p
-  ; store the SomeInstance inside the existential container
-  store %x to %p_instance
 
 
 Calling convention

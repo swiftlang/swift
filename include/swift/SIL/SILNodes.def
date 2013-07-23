@@ -118,14 +118,14 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StructElementAddrInst, SILInstruction)
   INST(RefElementAddrInst, SILInstruction)
 
-  INST(ProjectExistentialInst, SILInstruction)
+  // Protocol and Protocol Composition Types
   INST(InitExistentialInst, SILInstruction)
   INST(UpcastExistentialInst, SILInstruction)
   INST(DeinitExistentialInst, SILInstruction)
-
-  INST(ProjectExistentialRefInst, SILInstruction)
+  INST(ProjectExistentialInst, SILInstruction)
   INST(InitExistentialRefInst, SILInstruction)
   INST(UpcastExistentialRefInst, SILInstruction)
+  INST(ProjectExistentialRefInst, SILInstruction)
 
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(ConvertFunctionInst, ConversionInst)
