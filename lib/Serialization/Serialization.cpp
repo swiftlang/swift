@@ -1118,7 +1118,7 @@ bool Serializer::writeDecl(const Decl *D) {
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
-                           attrs.AsmName);
+                           fn->getAttrs().AsmName);
 
     writeGenericParams(fn->getGenericParams());
 
