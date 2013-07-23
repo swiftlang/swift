@@ -13,6 +13,7 @@
 #include "ModuleFile.h"
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -500,12 +501,21 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
 ///
 /// An empty name represents the builtin module. All other names are looked up
 /// in the ASTContext.
-static Module *getModule(ASTContext &ctx, Identifier name) {
+static Module *getModule(Module *currentModule, Identifier name) {
   if (name.empty())
-    return ctx.TheBuiltinModule;
+    return currentModule->Ctx.TheBuiltinModule;
+
+  // FIXME: duplicated from NameBinder::getModule
+  // FIXME: provide a real source location.
+  if (name == currentModule->Name)
+    if (auto importer = currentModule->Ctx.getClangModuleLoader())
+      return importer->loadModule(SourceLoc(),
+                                  std::make_pair(name, SourceLoc()),
+                                  false);
 
   // FIXME: provide a real source location.
-  return ctx.getModule(std::make_pair(name, SourceLoc()), false);
+  return currentModule->Ctx.getModule(std::make_pair(name, SourceLoc()),
+                                      false);
 }
 
 
@@ -1242,7 +1252,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     Identifier moduleName = getIdentifier(rawAccessPath.front());
     rawAccessPath = rawAccessPath.slice(1);
 
-    Module *M = getModule(ctx, moduleName);
+    Module *M = getModule(ModuleContext, moduleName);
     assert(M && "missing dependency");
 
     switch (kind) {
@@ -1251,7 +1261,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       // Start by looking up the top-level decl in the module.
       Module *baseModule = M;
       if (isWithinExtension) {
-        baseModule = getModule(ctx, getIdentifier(rawAccessPath.front()));
+        baseModule = getModule(ModuleContext,
+                               getIdentifier(rawAccessPath.front()));
         rawAccessPath = rawAccessPath.slice(1);
       }
 
@@ -1286,7 +1297,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
       ValueDecl *result = nullptr;
       for (auto value : values) {
-        if (value->getModuleContext() != M)
+        if (!value->hasClangNode() && value->getModuleContext() != M)
           continue;
         if (expectedTy && value->getType()->getCanonicalType() != expectedTy)
           continue;

@@ -138,7 +138,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   if (UseStandardLibraryHack) {
     for (auto ModPair : TU->getImportedModules()) {
       if (isa<BuiltinModule>(ModPair.second) || 
-          isa<ClangModule>(ModPair.second))
+          isa<LoadedModule>(ModPair.second))
         continue;
 
       TranslationUnit *SubTU = cast<TranslationUnit>(ModPair.second);

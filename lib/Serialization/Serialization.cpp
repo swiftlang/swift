@@ -845,12 +845,11 @@ bool Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
-  if (D->hasClangNode())
-    return false;
-
   Module *M = D->getModuleContext();
   if (M != TU)
     return writeCrossReference(D);
+
+  assert(!D->hasClangNode() && "imported decls should use cross-references");
 
   switch (D->getKind()) {
   case DeclKind::Import:

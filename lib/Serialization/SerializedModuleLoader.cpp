@@ -177,6 +177,9 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first, comp,
                                            loadedModuleFile.get());
 
+  // Whether we succeed or fail, don't try to load this module again.
+  Ctx.LoadedModules[moduleID.first.str()] = module;
+
   if (loadedModuleFile) {
     bool success = loadedModuleFile->associateWithModule(module);
     if (success) {
@@ -216,8 +219,6 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     }
   }
 
-  // Whether we succeeded or failed, don't try to load this module again.
-  Ctx.LoadedModules[moduleID.first.str()] = module;
   return module;
 }
 
