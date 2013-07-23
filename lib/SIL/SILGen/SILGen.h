@@ -250,12 +250,7 @@ class SwitchContext;
   
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
-  : public ASTVisitor<SILGenFunction,
-                      /*ExprRetTy=*/ RValue,
-                      /*StmtRetTy=*/ void,
-                      /*DeclRetTy=*/ void,
-                      /*PatternRetTy=*/ void,
-                      /*Args...=*/ SGFContext>
+  : public ASTVisitor<SILGenFunction>
 { // style violation because Xcode <rdar://problem/13065676>
 public:
   /// The SILGenModule this function belongs to.
@@ -471,37 +466,33 @@ public:
 
   using ASTVisitorType::visit;
   
-  RValue visit(Expr *E);
-  void visit(Stmt *S) { visit(S, SGFContext()); }
-  void visit(Decl *D) { visit(D, SGFContext()); }
-  
   //===--------------------------------------------------------------------===//
   // Statements
   //===--------------------------------------------------------------------===//
   
-  void visitBraceStmt(BraceStmt *S, SGFContext C);
+  void visitBraceStmt(BraceStmt *S);
   
-  void visitReturnStmt(ReturnStmt *S, SGFContext C);
+  void visitReturnStmt(ReturnStmt *S);
   
-  void visitIfStmt(IfStmt *S, SGFContext C);
+  void visitIfStmt(IfStmt *S);
   
-  void visitWhileStmt(WhileStmt *S, SGFContext C);
+  void visitWhileStmt(WhileStmt *S);
   
-  void visitDoWhileStmt(DoWhileStmt *S, SGFContext C);
+  void visitDoWhileStmt(DoWhileStmt *S);
   
-  void visitForStmt(ForStmt *S, SGFContext C);
+  void visitForStmt(ForStmt *S);
   
-  void visitForEachStmt(ForEachStmt *S, SGFContext C);
+  void visitForEachStmt(ForEachStmt *S);
   
-  void visitBreakStmt(BreakStmt *S, SGFContext C);
+  void visitBreakStmt(BreakStmt *S);
   
-  void visitContinueStmt(ContinueStmt *S, SGFContext C);
+  void visitContinueStmt(ContinueStmt *S);
   
-  void visitFallthroughStmt(FallthroughStmt *S, SGFContext C);
+  void visitFallthroughStmt(FallthroughStmt *S);
   
-  void visitSwitchStmt(SwitchStmt *S, SGFContext C);
+  void visitSwitchStmt(SwitchStmt *S);
 
-  void visitCaseStmt(CaseStmt *S, SGFContext C);
+  void visitCaseStmt(CaseStmt *S);
   
   //===--------------------------------------------------------------------===//
   // Patterns
@@ -514,7 +505,7 @@ public:
   // Expressions
   //===--------------------------------------------------------------------===//
  
-  RValue visit(Expr *E, SGFContext C = SGFContext()) = delete;
+  RValue visit(Expr *E) = delete;
  
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
@@ -646,20 +637,20 @@ public:
   // Declarations
   //===--------------------------------------------------------------------===//
   
-  void visitDecl(Decl *D, SGFContext C) {
+  void visitDecl(Decl *D) {
     D->dump();
     llvm_unreachable("Not yet implemented");
   }
 
-  void visitNominalTypeDecl(NominalTypeDecl *D, SGFContext C);
-  void visitFuncDecl(FuncDecl *D, SGFContext C);
-  void visitPatternBindingDecl(PatternBindingDecl *D, SGFContext C);
+  void visitNominalTypeDecl(NominalTypeDecl *D);
+  void visitFuncDecl(FuncDecl *D);
+  void visitPatternBindingDecl(PatternBindingDecl *D);
     
-  void visitTypeAliasDecl(TypeAliasDecl *D, SGFContext C) {
+  void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
   }
     
-  void visitVarDecl(VarDecl *D, SGFContext C) {
+  void visitVarDecl(VarDecl *D) {
     // We handle these in pattern binding.
   }
   

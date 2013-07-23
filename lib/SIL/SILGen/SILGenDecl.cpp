@@ -115,7 +115,7 @@ ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
   return {};
 }
 
-void SILGenFunction::visitFuncDecl(FuncDecl *fd, SGFContext C) {
+void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
   SGM.emitFunction(fd, fd->getBody());
   
@@ -358,8 +358,7 @@ struct InitializationForPattern
 } // end anonymous namespace
 
 
-void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D,
-                                             SGFContext C) {
+void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   InitializationPtr initialization =
@@ -802,7 +801,7 @@ void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
 }
 
-void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd, SGFContext C) {
+void SILGenFunction::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(SGM, ntd).emitType();
 }
 

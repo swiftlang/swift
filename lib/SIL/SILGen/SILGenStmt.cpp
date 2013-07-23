@@ -84,7 +84,7 @@ Condition SILGenFunction::emitCondition(SILLocation Loc, Expr *E,
   return Condition(TrueBB, FalseBB, ContBB);
 }
 
-void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
+void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(Cleanups, B, S);
   
@@ -138,7 +138,7 @@ void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
   Cleanups.emitReturnAndCleanups(loc, result);
 }
 
-void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
+void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
@@ -147,7 +147,7 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S, SGFContext C) {
     emitReturnExpr(S, S->getResult());
 }
 
-void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
+void SILGenFunction::visitIfStmt(IfStmt *S) {
   Condition Cond = emitCondition(S, S->getCond(), S->getElseStmt() != nullptr);
   
   if (Cond.hasTrue()) {
@@ -166,7 +166,7 @@ void SILGenFunction::visitIfStmt(IfStmt *S, SGFContext C) {
   Cond.complete(B);
 }
 
-void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
+void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
@@ -197,7 +197,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S, SGFContext C) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
+void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = new (F.getModule()) SILBasicBlock(&F);
   B.emitBlock(LoopBB);
@@ -234,7 +234,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S, SGFContext C) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
+void SILGenFunction::visitForStmt(ForStmt *S) {
   // Enter a new scope.
   Scope ForScope(Cleanups);
   
@@ -292,10 +292,10 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
+void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'range' variable that we'll be using for iteration.
   Scope OuterForScope(Cleanups);
-  visitPatternBindingDecl(S->getRange(), SGFContext());
+  visitPatternBindingDecl(S->getRange());
   
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -320,7 +320,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(Cleanups);
-      visitPatternBindingDecl(S->getElementInit(), SGFContext());
+      visitPatternBindingDecl(S->getElementInit());
       visit(S->getBody());
     }
     
@@ -338,30 +338,30 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S, SGFContext C) {
   ContinueDestStack.pop_back();
 }
 
-void SILGenFunction::visitBreakStmt(BreakStmt *S, SGFContext C) {
+void SILGenFunction::visitBreakStmt(BreakStmt *S) {
   Cleanups.emitBranchAndCleanups(BreakDestStack.back());
 }
 
-void SILGenFunction::visitContinueStmt(ContinueStmt *S, SGFContext C) {
+void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
   Cleanups.emitBranchAndCleanups(ContinueDestStack.back());
 }
 
-void SILGenFunction::visitSwitchStmt(SwitchStmt *S, SGFContext C) {
+void SILGenFunction::visitSwitchStmt(SwitchStmt *S) {
   // Implemented in SILGenPattern.cpp.
   emitSwitchStmt(S);
 }
 
-void SILGenFunction::visitCaseStmt(CaseStmt *S, SGFContext C) {
+void SILGenFunction::visitCaseStmt(CaseStmt *S) {
   llvm_unreachable("cases should be lowered as part of switch stmt");
 }
 
-void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S, SGFContext C) {
+void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
   // Implemented in SILGenPattern.cpp.
   emitSwitchFallthrough(S);
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
-                                                           LValue const &src) {
+                                                 LValue const &src) {
   SILValue addr;
   
   assert(src.begin() != src.end() && "lvalue must have at least one component");
