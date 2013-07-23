@@ -61,6 +61,13 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(DeallocStackInst, SILInstruction)
   INST(DeallocRefInst, SILInstruction)
 
+  // Accessing memory
+  INST(LoadInst, SILInstruction)
+  INST(StoreInst, SILInstruction)
+  INST(InitializeVarInst, SILInstruction)
+  INST(CopyAddrInst, SILInstruction)
+  INST(DestroyAddrInst, SILInstruction)
+
   // Literals
   INST(FunctionRefInst, SILInstruction)
   INST(BuiltinFunctionRefInst, SILInstruction)
@@ -102,10 +109,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(StructElementAddrInst, SILInstruction)
   INST(RefElementAddrInst, SILInstruction)
 
-  INST(LoadInst, SILInstruction)
-  INST(StoreInst, SILInstruction)
-  INST(InitializeVarInst, SILInstruction)
-  
   INST(ProjectExistentialInst, SILInstruction)
   INST(InitExistentialInst, SILInstruction)
   INST(UpcastExistentialInst, SILInstruction)
@@ -118,8 +121,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(RetainInst, SILInstruction)
   INST(RetainAutoreleasedInst, SILInstruction)
   INST(ReleaseInst, SILInstruction)
-  INST(DestroyAddrInst, SILInstruction)
-  INST(CopyAddrInst, SILInstruction)
   
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(ConvertFunctionInst, ConversionInst)

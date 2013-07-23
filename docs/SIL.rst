@@ -448,6 +448,149 @@ destroy the reference type instance or the values inside the box. The contents
 of the reference-counted instance must be fully initialized or destroyed before
 ``dealloc_ref`` is applied.
 
+Accessing Memory
+~~~~~~~~~~~~~~~~
+
+load
+````
+::
+
+  sil-instruction ::= 'load' sil-operand
+
+  %1 = load %0 : $*T
+  // %0 must be of a $*T address type for loadable type $T
+  // %1 will be of type $T
+
+Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
+This does not affect the reference count, if any, of the loaded value; the
+value must be retained explicitly if necessary.
+
+store
+`````
+::
+
+  store %0 : $T to %1 : $*T
+  // $T must be a loadable type
+
+Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
+loadable type. This will overwrite the memory at ``%1``; ``%1`` must point
+to uninitialized or destroyed memory.
+
+initialize_var
+``````````````
+::
+
+  initialize_var %0 : $*T
+  // %0 must be an address $*T
+
+TODO: Dataflow analysis not implemented yet. initialize_var currently is passed
+through to IRGen and lowers to zero initialization.
+
+TODO: Do we actually need an instruction to model this?
+
+A pseudo-instruction that notionally "stores" the "must be initialized" value
+to the address ``%0``. In dataflow analysis, this value has the following
+semantics:
+
+- It can be loaded but not stored. If it is of an address-only type,
+  ``copy_addr`` cannot use its address as a source. ``destroy_addr``
+  may take its address as an operand; it is a no-op.
+- A "must be initialized" value cannot be used as the argument of an ``apply``
+  or ``partial_apply`` instruction, and cannot be used as part of a ``struct``
+  or ``tuple`` construction.
+- Retaining and releasing the value, or any part of the value, is a no-op.
+- Extracting or projecting any component of the value, as by
+  ``struct_extract``, ``tuple_extract``, ``project_existential``, etc.,
+  produces another "must be initialized" value (or the address of such a value).
+- The address containing the value can be overwritten as the destination of a 
+  ``store`` or ``copy_addr``. A ``copy_addr`` assignment can be promoted to a
+  ``copy_addr`` ``[initialization]``.
+
+The goal of these semantics is model definitive assignment, that is, the
+requirement that local variables and instance variable fields be initialized
+before use. Dataflow analysis verifies these semantics then eliminates the
+instruction.
+
+copy_addr
+`````````
+::
+
+  sil-instruction ::= 'copy_addr' '[take]'? sil-operand
+                        'to' '[initialization]'? sil-operand
+
+  %_ = copy_addr [take] %0 : $*T to [initialization] %1 : $*T
+  // %0 and %1 must be of the same $*T address type
+
+Loads the value at address ``%0`` from memory and assigns a copy of it back
+into memory at address ``%1``. A bare ``copy_addr`` instruction::
+
+  copy_addr %0 : $*T to %1 : $*T
+
+is equivalent to::
+
+  %new = load %0 : $*T        // Load the new value from the source
+  %old = load %1 : $*T        // Load the old value from the destination
+  retain %new : $T            // Retain the new value
+  release %old : $T           // Release the old
+  store %new : $T to %1 : $*T // Store the new value to the destination
+
+except that ``copy_addr`` may be used even if ``%0`` is of an address-only
+type. The ``copy`` may be given one or both of the ``[take]`` or
+``[initialization]`` attributes:
+
+* ``[take]`` destroys the value at the source address in the course of the
+  copy.
+* ``[initialization]`` indicates that the destination address is uninitialized.
+  Without the attribute, the destination address is treated as already
+  initialized, and the existing value will be destroyed before the new value
+  is stored.
+
+The three attributed forms thus behave like the following loadable type
+operations::
+
+  // take-assignment
+    copy_addr [take] %0 : $*T to %1 : $*T
+  // is equivalent to:
+    %new = load %0 : $*T
+    %old = load %1 : $*T
+    // no retain of %new!
+    release %old : $T
+    store %new : $T to %1 : $*T
+
+  // copy-initialization
+    copy_addr %0 : $*T to [initialization] %1 : $*T
+  // is equivalent to:
+    %new = load %0 : $*T
+    retain %new : $T
+    // no load/release of %old!
+    store %new : $T to %1 : $*T
+
+  // take-initialization
+    copy_addr [take] %0 : $*T to [initialization] %1 : $*T
+  // is equivalent to:
+    %new = load %0 : $*T
+    ; no retain of %new!
+    ; no load/release of %old!
+    store %new : $T to %1 : $*T
+
+destroy_addr
+````````````
+::
+
+  sil-instruction ::= 'destroy_addr' sil-operand
+
+  %_ = destroy_addr %0 : $*T
+  // %0 must be of an address $*T type
+
+Destroys the value in memory at address ``%0``. This is equivalent to::
+
+  %1 = load %0
+  release %1
+
+except that ``destroy_addr`` may be used even if ``%0`` is of an
+address-only type.  This does not deallocate memory; it only destroys the
+pointed-to value, leaving the memory uninitialized.
+
 Literals
 ~~~~~~~~
 
@@ -1004,172 +1147,6 @@ variable inside the instance.
 TODO To Be Updated
 ~~~~~~~~~~~~~~~~~~
 
-load
-````
-::
-
-  %1 = load %0
-  ; %0 must be of a $*T type for a loadable type $T
-  ; %1 will be of type $T
-
-Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
-This does not affect the reference count, if any, of the loaded value; the
-value must be retained explicitly if necessary.
-
-store
-`````
-::
-
-  store %0 to %1
-  ; Given a %0 of loadable type $T,
-  ; %1 must be of type $*T
-
-Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
-loadable type. This will overwrite the memory at ``%1``; any existing value at
-``%1`` must be released or destroyed before being overwritten.
-
-initialize_var
-``````````````
-::
-
-  initialize_var %0
-  ; %0 must be an address $*T
-
-TODO: Dataflow analysis not implemented yet. initialize_var currently just
-does a zero initialization.
-
-A pseudo-instruction that semantically "stores" a pseudo-value to the address
-``%0`` representing the default state of a variable without an initializer.
-Dataflow analysis must replace this instruction in one of the following ways:
-
-- If there is a definitive assignment to ``%0`` along every code path
-  dominated by the ``initialize_var``, those assignments become
-  initializations of ``%0``. A definitive assignment is a store to ``%0`` that
-  precedes any use of the pseudo-value loaded from ``%0`` other than as the
-  operand of ``retain`` or ``release`` or as the destination
-  for ``copy_addr assign``. For example, this definitive assignment sequence
-  for a reference type::
-    
-    ; Foo is a class type
-    %x = alloc_var stack $Foo
-    initialize_var %x
-    ; Reassignment sequence
-    %x.old = load %x
-    retain %y
-    store %y to %x
-    release %x.old
-
-  becomes an initialization sequence::
-
-    %x = alloc_var stack $Foo
-    retain %y
-    store %y to %x
-
-  Likewise, in this definitive assignment sequence for an address-only type::
-
-    ; T is an archetype
-    %x = alloc_var stack $T
-    initialize_var %x
-    copy_addr %y to assign %x
-
-  the ``copy_addr`` becomes an initialization::
-
-    %x = alloc_var stack $T
-    copy_addr %y to %x
-
-- If dataflow analysis fails to find a definitive assignment for ``%0`` and the
-  type referenced by ``%0`` has a default constructor, then ``initialize_var``
-  becomes a call to the default constructor for the type referenced by ``%0``,
-  with its result stored to ``%0``. So in this sequence, in which the
-  ``initialize_var`` pseudo-value is used before being stored over::
-
-    ; Foo is a struct type with default constructor
-    %x = alloc_var stack $Foo
-    initialize_var %x
-    ; Pass the initialized x to a function
-    %x.value = load %x
-    %bar = constant_ref $(Foo) -> (), @bar
-    apply %bar(%x.value)
-    ; Store a new value to x
-    %bas = constant_ref $() -> Foo, @bas
-    %y = apply %bas()
-    store %y to %x
-
-  the ``initialize_var`` becomes a constructor call::
-
-    %x = alloc_var stack $Foo
-    %constructor = constant_ref $(Foo.metatype) -> () -> Foo, @Foo.constructor
-    %Foo = metatype $Foo
-    %constructor.0 = apply %constructor(%Foo)
-    %x.init = apply %constructor.0()
-    store %x.init to %x
-    ; ...
-
-  and the subsequent code continues normally.
-
-If neither definitive assignment nor default construction are possible, then
-dataflow analysis of ``initialize_var`` raises an error. ``initialize_var``
-cannot be lowered to IR.
-
-copy_addr
-`````````
-::
-
-  copy_addr [take] %0 to [assign] %1
-  ; %0 and %1 must be of the same $*T type
-
-Loads the value at address ``%0`` from memory and stores it back into memory at
-address ``%1``. A bare ``copy_addr`` instruction::
-
-  copy_addr %0 to %1
-
-is equivalent to::
-
-  %tmp = load %0
-  retain %tmp ; if %tmp is of a box or reference type
-  store %tmp to %1
-
-except that ``copy`` must be used if ``%0`` is of an address-only type. The
-operands of ``copy`` may be given one or both of the ``take`` or ``assign``
-attributes:
-
-* ``take`` indicates that ownership of resources may be taken from the source
-  value at ``%0`` and given to ``%1``, invalidating ``%0``. Without ``take``,
-  ``copy_addr`` will retain resources in ``%0`` so that both ``%0`` and ``%1``
-  are valid after the instruction.
-* ``assign`` indicates that ``%1`` already contains a valid value which must be
-  ``release``-d before being replaced with the value at ``%0``. Without
-  ``assign``, ``copy_addr`` will overwrite the memory at ``%1`` as if it is
-  uninitialized.
-
-The three attributed forms thus behave like the following loadable type
-operations::
-
-  ;;; take-initialization
-    copy_addr take %0 to %1
-  ;;; is equivalent to:
-    %tmp = load %0
-    ; no retain!
-    store %tmp to %1
-
-  ;;; assignment
-    copy_addr %0 to assign %1
-  ;;; is equivalent to:
-    %tmp_src = load %0
-    retain %tmp_src
-    %tmp_dest = load %1
-    store %tmp_src to %1
-    release %tmp_dest
-
-  ;;; take-assignment
-    copy_addr take %0 to assign %1
-  ;;; is equivalent to:
-    %tmp_src = load %0
-    ; no retain %tmp_src!
-    %tmp_dest = load %1
-    store %tmp_src to %1
-    release %tmp_dest
-
 project_existential
 ```````````````````
 ::
@@ -1275,22 +1252,6 @@ is destroyed and its memory is deallocated. A stack-allocated box must not
 be released to reference count zero; it must instead be destroyed manually and
 then deallocated with a ``dealloc_ref stack`` instruction. Releasing an
 address or value type is an error.
-
-destroy_addr
-````````````
-::
-
-  destroy_addr %0
-  ; %0 must be of a $*T type
-
-Destroys the value in memory at address ``%0``. This is equivalent to::
-
-  %1 = load %0
-  release %1
-
-except that ``destroy_addr`` must be used if ``%0`` is of an address-only type.
-This only destroys the referenced value; the memory may additionally need to be
-deallocated with a separate ``dealloc_var`` instruction.
 
 convert_function
 ````````````````
