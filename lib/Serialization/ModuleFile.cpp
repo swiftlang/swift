@@ -1700,11 +1700,17 @@ Type ModuleFile::getType(TypeID TID) {
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
                                                     rawArgumentIDs);
     SmallVector<Type, 8> genericArgs;
-    for (TypeID type : rawArgumentIDs)
-      genericArgs.push_back(getType(type));
+    NominalTypeDecl *nominal;
+    Type parentTy;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      for (TypeID type : rawArgumentIDs)
+        genericArgs.push_back(getType(type));
+      nominal = cast<NominalTypeDecl>(getDecl(declID));
+      parentTy = getType(parentID);
+    }
 
-    auto boundTy = BoundGenericType::get(cast<NominalTypeDecl>(getDecl(declID)),
-                                         getType(parentID), genericArgs);
+    auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
     typeOrOffset = boundTy;
 
     // BoundGenericTypes get uniqued in the ASTContext, so it's possible this
