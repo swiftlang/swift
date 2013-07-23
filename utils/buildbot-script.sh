@@ -163,6 +163,38 @@ component.
 
 === RECENT CHANGES ===
 
+* Debugger support. Swift has a "-g" command line swith that turns on
+  debug info for the compiled output. Using the standard lldb debugger
+  this will allow single-stepping through Swift programs, printing
+  backtraces, and navigating through stack frames; all in sync with
+  the corresponing Swift source code. An unmodified lldb cannot
+  inspect any variables.
+
+  Example session:
+    $ echo 'println("Hello World")' >hello.swift
+    $ swift hello.swift -c -g -o hello.o
+    $ ld hello.o "-dynamic" "-arch" "x86_64" "-macosx_version_min" "10.9.0" \
+         -framework Foundation lib/swift/libswift_stdlib_core.dylib \
+         lib/swift/libswift_stdlib_posix.dylib -lSystem -o hello
+    $ lldb hello
+    Current executable set to 'hello' (x86_64).
+    (lldb) b top_level_code
+    Breakpoint 1: where = hello`top_level_code + 26 at hello.swift:1, address = 0x0000000100000f2a
+    (lldb) r
+    Process 38592 launched: 'hello' (x86_64)
+    Process 38592 stopped
+    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1, queue = 'com.apple.main-thread, stop reason = breakpoint 1.1
+        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1
+    -> 1   	println("Hello World")
+    (lldb) bt
+    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1, queue = 'com.apple.main-thread, stop reason = breakpoint 1.1
+        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1
+        frame #1: 0x0000000100000f5c hello`main + 28
+        frame #2: 0x00007fff918605fd libdyld.dylib`start + 1
+        frame #3: 0x00007fff918605fd libdyld.dylib`start + 1
+  Also try "s", "n", "up", "down".
+
+
 * Swift now has a 'switch' statement, supporting pattern matching of
   multiple values with variable bindings, guard expressions, and range
   comparisons. For example:
