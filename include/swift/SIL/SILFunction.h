@@ -50,8 +50,8 @@ private:
   /// the function's linkage.
   llvm::PointerIntPair<SILModule*, 2, SILLinkage> ModuleAndLinkage;
   
-  /// MangledName - This is the mangled name of the SIL function, which will
-  /// be propagated into LLVM IR.
+  /// The mangled name of the SIL function, which will be propagated to the
+  /// binary.
   std::string Name;
 
   /// The lowered type of the function.
