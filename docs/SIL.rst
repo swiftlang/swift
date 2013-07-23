@@ -591,6 +591,50 @@ except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
 
+Reference Counting
+~~~~~~~~~~~~~~~~~~
+
+These instructions handle reference counting of heap objects.
+
+retain
+``````
+::
+  
+  sil-instruction ::= 'retain' sil-operand
+
+  %_ = retain %0 : $T
+  // %0 must be of a reference type
+
+Retains the heap object referenced by ``%0``.
+
+retain_autoreleased
+```````````````````
+::
+
+  sil-instruction ::= 'retain_autoreleased' sil-operand
+
+  %_ = retain_autoreleased %0 : $T
+  // %0 must be of a reference type
+
+Retains the heap object referenced by ``%0`` using the Objective-C ARC
+"autoreleased return value" optimization. The operand must be the result of
+an ``apply`` instruction with an Objective-C method callee, and the
+``retain_autoreleased`` instruction must be first use of the value after the
+defining ``apply`` instruction.
+
+TODO: Specify all the other retain_autoreleased constraints here.
+
+release
+```````
+::
+
+  %_ = release %0
+  // %0 must be of a reference type.
+
+Releases the heap object referenced by ``%0``. If the release
+operation brings the retain count of the object to zero, the object
+is destroyed and its memory is deallocated.
+
 Literals
 ~~~~~~~~
 
@@ -1225,33 +1269,6 @@ init_existential_ref
 
 upcast_existential_ref
 ``````````````````````
-
-retain
-``````
-::
-
-  retain %0
-  ; %0 must be of a box or reference type
-
-Retains the box or reference type instance represented by ``%0``. Retaining
-an address or value type is an error.
-
-retain_autoreleased
-```````````````````
-
-release
-```````
-::
-
-  release %0
-  ; %0 must be of a box or reference type
-
-Releases the box or reference type represented by ``%0``. If the release
-operation brings the retain count of the value to zero, the referenced object
-is destroyed and its memory is deallocated. A stack-allocated box must not
-be released to reference count zero; it must instead be destroyed manually and
-then deallocated with a ``dealloc_ref stack`` instruction. Releasing an
-address or value type is an error.
 
 convert_function
 ````````````````

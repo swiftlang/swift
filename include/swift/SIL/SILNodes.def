@@ -68,6 +68,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(CopyAddrInst, SILInstruction)
   INST(DestroyAddrInst, SILInstruction)
 
+  // Reference Counting
+  INST(RetainInst, SILInstruction)
+  INST(RetainAutoreleasedInst, SILInstruction)
+  INST(ReleaseInst, SILInstruction)
+
   // Literals
   INST(FunctionRefInst, SILInstruction)
   INST(BuiltinFunctionRefInst, SILInstruction)
@@ -118,10 +123,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InitExistentialRefInst, SILInstruction)
   INST(UpcastExistentialRefInst, SILInstruction)
 
-  INST(RetainInst, SILInstruction)
-  INST(RetainAutoreleasedInst, SILInstruction)
-  INST(ReleaseInst, SILInstruction)
-  
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(ConvertFunctionInst, ConversionInst)
     INST(CoerceInst, ConversionInst)
