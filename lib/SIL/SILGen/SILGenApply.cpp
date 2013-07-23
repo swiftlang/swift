@@ -414,7 +414,7 @@ public:
 /// reference are flattened into a single SIL apply to the most uncurried entry
 /// point fitting the call site, avoiding pointless intermediate closure
 /// construction.
-class SILGenApply : public ExprVisitor<SILGenApply>
+class SILGenApply : public Lowering::ExprVisitor<SILGenApply>
 {
 public:
   SILGenFunction &gen;
@@ -450,7 +450,7 @@ public:
 
   /// Fall back to an unknown, indirect callee.
   void visitExpr(Expr *e) {
-    ManagedValue fn = gen.visit(e).getAsSingleValue(gen);
+    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen);
     setCallee(Callee::forIndirect(fn));
   }
   
@@ -484,7 +484,7 @@ public:
       if (isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
-        setThisParam(gen.visit(thisCallSite->getArg()), thisCallSite);
+        setThisParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
         SILConstant constant(fd,
                              SILConstant::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(fd));
@@ -523,7 +523,7 @@ public:
     visit(e->getRHS());
   }
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    ManagedValue existential = gen.visit(e->getBase()).getAsSingleValue(gen);
+    ManagedValue existential = gen.emitRValue(e->getBase()).getAsSingleValue(gen);
     
     if (e->getDecl()->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets consumed
@@ -556,7 +556,7 @@ public:
                                   e->getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
-    setThisParam(gen.visit(e->getBase()), e);
+    setThisParam(gen.emitRValue(e->getBase()), e);
     
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
@@ -583,7 +583,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = gen.visit(arg).getAsSingleValue(gen);
+    ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen);
     if (super.isLValue()) {
       super = gen.emitManagedRValueWithCleanup(
                                        gen.B.createLoad(arg, super.getValue()));
@@ -783,7 +783,7 @@ namespace {
     void emit(SILGenFunction &gen, SmallVectorImpl<ManagedValue> &args) && {
       switch (kind) {
       case Kind::Expr:
-        gen.visit(expr).getAll(args);
+        gen.emitRValue(expr).getAll(args);
         return;
 
       case Kind::Value:
@@ -1243,7 +1243,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   
   // Evaluate and discard the side effect if present.
   if (apply.sideEffect)
-    gen.visit(apply.sideEffect);
+    gen.emitRValue(apply.sideEffect);
   
   // Build the call.
   // Pass the writeback scope on to CallEmission so it can thread scopes through

@@ -513,78 +513,16 @@ public:
   //===--------------------------------------------------------------------===//
   // Expressions
   //===--------------------------------------------------------------------===//
-  
+ 
+  RValue visit(Expr *E, SGFContext C = SGFContext()) = delete;
+ 
   /// Generate SIL for the given expression, storing the final result into the
   /// specified Initialization buffer(s). This avoids an allocation and copy if
   /// the result would be allocated into temporary memory normally.
   void emitExprInto(Expr *E, Initialization *I);
-  
-  RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
-  RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
-  RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
-  RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
-                                          SGFContext C);
+  RValue emitRValue(Expr *E, SGFContext C = SGFContext());
   
-  RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
-  RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
-  RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
-  RValue visitStringLiteralExpr(StringLiteralExpr *E, SGFContext C);
-  RValue visitLoadExpr(LoadExpr *E, SGFContext C);
-  RValue visitMaterializeExpr(MaterializeExpr *E, SGFContext C);
-  RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
-  RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
-                                           SGFContext C);
-  RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
-  RValue visitRequalifyExpr(RequalifyExpr *E, SGFContext C);
-  RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
-                                           SGFContext C);
-  RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
-  RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
-  RValue visitUnconditionalCheckedCastExpr(
-                                 UnconditionalCheckedCastExpr *E, SGFContext C);
-  RValue visitIsaExpr(IsaExpr *E, SGFContext C);
-  RValue visitParenExpr(ParenExpr *E, SGFContext C);
-  RValue visitTupleExpr(TupleExpr *E, SGFContext C);
-  RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
-  RValue visitSpecializeExpr(SpecializeExpr *E, SGFContext C);
-  RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C);
-  RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
-  RValue visitGenericMemberRefExpr(GenericMemberRefExpr *E, SGFContext C);
-  RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
-                                           SGFContext C);
-  RValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
-                                             SGFContext C);
-  RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
-                                             SGFContext C);
-  RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
-  RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
-  RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
-  RValue visitGenericSubscriptExpr(GenericSubscriptExpr *E, SGFContext C);
-  RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
-                                           SGFContext C);
-  RValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
-                                             SGFContext C);
-  RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
-  RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
-  RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
-  RValue visitFuncExpr(FuncExpr *E, SGFContext C);
-  RValue visitPipeClosureExpr(PipeClosureExpr *E, SGFContext C);
-  RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
-  RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
-                                            SGFContext C);
-  RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
-                                         SGFContext C);
-  RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
-  RValue visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *E,
-                                                SGFContext C);
-  RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
-  RValue visitIfExpr(IfExpr *E, SGFContext C);
-  RValue visitZeroValueExpr(ZeroValueExpr *E, SGFContext C);
-  RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
-  
-  RValue visitAssignExpr(AssignExpr *E, SGFContext C);
-
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,

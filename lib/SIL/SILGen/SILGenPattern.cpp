@@ -575,7 +575,7 @@ public:
         SILValue testBool;
         {
           FullExpr scope(gen.Cleanups);
-          testBool = gen.visit(eg.pattern->getMatchExpr())
+          testBool = gen.emitRValue(eg.pattern->getMatchExpr())
             .getUnmanagedSingleValue(gen);
         }
 
@@ -598,7 +598,7 @@ public:
         // Emit the guard.
         // TODO: We should emit every guard once and share code if it covers
         // multiple patterns.
-        guardBool = gen.visit(getGuard()).getUnmanagedSingleValue(gen);
+        guardBool = gen.emitRValue(getGuard()).getUnmanagedSingleValue(gen);
       }
       
       // Branch either to the row destination or the new BB.
@@ -1210,7 +1210,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   Scope OuterSwitchScope(Cleanups);
   
   // Emit the subject value.
-  ManagedValue subject = visit(S->getSubjectExpr()).getAsSingleValue(*this);
+  ManagedValue subject = emitRValue(S->getSubjectExpr()).getAsSingleValue(*this);
   
   // Prepare a case-to-bb mapping for fallthrough to consult.
   // The bbs for reachable cases will be filled in by emitDecisionTree below.

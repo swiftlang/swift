@@ -52,6 +52,11 @@ public:
   }
 };
 
+template <typename ImplClass,
+          typename ExprRetTy = void,
+          typename... Args>
+using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy, void, void, void, Args...>;
+
 } // end namespace Lowering
 } // end namespace swift
 

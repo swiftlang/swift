@@ -18,13 +18,14 @@
 #include "RValue.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
+#include "ASTVisitor.h"
 
 using namespace swift;
 using namespace Lowering;
 
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
-  : public ExprVisitor<SILGenLValue, LValue>
+  : public Lowering::ExprVisitor<SILGenLValue, LValue>
 {
 public:
   SILGenFunction &gen;
@@ -294,7 +295,7 @@ namespace {
       
       if (subscriptExpr) {
         if (!origSubscripts)
-          origSubscripts = gen.visit(subscriptExpr);
+          origSubscripts = gen.emitRValue(subscriptExpr);
         result.subscripts = origSubscripts.copy(gen);
       }
       
@@ -377,7 +378,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
   if (e->getType()->hasReferenceSemantics()) {
     // Any reference type expression can form the root of a logical lvalue.
     LValue lv;
-    lv.add<RefComponent>(gen.visit(e).getAsSingleValue(gen));
+    lv.add<RefComponent>(gen.emitRValue(e).getAsSingleValue(gen));
     return ::std::move(lv);
   } else {
     return visit(e);
@@ -425,7 +426,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
 
   // Evaluate the value, then use it to initialize a new temporary and return
   // the temp's address.
-  ManagedValue v = gen.visit(e->getSubExpr()).getAsSingleValue(gen);
+  ManagedValue v = gen.emitRValue(e->getSubExpr()).getAsSingleValue(gen);
   SILValue addr = gen.emitMaterialize(e, v).address;
   lv.add<AddressComponent>(addr);
   return ::std::move(lv);
@@ -433,7 +434,7 @@ LValue SILGenLValue::visitMaterializeExpr(MaterializeExpr *e) {
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e)
 {
-  gen.visit(e->getLHS());
+  gen.emitRValue(e->getLHS());
   return visitRec(e->getRHS());
 }
 

@@ -46,7 +46,7 @@ static SILValue emitConditionValue(SILGenFunction &gen, Expr *E) {
   SILValue V;
   {
     FullExpr Scope(gen.Cleanups);
-    V = gen.visit(E).forwardAsSingleValue(gen);
+    V = gen.emitRValue(E).forwardAsSingleValue(gen);
   }
   assert(V.getType().castTo<BuiltinIntegerType>()->getBitWidth() == 1);
 
@@ -99,7 +99,7 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S, SGFContext C) {
       if (!B.hasValidInsertionPoint()) return;
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
       FullExpr scope(Cleanups);
-      visit(E);
+      emitRValue(E);
     } else
       visit(ESD.get<Decl*>());
   }
@@ -133,7 +133,7 @@ void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
   } else {
     // SILValue return.
     FullExpr scope(Cleanups);
-    result = visit(ret).forwardAsSingleValue(*this);
+    result = emitRValue(ret).forwardAsSingleValue(*this);
   }
   Cleanups.emitReturnAndCleanups(loc, result);
 }
@@ -244,7 +244,7 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
   
   if (S->getInitializer()) {
     FullExpr Scope(Cleanups);
-    visit(S->getInitializer());
+    emitRValue(S->getInitializer());
   }
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -276,7 +276,7 @@ void SILGenFunction::visitForStmt(ForStmt *S, SGFContext C) {
     
     if (B.hasValidInsertionPoint() && S->getIncrement()) {
       FullExpr Scope(Cleanups);
-      visit(S->getIncrement());
+      emitRValue(S->getIncrement());
     }
     
     if (B.hasValidInsertionPoint())
