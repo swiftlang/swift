@@ -582,7 +582,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; Ty.CanTy.dump();
           llvm::dbgs() << "\n");
     Name = "<null>";
-    return DBuilder.createBasicType(Name, Size, Align, Encoding);
+    return DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
+                                      Name, Scope, File, /*Line*/ 0,
+                                      DW_LANG_Swift, Size, Align);
   }
 
   switch (BaseTy->getKind()) {

@@ -991,7 +991,8 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
                                              LinkEntity entity,
                                              llvm::Type *definitionType,
                                              llvm::Type *defaultType,
-                                             llvm::Type *pointerToDefaultType) {
+                                             llvm::Type *pointerToDefaultType,
+                                             DebugTypeInfo DebugType) {
   auto &entry = globals[entity];
   if (entry) {
     // If we're looking to define something, we may need to replace a
@@ -1019,7 +1020,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 
   // Create the variable.
   LinkInfo link = LinkInfo::get(IGM, entity);
-  auto var = link.createVariable(IGM, definitionType);
+  auto var = link.createVariable(IGM, definitionType, DebugType);
 
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
@@ -1040,9 +1041,10 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
+  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     TypeMetadataStructTy, TypeMetadataStructTy,
-                                    TypeMetadataPtrTy);
+                                    TypeMetadataPtrTy, DbgTy);
   return addr;
 }
 
@@ -1051,9 +1053,10 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
+  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,
-                                    ObjCClassPtrTy);
+                                    ObjCClassPtrTy, DbgTy);
   return addr;
 }
 
@@ -1062,9 +1065,10 @@ llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass) {
 llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
   LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
+  DebugTypeInfo DbgTy(*theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     ObjCClassStructTy, ObjCClassStructTy,
-                                    ObjCClassPtrTy);
+                                    ObjCClassPtrTy, DbgTy);
   return addr;
 }
 
@@ -1148,9 +1152,13 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                : LinkEntity::forTypeMetadata(concreteType, isIndirect,
                                              isPattern);
 
+  auto DbgTy = ObjCClass 
+    ? DebugTypeInfo(*ObjCClass, getPointerSize(), getPointerAlignment())
+    : DebugTypeInfo();
+
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                     storageType, defaultVarTy,
-                                    defaultVarPtrTy);
+                                    defaultVarPtrTy, DbgTy);
 
   // Do an adjustment if necessary.
   if (adjustmentIndex && !storageType) {
@@ -1218,8 +1226,9 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType concreteType,
 llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                                   llvm::Type *definitionType) {
   LinkEntity entity = LinkEntity::forValueWitnessTable(concreteType);
+  DebugTypeInfo DbgTy(concreteType, getPointerSize(), getPointerAlignment());
   return getAddrOfLLVMVariable(*this, GlobalVars, entity, definitionType,
-                               WitnessTableTy, WitnessTablePtrTy);
+                               WitnessTableTy, WitnessTablePtrTy, DbgTy);
 }
 
 static CanType addOwnerArgument(ASTContext &ctx, DeclContext *DC,

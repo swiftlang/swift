@@ -49,6 +49,12 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
   }
 }
 
+DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
+  : CanTy(Decl.getType()->getCanonicalType()),
+    SizeInBits(Size.getValue()),
+    AlignmentInBits(Align.getValue()) {
+}
+
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
   return CanTy == T.CanTy

@@ -20,6 +20,10 @@
 
 #include "swift/AST/Types.h"
 
+namespace llvm {
+  class Type;
+}
+
 namespace swift {
   namespace irgen {
     class Alignment;
@@ -36,12 +40,13 @@ namespace swift {
       uint64_t AlignmentInBits;
 
       DebugTypeInfo()
-        : CanTy(),  SizeInBits(0), AlignmentInBits(0) {
+        : CanTy(*new CanType()),  SizeInBits(0), AlignmentInBits(0) {
       }
       DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align);
       DebugTypeInfo(CanType CTy, Size Size, Alignment Align);
       DebugTypeInfo(CanType CTy, const TypeInfo &Info);
       DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info);
+      DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align);
 
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;
@@ -58,9 +63,8 @@ namespace llvm {
       return swift::irgen::DebugTypeInfo();
     }
     static swift::irgen::DebugTypeInfo getTombstoneKey() {
-      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<
-                                         swift::CanType>::getTombstoneKey(),
-                                         0, 0);
+      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::CanType>
+                                         ::getTombstoneKey(), 0, 0);
     }
     static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
       return DenseMapInfo<swift::CanType>::getHashValue(Val.CanTy);
