@@ -20,48 +20,48 @@ using namespace swift;
 /// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
-bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
+bool SILType::isAddressOnly(CanType type, SILModule &M) {
   // Handle the obvious cases inline.
 
   // Reference types are always loadable.
   // NB: class archetypes and existentials are not address-only. This
   // check must come before the check for archetype or existential types
   // below.
-  if (Ty->hasReferenceSemantics())
+  if (type.hasReferenceSemantics())
     return false;
 
   // Non-class archetypes and existentials are always address-only.
-  if (Ty->is<ArchetypeType>() || Ty->isExistentialType())
+  if (isa<ArchetypeType>(type) || type.isExistentialType())
     return true;
 
   // FIXME: if this is a struct has a resilient attribute, it is obviously
   // AddressOnly.
 
   // Structs and tuples are address-only if any of their elements are.
-  if (CanTupleType TTy = dyn_cast<TupleType>(Ty)) {
+  if (auto tuple = dyn_cast<TupleType>(type)) {
     // Check to see if we've computed this property for this tuple yet.
-    auto Entry = M.AddressOnlyTypeCache.find(TTy);
+    auto entry = M.AddressOnlyTypeCache.find(tuple);
     // If we got a hit, then return the precomputed value.
-    if (Entry != M.AddressOnlyTypeCache.end())
-      return Entry->second;
+    if (entry != M.AddressOnlyTypeCache.end())
+      return entry->second;
     
-    for (auto eltType : TTy.getElementTypes())
+    for (auto eltType : tuple.getElementTypes())
       if (isAddressOnly(eltType, M))
-        return M.AddressOnlyTypeCache[TTy] = true;
+        return M.AddressOnlyTypeCache[tuple] = true;
     
-    return M.AddressOnlyTypeCache[TTy] = false;
+    return M.AddressOnlyTypeCache[tuple] = false;
   }
 
   StructDecl *SD = nullptr;
-  if (NominalType *NTy = Ty->getAs<NominalType>()) {
-    SD = dyn_cast<StructDecl>(NTy->getDecl());
-  } else if (BoundGenericType *BGTy = Ty->getAs<BoundGenericType>()) {
-    SD = dyn_cast<StructDecl>(BGTy->getDecl());
+  if (auto structTy = dyn_cast<StructType>(type)) {
+    SD = structTy->getDecl();
+  } else if (auto structTy = dyn_cast<BoundGenericStructType>(type)) {
+    SD = structTy->getDecl();
   }
 
   if (SD) {
     // Check to see if we've computed this property for this tuple yet.
-    auto Entry = M.AddressOnlyTypeCache.find(Ty.getPointer());
+    auto Entry = M.AddressOnlyTypeCache.find(type.getPointer());
     // If we got a hit, then return the precomputed value.
     if (Entry != M.AddressOnlyTypeCache.end())
       return Entry->second;
@@ -70,12 +70,12 @@ bool SILType::isAddressOnly(CanType Ty, SILModule &M) {
       if (VarDecl *VD = dyn_cast<VarDecl>(D))
         if (!VD->isProperty() &&
             isAddressOnly(VD->getType()->getCanonicalType(), M))
-          return M.AddressOnlyTypeCache[Ty.getPointer()] = true;
-    return M.AddressOnlyTypeCache[Ty.getPointer()] = false;
+          return M.AddressOnlyTypeCache[type.getPointer()] = true;
+    return M.AddressOnlyTypeCache[type.getPointer()] = false;
   }
 
   // [weak] types are address-only, but [unowned] can just be passed around.
-  if (auto refTy = Ty->getAs<ReferenceStorageType>()) {
+  if (auto refTy = dyn_cast<ReferenceStorageType>(type)) {
     switch (refTy->getOwnership()) {
     case Ownership::Strong: llvm_unreachable("explicit strong ownership");
     case Ownership::Weak: return true;
