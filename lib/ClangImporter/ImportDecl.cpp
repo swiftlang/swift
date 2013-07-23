@@ -199,10 +199,15 @@ namespace {
     : public clang::ConstDeclVisitor<SwiftDeclConverter, Decl *>
   {
     ClangImporter::Implementation &Impl;
+    bool forwardDeclaration = false;
 
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl)
       : Impl(impl) { }
+
+    bool hadForwardDeclaration() const {
+      return forwardDeclaration;
+    }
 
     Decl *VisitDecl(const clang::Decl *decl) {
       return nullptr;
@@ -382,8 +387,10 @@ namespace {
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
       decl = decl->getDefinition();
-      if (!decl)
+      if (!decl) {
+        forwardDeclaration = true;
         return nullptr;
+      }
       
       Identifier name;
       if (decl->getDeclName())
@@ -510,8 +517,10 @@ namespace {
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
-      if (!decl)
+      if (!decl) {
+        forwardDeclaration = true;
         return nullptr;
+      }
 
       Identifier name;
       if (decl->getDeclName())
@@ -2029,8 +2038,10 @@ namespace {
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
-      if (!decl)
+      if (!decl) {
+        forwardDeclaration = true;
         return nullptr;
+      }
 
       // Append "Proto" to protocol names.
       auto name = Impl.importName(decl->getDeclName(), "Proto");
@@ -2133,8 +2144,10 @@ namespace {
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
-      if (!decl)
+      if (!decl) {
+        forwardDeclaration = true;
         return nullptr;
+      }
 
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
@@ -2445,7 +2458,9 @@ Decl *ClangImporter::Implementation::importDecl(const clang::NamedDecl *decl) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(canon);
   }
-  return ImportedDecls[canon] = result;
+  if (result || !converter.hadForwardDeclaration())
+    ImportedDecls[canon] = result;
+  return result;
 }
 
 Decl *
@@ -2465,7 +2480,9 @@ ClangImporter::Implementation::importMirroredDecl(const clang::ObjCMethodDecl *d
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(canon);
   }
-  return ImportedProtocolDecls[{canon, dc}] = result;
+  if (result || !converter.hadForwardDeclaration())
+    ImportedProtocolDecls[{canon, dc}] = result;
+  return result;
 }
 
 DeclContext *
