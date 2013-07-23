@@ -36,7 +36,7 @@ namespace llvm {
 
 namespace swift {
 
-class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
+class CompilerInvocation {
   std::string TargetTriple;
   std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
@@ -48,10 +48,6 @@ class CompilerInvocation : public llvm::RefCountedBase<CompilerInvocation> {
   bool ParseStdlib = false;
   bool ParseOnly = false;
   TranslationUnit::TUKind TUKind = TranslationUnit::Main;
-
-  llvm::SourceMgr DriverDiagsSourceMgr;
-  DiagnosticEngine DriverDiagnostics;
-  std::vector<DiagnosticConsumer *> DiagnosticConsumers;
 
   std::string ModuleName;
 
@@ -136,19 +132,6 @@ public:
     return TUKind;
   }
 
-  DiagnosticEngine &getDriverDiags() {
-    return DriverDiagnostics;
-  }
-
-  void addDiagnosticConsumer(DiagnosticConsumer *DC) {
-    DriverDiagnostics.addConsumer(*DC);
-    DiagnosticConsumers.push_back(DC);
-  }
-
-  ArrayRef<DiagnosticConsumer *> getDiagnosticConsumers() const {
-    return DiagnosticConsumers;
-  }
-
   void setModuleName(StringRef Name) {
     ModuleName = Name.str();
   }
@@ -167,7 +150,7 @@ public:
 };
 
 class CompilerInstance {
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation;
+  CompilerInvocation Invocation;
   llvm::SourceMgr SourceMgr;
   std::vector<unsigned> BufferIDs;
   DiagnosticEngine Diagnostics;
@@ -180,11 +163,16 @@ class CompilerInstance {
   void createSILModule();
 
 public:
-  CompilerInstance(llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation)
-      : Invocation(Invocation), Diagnostics(SourceMgr), TU(nullptr) {
+  CompilerInstance() : Diagnostics(SourceMgr), TU(nullptr) {
   }
 
   llvm::SourceMgr &getSourceMgr() { return SourceMgr; }
+
+  DiagnosticEngine &getDiags() { return Diagnostics; }
+
+  void addDiagnosticConsumer(DiagnosticConsumer *DC) {
+    Diagnostics.addConsumer(*DC);
+  }
 
   void setBufferIDs(const std::vector<unsigned> &IDs) {
     BufferIDs = IDs;
@@ -213,7 +201,7 @@ public:
     return TU;
   }
 
-  void setup();
+  void setup(const CompilerInvocation &Invocation);
 
   void doIt();
 };

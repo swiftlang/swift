@@ -70,21 +70,21 @@ int main(int argc, char **argv) {
   if (PrintStats)
     llvm::EnableStatistics();
 
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> Invocation(
-      new CompilerInvocation());
+  CompilerInvocation Invocation;
 
-  Invocation->setMainExecutablePath(
+  Invocation.setMainExecutablePath(
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   // Give the context the list of search paths to use for modules.
-  Invocation->setImportSearchPaths(ImportPaths);
+  Invocation.setImportSearchPaths(ImportPaths);
 
+  Invocation.setModuleName("main");
+  Invocation.setTUKind(TranslationUnit::SIL);
+
+  CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
-  Invocation->addDiagnosticConsumer(&PrintDiags);
-  Invocation->setModuleName("main");
-  Invocation->setTUKind(TranslationUnit::SIL);
-  CompilerInstance CI(Invocation);
+  CI.addDiagnosticConsumer(&PrintDiags);
 
   // Open the input file.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
   CI.addBufferID(CI.getSourceMgr().AddNewSourceBuffer(InputFile.take(),
                                                       llvm::SMLoc()));
-  CI.setup();
+  CI.setup(Invocation);
   CI.doIt();
 
   for (auto Pass : Passes) {

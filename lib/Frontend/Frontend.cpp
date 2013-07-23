@@ -30,8 +30,7 @@
 
 using namespace swift;
 
-swift::CompilerInvocation::CompilerInvocation()
-    : DriverDiagnostics(DriverDiagsSourceMgr) {
+swift::CompilerInvocation::CompilerInvocation() {
   TargetTriple = llvm::sys::getDefaultTargetTriple();
 }
 
@@ -47,27 +46,26 @@ void swift::CompilerInstance::createSILModule() {
   TheSILModule.reset(SILModule::createEmptyModule(getASTContext()));
 }
 
-void swift::CompilerInstance::setup() {
-  for (auto DC : Invocation->getDiagnosticConsumers())
-    Diagnostics.addConsumer(*DC);
+void swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
+  Invocation = Invok;
 
-  Context.reset(new ASTContext(Invocation->getLangOptions(), SourceMgr, Diagnostics));
+  Context.reset(new ASTContext(Invocation.getLangOptions(), SourceMgr, Diagnostics));
 
   // Give the context the list of search paths to use for modules.
-  Context->ImportSearchPaths = Invocation->getImportSearchPaths();
+  Context->ImportSearchPaths = Invocation.getImportSearchPaths();
   Context->addModuleLoader(SourceLoader::create(*Context));
   Context->addModuleLoader(SerializedModuleLoader::create(*Context));
 
   // If the user has specified an SDK, wire up the Clang module importer
   // and point it at that SDK.
-  if (!Invocation->getSDKPath().empty()) {
-    auto ImporterCtor = Invocation->getClangImporterCtor();
+  if (!Invocation.getSDKPath().empty()) {
+    auto ImporterCtor = Invocation.getClangImporterCtor();
     assert(ImporterCtor && "SDK patch can't be empty without importer set!");
     auto clangImporter =
-        ImporterCtor(*Context, Invocation->getSDKPath(),
-                     Invocation->getTargetTriple(),
-                     Invocation->getClangModuleCachePath(),
-                     Invocation->getImportSearchPaths());
+        ImporterCtor(*Context, Invocation.getSDKPath(),
+                     Invocation.getTargetTriple(),
+                     Invocation.getClangModuleCachePath(),
+                     Invocation.getImportSearchPaths());
     if (!clangImporter)
       return; // FIXME: error reporting
 
@@ -75,27 +73,27 @@ void swift::CompilerInstance::setup() {
   }
 
   // Add the runtime include path (which contains swift.swift)
-  Context->ImportSearchPaths.push_back(Invocation->getRuntimeIncludePath());
+  Context->ImportSearchPaths.push_back(Invocation.getRuntimeIncludePath());
 
-  assert(Lexer::isIdentifier(Invocation->getModuleName()));
+  assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
-  if (Invocation->getTUKind() == TranslationUnit::SIL)
+  if (Invocation.getTUKind() == TranslationUnit::SIL)
     createSILModule();
 }
 
 void swift::CompilerInstance::doIt() {
-  const TranslationUnit::TUKind Kind = Invocation->getTUKind();
+  const TranslationUnit::TUKind Kind = Invocation.getTUKind();
   Component *Comp = new (Context->Allocate<Component>(1)) Component();
-  Identifier ID = Context->getIdentifier(Invocation->getModuleName());
+  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   TU = new (*Context) TranslationUnit(ID, Comp, *Context, Kind);
   Context->LoadedModules[ID.str()] = TU;
 
-  TU->HasBuiltinModuleAccess = Invocation->getParseStdlib();
+  TU->HasBuiltinModuleAccess = Invocation.getParseStdlib();
 
   // If we're in SIL mode, don't auto import any libraries.
   // Also don't perform auto import if we are not going to do semantic
   // analysis.
-  if (Kind != TranslationUnit::SIL && !Invocation->getParseOnly())
+  if (Kind != TranslationUnit::SIL && !Invocation.getParseOnly())
     performAutoImport(TU);
 
   if (Kind == TranslationUnit::Library) {
@@ -106,12 +104,12 @@ void swift::CompilerInstance::doIt() {
       assert(Done && "Parser returned early?");
       (void) Done;
       performDelayedParsing(TU, TheParser.get(),
-                            Invocation->getCodeCompletionFactory());
+                            Invocation.getCodeCompletionFactory());
       TheParser.reset(nullptr);
     }
 
     // Finally, if enabled, type check the whole thing in one go.
-    if (!Invocation->getParseOnly())
+    if (!Invocation.getParseOnly())
       performTypeChecking(TU);
     return;
   }
@@ -133,11 +131,11 @@ void swift::CompilerInstance::doIt() {
     parseIntoTranslationUnit(TU, BufferID, &Done,
                              TheSILModule ? &SILContext : nullptr,
                              &TheParser);
-    if (!Invocation->getParseOnly())
+    if (!Invocation.getParseOnly())
       performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (!Done);
   performDelayedParsing(TU, TheParser.get(),
-                        Invocation->getCodeCompletionFactory());
+                        Invocation.getCodeCompletionFactory());
 }
 
