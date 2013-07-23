@@ -305,14 +305,13 @@ public:
 ///
 /// This may be a Swift module or a Clang module.
 class LoadedModule : public Module {
-  ModuleLoader &Owner;
-
 protected:
   LoadedModule(DeclContextKind kind, Identifier name, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(kind, name, comp, ctx), Owner(owner) {
+    : Module(kind, name, comp, ctx) {
     // Loaded modules are always well-formed.
     ASTStage = TypeChecked;
+    LookupCachePimpl = static_cast<void *>(&owner);
   }
 
 public:

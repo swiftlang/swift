@@ -338,11 +338,13 @@ void TranslationUnit::clearLookupCache() {
 void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
                                NLKind lookupKind,
                                SmallVectorImpl<ValueDecl*> &result) {
-  return Owner.lookupValue(this, accessPath, name, lookupKind, result);
+  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
+  return owner->lookupValue(this, accessPath, name, lookupKind, result);
 }
 
 OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
-  return Owner.lookupOperator(this, name, fixity);
+  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
+  return owner->lookupOperator(this, name, fixity);
 }
 
 template<>
