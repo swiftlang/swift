@@ -604,7 +604,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // The builtin opaque Objective-C pointer type. Useful for pushing
     // an Objective-C type through swift.
     auto IdTy = DBuilder.
-      createStructType(Scope, "objc_object", MainFile, 0, 0, 0, 0,
+      createStructType(Scope, "objc_object", File, 0, 0, 0, 0,
                        llvm::DIType(), llvm::DIArray(), DW_LANG_ObjC);
     return DBuilder.createPointerType(IdTy, Size, Align);
   }
@@ -638,7 +638,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     }
     DEBUG(llvm::dbgs() << "Struct without Decl: "; Ty.CanTy.dump();
           llvm::dbgs() << "\n");
-    return llvm::DIType();
+    break;
   }
 
   case TypeKind::Class: {
@@ -660,7 +660,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     }
     DEBUG(llvm::dbgs() << "Class without Decl: "; Ty.CanTy.dump();
           llvm::dbgs() << "\n");
-    return llvm::DIType();
+    break;
+  }
+
+  case TypeKind::Protocol: {
+    Name = getMangledName(Ty.CanTy);
+    break;
   }
 
   case TypeKind::BoundGenericStruct: {
@@ -677,7 +682,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     }
     DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
           Ty.CanTy.dump(); llvm::dbgs() << "\n");
-    return llvm::DIType();
+    break;
   }
 
   case TypeKind::BoundGenericClass: {
@@ -696,7 +701,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     }
     DEBUG(llvm::dbgs() << "Bound Generic class without Decl: ";
           Ty.CanTy.dump(); llvm::dbgs() << "\n");
-    return llvm::DIType();
+    break;
   }
 
   case TypeKind::Tuple: {
@@ -706,10 +711,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // tuples typiclly don't have any declaration associated with
     // them.
     Name = "<tuple>";
+    // We could use the mangled Name instead of emitting the typ, but no:
     // FIXME: getMangledName(Ty.CanTy) crashes if one of the elements
     // is an ArcheType.
     return DBuilder.createStructType(Scope, Name,
-                                     MainFile, 0,
+                                     File, 0,
                                      Size, Align, Flags,
                                      llvm::DIType(),  // DerivedFrom
                                      getTupleElements(TupleTy, Scope),
@@ -754,12 +760,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                               getEnumElems(Decl, Scope),
                          /* UnderlyingType */ llvm::DIType());
     }
-    break;
-  }
-
-  // Handle everything else that is based off NominalType.
-  case TypeKind::Protocol: {
-    Name = getMangledName(Ty.CanTy);
     break;
   }
 
