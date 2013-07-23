@@ -1147,6 +1147,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
     subscript->setOverriddenDecl(overriddenDecl);
+
+    if (getter)
+      getter->makeGetter(subscript);
+    if (setter)
+      setter->makeSetter(subscript);
     break;
   }
 
