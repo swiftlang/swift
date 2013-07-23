@@ -339,6 +339,11 @@ public:
   /// Adds any modules re-exported by this module to the given vector.
   void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
 
+  /// Find ValueDecls in the module and pass them to the given consumer object.
+  void lookupVisibleDecls(AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer,
+                          NLKind lookupKind) const;
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;

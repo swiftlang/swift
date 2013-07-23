@@ -85,6 +85,11 @@ public:
   virtual void getReexportedModules(
     const Module *module,
     SmallVectorImpl<Module::ImportedModule> &exports) override;
+
+  virtual void lookupVisibleDecls(const Module *module,
+                                  Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) override;
 };
 
 } // end namespace swift

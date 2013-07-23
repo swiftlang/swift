@@ -103,6 +103,12 @@ public:
   virtual void
   getReexportedModules(const Module *module,
                        SmallVectorImpl<Module::ImportedModule> &exports) { }
+
+  /// \brief Look for all visible top-level decls in the module.
+  virtual void lookupVisibleDecls(const Module *module,
+                                  Module::AccessPathTy accessPath,
+                                  VisibleDeclConsumer &consumer,
+                                  NLKind lookupKind) { }
 };
 
 }

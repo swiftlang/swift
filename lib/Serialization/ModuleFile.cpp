@@ -14,6 +14,7 @@
 #include "ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -2211,5 +2212,15 @@ void ModuleFile::getReexportedModules(
   // FIXME: Handle imports with access paths.
   for (auto &dep : Dependencies)
     results.push_back({Module::AccessPathTy(), dep.Mod});
+}
+
+void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                    VisibleDeclConsumer &consumer,
+                                    NLKind lookupKind) {
+  // FIXME: Validate against access path.
+  for (auto &topLevelEntry : TopLevelDecls) {
+    for (auto &value : topLevelEntry.second)
+      consumer.foundDecl(value);
+  }
 }
 

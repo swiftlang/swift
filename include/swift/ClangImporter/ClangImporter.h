@@ -108,6 +108,7 @@ public:
   /// \param consumer The VisibleDeclConsumer that will be fed decls as they
   ///   are found.
   void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const;
+  using ModuleLoader::lookupVisibleDecls;
 
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.

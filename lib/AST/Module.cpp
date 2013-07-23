@@ -221,7 +221,8 @@ void Module::lookupVisibleDecls(AccessPathTy AccessPath,
   // Importing every single Clang decl as a Swift decl currently makes
   // everything horrendously slow.
   
-  return;
+  return cast<LoadedModule>(this)->lookupVisibleDecls(AccessPath, Consumer,
+                                                      LookupKind);
 }
 
 namespace {
@@ -386,6 +387,13 @@ void LoadedModule::getReexportedModules(
     SmallVectorImpl<ImportedModule> &exports) const {
   auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
   return owner->getReexportedModules(this, exports);
+}
+
+void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
+                                      VisibleDeclConsumer &consumer,
+                                      NLKind lookupKind) const {
+  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
+  return owner->lookupVisibleDecls(this, accessPath, consumer, lookupKind);
 }
 
 

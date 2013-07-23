@@ -304,6 +304,11 @@ public:
 
   /// Adds any reexported modules to the given vector.
   void getReexportedModules(SmallVectorImpl<Module::ImportedModule> &results);
+
+  /// Adds any reexported modules to the given vector.
+  void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer,
+                          NLKind lookupKind);
 };
 
 class SerializedModule : public LoadedModule {

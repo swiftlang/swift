@@ -243,3 +243,16 @@ void SerializedModuleLoader::getReexportedModules(
 
   moduleFile->getReexportedModules(exports);
 }
+
+void
+SerializedModuleLoader::lookupVisibleDecls(const Module *module,
+                                           Module::AccessPathTy accessPath,
+                                           VisibleDeclConsumer &consumer,
+                                           NLKind lookupKind) {
+
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+  
+  moduleFile->lookupVisibleDecls(accessPath, consumer, lookupKind);
+}
