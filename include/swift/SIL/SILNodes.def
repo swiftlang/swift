@@ -128,19 +128,23 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProjectExistentialRefInst, SILInstruction)
 
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
-    INST(ConvertFunctionInst, ConversionInst)
+  
+    // Unchecked Conversions
     INST(CoerceInst, ConversionInst)
     INST(UpcastInst, ConversionInst)
+    INST(ArchetypeRefToSuperInst, ConversionInst)
     INST(AddressToPointerInst, ConversionInst)
     INST(PointerToAddressInst, ConversionInst)
     INST(RefToObjectPointerInst, ConversionInst)
     INST(ObjectPointerToRefInst, ConversionInst)
     INST(RefToRawPointerInst, ConversionInst)
     INST(RawPointerToRefInst, ConversionInst)
-    INST(ThinToThickFunctionInst, ConversionInst)
+    INST(ConvertFunctionInst, ConversionInst)
     INST(ConvertCCInst, ConversionInst)
     INST(BridgeToBlockInst, ConversionInst)
-    INST(ArchetypeRefToSuperInst, ConversionInst)
+    INST(ThinToThickFunctionInst, ConversionInst)
+
+    // Checked Conversions
     ABSTRACT_VALUE(CheckedConversionInst, ConversionInst)
       INST(SuperToArchetypeRefInst, CheckedConversionInst)
       INST(DowncastInst, CheckedConversionInst)

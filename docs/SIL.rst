@@ -983,6 +983,9 @@ lowers to an uncurried entry point and is curried in the enclosing function::
     return %ret : $Int
   }
 
+TODO: Partial application of already thick functions should be supported but
+is not implemented.
+
 specialize
 ``````````
 ::
@@ -1374,80 +1377,211 @@ It is invalid for the result of ``project_existential_ref`` is used as anything
 other than the "this" argument of an instance method reference obtained by
 ``protocol_method`` from the same existential container.
 
-TODO To Be Updated
-~~~~~~~~~~~~~~~~~~
+Unchecked Conversions
+~~~~~~~~~~~~~~~~~~~~~
 
-convert_function
-````````````````
-::
-
-  %1 = convert_function %0, $T
-  ; %0 must be of a function type $U ABI-compatible with $T
-  ; %1 will be of type $T
-
-Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
-compatible with the type of ``%0``. Function types are ABI-compatible if their
-input and/or result types are tuple types that differ only in label names or
-default values.
+These instructions implement type conversions which are not checked. These are
+either user-level conversions that are always safe and do not need to be
+checked, or implementation detail conversions that are unchecked for
+performance or flexibility.
 
 coerce
 ``````
 ::
 
-  %1 = coerce %0, $T
-  ; %0 must be of type $T
-  ; %1 will be of type $T
+  sil-instruction ::= 'coerce' sil-operand 'to' sil-type
+
+  %1 = coerce %0 : $T to $T
+  // %1 will have type $T
 
 Represents an explicit type coercion with no runtime effect. ``%1`` will be
 equivalent to ``%0``.
 
 upcast
 ``````
+::
+
+  sil-instruction ::= 'upcast' sil-operand 'to' sil-type
+
+  %1 = coerce %0 : $D to $B
+  // $D and $B must be class types or metatypes, with B a superclass of D
+  // %1 will have type $B
+
+Represents a conversion from a derived class instance or metatype to a
+superclass.
+
+archetype_ref_to_super
+``````````````````````
+::
+
+  sil-instruction ::= 'archetype_ref_to_super' sil-operand 'to' sil-type
+
+  %1 = archetype_to_super %0 : $T to $B
+  // %0 must be of an archetype type $T with a base class constraint
+  // $B must be the base class constraint type of $T or a superclass thereof
+  // %1 will be of the base type $B
+
+Represents a conversion from a generic type to a superclass specified as a
+constraint of the generic type.
 
 address_to_pointer
 ``````````````````
 ::
 
-  %1 = address_to_pointer %0
-  ; %0 must be of an address type $*T
-  ; %1 will be of type Builtin.RawPointer
+  sil-instruction ::= 'address_to_pointer' sil-operand 'to' sil-type
+
+  %1 = address_to_pointer %0 : $*T to $Builtin.RawPointer
+  // %0 must be of an address type $*T
+  // %1 will be of type Builtin.RawPointer
 
 Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
+Converting the result pointer back to an address of the same type will give
+an address equivalent to ``%0``. Type punning is always undefined in SIL; it
+is invalid to cast the ``RawPointer`` back to any type other than its
+original address type.
 
 pointer_to_address
 ``````````````````
+::
+
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' sil-type
+
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*T
+  // %1 will be of type $*T
+
+Creates an address value corresponding to the ``Builtin.RawPointer`` value
+``%0``.  Converting a ``RawPointer`` back to an address of the same type as
+its originating ``address_to_pointer`` instruction gives back an equivalent
+address. Type punning is always undefined in SIL; it
+is invalid to cast the ``RawPointer`` back to any type other than its
+original address type. It is also invalid to cast a ``RawPointer`` from a
+heap object to any address type. This conversion, however, is unchecked and
+will not raise a compile-time or runtime error if used incorrectly.
 
 ref_to_object_pointer
 `````````````````````
+::
+
+  sil-instruction ::= 'ref_to_object_pointer' sil-operand 'to' sil-type
+
+  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
+  // %0 must be of class type $C
+  // %1 will be of type $Builtin.ObjectPointer
+
+Converts a class instance reference to the ``Builtin.ObjectPointer`` type.
 
 object_pointer_to_ref
 `````````````````````
+::
+
+  sil-instruction ::= 'object_pointer_to_ref' sil-operand 'to' sil-type
+
+  %1 = object_pointer_to_ref %0 : $Builtin.ObjectPointer to $C
+  // $C must be a class type
+  // %1 will be of type $C
+
+Converts a ``Builtin.ObjectPointer`` value to a class instance reference.
+The destination type ``$C`` must be the correct type (or a superclass) of the
+type of the referenced heap object. This conversion, however, is unchecked and
+will not raise a compile-time or runtime error if used incorrectly.
 
 ref_to_raw_pointer
 ``````````````````
+::
+
+  sil-instruction ::= 'ref_to_raw_pointer' sil-operand 'to' sil-type
+
+  %1 = ref_to_raw_pointer %0 : $C to $Builtin.RawPointer
+  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // %1 will be of type $Builtin.RawPointer
+
+Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
+result can be cast back to the originating class type but does not have
+ownership semantics. It is invalid to cast a ``RawPointer`` from a heap
+object reference to an address using ``pointer_to_address``.
 
 raw_pointer_to_ref
 ``````````````````
+::
+  
+  sil-instruction ::= 'raw_pointer_to_ref' sil-operand 'to' sil-type
 
-thin_to_thick_function
-``````````````````````
+  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  // $C must be a class type, or Builtin.ObjectPointer, or Builtin.ObjCPointer
+  // %1 will be of type $C
+
+Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting
+a heap object reference to ``Builtin.RawPointer`` back to the same type gives
+an equivalent heap object reference (though the raw pointer has no ownership
+semantics for the object on its own). It is invalid to cast a ``RawPointer`` to
+a type unrelated to the dynamic type of the referenced object. It is invalid
+to cast a ``RawPointer`` from an address to any heap object type. The
+conversion, however, is unchecked and will not raise a compile-time or runtime
+error if used incorrectly.
+
+convert_function
+````````````````
+::
+
+  sil-instruction ::= 'convert_function' sil-operand 'to' sil-type
+
+  %1 = convert_function %0 : $T -> U to $T' -> U'
+  // %0 must be of a function type $T -> U ABI-compatible with $T' -> U'
+  //   (see below)
+  // %1 will be of type $T' -> U'
+
+Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
+compatible with the type of ``%0``. Function types are ABI-compatible if their
+input and result types are tuple types that, after destructuring, differ only
+in label names or default values.
 
 convert_cc
 ``````````
+::
+
+  sil-instruction ::= 'convert_cc' sil-operand 'to' sil-type
+
+  %1 = convert_cc %0 : $[cc(X)] T -> U to $[cc(Y)] T -> U
+  // %0 must be of a function type
+  // The destination must be the same function type, differing only in
+  //   calling convention
+  // %1 will be of type $[cc(Y)] T -> U
+
+Thunks the calling convention of a function. If the input operand is statically
+a ``function_ref`` instruction, the result can be ``[thin]``; otherwise, the
+result must be thick.
 
 bridge_to_block
 ```````````````
-
-archetype_ref_to_super
-``````````````````
 ::
 
-  %1 = archetype_to_super %0, $T
-  ; %0 must be an address of an archetype $*U with base class constraint U : B
-  ; $T must be the base constraint type B or a superclass of B
-  ; %1 will be of the base type $T
+  sil-instruction ::= 'bridge_to_block' sil-operand 'to' sil-type
 
-Performs an upcast operation on the archetype value referenced by ``%0``.
+  %1 = bridge_to_block %0 : $T -> U to $[cc(cdecl), objc_block] T -> U
+  // %0 must be of a function type
+  // The destination must be of the same function type, with the 
+  //   [objc_block] attribute
+  // %1 will be of type $[cc(cdecl), objc_block] T -> U
+
+Converts a function value from Swift representation to Objective-C block
+representation.
+
+thin_to_thick_function
+``````````````````````
+::
+
+  sil-instruction ::= 'thin_to_thick_function' sil-operand 'to' sil-type
+
+  %1 = thin_to_thick_function %0 : $[thin] T -> U to $T -> U
+  // %0 must be of a thin function type $[thin] T -> U
+  // The destination type must be the corresponding thick function type
+  // %1 will be of type $T -> U
+
+Converts a thin function value, that is, a bare function pointer with no
+context information, into a thick function value with empty context.
+
+TODO To Be Updated
+~~~~~~~~~~~~~~~~~~
 
 super_to_archetype_ref
 ``````````````````````
