@@ -437,6 +437,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
   assert(kind == DECL_CONTEXT);
+  (void)kind;
 
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::DeclContextLayout::readRecord(memberIDBuffer, rawMemberIDs);
