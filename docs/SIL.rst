@@ -63,9 +63,10 @@ Guaranteed Optimization Passes
 After SILGen, a deterministic sequence of optimization passes is run over the
 raw SIL, as follows:
 
-- Memory promotion. This is a combination of an LLVM-style "mem2reg" pass to
-  reduce in-memory variables to SSA values with a capture analysis mechanism
-  for eliminating reference-counted boxes.
+- Memory promotion: this is implemented as two optimization phases, the first
+  of which performance capture analysis to promote alloc_box instructions to
+  alloc_stack, and the second which promotes non-address exposed alloc_stack
+  instructions to SSA registers.
 
 TODO:
 
