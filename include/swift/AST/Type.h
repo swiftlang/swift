@@ -58,6 +58,10 @@ private:
 /// as 'Type' (they just don't have sugar) we derive from Type.
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
+
+  static bool hasReferenceSemanticsImpl(CanType type);
+  static bool isExistentialTypeImpl(CanType type);
+
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
     assert(isActuallyCanonicalOrNull() &&
@@ -66,6 +70,18 @@ public:
   explicit CanType(Type T) : Type(T) {
     assert(isActuallyCanonicalOrNull() &&
            "Forming a CanType out of a non-canonical type!");
+  }
+
+  // Provide a few optimized accessors that are really type-class queries.
+
+  /// Do values of this type have reference semantics?
+  bool hasReferenceSemantics() const {
+    return hasReferenceSemanticsImpl(*this);
+  }
+
+  /// Is this type existential?
+  bool isExistentialType() const {
+    return isExistentialTypeImpl(*this);
   }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.

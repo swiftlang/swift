@@ -83,9 +83,12 @@ bool TypeBase::isMaterializable() {
 
 /// hasReferenceSemantics - Does this type have reference semantics?
 bool TypeBase::hasReferenceSemantics() {
+  return getCanonicalType().hasReferenceSemantics();
+}
+
+bool CanType::hasReferenceSemanticsImpl(CanType type) {
   // At the moment, Builtin.ObjectPointer, class types, and function types.
-  CanType canonical = getCanonicalType();
-  switch (canonical->getKind()) {
+  switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
@@ -113,11 +116,11 @@ bool TypeBase::hasReferenceSemantics() {
     return false; // This might seem non-obvious.
 
   case TypeKind::Archetype:
-    return cast<ArchetypeType>(canonical)->requiresClass();
+    return cast<ArchetypeType>(type)->requiresClass();
   case TypeKind::Protocol:
-    return cast<ProtocolType>(canonical)->requiresClass();
+    return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
-    return cast<ProtocolCompositionType>(canonical)->requiresClass();
+    return cast<ProtocolCompositionType>(type)->requiresClass();
       
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
@@ -128,7 +131,7 @@ bool TypeBase::hasReferenceSemantics() {
     return true;
 
   case TypeKind::UnboundGeneric:
-    return isa<ClassDecl>(cast<UnboundGenericType>(canonical)->getDecl());
+    return isa<ClassDecl>(cast<UnboundGenericType>(type)->getDecl());
   }
 
   llvm_unreachable("Unhandled type kind!");
@@ -146,7 +149,11 @@ bool TypeBase::hasReferenceSemantics() {
 bool TypeBase::allowsOwnership() {
   CanType canonical = getCanonicalType();
   return (!isa<AnyFunctionType>(canonical)
-          && canonical->hasReferenceSemantics());
+          && canonical.hasReferenceSemantics());
+}
+
+bool CanType::isExistentialTypeImpl(CanType type) {
+  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
 }
 
 bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
@@ -162,7 +169,8 @@ bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
                    [](Type T) { return T->castTo<ProtocolType>()->getDecl(); });
     return true;
   }
-  
+
+  assert(!T.isExistentialType());
   return false;
 }
 
