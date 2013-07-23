@@ -802,6 +802,79 @@ conversion thunk includes loading non-address-only concrete arguments from
 address-only arguments (in other words, an address-only argument of type $*T
 will be mapped to a loadable value argument of type $U).
 
+Metatypes
+~~~~~~~~~
+
+These instructions access metatypes, either statically by type name or
+dynamically by introspecting class or generic values.
+
+metatype
+````````
+::
+
+  sil-instruction ::= 'metatype' sil-type
+
+  %1 = metatype $T.metatype
+  // %1 has type $T.metatype
+
+Creates a reference to the metatype object for type ``T``.
+
+class_metatype
+``````````````
+::
+
+  sil-instruction ::= 'class_metatype' sil-type ',' sil-operand
+
+  %1 = class_metatype $T.metatype, %0 : $T
+  // %0 must be of a class type $T
+  // %1 will be of type $T.metatype and reference the runtime metatype of %0
+
+Obtains a reference to the dynamic metatype of the class instance ``%0``.
+
+archetype_metatype
+``````````````````
+::
+
+  sil-instruction ::= 'archetype_metatype' sil-type ',' sil-operand
+
+  %1 = archetype_metatype $T.metatype, %0 : $T
+  // %0 must be a value of class archetype $T, or the address of
+  // an address-only archetype $*T
+  // %1 will be of type $T.metatype
+
+Obtains a reference to the dynamic metatype of the archetype value ``%0``.
+
+protocol_metatype
+`````````````````
+::
+
+  sil-instruction ::= 'protocol_metatype' sil-type ',' sil-operand
+
+  %1 = protocol_metatype $P.metatype, %0 : $P
+  // %0 must be a value of class protocol or protocol composition
+  //   type $P, or an address of address-only protocol type $*P
+  // %1 will be a $P.metatype value referencing the metatype of the
+  //   concrete value inside %0
+
+Obtains the metatype of the concrete value
+referenced by the existential container referenced by ``%0``.
+
+associated_metatype
+```````````````````
+::
+
+  sil-instruction ::= 'associated_metatype' sil-operand ',' sil-type
+
+  %1 = associated_metatype %0 : $T.metatype, $T.U.metatype
+  // %0 must be a metatype value of type $T.metatype
+  // $T.U must be an associated type of $T
+  // %1 has type $T.U.metatype
+
+Obtains the metatype object for the associated type ``$T.U`` of the type with
+metatype ``%0``.
+
+TODO: This doesn't need to be different from ``metatype``.
+
 TODO To Be Updated
 ~~~~~~~~~~~~~~~~~~
 
@@ -976,62 +1049,6 @@ struct
 
 tuple
 `````
-
-metatype
-````````
-::
-
-  %1 = metatype $T
-  ; $T must be a type
-  ; %1 has type $T.metatype
-
-Retrieves the metatype object for type ``T``.
-
-class_metatype
-``````````````
-::
-
-  %1 = class_metatype %0
-  ; %0 must be of a class type $T
-  ; %1 will be of type $T.metatype and reference the runtime metatype of %0
-
-Obtains a reference to the runtime metatype of ``%0``.
-
-archetype_metatype
-``````````````````
-::
-
-  %1 = archetype_metatype %0
-  ; %0 must be the address of an archetype $*T
-  ; %1 will be of type $T.metatype
-
-Obtains a reference to the metatype of the archetype value ``%0``.
-
-protocol_metatype
-`````````````````
-::
-
-  %1 = protocol_metatype %0
-  ; %0 must be of an address type $*P for protocol or protocol composition
-  ;   type P
-  ; %1 will be a $P.metatype value referencing the metatype of the
-  ;   concrete value of %0
-
-Obtains the metatype of the concrete value
-referenced by the existential container referenced by ``%0``. This pointer
-can be passed to protocol static methods obtained by ``protocol_method`` from
-the same existential container.
-
-associated_metatype
-```````````````````
-::
-
-  %1 = associated_metatype %0, $U
-  ; %0 must be a metatype value of type $T.metatype
-  ; $U must be an associated type of $T
-
-Obtains the metatype object for the associated type ``$U`` of the type with
-metatype ``%0``.
 
 module
 ``````
