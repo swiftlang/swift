@@ -360,6 +360,48 @@ void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
   emitSwitchFallthrough(S);
 }
 
+/// Produce a physical address that corresponds to the given l-value
+/// component.
+static SILValue drillIntoComponent(SILGenFunction &SGF,
+                                   SILLocation loc,
+                                   const PathComponent &component,
+                                   SILValue base) {
+  assert(!base ||
+         base.getType().isAddress() ||
+         base.getType().getSwiftRValueType()->hasReferenceSemantics());
+
+  SILValue addr;
+  if (component.isPhysical()) {
+    addr = component.asPhysical().offset(SGF, loc, base);
+  } else {
+    auto &lcomponent = component.asLogical();
+    Materialize temporary = lcomponent.getMaterialized(SGF, loc, base);
+    addr = temporary.address;
+  }
+
+  assert(addr.getType().isAddress() ||
+         addr.getType().getSwiftRValueType()->hasReferenceSemantics());
+  return addr;
+}
+
+/// Find the last component of the given lvalue and derive a base
+/// location for it.
+static const PathComponent &drillToLastComponent(SILGenFunction &SGF,
+                                                 SILLocation loc,
+                                                 const LValue &lv,
+                                                 SILValue &addr) {
+  assert(lv.begin() != lv.end() &&
+         "lvalue must have at least one component");
+
+  auto component = lv.begin(), next = lv.begin(), end = lv.end();
+  ++next;
+  for (; next != end; component = next, ++next) {
+    addr = drillIntoComponent(SGF, loc, *component, addr);
+  }
+
+  return *component;
+}
+
 ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
                                               const LValue &src,
                                               SGFContext C) {
@@ -367,37 +409,16 @@ ManagedValue SILGenFunction::emitLoadOfLValue(SILLocation loc,
   DisableWritebackScope scope(*this);
 
   SILValue addr;
-  for (auto i = src.begin(), e = src.end(); ; ) {
-    assert(i != e && "ran out of lvalue components!");
-    assert((!addr ||
-            addr.getType().isAddress() ||
-            addr.getType().hasReferenceSemantics()) &&
-           "resolving lvalue component did not give an address "
-           "or reference type");
+  auto &component = drillToLastComponent(*this, loc, src, addr);
 
-    auto &component = *i;
-    ++i;
-    bool isLastComponent = (i == e);
-
-    // If the component is physical, just drill down.
-    if (component.isPhysical()) {
-      addr = component.asPhysical().offset(*this, loc, addr);
-      if (!isLastComponent) continue;
-
-      // Load from the final component.
-      return emitLoad(loc, addr, C, /*isTake*/ false);
-    }
-
-    // If the component is logical, and this isn't the final component,
-    // materialize and continue.
-    if (!isLastComponent) {
-      addr = component.asLogical().getMaterialized(*this, loc, addr).address;
-      continue;
-    }
-
-    // Otherwise, load from that.
-    return component.asLogical().get(*this, loc, addr, C);
+  // If the last component is physical, just drill down and load from it.
+  if (component.isPhysical()) {
+    addr = component.asPhysical().offset(*this, loc, addr);
+    return emitLoad(loc, addr, C, /*isTake*/ false);
   }
+
+  // If the last component is logical, just emit a get.
+  return component.asLogical().get(*this, loc, addr, C);
 }
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
@@ -406,17 +427,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
   
   assert(src.begin() != src.end() && "lvalue must have at least one component");
   for (auto &component : src) {
-    if (component.isPhysical()) {
-      addr = component.asPhysical().offset(*this, loc, addr);
-    } else {
-      addr = component.asLogical()
-        .getMaterialized(*this, loc, addr)
-        .address;
-    }
-    assert((addr.getType().isAddress() ||
-            addr.getType().hasReferenceSemantics()) &&
-           "resolving lvalue component did not give an address "
-           "or reference type");
+    addr = drillIntoComponent(*this, loc, component, addr);
   }
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
@@ -427,35 +438,20 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         RValue &&src, LValue const &dest) {
   WritebackScope scope(*this);
   
-  SILValue destAddr;
-
-  assert(dest.begin() != dest.end() &&
-         "lvalue must have at least one component");
-  
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.
-  auto component = dest.begin(), next = dest.begin(), end = dest.end();
-  ++next;
-  for (; next != end; component = next, ++next) {
-    if (component->isPhysical()) {
-      destAddr = component->asPhysical().offset(*this, loc, destAddr);
-    } else {
-      LogicalPathComponent const &lcomponent = component->asLogical();
-      Materialize newDest = lcomponent.getMaterialized(*this, loc, destAddr);
-      destAddr = newDest.address;
-    }
-  }
+  SILValue destAddr;
+  auto &component = drillToLastComponent(*this, loc, dest, destAddr);
   
   // Write to the tail component.
-  if (component->isPhysical()) {
+  if (component.isPhysical()) {
     SILValue finalDestAddr
-      = component->asPhysical().offset(*this, loc, destAddr);
+      = component.asPhysical().offset(*this, loc, destAddr);
     
     std::move(src).getAsSingleValue(*this)
       .assignInto(*this, loc, finalDestAddr);
   } else {
-    component->asLogical().set(*this, loc,
-                                       std::move(src), destAddr);
+    component.asLogical().set(*this, loc, std::move(src), destAddr);
   }
 
   // The writeback scope closing will propagate the value back up through the

@@ -56,6 +56,9 @@ class PathComponent {
   // to a specific file.
   virtual void _anchor();
 
+  PathComponent(const PathComponent &) = delete;
+  PathComponent &operator=(const PathComponent &) = delete;
+
 protected:
   PathComponent(bool isPhysical)
     : IsPhysical(isPhysical) {}
