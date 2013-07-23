@@ -78,16 +78,17 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(ProtocolMethodInst, DynamicMethodInst)
     VALUE_RANGE(DynamicMethodInst, ClassMethodInst, ProtocolMethodInst)
 
+  // Function Application
   ABSTRACT_VALUE(FunctionInst, SILInstruction)
     INST(ApplyInst, FunctionInst)
     INST(PartialApplyInst, FunctionInst)
     VALUE_RANGE(FunctionInst, ApplyInst, PartialApplyInst)
+  INST(SpecializeInst, SILInstruction)
 
   INST(LoadInst, SILInstruction)
   INST(StoreInst, SILInstruction)
   INST(InitializeVarInst, SILInstruction)
   INST(CopyAddrInst, SILInstruction)
-  INST(SpecializeInst, SILInstruction)
   INST(StructInst, SILInstruction)
   INST(TupleInst, SILInstruction)
   INST(MetatypeInst, SILInstruction)

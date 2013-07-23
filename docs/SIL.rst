@@ -664,81 +664,96 @@ operand::
 - If the operand is a protocol metatype, it does not need to be projected, and
   the "this" argument of the method is the protocol metatype itself.
 
-TODO To Be Updated
-~~~~~~~~~~~~~~~~~~
+Function Application
+~~~~~~~~~~~~~~~~~~~~
+
+These instructions call functions or wrap them in partial application or
+specialization thunks.
 
 apply
 `````
 ::
 
-  %R = apply %0(%1, %2, ...)
-  ; %0 must be of a concrete function type $(A...)(B...) ... -> R
-  ; %1, %2, etc. must be of the argument types $A..., $B..., etc.
-  ; %R will be of the return type $R
+  sil-instruction ::= 'apply' sil-value
+                        '(' (sil-operand (',' sil-operand)?)? ')'
+                        ':' sil-type
 
-Transfers control to function ``%0``, passing in the given arguments. The
+  %r = apply %0(%1 : $A, %2 : $B, ...) : $(A, B, ...) -> R
+  // Note that the type of the callee '%0' is specified *after* the arguments
+  // %0 must be of a concrete function type $(A, B, ...) -> R
+  // %1, %2, etc. must be of the argument types $A, $B, etc.
+  // %r will be of the return type $R
+
+Transfers control to function ``%0``, passing it the given arguments. The
+input argument tuple type is destructured. The
 ``apply`` instruction does no retaining or releasing of its arguments by
 itself; the calling convention's retain/release policy must be handled by
 separate explicit ``retain`` and ``release`` instructions. The return value
 will likewise not be implicitly retained or released. ``%0`` must be an object
 of a concrete function type; generic functions must have all of their generic
-parameters bound with ``specialize`` instructions before they can be applied.
-If ``%0`` is an uncurried function, the arguments for the uncurried clauses
-are specified in outer-to-inner (that is, left-to-right) order.
+parameters bound with a ``specialize`` instruction before they can be applied.
 
-TODO: should have normal/unwind branch targets like LLVM ``invoke``
+TODO: should have normal/unwind branch targets, like LLVM ``invoke``.
 
 partial_apply
 `````````````
 ::
 
-  %C = partial_apply %0(%1, %2, ...)
-  ; %0 must be of a concrete uncurried function type $(A...)(B...)...(C) -> R
-  ; %1, %2, etc. must be of the types A..., B..., etc. of the outermost
-  ;   uncurry levels
-  ; %C will be of the function type (C) -> R
+  sil-instruction ::= 'partial_apply' sil-value
+                        '(' (sil-operand (',' sil-operand)?)? ')'
+                        ':' sil-type
 
-Allocates a closure by partially applying the function ``%0`` to its outer
-curry levels. The closure context will be allocated with retain
-count 1 containing the values ``%1``, ``%2``, etc. The closed-over values
-will not be retained; that must be done separately if necessary. Retaining
-or releasing the closure object will retain or release its context.
+  %c = partial_apply %0(%1 : $A, %2 : $B, ...) : $[thin] (T..., A, B, ...) -> R
+  // Note that the type of the callee '%0' is specified *after* the arguments
+  // %0 must be of a thin concrete function type $[thin] (T..., A, B, ...) -> R
+  // %1, %2, etc. must be of the argument types $A, $B, etc.,
+  //   of the tail part of the argument tuple of %0
+  // %c will be of the partially-applied thick function type (T...) -> R
+
+Creates a closure by partially applying the function ``%0`` to a partial
+sequence of its arguments. The closure context will be allocated with retain
+count 1 and initialized to contain the values ``%1``, ``%2``, etc.
+The closed-over values will not be retained; that must be done separately before
+the ``partial_apply``. The closure does take ownership of the partially applied
+arguments.
 
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::
-  
+
   func foo(a:A)(b:B)(c:C)(d:D) -> E { /* body of foo */ }
 
-emits curry thunks in SIL as follows::
-  
-  func @foo : $(a:A) -> (b:B) -> (c:C) -> (d:D) -> E {
-  entry(%a:$A):
-    %foo.1 = constant_ref $(a:A)(b:B) -> (c:C) -> (d:D) -> E, @foo.1
-    %thunk = partial_apply %foo.1(%a)
-    return %thunk
+emits curry thunks in SIL as follows (retains and releases omitted for
+clarity)::
+
+  func @foo : $[thin] A -> B -> C -> D -> E {
+  entry(%a : $A):
+    %foo_1 = function_ref @foo_1 : $[thin] (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a : $A) : $[thin] (B, A) -> C -> D -> E
+    return %thunk : $B -> C -> D -> E
   }
 
-  func @foo.1 : $(a:A)(b:B) -> (c:C) -> (d:D) -> E {
-  entry(%a:$A, %b:$B):
-    %foo.2 = constant_ref $(a:A)(b:B)(c:C) -> (d:D) -> E, @foo.2
-    %thunk = partial_apply %foo.2(%a, %b)
-    return %thunk
+  func @foo_1 : $[thin] (B, A) -> C -> D -> E {
+  entry(%b : $B, %a : $A):
+    %foo_2 = function_ref @foo_2 : $[thin] (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b : $B, %a : $A) : $[thin] (C, B, A) -> D -> E
+    return %thunk : $(B, A) -> C -> D -> E
   }
 
-  func @foo.2 : $(a:A)(b:B)(c:C) -> (d:D) -> E {
-  entry(%a:$A, %b:$B, %c:$C):
-    %foo.3 = constant_ref $(a:A)(b:B)(c:C)(d:D) -> E, @foo.3
-    %thunk = partial_apply %foo.3(%a, %b, %c)
-    return %thunk
+  func @foo_2 : $[thin] (C, B, A) -> D -> E {
+  entry(%c : $C, %b : $B, %a : $A):
+    %foo_3 = function_ref @foo_3 : $[thin] (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c : $C, %b : $B, %a : $A) : $[thin] (D, C, B, A) -> E
+    return %thunk : $(C, B, A) -> D -> E
   }
 
-  func @foo.3 : $(a:A)(b:B)(c:C)(d:D) -> E {
-  entry(%a:$A, %b:$B, %c:$C, %d:$D):
-    ; body of foo
+  func @foo_3 : $[thin] (D, C, B, A) -> E {
+  entry(%d : $D, %c : $C, %b : $B, %a : $A):
+    // ... body of foo ...
   }
 
-A local function in Swift that captures context::
-  
+A local function in Swift that captures context, such as ``bar`` in the
+following example::
+
   func foo(x:Int) -> Int {
     func bar(y:Int) -> Int {
       return x + y
@@ -746,27 +761,49 @@ A local function in Swift that captures context::
     return bar(1)
   }
 
-lowers to an uncurried entry point and is curried by the enclosing function::
-
-  func @bar : $(x:Int)(y:Int) -> Int {
-  entry(%x:$Int, %y:$Int):
-    ; body of bar
+lowers to an uncurried entry point and is curried in the enclosing function::
+  
+  func @bar : $[thin] (Int, Int) -> Int {
+  entry(%y : $Int, %x : $Int):
+    // ... body of bar ...
   }
 
-  func @foo : $(x:Int) -> Int {
-  entry(%x:$Int):
-    ; Create the bar closure
-    %bar.uncurry = constant_ref $(x:Int)(y:Int) -> Int, @bar
-    %bar = partial_apply %bar.uncurry(%x)
+  func @foo : $[thin] Int -> Int {
+  entry(%x : $Int):
+    // Create the bar closure
+    %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
+    %bar = partial_apply %bar_uncurried(%x : $Int) : $(Int, Int) -> Int
 
-    ; Apply it
-    %1 = integer_literal 1
-    %ret = apply %bar(%1)
+    // Apply it
+    %1 = integer_literal $Int, 1
+    %ret = apply %bar(%1 : $Int) : $(Int) -> Int
 
-    ; Clean up
-    release %bar
-    return %ret
+    // Clean up
+    release %bar : $(Int) -> Int
+    return %ret : $Int
   }
+
+specialize
+``````````
+::
+  
+  sil-instruction ::= 'specialize' sil-operand ',' sil-type
+                        (',' sil-substitution)+
+  sil-substitution ::= type '=' type
+  
+  %1 = specialize %0 : $[thin] <A, B, C> T -> U, $T1 -> U1, A = A1, B = B1, ...
+  // %0 must be of a thin generic function type $[thin] <A, B, C> T -> U
+  // $T1 -> U1 must be the thick concrete function type $T1 -> U1, where
+  //   T1 == T and U1 == U after substitutions A == A1, B == B1, etc.
+
+Specializes a generic function ``%0`` to a concrete function type
+by binding its generic type variables with the given substitutions. The
+conversion thunk includes loading non-address-only concrete arguments from
+address-only arguments (in other words, an address-only argument of type $*T
+will be mapped to a loadable value argument of type $U).
+
+TODO To Be Updated
+~~~~~~~~~~~~~~~~~~
 
 load
 ````
@@ -933,21 +970,6 @@ operations::
     %tmp_dest = load %1
     store %tmp_src to %1
     release %tmp_dest
-
-specialize
-``````````
-::
-
-  %1 = specialize %0, $T
-  ; %0 must be of a generic function type $<T1, T2, ...> (A) -> R
-  ; $T must be of either the concrete function type $(A) -> R or a generic
-  ; function type $<T3, ...> A -> R with some type variables removed.
-  ; %1 will be of the function type $T
-
-Specializes a generic function ``%0`` to the generic or concrete function type
-``T``, binding its generic type variables. ``%0`` may be of an uncurried
-function type, in which case ``specialize`` must bind all of its generic
-parameters at every uncurry level.
 
 struct
 ``````
