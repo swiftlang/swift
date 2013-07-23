@@ -527,6 +527,17 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
     // FIXME: Submodules? Packages?
     imported.push_back(moduleEntry.second->Name.str());
   }
+
+  // Do we have a shadowed module? This is used when adapting a Clang module
+  // for Swift.
+  if (std::any_of(TU->getImportedModules().begin(),
+                  TU->getImportedModules().end(),
+                  [&](const TranslationUnit::ImportedModule &import) {
+    return import.first.empty() && import.second->Name == TU->Name;
+  })) {
+    imported.push_back(TU->Name.str());
+  }
+
   // Arbitrarily sort by name.
   // FIXME: It would be more efficient to linearize the dependency graph, but
   // that's more difficult, especially with Clang modules in the mix. This is

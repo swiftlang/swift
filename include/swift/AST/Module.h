@@ -334,6 +334,9 @@ public:
                   "Must specify prefix, postfix, or infix operator decl");
   }
 
+  /// Adds any modules re-exported by this module to the given vector.
+  void getReexportedModules(SmallVectorImpl<Module *> &modules);
+
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;

@@ -247,8 +247,13 @@ OperatorDecl *SerializedModuleLoader::lookupOperator(Module *module,
   return moduleFile->lookupOperator(name, fixity);
 }
 
-void SerializedModuleLoader::loadExtensions(NominalTypeDecl *nominal,
-                                            unsigned previousGeneration) {
-  // FIXME: Look for extensions of the given nominal type within the
-  // serialized module.
+void SerializedModuleLoader::getReexportedModules(
+    Module *module,
+    SmallVectorImpl<swift::Module *> &exports) {
+
+  ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
+  if (!moduleFile)
+    return;
+
+  moduleFile->getReexportedModules(exports);
 }

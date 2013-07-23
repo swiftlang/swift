@@ -368,6 +368,11 @@ LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
   return cast_or_null<InfixOperatorDecl>(result);
 }
 
+void LoadedModule::getReexportedModules(SmallVectorImpl<Module *> &exports) {
+  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
+  return owner->getReexportedModules(this, exports);
+}
+
 
 
 //===----------------------------------------------------------------------===//

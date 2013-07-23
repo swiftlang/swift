@@ -61,7 +61,10 @@ enum class ModuleStatus {
 /// A serialized module, along with the tools to access it.
 class ModuleFile {
   /// A reference back to the AST representation of the module.
-  Module *ModuleContext;
+  Module *ModuleContext = nullptr;
+
+  /// The module shadowed by this module, if any.
+  Module *ShadowedModule = nullptr;
 
   /// The module file data.
   llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -246,6 +249,12 @@ private:
   /// Returns the identifier with the given ID, deserializing it if needed.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
+  /// Returns the appropriate module for the given name.
+  ///
+  /// If the name matches the name of the current module, a shadowed module
+  /// is loaded instead. An empty name represents the Builtin module.
+  Module *getModule(Identifier name);
+
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
@@ -291,6 +300,9 @@ public:
   ///
   /// If none is found, returns null.
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+
+  /// Adds any reexported modules to the given vector.
+  void getReexportedModules(SmallVectorImpl<Module*> &results);
 };
 
 } // end namespace swift

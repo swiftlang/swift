@@ -75,22 +75,16 @@ public:
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) override;
 
-  /// \brief Load extensions to the given nominal type.
-  ///
-  /// \param nominal The nominal type whose extensions should be loaded.
-  ///
-  /// \param previousGeneration The previous generation number. The AST already
-  /// contains extensions loaded from any generation up to and including this
-  /// one.
-  virtual void loadExtensions(NominalTypeDecl *nominal,
-                              unsigned previousGeneration) override;
-
   /// \brief Look for a declaration of the given operator.
   ///
   /// \returns The operator decl, or null if this module does not define the
   /// operator in question.
   virtual OperatorDecl *lookupOperator(Module *module, Identifier name,
-                                       DeclKind fixity);
+                                       DeclKind fixity) override;
+
+  virtual void
+  getReexportedModules(Module *module,
+                       SmallVectorImpl<Module *> &exports) override;
 };
 
 } // end namespace swift

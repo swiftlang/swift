@@ -76,7 +76,7 @@ public:
   /// contains extensions loaded from any generation up to and including this
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
-                              unsigned previousGeneration) = 0;
+                              unsigned previousGeneration) { };
 
   /// \brief Look for members of the given type.
   ///
@@ -98,6 +98,10 @@ public:
                                        DeclKind fixity) {
     return nullptr;
   }
+
+  /// \brief Look for modules re-exported by the given module.
+  virtual void getReexportedModules(Module *module,
+                                    SmallVectorImpl<Module *> &exports) { }
 };
 
 }

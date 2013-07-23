@@ -498,24 +498,27 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
   llvm_unreachable("unknown DeclContext kind");
 }
 
-/// Returns the appropriate module for the given name.
-///
-/// An empty name represents the builtin module. All other names are looked up
-/// in the ASTContext.
-static Module *getModule(Module *currentModule, Identifier name) {
+Module *ModuleFile::getModule(Identifier name) {
   if (name.empty())
-    return currentModule->Ctx.TheBuiltinModule;
+    return ModuleContext->Ctx.TheBuiltinModule;
 
   // FIXME: duplicated from NameBinder::getModule
   // FIXME: provide a real source location.
-  if (name == currentModule->Name)
-    if (auto importer = currentModule->Ctx.getClangModuleLoader())
-      return importer->loadModule(SourceLoc(),
-                                  std::make_pair(name, SourceLoc()),
-                                  false);
+  if (name == ModuleContext->Name) {
+    if (!ShadowedModule) {
+      auto importer = ModuleContext->Ctx.getClangModuleLoader();
+      assert(importer && "no way to import shadowed module (recursive xref?)");
+      ShadowedModule = importer->loadModule(SourceLoc(),
+                                            std::make_pair(name, SourceLoc()),
+                                            false);
+      assert(ShadowedModule && "missing shadowed module");
+    }
+
+    return ShadowedModule;
+  }
 
   // FIXME: provide a real source location.
-  return currentModule->Ctx.getModule(std::make_pair(name, SourceLoc()),
+  return ModuleContext->Ctx.getModule(std::make_pair(name, SourceLoc()),
                                       false);
 }
 
@@ -1250,11 +1253,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isWithinExtension, rawAccessPath);
 
     // First, find the module this reference is referring to.
-    Identifier moduleName = getIdentifier(rawAccessPath.front());
-    rawAccessPath = rawAccessPath.slice(1);
-
-    Module *M = getModule(ModuleContext, moduleName);
+    Module *M = getModule(getIdentifier(rawAccessPath.front()));
     assert(M && "missing dependency");
+    rawAccessPath = rawAccessPath.slice(1);
 
     switch (kind) {
     case XRefKind::SwiftValue:
@@ -1262,8 +1263,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       // Start by looking up the top-level decl in the module.
       Module *baseModule = M;
       if (isWithinExtension) {
-        baseModule = getModule(ModuleContext,
-                               getIdentifier(rawAccessPath.front()));
+        baseModule = getModule(getIdentifier(rawAccessPath.front()));
         rawAccessPath = rawAccessPath.slice(1);
       }
 
@@ -2051,16 +2051,15 @@ ModuleFile::ModuleFile(llvm::OwningPtr<llvm::MemoryBuffer> &&input)
 }
 
 bool ModuleFile::associateWithModule(Module *module) {
-  assert(!ModuleContext && "already associated with an AST module");
   assert(Status == ModuleStatus::Valid && "invalid module file");
+  assert(!ModuleContext && "already associated with an AST module");
+  ModuleContext = module;
 
   ASTContext &ctx = module->Ctx;
   bool missingDependency = false;
   for (auto &dependency : Dependencies) {
     assert(!dependency.Mod && "already loaded?");
-    Identifier ID = ctx.getIdentifier(dependency.Name);
-    // FIXME: Provide a proper source location.
-    dependency.Mod = ctx.getModule(std::make_pair(ID, SourceLoc()), false);
+    dependency.Mod = getModule(ctx.getIdentifier(dependency.Name));
     if (!dependency.Mod)
       missingDependency = true;
   }
@@ -2070,7 +2069,6 @@ bool ModuleFile::associateWithModule(Module *module) {
     return false;
   }
 
-  ModuleContext = module;
 
   // FIXME: The only reason we're deserializing eagerly is to force extensions
   // to load, which they shouldn't yet anyway.
@@ -2124,3 +2122,10 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 
   return Operators.lookup(OperatorKey(name, getOperatorKind(fixity)));
 }
+
+void ModuleFile::getReexportedModules(SmallVectorImpl<Module*> &results) {
+  // FIXME: Generalized re-exports.
+  if (ShadowedModule)
+    results.push_back(ShadowedModule);
+}
+
