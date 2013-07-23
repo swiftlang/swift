@@ -528,3 +528,10 @@ bb0(%0 : $*SomeProtocol):
   %9 = release %1#0 : $Builtin.ObjectPointer
   %10 = return %6 : $SomeProtocol.metatype
 }
+
+// CHECK: sil @test_unreachable
+sil @test_unreachable : $() -> () {
+bb0:
+  %0 = unreachable
+// CHECK: %0 = unreachable
+}

@@ -803,6 +803,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
+    .Case("unreachable", ValueKind::UnreachableInst)
     .Case("upcast", ValueKind::UpcastInst)
     .Case("upcast_existential", ValueKind::UpcastExistentialInst)
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
@@ -1312,6 +1313,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                    getBBForReference(BBName2, NameLoc2));
     break;
   }
+  case ValueKind::UnreachableInst:
+    ResultVal = B.createUnreachable(SILLocation());
+    break;
+    
   case ValueKind::ProtocolMethodInst: {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, P, "volatile"))
