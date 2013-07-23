@@ -301,6 +301,46 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   return CaptureKind::Constant;
 }
   
+
+/// True if the type, or the referenced type of an address
+/// type, is address-only.  For example, it could be a resilient struct or
+/// something of unknown size.
+bool SILType::isAddressOnly(CanType type, SILModule &M) {
+  // Handle some simple cases without asking for a type lowering.
+
+  // Reference types are always loadable.
+  // NB: class archetypes and existentials are not address-only. This
+  // check must come before the check for archetype or existential types
+  // below.
+  if (type.hasReferenceSemantics())
+    return false;
+
+  // Non-class archetypes and existentials are always address-only.
+  if (isa<ArchetypeType>(type) || type.isExistentialType())
+    return true;
+
+  // [weak] types are address-only, but [unowned] can just be passed around.
+  if (auto refTy = dyn_cast<ReferenceStorageType>(type)) {
+    switch (refTy->getOwnership()) {
+    case Ownership::Strong: llvm_unreachable("explicit strong ownership");
+    case Ownership::Weak: return true;
+    case Ownership::Unowned: return false;
+    }
+    llvm_unreachable("bad ownership kind");
+  }
+
+  // Tuples are address-only if any of their elements are.
+  if (auto tupleTy = dyn_cast<TupleType>(type)) {
+    for (auto eltTy : tupleTy.getElementTypes())
+      if (isAddressOnly(eltTy, M))
+        return true;
+    return false;
+  }
+
+  // Otherwise use the type lowering information.
+  return M.Types.getTypeLoweringInfo(type).isAddressOnly();
+}
+
 /// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct
 /// and tuple types and visit their element types, storing information about the
 /// reference type members in the TypeLoweringInfo for the type.
@@ -320,13 +360,22 @@ public:
   void setPath(ReferenceTypePath::Component c) {
     currentElement.path.back() = c;
   }
-  
+
+  void flagAddressOnly() {
+    theInfo.LoweredTypeAndIsAddressOnly.setInt(true);
+  }
+
   void visitType(CanType t) {
-    if (t->hasReferenceSemantics())
+    if (t.hasReferenceSemantics()) {
       theInfo.referenceTypeElements.push_back(currentElement);
+    } else if (isa<ArchetypeType>(t) || t.isExistentialType()) {
+      flagAddressOnly();
+    }
   }
   
-  void walkStructDecl(StructDecl *sd) {
+  void visitAnyStructType(StructDecl *sd) {
+    // FIXME: if this is a struct has a resilient attribute, it is obviously
+    // AddressOnly.
     pushPath();
     for (Decl *d : sd->getMembers())
       if (VarDecl *vd = dyn_cast<VarDecl>(d))
@@ -338,18 +387,26 @@ public:
     popPath();
   }
   
-  void visitBoundGenericType(CanBoundGenericType gt) {
-    if (StructDecl *sd = dyn_cast<StructDecl>(gt->getDecl()))
-      walkStructDecl(sd);
-    else
-      visitType(gt);
+  void visitBoundGenericStructType(CanBoundGenericStructType t) {
+    visitAnyStructType(t->getDecl());
   }
   
-  void visitNominalType(CanNominalType t) {
-    if (StructDecl *sd = dyn_cast<StructDecl>(t->getDecl()))
-      walkStructDecl(sd);
-    else
-      this->visitType(t);
+  void visitStructType(CanStructType t) {
+    visitAnyStructType(t->getDecl());
+  }
+
+  void visitReferenceStorageType(CanReferenceStorageType t) {
+    switch (t->getOwnership()) {
+    case Ownership::Strong:
+      llvm_unreachable("explicit strong ownership");
+    case Ownership::Unowned:
+      // FIXME: push path to weak_retain/weak_release
+      return;
+    case Ownership::Weak:
+      flagAddressOnly();
+      return;
+    }
+    llvm_unreachable("bad ownership kind");
   }
   
   void visitTupleType(CanTupleType t) {
@@ -370,8 +427,12 @@ TypeConverter::TypeConverter(SILModule &m)
 TypeConverter::~TypeConverter() {
   // The bump pointer allocator destructor will deallocate but not destroy all
   // our TypeLoweringInfos.
-  for (auto &ti : types) {
-    ti.second->~TypeLoweringInfo();
+  for (auto &ti : Types) {
+    // Destroy only the unique entries.
+    CanType srcType = CanType(ti.first.first);
+    CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
+    if (srcType == mappedType || isa<LValueType>(srcType))
+      ti.second->~TypeLoweringInfo();
   }
 }
 
@@ -380,75 +441,99 @@ void *TypeLoweringInfo::operator new(size_t size, TypeConverter &tc) {
 }
   
 const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfo(Type t, unsigned uncurryLevel) {
-  CanType ct = t->getCanonicalType();
-  auto existing = types.find(getTypeKey(ct, uncurryLevel));
-  if (existing != types.end()) {
+TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
+  CanType type = origType->getCanonicalType();
+  auto key = getTypeKey(type, uncurryLevel);
+  auto existing = Types.find(key);
+  if (existing != Types.end()) {
     assert(existing->second && "reentered getTypeLoweringInfo");
     return *existing->second;
   }
-  
-  // Catch reentrancy bugs.
-  types[getTypeKey(ct, uncurryLevel)] = nullptr;
-  
+
   // LValue types are a special case for lowering, because they get completely
   // removed and represented as 'address' SILTypes.
-  if (auto lvt = dyn_cast<LValueType>(ct)) {
+  if (auto lvalueType = dyn_cast<LValueType>(type)) {
     // Derive SILType for LValueType from the object type.
-    CanType obj = lvt.getObjectType();
-    SILType loweredType = getLoweredType(obj, uncurryLevel).getAddressType();
-    auto *theInfo = new (*this) TypeLoweringInfo(loweredType, M);
-    types[getTypeKey(ct, uncurryLevel)] = theInfo;
+    CanType objectType = lvalueType.getObjectType();
+    SILType loweredType =
+      getLoweredType(objectType, uncurryLevel).getAddressType();
+
+    auto *theInfo = new (*this) TypeLoweringInfo();
+    theInfo->LoweredTypeAndIsAddressOnly.setPointer(loweredType);
+    Types[key] = theInfo;
     return *theInfo;
   }
-  
-  bool addressOnly = SILType::isAddressOnly(ct, M);
-  SILType loweredType;
-  
-  // Uncurry function types.
-  if (auto ft = dyn_cast<AnyFunctionType>(ct)) {
-    assert(!addressOnly && "function types should never be address-only");
-    auto uncurried = getUncurriedFunctionType(ft, uncurryLevel);
-    loweredType = SILType(uncurried, /*address=*/ false);
-  } else {
-    // Otherwise, the Swift type maps directly to a SILType.
-    assert(uncurryLevel == 0 &&
-           "non-function type cannot have an uncurry level");
-    loweredType = SILType(ct, /*address=*/ addressOnly);
+
+  // Uncurry and lower function types.  This transformation is
+  // essentially a kind of canonicalization, which makes it idempotent
+  // at uncurry level 0.  We exploit that in our caching logic.
+  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
+    CanType loweredType = getUncurriedFunctionType(fnType, uncurryLevel);
+
+    // If the lowering process changed the type, re-check the cache
+    // and add a cache entry for the unlowered type.
+    if (loweredType != type) {
+      auto &typeInfo = getTypeLoweringInfoForLoweredType(loweredType);
+      Types[key] = &typeInfo;
+      return typeInfo;
+    }
+
+    // If it didn't, use the standard logic.
   }
-  
-  // Emit the lowering info for the SIL type.
-  auto *theInfo
-    = &const_cast<TypeLoweringInfo&>(getTypeLoweringInfo(loweredType));
-  assert(theInfo->getLoweredType() == loweredType);
-  types[getTypeKey(ct, uncurryLevel)] = theInfo;
-  return *theInfo;
+
+  // The Swift type directly corresponds to the lowered type; don't
+  // re-check the cache.
+  assert(uncurryLevel == 0);
+  return getTypeLoweringInfoForUncachedLoweredType(type);
 }
 
 const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfo(SILType loweredType) {
-  bool addressOnly = loweredType.isAddressOnly(M);
-  // Address types don't have interesting type info independent of their
-  // object type.
-  if (!addressOnly && loweredType.isAddress())
-    loweredType = loweredType.getObjectType();
-  
-  auto existing = silTypes.find(loweredType);
-  if (existing != silTypes.end())
+TypeConverter::getTypeLoweringInfo(SILType type) {
+  return getTypeLoweringInfoForLoweredType(type.getSwiftRValueType());
+}
+
+const TypeLoweringInfo &
+TypeConverter::getTypeLoweringInfoForLoweredType(CanType type) {
+  assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
+
+  // Re-using uncurry level 0 is reasonable because our uncurrying
+  // transforms are idempotent at this level.  This means we don't
+  // need a ton of redundant entries in the map.
+  auto key = getTypeKey(type, 0);
+  auto existing = Types.find(key);
+  if (existing != Types.end()) {
+    assert(existing->second && "reentered getTypeLoweringInfoForLoweredType");
     return *existing->second;
+  }
+
+  return getTypeLoweringInfoForUncachedLoweredType(type);
+}
+
+/// Do type-lowering for a lowered type which is not already in the cache.
+const TypeLoweringInfo &
+TypeConverter::getTypeLoweringInfoForUncachedLoweredType(CanType type) {
+  auto key = getTypeKey(type, 0);
+  assert(!Types.count(key) && "re-entrant or already cached");
+  assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
   
-  auto *theInfo = new (*this) TypeLoweringInfo(loweredType, M);
-  silTypes[loweredType] = theInfo;
+  auto *theInfo = new (*this) TypeLoweringInfo();
+#ifndef NDEBUG
+  // Catch reentrancy bugs.
+  Types[key] = nullptr;
+#endif
   
-  if (loweredType.hasReferenceSemantics()) {
+  if (type.hasReferenceSemantics()) {
     // Reference types need only to retain/release themselves.
     theInfo->referenceTypeElements.push_back(ReferenceTypePath());
-  } else if (!addressOnly) {
+  } else {
     // Walk aggregate types to find reference type elements.
-    LoadableTypeLoweringInfoVisitor(*theInfo)
-      .visit(loweredType.getSwiftRValueType());
+    LoadableTypeLoweringInfoVisitor(*theInfo).visit(type);
   }
-  
+
+  auto silType = SILType::getPrimitiveType(type, theInfo->isAddressOnly());
+  theInfo->LoweredTypeAndIsAddressOnly.setPointer(silType);
+
+  Types[key] = theInfo;  
   return *theInfo;
 }
 

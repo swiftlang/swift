@@ -132,13 +132,11 @@ class TypeLoweringInfo {
   
   /// loweredTypeAndIsAddressOnly - The SIL type of values with this Swift type,
   /// and whether it is an address-only type.
-  llvm::PointerIntPair<SILType, 1, bool> loweredTypeAndIsAddressOnly;
+  llvm::PointerIntPair<SILType, 1, bool> LoweredTypeAndIsAddressOnly;
   
-public:
-  TypeLoweringInfo(SILType loweredType, SILModule &M)
-    : loweredTypeAndIsAddressOnly(loweredType, loweredType.isAddressOnly(M))
-  {}
+  TypeLoweringInfo() : LoweredTypeAndIsAddressOnly(SILType(), false) {}
 
+public:
   TypeLoweringInfo(const TypeLoweringInfo &) = delete;
   TypeLoweringInfo &operator=(const TypeLoweringInfo &) = delete;
   TypeLoweringInfo(TypeLoweringInfo &&) = default;
@@ -149,7 +147,7 @@ public:
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
   bool isAddressOnly() const {
-    return loweredTypeAndIsAddressOnly.getInt();
+    return LoweredTypeAndIsAddressOnly.getInt();
   }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
@@ -173,7 +171,7 @@ public:
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
   SILType getLoweredType() const {
-    return loweredTypeAndIsAddressOnly.getPointer();
+    return LoweredTypeAndIsAddressOnly.getPointer();
   }
   
   /// Allocate a new TypeLoweringInfo using the TypeConverter's allocator.
@@ -194,14 +192,20 @@ class TypeConverter {
   friend class TypeLoweringInfo;
 
   llvm::BumpPtrAllocator TypeLoweringInfoBPA;
+
+  enum : unsigned {
+    /// There is a unique entry with this uncurry level in the
+    /// type-lowering map for every TLI we create.  The map has the
+    /// responsibility to call the destructor for these entries.
+    UniqueLoweringEntry = ~0U
+  };
   
   using TypeKey = std::pair<TypeBase *, unsigned>;
   TypeKey getTypeKey(CanType t, unsigned uncurryLevel) {
     return {t.getPointer(), uncurryLevel};
   }
   
-  llvm::DenseMap<TypeKey, TypeLoweringInfo *> types;
-  llvm::DenseMap<SILType, TypeLoweringInfo *> silTypes;
+  llvm::DenseMap<TypeKey, const TypeLoweringInfo *> Types;
   llvm::DenseMap<SILConstant, SILType> constantTypes;
   
   Type makeConstantType(SILConstant constant);
@@ -211,6 +215,9 @@ class TypeConverter {
   Optional<CanType> BridgedType##Ty; \
   Optional<CanType> NativeType##Ty;
 #include "swift/SIL/BridgedTypes.def"
+
+  const TypeLoweringInfo &getTypeLoweringInfoForLoweredType(CanType type);
+  const TypeLoweringInfo &getTypeLoweringInfoForUncachedLoweredType(CanType type);
   
 public:
   SILModule &M;

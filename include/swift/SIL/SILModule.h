@@ -71,9 +71,6 @@ private:
   /// The collection of global variables used in the module.
   llvm::SetVector<VarDecl*> globals;
 
-  /// This is a cache that memoizes the result of SILType::isAddressOnly.
-  llvm::DenseMap<TypeBase*, bool> AddressOnlyTypeCache;
-  
   /// This is a cache that memoizes the result of SILType::getFunctionTypeInfo.
   llvm::DenseMap<AnyFunctionType*, SILFunctionTypeInfo*> FunctionTypeInfoCache;
   
