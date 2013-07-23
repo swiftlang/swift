@@ -803,6 +803,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                  argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()),
                                  DC);
+    body->setType(signature);
     fn->setBody(body);
 
     if (genericParams)
