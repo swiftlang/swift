@@ -1750,17 +1750,23 @@ a basic block.
 unreachable
 ```````````
 ::
+  
+  sil-terminator ::= 'unreachable'
 
-  unreachable
+  %_ = unreachable
 
 Indicates that control flow must not reach the end of the current basic block.
+It is a dataflow error if an unreachable terminator is reachable from the entry
+point of a function and is not dominated by calls to ``[noreturn]`` functions.
 
 return
 ``````
 ::
+  
+  sil-terminator ::= 'return' sil-operand
 
-  return %0
-  ; %0 must be of the return type of the current function
+  %_ = return %0 : $T
+  // $T must be the return type of the current function
 
 Exits the current function and returns control to the calling function. The
 result of the ``apply`` instruction that invoked the current function will be
@@ -1769,41 +1775,113 @@ release its operand or any other values.
 
 autorelease_return
 ``````````````````
+::
+
+  sil-terminator ::= 'autorelease_return' sil-operand
+
+  %_ = autorelease_return %0 : $T
+  // $T must be the return type of the current function, which must be of
+  //   class type
+
+Exits the current function and returns control to the calling function. The
+result of the ``apply`` instruction that invoked the current function will be
+the operand of this ``return`` instruction. The return value is autoreleased
+into the active Objective-C autorelease pool using the "autoreleased return
+value" optimization. The current function must use the ``[cc(objc)]`` calling
+convention.
 
 br
 ``
 ::
 
-  br label (%0, %1, ...)
-  ; `label` must refer to a block label within the current function
-  ; %0, %1, etc. must be of the types of `label`'s arguments
+  sil-terminator ::= 'br' sil-identifier
+                       '(' (sil-operand (',' sil-operand)*)? ')'
+
+  %_ = br label (%0 : $A, %1 : $B, ...)
+  // `label` must refer to a basic block label within the current function
+  // %0, %1, etc. must be of the types of `label`'s arguments
 
 Unconditionally transfers control from the current basic block to the block
-labeled ``label``, passing the given values as arguments to ``label``.
+labeled ``label``, binding the given values to the arguments of the destination
+basic block.
 
 condbranch
 ``````````
 ::
 
-  condbranch %0, true_label (%T1, %T2, ...),
-                 false_label (%F1, %F2, ...)
-  ; %0 must be of the builtin Int1 type
-  ; `true_label` and `false_label` must refer to block labels within the
-  ;   current function
-  ; %T1, %T2, etc. must be of the types of `true_label`'s arguments
-  ; %F1, %F2, etc. must be of the types of `false_label`'s arguments
+  sil-terminator ::= 'condbranch' sil-operand ','
+                       sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
+                       sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
 
-Conditionally branches to ``true_label`` if ``%0`` is equal to one or to
-``false_label`` if ``%0`` is equal to zero, passing the corresponding set of
-values as arguments to the chosen block. ``%0`` must be of the builtin ``Int1``
-type.
+  condbranch %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...),
+                                 false_label (%x : $X, %y : $Y, ...)
+  // %0 must be of $Builtin.Int1 type
+  // `true_label` and `false_label` must refer to block labels within the
+  //   current function
+  // %a, %b, etc. must be of the types of `true_label`'s arguments
+  // %x, %y, etc. must be of the types of `false_label`'s arguments
+
+Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
+``false_label`` if ``%0`` is equal to ``0``, binding the corresponding set of
+values to the the arguments of the chosen destination block.
 
 switch_oneof
 ````````````
+::
 
-Protocol and protocol composition types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  sil-terminator ::= 'switch_oneof' sil-operand
+                       (',' sil-switch-case)*
+                       (',' sil-switch-default)
+  sil-switch-case ::= 'case' sil-decl-ref ':' sil-identifier
+  sil-switch-default ::= 'default' sil-identifier
 
+  switch_oneof %0 : $U, case #U.Foo: label1, case #U.Bar: label2, ..., default labelN
+  // %0 must be a value or address of oneof type $U
+  // #U.Foo, #U.Bar, etc. must be 'case' declarations inside $U
+  // `label1` through `labelN` must refer to block labels within the current
+  //   function
+  // label1 must take either no basic block arguments, or a single argument
+  //   of the type of #U.Foo's data
+  // label2 must take either no basic block arguments, or a single argument
+  //   of the type of #U.Bar's data, etc.
+
+Conditionally branches to one of several destination basic blocks based on the
+discriminator in a ``oneof`` value. If the ``oneof`` type is resilient, the
+``default`` branch is required; if the ``oneof`` type is fragile, the ``default``
+branch is required unless a destination is assigned to every ``case`` of the
+``oneof``. The destination basic block for a ``case`` may take an argument
+of the corresponding ``oneof`` ``case``'s data type (or of the address type,
+if the operand is an address). If the branch is taken, the argument will be
+bound to the associated data (or its address) inside the original oneof value.
+For example::
+
+  oneof Foo {
+    case Nothing
+    case OneInt(Int)
+    case TwoInts(Int, Int)
+  }
+
+  sil @sum_of_foo : $Foo -> Int {
+  entry(%x : $Foo):
+    switch_oneof %x : $Foo,       \
+      case #Foo.Nothing: nothing, \
+      case #Foo.OneInt:  one_int, \
+      case #Foo.TwoInts: two_ints
+
+  nothing:
+    %zero = integer_literal 0 : $Int
+    return %zero : $Int
+
+  one_int(%y : $Int):
+    return %y : $Int
+
+  two_ints(%ab : $(Int, Int)):
+    %a = tuple_extract %ab : $(Int, Int), 0
+    %b = tuple_extract %ab : $(Int, Int), 1
+    %add = function_ref @add : $(Int, Int) -> Int
+    %result = apply %add(%a : $Int, %b : $Int) : $(Int, Int) -> Int
+    return %result : $Int
+  }
 
 Calling convention
 ------------------
