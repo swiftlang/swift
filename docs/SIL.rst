@@ -581,7 +581,11 @@ load
 
 Loads the value at address ``%0`` from memory. ``T`` must be a loadable type.
 This does not affect the reference count, if any, of the loaded value; the
-value must be retained explicitly if necessary.
+value must be retained explicitly if necessary. It is undefined behavior to
+load from uninitialized memory.
+
+TODO: Should loading from uninitialized memory instead have the dataflow
+analysis semantics of initialize_var?
 
 store
 `````
@@ -591,8 +595,8 @@ store
   // $T must be a loadable type
 
 Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
-loadable type. This will overwrite the memory at ``%1``; ``%1`` must point
-to uninitialized or destroyed memory.
+loadable type. This will overwrite the memory at ``%1``; ``%1`` must reference
+uninitialized or destroyed memory.
 
 initialize_var
 ``````````````
@@ -724,9 +728,12 @@ index_addr
 Given an address that references into an array of values, returns the address
 of the ``%1``-th element relative to ``%0``. The address must reference into
 a contiguous array, produced by ``alloc_array`` or by an external function. It
-is invalid to try to reference offsets within a value, such as within a
-struct or tuple type, using ``index_addr``. (Byte types have no special behavior
-in this regard, unlike ``char*`` in C.)
+is undefined to try to reference offsets within a non-array value, such as
+fields within a homogeneous struct or tuple type, or bytes within a value,
+using ``index_addr``. (``Int8`` address types have no special behavior in this
+regard, unlike ``char*`` or ``void*`` in C.) It is also undefined behavior to
+index out of bounds of an array, except to index the "past-the-end" address of
+the array.
 
 index_raw_pointer
 `````````````````
@@ -752,6 +759,7 @@ are never implicit in SIL and always must be explicitly performed where needed.
 Retains and releases on the value may be freely moved, and balancing
 retains and releases may deleted, so long as an owning retain count is
 maintained for the uses of the value. 
+
 TODO: Weak and unowned references.
 
 retain
@@ -950,7 +958,8 @@ class_method
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
-instance. The reference must not be null.
+instance. It is undefined behavior if the class reference is null and the
+method is not an Objective-C method.
 
 super_method
 ````````````
@@ -968,7 +977,8 @@ super_method
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
 dispatched, so this instruction is only valid for Objective-C methods.
-The class reference must not be null.
+It is undefined behavior if the class reference is null and the method is
+not an Objective-C method.
 
 archetype_method
 ````````````````
@@ -1022,6 +1032,10 @@ operand:
   projected using the ``project_existential_ref`` instruction.
 - If the operand is a protocol metatype, it does not need to be projected, and
   the "this" argument of the method is the protocol metatype itself.
+
+It is undefined behavior if the ``protocol_method`` function value is invoked
+with a "this" argument not derived from the same existential container as the
+method itself.
 
 Function Application
 ~~~~~~~~~~~~~~~~~~~~
@@ -1192,7 +1206,7 @@ class_metatype
   // %1 will be of type $T.metatype and reference the runtime metatype of %0
 
 Obtains a reference to the dynamic metatype of the class instance ``%0``.
-The class instance reference must not be null.
+It is undefined behavior if the class instance reference is null.
 
 archetype_metatype
 ``````````````````
@@ -1400,7 +1414,8 @@ remains uninitialized. The contained value must be ``store``-d or
 If the existential container needs to be destroyed while the contained value
 is uninitialized, ``deinit_existential`` must be used to do so. A fully
 initialized existential container can be destroyed with ``destroy_addr`` as
-usual.
+usual. It is undefined behavior to ``destroy_addr`` a partially-initialized
+existential container.
 
 upcast_existential
 ``````````````````
@@ -1470,9 +1485,9 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.OpaquePointer) : $(Int, Builtin.OpaquePointer) -> ()
 
-It is invalid for the result of ``project_existential`` is used as anything
-other than the "this" argument of an instance method reference obtained by
-``protocol_method`` from the same existential container.
+It is undefined behavior if the result of ``project_existential`` is used as
+anything other than the "this" argument of an instance method reference
+obtained by ``protocol_method`` from the same existential container.
 
 init_existential_ref
 ````````````````````
@@ -1533,9 +1548,9 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.ObjCPointer) : $(Int, Builtin.ObjCPointer) -> ()
 
-It is invalid for the result of ``project_existential_ref`` is used as anything
-other than the "this" argument of an instance method reference obtained by
-``protocol_method`` from the same existential container.
+It is undefined behavior if the result of ``project_existential_ref`` is used
+as anything other than the "this" argument of an instance method reference
+obtained by ``protocol_method`` from the same existential container.
 
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1597,8 +1612,8 @@ address_to_pointer
 Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
 Converting the result pointer back to an address of the same type will give
 an address equivalent to ``%0``. Type punning is always undefined in SIL; it
-is invalid to cast the ``RawPointer`` back to any type other than its
-original address type.
+is undefined behavior to cast the ``RawPointer`` to any address type other than
+its original address type.
 
 pointer_to_address
 ``````````````````
@@ -1613,10 +1628,9 @@ Creates an address value corresponding to the ``Builtin.RawPointer`` value
 ``%0``.  Converting a ``RawPointer`` back to an address of the same type as
 its originating ``address_to_pointer`` instruction gives back an equivalent
 address. Type punning is always undefined in SIL; it
-is invalid to cast the ``RawPointer`` back to any type other than its
-original address type. It is also invalid to cast a ``RawPointer`` from a
-heap object to any address type. This conversion, however, is unchecked and
-will not raise a compile-time or runtime error if used incorrectly.
+is undefined behavior to cast the ``RawPointer`` back to any type other than
+its original address type. It is also undefined behavior to cast a
+``RawPointer`` from a heap object to any address type.
 
 ref_to_object_pointer
 `````````````````````
@@ -1643,7 +1657,8 @@ object_pointer_to_ref
 Converts a ``Builtin.ObjectPointer`` value to a class instance reference.
 The destination type ``$C`` must be the correct type (or a superclass) of the
 type of the referenced heap object. This conversion, however, is unchecked and
-will not raise a compile-time or runtime error if used incorrectly.
+it is undefined behavior if the destination type is not a valid type for the
+heap object.
 
 ref_to_raw_pointer
 ``````````````````
@@ -1657,8 +1672,8 @@ ref_to_raw_pointer
 
 Converts a heap object reference to a ``Builtin.RawPointer``. The ``RawPointer``
 result can be cast back to the originating class type but does not have
-ownership semantics. It is invalid to cast a ``RawPointer`` from a heap
-object reference to an address using ``pointer_to_address``.
+ownership semantics. It is undefined behavior to cast a ``RawPointer`` from a
+heap object reference to an address using ``pointer_to_address``.
 
 raw_pointer_to_ref
 ``````````````````
@@ -1673,11 +1688,10 @@ raw_pointer_to_ref
 Converts a ``Builtin.RawPointer`` back to a heap object reference. Casting
 a heap object reference to ``Builtin.RawPointer`` back to the same type gives
 an equivalent heap object reference (though the raw pointer has no ownership
-semantics for the object on its own). It is invalid to cast a ``RawPointer`` to
-a type unrelated to the dynamic type of the referenced object. It is invalid
-to cast a ``RawPointer`` from an address to any heap object type. The
-conversion, however, is unchecked and will not raise a compile-time or runtime
-error if used incorrectly.
+semantics for the object on its own). It is undefined behavior to cast a
+``RawPointer`` to a type unrelated to the dynamic type of the heap object.
+It is also undefined behavior to cast a ``RawPointer`` from an address to any
+heap object type.
 
 convert_function
 ````````````````
