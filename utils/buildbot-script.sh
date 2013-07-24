@@ -154,6 +154,7 @@ Subject: Swift package $package_basename now available
 A new Swift package is available at
 You can download and install it using the command line:
 
+          ~/Downloads
         sudo darwinup install ~/Downloads/$package_basename
 
 where \$USER is your Open Directory username.
