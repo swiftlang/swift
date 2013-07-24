@@ -153,13 +153,14 @@ type grammar. SIL adds some additional kinds of type of its own:
   Addresses of address-only types (see below) can only be used with
   instructions that manipulate their operands indirectly by address, such
   as ``copy_addr``, ``destroy_addr``, and ``dealloc_var``, or as arguments
-  to functions.
+  to functions. For an address-only type ``T``, only the SIL address ``$*T``
+  can be formed. ``$T`` for address-only ``T`` is an invalid SIL type.
   
   Addresses are not reference-counted pointers like class values are. They
   cannot be retained or released.
   
-  The address of an address cannot be taken. Values of address type
-  thus cannot be allocated, loaded, or stored
+  The address of an address cannot be taken. ``$**T`` is not a representable
+  type. Values of address type thus cannot be allocated, loaded, or stored
   (though addresses can of course be loaded from and stored to).
 
   If a function takes address arguments, those addresses are assumed to be
@@ -179,7 +180,8 @@ type grammar. SIL adds some additional kinds of type of its own:
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
   function with ``function_ref`` will give a value of a generic function type.
   Its type variables can be bound with a ``specialize`` instruction to
-  give a value of a *concrete function type* ``$(A...) -> R``.
+  give a value of a *concrete function type* ``$(A...) -> R``, which can then
+  be applied. A generic function type value cannot be applied directly.
 
 SIL classifies types into additional subgroups based on ABI stability and
 generic constraints:
