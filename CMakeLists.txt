@@ -132,7 +132,7 @@ option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
-option(SWIFT_USE_LIBRARY_MODULES "Use modules for Swift libraries" NO)
+option(SWIFT_USE_LIBRARY_MODULES "Use modules for Swift libraries" YES)
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
@@ -242,7 +242,7 @@ function(compile_swift_files)
         OUTPUT ${module_source_file}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
         COMMAND swift -emit-module ${swift_flags} -o "${module_source_file}" ${source_files}
-        DEPENDS ${source_files})
+        DEPENDS swift ${source_files})
     else()
       # Build the module source file; a hack until we get real module
       # compilation.  In principle this separate file might not be needed
@@ -254,7 +254,7 @@ function(compile_swift_files)
         OUTPUT ${module_source_file}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
         COMMAND cat ${source_files} > "${module_source_file}"
-        DEPENDS swift ${source_files}
+        DEPENDS ${source_files}
         COMMENT "FIXME: generating module source file ${module_source_name}.swift")
     endif()
 
