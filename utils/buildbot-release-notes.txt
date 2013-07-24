@@ -1,3 +1,9 @@
+* Arithmetic operators "+", "-", "*", and "/" on integer types now do
+  overflow checking and trap on overflow. A parallel set of masking operators,
+  "&+", "&-", "&*", and "&/", are defined to perform two's complement wrapping
+  arithmetic for all signed and unsigned integer types.
+
+
 * Debugger support. Swift has a "-g" command line switch that turns on
   debug info for the compiled output. Using the standard lldb debugger
   this will allow single-stepping through Swift programs, printing
@@ -60,6 +66,7 @@
       }
     }
 
+
 * Swift has a new closure syntax. The new syntax eliminates the use of
   pipes. Instead, the closure signature is written the same way as a
   function type and is separated from the body by the "in"
@@ -78,10 +85,12 @@
 
     sort(fruits) { $0 > $1 }
 
+
 * nil can now be used without explicit casting. Previously, 'nil' had
   type NSObject, so one would have to write (e.g.) 'nil as! NSArray'
   to create a nil NSArray. Now, 'nil' picks up the type of its
   context.
+
 
 * POSIX.EnvironmentVariables and swift.CommandLineArguments global variables
   were merged into a swift.Process variable.  Now you can access command line
