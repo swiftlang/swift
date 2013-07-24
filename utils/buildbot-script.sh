@@ -48,9 +48,15 @@ test -d "$WORKSPACE/swift"
 
 # Make sure install-test-script.sh is available alongside us.
 INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
+RELEASE_NOTES_TXT="$(dirname "$0")/buildbot-release-notes.txt"
 
 if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
   echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
+  exit 1
+fi
+
+if [ \! -f "$RELEASE_NOTES_TXT" ]; then
+  echo "Release notes file $RELEASE_NOTES_TXT is unavailable!"
   exit 1
 fi
 
@@ -163,95 +169,7 @@ component.
 
 === RECENT CHANGES ===
 
-* Debugger support. Swift has a "-g" command line switch that turns on
-  debug info for the compiled output. Using the standard lldb debugger
-  this will allow single-stepping through Swift programs, printing
-  backtraces, and navigating through stack frames; all in sync with
-  the corresponding Swift source code. An unmodified lldb cannot
-  inspect any variables.
-
-  Example session:
-    $ echo 'println("Hello World")' >hello.swift
-    $ swift hello.swift -c -g -o hello.o
-    $ ld hello.o "-dynamic" "-arch" "x86_64" "-macosx_version_min" "10.9.0" \
-         -framework Foundation lib/swift/libswift_stdlib_core.dylib \
-         lib/swift/libswift_stdlib_posix.dylib -lSystem -o hello
-    $ lldb hello
-    Current executable set to 'hello' (x86_64).
-    (lldb) b top_level_code
-    Breakpoint 1: where = hello`top_level_code + 26 at hello.swift:1, address = 0x0000000100000f2a
-    (lldb) r
-    Process 38592 launched: 'hello' (x86_64)
-    Process 38592 stopped
-    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1, queue = 'com.apple.main-thread, stop reason = breakpoint 1.1
-        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1
-    -> 1   	println("Hello World")
-    (lldb) bt
-    * thread #1: tid = 0x1599fb, 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1, queue = 'com.apple.main-thread, stop reason = breakpoint 1.1
-        frame #0: 0x0000000100000f2a hello`top_level_code + 26 at hello.swift:1
-        frame #1: 0x0000000100000f5c hello`main + 28
-        frame #2: 0x00007fff918605fd libdyld.dylib`start + 1
-        frame #3: 0x00007fff918605fd libdyld.dylib`start + 1
-  Also try "s", "n", "up", "down".
-
-
-* Swift now has a 'switch' statement, supporting pattern matching of
-  multiple values with variable bindings, guard expressions, and range
-  comparisons. For example:
-
-    func classifyPoint(point:(Int, Int)) {
-      switch point {
-      case (0, 0):
-        println("origin")
-
-      case (_, 0):
-        println("on the x axis")
-
-      case (0, _):
-        println("on the y axis")
-
-      case (var x, var y) where x == y:
-        println("on the y = x diagonal")
-
-      case (var x, var y) where -x == y:
-        println("on the y = -x diagonal")
-
-      case (-10..10, -10..10):
-        println("close to the origin")
-
-      case (var x, var y):
-        println("length \(sqrt(x*x + y*y))")
-      }
-    }
-
-* Swift has a new closure syntax. The new syntax eliminates the use of
-  pipes. Instead, the closure signature is written the same way as a
-  function type and is separated from the body by the "in"
-  keyword. For example:
-
-    sort(fruits) { (lhs : String, rhs : String) -> Bool in
-      return lhs > rhs 
-    }
-
-  When the types are omitted, one can also omit the parentheses, e.g.,
-
-    sort(fruits) { lhs, rhs in lhs > rhs }
-
-  Closures with no parameters or that use the anonymous parameters
-  (\$0, \$1, etc.) don't need the 'in', e.g.,
-
-    sort(fruits) { \$0 > \$1 }
-
-* nil can now be used without explicit casting. Previously, 'nil' had
-  type NSObject, so one would have to write (e.g.) 'nil as! NSArray'
-  to create a nil NSArray. Now, 'nil' picks up the type of its
-  context.
-
-* POSIX.EnvironmentVariables and swift.CommandLineArguments global variables
-  were merged into a swift.Process variable.  Now you can access command line
-  arguments with Process.arguments.  In order to acces environment variables
-  add "import POSIX" and use Process.environmentVariables.
-
+$(cat "$RELEASE_NOTES_TXT")
 
 === GETTING STARTED WITH SWIFT ===
 
