@@ -122,32 +122,37 @@ struct ReferenceTypePath {
 
 /// TypeLoweringInfo - Extended type information used by SILGen.
 class TypeLoweringInfo {
-  friend class TypeConverter;
-  friend class LoadableTypeLoweringInfoVisitor;
+public:
+  enum IsTrivial_t : bool { IsNotTrivial, IsTrivial };
+  enum IsAddressOnly_t : bool { IsNotAddressOnly, IsAddressOnly };
 
-  /// referenceTypeElements - For a loadable type, this contains element index
-  /// paths to every element inside the aggregate that must be retained and
-  /// released.
-  llvm::SmallVector<ReferenceTypePath, 4> referenceTypeElements;
-  
-  /// loweredTypeAndIsAddressOnly - The SIL type of values with this Swift type,
-  /// and whether it is an address-only type.
-  llvm::PointerIntPair<SILType, 1, bool> LoweredTypeAndIsAddressOnly;
-  
-  TypeLoweringInfo() : LoweredTypeAndIsAddressOnly(SILType(), false) {}
+private:
+  /// The SIL type of values with this Swift type, and some associated
+  /// flags.
+  llvm::PointerIntPair<SILType, 2, unsigned> LoweredTypeAndFlags;
+
+  enum : unsigned {
+    IsTrivialFlag     = 0x1,
+    IsAddressOnlyFlag = 0x2,
+  };
+
+protected:  
+  TypeLoweringInfo(SILType type, IsTrivial_t isTrivial,
+                   IsAddressOnly_t isAddressOnly)
+    : LoweredTypeAndFlags(type,
+                          (isTrivial ? IsTrivialFlag : 0U) | 
+                          (isAddressOnly ? IsAddressOnlyFlag : 0U)) {}
 
 public:
   TypeLoweringInfo(const TypeLoweringInfo &) = delete;
   TypeLoweringInfo &operator=(const TypeLoweringInfo &) = delete;
-  TypeLoweringInfo(TypeLoweringInfo &&) = default;
-  TypeLoweringInfo &operator=(TypeLoweringInfo &&) = default;
-  
+
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
   bool isAddressOnly() const {
-    return LoweredTypeAndIsAddressOnly.getInt();
+    return LoweredTypeAndFlags.getInt() & IsAddressOnlyFlag;
   }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
@@ -159,19 +164,13 @@ public:
   /// isTrivial - Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
-    return isLoadable() && referenceTypeElements.empty();
-  }
-  
-  /// getReferenceTypeElements - For a nontrivial loadable value type, returns
-  /// an array of ReferenceTypePaths addressing the reference type elements.
-  llvm::ArrayRef<ReferenceTypePath> getReferenceTypeElements() const {
-    return referenceTypeElements;
+    return LoweredTypeAndFlags.getInt() & IsTrivialFlag;
   }
   
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
   SILType getLoweredType() const {
-    return LoweredTypeAndIsAddressOnly.getPointer();
+    return LoweredTypeAndFlags.getPointer();
   }
   
   /// Allocate a new TypeLoweringInfo using the TypeConverter's allocator.

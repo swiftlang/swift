@@ -15,47 +15,59 @@
 using namespace swift;
 using namespace Lowering;
 
-static void rrLoadableValueElement(SILBuilder &B, SILLocation loc,
-                                   SILValue v,
-                                   void (SILBuilder::*createRR)(SILLocation,
-                                                                SILValue),
-                                   ReferenceTypePath const &elt) {
-  for (auto &comp : elt.path) {
-    SILType silTy
-      = B.getFunction().getModule().Types.getLoweredType(comp.getType());
-    switch (comp.getKind()) {
-      case ReferenceTypePath::Component::Kind::StructField:
-        v = B.createStructExtract(loc, v, comp.getStructField(), silTy);
-        break;
-      case ReferenceTypePath::Component::Kind::TupleElement:
-        v = B.createTupleExtract(loc, v, comp.getTupleElement(), silTy);
-        break;
-    }
-  }
-  (B.*createRR)(loc, v);
-}
-
 static void rrLoadableValue(SILBuilder &B, SILLocation loc, SILValue v,
-                            void (SILBuilder::*createRR)(SILLocation, SILValue),
-                            ArrayRef<ReferenceTypePath> elts) {
-  for (auto &elt : elts)
-    rrLoadableValueElement(B, loc, v, createRR, elt);
+                        void (SILBuilder::*createRR)(SILLocation, SILValue)) {
+  auto type = v.getType().getSwiftRValueType();
+
+  // TODO: abstract this into TypeLoweringInfo
+
+  if (auto tupleTy = dyn_cast<TupleType>(type)) {
+    unsigned i = 0;
+    for (auto eltTy : tupleTy.getElementTypes()) {
+      auto curIndex = i++;
+      auto &eltTI =
+        B.getFunction().getParent()->Types.getTypeLoweringInfo(eltTy);
+      if (eltTI.isTrivial()) continue;
+      auto eltVal = B.createTupleExtract(loc, v, curIndex, eltTI.getLoweredType());
+      rrLoadableValue(B, loc, eltVal, createRR);
+    }
+    return;
+  }
+
+  if (auto structDecl =
+        dyn_cast_or_null<StructDecl>(type->getNominalOrBoundGenericNominal())) {
+    for (auto member : structDecl->getMembers()) {
+      auto field = dyn_cast<VarDecl>(member);
+      if (!field || field->isProperty()) continue;
+
+      auto &fieldTI = B.getFunction().getParent()->Types
+                                     .getTypeLoweringInfo(field->getType());
+      if (fieldTI.isTrivial()) continue;
+      auto fieldVal = B.createStructExtract(loc, v, field,
+                                            fieldTI.getLoweredType());
+      rrLoadableValue(B, loc, fieldVal, createRR);
+    }
+    return;
+  }
+
+  assert(type.hasReferenceSemantics());
+  (B.*createRR)(loc, v);  
 }
 
 void SILBuilder::emitRetainValueImpl(SILLocation loc, SILValue v,
                                      const TypeLoweringInfo &ti) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
+  if (ti.isTrivial()) return;
   
-  rrLoadableValue(*this, loc, v, &SILBuilder::createRetain,
-                  ti.getReferenceTypeElements());
+  rrLoadableValue(*this, loc, v, &SILBuilder::createRetain);
 }
 
 void SILBuilder::emitReleaseValueImpl(SILLocation loc, SILValue v,
                                       const TypeLoweringInfo &ti) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
+  if (ti.isTrivial()) return;
   
-  rrLoadableValue(*this, loc, v, &SILBuilder::createRelease,
-                  ti.getReferenceTypeElements());
+  rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
 }

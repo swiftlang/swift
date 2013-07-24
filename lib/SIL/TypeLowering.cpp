@@ -300,126 +300,212 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   }
   return CaptureKind::Constant;
 }
-  
+
+enum class LoweredTypeKind {
+  /// Trivial and loadable.
+  Trivial,
+
+  /// Non-trivial but still loadable.
+  Scalar,
+
+  /// Non-trivial and not loadable.
+  AddressOnly
+};
+
+static LoweredTypeKind classifyType(CanType type, SILModule &M);
+
+namespace {
+  template <class Impl, class RetTy>
+  class TypeClassifierBase : public CanTypeVisitor<Impl, RetTy> {
+    SILModule &M;
+    Impl &asDerived() { return *static_cast<Impl*>(this); }
+  protected:
+    TypeClassifierBase(SILModule &M) : M(M) {}
+  public:
+    RetTy handle(CanType type, LoweredTypeKind kind) {
+      switch (kind) {
+      case LoweredTypeKind::AddressOnly:
+        return asDerived().handleAddressOnly(type);
+      case LoweredTypeKind::Scalar:
+        return asDerived().handleScalar(type);
+      case LoweredTypeKind::Trivial:
+        return asDerived().handleTrivial(type);
+      }
+      llvm_unreachable("bad type lowering kind");
+    }
+
+#define IMPL(TYPE, LOWERING)                            \
+    RetTy visit##TYPE##Type(Can##TYPE##Type type) {     \
+      return asDerived().handle##LOWERING(type);        \
+    }
+
+    IMPL(BuiltinInteger, Trivial)
+    IMPL(BuiltinFloat, Trivial)
+    IMPL(BuiltinRawPointer, Trivial)
+    IMPL(BuiltinOpaquePointer, Trivial)
+    IMPL(BuiltinObjectPointer, Scalar)
+    IMPL(BuiltinObjCPointer, Scalar)
+    IMPL(BuiltinVector, Trivial)
+    IMPL(Class, Scalar)
+    IMPL(BoundGenericClass, Scalar)
+    IMPL(MetaType, Trivial)
+    IMPL(AnyFunction, Scalar)
+    IMPL(Array, AddressOnly) // who knows?
+    IMPL(Module, Trivial)
+
+#undef IMPL
+
+    RetTy visitLValueType(CanLValueType type) {
+      llvm_unreachable("shouldn't get an l-value type here");
+    }
+
+    RetTy visitReferenceStorageType(CanReferenceStorageType type) {
+      switch (type->getOwnership()) {
+      case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
+      case Ownership::Unowned: return asDerived().handleScalar(type);
+      case Ownership::Weak:    return asDerived().handleAddressOnly(type);
+      }
+      llvm_unreachable("bad ownership kind");
+    }
+
+    // These types are address-only unless they're class-constrained.
+    template <class T> RetTy visitAbstracted(T type) {
+      if (type->requiresClass()) {
+        return asDerived().handleScalar(type);
+      } else {
+        return asDerived().handleAddressOnly(type);        
+      }
+    }
+    RetTy visitArchetypeType(CanArchetypeType type) {
+      return visitAbstracted(type);
+    }
+    RetTy visitProtocolType(CanProtocolType type) {
+      return visitAbstracted(type);
+    }
+    RetTy visitProtocolCompositionType(CanProtocolCompositionType type) {
+      return visitAbstracted(type);
+    }
+
+    // Unions depend on their enumerators.
+    RetTy visitOneOfType(CanOneOfType type) {
+      return asDerived().visitAnyOneOfType(type, type->getDecl());
+    }
+    RetTy visitBoundGenericOneOfType(CanBoundGenericOneOfType type) {
+      return asDerived().visitAnyOneOfType(type, type->getDecl());
+    }
+    RetTy visitAnyOneOfType(CanType type, OneOfDecl *D) {
+      // FIXME
+      return asDerived().handleTrivial(type);
+    }
+
+    // Structs depend on their physical fields.
+    RetTy visitStructType(CanStructType type) {
+      return asDerived().visitAnyStructType(type, type->getDecl());
+    }
+    RetTy visitBoundGenericStructType(CanBoundGenericStructType type) {
+      return asDerived().visitAnyStructType(type, type->getDecl());
+    }
+    RetTy visitAnyStructType(CanType type, StructDecl *D) {
+      // FIXME: if this struct is resilient to anybody, it needs to be
+      // AddressOnly.
+      auto structKind = LoweredTypeKind::Trivial;
+      for (Decl *member : D->getMembers()) {
+        VarDecl *field = dyn_cast<VarDecl>(member);
+        if (!field || field->isProperty()) continue;
+
+        CanType fieldType = field->getType()->getCanonicalType();
+        auto fieldKind = classifyType(fieldType, M);
+        structKind = std::max(structKind, fieldKind);
+      }
+      return asDerived().handle(type, structKind);
+    }
+
+    // Tuples depend on their elements.
+    RetTy visitTupleType(CanTupleType type) {
+      auto tupleKind = LoweredTypeKind::Trivial;
+      for (auto eltType : type.getElementTypes()) {
+        auto eltKind = classifyType(eltType, M);
+        tupleKind = std::max(tupleKind, eltKind);
+      }
+      return asDerived().handle(type, tupleKind);
+    }
+  };
+
+  class TypeClassifier :
+      public TypeClassifierBase<TypeClassifier, LoweredTypeKind> {
+  public:
+    TypeClassifier(SILModule &M) : TypeClassifierBase(M) {}
+
+    LoweredTypeKind handleScalar(CanType type) {
+      return LoweredTypeKind::Scalar;
+    }
+    LoweredTypeKind handleTrivial(CanType type) {
+      return LoweredTypeKind::Trivial;
+    }
+    LoweredTypeKind handleAddressOnly(CanType type) {
+      return LoweredTypeKind::AddressOnly;
+    }
+  };
+}
+
+static LoweredTypeKind classifyType(CanType type, SILModule &M) {
+  // FIXME: caching?
+  return TypeClassifier(M).visit(type);
+}
 
 /// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
 bool SILType::isAddressOnly(CanType type, SILModule &M) {
-  // Handle some simple cases without asking for a type lowering.
-
-  // Reference types are always loadable.
-  // NB: class archetypes and existentials are not address-only. This
-  // check must come before the check for archetype or existential types
-  // below.
-  if (type.hasReferenceSemantics())
-    return false;
-
-  // Non-class archetypes and existentials are always address-only.
-  if (isa<ArchetypeType>(type) || type.isExistentialType())
-    return true;
-
-  // [weak] types are address-only, but [unowned] can just be passed around.
-  if (auto refTy = dyn_cast<ReferenceStorageType>(type)) {
-    switch (refTy->getOwnership()) {
-    case Ownership::Strong: llvm_unreachable("explicit strong ownership");
-    case Ownership::Weak: return true;
-    case Ownership::Unowned: return false;
-    }
-    llvm_unreachable("bad ownership kind");
-  }
-
-  // Tuples are address-only if any of their elements are.
-  if (auto tupleTy = dyn_cast<TupleType>(type)) {
-    for (auto eltTy : tupleTy.getElementTypes())
-      if (isAddressOnly(eltTy, M))
-        return true;
-    return false;
-  }
-
-  // Otherwise use the type lowering information.
-  return M.Types.getTypeLoweringInfo(type).isAddressOnly();
+  return classifyType(type, M) == LoweredTypeKind::AddressOnly;
 }
 
-/// LoadableTypeLoweringInfoVisitor - Recursively descend into fragile struct
-/// and tuple types and visit their element types, storing information about the
-/// reference type members in the TypeLoweringInfo for the type.
-///
-/// This is only invoked on loadable types.
-///
-class Lowering::LoadableTypeLoweringInfoVisitor
-  : public CanTypeVisitor<LoadableTypeLoweringInfoVisitor> {
-  TypeLoweringInfo &theInfo;
-  ReferenceTypePath currentElement;
-public:
-  LoadableTypeLoweringInfoVisitor(TypeLoweringInfo &theInfo)
-    : theInfo(theInfo) {}
-  
-  void pushPath() { currentElement.path.push_back({}); }
-  void popPath() { currentElement.path.pop_back(); }
-  void setPath(ReferenceTypePath::Component c) {
-    currentElement.path.back() = c;
-  }
+namespace {
+  /// A class for trivial, loadable types.
+  class TrivialTypeLoweringInfo : public TypeLoweringInfo {
+  public:
+    TrivialTypeLoweringInfo(SILType type)
+      : TypeLoweringInfo(type, IsTrivial, IsNotAddressOnly) {}
+  };
 
-  void flagAddressOnly() {
-    theInfo.LoweredTypeAndIsAddressOnly.setInt(true);
-  }
+  /// A class for non-trivial but loadable types.
+  class ScalarTypeLoweringInfo : public TypeLoweringInfo {
+  public:
+    ScalarTypeLoweringInfo(SILType type)
+      : TypeLoweringInfo(type, IsNotTrivial, IsNotAddressOnly) {}
+  };
 
-  void visitType(CanType t) {
-    if (t.hasReferenceSemantics()) {
-      theInfo.referenceTypeElements.push_back(currentElement);
-    } else if (isa<ArchetypeType>(t) || t.isExistentialType()) {
-      flagAddressOnly();
-    }
-  }
-  
-  void visitAnyStructType(StructDecl *sd) {
-    // FIXME: if this is a struct has a resilient attribute, it is obviously
-    // AddressOnly.
-    pushPath();
-    for (Decl *d : sd->getMembers())
-      if (VarDecl *vd = dyn_cast<VarDecl>(d))
-        if (!vd->isProperty()) {
-          CanType ct = vd->getType()->getCanonicalType();
-          setPath(ReferenceTypePath::Component::forStructField(ct, vd));
-          visit(ct);
-        }
-    popPath();
-  }
-  
-  void visitBoundGenericStructType(CanBoundGenericStructType t) {
-    visitAnyStructType(t->getDecl());
-  }
-  
-  void visitStructType(CanStructType t) {
-    visitAnyStructType(t->getDecl());
-  }
+  /// A class for non-trivial, address-only types.
+  class AddressOnlyTypeLoweringInfo : public TypeLoweringInfo {
+  public:
+    AddressOnlyTypeLoweringInfo(SILType type)
+      : TypeLoweringInfo(type, IsNotTrivial, IsAddressOnly) {}
+  };
 
-  void visitReferenceStorageType(CanReferenceStorageType t) {
-    switch (t->getOwnership()) {
-    case Ownership::Strong:
-      llvm_unreachable("explicit strong ownership");
-    case Ownership::Unowned:
-      // FIXME: push path to weak_retain/weak_release
-      return;
-    case Ownership::Weak:
-      flagAddressOnly();
-      return;
+  /// Build the appropriate TypeLoweringInfo subclass for the given type.
+  class LowerType :
+      public TypeClassifierBase<LowerType, const TypeLoweringInfo *> {
+    TypeConverter &TC;
+  public:
+    LowerType(TypeConverter &TC) : TypeClassifierBase(TC.M), TC(TC) {}
+
+    const TypeLoweringInfo *handleTrivial(CanType type) {
+      auto silType = SILType::getPrimitiveType(type, false);
+      return new (TC) TrivialTypeLoweringInfo(silType);
     }
-    llvm_unreachable("bad ownership kind");
-  }
   
-  void visitTupleType(CanTupleType t) {
-    pushPath();
-    unsigned i = 0;
-    for (auto eltType : t.getElementTypes()) {
-      setPath(ReferenceTypePath::Component::forTupleElement(eltType, i++));
-      visit(eltType);
+    const TypeLoweringInfo *handleScalar(CanType type) {
+      auto silType = SILType::getPrimitiveType(type, false);
+      return new (TC) ScalarTypeLoweringInfo(silType);
     }
-    popPath();
-  }
-};
-  
+
+    const TypeLoweringInfo *handleAddressOnly(CanType type) {
+      auto silType = SILType::getPrimitiveType(type, true);
+      return new (TC) AddressOnlyTypeLoweringInfo(silType);
+    }
+  };
+}
+
 TypeConverter::TypeConverter(SILModule &m)
   : M(m), Context(m.getASTContext()) {
 }
@@ -458,8 +544,7 @@ TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
     SILType loweredType =
       getLoweredType(objectType, uncurryLevel).getAddressType();
 
-    auto *theInfo = new (*this) TypeLoweringInfo();
-    theInfo->LoweredTypeAndIsAddressOnly.setPointer(loweredType);
+    auto *theInfo = new (*this) TrivialTypeLoweringInfo(loweredType);
     Types[key] = theInfo;
     return *theInfo;
   }
@@ -515,25 +600,14 @@ TypeConverter::getTypeLoweringInfoForUncachedLoweredType(CanType type) {
   auto key = getTypeKey(type, 0);
   assert(!Types.count(key) && "re-entrant or already cached");
   assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
-  
-  auto *theInfo = new (*this) TypeLoweringInfo();
+
 #ifndef NDEBUG
   // Catch reentrancy bugs.
   Types[key] = nullptr;
 #endif
-  
-  if (type.hasReferenceSemantics()) {
-    // Reference types need only to retain/release themselves.
-    theInfo->referenceTypeElements.push_back(ReferenceTypePath());
-  } else {
-    // Walk aggregate types to find reference type elements.
-    LoadableTypeLoweringInfoVisitor(*theInfo).visit(type);
-  }
 
-  auto silType = SILType::getPrimitiveType(type, theInfo->isAddressOnly());
-  theInfo->LoweredTypeAndIsAddressOnly.setPointer(silType);
-
-  Types[key] = theInfo;  
+  auto *theInfo = LowerType(*this).visit(type);
+  Types[key] = theInfo;
   return *theInfo;
 }
 
