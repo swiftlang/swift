@@ -40,7 +40,7 @@ namespace swift {
       uint64_t AlignmentInBits;
 
       DebugTypeInfo()
-        : CanTy(*new CanType()),  SizeInBits(0), AlignmentInBits(0) {
+        : CanTy(),  SizeInBits(0), AlignmentInBits(0) {
       }
       DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align);
       DebugTypeInfo(CanType CTy, Size Size, Alignment Align);
