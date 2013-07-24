@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_TOKEN_RANGE_H
 #define SWIFT_AST_TOKEN_RANGE_H
 
+namespace swift {
+
 /// \brief An opaque object that stores the parser state for delayed parsing.
 class ParserTokenRange {
   // These pointers are meaningful for the parser.  Memory is allocated on the
@@ -41,6 +43,8 @@ public:
     return static_cast<T *>(EndLexerState);
   }
 };
+
+} // namespace swift
 
 #endif // LLVM_SWIFT_AST_TOKEN_RANGE_H
 
