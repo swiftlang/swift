@@ -1,0 +1,113 @@
+--type A32Si
+--type Bf80_
+--type Bi32_
+--type BO
+--type Bo
+--type Bp
+--type Bu
+--type Bv4Bi8_
+--type Bv4Bf16_
+--type Bv4Bp
+--type Sa
+--type Sb
+--type Sc
+--type Sd
+--type Sf
+--type Si
+--type SS
+--type Su
+--type GSaSS_
+--type GCSs10DictionarySSSi_
+--type VSs7CString
+--type CSo8NSObject
+--type O6Monads6Either
+--type bSiSu
+--type bTSiSc_Su
+--type FSiSu
+--type fSiFScSu
+--type FSiFScSu
+--type MSi
+--type P_
+--type P3foo3bar_
+--type P3foo3barS_3bas_
+--type TP3foo3barS_3bas_PS1__PS1_S_3zimS0___
+--type RSi
+--type TSiSu_
+--type tSiSu_
+--type T3fooSi3barSu_
+--type U__FQ_Si
+--type U3foo3bar_S_3basS_3zim__FTQ0_Q__Si
+--type U3foo3bar_S_3basS_3zim___FTQ0_Q__Q1_
+--type U___FQ_U____FQ_T_
+--type U___FQ_U____FQ0_T_
+--type U___FQ_U____FQ1_T_
+--type U___FQ_U____FQd__T_
+--type U___FQ_U____FQd_0_T_
+_T3foo3barSi
+_T3foo3barSia
+_T3foo3barSig
+_T3foo3barSis
+_TC3foo3bar3basfS0_FT3zimCS_3zim_T_
+_TToC3foo3bar3basfS0_FT3zimCS_3zim_T_
+_Tnk_C3foo3bar3basfS0_FT3zimCS_3zim_T_
+_TLC3foo3bar3basfS0_FT3zimCS_3zim_T_
+_T3foooi1pFTCS_3barVS_3bas_OS_3zim
+_T3foooP1xFTCS_3barVS_3bas_OS_3zim
+_TC3foo3barCfMS0_FT_S0_
+_TC3foo3barcfMS0_FT_S0_
+_TC3foo3barD
+_TC3foo3bard
+_TMPdC3foo3bar
+_TMPiC3foo3bar
+_TMmC3foo3bar
+_TMdC3foo3bar
+_TMiC3foo3bar
+_TwalC3foo3bar
+_TwcaC3foo3bar
+_TwtaC3foo3bar
+_TwdeC3foo3bar
+_TwxxC3foo3bar
+_TwXXC3foo3bar
+_TwCPC3foo3bar
+_TwCpC3foo3bar
+_TwcpC3foo3bar
+_TwTkC3foo3bar
+_TwtkC3foo3bar
+_TwprC3foo3bar
+_TwtyC3foo3bar
+_TWVC3foo3bar
+_TWoC3foo3bar3basFSiSi
+_TWvdC3foo3bar3basSi
+_TWviC3foo3bar3basSi
+_TTbbSiSi
+_TSC5greenVSC5Colorg
+_T1t1fFT1iSi1sSS_T_e_
+_T1t1fFT1iSi1sSS_T_e0_
+--type ZZ
+--type B
+--type BSi
+--type Bx
+--type C
+--type T
+--type TSi
+--type Qd_
+--type U__FQo_Si
+--type U__FQD__Si
+--type U___FQ_U____FQd0__T_
+--type U___FQ_U____FQd_1_T_
+--type U___FQ_U____FQ2_T_
+_Tw
+_TWa
+_Twal
+_T
+_TTo
+_TC
+_TM
+_TMd
+_TW
+_TWV
+_TWo
+_TWv
+_TWvd
+_TWvi
+_TWvx
