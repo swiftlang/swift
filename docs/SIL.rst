@@ -36,7 +36,7 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 - *IRGen* lowers optimized SIL to LLVM IR.
 - The LLVM backend applies LLVM optimizations and emits binary code.
 
-The different stages pertaining especially to SIL processing are as follows:
+The stages pertaining especially to SIL processing are as follows:
 
 SILGen
 ~~~~~~
@@ -45,10 +45,10 @@ SILGen produces "raw" SIL by walking a type-checked Swift AST. The form of SIL
 emitted by SILGen has the following properties:
 
 - Variables are represented by loading and storing mutable memory locations
-  instead of being in strict SSA form. This is similar to the LLVM IR emitted
-  by frontends such as Clang. However, Swift represents variables as
-  reference-counted "boxes" in the most general case, which can be retained,
-  released, and shared.
+  instead of being in strict SSA form. This is similar to the initial
+  ``alloca``-heavy LLVM IR emitted by frontends such as Clang. However, Swift
+  represents variables as reference-counted "boxes" in the most general case,
+  which can be retained, released, and shared.
 - Dataflow requirements, such as definitive assignment, function returns,
   switch coverage, etc. have not yet been enforced.
 - ``always_inline``, ``always_instantiate``, and other function optimization
@@ -61,7 +61,8 @@ Guaranteed Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After SILGen, a deterministic sequence of optimization passes is run over the
-raw SIL, as follows:
+raw SIL. These passes are more concerned with predictability and exposing
+dataflow for diagnostic passes than performance.
 
 - Memory promotion: this is implemented as two optimization phases, the first
   of which performs capture analysis to promote alloc_box instructions to
@@ -284,7 +285,7 @@ SSA as an alternative to phi instructions::
   else:
     br finish(%else : $Builtin.Int64)
   finish(%result : $Builtin.Int64):
-    ret %result : $Builtin.Int64
+    return %result : $Builtin.Int64
   }
 
 Declaration References
@@ -335,10 +336,6 @@ can be discriminated. Currently ``objc`` is the only such discriminator.
 
 Instruction Set
 ---------------
-
-In the instruction descriptions, ``[optional attributes]`` appear in square
-brackets, and ``{required|attribute|choices}`` appear in curly braces with
-options separated by pipes. Variadic operands are indicated with ``...``.
 
 Allocation and Deallocation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
