@@ -186,6 +186,20 @@ SIL classifies types into additional subgroups based on ABI stability:
   stored to. SIL provides special instructions for indirectly accessing
   address-only values.
 
+Some additional meaningful categories of type:
+
+- A *heap object reference* type is a type whose representation consists of a
+  single strong-reference-counted pointer. This includes all class types,
+  the ``Builtin.ObjectPointer`` and ``Builtin.ObjCPointer`` types, and
+  archetypes that conform to one or more class protocols.
+- A *reference type* is more general in that its low-level representation may
+  include additional global pointers alongside a strong-reference-counted
+  pointer. This includes all heap object reference types and adds
+  thick function types and protocol/protocol composition types that conform to
+  one or more class protocols. All reference types can be ``retain``-ed and
+  ``release``-d. Reference types also have *ownership semantics* for their
+  referenced heap object; see `Reference Counting`_ below.
+
 Swift types may not translate one-to-one to SIL types. In particular, tuple
 types are canonicalized, and function types are canonicalized and mangled in
 order to encode calling convention and resilience rules. Function input argument
@@ -624,6 +638,8 @@ Reference Counting
 ~~~~~~~~~~~~~~~~~~
 
 These instructions handle reference counting of heap objects.
+
+TODO: Discuss ownership semantics here.
 
 retain
 ``````
