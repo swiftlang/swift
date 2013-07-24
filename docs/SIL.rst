@@ -691,9 +691,14 @@ byte offset ``%1`` relative to ``%0``.
 Reference Counting
 ~~~~~~~~~~~~~~~~~~
 
-These instructions handle reference counting of heap objects.
-
-TODO: Discuss ownership semantics here.
+These instructions handle reference counting of heap objects. Values of
+strong reference type have ownership semantics for the referenced heap
+object. Retain and release operations, however,
+are never implicit in SIL and always must be explicitly performed where needed.
+Retains and releases on the value may be freely moved, and balancing
+retains and releases may deleted, so long as an owning retain count is
+maintained for the uses of the value. 
+TODO: Weak and unowned references.
 
 retain
 ``````
