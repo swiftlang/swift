@@ -886,7 +886,7 @@ Looks up the implementation of a protocol method for the dynamic type of the
 value inside an existential container. The "this" operand of the result
 function value is represented using an opaque type, the value for which must
 be projected out of the same existential container as the ``protocol_method``
-operand::
+operand:
 
 - If the operand is the address of an address-only protocol type, then the
   "this" argument of the method is of type ``Builtin.OpaquePointer``, and
