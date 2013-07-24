@@ -402,6 +402,18 @@ It is permitted to hoist the overflow check and associated runtime failure out
 of the loop itself and check the bounds of the loop prior to entering it, so
 long as the loop body has no observable effect outside of the current actor.
 
+Undefined Behavior
+------------------
+
+Incorrect use of some operations is *undefined behavior*, such as invalid
+unchecked casts involving ``Builtin.RawPointer`` types, or use of compiler
+builtins that lower to LLVM instructions with undefined behavior at the LLVM
+level. A SIL program with undefined behavior is meaningless, much like undefined
+behavior in C, and has no predictable semantics. Undefined behavior should not
+be triggered by valid SIL emitted by a correct Swift program using a correct
+standard library, but cannot in all cases be diagnosed or verified at the SIL
+level.
+
 Instruction Set
 ---------------
 
@@ -551,7 +563,8 @@ initialize_var
 TODO: Dataflow analysis not implemented yet. initialize_var currently is passed
 through to IRGen and lowers to zero initialization.
 
-TODO: Do we actually need an instruction to model this?
+TODO: Do we actually need an instruction to model this? Should alloc
+instructions just implicitly require definitive initialization?
 
 A pseudo-instruction that notionally "stores" the "must be initialized" value
 to the address ``%0``. In dataflow analysis, this value has the following
