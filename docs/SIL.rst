@@ -36,7 +36,7 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 - *IRGen* lowers optimized SIL to LLVM IR.
 - The LLVM backend applies LLVM optimizations and emits binary code.
 
-The stages pertaining especially to SIL processing are as follows:
+The stages pertaining to SIL processing in particular are as follows:
 
 SILGen
 ~~~~~~
@@ -159,7 +159,8 @@ type grammar. SIL adds some additional kinds of type of its own:
   Its type variables can be bound with a ``specialize`` instruction to
   give a value of a *concrete function type* ``$(A...) -> R``.
 
-SIL classifies types into additional subgroups based on ABI stability:
+SIL classifies types into additional subgroups based on ABI stability and
+generic constraints:
 
 - *Loadable types* are types with a fully exposed concrete representation:
 
