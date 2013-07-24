@@ -245,15 +245,29 @@ Functions
 ~~~~~~~~~
 ::
 
-  sil-function ::= 'sil' sil-function-name ':' sil-type '{' sil-basic-block+ '}'
+  sil-function ::= 'sil' sil-linkage? sil-function-name ':' sil-type
+                     '{' sil-basic-block+ '}'
   sil-function-name ::= '@' [A-Za-z_0-9]+
 
-SIL functions are introduced at the top level with the ``sil`` keyword. SIL
+  sil-linkage ::= 'internal'
+  sil-linkage ::= 'clang_thunk'
+
+SIL functions are defined at the top level with the ``sil`` keyword. SIL
 function names are introduced with the ``@`` sigil and named by an
 alphanumeric identifier. This name is usually the mangled name of a Swift
 function. The ``sil`` syntax declares the function's name and SIL type then
 defines the body of the function inside braces. The declared type must be a
 function type, which may be generic.
+
+The ``sil`` keyword may be optionally followed by a linkage specifier. By
+default, SIL functions are externally visible from their enclosing module.
+
+- The ``internal`` specifier indicates that the function is internal to its
+  module. Internal functions may be freely transformed by optimizations.
+- The ``clang_thunk`` specifier indicates that the function was generated as
+  an adapter thunk to interface with a C or Objective-C declaration imported
+  from Clang. These are currently generated lazily and given ``linkonce_odr``
+  linkage at the LLVM level.
 
 Basic Blocks
 ~~~~~~~~~~~~
