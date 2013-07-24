@@ -74,13 +74,31 @@ static bool isStartOfIdentifier(char c) {
   return c == 'o';
 }
 
-static bool isStartOfNominalType(char c) {
-  if (c == 'C')
+enum class swiftContextType {
+  swiftClass,
+  swiftStruct,
+  swiftOneOf,
+  swiftModule,
+  swiftProtocol,
+  swiftSubstitution
+};
+
+static bool isStartOfNominalType(char c, swiftContextType* context = NULL) {
+  if (c == 'C') {
+    if (context)
+      *context = swiftContextType::swiftClass;
     return true;
-  if (c == 'V')
+  }
+  if (c == 'V') {
+    if (context)
+      *context = swiftContextType::swiftStruct;
     return true;
-  if (c == 'O')
+  }
+  if (c == 'O') {
+    if (context)
+      *context = swiftContextType::swiftOneOf;
     return true;
+  }
   return false;
 }
 
@@ -138,7 +156,7 @@ private:
   enum class isVariadic : bool {
     yes = true, no = false
   };
-
+  
   typedef std::tuple<std::string, bool, bool> SubstitutionWithProtocol;
 
   class MangledNameSource {
@@ -178,7 +196,7 @@ private:
 
   Substitution demangleValueWitnessKind();
 
-  Substitution demangleContext();
+  Substitution demangleContext(swiftContextType* context = NULL);
 
   Substitution demangleModule();
 
@@ -443,18 +461,25 @@ Demangler::Substitution Demangler::demangleGlobal() {
 }
 
 Demangler::Substitution Demangler::demangleEntity() {
-
-  Substitution context = demangleContext();
+  swiftContextType contextType;
+  Substitution context = demangleContext(&contextType);
   if (context) {
-    if (Mangled.nextIf('D'))
+    if (Mangled.nextIf('D')) {
+      if (contextType == swiftContextType::swiftClass)
+        return success(DemanglerPrinter() << context.first()
+                       << ".__deallocating_destructor");
       return success(DemanglerPrinter() << context.first() << ".destructor");
+    }
     if (Mangled.nextIf('d'))
       return success(DemanglerPrinter() << context.first()
-                                        << ".destructor [destroying]");
+                                        << ".destructor");
     if (Mangled.nextIf('C')) {
       Substitution type = demangleType();
       if (!type)
         return failure();
+      if (contextType == swiftContextType::swiftClass)
+        return success(DemanglerPrinter() << context.first()
+                       << ".__allocating_constructor : " << type.first());
       return success(DemanglerPrinter() << context.first()
                                         << ".constructor : " << type.first());
     }
@@ -463,7 +488,7 @@ Demangler::Substitution Demangler::demangleEntity() {
       if (!type)
         return failure();
       return success(DemanglerPrinter() << context.first()
-                                        << ".constructor [initializing] : "
+                                        << ".constructor : "
                                         << type.first());
     }
 
@@ -520,16 +545,26 @@ Demangler::Substitution Demangler::demangleValueWitnessKind() {
   return failure();
 }
 
-Demangler::Substitution Demangler::demangleContext() {
+Demangler::Substitution Demangler::demangleContext(swiftContextType* context) {
   if (!Mangled)
     return failure();
   char c = Mangled.peek();
   if (isStartOfIdentifier(c) || c == 'S')
+  {
+    if (context) {
+      if (c == 'S')
+        *context = swiftContextType::swiftSubstitution;
+      else
+        *context = swiftContextType::swiftModule;
+    }
     return demangleModule();
-  if (isStartOfNominalType(c))
+  }
+  if (isStartOfNominalType(c, context))
     return demangleNominalType();
   if (c == 'P') {
     Mangled.next();
+    if (context)
+      *context = swiftContextType::swiftProtocol;
     return demangleProtocolName();
   }
   return failure();
