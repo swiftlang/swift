@@ -196,10 +196,18 @@ private:
 
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///
+  /// The conformance will be newly-created; it's likely that it already exists
+  /// in the AST, and will need to be canonicalized.
+  ///
   /// If the record at the cursor is not a protocol conformance, returns
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
   maybeReadConformance();
+
+  /// Reads a substitution record from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a substitution, returns Nothing.
+  Optional<Substitution> maybeReadSubstitution();
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///

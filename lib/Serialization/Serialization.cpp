@@ -187,6 +187,9 @@ namespace {
     /// Writes a generic parameter list.
     bool writeGenericParams(const GenericParamList *genericParams);
 
+    /// Writes a list of generic substitutions.
+    void writeSubstitutions(ArrayRef<Substitution> substitutions);
+
     /// Writes a list of protocol conformances.
     void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                            ArrayRef<ProtocolConformance *> conformances);
@@ -714,9 +717,10 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
 
     SmallVector<DeclID, 16> data;
     for (auto valueMapping : conf->Mapping) {
-      // FIXME: Serialize witness substitutions.
       data.push_back(addDeclRef(valueMapping.first));
       data.push_back(addDeclRef(valueMapping.second.Decl));
+      // The substitution records are serialized later.
+      data.push_back(valueMapping.second.Substitutions.size());
     }
     for (auto typeMapping : conf->TypeMapping) {
       data.push_back(addTypeRef(typeMapping.first));
@@ -743,7 +747,20 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
       inheritedConformance.push_back(inheritedMapping.second);
     }
     writeConformances(inheritedProtos, inheritedConformance);
+    for (auto valueMapping : conf->Mapping)
+      writeSubstitutions(valueMapping.second.Substitutions);
   });
+}
+
+void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions) {
+  using namespace decls_block;
+  auto abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
+  for (auto &sub : substitutions) {
+    BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               addTypeRef(sub.Archetype),
+                                               addTypeRef(sub.Replacement));
+    writeConformances(sub.Archetype->getConformsTo(), sub.Conformance);
+  }
 }
 
 
@@ -1521,15 +1538,8 @@ bool Serializer::writeType(Type ty) {
                                        addTypeRef(generic->getParent()),
                                        genericArgIDs);
 
-    if (generic->hasSubstitutions()) {
-      abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
-      for (auto &sub : generic->getSubstitutions()) {
-        BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                   addTypeRef(sub.Archetype),
-                                                   addTypeRef(sub.Replacement));
-        writeConformances(sub.Archetype->getConformsTo(), sub.Conformance);
-      }
-    }
+    if (generic->hasSubstitutions())
+      writeSubstitutions(generic->getSubstitutions());
 
     return true;
   }

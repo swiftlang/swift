@@ -283,19 +283,38 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     conformance->InheritedMapping.insert(inherited.getValue());
   }
 
-  // Reset the offset RAII to the end of the trailing records.
-  lastRecordOffset.reset();
-
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  ASTContext &ctx = ModuleContext->Ctx;
+  ProtocolDecl *proto;
+  {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    proto = cast<ProtocolDecl>(getDecl(protoID));
+  }
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
-    auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
-    auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
-    // FIXME: Deserialize witness substitutions.
-    ProtocolConformanceWitness witness{second, {}};
+    ValueDecl *first, *second;
+    {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      first = cast<ValueDecl>(getDecl(*rawIDIter++));
+      second = cast<ValueDecl>(getDecl(*rawIDIter++));
+    }
+    unsigned substitutionCount = *rawIDIter++;
+
+    SmallVector<Substitution, 8> substitutions;
+    while (substitutionCount--) {
+      auto sub = maybeReadSubstitution();
+      assert(sub.hasValue());
+      substitutions.push_back(sub.getValue());
+    }
+
+    ProtocolConformanceWitness witness{second, ctx.AllocateCopy(substitutions)};
     conformance->Mapping.insert(std::make_pair(first, witness));
   }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
+  // Reset the offset RAII to the end of the trailing records.
+  lastRecordOffset.reset();
+
   while (typeCount--) {
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
@@ -304,12 +323,116 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     auto second = getType(*rawIDIter++);
     conformance->TypeMapping.insert(std::make_pair(first, second));
   }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
   while (defaultedCount--) {
     auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
     conformance->DefaultedDefinitions.insert(decl);
   }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
 
   return std::make_pair(proto, conformance.release());
+}
+
+/// Uniques a single protocol conformance and any inherited conformances, and
+/// records the conformances in the ASTContext.
+///
+/// If a conformance has already been recorded, the given record \p conformance
+/// will be deleted.
+///
+/// \returns The canonical conformance for this (\p decl, \p canTy) pair.
+///
+/// \sa processConformances
+template <typename T>
+ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
+                                        ProtocolDecl *proto,
+                                        ProtocolConformance *conformance) {
+  if (!conformance)
+    return nullptr;
+
+  for (auto &inherited : conformance->InheritedMapping) {
+    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
+                                          inherited.second);
+  }
+
+  auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
+
+  if (conformanceRecord && conformanceRecord != conformance) {
+    delete conformance;
+    conformance = conformanceRecord;
+  } else {
+    conformanceRecord = conformance;
+  }
+
+  if (decl)
+    ctx.recordConformance(proto, decl);
+
+  return conformance;
+}
+
+/// Uniques and applies protocol conformances to a decl, as well as recording
+/// the conformances in the ASTContext.
+template <typename T>
+void processConformances(ASTContext &ctx, T *decl, CanType canTy,
+                         ArrayRef<ConformancePair> conformances) {
+  SmallVector<ProtocolDecl *, 16> protoBuf;
+  SmallVector<ProtocolConformance *, 16> conformanceBuf;
+  for (auto conformancePair : conformances) {
+    auto proto = conformancePair.first;
+    auto conformance = conformancePair.second;
+    conformance = processConformance(ctx, decl, canTy, proto, conformance);
+
+    protoBuf.push_back(proto);
+    conformanceBuf.push_back(conformance);
+  }
+
+  decl->setProtocols(ctx.AllocateCopy(protoBuf));
+  decl->setConformances(ctx.AllocateCopy(conformanceBuf));
+}
+
+
+Optional<Substitution> ModuleFile::maybeReadSubstitution() {
+  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return Nothing;
+
+  StringRef blobData;
+  SmallVector<uint64_t, 2> scratch;
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+                                                &blobData);
+  if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
+    return Nothing;
+
+
+  TypeID archetypeID, replacementID;
+  decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
+                                                          archetypeID,
+                                                          replacementID);
+
+  ArchetypeType *archetypeTy;
+  Type replacementTy;
+  {
+    BCOffsetRAII restoreOffset(DeclTypeCursor);
+    archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
+    replacementTy = getType(replacementID);
+  }
+
+  CanType canReplTy = replacementTy->getCanonicalType();
+  ASTContext &ctx = ModuleContext->Ctx;
+
+  SmallVector<ProtocolConformance *, 16> conformanceBuf;
+  while (auto conformancePair = maybeReadConformance()) {
+    auto conformance = processConformance(ctx, nullptr, canReplTy,
+                                          conformancePair->first,
+                                          conformancePair->second);
+    conformanceBuf.push_back(conformance);
+  }
+
+  lastRecordOffset.reset();
+  return Substitution{archetypeTy, replacementTy,
+                      ctx.AllocateCopy(conformanceBuf)};
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
@@ -446,62 +569,6 @@ MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs,
   }
 
   return result;
-}
-
-/// Uniques a single protocol conformance and any inherited conformances, and
-/// records the conformances in the ASTContext.
-///
-/// If a conformance has already been recorded, the given record \p conformance
-/// will be deleted.
-///
-/// \returns The canonical conformance for this (\p decl, \p canTy) pair.
-///
-/// \sa processConformances
-template <typename T>
-ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
-                                        ProtocolDecl *proto,
-                                        ProtocolConformance *conformance) {
-  if (!conformance)
-    return nullptr;
-
-  for (auto &inherited : conformance->InheritedMapping) {
-    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
-                                          inherited.second);
-  }
-
-  auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
-
-  if (conformanceRecord && conformanceRecord != conformance) {
-    delete conformance;
-    conformance = conformanceRecord;
-  } else {
-    conformanceRecord = conformance;
-  }
-
-  if (decl)
-    ctx.recordConformance(proto, decl);
-
-  return conformance;
-}
-
-/// Uniques and applies protocol conformances to a decl, as well as recording
-/// the conformances in the ASTContext.
-template <typename T>
-void processConformances(ASTContext &ctx, T *decl, CanType canTy,
-                         ArrayRef<ConformancePair> conformances) {
-  SmallVector<ProtocolDecl *, 16> protoBuf;
-  SmallVector<ProtocolConformance *, 16> conformanceBuf;
-  for (auto conformancePair : conformances) {
-    auto proto = conformancePair.first;
-    auto conformance = conformancePair.second;
-    conformance = processConformance(ctx, decl, canTy, proto, conformance);
-
-    protoBuf.push_back(proto);
-    conformanceBuf.push_back(conformance);
-  }
-
-  decl->setProtocols(ctx.AllocateCopy(protoBuf));
-  decl->setConformances(ctx.AllocateCopy(conformanceBuf));
 }
 
 Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
@@ -1815,43 +1882,8 @@ Type ModuleFile::getType(TypeID TID) {
       break;
 
     SmallVector<Substitution, 8> substitutions;
-    while (true) {
-      auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-      if (entry.Kind != llvm::BitstreamEntry::Record)
-        break;
-
-      scratch.clear();
-      unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                    &blobData);
-      if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
-        break;
-
-      TypeID archetypeID, replacementID;
-      decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                              archetypeID,
-                                                              replacementID);
-
-      ArchetypeType *archetypeTy;
-      Type replacementTy;
-      {
-        BCOffsetRAII restoreOffset(DeclTypeCursor);
-        archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
-        replacementTy = getType(replacementID);
-      }
-
-      CanType canReplTy = replacementTy->getCanonicalType();
-
-      SmallVector<ProtocolConformance *, 16> conformanceBuf;
-      while (auto conformancePair = maybeReadConformance()) {
-        auto conformance = processConformance(ctx, nullptr, canReplTy,
-                                              conformancePair->first,
-                                              conformancePair->second);
-        conformanceBuf.push_back(conformance);
-      }
-
-      substitutions.push_back({archetypeTy, replacementTy,
-                               ctx.AllocateCopy(conformanceBuf)});
-    }
+    while (auto sub = maybeReadSubstitution())
+      substitutions.push_back(sub.getValue());
 
     boundTy->setSubstitutions(ctx.AllocateCopy(substitutions));
     break;
