@@ -66,9 +66,9 @@ private:
 public:
   OwnershipConventions() = default;
   
-  /// Derive the ownership conventions for a SILConstant.
+  /// Derive the ownership conventions for a SILDeclRef.
   static OwnershipConventions get(SILGenFunction &gen,
-                                  SILConstant c,
+                                  SILDeclRef c,
                                   SILType ty);
   
   /// Derive the default Swift ownership conventions for a SILType, which must

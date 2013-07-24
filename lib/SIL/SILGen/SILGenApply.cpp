@@ -67,14 +67,14 @@ public:
 private:
   union {
     ManagedValue indirectValue;
-    SILConstant standaloneFunction;
+    SILDeclRef standaloneFunction;
     struct {
       SILValue thisValue;
-      SILConstant methodName;
+      SILDeclRef methodName;
     } method;
     struct {
       SILValue thisValue;
-      SILConstant methodName;
+      SILDeclRef methodName;
       CanType origType;
     } genericMethod;
   };
@@ -84,7 +84,7 @@ private:
   CanType specializedType;
   SILLocation specializeLoc;
 
-  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILConstant c);
+  static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c);
 
   Callee(ManagedValue indirectValue)
     : kind(Kind::IndirectValue),
@@ -92,7 +92,7 @@ private:
       specializedType(indirectValue.getType().getSwiftRValueType())
   {}
 
-  Callee(SILGenFunction &gen, SILConstant standaloneFunction)
+  Callee(SILGenFunction &gen, SILDeclRef standaloneFunction)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
       specializedType(
                 gen.SGM.getConstantType(standaloneFunction.atUncurryLevel(0))
@@ -102,7 +102,7 @@ private:
   Callee(Kind methodKind,
          SILGenFunction &gen,
          SILValue thisValue,
-         SILConstant methodName)
+         SILDeclRef methodName)
     : kind(methodKind), method{thisValue, methodName},
       specializedType(
                 gen.SGM.getConstantType(methodName.atUncurryLevel(0))
@@ -125,7 +125,7 @@ private:
   
   Callee(ForArchetype_t,
          SILGenFunction &gen,
-         SILValue archetype, SILConstant methodName, Type memberType)
+         SILValue archetype, SILDeclRef methodName, Type memberType)
     : kind(Kind::ArchetypeMethod),
       genericMethod{archetype,
                     methodName,
@@ -143,7 +143,7 @@ private:
 
   static CanType getProtocolMethodType(SILGenFunction &gen,
                                        SILValue proto,
-                                       SILConstant methodName,
+                                       SILDeclRef methodName,
                                        Type memberType) {
     // 'this' for instance methods is projected out of the existential container
     // as an OpaquePointer or ObjCPointer.
@@ -177,7 +177,7 @@ private:
 
   Callee(ForProtocol_t,
          SILGenFunction &gen,
-         SILValue proto, SILConstant methodName, Type memberType)
+         SILValue proto, SILDeclRef methodName, Type memberType)
     : kind(Kind::ProtocolMethod),
       genericMethod{proto, methodName,
                     getProtocolMethodType(gen, proto, methodName, memberType)},
@@ -188,23 +188,23 @@ public:
   static Callee forIndirect(ManagedValue indirectValue) {
     return Callee(indirectValue);
   }
-  static Callee forDirect(SILGenFunction &gen, SILConstant c) {
+  static Callee forDirect(SILGenFunction &gen, SILDeclRef c) {
     return Callee(gen, c);
   }
   static Callee forClassMethod(SILGenFunction &gen, SILValue thisValue,
-                               SILConstant name) {
+                               SILDeclRef name) {
     return Callee(Kind::ClassMethod, gen, thisValue, name);
   }
   static Callee forSuperMethod(SILGenFunction &gen, SILValue thisValue,
-                               SILConstant name) {
+                               SILDeclRef name) {
     return Callee(Kind::SuperMethod, gen, thisValue, name);
   }
   static Callee forArchetype(SILGenFunction &gen, SILValue archetypeValue,
-                             SILConstant name, Type memberType) {
+                             SILDeclRef name, Type memberType) {
     return Callee(ForArchetype, gen, archetypeValue, name, memberType);
   }
   static Callee forProtocol(SILGenFunction &gen, SILValue proto,
-                            SILConstant name, Type memberType) {
+                            SILDeclRef name, Type memberType) {
     return Callee(ForProtocol, gen, proto, name, memberType);
   }
 
@@ -273,14 +273,14 @@ public:
     ManagedValue mv;
     OwnershipConventions ownership;
 
-    /// Get the SILConstant for a method at an uncurry level, and store its
+    /// Get the SILDeclRef for a method at an uncurry level, and store its
     /// ownership conventions into the 'ownership' local variable.
-    auto getMethodAndSetOwnership = [&]() -> SILConstant {
+    auto getMethodAndSetOwnership = [&]() -> SILDeclRef {
       assert(level >= 1
              && "currying 'this' of dynamic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
-      SILConstant c = method.methodName.atUncurryLevel(level);
+      SILDeclRef c = method.methodName.atUncurryLevel(level);
       ownership = OwnershipConventions::get(gen, c, gen.SGM.getConstantType(c));
       return c;
     };
@@ -295,7 +295,7 @@ public:
     case Kind::StandaloneFunction: {
       assert(level <= standaloneFunction.uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
-      SILConstant constant = standaloneFunction.atUncurryLevel(level);
+      SILDeclRef constant = standaloneFunction.atUncurryLevel(level);
       SILValue ref = gen.emitGlobalFunctionRef(SILLocation(), constant);
       mv = ManagedValue(ref, ManagedValue::Unmanaged);
       ownership = OwnershipConventions::get(gen, constant, ref.getType());
@@ -303,7 +303,7 @@ public:
     }
 
     case Kind::ClassMethod: {
-      SILConstant constant = getMethodAndSetOwnership();
+      SILDeclRef constant = getMethodAndSetOwnership();
       SILValue classMethod = gen.B.createClassMethod(SILLocation(),
                                            method.thisValue,
                                            constant,
@@ -313,7 +313,7 @@ public:
       break;
     }
     case Kind::SuperMethod: {
-      SILConstant constant = getMethodAndSetOwnership();
+      SILDeclRef constant = getMethodAndSetOwnership();
       SILValue superMethod = gen.B.createSuperMethod(SILLocation(),
                                            method.thisValue,
                                            constant,
@@ -328,7 +328,7 @@ public:
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
 
-      SILConstant constant = genericMethod.methodName.atUncurryLevel(level);
+      SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
       CanType archetypeType
         = genericMethod.thisValue.getType().getSwiftRValueType();
       if (auto metatype = dyn_cast<MetaTypeType>(archetypeType))
@@ -348,7 +348,7 @@ public:
       assert(level <= method.methodName.uncurryLevel
              && "uncurrying past natural uncurry level of method");
       
-      SILConstant constant = genericMethod.methodName.atUncurryLevel(level);
+      SILDeclRef constant = genericMethod.methodName.atUncurryLevel(level);
       SILValue method = gen.B.createProtocolMethod(SILLocation(),
                             genericMethod.thisValue,
                             constant,
@@ -485,8 +485,8 @@ public:
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setThisParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
-        SILConstant constant(fd,
-                             SILConstant::ConstructAtNaturalUncurryLevel,
+        SILDeclRef constant(fd,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(fd));
         
         setCallee(Callee::forClassMethod(gen, thisParam.peekScalarValue(),
@@ -501,8 +501,8 @@ public:
     
     // FIXME: Store context values for local funcs in a way that we can
     // apply them directly as an added "call site" here.
-    SILConstant constant(e->getDecl(),
-                         SILConstant::ConstructAtNaturalUncurryLevel,
+    SILDeclRef constant(e->getDecl(),
+                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCDispatch(e->getDecl()));
 
     // Obtain a reference for a local closure.
@@ -510,13 +510,13 @@ public:
       ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDecl());
       setCallee(Callee::forIndirect(localFn));
     }
-    // Otherwise, stash the SILConstant.
+    // Otherwise, stash the SILDeclRef.
     else
       setCallee(Callee::forDirect(gen, constant));
   }
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     setCallee(Callee::forDirect(gen,
-                    SILConstant(e->getDecl(), SILConstant::Kind::Initializer)));
+                    SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer)));
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
     setSideEffect(e->getLHS());
@@ -552,7 +552,7 @@ public:
     bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
     
     setCallee(Callee::forProtocol(gen, existential.getValue(),
-                                  SILConstant(fd).asObjC(isObjC),
+                                  SILDeclRef(fd).asObjC(isObjC),
                                   e->getType()));
   }
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
@@ -565,7 +565,7 @@ public:
     bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
     
     setCallee(Callee::forArchetype(gen, thisParam.peekScalarValue(),
-                                   SILConstant(fd).asObjC(isObjC),
+                                   SILDeclRef(fd).asObjC(isObjC),
                                    e->getType()));
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -592,15 +592,15 @@ public:
     
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
-    SILConstant constant;
+    SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      constant = SILConstant(ctorRef->getDecl(), SILConstant::Kind::Initializer,
-                         SILConstant::ConstructAtNaturalUncurryLevel,
+      constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
+                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
-      constant = SILConstant(declRef->getDecl(),
-                         SILConstant::ConstructAtNaturalUncurryLevel,
+      constant = SILDeclRef(declRef->getDecl(),
+                         SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
     } else
       llvm_unreachable("invalid super callee");
@@ -1203,10 +1203,10 @@ namespace {
   }
 
   Callee::SpecializedEmitter
-  Callee::getSpecializedEmitterForSILBuiltin(SILConstant function) {
+  Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function) {
     // Filter out non-function members and non-builtin modules.
 
-    if (function.kind != SILConstant::Kind::Func)
+    if (function.kind != SILDeclRef::Kind::Func)
       return nullptr;
     if (!function.hasDecl())
       return nullptr;
@@ -1302,7 +1302,7 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
 
 Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
                                           SILLocation loc,
-                                          SILConstant constant,
+                                          SILDeclRef constant,
                                           ArrayRef<Substitution> substitutions,
                                           Type substPropertyType)
 {
@@ -1334,7 +1334,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
 
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
-                                             SILConstant get,
+                                             SILDeclRef get,
                                              ArrayRef<Substitution> substitutions,
                                              RValue &&thisValue,
                                              RValue &&subscripts,
@@ -1344,11 +1344,11 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
   auto &tc = SGM.Types;
   Type propType;
   if (subscripts)
-    propType = tc.getSubscriptPropertyType(SILConstant::Kind::Getter,
+    propType = tc.getSubscriptPropertyType(SILDeclRef::Kind::Getter,
                                            subscripts.getType(),
                                            resultType);
   else
-    propType = tc.getPropertyType(SILConstant::Kind::Getter, resultType);
+    propType = tc.getPropertyType(SILDeclRef::Kind::Getter, resultType);
   if (thisValue)
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),
                                          propType);
@@ -1375,7 +1375,7 @@ ManagedValue SILGenFunction::emitGetProperty(SILLocation loc,
 }
 
 void SILGenFunction::emitSetProperty(SILLocation loc,
-                                     SILConstant set,
+                                     SILDeclRef set,
                                      ArrayRef<Substitution> substitutions,
                                      RValue &&thisValue,
                                      RValue &&subscripts,
@@ -1384,11 +1384,11 @@ void SILGenFunction::emitSetProperty(SILLocation loc,
   auto &tc = SGM.Types;
   Type propType;
   if (subscripts)
-    propType = tc.getSubscriptPropertyType(SILConstant::Kind::Setter,
+    propType = tc.getSubscriptPropertyType(SILDeclRef::Kind::Setter,
                                            subscripts.getType(),
                                            setValue.getType());
   else
-    propType = tc.getPropertyType(SILConstant::Kind::Setter,
+    propType = tc.getPropertyType(SILDeclRef::Kind::Setter,
                                   setValue.getType());
   if (thisValue)
     propType = tc.getMethodTypeInContext(thisValue.getType()->getRValueType(),

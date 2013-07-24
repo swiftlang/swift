@@ -20,7 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"

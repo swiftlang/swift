@@ -24,7 +24,7 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
-  struct SILConstant;
+  struct SILDeclRef;
   class SILType;
   class Substitution;
   
@@ -39,7 +39,7 @@ namespace irgen {
   class IRGenModule;
 
   CallEmission prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                         SILConstant method,
+                                         SILDeclRef method,
                                          SILType origType,
                                          SILType substResultType,
                                          ArrayRef<Substitution> subs,
@@ -48,7 +48,7 @@ namespace irgen {
 
   void addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                           Explosion &emission,
-                                          SILConstant method,
+                                          SILDeclRef method,
                                           llvm::Value *self,
                                           SILType searchType);
 

@@ -1,4 +1,4 @@
-//===--- SILConstant.h - Defines the SILConstant struct ---------*- C++ -*-===//
+//===--- SILDeclRef.h - Defines the SILDeclRef struct ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the SILConstant struct, which is used to identify a SIL
+// This file defines the SILDeclRef struct, which is used to identify a SIL
 // global identifier that can be used as the operand of a FunctionRefInst
 // instruction or that can have a SIL Function associated with it.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILCONSTANT_H
-#define SWIFT_SIL_SILCONSTANT_H
+#ifndef SWIFT_SIL_SILDeclRef_H
+#define SWIFT_SIL_SILDeclRef_H
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -33,17 +33,19 @@ namespace swift {
   class ASTContext;
   class ClassDecl;
 
-/// SILConstant - A key for referencing an entity that can be the subject of a
-/// SIL FunctionRefInst or the name of a SILFunction body. This can currently
-/// be either a reference to a ValueDecl for functions, methods, constructors,
-/// and other named entities, or a reference to a CapturingExpr (that is, a
-/// FuncExpr or ClosureExpr) for an anonymous function. In addition to the AST
-/// reference, there is also an identifier for distinguishing definitions with
-/// multiple associated entry points, such as a curried function.
-struct SILConstant {
+/// SILDeclRef - A key for referencing a Swift declaration in SIL.
+/// This can currently be either a reference to a ValueDecl for functions,
+/// methods, constructors, and other named entities, or a reference to a
+/// CapturingExpr (that is, a FuncExpr or ClosureExpr) for an anonymous
+/// function. In addition to the AST reference, there are discriminators for
+/// referencing different implementation-level entities associated with a
+/// single language-level declaration, such as uncurry levels of a function,
+/// the allocating and initializing entry points of a constructor, the getter
+/// and setter for a property, etc.
+struct SILDeclRef {
   typedef llvm::PointerUnion<ValueDecl*, CapturingExpr*> Loc;
   
-  /// Represents the "kind" of the SILConstant. For some Swift decls there
+  /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
     /// Func - this constant references the FuncDecl or CapturingExpr in loc
@@ -79,52 +81,52 @@ struct SILConstant {
     DefaultArgGenerator
   };
   
-  /// The ValueDecl or CapturingExpr represented by this SILConstant.
+  /// The ValueDecl or CapturingExpr represented by this SILDeclRef.
   Loc loc;
-  /// The Kind of this SILConstant.
+  /// The Kind of this SILDeclRef.
   Kind kind : 4;
-  /// The uncurry level of this SILConstant.
+  /// The uncurry level of this SILDeclRef.
   unsigned uncurryLevel : 16;
   /// True if this references an ObjC-visible method.
   unsigned isObjC : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
   
-  /// A magic value for SILConstant constructors to ask for the natural uncurry
+  /// A magic value for SILDeclRef constructors to ask for the natural uncurry
   /// level of the constant.
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
   
-  /// Produces a null SILConstant.
-  SILConstant() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0),
+  /// Produces a null SILDeclRef.
+  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), isObjC(0),
                   defaultArgIndex(0) {}
   
-  /// Produces a SILConstant of the given kind for the given decl.
-  explicit SILConstant(ValueDecl *decl, Kind kind,
+  /// Produces a SILDeclRef of the given kind for the given decl.
+  explicit SILDeclRef(ValueDecl *decl, Kind kind,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                        bool isObjC = false);
   
-  /// Produces the 'natural' SILConstant for the given ValueDecl or
+  /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// CapturingExpr:
-  /// - If 'loc' is a func or closure, this returns a Func SILConstant.
+  /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
   /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
-  ///   Setter SILConstant for the property VarDecl.
-  /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILConstant
+  ///   Setter SILDeclRef for the property VarDecl.
+  /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef
   ///   for the constructor.
   /// - If 'loc' is a OneOfElementDecl, this returns the OneOfElement
-  ///   SILConstant for the oneof element.
-  /// - If 'loc' is a DestructorDecl, this returns the Destructor SILConstant
+  ///   SILDeclRef for the oneof element.
+  /// - If 'loc' is a DestructorDecl, this returns the Destructor SILDeclRef
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
-  ///   SILConstant.
+  ///   SILDeclRef.
   /// If the uncurry level is unspecified or specified as NaturalUncurryLevel,
-  /// then the SILConstant for the natural uncurry level of the definition is
+  /// then the SILDeclRef for the natural uncurry level of the definition is
   /// used.
-  explicit SILConstant(Loc loc,
+  explicit SILDeclRef(Loc loc,
                        unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                        bool isObjC = false);
 
   /// Produce a SIL constant for a default argument generator.
-  static SILConstant getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
+  static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
 
   bool isNull() const { return loc.isNull(); }
   
@@ -134,35 +136,35 @@ struct SILConstant {
   ValueDecl *getDecl() const { return loc.get<ValueDecl*>(); }
   CapturingExpr *getExpr() const { return loc.get<CapturingExpr*>(); }
   
-  /// True if the SILConstant references a function.
+  /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;
   }
-  /// True if the SILConstant references a property accessor.
+  /// True if the SILDeclRef references a property accessor.
   bool isProperty() const {
     return kind == Kind::Getter || kind == Kind::Setter;
   }
-  /// True if the SILConstant references a constructor entry point.
+  /// True if the SILDeclRef references a constructor entry point.
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
   }
-  /// True if the SILConstant references a oneof entry point.
+  /// True if the SILDeclRef references a oneof entry point.
   bool isOneOfElement() const {
     return kind == Kind::OneOfElement;
   }
-  /// True if the SILConstant references a global variable accessor.
+  /// True if the SILDeclRef references a global variable accessor.
   bool isGlobal() const {
     return kind == Kind::GlobalAccessor;
   }
   
-  bool operator==(SILConstant rhs) const {
+  bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
       && uncurryLevel == rhs.uncurryLevel
       && isObjC == rhs.isObjC
       && defaultArgIndex == rhs.defaultArgIndex;
   }
-  bool operator!=(SILConstant rhs) const {
+  bool operator!=(SILDeclRef rhs) const {
     return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
       || kind != rhs.kind
       || uncurryLevel != rhs.uncurryLevel
@@ -173,22 +175,22 @@ struct SILConstant {
   void print(llvm::raw_ostream &os) const;
   void dump() const;
   
-  // Returns the SILConstant for an entity at a shallower uncurry level.
-  SILConstant atUncurryLevel(unsigned level) const {
+  // Returns the SILDeclRef for an entity at a shallower uncurry level.
+  SILDeclRef atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
-    return SILConstant(loc.getOpaqueValue(), kind, level, isObjC,
+    return SILDeclRef(loc.getOpaqueValue(), kind, level, isObjC,
                        defaultArgIndex);
   }
   
   // Returns the ObjC (or native) entry point corresponding to the same
   // constant.
-  SILConstant asObjC(bool objc = true) const {
-    return SILConstant(loc.getOpaqueValue(), kind, uncurryLevel, objc,
+  SILDeclRef asObjC(bool objc = true) const {
+    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, objc,
                        defaultArgIndex);
   }
   
-  /// Produces a SILConstant from an opaque value.
-  explicit SILConstant(void *opaqueLoc,
+  /// Produces a SILDeclRef from an opaque value.
+  explicit SILDeclRef(void *opaqueLoc,
                        Kind kind,
                        unsigned uncurryLevel,
                        bool isObjC,
@@ -199,7 +201,7 @@ struct SILConstant {
   {}
 };
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILConstant C) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
   C.print(OS);
   return OS;
 }
@@ -208,21 +210,21 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILConstant C) {
 
 namespace llvm {
 
-// DenseMap key support for SILConstant.
-template<> struct DenseMapInfo<swift::SILConstant> {
-  using SILConstant = swift::SILConstant;
-  using Kind = SILConstant::Kind;
-  using Loc = SILConstant::Loc;
+// DenseMap key support for SILDeclRef.
+template<> struct DenseMapInfo<swift::SILDeclRef> {
+  using SILDeclRef = swift::SILDeclRef;
+  using Kind = SILDeclRef::Kind;
+  using Loc = SILDeclRef::Loc;
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
-  static SILConstant getEmptyKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
+  static SILDeclRef getEmptyKey() {
+    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
   }
-  static swift::SILConstant getTombstoneKey() {
-    return SILConstant(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
+  static swift::SILDeclRef getTombstoneKey() {
+    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
   }
-  static unsigned getHashValue(swift::SILConstant Val) {
+  static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
     unsigned h2 = UnsignedInfo::getHashValue(unsigned(Val.kind));
     unsigned h3 = (Val.kind == Kind::DefaultArgGenerator)
@@ -231,8 +233,8 @@ template<> struct DenseMapInfo<swift::SILConstant> {
     unsigned h4 = UnsignedInfo::getHashValue(Val.isObjC);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7);
   }
-  static bool isEqual(swift::SILConstant const &LHS,
-                      swift::SILConstant const &RHS) {
+  static bool isEqual(swift::SILDeclRef const &LHS,
+                      swift::SILDeclRef const &RHS) {
     return LHS == RHS;
   }
 };

@@ -34,7 +34,7 @@ namespace swift {
   class FuncDecl;
   class PolymorphicFunctionType;
   class ProtocolConformance;
-  struct SILConstant;
+  struct SILDeclRef;
   class SILType;
   enum class CheckedCastMode : unsigned char;
 
@@ -116,7 +116,7 @@ namespace irgen {
   /// as a function value.
   void emitArchetypeMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
-                                SILConstant member,
+                                SILDeclRef member,
                                 Explosion &out);
   
   /// Extract the method pointer and metadata from an opaque existential
@@ -124,7 +124,7 @@ namespace irgen {
   void emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
                                      Address existAddr,
                                      SILType baseTy,
-                                     SILConstant member,
+                                     SILDeclRef member,
                                      Explosion &out);
   
   /// Load the type metadata and witnesses out of an opaque existential
@@ -140,7 +140,7 @@ namespace irgen {
   void emitClassProtocolMethodValue(IRGenFunction &IGF,
                                     Explosion &in,
                                     SILType baseTy,
-                                    SILConstant member,
+                                    SILDeclRef member,
                                     Explosion &out);
   
   /// Add the witness arguments necessary for calling a function with

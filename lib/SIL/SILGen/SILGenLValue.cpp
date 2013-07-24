@@ -259,8 +259,8 @@ namespace {
   };
   
   class GetterSetterComponent : public LogicalPathComponent {
-    SILConstant getter;
-    SILConstant setter;
+    SILDeclRef getter;
+    SILDeclRef setter;
     std::vector<Substitution> substitutions;
     Expr *subscriptExpr;
     mutable RValue origSubscripts;
@@ -314,10 +314,10 @@ namespace {
                           ArrayRef<Substitution> substitutions,
                           Expr *subscriptExpr,
                           Type substType)
-      : getter(SILConstant(decl, SILConstant::Kind::Getter)),
+      : getter(SILDeclRef(decl, SILDeclRef::Kind::Getter)),
         setter(decl->isSettable()
-                 ? SILConstant(decl, SILConstant::Kind::Setter)
-                 : SILConstant()),
+                 ? SILDeclRef(decl, SILDeclRef::Kind::Setter)
+                 : SILDeclRef()),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptExpr(subscriptExpr),
         substType(substType)

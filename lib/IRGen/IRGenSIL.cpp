@@ -30,7 +30,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
@@ -81,18 +81,18 @@ public:
 /// Represents an ObjC method reference that will be invoked by a form of
 /// objc_msgSend.
 class ObjCMethod {
-  /// The SILConstant declaring the method.
-  SILConstant method;
+  /// The SILDeclRef declaring the method.
+  SILDeclRef method;
   /// For a super call, the type to pass to msgSendSuper2 dispatch.
   /// Null for non-super calls.
   SILType superSearchType;
 
 public:
-  ObjCMethod(SILConstant method, SILType superSearchType)
+  ObjCMethod(SILDeclRef method, SILType superSearchType)
     : method(method), superSearchType(superSearchType)
   {}
   
-  SILConstant getMethod() const { return method; }
+  SILDeclRef getMethod() const { return method; }
   SILType getSuperSearchType() const { return superSearchType; }
   
   /// FIXME: Thunk down to a Swift function value?
@@ -414,7 +414,7 @@ public:
     setLoweredValue(v, StaticFunction{f, cc, explosionLevel});
   }
   
-  void setLoweredObjCMethod(SILValue v, SILConstant method,
+  void setLoweredObjCMethod(SILValue v, SILDeclRef method,
                             SILType superSearchType = SILType()) {
     assert(!v.getType().isAddress() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
@@ -926,7 +926,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 /// Find the entry point, natural curry level, and calling convention for a
-/// SILConstant function.
+/// SILDeclRef function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ExplosionKind level) {
   // Check whether we've created the function already.
@@ -2100,7 +2100,7 @@ void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {
   }
 
   SILType baseTy = i->getOperand().getType();
-  SILConstant member = i->getMember();
+  SILDeclRef member = i->getMember();
   
   Explosion lowered(ExplosionKind::Maximal);
   if (baseTy.isClassExistentialType()) {
@@ -2123,7 +2123,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   }
 
   SILType baseTy = i->getLookupArchetype();
-  SILConstant member = i->getMember();
+  SILDeclRef member = i->getMember();
 
   Explosion lowered(ExplosionKind::Maximal);
   emitArchetypeMethodValue(*this, baseTy, member, lowered);
@@ -2195,7 +2195,7 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *baseValue = base.claimNext();
   
-  SILConstant method = i->getMember();
+  SILDeclRef method = i->getMember();
   
   // For Swift classes, get the method implementation from the vtable.
   // FIXME: better explosion kind, map as static.

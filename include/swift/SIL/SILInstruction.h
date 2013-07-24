@@ -19,7 +19,7 @@
 
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
@@ -1134,16 +1134,16 @@ public:
 /// DynamicMethodInst - Abstract base for instructions that implement dynamic
 /// method lookup.
 class DynamicMethodInst : public SILInstruction {
-  SILConstant Member;
+  SILDeclRef Member;
   bool Volatile;
 public:
   DynamicMethodInst(ValueKind Kind,
                     SILLocation Loc, SILType Ty,
-                    SILConstant Member,
+                    SILDeclRef Member,
                     bool Volatile = false)
     : SILInstruction(Kind, Loc, Ty), Member(Member), Volatile(Volatile) {}
   
-  SILConstant getMember() const { return Member; }
+  SILDeclRef getMember() const { return Member; }
   
   /// True if this dynamic dispatch is semantically required.
   bool isVolatile() const { return Volatile; }
@@ -1161,7 +1161,7 @@ class ClassMethodInst
   : public UnaryInstructionBase<ValueKind::ClassMethodInst, DynamicMethodInst>
 {
 public:
-  ClassMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
+  ClassMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
                   SILType Ty, bool Volatile = false)
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
@@ -1173,7 +1173,7 @@ class SuperMethodInst
   : public UnaryInstructionBase<ValueKind::SuperMethodInst, DynamicMethodInst>
 {
 public:
-  SuperMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
+  SuperMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
                   SILType Ty, bool Volatile = false)
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
@@ -1183,7 +1183,7 @@ public:
 class ArchetypeMethodInst : public DynamicMethodInst {
   SILType LookupType;
 public:
-  ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILConstant Member,
+  ArchetypeMethodInst(SILLocation Loc, SILType LookupType, SILDeclRef Member,
                       SILType Ty, bool Volatile = false)
     : DynamicMethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member,
                         Volatile),
@@ -1209,7 +1209,7 @@ class ProtocolMethodInst
                                 DynamicMethodInst>
 {
 public:
-  ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILConstant Member,
+  ProtocolMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
                      SILType Ty, bool Volatile = false)
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };

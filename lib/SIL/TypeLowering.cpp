@@ -621,7 +621,7 @@ static bool isClassOrProtocolMethod(ValueDecl *vd) {
     || contextType->isClassExistentialType();
 }
 
-static AbstractCC getAbstractCC(SILConstant c) {
+static AbstractCC getAbstractCC(SILDeclRef c) {
   // If this is an ObjC thunk, it always has ObjC calling convention.
   if (c.isObjC)
     return c.hasDecl() && isClassOrProtocolMethod(c.getDecl())
@@ -636,17 +636,17 @@ static AbstractCC getAbstractCC(SILConstant c) {
   // FIXME: We don't emit calls to ObjC properties correctly as class_method
   // dispatches yet.
   assert((!c.getDecl()->hasClangNode() ||
-          c.kind == SILConstant::Kind::Getter ||
-          c.kind == SILConstant::Kind::Setter)
+          c.kind == SILDeclRef::Kind::Getter ||
+          c.kind == SILDeclRef::Kind::Setter)
          && "should not be referencing native entry point of foreign decl");
 
   if (c.getDecl()->isInstanceMember() ||
-      c.kind == SILConstant::Kind::Initializer)
+      c.kind == SILDeclRef::Kind::Initializer)
     return AbstractCC::Method;
   return AbstractCC::Freestanding;
 }
 
-SILType TypeConverter::getConstantType(SILConstant constant) {
+SILType TypeConverter::getConstantType(SILDeclRef constant) {
   auto found = constantTypes.find(constant);
   if (found != constantTypes.end())
     return found->second;
@@ -666,12 +666,12 @@ SILType TypeConverter::getConstantType(SILConstant constant) {
 
 /// Get the type of a property accessor, () -> T for a getter or (value:T) -> ()
 /// for a setter.
-Type TypeConverter::getPropertyType(SILConstant::Kind kind,
+Type TypeConverter::getPropertyType(SILDeclRef::Kind kind,
                                     Type valueType) const {
-  if (kind == SILConstant::Kind::Getter) {
+  if (kind == SILDeclRef::Kind::Getter) {
     return FunctionType::get(TupleType::getEmpty(Context), valueType, Context);
   }
-  if (kind == SILConstant::Kind::Setter) {
+  if (kind == SILDeclRef::Kind::Setter) {
     TupleTypeElt valueParam(valueType, Context.getIdentifier("value"));
     return FunctionType::get(TupleType::get(valueParam, Context),
                              TupleType::getEmpty(Context),
@@ -681,7 +681,7 @@ Type TypeConverter::getPropertyType(SILConstant::Kind kind,
 }
 
 /// Get the type of a subscript accessor, Index -> PropertyAccessor.
-Type TypeConverter::getSubscriptPropertyType(SILConstant::Kind kind,
+Type TypeConverter::getSubscriptPropertyType(SILDeclRef::Kind kind,
                                              Type indexType,
                                              Type elementType) const {
   Type propertyType = getPropertyType(kind, elementType);
@@ -772,14 +772,14 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
     }
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy = getPropertyType(SILConstant::Kind::Setter,
+      Type setterTy = getPropertyType(SILDeclRef::Kind::Setter,
                                       capture->getType());
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy = getPropertyType(SILConstant::Kind::Getter,
+      Type getterTy = getPropertyType(SILDeclRef::Kind::Getter,
                                       capture->getType());
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
@@ -809,11 +809,11 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
   return FunctionType::get(capturedInputs, funcType, Context);
 }
 
-Type TypeConverter::makeConstantType(SILConstant c) {
+Type TypeConverter::makeConstantType(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl*>();
 
   switch (c.kind) {
-  case SILConstant::Kind::Func:
+  case SILDeclRef::Kind::Func:
     if (CapturingExpr *e = c.loc.dyn_cast<CapturingExpr*>()) {
       auto *funcTy = e->getType()->castTo<AnyFunctionType>();
       return getFunctionTypeWithCaptures(funcTy, e->getCaptures(),
@@ -826,8 +826,8 @@ Type TypeConverter::makeConstantType(SILConstant c) {
                                          func->getDeclContext());
     }
 
-  case SILConstant::Kind::Getter:
-  case SILConstant::Kind::Setter: {
+  case SILDeclRef::Kind::Getter:
+  case SILDeclRef::Kind::Setter: {
     Type contextType = vd->getDeclContext()->getDeclaredTypeOfContext();
     GenericParamList *genericParams = nullptr;
     if (contextType) {
@@ -854,7 +854,7 @@ Type TypeConverter::makeConstantType(SILConstant c) {
     // If this is a local variable, its property methods may be closures.
     if (VarDecl *var = dyn_cast<VarDecl>(c.getDecl())) {
       if (var->isProperty()) {
-        FuncDecl *property = c.kind == SILConstant::Kind::Getter
+        FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
           ? var->getGetter()
           : var->getSetter();
         auto *propTy = propertyMethodType->castTo<AnyFunctionType>();
@@ -866,22 +866,22 @@ Type TypeConverter::makeConstantType(SILConstant c) {
     return propertyMethodType;
   }
       
-  case SILConstant::Kind::Allocator:
-  case SILConstant::Kind::OneOfElement:
+  case SILDeclRef::Kind::Allocator:
+  case SILDeclRef::Kind::OneOfElement:
     return vd->getTypeOfReference();
   
-  case SILConstant::Kind::Initializer:
+  case SILDeclRef::Kind::Initializer:
     return cast<ConstructorDecl>(vd)->getInitializerType();
   
-  case SILConstant::Kind::Destroyer:
+  case SILDeclRef::Kind::Destroyer:
     return getDestroyingDestructorType(cast<ClassDecl>(vd), Context);
   
-  case SILConstant::Kind::GlobalAccessor: {
+  case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(!var->isProperty() && "constant ref to non-physical global var");
     return getGlobalAccessorType(var->getType(), Context);
   }
-  case SILConstant::Kind::DefaultArgGenerator: {
+  case SILDeclRef::Kind::DefaultArgGenerator: {
     return getDefaultArgGeneratorType(vd, c.defaultArgIndex, Context);
   }
   }

@@ -331,14 +331,14 @@ static llvm::FunctionType *getMsgSendSuperTy(IRGenModule &IGM,
 /// Prepare a call using ObjC method dispatch without applying the 'self' and
 /// '_cmd' arguments.
 CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
-                                              SILConstant method,
+                                              SILDeclRef method,
                                               SILType origType,
                                               SILType substResultType,
                                               ArrayRef<Substitution> subs,
                                               ExplosionKind maxExplosion,
                                               bool isSuper) {
-  assert((method.kind == SILConstant::Kind::Initializer
-          || method.kind == SILConstant::Kind::Func)
+  assert((method.kind == SILDeclRef::Kind::Initializer
+          || method.kind == SILDeclRef::Kind::Func)
          && "objc method call must be to a func or constructor decl");
   llvm::AttributeSet attrs;
   auto fnTy = IGF.IGM.getFunctionType(AbstractCC::ObjCMethod,
@@ -384,7 +384,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
 /// Emit the 'self'/'super' and '_cmd' arguments for an ObjC method dispatch.
 void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
                                                Explosion &args,
-                                               SILConstant method,
+                                               SILDeclRef method,
                                                llvm::Value *self,
                                                SILType searchType) {
   // Compute the selector.
@@ -393,7 +393,7 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   // super.constructor references an instance method (even though the
   // decl is really a 'static' member).
   bool isInstanceMethod
-    = method.kind == SILConstant::Kind::Initializer
+    = method.kind == SILDeclRef::Kind::Initializer
       || method.getDecl()->isInstanceMember();
 
   if (searchType) {

@@ -190,7 +190,7 @@ SILValue SILGenFunction::emitEmptyTuple(SILLocation loc) {
 }
 
 SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
-                                               SILConstant constant) {
+                                               SILDeclRef constant) {
   assert(!LocalConstants.count(constant) &&
          "emitting ref to local constant without context?!");
   if (constant.hasDecl() &&
@@ -203,7 +203,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
 }
 
 SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
-                                               SILConstant constant) {
+                                               SILDeclRef constant) {
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
     return LocalConstants[constant];
@@ -214,7 +214,7 @@ SILValue SILGenFunction::emitUnmanagedFunctionRef(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
-                                             SILConstant constant) {
+                                             SILDeclRef constant) {
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
     SILValue v = LocalConstants[constant];
@@ -252,7 +252,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   if (isa<TypeDecl>(decl)) {
     assert(decl->getType()->is<MetaTypeType>() &&
            "type declref does not have metatype type?!");
-    assert((uncurryLevel == SILConstant::ConstructAtNaturalUncurryLevel
+    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for types");
     return ManagedValue(B.createMetatype(loc, getLoweredType(declType)),
@@ -261,7 +261,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   
   // If this is a reference to a var, produce an address.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
-    assert((uncurryLevel == SILConstant::ConstructAtNaturalUncurryLevel
+    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for vars");
 
@@ -282,15 +282,15 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   assert(!decl->getTypeOfReference()->is<LValueType>() &&
          "unexpected lvalue decl ref?!");
   
-  // If the referenced decl is a local func with context, then the SILConstant
+  // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
     if (!fd->getCaptures().empty()
-        && uncurryLevel != SILConstant::ConstructAtNaturalUncurryLevel)
+        && uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
       ++uncurryLevel;
   }
 
-  return emitFunctionRef(loc, SILConstant(decl, uncurryLevel));
+  return emitFunctionRef(loc, SILDeclRef(decl, uncurryLevel));
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
@@ -759,7 +759,7 @@ RValue RValueEmitter::visitAddressOfExpr(AddressOfExpr *E,
 
 ManagedValue SILGenFunction::emitMethodRef(SILLocation loc,
                                            SILValue thisValue,
-                                           SILConstant methodConstant,
+                                           SILDeclRef methodConstant,
                                            ArrayRef<Substitution> innerSubs) {
   // FIXME: Emit dynamic dispatch instruction (class_method, super_method, etc.)
   // if needed.
@@ -937,8 +937,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
       unsigned destIndex
         = shuffleIndexIterator - E->getElementMapping().begin() - 1;
-      SILConstant generator 
-        = SILConstant::getDefaultArgGenerator(E->getDefaultArgsOwner(),
+      SILDeclRef generator 
+        = SILDeclRef::getDefaultArgGenerator(E->getDefaultArgsOwner(),
                                               destIndex);
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
@@ -1041,8 +1041,8 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     assert(outerFields[i].hasInit() &&
            "no default initializer in non-scalar field of scalar-to-tuple?!");
     if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
-      SILConstant generator
-      = SILConstant::getDefaultArgGenerator(defaultArgOwner, i);
+      SILDeclRef generator
+      = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
       auto fnRef = gen.emitFunctionRef(E, generator);
       auto generatorTy = gen.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
@@ -1111,8 +1111,8 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
     assert(outerFields[i].hasInit() &&
            "no default initializer in non-scalar field of scalar-to-tuple?!");
     if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
-      SILConstant generator
-        = SILConstant::getDefaultArgGenerator(defaultArgOwner, i);
+      SILDeclRef generator
+        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto generatorTy = SGF.SGM.getConstantType(generator);
       auto resultTy = generatorTy.getFunctionResultType();
@@ -1183,7 +1183,7 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
 }
 
 ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
-                                             SILConstant constant,
+                                             SILDeclRef constant,
                                              ArrayRef<Substitution> forwardSubs,
                                              CapturingExpr *body) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
@@ -1249,15 +1249,15 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
         }
         case CaptureKind::GetterSetter: {
           // Pass the setter and getter closure references on.
-          ManagedValue v = emitFunctionRef(loc, SILConstant(capture,
-                                                   SILConstant::Kind::Setter));
+          ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                                   SILDeclRef::Kind::Setter));
           capturedArgs.push_back(v.forward(*this));
           SWIFT_FALLTHROUGH;
         }
         case CaptureKind::Getter: {
           // Pass the getter closure reference on.
-          ManagedValue v = emitFunctionRef(loc, SILConstant(capture,
-                                                   SILConstant::Kind::Getter));
+          ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+                                                   SILDeclRef::Kind::Getter));
           capturedArgs.push_back(v.forward(*this));
           break;
         }
@@ -1278,7 +1278,7 @@ RValue RValueEmitter::visitFuncExpr(FuncExpr *e, SGFContext C) {
   SGF.SGM.emitFunction(e, e);
 
   // Generate the closure (if any) for the function reference.
-  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILConstant(e),
+  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
                                               SGF.getForwardingSubstitutions(),
                                                      e));
 }
@@ -1289,7 +1289,7 @@ RValue RValueEmitter::visitPipeClosureExpr(PipeClosureExpr *e, SGFContext C) {
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILConstant(e),
+  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
                                              SGF.getForwardingSubstitutions(),
                                                      e));
 }
@@ -1300,7 +1300,7 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   
   // Generate the closure value (if any) for the closure expr's function
   // reference.
-  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILConstant(e),
+  return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
                                               SGF.getForwardingSubstitutions(),
                                                      e));
 }
@@ -1399,8 +1399,8 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       return;
     }
     
-    SILConstant dtorConstant =
-      SILConstant(baseClass, SILConstant::Kind::Destroyer);
+    SILDeclRef dtorConstant =
+      SILDeclRef(baseClass, SILDeclRef::Kind::Destroyer);
     SILType baseSILTy = getLoweredLoadableType(baseTy);
     SILValue baseThis = B.createUpcast(dd, thisValue, baseSILTy);
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
@@ -1762,7 +1762,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   args.push_back(thisValue);
 
   // Call the initializer.
-  SILConstant initConstant = SILConstant(ctor, SILConstant::Kind::Initializer);
+  SILDeclRef initConstant = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
   auto forwardingSubs = buildForwardingSubstitutions(ctor->getGenericParams());
   ManagedValue initVal = emitMethodRef(ctor, thisValue, initConstant,
                                        forwardingSubs);
@@ -1869,14 +1869,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
-    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
+    Type setTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Setter,
                                                capture->getType());
     addSILArgument(gen.getLoweredType(setTy));
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
-    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
+    Type getTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Getter,
                                                capture->getType());
     addSILArgument(gen.getLoweredType(getTy));
     break;
@@ -1885,7 +1885,7 @@ static void forwardCaptureArgs(SILGenFunction &gen,
 }
 
 void SILGenFunction::emitCurryThunk(FuncExpr *fe,
-                                    SILConstant from, SILConstant to) {
+                                    SILDeclRef from, SILDeclRef to) {
   SmallVector<SILValue, 8> curriedArgs;
   
   unsigned paramCount = from.uncurryLevel + 1;
@@ -1930,7 +1930,7 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
   B.createReturn(fe, toClosure);
 }
 
-void SILGenFunction::emitGeneratorFunction(SILConstant function, Expr *value) {
+void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   emitProlog({ }, value->getType());
   emitReturnExpr(value, value);
 }

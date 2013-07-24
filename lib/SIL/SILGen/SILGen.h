@@ -54,17 +54,17 @@ public:
   /// the module is not a main module.
   SILGenFunction /*nullable*/ *TopLevelSGF;
   
-  /// Mapping from SILConstants to emitted SILFunctions.
-  llvm::DenseMap<SILConstant, SILFunction*> emittedFunctions;
+  /// Mapping from SILDeclRefs to emitted SILFunctions.
+  llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   
   SILFunction *emitTopLevelFunction();
   
   size_t anonymousFunctionCounter = 0;
   
-  Optional<SILConstant> StringToNSStringFn;
-  Optional<SILConstant> NSStringToStringFn;
-  Optional<SILConstant> BoolToObjCBoolFn;
-  Optional<SILConstant> ObjCBoolToBoolFn;
+  Optional<SILDeclRef> StringToNSStringFn;
+  Optional<SILDeclRef> NSStringToStringFn;
+  Optional<SILDeclRef> BoolToObjCBoolFn;
+  Optional<SILDeclRef> ObjCBoolToBoolFn;
   
 public:
   SILGenModule(SILModule &M);
@@ -74,29 +74,29 @@ public:
   void operator=(SILGenModule const &) = delete;
   
   /// Returns the type of a constant reference.
-  SILType getConstantType(SILConstant constant);
+  SILType getConstantType(SILDeclRef constant);
   
   /// Returns the calling convention for a function.
-  AbstractCC getConstantCC(SILConstant constant) {
+  AbstractCC getConstantCC(SILDeclRef constant) {
     return getConstantType(constant).getAbstractCC();
   }
   
   /// Determine the linkage of a constant.
-  SILLinkage getConstantLinkage(SILConstant constant);
+  SILLinkage getConstantLinkage(SILDeclRef constant);
   
-  /// Get the function for a SILConstant.
-  SILFunction *getFunction(SILConstant constant);
+  /// Get the function for a SILDeclRef.
+  SILFunction *getFunction(SILDeclRef constant);
 
-  /// True if a function has been emitted for a given SILConstant.
-  bool hasFunction(SILConstant constant);
+  /// True if a function has been emitted for a given SILDeclRef.
+  bool hasFunction(SILDeclRef constant);
   
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
     return Types.getTypeLoweringInfo(t).getLoweredType();
   }
   
-  /// Generate the mangled symbol name for a SILConstant.
-  void mangleConstant(SILConstant constant,
+  /// Generate the mangled symbol name for a SILDeclRef.
+  void mangleConstant(SILDeclRef constant,
                       SILFunction *f);
 
   //===--------------------------------------------------------------------===//
@@ -111,41 +111,41 @@ public:
   void visitVarDecl(VarDecl *vd);
 
   /// emitFunction - Generates code for the given FuncExpr and adds the
-  /// SILFunction to the current SILModule under the name SILConstant(decl). For
+  /// SILFunction to the current SILModule under the name SILDeclRef(decl). For
   /// curried functions, curried entry point Functions are also generated and
   /// added to the current SILModule.
-  void emitFunction(SILConstant::Loc decl, FuncExpr *fe);
+  void emitFunction(SILDeclRef::Loc decl, FuncExpr *fe);
   /// \brief Generates code for the given closure expression and adds the 
-  /// SILFunction to the current SILModule under the nane SILConstant(ce).
+  /// SILFunction to the current SILModule under the nane SILDeclRef(ce).
   void emitClosure(PipeClosureExpr *ce);
   /// emitClosure - Generates code for the given ClosureExpr and adds the
-  /// SILFunction to the current SILModule under the name SILConstant(ce).
+  /// SILFunction to the current SILModule under the name SILDeclRef(ce).
   void emitClosure(ClosureExpr *ce);
   /// emitConstructor - Generates code for the given ConstructorDecl and adds
-  /// the SILFunction to the current SILModule under the name SILConstant(decl).
+  /// the SILFunction to the current SILModule under the name SILDeclRef(decl).
   void emitConstructor(ConstructorDecl *decl);
   /// emitDestructor - Generates code for the given class's destructor and adds
   /// the SILFunction to the current SILModule under the name
-  /// SILConstant(cd, Destructor). If a DestructorDecl is provided, it will be
+  /// SILDeclRef(cd, Destructor). If a DestructorDecl is provided, it will be
   /// used, otherwise only the implicit destruction behavior will be emitted.
   void emitDestructor(ClassDecl *cd, DestructorDecl /*nullable*/ *dd);
 
   /// Emits the default argument generator with the given expression.
-  void emitDefaultArgGenerator(SILConstant constant, Expr *arg);
+  void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg);
   
   /// Emits the default argument generator for the given function.
-  void emitDefaultArgGenerators(SILConstant::Loc decl, 
+  void emitDefaultArgGenerators(SILDeclRef::Loc decl, 
                                 ArrayRef<Pattern*> patterns);
 
   /// emitCurryThunk - Emits the curry thunk between two uncurry levels of a
   /// function.
-  void emitCurryThunk(SILConstant entryPoint,
-                      SILConstant nextEntryPoint,
+  void emitCurryThunk(SILDeclRef entryPoint,
+                      SILDeclRef nextEntryPoint,
                       FuncExpr *fe);
   
   template<typename T>
-  SILFunction *preEmitFunction(SILConstant constant, T *astNode);
-  void postEmitFunction(SILConstant constant, SILFunction *F);
+  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode);
+  void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
@@ -176,10 +176,10 @@ public:
   bool requiresObjCSuperDispatch(ValueDecl *vd);
 
   /// Known functions for bridging.
-  SILConstant getStringToNSStringFn();
-  SILConstant getNSStringToStringFn();
-  SILConstant getBoolToObjCBoolFn();
-  SILConstant getObjCBoolToBoolFn();
+  SILDeclRef getStringToNSStringFn();
+  SILDeclRef getNSStringToStringFn();
+  SILDeclRef getBoolToObjCBoolFn();
+  SILDeclRef getObjCBoolToBoolFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>
@@ -320,7 +320,7 @@ public:
   /// declaration that requires local context, such as a func closure, is
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
   /// to a local constant.
-  llvm::DenseMap<SILConstant, SILValue> LocalConstants;
+  llvm::DenseMap<SILDeclRef, SILValue> LocalConstants;
   
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
@@ -395,19 +395,19 @@ public:
   void emitClassConstructorInitializer(ConstructorDecl *ctor);
   /// emitCurryThunk - Generates code for a curry thunk from one uncurry level
   /// of a function to another.
-  void emitCurryThunk(FuncExpr *fe, SILConstant fromLevel, SILConstant toLevel);
+  void emitCurryThunk(FuncExpr *fe, SILDeclRef fromLevel, SILDeclRef toLevel);
 
   // Generate a nullary function that returns the given value.
-  void emitGeneratorFunction(SILConstant function, Expr *value);
+  void emitGeneratorFunction(SILDeclRef function, Expr *value);
 
   /// Generate an ObjC-compatible thunk for a method.
-  void emitObjCMethodThunk(SILConstant thunk);
+  void emitObjCMethodThunk(SILDeclRef thunk);
   
   /// Generate an ObjC-compatible getter for a property.
-  void emitObjCPropertyGetter(SILConstant getter);
+  void emitObjCPropertyGetter(SILDeclRef getter);
   
   /// Generate an ObjC-compatible setter for a property.
-  void emitObjCPropertySetter(SILConstant setter);
+  void emitObjCPropertySetter(SILDeclRef setter);
 
   //===--------------------------------------------------------------------===//
   // Control flow
@@ -526,38 +526,38 @@ public:
 
   /// Returns a reference to a constant in global context. For local func decls
   /// this returns the function constant with unapplied closure context.
-  SILValue emitGlobalFunctionRef(SILLocation loc, SILConstant constant);
+  SILValue emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant);
   /// Returns a reference to a constant in local context. This will return a
   /// closure object reference if the constant refers to a local func decl.
   /// In rvalue contexts, emitFunctionRef should be used instead, which retains
   /// a local constant and returns a ManagedValue with a cleanup.
-  SILValue emitUnmanagedFunctionRef(SILLocation loc, SILConstant constant);
+  SILValue emitUnmanagedFunctionRef(SILLocation loc, SILDeclRef constant);
   /// Returns a reference to a constant in local context. This will return a
   /// retained closure object reference if the constant refers to a local func
   /// decl.
-  ManagedValue emitFunctionRef(SILLocation loc, SILConstant constant);
+  ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant);
 
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                ValueDecl *decl,
                                Type declType = Type(),
                                unsigned uncurryLevel
-                                 = SILConstant::ConstructAtNaturalUncurryLevel);
+                                 = SILDeclRef::ConstructAtNaturalUncurryLevel);
 
   ManagedValue emitClosureForCapturingExpr(SILLocation loc,
-                                           SILConstant function,
+                                           SILDeclRef function,
                                            ArrayRef<Substitution> forwardSubs,
                                            CapturingExpr *body);
   
   Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   ManagedValue emitGetProperty(SILLocation loc,
-                               SILConstant getter,
+                               SILDeclRef getter,
                                ArrayRef<Substitution> substitutions,
                                RValue &&optionalthisValue,
                                RValue &&optionalSubscripts,
                                Type resultType,
                                SGFContext C);
   void emitSetProperty(SILLocation loc,
-                       SILConstant setter,
+                       SILDeclRef setter,
                        ArrayRef<Substitution> substitutions,
                        RValue &&optionalThisValue,
                        RValue &&optionalSubscripts,
@@ -575,7 +575,7 @@ public:
                                 SGFContext C);
   ManagedValue emitMethodRef(SILLocation loc,
                              SILValue thisValue,
-                             SILConstant methodConstant,
+                             SILDeclRef methodConstant,
                              ArrayRef<Substitution> innerSubstitutions);
   void emitStore(SILLocation loc, ManagedValue src, SILValue destAddr);
   

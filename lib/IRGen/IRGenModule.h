@@ -58,7 +58,7 @@ namespace swift {
   class OneOfDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
-  struct SILConstant;
+  struct SILDeclRef;
   class SILModule;
   class SILType;
   class SourceLoc;

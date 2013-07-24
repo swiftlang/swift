@@ -136,7 +136,7 @@ namespace {
       return parseSILType(Result);
     }
 
-    bool parseSILConstant(SILConstant &Result);
+    bool parseSILDeclRef(SILDeclRef &Result);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
     bool parseValueRef(SILValue &Result, SILType Ty);
@@ -573,7 +573,7 @@ bool SILParser::parseSILType(SILType &Result) {
 /// sil-constant-kind:
 ///   'func' | 'getter' | 'setter' | 'allocator' | 'initializer' | 'oneofelt' \
 ///   | 'destroyer' | 'globalaccessor'
-bool SILParser::parseSILConstant(SILConstant &Result) {
+bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
     return true;
 
@@ -605,13 +605,13 @@ bool SILParser::parseSILConstant(SILConstant &Result) {
   }
 
   // Initialize Kind, uncurryLevel and IsObjC.
-  SILConstant::Kind Kind = SILConstant::Kind::Func;
+  SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
   unsigned uncurryLevel = 0;
   bool IsObjC = false;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
-    // Construct SILConstant.
-    Result = SILConstant(VD, Kind, uncurryLevel, IsObjC);
+    // Construct SILDeclRef.
+    Result = SILDeclRef(VD, Kind, uncurryLevel, IsObjC);
     return false;
   }
 
@@ -627,28 +627,28 @@ bool SILParser::parseSILConstant(SILConstant &Result) {
       if (P.parseIdentifier(Id, diag::expected_sil_constant))
         return true;
       if (!ParseState && Id.str() == "func") {
-        Kind = SILConstant::Kind::Func;
+        Kind = SILDeclRef::Kind::Func;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "getter") {
-        Kind = SILConstant::Kind::Getter;
+        Kind = SILDeclRef::Kind::Getter;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "setter") {
-        Kind = SILConstant::Kind::Setter;
+        Kind = SILDeclRef::Kind::Setter;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
-        Kind = SILConstant::Kind::Allocator;
+        Kind = SILDeclRef::Kind::Allocator;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "initializer") {
-        Kind = SILConstant::Kind::Initializer;
+        Kind = SILDeclRef::Kind::Initializer;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "oneofelt") {
-        Kind = SILConstant::Kind::OneOfElement;
+        Kind = SILDeclRef::Kind::OneOfElement;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "destroyer") {
-        Kind = SILConstant::Kind::Destroyer;
+        Kind = SILDeclRef::Kind::Destroyer;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "globalaccessor") {
-        Kind = SILConstant::Kind::GlobalAccessor;
+        Kind = SILDeclRef::Kind::GlobalAccessor;
         ParseState = 1;
       } else if (Id.str() == "objc") {
         IsObjC = true;
@@ -664,8 +664,8 @@ bool SILParser::parseSILConstant(SILConstant &Result) {
 
   } while (P.consumeIf(tok::period));
 
-  // Construct SILConstant.
-  Result = SILConstant(VD, Kind, uncurryLevel, IsObjC);
+  // Construct SILDeclRef.
+  Result = SILDeclRef(VD, Kind, uncurryLevel, IsObjC);
   return false;
 }
 
@@ -1331,12 +1331,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, P, "volatile"))
       return true;
-    SILConstant Member;
+    SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILConstant(Member) ||
+        parseSILDeclRef(Member) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(MethodTy, TyLoc)
        )
@@ -1349,12 +1349,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, P, "volatile"))
       return true;
-    SILConstant Member;
+    SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILConstant(Member) ||
+        parseSILDeclRef(Member) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(MethodTy, TyLoc)
        )
@@ -1368,12 +1368,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILOptional(IsVolatile, P, "volatile"))
       return true;
     SILType LookupTy;
-    SILConstant Member;
+    SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
     if (parseSILType(LookupTy, TyLoc) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILConstant(Member) ||
+        parseSILDeclRef(Member) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(MethodTy, TyLoc)
        )

@@ -15,7 +15,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILType.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
@@ -205,9 +205,9 @@ class TypeConverter {
   }
   
   llvm::DenseMap<TypeKey, const TypeLoweringInfo *> Types;
-  llvm::DenseMap<SILConstant, SILType> constantTypes;
+  llvm::DenseMap<SILDeclRef, SILType> constantTypes;
   
-  Type makeConstantType(SILConstant constant);
+  Type makeConstantType(SILDeclRef constant);
   
   // Types converted during foreign bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
@@ -242,7 +242,7 @@ public:
   }
   
   /// Returns the SIL type of a constant reference.
-  SILType getConstantType(SILConstant constant);
+  SILType getConstantType(SILDeclRef constant);
   
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
@@ -259,14 +259,14 @@ public:
   
   /// Returns the type of a property accessor, () -> T for a getter,
   /// or (value:T) -> () for a setter. 'kind' must be one of the Kind constants
-  /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
-  Type getPropertyType(SILConstant::Kind kind, Type propType) const;
+  /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
+  Type getPropertyType(SILDeclRef::Kind kind, Type propType) const;
   
   /// Returns the type of a subscript property accessor, Index -> () -> T
   /// for a getter, or Index -> (value:T) -> () for a setter.
   /// 'kind' must be one of the Kind constants
-  /// from SILConstant, SILConstant::Getter or SILConstant::Setter.
-  Type getSubscriptPropertyType(SILConstant::Kind kind,
+  /// from SILDeclRef, SILDeclRef::Getter or SILDeclRef::Setter.
+  Type getSubscriptPropertyType(SILDeclRef::Kind kind,
                                 Type indexType,
                                 Type elementType) const;
 

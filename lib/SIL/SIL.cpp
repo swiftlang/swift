@@ -12,7 +12,7 @@
 
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILType.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -46,7 +46,7 @@ static unsigned getNaturalUncurryLevel(FuncDecl *fd) {
   return 0;
 }
 
-SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                          unsigned atUncurryLevel,
                          bool isObjC)
   : loc(vd), kind(kind), isObjC(isObjC), defaultArgIndex(0)
@@ -57,28 +57,28 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
 
   if (auto *func = dyn_cast<FuncDecl>(vd)) {
     assert(!func->isGetterOrSetter() &&
-           "cannot create a Func SILConstant for a property accessor");
+           "cannot create a Func SILDeclRef for a property accessor");
     assert(kind == Kind::Func &&
-           "can only create a Func SILConstant for a func decl");
+           "can only create a Func SILDeclRef for a func decl");
     naturalUncurryLevel = getNaturalUncurryLevel(func);
   } else if (isa<ConstructorDecl>(vd)) {
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
-           && "can only create Allocator or Initializer SILConstant for ctor");
+           && "can only create Allocator or Initializer SILDeclRef for ctor");
     naturalUncurryLevel = 1;
   } else if (auto *ed = dyn_cast<OneOfElementDecl>(vd)) {
     assert(kind == Kind::OneOfElement
-           && "can only create OneOfElement SILConstant for oneof element");
+           && "can only create OneOfElement SILDeclRef for oneof element");
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<ClassDecl>(vd)) {
     assert(kind == Kind::Destroyer
-           && "can only create Destructor SILConstant for class");
+           && "can only create Destructor SILDeclRef for class");
     naturalUncurryLevel = 0;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
     assert((kind == Kind::Getter
             || kind == Kind::Setter
             || kind == Kind::GlobalAccessor)
            && "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
-              "SILConstant for var");
+              "SILDeclRef for var");
     
     bool isGlobal = kind == Kind::GlobalAccessor;
     
@@ -107,24 +107,24 @@ SILConstant::SILConstant(ValueDecl *vd, SILConstant::Kind kind,
     
   } else if (isa<SubscriptDecl>(vd)) {
     assert((kind == Kind::Getter || kind == Kind::Setter)
-           && "can only create Getter or Setter SILConstant for subscript");
+           && "can only create Getter or Setter SILDeclRef for subscript");
     // Subscript accessors have
     //   getter type (T)(Index)() -> U and
     //   setter type (T)(Index)(U) -> ()
     naturalUncurryLevel = 2;
   } else {
-    llvm_unreachable("Unhandled ValueDecl for SILConstant");
+    llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
   
   assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
           || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILConstant below natural uncurry level");
+         && "can't emit SILDeclRef below natural uncurry level");
   uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
     ? naturalUncurryLevel
     : atUncurryLevel;
 }
 
-SILConstant::SILConstant(SILConstant::Loc baseLoc,
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                          unsigned atUncurryLevel,
                          bool asObjC) 
  : defaultArgIndex(0)
@@ -132,7 +132,7 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
   unsigned naturalUncurryLevel;
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
-      // Map getter or setter FuncDecls to Getter or Setter SILConstants of the
+      // Map getter or setter FuncDecls to Getter or Setter SILDeclRefs of the
       // property.
       if (fd->isGetterOrSetter()) {
         ValueDecl *property = cast<ValueDecl>(fd->getGetterOrSetterDecl());
@@ -145,27 +145,27 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
           llvm_unreachable("no getter or setter decl?!");
         }
       }
-      // Map other FuncDecls directly to Func SILConstants.
+      // Map other FuncDecls directly to Func SILDeclRefs.
       else {
         loc = fd;
         kind = Kind::Func;
       }
       naturalUncurryLevel = getNaturalUncurryLevel(fd);
     }
-    // Map DestructorDecls to Destroyer SILConstants of the ClassDecl.
+    // Map DestructorDecls to Destroyer SILDeclRefs of the ClassDecl.
     else if (DestructorDecl *dd = dyn_cast<DestructorDecl>(vd)) {
       ClassDecl *cd = cast<ClassDecl>(dd->getParent());
       loc = cd;
       kind = Kind::Destroyer;
       naturalUncurryLevel = 0;
     }
-    // Map ConstructorDecls to the Allocator SILConstant of the constructor.
+    // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
     else if (ConstructorDecl *cd = dyn_cast<ConstructorDecl>(vd)) {
       loc = cd;
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
-    // Map OneOfElementDecls to the OneOfElement SILConstant of the element.
+    // Map OneOfElementDecls to the OneOfElement SILDeclRef of the element.
     else if (OneOfElementDecl *ed = dyn_cast<OneOfElementDecl>(vd)) {
       loc = ed;
       kind = Kind::OneOfElement;
@@ -173,10 +173,10 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
     }
     // VarDecl constants require an explicit kind.
     else if (isa<VarDecl>(vd)) {
-      llvm_unreachable("must create SILConstant for VarDecl with explicit kind");
+      llvm_unreachable("must create SILDeclRef for VarDecl with explicit kind");
     }
     else {
-      llvm_unreachable("invalid loc decl for SILConstant!");
+      llvm_unreachable("invalid loc decl for SILDeclRef!");
     }
   } else {
     auto *expr = baseLoc.get<CapturingExpr*>();
@@ -190,7 +190,7 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
   // Set the uncurry level.
   assert((atUncurryLevel == ConstructAtNaturalUncurryLevel
           || atUncurryLevel <= naturalUncurryLevel)
-         && "can't emit SILConstant below natural uncurry level");
+         && "can't emit SILDeclRef below natural uncurry level");
   uncurryLevel = atUncurryLevel == ConstructAtNaturalUncurryLevel
     ? naturalUncurryLevel
     : atUncurryLevel;
@@ -198,9 +198,9 @@ SILConstant::SILConstant(SILConstant::Loc baseLoc,
   isObjC = asObjC;
 }
 
-SILConstant SILConstant::getDefaultArgGenerator(Loc loc,
+SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
                                                 unsigned defaultArgIndex) {
-  SILConstant result;
+  SILDeclRef result;
   result.loc = loc;
   result.kind = Kind::DefaultArgGenerator;
   result.defaultArgIndex = defaultArgIndex;

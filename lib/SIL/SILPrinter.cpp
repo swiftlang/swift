@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/Decl.h"
@@ -112,8 +112,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   llvm_unreachable("bad decl context");
 }
 
-/// SILConstant uses sigil "#" and prints the fully qualified dotted path.
-void SILConstant::print(raw_ostream &OS) const {
+/// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.
+void SILDeclRef::print(raw_ostream &OS) const {
   OS << "#";
   if (isNull()) {
     OS << "<null>";
@@ -128,46 +128,46 @@ void SILConstant::print(raw_ostream &OS) const {
   }
   OS << "!";
   switch (kind) {
-  case SILConstant::Kind::Func:
+  case SILDeclRef::Kind::Func:
     break;
-  case SILConstant::Kind::Getter:
+  case SILDeclRef::Kind::Getter:
     OS << "getter";
     break;
-  case SILConstant::Kind::Setter:
+  case SILDeclRef::Kind::Setter:
     OS << "setter";
     break;
-  case SILConstant::Kind::Allocator:
+  case SILDeclRef::Kind::Allocator:
     OS << "allocator";
     break;
-  case SILConstant::Kind::Initializer:
+  case SILDeclRef::Kind::Initializer:
     OS << "initializer";
     break;
-  case SILConstant::Kind::OneOfElement:
+  case SILDeclRef::Kind::OneOfElement:
     OS << "oneofelt";
     break;
-  case SILConstant::Kind::Destroyer:
+  case SILDeclRef::Kind::Destroyer:
     OS << "destroyer";
     break;
-  case SILConstant::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::GlobalAccessor:
     OS << "globalaccessor";
     break;
-  case SILConstant::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "defaultarg" << "." << defaultArgIndex;
     break;
   }
   if (uncurryLevel != 0) {
-    if (kind != SILConstant::Kind::Func)
+    if (kind != SILDeclRef::Kind::Func)
       OS << ".";
     OS << uncurryLevel;
   }
   if (isObjC) {
-    if (uncurryLevel != 0 || kind != SILConstant::Kind::Func)
+    if (uncurryLevel != 0 || kind != SILDeclRef::Kind::Func)
       OS << ".";
     OS << "objc";
   }
 }
 
-void SILConstant::dump() const {
+void SILDeclRef::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
@@ -693,7 +693,7 @@ public:
       OneOfElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
-      OS << ", case " << SILConstant(elt, SILConstant::Kind::OneOfElement)
+      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::OneOfElement)
          << ": " << getID(dest);
     }
     if (SOI->hasDefault())

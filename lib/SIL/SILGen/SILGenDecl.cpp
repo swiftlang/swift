@@ -122,12 +122,12 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // If there are captures, build the local closure value for the function and
   // store it as a local constant.
   if (!fd->getCaptures().empty()) {
-    SILValue closure = emitClosureForCapturingExpr(fd, SILConstant(fd),
+    SILValue closure = emitClosureForCapturingExpr(fd, SILDeclRef(fd),
                                                    getForwardingSubstitutions(),
                                                    fd->getBody())
       .forward(*this);
     Cleanups.pushCleanup<CleanupClosureConstant>(closure);
-    LocalConstants[SILConstant(fd)] = closure;
+    LocalConstants[SILDeclRef(fd)] = closure;
   }
 }
 
@@ -563,27 +563,27 @@ static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
     const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                              gen.F.begin());
-    gen.LocalConstants[SILConstant(capture)] = value;
+    gen.LocalConstants[SILDeclRef(capture)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Setter,
+    Type setTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Setter,
                                                capture->getType());
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin());
-    gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Setter)] = value;
+    gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = gen.SGM.Types.getPropertyType(SILConstant::Kind::Getter,
+    Type getTy = gen.SGM.Types.getPropertyType(SILDeclRef::Kind::Getter,
                                                capture->getType());
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin());
-    gen.LocalConstants[SILConstant(capture, SILConstant::Kind::Getter)] = value;
+    gen.LocalConstants[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
     gen.Cleanups.pushCleanup<CleanupCaptureValue>(value);
     break;
   }
@@ -1053,7 +1053,7 @@ static void emitObjCUnconsumedArgument(SILGenFunction &gen,
 /// Reorder arguments from ObjC method order (self-first) to Swift method order
 /// (self-last), and bridge argument types.
 static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
-                                             SILConstant thunk,
+                                             SILDeclRef thunk,
                                              SmallVectorImpl<SILValue> &args) {
   SILType objcTy = gen.SGM.getConstantType(thunk),
           swiftTy = gen.SGM.getConstantType(thunk.asObjC(false));
@@ -1105,8 +1105,8 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   return ownership;
 }
 
-void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
-  SILConstant native = thunk.asObjC(false);
+void SILGenFunction::emitObjCMethodThunk(SILDeclRef thunk) {
+  SILDeclRef native = thunk.asObjC(false);
   
   SmallVector<SILValue, 4> args;  
   auto ownership = emitObjCThunkArguments(*this, thunk, args);
@@ -1123,10 +1123,10 @@ void SILGenFunction::emitObjCMethodThunk(SILConstant thunk) {
   emitObjCReturnValue(*this, thunk.getDecl(), result, objcResultTy, ownership);
 }
 
-void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
+void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
   SmallVector<SILValue, 2> args;
   auto ownership = emitObjCThunkArguments(*this, getter, args);
-  SILConstant native = getter.asObjC(false);
+  SILDeclRef native = getter.asObjC(false);
   SILType swiftResultTy
     = SGM.getConstantType(native).getFunctionTypeInfo(SGM.M)->getResultType();
   SILType objcResultTy
@@ -1177,10 +1177,10 @@ void SILGenFunction::emitObjCPropertyGetter(SILConstant getter) {
                              ownership);
 }
 
-void SILGenFunction::emitObjCPropertySetter(SILConstant setter) {
+void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   SmallVector<SILValue, 2> args;
   auto ownership = emitObjCThunkArguments(*this, setter, args);
-  SILConstant native = setter.asObjC(false);
+  SILDeclRef native = setter.asObjC(false);
   
   // If the native property is logical, store to the native setter.
   auto *var = cast<VarDecl>(setter.getDecl());

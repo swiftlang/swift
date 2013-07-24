@@ -46,13 +46,13 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   return SelectorFamily::None;
 }
   
-/// Get the ObjC selector family a SILConstant implicitly belongs to.
-static SelectorFamily getSelectorFamily(SILConstant c) {
+/// Get the ObjC selector family a SILDeclRef implicitly belongs to.
+static SelectorFamily getSelectorFamily(SILDeclRef c) {
   switch (c.kind) {
-  case SILConstant::Kind::Func:
+  case SILDeclRef::Kind::Func:
     return getSelectorFamily(c.getDecl()->getName());
 
-  case SILConstant::Kind::Getter:
+  case SILDeclRef::Kind::Getter:
     // Getter selectors can belong to families if their name begins with the
     // wrong thing.
     if (c.getDecl()->isObjC() || c.isObjC)
@@ -61,16 +61,16 @@ static SelectorFamily getSelectorFamily(SILConstant c) {
     SWIFT_FALLTHROUGH;
 
   // Setter selectors shouldn't belong to any family we care about.
-  case SILConstant::Kind::Setter:
+  case SILDeclRef::Kind::Setter:
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
-  case SILConstant::Kind::Allocator:
-  case SILConstant::Kind::Initializer:
+  case SILDeclRef::Kind::Allocator:
+  case SILDeclRef::Kind::Initializer:
   /// These constants don't correspond to method families we care about yet.
-  case SILConstant::Kind::OneOfElement:
-  case SILConstant::Kind::Destroyer:
-  case SILConstant::Kind::GlobalAccessor:
-  case SILConstant::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::OneOfElement:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::GlobalAccessor:
+  case SILDeclRef::Kind::DefaultArgGenerator:
     return SelectorFamily::None;
   }
 }
@@ -89,7 +89,7 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
 }
 
 OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
-                                               SILConstant c,
+                                               SILDeclRef c,
                                                SILType ty) {
   // Native functions use the default Swift convention.
   if (!c.isObjC)
@@ -100,7 +100,7 @@ OwnershipConventions OwnershipConventions::get(SILGenFunction &gen,
   // If we have a clang decl associated with the Swift decl, derive its
   // ownership conventions.
   // FIXME: When we support calling ObjC blocks, we'll need to handle anonymous
-  // SILConstants here too.
+  // SILDeclRefs here too.
   if (auto *decl = c.loc.dyn_cast<ValueDecl*>())
     if (auto *clangDecl = findClangMethod(decl))
       return getForClangDecl(clangDecl, ft);

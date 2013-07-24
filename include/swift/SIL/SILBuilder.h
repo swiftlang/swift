@@ -425,7 +425,7 @@ public:
   }
   
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
-                                     SILConstant Member,
+                                     SILDeclRef Member,
                                      SILType MethodTy,
                                      bool Volatile = false)
   {
@@ -434,7 +434,7 @@ public:
   }
   
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
-                                     SILConstant Member,
+                                     SILDeclRef Member,
                                      SILType MethodTy,
                                      bool Volatile = false)
   {
@@ -444,7 +444,7 @@ public:
   
   ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc,
                                              SILType LookupTy,
-                                             SILConstant Member,
+                                             SILDeclRef Member,
                                              SILType MethodTy,
                                              bool Volatile = false)
   {
@@ -455,7 +455,7 @@ public:
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc,
                                            SILValue Operand,
-                                           SILConstant Member,
+                                           SILDeclRef Member,
                                            SILType MethodTy,
                                            bool Volatile = false) {
     return insert(new (F.getModule())

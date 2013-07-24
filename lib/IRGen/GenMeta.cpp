@@ -1724,7 +1724,7 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
 llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            llvm::Value *base,
                                            SILType baseType,
-                                           SILConstant method,
+                                           SILDeclRef method,
                                            SILType methodType,
                                            ExplosionKind maxExplosion) {
   // TODO: maybe use better versions in the v-table sometimes?

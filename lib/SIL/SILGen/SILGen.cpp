@@ -97,13 +97,13 @@ SILGenModule::~SILGenModule() {
   M.verify();
 }
 
-static SILConstant getBridgingFn(Optional<SILConstant> &cacheSlot,
+static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                                  SILGenModule &SGM,
                                  StringRef moduleName,
                                  StringRef functionName,
                                  std::initializer_list<SILType> inputTypes,
                                  SILType outputType) {
-  SILConstant fn = cacheSlot.cache([&] {
+  SILDeclRef fn = cacheSlot.cache([&] {
     Optional<UnqualifiedLookup> lookup
       = UnqualifiedLookup::forModuleAndName(SGM.M.getASTContext(),
                                             moduleName,
@@ -142,7 +142,7 @@ static SILConstant getBridgingFn(Optional<SILConstant> &cacheSlot,
     }
     // Check that the function takes the expected arguments and returns the
     // expected result type.
-    SILConstant c(fd);
+    SILDeclRef c(fd);
     SILFunctionTypeInfo *funcInfo
       = SGM.getConstantType(c).getFunctionTypeInfo(SGM.M);
     
@@ -190,28 +190,28 @@ static SILType getObjCBoolTy(SILGenModule &SGM) {
   return SGM.getLoweredType(SGM.Types.getObjCBoolType());
 }
 
-SILConstant SILGenModule::getNSStringToStringFn() {
+SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
                        "Foundation", "convertNSStringToString",
                        {getNSStringTy(*this), getByrefStringTy(*this)},
                        Types.getEmptyTupleType());
 }
 
-SILConstant SILGenModule::getStringToNSStringFn() {
+SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
                        "Foundation", "convertStringToNSString",
                        {getByrefStringTy(*this)},
                        getNSStringTy(*this));
 }
 
-SILConstant SILGenModule::getBoolToObjCBoolFn() {
+SILDeclRef SILGenModule::getBoolToObjCBoolFn() {
   return getBridgingFn(BoolToObjCBoolFn, *this,
                        "ObjectiveC", "convertBoolToObjCBool",
                        {getBoolTy(*this)},
                        getObjCBoolTy(*this));
 }
 
-SILConstant SILGenModule::getObjCBoolToBoolFn() {
+SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
   return getBridgingFn(ObjCBoolToBoolFn, *this,
                        "ObjectiveC", "convertObjCBoolToBool",
                        {getObjCBoolTy(*this)},
@@ -227,11 +227,11 @@ SILFunction *SILGenModule::emitTopLevelFunction() {
                              "top_level_code", loweredType);
 }
 
-SILType SILGenModule::getConstantType(SILConstant constant) {
+SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
-SILLinkage SILGenModule::getConstantLinkage(SILConstant constant) {
+SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant) {
   /// Anonymous functions always have internal linkage.
   if (!constant.hasDecl())
     return SILLinkage::Internal;
@@ -253,7 +253,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILConstant constant) {
   return SILLinkage::External;
 }
 
-SILFunction *SILGenModule::getFunction(SILConstant constant) {
+SILFunction *SILGenModule::getFunction(SILDeclRef constant) {
   auto found = emittedFunctions.find(constant);
   if (found != emittedFunctions.end())
     return found->second;
@@ -268,7 +268,7 @@ SILFunction *SILGenModule::getFunction(SILConstant constant) {
   return F;
 }
 
-bool SILGenModule::hasFunction(SILConstant constant) {
+bool SILGenModule::hasFunction(SILDeclRef constant) {
   return emittedFunctions.count(constant);
 }
 
@@ -277,7 +277,7 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
 }
 
 template<typename T>
-SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
+SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode) {
   SILFunction *f = getFunction(constant);
   assert(f->empty() && "already emitted function?!");
 
@@ -299,7 +299,7 @@ SILFunction *SILGenModule::preEmitFunction(SILConstant constant, T *astNode) {
   return f;
 }
 
-void SILGenModule::postEmitFunction(SILConstant constant,
+void SILGenModule::postEmitFunction(SILDeclRef constant,
                                     SILFunction *F) {
   assert(!F->isExternalDeclaration() && "did not emit any function body?!");
   DEBUG(llvm::dbgs() << "lowered sil:\n";
@@ -307,7 +307,7 @@ void SILGenModule::postEmitFunction(SILConstant constant,
   F->verify();
 }
 
-void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
+void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   // Emit any default argument generators.
   {
     auto patterns = fe->getArgParamPatterns();
@@ -319,7 +319,7 @@ void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Ignore prototypes.
   if (fe->getBody() == nullptr) return;
   
-  SILConstant constant(decl);
+  SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, fe);
   bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
   SILGenFunction(*this, *f, hasVoidReturn).emitFunction(fe);
@@ -348,15 +348,15 @@ void SILGenModule::emitFunction(SILConstant::Loc decl, FuncExpr *fe) {
   // Generate the curry thunks.
   unsigned level = constant.uncurryLevel;
   while (level-- > 0) {
-    SILConstant curryConstant = constant.atUncurryLevel(level);
+    SILDeclRef curryConstant = constant.atUncurryLevel(level);
     
     emitCurryThunk(curryConstant, constant, fe);
     constant = curryConstant;
   }
 }
 
-void SILGenModule::emitCurryThunk(SILConstant entryPoint,
-                                  SILConstant nextEntryPoint,
+void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
+                                  SILDeclRef nextEntryPoint,
                                   FuncExpr *fe) {
   SILFunction *f = preEmitFunction(entryPoint, fe);
   bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
@@ -373,7 +373,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Emit any default argument getter functions.
   emitDefaultArgGenerators(decl, decl->getArguments());
 
-  SILConstant constant(decl);
+  SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl);
 
   if (decl->getImplicitThisDecl()->getType()->getClassOrBoundGenericClass()) {
@@ -383,7 +383,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
       .emitClassConstructorAllocator(decl);
     postEmitFunction(constant, f);
     
-    SILConstant initConstant(decl, SILConstant::Kind::Initializer);
+    SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
     SILFunction *initF = preEmitFunction(initConstant, decl);
     SILGenFunction(*this, *initF, /*hasVoidReturn=*/true)
       .emitClassConstructorInitializer(decl);
@@ -397,7 +397,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 }
 
 void SILGenModule::emitClosure(PipeClosureExpr *ce) {
-  SILConstant constant(ce);
+  SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
   bool hasVoidReturn = ce->getResultType()->isVoid();
   SILGenFunction(*this, *f, hasVoidReturn).emitClosure(ce);
@@ -405,7 +405,7 @@ void SILGenModule::emitClosure(PipeClosureExpr *ce) {
 }
 
 void SILGenModule::emitClosure(ClosureExpr *ce) {
-  SILConstant constant(ce);
+  SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/false).emitClosure(ce);
   postEmitFunction(constant, f);
@@ -414,20 +414,20 @@ void SILGenModule::emitClosure(ClosureExpr *ce) {
 void SILGenModule::emitDestructor(ClassDecl *cd,
                                   DestructorDecl /*nullable*/ *dd) {
   // Emit the destroying destructor.
-  SILConstant destroyer(cd, SILConstant::Kind::Destroyer);
+  SILDeclRef destroyer(cd, SILDeclRef::Kind::Destroyer);
   SILFunction *f = preEmitFunction(destroyer, dd);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
 }
 
-void SILGenModule::emitDefaultArgGenerator(SILConstant constant, Expr *arg) {
+void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
   SILFunction *f = preEmitFunction(constant, arg);
   SILGenFunction(*this, *f, /*hasVoidReturn=*/arg->getType()->isVoid())
     .emitGeneratorFunction(constant, arg);
   postEmitFunction(constant, f);
 }
   
-void SILGenModule::emitDefaultArgGenerators(SILConstant::Loc decl,
+void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                             ArrayRef<Pattern*> patterns) {
   unsigned index = 0;
   for (auto pattern : patterns) {
@@ -440,7 +440,7 @@ void SILGenModule::emitDefaultArgGenerators(SILConstant::Loc decl,
 
     for (auto &elt : tuplePattern->getFields()) {
       if (auto handle = elt.getInit()) {
-        emitDefaultArgGenerator(SILConstant::getDefaultArgGenerator(decl,index),
+        emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl,index),
                                 handle->getExpr());
       }
       ++index;
@@ -449,7 +449,7 @@ void SILGenModule::emitDefaultArgGenerators(SILConstant::Loc decl,
 }
 
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
-  SILConstant thunk(method, SILConstant::ConstructAtNaturalUncurryLevel,
+  SILDeclRef thunk(method, SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC*/ true);
   
   // Don't emit the thunk if it already exists.
@@ -462,8 +462,8 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
-  SILConstant getter(prop, SILConstant::Kind::Getter,
-                     SILConstant::ConstructAtNaturalUncurryLevel,
+  SILDeclRef getter(prop, SILDeclRef::Kind::Getter,
+                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
                      
   // Don't emit the thunks if they already exist.
@@ -477,8 +477,8 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
   if (!prop->isSettable())
     return;
 
-  SILConstant setter(prop, SILConstant::Kind::Setter,
-                     SILConstant::ConstructAtNaturalUncurryLevel,
+  SILDeclRef setter(prop, SILDeclRef::Kind::Setter,
+                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
 
   f = preEmitFunction(setter, prop);

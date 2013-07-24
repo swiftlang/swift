@@ -28,7 +28,7 @@ namespace swift {
   class ClassDecl;
   class FuncDecl;
   class NominalTypeDecl;
-  struct SILConstant;
+  struct SILDeclRef;
   class SILType;
   class StructDecl;
   class Substitution;
@@ -149,7 +149,7 @@ namespace irgen {
   llvm::Value *emitVirtualMethodValue(IRGenFunction &IGF,
                                       llvm::Value *base,
                                       SILType baseType,
-                                      SILConstant method,
+                                      SILDeclRef method,
                                       SILType methodType,
                                       Mangle::ExplosionKind maxExplosion);
 

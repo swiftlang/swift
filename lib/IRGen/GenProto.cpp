@@ -31,7 +31,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
-#include "swift/SIL/SILConstant.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallString.h"
@@ -3969,11 +3969,11 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
 void
 irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
-                                SILConstant member,
+                                SILDeclRef member,
                                 Explosion &out) {
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
-  assert(member.kind == SILConstant::Kind::Func
+  assert(member.kind == SILDeclRef::Kind::Func
          && "getters and setters not yet supported");
   ValueDecl *vd = member.getDecl();
   FuncDecl *fn = cast<FuncDecl>(vd);
@@ -4023,7 +4023,7 @@ void
 irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
                                      Address existAddr,
                                      SILType baseTy,
-                                     SILConstant member,
+                                     SILDeclRef member,
                                      Explosion &out) {
   assert(baseTy.isExistentialType());
   assert(!baseTy.isClassExistentialType() &&
@@ -4033,7 +4033,7 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
-  assert(member.kind == SILConstant::Kind::Func
+  assert(member.kind == SILDeclRef::Kind::Func
          && "getters and setters not yet supported");
   ValueDecl *vd = member.getDecl();
   FuncDecl *fn = cast<FuncDecl>(vd);
@@ -4077,7 +4077,7 @@ irgen::emitOpaqueExistentialMetadataAndWitnesses(IRGenFunction &IGF,
 void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
                                          Explosion &in,
                                          SILType baseTy,
-                                         SILConstant member,
+                                         SILDeclRef member,
                                          Explosion &out) {
   assert(baseTy.isClassExistentialType());
 
@@ -4087,7 +4087,7 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
   
   // The function we're going to call.
   // FIXME: Support getters and setters (and curried entry points?)
-  assert(member.kind == SILConstant::Kind::Func
+  assert(member.kind == SILDeclRef::Kind::Func
          && "getters and setters not yet supported");
   ValueDecl *vd = member.getDecl();
   FuncDecl *fn = cast<FuncDecl>(vd);
