@@ -146,23 +146,23 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
     // Checked Conversions
     ABSTRACT_VALUE(CheckedConversionInst, ConversionInst)
-      INST(SuperToArchetypeRefInst, CheckedConversionInst)
       INST(DowncastInst, CheckedConversionInst)
-      INST(DowncastArchetypeAddrInst, CheckedConversionInst)
+      INST(SuperToArchetypeRefInst, CheckedConversionInst)
       INST(DowncastArchetypeRefInst, CheckedConversionInst)
+      INST(DowncastArchetypeAddrInst, CheckedConversionInst)
       INST(ProjectDowncastExistentialAddrInst, CheckedConversionInst)
       INST(DowncastExistentialRefInst, CheckedConversionInst)
       VALUE_RANGE(CheckedConversionInst, SuperToArchetypeRefInst, DowncastExistentialRefInst)
     VALUE_RANGE(ConversionInst, ConvertFunctionInst, DowncastExistentialRefInst)
   INST(IsNonnullInst, SILInstruction)
 
-  // Array indexing instructions.
+  // Array Indexing
   ABSTRACT_VALUE(IndexingInst, SILInstruction)
     INST(IndexAddrInst, IndexingInst)
     INST(IndexRawPointerInst, IndexingInst)
     VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
-  // Terminators.
+  // Terminators
   ABSTRACT_VALUE(TermInst, SILInstruction)
     INST(UnreachableInst, TermInst)
     INST(ReturnInst, TermInst)

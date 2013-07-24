@@ -792,7 +792,7 @@ class_method
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
-instance.
+instance. The reference must not be null.
 
 super_method
 ````````````
@@ -810,6 +810,7 @@ super_method
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
 dispatched, so this instruction is only valid for Objective-C methods.
+The class reference must not be null.
 
 archetype_method
 ````````````````
@@ -1033,6 +1034,7 @@ class_metatype
   // %1 will be of type $T.metatype and reference the runtime metatype of %0
 
 Obtains a reference to the dynamic metatype of the class instance ``%0``.
+The class instance reference must not be null.
 
 archetype_metatype
 ``````````````````
@@ -1189,7 +1191,7 @@ ref_element_addr
   //   of C
 
 Given an instance of a class, derives the address of a physical instance
-variable inside the instance.
+variable inside the instance. The class reference must not be null.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1580,51 +1582,136 @@ thin_to_thick_function
 Converts a thin function value, that is, a bare function pointer with no
 context information, into a thick function value with empty context.
 
-TODO To Be Updated
-~~~~~~~~~~~~~~~~~~
+Checked Conversions
+~~~~~~~~~~~~~~~~~~~
 
-super_to_archetype_ref
-``````````````````````
-::
+These instructions represent user-level cast operations that can fail and thus
+require runtime checking. All of these instructions take a flag to indicate
+the desired behavior of the runtime check::
 
-  super_to_archetype %0 to %1
-  ; %0 must be of a reference type $T
-  ; %1 must be the address of an archetype $*U with base class constraint U : B
-  ;   where B is T or a subclass of T
+  sil-checked-conversion-mode ::= 'conditional'
+  sil-checked-conversion-mode ::= 'unconditional'
 
-Performs a checked downcast operation on the class instance referenced by
-``%0``, initializing the archetype referenced by ``%1`` with a reference to
-the class instance if the check succeeds.
-
-FIXME: if it fails...
+- ``conditional`` causes the conversion to return a null address or reference
+  if the cast fails. The success of the conversion be tested with
+  the ``is_nonnull`` instruction.
+- ``unconditional`` requires the conversion to succeed. It is a runtime failure
+  if the cast fails.
 
 downcast
 ````````
 ::
 
-  %1 = downcast %0, $T
-  ; %0 must be of a reference type that is a subclass of $T
-  ; $T must be a class type
-  ; %1 will be of type T
+  sil-instruction ::= 'downcast' sil-checked-conversion-mode 
+                        sil-operand 'to' sil-type
 
-Performs a checked downcast conversion of ``%0`` to subclass ``T``.
+  %1 = downcast conditional conditional %0 : $B to $D
+  // %0 must be of a class type $B that is a superclass of $D
+  // $D must be a class type
+  // %1 will be of type $D
 
-FIXME: if it fails...
+Performs a checked downcast conversion of class instance reference ``%0`` to
+a subclass ``D`` of its current static type.
 
-downcast_archetype_addr
-```````````````````````
+super_to_archetype_ref
+``````````````````````
+::
+
+  sil-instruction :: 'super_to_archetype_ref' sil-checked-conversion-mode
+                       sil-operand 'to' sil-type
+
+  %1 = super_to_archetype_ref conditional %0 : $B to $T
+  // %0 must be of a class type $B that is the superclass constraint of
+  //  archetype $T (or a superclass of its superclass)
+  // %1 will be of type $T
+
+Performs a checked downcast operation on the class instance reference ``%0``
+to an archetype ``T`` constrained by the class type.
 
 downcast_archetype_ref
 ``````````````````````
+::
+
+  sil-instruction :: 'downcast_archetype_ref' sil-checked-conversion-mode
+                       sil-operand 'to' sil-type
+
+  %1 = downcast_archetype_ref conditional %0 : $T to $A
+  // %0 must be of a class archetype $T
+  // $A must be a concrete class type or another class archetype
+  // %1 will be of type $A
+
+Performs a checked conversion of a class instance from a class archetype to a
+concrete class type or to another archetype.
+
+downcast_archetype_addr
+```````````````````````
+::
+
+  sil-instruction :: 'downcast_archetype_addr' sil-checked-conversion-mode
+                       sil-operand 'to' sil-type
+
+  %1 = downcast_archetype_ref conditional %0 : $*T to $*A
+  // %0 must be the address of an archetype $*T
+  // $*A must the address of a concrete type or of another archetype
+  // %1 will be of type $*A
+
+Performs a checked conversion of an address from an archetype to a concrete
+class type or to another archetype.
 
 project_downcast_existential_addr
 `````````````````````````````````
+::
+
+  sil-instruction ::= 'project_downcast_existential_addr'
+                        sil-checked-conversion-mode
+                        sil-operand 'to' sil-type
+
+  %1 = project_downcast_existential_addr conditional %0 : $*P to $*A
+  // %0 must be the address of an opaque existential container $*P
+  // $*A must the address of a concrete type or archetype
+  // %1 will be of type $*A
+
+Performs a checked conversion on the value inside of an opaque existential
+container. If the conversion succeeds, the address of the contained value is
+projected out of the existential container.
 
 downcast_existential_ref
 ````````````````````````
+::
+
+  sil-instruction ::= 'downcast_existential_ref' sil-checked-conversion-mode
+                        sil-operand 'to' sil-type
+
+  %1 = downcast_existential_ref conditional %0 : $P to $C
+  // %0 must be a class existential container value of type $P
+  // $C must be a concrete class type or class archetype
+  // %1 will be of type $C
+
+Performs a checked conversion on the class instance reference inside of a
+class existential container. If the conversion succeeds, the contained
+class instance is returned.
 
 is_nonnull
 ``````````
+::
+
+  sil-instruction ::= 'is_nonnull' sil-operand
+
+  %1 = is_nonnull %0 : $C
+  %1 = is_nonnull %0 : $*T
+  // %0 must be of reference type $C or of address type $*T
+  // %1 will be of type swift.Bool
+
+TODO: The instruction should produce a Builtin.i1 and we should emit a
+conversion to swift.Bool when needed.
+
+Checks whether a reference type or address value is null, returning true if
+the value is not null, or false if it is null.
+
+Array Indexing
+~~~~~~~~~~~~~~
+
+TODO
 
 index_addr
 ``````````
