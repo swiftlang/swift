@@ -380,6 +380,28 @@ of ``[noreturn]`` functions. An ``unreachable`` instruction that survives
 guaranteed DCE and is not dominated by a ``[noreturn]`` application is a
 dataflow error.
 
+Runtime Failure
+---------------
+
+Some operations, such as failed unconditional `Checked Casts`_ or the
+``Builtin.trap`` compiler builtin, cause a *runtime failure*, which
+unconditionally terminates the current actor. If it can be proven that a
+runtime failure will occur or did occur, runtime failures may be reordered so
+long as they remain well-ordered relative to operations external to the actor
+or the program as a whole. For instance, with overflow checking on integer
+arithmetic enabled, a simple ``for`` loop that reads inputs in from one or more
+arrays and writes outputs to another array, all local
+to the current actor, may cause runtime failure in the update operations::
+
+  // Given unknown start and end values, this loop may overflow
+  for var i = unknownStartValue; i != unknownEndValue; ++i {
+    ...
+  }
+
+It is permitted to hoist the overflow check and associated runtime failure out
+of the loop itself and check the bounds of the loop prior to entering it, so
+long as the loop body has no observable effect outside of the current actor.
+
 Instruction Set
 ---------------
 
