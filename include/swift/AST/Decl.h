@@ -841,10 +841,6 @@ public:
 /// makes it easier to distinguish between local top-level variables (which
 /// are not live past the end of the statement) and global variables.
 class TopLevelCodeDecl : public Decl, public DeclContext {
-public:
-  typedef llvm::PointerUnion<Expr*, Stmt*> ExprOrStmt;
-
-private:
   BraceStmt *Body;
 
 public:
