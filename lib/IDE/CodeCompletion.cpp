@@ -31,7 +31,7 @@ std::string swift::code_completion::removeCodeCompletionTokens(
     if (C == '#' && Ptr <= End - Token.size() &&
         StringRef(Ptr, Token.size()) == Token) {
       Ptr += Token.size() - 1;
-      *CompletionOffset = CleanFile.size() + 1;
+      *CompletionOffset = CleanFile.size();
       continue;
     }
     if (C == '#' && Ptr <= End - 2 && Ptr[1] == '^') {

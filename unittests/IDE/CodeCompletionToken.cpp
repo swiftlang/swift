@@ -32,7 +32,7 @@ TEST(CodeCompletionToken, FindBegin) {
   std::string Source = "#^A^# func";
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
-  EXPECT_EQ(1U, Offset);
+  EXPECT_EQ(0U, Offset);
   EXPECT_EQ(" func", Clean);
 }
 
@@ -40,7 +40,7 @@ TEST(CodeCompletionToken, FindEnd) {
   std::string Source = "func #^A^#";
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
-  EXPECT_EQ(6U, Offset);
+  EXPECT_EQ(5U, Offset);
   EXPECT_EQ("func ", Clean);
 }
 
@@ -48,7 +48,7 @@ TEST(CodeCompletionToken, FindSingleLine) {
   std::string Source = "func zzz() {#^A^#}";
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
-  EXPECT_EQ(13U, Offset);
+  EXPECT_EQ(12U, Offset);
   EXPECT_EQ("func zzz() {}", Clean);
 }
 
@@ -59,7 +59,7 @@ TEST(CodeCompletionToken, FindMultiline) {
       "}\n";
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
-  EXPECT_EQ(20U, Offset);
+  EXPECT_EQ(19U, Offset);
   EXPECT_EQ("func zzz() {\n  1 + \r\n}\n", Clean);
 }
 
