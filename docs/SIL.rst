@@ -276,6 +276,8 @@ Basic Blocks
 
   sil-basic-block ::= sil-label sil-instruction-def* sil-terminator-def
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
+  sil-argument ::= sil-value ':' sil-type
+
   sil-instruction-def ::= sil-value '=' sil-instruction
   sil-terminator-def ::= sil-value '=' sil-terminator
 
