@@ -1799,6 +1799,10 @@ public:
   /// Returns the location of the 'func' keyword.
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
+  /// Returns true if the function has a body written in the source file.
+  ///
+  /// Note that a true return value does not imply that the body was actually
+  /// parsed.
   bool hasBody() const {
     return getBodyKind() != BodyKind::None;
   }
