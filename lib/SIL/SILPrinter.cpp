@@ -354,12 +354,12 @@ public:
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref @" << BFI->getFunction()->getName()
+    OS << "builtin_function_ref #" << BFI->getFunction()->getName()
        << " : " << BFI->getType();
   }
   
   void visitGlobalAddrInst(GlobalAddrInst *GAI) {
-    OS << "global_addr @" << GAI->getGlobal()->getName()
+    OS << "global_addr #" << GAI->getGlobal()->getName()
        << " : " << GAI->getType();
   }
 
@@ -545,15 +545,15 @@ public:
        << EI->getFieldNo();
   }
   void visitStructExtractInst(StructExtractInst *EI) {
-    OS << "struct_extract " << getIDAndType(EI->getOperand()) << ", @"
+    OS << "struct_extract " << getIDAndType(EI->getOperand()) << ", #"
        << EI->getField()->getName().get();
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
-    OS << "struct_element_addr " << getIDAndType(EI->getOperand()) << ", @"
+    OS << "struct_element_addr " << getIDAndType(EI->getOperand()) << ", #"
     << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", @"
+    OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #"
        << EI->getField()->getName().get();
   }
   
@@ -633,7 +633,7 @@ public:
     OS << "metatype " << MI->getType();
   }
   void visitModuleInst(ModuleInst *MI) {
-    OS << "module @" << MI->getType().castTo<ModuleType>()->getModule()->Name;
+    OS << "module #" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
   void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
     OS << "associated_metatype " << getIDAndType(MI->getOperand())

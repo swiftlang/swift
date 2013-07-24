@@ -1464,8 +1464,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseToken(tok::sil_at_sign, diag::expected_tok_in_sil_instr, "@") ||
-        P.parseIdentifier(ElemId, NameLoc, diag::sil_struct_inst_wrong_field))
+        P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
+        P.parseIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
       return true;
     ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
                                      ElemId);
@@ -1496,8 +1496,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseToken(tok::sil_at_sign, diag::expected_tok_in_sil_instr, "@") ||
-        P.parseIdentifier(ElemId, NameLoc, diag::sil_ref_inst_wrong_field))
+        P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
+        P.parseIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
       return true;
     ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
                                      ElemId);
@@ -1542,7 +1542,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::GlobalAddrInst: {
     Identifier GlobalName;
     SILType Ty;
-    if (parseGlobalName(GlobalName) ||
+    if (P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
+        P.parseIdentifier(GlobalName, diag::expected_sil_constant) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
       return true;

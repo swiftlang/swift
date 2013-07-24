@@ -316,14 +316,14 @@ bb0(%0 : $Aleph.metatype):
   // CHECK: initialize_var [no_default_construct]
   %3 = initialize_var [no_default_construct] %2#1 : $*Aleph
   %4 = builtin_zero $Ref      // CHECK: builtin_zero $Ref
-  // CHECK: struct_element_addr {{.*}} : $*Aleph, @a
-  %5 = struct_element_addr %2#1 : $*Aleph, @a
+  // CHECK: struct_element_addr {{.*}} : $*Aleph, #a
+  %5 = struct_element_addr %2#1 : $*Aleph, #a
   %6 = load %5 : $*Ref
   %7 = store %4 to %5 : $*Ref
   %8 = release %6 : $Ref
   %14 = load %2#1 : $*Aleph
-  // CHECK: struct_extract {{%.*}} : $Aleph, @a
-  %15 = struct_extract %14 : $Aleph, @a
+  // CHECK: struct_extract {{%.*}} : $Aleph, #a
+  %15 = struct_extract %14 : $Aleph, #a
   %16 = retain %15 : $Ref
   %17 = release %2#0 : $Builtin.ObjectPointer
   %18 = return %14 : $Aleph
@@ -376,8 +376,8 @@ bb0(%0 : $Int64, %1 : $M):
   %6 = load %2#1 : $*Int64  // CHECK: load {{.*}} : $*Int64
   %7 = load %4#1 : $*M      // CHECK: load {{.*}} : $*M
   %8 = retain %7 : $M
-  // CHECK: ref_element_addr {{%.*}} : $M, @member
-  %9 = ref_element_addr %7 : $M, @member
+  // CHECK: ref_element_addr {{%.*}} : $M, #member
+  %9 = ref_element_addr %7 : $M, #member
   %10 = store %6 to %9 : $*Int64
   %11 = release %7 : $M
   %12 = tuple ()
@@ -428,8 +428,8 @@ bb0:
   %14 = apply %8(%11, %12, %13, %9) : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
   %15 = store %14 to %7 : $*String
   %16 = load %7 : $*String                        // CHECK: load {{%.*}} : $*String
-  %17 = struct_extract %16 : $String, @str_value  // CHECK: struct_extract
-  %18 = struct_extract %17 : $StringByteData, @owner // CHECK: struct_extract
+  %17 = struct_extract %16 : $String, #str_value  // CHECK: struct_extract
+  %18 = struct_extract %17 : $StringByteData, #owner // CHECK: struct_extract
   %19 = release %18 : $Builtin.ObjectPointer
   %20 = dealloc_stack %7 : $*String
   %21 = dealloc_stack %1 : $*Float64
@@ -443,7 +443,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Int64):
   %3 = alloc_box $Builtin.Int64                   // CHECK: alloc_box
   %4 = store %0 to %2#1 : $*Builtin.RawPointer
   %5 = store %1 to %3#1 : $*Builtin.Int64
-  // %6 = module @Builtin
+  // %6 = module #Builtin
   %7 = load %2#1 : $*Builtin.RawPointer           // CHECK: load
   %8 = load %3#1 : $*Builtin.Int64                // CHECK: load
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Int64
@@ -459,8 +459,8 @@ sil @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
 // CHECK: $() -> ()
 sil internal @global_code : $() -> () {
 bb0:
-  // CHECK: global_addr @x : $*Int64
-  %0 = global_addr @x : $*Int64
+  // CHECK: global_addr #x : $*Int64
+  %0 = global_addr #x : $*Int64
   %1 = function_ref @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %2 = metatype $Int64.metatype
   %3 = integer_literal $Builtin.Int128, 0         // CHECK: integer_literal
