@@ -159,6 +159,7 @@ APInt IntegerLiteralExpr::getValue(StringRef Text,
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
+  assert(!getType()->is<ErrorType>() && "Should have a valid type");
   return getValue(getText(),
                   getType()->castTo<BuiltinIntegerType>()->getBitWidth());
 }

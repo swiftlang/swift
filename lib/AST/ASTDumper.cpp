@@ -725,7 +725,8 @@ public:
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr") << " value=";
-    if (E->getType().isNull() || E->getType()->hasTypeVariable())
+    Type T = E->getType();
+    if (T.isNull() || T->is<ErrorType>() || T->hasTypeVariable())
       OS << E->getText();
     else
       OS << E->getValue();
