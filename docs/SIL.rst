@@ -591,6 +591,38 @@ except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
 
+index_addr
+``````````
+::
+
+  sil-instruction ::= 'index_addr' sil-operand ',' sil-operand
+
+  %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
+  ; %0 must be of an address type $*T
+  ; %1 must be of a builtin integer type
+  ; %2 will be of type $*T
+
+Given an address that references into an array of values, returns the address
+of the ``%1``-th element relative to ``%0``. The address must reference into
+a contiguous array, produced by ``alloc_array`` or by an external function. It
+is invalid to try to reference offsets within a value, such as within a
+struct or tuple type, using ``index_addr``. (Byte types have no special behavior
+in this regard, unlike ``char*`` in C.)
+
+index_raw_pointer
+`````````````````
+::
+
+  sil-instruction ::= 'index_raw_pointer' sil-operand ',' sil-operand
+
+  %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
+  ; %0 must be of $Builtin.RawPointer type
+  ; %1 must be of a builtin integer type
+  ; %2 will be of type $*T
+
+Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
+byte offset ``%1`` relative to ``%0``.
+
 Reference Counting
 ~~~~~~~~~~~~~~~~~~
 
@@ -1708,31 +1740,12 @@ conversion to swift.Bool when needed.
 Checks whether a reference type or address value is null, returning true if
 the value is not null, or false if it is null.
 
-Array Indexing
-~~~~~~~~~~~~~~
-
-TODO
-
-index_addr
-``````````
-::
-
-  %2 = index_addr %0, %1
-  ; %0 must be of a $*T type
-  ; %1 must be of a builtin integer type
-  ; %2 will be of the same $*T type as %0
-
-Given a pointer into an array of values, returns the address of the
-``%1``-th element relative to ``%0``.
-
-index_raw_pointer
-`````````````````
-
 Terminators
 ~~~~~~~~~~~
 
 These instructions terminate a basic block. Every basic block must end
-with a terminator.
+with a terminator. Terminators may only appear as the final instruction of
+a basic block.
 
 unreachable
 ```````````

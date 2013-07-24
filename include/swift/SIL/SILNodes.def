@@ -67,6 +67,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(InitializeVarInst, SILInstruction)
   INST(CopyAddrInst, SILInstruction)
   INST(DestroyAddrInst, SILInstruction)
+  ABSTRACT_VALUE(IndexingInst, SILInstruction)
+    INST(IndexAddrInst, IndexingInst)
+    INST(IndexRawPointerInst, IndexingInst)
+    VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
@@ -155,12 +159,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
       VALUE_RANGE(CheckedConversionInst, SuperToArchetypeRefInst, DowncastExistentialRefInst)
     VALUE_RANGE(ConversionInst, ConvertFunctionInst, DowncastExistentialRefInst)
   INST(IsNonnullInst, SILInstruction)
-
-  // Array Indexing
-  ABSTRACT_VALUE(IndexingInst, SILInstruction)
-    INST(IndexAddrInst, IndexingInst)
-    INST(IndexRawPointerInst, IndexingInst)
-    VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
   // Terminators
   ABSTRACT_VALUE(TermInst, SILInstruction)
