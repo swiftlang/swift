@@ -257,9 +257,9 @@ to multiple-value instructions choose the value by following the ``%name`` with
   // value address %box#1
   %box = alloc_box $Int64
   // Refer to the refcounted pointer
-  %1 = retain %box#0
+  %1 = retain %box#0 : $Builtin.ObjectPointer
   // Refer to the address
-  store %box#1, %value
+  store %value : $Int64 to %box#1 : $*Int64
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -500,18 +500,20 @@ alloc_box
 
   %1 = alloc_box $T
   // %1 has two values:
-  //   %1#0 has type Builtin.ObjectPointer
-  //   %1#1 has type *T
+  //   %1#0 has type $Builtin.ObjectPointer
+  //   %1#1 has type $*T
 
 Allocates a reference-counted "box" on the heap large enough to hold a value of
 type ``T``. The result of the instruction is a two-value operand;
 the first value is the reference-counted ``ObjectPointer`` that owns the box,
 and the second value is the address of the value inside the box.
+
 The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
-count of zero destroys the contained value as if by ``destroy_addr``. Releasing
-a box is thus invalid if the box's value is uninitialized. To deallocate a box
-whose value has not been initialized, ``dealloc_ref`` should be used.
+count of zero destroys the contained value as if by ``destroy_addr``.
+Releasing a box is undefined behavior if the box's value is uninitialized.
+To deallocate a box whose value has not been initialized, ``dealloc_ref``
+should be used.
 
 alloc_array
 ```````````
@@ -1276,12 +1278,11 @@ tuple
 
 Creates a loadable tuple value by aggregating multiple loadable values.
 
-If the
-destination type is a "simple" tuple type, that is, it has no keyword argument
-labels or variadic arguments, then the first notation can be used, which
-interleaves the element values and types. If keyword names or variadic fields
-are specified, then the second notation must be used, which spells out the
-tuple type before the fields.
+If the destination type is a "simple" tuple type, that is, it has no keyword
+argument labels or variadic arguments, then the first notation can be used,
+which interleaves the element values and types. If keyword names or variadic
+fields are specified, then the second notation must be used, which spells out
+the tuple type before the fields.
 
 tuple_extract
 `````````````
@@ -1707,7 +1708,17 @@ convert_function
 Performs a conversion of the function ``%0`` to type ``T``, which must be ABI-
 compatible with the type of ``%0``. Function types are ABI-compatible if their
 input and result types are tuple types that, after destructuring, differ only
-in label names or default values.
+in the following ways:
+
+- Corresponding tuple elements may add, remove, or change keyword names.
+  ``(a:Int, b:Float, Char) -> ()`` and ``(x:Int, Float, z:Char) -> ()`` are
+  ABI compatible.
+- A class tuple element of the destination type may be a superclass of the
+  source type's corresponding tuple element.
+
+The function types may also differ in ``[auto_closure]`` attributes. A
+``[noreturn]`` function may additionally be converted to a non-``[noreturn]``
+type.
 
 convert_cc
 ``````````
