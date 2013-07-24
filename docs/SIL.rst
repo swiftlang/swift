@@ -149,10 +149,32 @@ type grammar. SIL adds some additional kinds of type of its own:
   value of any reference or value type ``$T``.  This can be an internal pointer
   into a data structure. Addresses of loadable types can be loaded and stored
   to access values of those types.
+
   Addresses of address-only types (see below) can only be used with
   instructions that manipulate their operands indirectly by address, such
   as ``copy_addr``, ``destroy_addr``, and ``dealloc_var``, or as arguments
-  to functions. Addresses cannot be retained or released.
+  to functions.
+  
+  Addresses are not reference-counted pointers like class values are. They
+  cannot be retained or released.
+  
+  The address of an address cannot be taken. Values of address type
+  thus cannot be allocated, loaded, or stored
+  (though addresses can of course be loaded from and stored to).
+
+  If a function takes address arguments, those addresses are assumed to be
+  non-aliasing. A function may not capture an address, that is, it may not
+  store the address value in a location that survives the duration of a
+  function call. (Although addresses cannot directly be stored, they can be
+  cast to ``Builtin.RawPointer`` values using the ``address_to_pointer``
+  instruction, which could be stored.) In LLVM terms, all address arguments are
+  ``noalias nocapture``. It is undefined behavior for two address arguments to
+  alias or for a captured address value to be dereferenced.
+  
+  Functions cannot return an address. If an address-only
+  value needs to be returned, it is done so using an indirect return argument
+  according to the `calling convention`_ of the function.
+
 - Values of *generic function type* such as
   ``$<T...> (A...) -> R`` can be expressed in SIL.  Accessing a generic
   function with ``function_ref`` will give a value of a generic function type.
