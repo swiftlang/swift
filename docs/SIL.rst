@@ -383,7 +383,7 @@ dataflow error.
 Runtime Failure
 ---------------
 
-Some operations, such as failed unconditional `Checked Casts`_ or the
+Some operations, such as failed unconditional `checked conversions`_ or the
 ``Builtin.trap`` compiler builtin, cause a *runtime failure*, which
 unconditionally terminates the current actor. If it can be proven that a
 runtime failure will occur or did occur, runtime failures may be reordered so
