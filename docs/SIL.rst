@@ -345,8 +345,40 @@ Methods and curried function definitions in Swift also have multiple "uncurry
 levels" in SIL, representing the function at each possible partial application
 level.
 
-Functions may also have multiple entry points for foreign language interop which
+Methods may also have multiple entry points for foreign language interop which
 can be discriminated. Currently ``objc`` is the only such discriminator.
+
+Dataflow Errors
+---------------
+
+*Dataflow errors* may exist in raw SIL. Swift's semantics defines these
+conditions as errors, so they must be diagnosed by diagnostic
+passes and must not exist in canonical SIL.
+
+Definitive Initialization
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Swift requires that all local variables be initialized before use. In
+constructors, all instance variables of a struct, oneof, or class value must
+be initialized before the object is used and before the constructor is returned
+from.
+
+Memory locations that require definitive initialization are currently modeled
+using the `initialize_var`_ instruction. See the discussion below for more
+details. ``initialize_var`` instructions that cannot be eliminated are dataflow
+errors.
+
+Unreachable Control Flow
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``unreachable`` terminator is emitted in raw SIL to mark incorrect control
+flow, such as a non-``Void`` function failing to ``return`` a value, or a
+``switch`` statement failing to cover all possible values of its subject.
+The guaranteed dead code elimination pass can eliminate truly unreachable
+basic blocks, or ``unreachable`` instructions may be dominated by applications
+of ``[noreturn]`` functions. An ``unreachable`` instruction that survives
+guaranteed DCE and is not dominated by a ``[noreturn]`` application is a
+dataflow error.
 
 Instruction Set
 ---------------
