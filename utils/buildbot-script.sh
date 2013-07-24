@@ -163,11 +163,11 @@ component.
 
 === RECENT CHANGES ===
 
-* Debugger support. Swift has a "-g" command line swith that turns on
+* Debugger support. Swift has a "-g" command line switch that turns on
   debug info for the compiled output. Using the standard lldb debugger
   this will allow single-stepping through Swift programs, printing
   backtraces, and navigating through stack frames; all in sync with
-  the corresponing Swift source code. An unmodified lldb cannot
+  the corresponding Swift source code. An unmodified lldb cannot
   inspect any variables.
 
   Example session:
