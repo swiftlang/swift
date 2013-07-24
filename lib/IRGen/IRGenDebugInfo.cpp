@@ -84,17 +84,16 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
     Dir = getCurrentDirname();
   } else {
     // Separate path and filename.
-    llvm::SmallString<64>  File = llvm::sys::path::filename(MainFilename);
+    Filename = BumpAllocatedString(llvm::sys::path::filename(MainFilename),
+                                   DebugInfoNames);
     llvm::SmallString<512> Path(MainFilename);
     llvm::sys::path::remove_filename(Path);
     llvm::sys::fs::make_absolute(Path);
-    Filename = BumpAllocatedString(File, DebugInfoNames);
     Dir = BumpAllocatedString(Path, DebugInfoNames);
   }
   // The fallback file.
-
-  llvm::SmallString<512> MainFileBuf;
-  llvm::sys::path::append(MainFileBuf, Dir, Filename);
+  llvm::SmallString<512> MainFileBuf(Dir);
+  llvm::sys::path::append(MainFileBuf, Filename);
   MainFile = getOrCreateFile(MainFileBuf.c_str());
 
   unsigned Lang = DW_LANG_Swift;
@@ -235,7 +234,8 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   }
 
   // Create a new one.
-  llvm::SmallString<64>  File = llvm::sys::path::filename(Filename);
+  StringRef File = BumpAllocatedString(llvm::sys::path::filename(Filename),
+                                       DebugInfoNames);
   llvm::SmallString<512> Path(Filename);
   llvm::sys::path::remove_filename(Path);
   llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
@@ -243,8 +243,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   assert(ec == llvm::errc::success);
   (void)ec; // Silence the unused variable warning
   llvm::DIFile F =
-    DBuilder.createFile(BumpAllocatedString(File, DebugInfoNames),
-                        BumpAllocatedString(Path, DebugInfoNames));
+    DBuilder.createFile(File, BumpAllocatedString(Path, DebugInfoNames));
 
   // Cache it.
   DIFileCache[Filename] = F;
