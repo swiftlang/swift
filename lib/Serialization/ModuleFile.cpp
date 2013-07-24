@@ -458,11 +458,16 @@ MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs,
 ///
 /// \sa processConformances
 template <typename T>
-ProtocolConformance *processConformance(ASTContext &ctx, T *decl, CanType canTy,
+ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
                                         ProtocolDecl *proto,
                                         ProtocolConformance *conformance) {
   if (!conformance)
     return nullptr;
+
+  for (auto &inherited : conformance->InheritedMapping) {
+    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
+                                          inherited.second);
+  }
 
   auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
 
@@ -473,12 +478,8 @@ ProtocolConformance *processConformance(ASTContext &ctx, T *decl, CanType canTy,
     conformanceRecord = conformance;
   }
 
-  ctx.recordConformance(proto, decl);
-
-  for (auto &inherited : conformance->InheritedMapping) {
-    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
-                                          inherited.second);
-  }
+  if (decl)
+    ctx.recordConformance(proto, decl);
 
   return conformance;
 }
@@ -1830,16 +1831,26 @@ Type ModuleFile::getType(TypeID TID) {
                                                               archetypeID,
                                                               replacementID);
 
-      SmallVector<ProtocolConformance *, 16> conformanceBuf;
-      while (auto conformance = maybeReadConformance())
-        conformanceBuf.push_back(conformance.getValue().second);
-
+      ArchetypeType *archetypeTy;
+      Type replacementTy;
       {
         BCOffsetRAII restoreOffset(DeclTypeCursor);
-        substitutions.push_back({getType(archetypeID)->castTo<ArchetypeType>(),
-                                 getType(replacementID),
-                                 ctx.AllocateCopy(conformanceBuf)});
+        archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
+        replacementTy = getType(replacementID);
       }
+
+      CanType canReplTy = replacementTy->getCanonicalType();
+
+      SmallVector<ProtocolConformance *, 16> conformanceBuf;
+      while (auto conformancePair = maybeReadConformance()) {
+        auto conformance = processConformance(ctx, nullptr, canReplTy,
+                                              conformancePair->first,
+                                              conformancePair->second);
+        conformanceBuf.push_back(conformance);
+      }
+
+      substitutions.push_back({archetypeTy, replacementTy,
+                               ctx.AllocateCopy(conformanceBuf)});
     }
 
     boundTy->setSubstitutions(ctx.AllocateCopy(substitutions));
