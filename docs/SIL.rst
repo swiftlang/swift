@@ -238,9 +238,8 @@ Some additional meaningful categories of type:
   ``release``-d. Reference types also have *ownership semantics* for their
   referenced heap object; see `Reference Counting`_ below.
 
-Swift types may not translate one-to-one to SIL types. In particular, function
-types are canonicalized and transformed in order to encode additional
-attributes:
+SILGen does not always map Swift function types one-to-one to SIL function
+types. Function types are transformed in order to encode additional attributes:
 
 - The calling convention of the function, indicated by the ``[cc(convention)]``
   attribute, where ``convention`` can currently be ``swift``, ``method``,
