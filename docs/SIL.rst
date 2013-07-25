@@ -248,20 +248,13 @@ Values and Operands
 ::
 
   sil-identifier ::= [A-Za-z_0-9]+
-  sil-value ::= '%' sil-identifier
-  sil-operand ::= sil-value ('#' [0-9]+)? ':' sil-type
+  sil-value-name ::= '%' sil-identifier
+  sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-operand ::= sil-value ':' sil-type
 
 SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
-argument that produces the value. When used as an operand, the reference
-is always followed by a ``:`` and the SIL type of the value. For example::
-
-  // Produce a function and integer value with builtin and integer_literal
-  %negate = builtin_function_ref #Builtin.neg_Int64
-  %five = integer_literal 5 : $Builtin.Int64
-  // Use the values as operands
-  %neg_five = apply %negate(%five) : (Builtin.Int64) -> Builtin.Int64
-
+argument that produces the value.
 In SIL, a single instruction may produce multiple values. Operands that refer
 to multiple-value instructions choose the value by following the ``%name`` with
 ``#`` and the index of the value. For example::
@@ -316,9 +309,9 @@ Basic Blocks
 
   sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
-  sil-argument ::= sil-value ':' sil-type
+  sil-argument ::= sil-value-name ':' sil-type
 
-  sil-instruction-def ::= (sil-value '=')? sil-instruction
+  sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 
 A function body consists of one or more basic blocks. These form the nodes of
 the control flow graph. Each basic block contains one or more instructions and
