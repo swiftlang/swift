@@ -14,7 +14,7 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "swift/SIL/demangle.h"
+#include "swift/SIL/Demangle.h"
 
 #include "llvm/Support/raw_ostream.h"
 
