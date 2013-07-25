@@ -341,12 +341,12 @@ phi nodes. Basic block arguments are bound by the branch from the predecessor
 block::
 
   sil @iif : $(Builtin.Int1, Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
-  bb0(%cond : $Builtin.Int1, %then : $Builtin.Int64, %else : $Builtin.Int64):
+  bb0(%cond : $Builtin.Int1, %ifTrue : $Builtin.Int64, %ifFalse : $Builtin.Int64):
     condbranch %cond : $Builtin.Int1, then, else
   then:
-    br finish(%then : $Builtin.Int64)
+    br finish(%ifTrue : $Builtin.Int64)
   else:
-    br finish(%else : $Builtin.Int64)
+    br finish(%ifFalse : $Builtin.Int64)
   finish(%result : $Builtin.Int64):
     return %result : $Builtin.Int64
   }
