@@ -561,12 +561,12 @@ public:
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     DEBUG(llvm::dbgs() << "verifying";
           AMI->print(llvm::dbgs()));
-    FunctionType *methodType = AMI->getType(0).getAs<FunctionType>();
+    AnyFunctionType *methodType = AMI->getType(0).getAs<AnyFunctionType>();
     DEBUG(llvm::dbgs() << "method type ";
           methodType->print(llvm::dbgs());
           llvm::dbgs() << "\n");
     require(methodType,
-            "result method must be of a concrete function type");
+            "result method must be a function type");
     require(methodType->isThin()
               == AMI->getLookupArchetype().castTo<ArchetypeType>()
                   ->requiresClass(),
@@ -595,9 +595,9 @@ public:
   }
   
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
-    FunctionType *methodType = EMI->getType(0).getAs<FunctionType>();
+    AnyFunctionType *methodType = EMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
-            "result method must be of a concrete function type");
+            "result method must be a function type");
     SILType operandType = EMI->getOperand().getType();
     require(methodType->isThin()
               == operandType.isClassExistentialType(),
