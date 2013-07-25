@@ -886,8 +886,8 @@ operations::
     copy_addr [take] %0 : $*T to [initialization] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
-    ; no retain of %new!
-    ; no load/release of %old!
+    // no retain of %new!
+    // no load/release of %old!
     store %new : $T to %1 : $*T
 
 destroy_addr
@@ -915,9 +915,9 @@ index_addr
   sil-instruction ::= 'index_addr' sil-operand ',' sil-operand
 
   %2 = index_addr %0 : $*T, %1 : $Builtin.Int<n>
-  ; %0 must be of an address type $*T
-  ; %1 must be of a builtin integer type
-  ; %2 will be of type $*T
+  // %0 must be of an address type $*T
+  // %1 must be of a builtin integer type
+  // %2 will be of type $*T
 
 Given an address that references into an array of values, returns the address
 of the ``%1``-th element relative to ``%0``. The address must reference into
@@ -936,9 +936,9 @@ index_raw_pointer
   sil-instruction ::= 'index_raw_pointer' sil-operand ',' sil-operand
 
   %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int<n>
-  ; %0 must be of $Builtin.RawPointer type
-  ; %1 must be of a builtin integer type
-  ; %2 will be of type $*T
+  // %0 must be of $Builtin.RawPointer type
+  // %1 must be of a builtin integer type
+  // %2 will be of type $*T
 
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
