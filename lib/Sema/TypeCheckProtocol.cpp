@@ -821,6 +821,113 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   return Result;
 }
 
+/// \brief Check whether an existential value of the given protocol conforms
+/// to itself.
+///
+/// \param tc The type checker.
+/// \param type The existential type we're checking, used for diagnostics.
+/// \param proto The protocol to test.
+/// \param If we're allowed to complain, the location to use.
+
+/// \returns true if the existential type conforms to itself, false otherwise.
+static bool
+existentialConformsToItself(TypeChecker &tc,
+                            Type type,
+                            ProtocolDecl *proto,
+                            SourceLoc complainLoc,
+                            llvm::SmallPtrSet<ProtocolDecl *, 4> &checking) {
+  // Check that all inherited protocols conform to themselves.
+  // FIXME: Should use getProtocols here?
+  for (auto inherited : proto->getInherited()) {
+    SmallVector<ProtocolDecl *, 4> inheritedProtos;
+    if (!inherited.getType()->isExistentialType(inheritedProtos))
+      return nullptr;
+
+    for (auto inheritedProto : inheritedProtos) {
+      // If we're already checking this protocol, assume it's fine.
+      if (!checking.insert(inheritedProto))
+        continue;
+
+      // Check whether the inherited protocol conforms to itself.
+      if (!existentialConformsToItself(tc, type, inheritedProto, complainLoc,
+                                       checking)) {
+        // Recursive call already diagnosed this problem, but tack on a note
+        // to establish the relationship.
+        // FIXME: Poor location information.
+        if (complainLoc.isValid()) {
+          tc.diagnose(proto,
+                      diag::inherited_protocol_does_not_conform, type,
+                      inherited.getType());
+        }
+        return nullptr;
+      }
+    }
+  }
+
+  // Check whether this protocol conforms to itself.
+  auto thisDecl = proto->getThis();
+  auto thisType =proto->getThis()->getUnderlyingType()->castTo<ArchetypeType>();
+  for (auto member : proto->getMembers()) {
+    // Check for associated types.
+    if (auto associatedType = dyn_cast<TypeAliasDecl>(member)) {
+      // 'This' is obviously okay.
+      if (associatedType == thisDecl)
+        continue;
+
+      // A protocol cannot conform to itself if it has an associated type.
+      if (complainLoc.isInvalid())
+        return false;
+
+      tc.diagnose(complainLoc, diag::type_does_not_conform, type,
+                  proto->getDeclaredType());
+      tc.diagnose(associatedType, diag::protocol_existential_assoc_type,
+                  associatedType->getName());
+      return false;
+    }
+
+    // For value members, look at their type signatures.
+    auto valueMember = dyn_cast<ValueDecl>(member);
+    if (!valueMember)
+      continue;
+
+    // Extract the type of the member, ignoring the 'this' parameter of
+    // functions.
+    auto memberTy = valueMember->getType();
+    if (memberTy->is<ErrorType>())
+      continue;
+    if (isa<FuncDecl>(valueMember))
+      memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
+
+    // "Transform" the type to walk the whole type. If we find 'This', return
+    // null. Otherwise, make this the identity transform and throw away the
+    // result.
+    if (tc.transformType(memberTy, [&](Type type) -> Type {
+          // If we found our archetype, return null.
+          if (auto archetype = type->getAs<ArchetypeType>()) {
+            return archetype == thisType? nullptr : type;
+          }
+
+          return type;
+        })) {
+      // We didn't find 'This'. We're okay.
+      continue;
+    }
+
+    // A protocol cannot conform to itself if any of its value members
+    // refers to 'This'.
+    if (complainLoc.isInvalid())
+      return false;
+
+    tc.diagnose(complainLoc, diag::type_does_not_conform, type,
+                proto->getDeclaredType());
+    tc.diagnose(valueMember, diag::protocol_existential_refers_to_this,
+                valueMember->getName());
+    return false;
+  }
+
+  return true;
+}
+
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc, 
@@ -845,10 +952,19 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     SmallVector<ProtocolDecl *, 4> AProtos;
     if (T->isExistentialType(AProtos)) {
       for (auto AP : AProtos) {
-        if (AP == Proto || AP->inheritsFrom(Proto))
-          return true;
+        // If this isn't the protocol we're looking for, continue looking.
+        // FIXME: Drop the 'inheritsFrom'.
+        if (AP != Proto && !AP->inheritsFrom(Proto))
+          continue;
+
+        // Check whether this protocol conforms to itself.
+        llvm::SmallPtrSet<ProtocolDecl *, 4> checking;
+        checking.insert(Proto);
+        return existentialConformsToItself(*this, T, AP, ComplainLoc, checking);
       }
 
+      // We didn't find the protocol we were looking for.
+      // FIXME: Complain here.
       return false;
     }
   }
