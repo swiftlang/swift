@@ -1675,7 +1675,7 @@ class FuncExpr : public CapturingExpr {
     /// This union member is active if getBodyKind() == BodyKind::Parsed.
     BraceStmt *Body;
 
-    /// End location of the function body saved for delayed parsing.
+    /// End location of the function body when the body is delayed or skipped.
     /// This union member is active if getBodyKind() == BodyKind::Unparsed.
     SourceLoc BodyEndLoc;
   };
