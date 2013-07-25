@@ -32,13 +32,14 @@ using namespace irgen;
 IRGenFunction::IRGenFunction(IRGenModule &IGM,
                              ExplosionKind explosionLevel,
                              llvm::Function *Fn,
-                             SILDebugScope *DS)
+                             SILDebugScope *DbgScope,
+                             SILLocation DbgLoc)
   : IGM(IGM), Builder(IGM.getLLVMContext()),
     CurFn(Fn), CurExplosionLevel(explosionLevel),
     ContextPtr(nullptr) {
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo)
-    IGM.DebugInfo->setCurrentLoc(Builder, DS);
+    IGM.DebugInfo->setCurrentLoc(Builder, DbgScope, DbgLoc);
 
   emitPrologue();
 }

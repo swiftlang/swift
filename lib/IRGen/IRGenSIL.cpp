@@ -645,7 +645,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    ExplosionKind explosionLevel)
   : IRGenFunction(IGM, explosionLevel,
                   IGM.getAddrOfSILFunction(f, explosionLevel),
-                  f->getDebugScope()),
+                  f->getDebugScope(), f->getLocation()),
     CurSILFn(f)
 {}
 

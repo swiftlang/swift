@@ -20,6 +20,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
+#include "swift/SIL/SILLocation.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/CallingConv.h"
 #include "IRBuilder.h"
@@ -91,7 +92,8 @@ public:
   IRGenFunction(IRGenModule &IGM,
                 Mangle::ExplosionKind explosion,
                 llvm::Function *fn,
-                SILDebugScope* DS = nullptr);
+                SILDebugScope* DbgScope = nullptr,
+                SILLocation DbgLoc = SILLocation());
   ~IRGenFunction();
 
   void unimplemented(SourceLoc Loc, StringRef Message);
