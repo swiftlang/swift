@@ -15,10 +15,11 @@
 //===---------------------------------------------------------------------===//
 
 #include "swift/SIL/Demangle.h"
-
+#include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
-
-using namespace llvm;
+#include <functional>
+#include <tuple>
+#include <vector>
 
 using namespace swift;
 using namespace Demangle;
@@ -51,10 +52,10 @@ public:
 
 private:
   std::string Buffer;
-  raw_string_ostream BackendPrinter;
+  llvm::raw_string_ostream BackendPrinter;
 };
 
-static size_t stringToNumber(const llvm::StringRef &Text) {
+static size_t stringToNumber(const StringRef &Text) {
   size_t result = 0;
   Text.getAsInteger<size_t>(0, result);
   return result;
@@ -114,7 +115,7 @@ static std::string archetypeName(size_t i) {
 class Demangler {
 public:
 
-  Demangler(llvm::StringRef mangled);
+  Demangler(StringRef mangled);
 
   ~Demangler();
 
@@ -161,7 +162,7 @@ private:
 
   class MangledNameSource {
   public:
-    MangledNameSource(llvm::StringRef mangled);
+    MangledNameSource(StringRef mangled);
 
     char peek();
 
@@ -186,7 +187,7 @@ private:
     void advanceOffset(size_t by);
 
   private:
-    llvm::StringRef Mangled;
+    StringRef Mangled;
     size_t Offset;
   };
 
@@ -279,7 +280,7 @@ Demangler::Substitution Demangler::Substitution::monad(
   return *this;
 }
 
-Demangler::MangledNameSource::MangledNameSource(llvm::StringRef Mangled)
+Demangler::MangledNameSource::MangledNameSource(StringRef Mangled)
     : Mangled(Mangled), Offset(0) {}
 
 char Demangler::MangledNameSource::peek() { return Mangled.front(); }
@@ -326,7 +327,7 @@ void Demangler::MangledNameSource::advanceOffset(size_t by) {
   Mangled = Mangled.substr(by);
 }
 
-Demangler::Demangler(llvm::StringRef Mangled)
+Demangler::Demangler(StringRef Mangled)
     : Substitutions(), ArchetypeCounts(), ArchetypeCount(0), Mangled(Mangled) {}
 
 Demangler::~Demangler() {}
@@ -712,7 +713,6 @@ Demangler::demangleSubstitutionIndexWithProtocol() {
 }
 
 Demangler::Substitution Demangler::demangleIndex() {
-
   if (Mangled.nextIf('_'))
     return success("0");
   size_t natural;
@@ -771,7 +771,6 @@ Demangler::demangleDeclWithContext(std::string context) {
 Demangler::Substitution
 Demangler::demangleDeclTypeWithContextAndName(std::string context,
                                               std::string name) {
-
   Substitution type = demangleType();
   if (!type)
     return failure();
@@ -788,7 +787,6 @@ bool Demangler::demangleBuiltinSize(size_t &num) {
 }
 
 Demangler::Substitution Demangler::demangleType() {
-
   if (!Mangled)
     return failure();
   char c = Mangled.next();
@@ -1081,14 +1079,14 @@ Demangler::Substitution Demangler::success(Substitution &SN) {
   return success(SN.first());
 }
 
-std::string swift::Demangle::demangleSymbol(llvm::StringRef mangled) {
+std::string swift::Demangle::demangleSymbol(StringRef mangled) {
   Demangler::Substitution demangled = Demangler(mangled).demangleSymbol();
   if (demangled)
     return demangled.first();
   return mangled.data();
 }
 
-std::string swift::Demangle::demangleType(llvm::StringRef mangled) {
+std::string swift::Demangle::demangleType(StringRef mangled) {
   Demangler::Substitution demangled = Demangler(mangled).demangleType();
   if (demangled)
     return demangled.first();

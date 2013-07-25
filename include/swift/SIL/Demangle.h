@@ -14,11 +14,7 @@
 #define __SWIFT_SIL_DEMANGLE_H__
 
 #include "llvm/ADT/StringRef.h"
-
-#include <functional>
 #include <string>
-#include <tuple>
-#include <vector>
 
 namespace swift {
 namespace Demangle {
