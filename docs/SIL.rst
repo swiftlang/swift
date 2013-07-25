@@ -197,6 +197,10 @@ generic constraints:
 
   A *loadable aggregate type* is a tuple or struct type that is loadable.
 
+  A *trivial type* is a loadable type with trivial value semantics.
+  Values of trivial type can be loaded and stored without any retain or
+  release operations and do not need to be destroyed.
+
 - *Address-only types* are restricted value types for which the compiler
   cannot access a full concrete representation:
 
@@ -208,8 +212,8 @@ generic constraints:
 
   Values of address-only types must reside in memory and can only be referenced
   in SIL by address. Address-only type addresses cannot be loaded from or
-  stored to. SIL provides special instructions for indirectly accessing
-  address-only values.
+  stored to. SIL provides special instructions for indirectly manipulating
+  address-only values, such as ``copy_addr`` and ``destroy_addr``.
 
 Some additional meaningful categories of type:
 
@@ -454,6 +458,194 @@ behavior in C, and has no predictable semantics. Undefined behavior should not
 be triggered by valid SIL emitted by a correct Swift program using a correct
 standard library, but cannot in all cases be diagnosed or verified at the SIL
 level.
+
+Calling Convention
+------------------
+
+This section describes how Swift functions are emitted in SIL.
+
+Swift Calling Convention [cc(swift)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Swift calling convention is the one used by default for native Swift
+functions.
+
+Tuples in the input type of the function are recursively destructured into
+separate arguments, both in the entry point basic block of the callee, and
+in the ``apply`` instructions used by callers::
+
+  func foo(x:Int, y:Int)
+  
+  sil @foo : $(x:Int, y:Int) -> () {
+  entry(%x : $Int, %y : $Int):
+    ...
+  }
+
+  func bar(x:Int, y:(Int, Int))
+
+  sil @bar : $(x:Int, y:(Int, Int)) -> () {
+  entry(%x : $Int, %y0 : $Int, %y1 : $Int):
+    ...
+  }
+
+  func call_foo_and_bar() {
+    foo(1, 2)
+    bar(4, (5, 6))
+  }
+
+  sil @call_foo_and_bar : $() -> () {
+  entry:
+    ...
+    %foo = function_ref @foo : $(x:Int, y:Int) -> ()
+    %foo_result = apply %foo(%1 : $Int, %2 : $Int) : $(x:Int, y:Int) -> ()
+    ...
+    %bar = function_ref @bar : $(x:Int, y:(Int, Int)) -> ()
+    %bar_result = apply %bar(%4 : $Int, %5 : $Int, %6 : $Int) \
+      : $(x:Int, y:(Int, Int)) -> ()
+  }
+
+Calling a function with trivial value types as inputs and outputs
+simply passes the arguments by value. This Swift function::
+
+  func foo(x:Int, y:Float) -> Char
+
+  foo(x, y)
+
+gets called in SIL as::
+
+  %foo = constant_ref $(Int, Float) -> Char, @foo
+  %z = apply %foo(%x, %y)
+
+Reference Counts
+````````````````
+
+Reference type arguments are passed in at +1 retain count and consumed by the
+callee. A reference type return value is returned at +1 and consumed by the
+caller. Value types with reference type components have their reference
+type components each retained and released the same way. This Swift function::
+
+  class A {}
+
+  func bar(x:A) -> (Int, A)
+
+  bar(x)
+
+gets called in SIL as::
+
+  %bar = function_ref @bar : $(A) -> (Int, A)
+  retain %x : $A
+  %z = apply %bar(%x : $A) : $(A) -> (Int, A)
+  // ... use %z ...
+  %z_1 = tuple_extract %z : $(Int, A), 1
+  release %z_1
+
+Address-Only Types
+``````````````````
+
+For address-only arguments, the caller allocates a copy and passes the address
+of the copy to the callee. The callee takes ownership of the copy and is
+responsible for destroying or consuming the value, though the caller must still
+deallocate the memory. For address-only return values, the
+caller allocates an uninitialized buffer and passes its address as the first
+argument to the callee. The callee must initialize this buffer before
+returning. This Swift function::
+
+  struct [API] A {}
+
+  func bas(x:A, y:Int) -> A { return x }
+
+  var z = bas(x, y)
+  // ... use z ...
+
+gets called in SIL as::
+
+  %bas = function_ref @bas : $(A, Int) -> A
+  %z = alloc_stack $A
+  %x_arg = alloc_stack $A
+  copy_addr %x : $*A to [initialize] %x_arg : $*A
+  apply %bas(%z : $*A, %x_arg : $*A, %y : $Int) : $(A, Int) -> A
+  dealloc_stack %x_arg : $*A // callee consumes %x.arg, caller deallocs
+  // ... use %z ...
+  destroy_addr %z : $*A
+  dealloc_var stack %z : $*A
+
+The implementation of ``@bas`` is then responsible for consuming ``%x_arg`` and
+initializing ``%z``.
+
+Tuple arguments are destructured regardless of the
+address-only-ness of the tuple type. The destructured fields are passed
+individually according to the above convention. This Swift function::
+
+  struct [API] A {}
+
+  func zim(x:Int, y:A, (z:Int, w:(A, Int)))
+
+  zim(x, y, (z, w))
+
+gets called in SIL as::
+
+  %zim = function_ref @zim : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
+  %y_arg = alloc_stack $A
+  copy_addr %y : $*A to [initialize] %y_arg : $*A
+  %w_0_addr = element_addr %w : $*(A, Int), 0
+  %w_0_arg = alloc_var stack $A
+  copy_addr %w_0_addr : $*A to [initialize] %w_0_arg : $*A
+  %w_1_addr = element_addr %w : $*(A, Int), 1
+  %w_1 = load %w_1_addr : $*Int
+  apply %zim(%x : $Int, %y_arg : $*A, %z : $Int, %w_0_arg : $A, %w_1 : $Int) \
+    : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
+  dealloc_stack %w_0_arg
+  dealloc_stack %y_arg
+
+Variadic Arguments
+``````````````````
+
+Variadic arguments and tuple elements are packaged into an array and passed as
+a single array argument. This Swift function::
+
+  func zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
+
+  zang(x, (y, z0, z1), v, w0, w1, w2)
+
+gets called in SIL as::
+
+  %zang = function_ref @zang : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
+  %zs = <<make array from %z1, %z2>>
+  %ws = <<make array from %w0, %w1, %w2>>
+  apply %zang(%x : $Int, %y : $Int, %zs : $Int[], %v : $Int, %ws : $Int[]) \
+    : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
+
+Function Currying
+`````````````````
+
+Curried function definitions in Swift emit multiple SIL entry points, one for
+each "uncurry level" of the function. When a function is uncurried, its
+outermost argument clauses are combined into a tuple in right-to-left order.
+For the following declaration::
+
+  func curried(x:A)(y:B)(z:C)(w:D) -> Int {}
+
+The types of the SIL entry points are as follows::
+
+  sil @curried_0 : $(x:A) -> (y:B) -> (z:C) -> (w:D) -> Int { ... }
+  sil @curried_1 : $((y:B), (x:A)) -> (z:C) -> (w:D) -> Int { ... }
+  sil @curried_2 : $((z:C), (y:B), (x:A)) -> (w:D) -> Int { ... }
+  sil @curried_3 : $((w:D), (z:C), (y:B), (x:A)) -> Int { ... }
+
+Swift Method Calling Convention [cc(method)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The method calling convention is currently identical to the freestanding
+function convention. Methods are considered to be curried functions, taking
+the "this" argument as their outer argument clause, and the method arguments
+as the inner argument clause(s). When uncurried, the "this" argument is thus
+passed last::
+
+  struct Foo {
+    func method(x:Int) -> Int {}
+  }
+
+  sil @Foo_method_1 : $((x : Int), Foo) -> Int { ... }
 
 Instruction Set
 ---------------
@@ -2033,115 +2225,6 @@ For example::
     %result = apply %add(%a : $Int, %b : $Int) : $(Int, Int) -> Int
     return %result : $Int
   }
-
-Calling convention
-------------------
-
-Calling a function with trivial value types as inputs and outputs simply passes
-the arguments by value. This Swift function::
-
-  func foo(x:Int, y:Float) -> Char
-
-  foo(x, y)
-
-gets called in SIL as::
-
-  %foo = constant_ref $(Int, Float) -> Char, @foo
-  %z = apply %foo(%x, %y)
-
-Reference type arguments get retained, and reference type return values must
-be released. Value types with reference type components have their reference
-type components retained and released the same way. This Swift function::
-
-  class A {}
-
-  func bar(x:A) -> (Int, A)
-
-  bar(x)
-
-gets called in SIL as::
-
-  %bar = constant_ref $(A) -> (Int, A), @bar
-  retain %x
-  %z = apply %bar(%x)
-  ; ... use %z ...
-  %z.1 = extract %z, 1
-  release %z.1
-
-For address-only arguments, the caller allocates a copy and passes the address
-of the copy to the callee. The callee takes ownership of the copy and is
-responsible for destroying or consuming the value, though the caller must
-deallocate the memory. For address-only return values, the
-caller allocates an uninitialized buffer and passes its address as the final
-argument to the callee. The callee must initialize this buffer before
-returning. This Swift function::
-
-  struct [API] A {}
-
-  func bas(x:A, y:Int) -> A { return x }
-
-  var z = bas(x, y)
-  // ... use z ...
-
-gets called in SIL as::
-
-  %bas = constant_ref $(*A, Int, *A) -> (), @bas
-  %z = alloc_var stack $A
-  %x.arg = alloc_var stack $A
-  copy_addr %x to initialize %x.arg
-  apply %bas(%x.arg, %y, %z)
-  dealloc_var stack %x.arg ; callee consumes %x.arg, caller deallocs
-  ; ... use %z ...
-  destroy_addr %z
-  dealloc_var stack %z
-
-The implementation of ``bas`` is then responsible for consuming ``%x.arg`` and
-initializing ``%z``. In this trivial case, it could optimize down to a
-take-initialization of the return value::
-  
-  func bas : $(*A, Int, *A) -> () {
-  entry(%x, %y, %ret):
-    copy_addr take %x to initialize %ret
-    ret
-  }
-
-Tuple arguments are destructured recursively, regardless of the
-address-only-ness of the tuple type. The destructured fields are passed
-individually according to the above convention. This Swift function::
-
-  struct [API] A {}
-
-  func zim(x:Int, y:A, (z:Int, w:(A, Int)))
-
-  zim(x, y, (z, w))
-
-gets called in SIL as::
-
-  %zim = constant_ref $(Int, *A, Int, *A, Int) -> (), @bas
-  %y.arg = alloc_var stack $A
-  copy_addr %y to initialize %y.arg
-  %w.0 = element_addr %w, 0
-  %w.0.arg = alloc_var stack $A
-  copy_addr %w.0 to initialize %w.0.arg
-  %w.1.addr = element_addr %w, 1
-  %w.1 = load %w.1.addr
-  apply %zim(%x, %y.arg, %z, %w.0.arg, %w.1)
-  dealloc_var stack %w.0.arg
-  dealloc_var stack %y.arg
-
-Variadic arguments and tuple elements are packaged into an array and passed as
-a single array argument. This Swift function::
-
-  func zang(x:Int, (y:Int, z:Int...), v:Int, w:Int...)
-
-  zang(x, (y, z0, z1), v, w0, w1, w2)
-
-gets called in SIL as::
-
-  %zang = constant_ref $(Int, Int, Int[], Int, Int[]) -> (), @zang
-  %zs = <<make array from %z1, %z2>>
-  %ws = <<make array from %w0, %w1, %w2>>
-  apply %zang(%x, %y, %zs, %v, %ws)
 
 TODO design questions
 ---------------------
