@@ -55,6 +55,7 @@ std::string removeCodeCompletionTokens(StringRef Input,
 class CodeCompletionString {
   friend class CodeCompletionResultBuilder;
 
+public:
   class Chunk {
     friend class CodeCompletionResultBuilder;
 
@@ -156,6 +157,7 @@ public:
     }
   };
 
+private:
   unsigned NumChunks : 16;
 
   CodeCompletionString(ArrayRef<Chunk> Chunks);
