@@ -667,6 +667,44 @@ passed last::
 
   sil @Foo_method_1 : $((x : Int), [byref] Foo) -> Int { ... }
 
+C Calling Convention [cc(cdecl)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Swift's C module importer, C types are always mapped to Swift types
+considered trivial by SIL. SIL does not concern itself with platform
+ABI requirements for indirect return, register vs. stack passing, etc.; C
+function arguments and returns in SIL are always by value regardless of the
+platform calling convention.
+
+SIL (and therefore Swift) cannot currently invoke variadic C functions.
+
+Objective-C Calling Convention [cc(objc)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Reference Counts
+````````````````
+
+Objective-C methods use the same argument and return value ownership rules as
+ARC Objective-C. Selector families and the ``ns_consumed``,
+``ns_returns_retained``, etc. attributes from imported Objective-C definitions
+are honored.
+
+Method Currying
+```````````````
+
+The "this" argument of an Objective-C method is uncurried to the *first*
+argument of the uncurried type, opposite to the native Swift convention::
+
+  class [objc] NSString {
+    func stringByPaddingToLength(Int) withString(NSString) startingAtIndex(Int)
+  }
+
+  sil @NSString_stringByPaddingToLength_withString_startingAtIndex \
+    : $(NSString, (Int, NSString, Int))
+
+The ``_cmd`` selector argument to Objective-C methods is abstracted away in
+SIL.
+
 Instruction Set
 ---------------
 
