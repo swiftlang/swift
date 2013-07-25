@@ -325,12 +325,11 @@ Basic Blocks
 ~~~~~~~~~~~~
 ::
 
-  sil-basic-block ::= sil-label sil-instruction-def* sil-terminator-def
+  sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
   sil-argument ::= sil-value ':' sil-type
 
   sil-instruction-def ::= (sil-value '=')? sil-instruction
-  sil-terminator-def ::= (sil-value '=')? sil-terminator
 
 A function body consists of one or more basic blocks. These form the nodes of
 the control flow graph. Each basic block contains one or more instructions and
