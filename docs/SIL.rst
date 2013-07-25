@@ -1782,10 +1782,12 @@ coerce
   sil-instruction ::= 'coerce' sil-operand 'to' sil-type
 
   %1 = coerce %0 : $T to $T
+  // The source and destination types must be exactly the same
   // %1 will have type $T
 
-Represents an explicit type coercion with no runtime effect. ``%1`` will be
-equivalent to ``%0``.
+Represents a trivial type coercion. This instruction is emitted for source
+fidelity to represent that an explicit ``x as T`` coercion was made; it has
+no runtime effect. ``%1`` will be equivalent to ``%0``.
 
 upcast
 ``````
