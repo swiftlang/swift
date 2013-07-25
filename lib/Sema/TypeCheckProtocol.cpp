@@ -460,26 +460,20 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
 
   // Check that T conforms to all inherited protocols.
-  for (auto Inherited : Proto->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (!Inherited.getType()->isExistentialType(InheritedProtos))
-      return nullptr;
-    
-    for (auto InheritedProto : InheritedProtos) {
-      ProtocolConformance *InheritedConformance = nullptr;
-      if (TC.conformsToProtocol(T, InheritedProto, &InheritedConformance,
-                                ComplainLoc))
-        InheritedMapping[InheritedProto] = InheritedConformance;
-      else {
-        // Recursive call already diagnosed this problem, but tack on a note
-        // to establish the relationship.
-        if (ComplainLoc.isValid()) {
-          TC.diagnose(Proto,
-                      diag::inherited_protocol_does_not_conform, T,
-                      Inherited.getType());
-        }
-        return nullptr;
+  for (auto InheritedProto : Proto->getProtocols()) {
+    ProtocolConformance *InheritedConformance = nullptr;
+    if (TC.conformsToProtocol(T, InheritedProto, &InheritedConformance,
+                              ComplainLoc))
+      InheritedMapping[InheritedProto] = InheritedConformance;
+    else {
+      // Recursive call already diagnosed this problem, but tack on a note
+      // to establish the relationship.
+      if (ComplainLoc.isValid()) {
+        TC.diagnose(Proto,
+                    diag::inherited_protocol_does_not_conform, T,
+                    InheritedProto->getDeclaredType());
       }
+      return nullptr;
     }
   }
   
@@ -837,30 +831,23 @@ existentialConformsToItself(TypeChecker &tc,
                             SourceLoc complainLoc,
                             llvm::SmallPtrSet<ProtocolDecl *, 4> &checking) {
   // Check that all inherited protocols conform to themselves.
-  // FIXME: Should use getProtocols here?
-  for (auto inherited : proto->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> inheritedProtos;
-    if (!inherited.getType()->isExistentialType(inheritedProtos))
-      return nullptr;
+  for (auto inheritedProto : proto->getProtocols()) {
+    // If we're already checking this protocol, assume it's fine.
+    if (!checking.insert(inheritedProto))
+      continue;
 
-    for (auto inheritedProto : inheritedProtos) {
-      // If we're already checking this protocol, assume it's fine.
-      if (!checking.insert(inheritedProto))
-        continue;
-
-      // Check whether the inherited protocol conforms to itself.
-      if (!existentialConformsToItself(tc, type, inheritedProto, complainLoc,
-                                       checking)) {
-        // Recursive call already diagnosed this problem, but tack on a note
-        // to establish the relationship.
-        // FIXME: Poor location information.
-        if (complainLoc.isValid()) {
-          tc.diagnose(proto,
-                      diag::inherited_protocol_does_not_conform, type,
-                      inherited.getType());
-        }
-        return nullptr;
+    // Check whether the inherited protocol conforms to itself.
+    if (!existentialConformsToItself(tc, type, inheritedProto, complainLoc,
+                                     checking)) {
+      // Recursive call already diagnosed this problem, but tack on a note
+      // to establish the relationship.
+      // FIXME: Poor location information.
+      if (complainLoc.isValid()) {
+        tc.diagnose(proto,
+                    diag::inherited_protocol_does_not_conform, type,
+                    inheritedProto->getType());
       }
+      return nullptr;
     }
   }
 
@@ -953,7 +940,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     if (T->isExistentialType(AProtos)) {
       for (auto AP : AProtos) {
         // If this isn't the protocol we're looking for, continue looking.
-        // FIXME: Drop the 'inheritsFrom'.
         if (AP != Proto && !AP->inheritsFrom(Proto))
           continue;
 
