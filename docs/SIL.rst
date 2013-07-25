@@ -1168,7 +1168,9 @@ Creates the "zero" value of a builtin or reference type:
   null pointer.
 - For reference types, this produces a null reference.
 
-TODO: Design type-safe nullability for reference types.
+TODO: ``builtin_zero`` is a temporary hack to support our current AST-level 
+default initialization implementation. Definitive assignment analysis in SIL
+will supersede this.
 
 module
 ``````
@@ -1750,9 +1752,11 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
 
-It is undefined behavior if the result of ``project_existential`` is used as
-anything other than the "this" argument of an instance method reference
-obtained by ``protocol_method`` from the same existential container.
+It is undefined behavior for the ``OpaquePointer`` value to be passed as the
+"this" argument to a method value obtained by ``protocol_method`` from
+a different existential container. It is also undefined behavior if the
+``OpaquePointer`` value is dereferenced, cast, or passed to a method after
+the originating existential container has been mutated.
 
 init_existential_ref
 ````````````````````
@@ -1813,9 +1817,11 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
 
-It is undefined behavior if the result of ``project_existential_ref`` is used
-as anything other than the "this" argument of an instance method reference
-obtained by ``protocol_method`` from the same existential container.
+It is undefined behavior for the ``ObjCPointer`` value to be passed as the
+"this" argument to a method value obtained by ``protocol_method`` from
+a different existential container. It is also undefined behavior if the
+``ObjCPointer`` value is dereferenced, cast, or passed to a method after the
+originating existential container has been mutated.
 
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
