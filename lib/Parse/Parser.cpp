@@ -229,10 +229,9 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
            TU, TU->getASTContext().Diags, SIL, PersistentState) {
   this->IsMainModule = IsMainModule;
   auto ParserPos = State->takeParserPosition();
-  if (ParserPos.first.isValid() &&
-      SourceMgr.FindBufferContainingLoc(ParserPos.first.Value)== int(BufferID)){
-    auto BeginParserPosition =
-        getParserPosition(ParserPos.first, ParserPos.second);
+  if (ParserPos.isValid() &&
+      SourceMgr.FindBufferContainingLoc(ParserPos.Loc.Value) == int(BufferID)) {
+    auto BeginParserPosition = getParserPosition(ParserPos);
     restoreParserPosition(BeginParserPosition);
   }
 }

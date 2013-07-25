@@ -26,10 +26,16 @@ namespace swift {
 
 /// \brief Parser state persistent across multiple parses.
 class PersistentParserState {
+public:
+  struct ParserPos {
+    SourceLoc Loc;
+    SourceLoc PrevLoc;
+
+    bool isValid() const { return Loc.isValid(); }
+  };
 
   class FunctionBodyState {
-    SourceRange BodyRange;
-    SourceLoc PreviousLoc;
+    ParserPos BodyPos;
     SavedScope Scope;
     friend class Parser;
 
@@ -40,16 +46,17 @@ class PersistentParserState {
   public:
     FunctionBodyState(SourceRange BodyRange, SourceLoc PreviousLoc,
                       SavedScope &&Scope)
-      : BodyRange(BodyRange), PreviousLoc(PreviousLoc), Scope(std::move(Scope))
+      : BodyPos{BodyRange.Start, PreviousLoc}, Scope(std::move(Scope))
     {}
   };
 
+private:
   ScopeInfo ScopeInfo;
   typedef llvm::DenseMap<FuncExpr *, std::unique_ptr<FunctionBodyState>>
       DelayedBodiesTy;
   DelayedBodiesTy DelayedBodies;
-  SourceLoc ParserPos;
-  SourceLoc PrevParserLoc;
+  /// \brief Parser sets this if it stopped parsing before the buffer ended.
+  ParserPos MarkedPos;
 
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
@@ -59,14 +66,13 @@ public:
   std::unique_ptr<FunctionBodyState> takeBodyState(FuncExpr *FE);
 
   void markParserPosition(SourceLoc Loc, SourceLoc PrevLoc) {
-    ParserPos = Loc;
-    PrevParserLoc = PrevLoc;
+    MarkedPos = {Loc, PrevLoc};
   }
 
-  std::pair<SourceLoc, SourceLoc> takeParserPosition() {
-    auto Pos = std::make_pair(ParserPos, PrevParserLoc);
-    ParserPos = SourceLoc();
-    PrevParserLoc = SourceLoc();
+  /// \brief Returns the marked parser position and resets it.
+  ParserPos takeParserPosition() {
+    ParserPos Pos = MarkedPos;
+    MarkedPos = ParserPos();
     return Pos;
   }
 };

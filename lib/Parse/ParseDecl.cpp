@@ -1377,11 +1377,8 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   if (!FunctionParserState)
     return false;
 
-  auto BeginParserPosition =
-      getParserPosition(FunctionParserState->BodyRange.Start,
-                        FunctionParserState->PreviousLoc);
-  auto EndLexerState =
-      L->getStateForBeginningOfTokenLoc(FunctionParserState->BodyRange.End);
+  auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
+  auto EndLexerState = L->getStateForBeginningOfTokenLoc(FE->getEndLoc());
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
