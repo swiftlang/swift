@@ -1270,7 +1270,7 @@ Restart:
     return formToken(tok::unknown, TokStart);
 
   case '#':
-    // @ is only a token in SIL mode.
+    // # is only a token in SIL mode.
     if (InSILMode)
       return formToken(tok::sil_pound, TokStart);
     diagnose(CurPtr-1, diag::lex_invalid_character);
