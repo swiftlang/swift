@@ -71,9 +71,11 @@ namespace swift {
   ///
   /// \param SIL if non-null, we're parsing a SIL file.
   ///
-  /// \param PersistentState if non-null and points to a parser, the routine
-  /// will reuse that parser.  If it does not point to a parser,  a pointer to a
-  /// new parser will be stored there.
+  /// \param PersistentState if non-null the same PersistentState object can
+  /// be used to resume parsing or parse delayed function bodies.
+  ///
+  /// \param DelayedParseCB if non-null enables delayed parsing for function
+  /// bodies.
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL = nullptr,
