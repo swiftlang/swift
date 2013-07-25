@@ -8,7 +8,7 @@ Swift Intermediate Language (SIL)
 Abstract
 --------
 
-SIL is a SSA-form IR with high-level semantic information designed to implement
+SIL is an SSA-form IR with high-level semantic information designed to implement
 the Swift programming language. SIL accommodates the following use cases:
 
 - High-level optimization passes, including retain/release optimization,
@@ -23,6 +23,10 @@ the Swift programming language. SIL accommodates the following use cases:
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
 
+In contrast to LLVM IR, SIL is a generally target-independent format
+representation that can be used for code distribution, but can also express
+target-specific concepts as well as Swift can.
+
 SIL in the Swift Compiler
 -------------------------
 
@@ -31,10 +35,16 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 - The *Parse* module constructs an AST from Swift source code.
 - The *Sema* module type-checks the AST and annotates it with type information.
 - The *SILGen* module generates "raw" SIL from an AST.
-- SIL *Passes* run over the raw SIL to emit diagnostics and apply optimizations
-  to produce canonical SIL.
+- A series of *Guaranteed Optimization Passes* and *Diagnostic Passes* are run
+  over the "raw" to both perform optimizations, but also to emit
+  language-specific diagnostics.  These are always run, even at -O0, and produce
+  "canonical" SIL.
+- General SIL *Optimization Passes* optionally run over the canonical SIL to
+  improve performance of the resultant executable.  These are enabled and
+  controlled by the optimization level and are not run at -O0.
 - *IRGen* lowers optimized SIL to LLVM IR.
-- The LLVM backend applies LLVM optimizations and emits binary code.
+- The LLVM backend (optionally) applies LLVM optimizations, runs the LLVM code
+  generator and emits binary code.
 
 The stages pertaining to SIL processing in particular are as follows:
 
@@ -50,7 +60,7 @@ emitted by SILGen has the following properties:
   represents variables as reference-counted "boxes" in the most general case,
   which can be retained, released, and shared.
 - Dataflow requirements, such as definitive assignment, function returns,
-  switch coverage, etc. have not yet been enforced.
+  switch coverage (TBD), etc. have not yet been enforced.
 - ``always_inline``, ``always_instantiate``, and other function optimization
   attributes have not yet been honored.
 
@@ -62,7 +72,9 @@ Guaranteed Optimization Passes
 
 After SILGen, a deterministic sequence of optimization passes is run over the
 raw SIL. These passes are more concerned with predictability and exposing
-dataflow for diagnostic passes than performance.
+dataflow for diagnostic passes than performance.  Notably, we do not want the
+diagnostics produced by the compiler to change as the compiler evolves, so these
+passes are intended to be simple and predictable.
 
 - Memory promotion: this is implemented as two optimization phases, the first
   of which performs capture analysis to promote alloc_box instructions to
@@ -74,6 +86,7 @@ TODO:
 - Always inline
 - Constant folding/guaranteed simplifications (including constant overflow
   warnings)
+- Basic ARC optimization for acceptable performance at -O0.
 
 Diagnostic Passes
 ~~~~~~~~~~~~~~~~~
@@ -91,11 +104,18 @@ TODO:
 - Dead code detection/elimination. Non-implicit dead code is an error.
 - Definitive assignment of local variables, and of instance variables in
   constructors.
-- Basic ARC optimization for decent performance at -O0.
 
 If the diagnostic passes all succeed, the final result is the *canonical SIL*
-for the program. Performance optimization, native code generation, and module
-distribution are derived from this form.
+for the program. Performance optimization and, native code generation are
+derived from this form, and a module can be built from this (or later) forms.
+
+General Optimization Passes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+SIL captures language-specific type information, which makes it possible to
+perform high-level optimizations such as generics specialization that are
+difficult to perform on LLVM IR.  The details of these have not been fully
+nailed down, but we expect this to be important.
 
 Syntax
 ------
@@ -131,7 +151,7 @@ Here is an example of a ``.sil`` file::
     %1 = function_ref @_TSsoi1pfTSdSd_Sd
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
-    %4 = apply %1(%2 : $Double, %3 : $Double) : $(Double, Double) -> Double
+    %4 = apply %1(%2, %3) : $(Double, Double) -> Double
     %5 = return %4 : Double
   }
 
@@ -152,7 +172,7 @@ type grammar. SIL adds some additional kinds of type of its own:
 
   Addresses of address-only types (see below) can only be used with
   instructions that manipulate their operands indirectly by address, such
-  as ``copy_addr``, ``destroy_addr``, and ``dealloc_var``, or as arguments
+  as ``copy_addr``, ``destroy_addr``, and ``dealloc_stack``, or as arguments
   to functions. For an address-only type ``T``, only the SIL address ``$*T``
   can be formed. ``$T`` for address-only ``T`` is an invalid SIL type.
   
@@ -251,7 +271,7 @@ is always followed by a ``:`` and the SIL type of the value. For example::
   %negate = builtin_function_ref #Builtin.neg_Int64
   %five = integer_literal 5 : $Builtin.Int64
   // Use the values as operands
-  %neg_five = apply %negate(%five : $Builtin.Int64) : (Builtin.Int64) -> Builtin.Int64
+  %neg_five = apply %negate(%five) : (Builtin.Int64) -> Builtin.Int64
 
 In SIL, a single instruction may produce multiple values. Operands that refer
 to multiple-value instructions choose the value by following the ``%name`` with
@@ -326,8 +346,8 @@ received from the function caller::
   sil @bar : $(Int, Int) -> () {
   bb0(%x : $Int, %y : $Int):
     %foo = function_ref @foo
-    %1 = apply %foo(%x : $Int) : $(Int) -> Int
-    %2 = apply %foo(%y : $Int) : $(Int) -> Int
+    %1 = apply %foo(%x) : $(Int) -> Int
+    %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
     %4 = return %3 : $()
   }
@@ -497,11 +517,10 @@ in the ``apply`` instructions used by callers::
   entry:
     ...
     %foo = function_ref @foo : $(x:Int, y:Int) -> ()
-    %foo_result = apply %foo(%1 : $Int, %2 : $Int) : $(x:Int, y:Int) -> ()
+    %foo_result = apply %foo(%1, %2) : $(x:Int, y:Int) -> ()
     ...
     %bar = function_ref @bar : $(x:Int, y:(Int, Int)) -> ()
-    %bar_result = apply %bar(%4 : $Int, %5 : $Int, %6 : $Int) \
-      : $(x:Int, y:(Int, Int)) -> ()
+    %bar_result = apply %bar(%4, %5, %6) : $(x:Int, y:(Int, Int)) -> ()
   }
 
 Calling a function with trivial value types as inputs and outputs
@@ -514,7 +533,7 @@ simply passes the arguments by value. This Swift function::
 gets called in SIL as::
 
   %foo = constant_ref $(Int, Float) -> Char, @foo
-  %z = apply %foo(%x, %y)
+  %z = apply %foo(%x, %y) : $(Int, Float) -> Char
 
 Reference Counts
 ````````````````
@@ -526,7 +545,7 @@ type components each retained and released the same way. This Swift function::
 
   class A {}
 
-  func bar(x:A) -> (Int, A)
+  func bar(x:A) -> (Int, A) { ... }
 
   bar(x)
 
@@ -534,7 +553,7 @@ gets called in SIL as::
 
   %bar = function_ref @bar : $(A) -> (Int, A)
   retain %x : $A
-  %z = apply %bar(%x : $A) : $(A) -> (Int, A)
+  %z = apply %bar(%x) : $(A) -> (Int, A)
   // ... use %z ...
   %z_1 = tuple_extract %z : $(Int, A), 1
   release %z_1
@@ -563,11 +582,11 @@ gets called in SIL as::
   %z = alloc_stack $A
   %x_arg = alloc_stack $A
   copy_addr %x : $*A to [initialize] %x_arg : $*A
-  apply %bas(%z : $*A, %x_arg : $*A, %y : $Int) : $(A, Int) -> A
+  apply %bas(%z, %x_arg, %y) : $(A, Int) -> A
   dealloc_stack %x_arg : $*A // callee consumes %x.arg, caller deallocs
   // ... use %z ...
   destroy_addr %z : $*A
-  dealloc_var stack %z : $*A
+  dealloc_stack stack %z : $*A
 
 The implementation of ``@bas`` is then responsible for consuming ``%x_arg`` and
 initializing ``%z``.
@@ -588,12 +607,11 @@ gets called in SIL as::
   %y_arg = alloc_stack $A
   copy_addr %y : $*A to [initialize] %y_arg : $*A
   %w_0_addr = element_addr %w : $*(A, Int), 0
-  %w_0_arg = alloc_var stack $A
+  %w_0_arg = alloc_stack $A
   copy_addr %w_0_addr : $*A to [initialize] %w_0_arg : $*A
   %w_1_addr = element_addr %w : $*(A, Int), 1
   %w_1 = load %w_1_addr : $*Int
-  apply %zim(%x : $Int, %y_arg : $*A, %z : $Int, %w_0_arg : $A, %w_1 : $Int) \
-    : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
+  apply %zim(%x, %y_arg, %z, %w_0_arg, %w_1) : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
   dealloc_stack %w_0_arg
   dealloc_stack %y_arg
 
@@ -612,8 +630,7 @@ gets called in SIL as::
   %zang = function_ref @zang : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
   %zs = <<make array from %z1, %z2>>
   %ws = <<make array from %w0, %w1, %w2>>
-  apply %zang(%x : $Int, %y : $Int, %zs : $Int[], %v : $Int, %ws : $Int[]) \
-    : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
+  apply %zang(%x, %y, %zs, %v, %ws)  : $(x:Int, (y:Int, z:Int...), v:Int, w:Int...) -> ()
 
 Function Currying
 `````````````````
@@ -664,8 +681,8 @@ alloc_stack
   %1 = alloc_stack $T
   // %1 has type $*T
 
-Allocates enough uninitialized memory on the stack to contain a value of type
-``T``. The result of the instruction is the address
+Allocates enough uninitialized memory that is sufficiently aligned on the stack
+to contain a value of type ``T``. The result of the instruction is the address
 of the allocated memory. ``alloc_stack`` marks the start of the lifetime of
 the value; the allocation must be balanced with a ``dealloc_stack``
 instruction to mark the end of its lifetime. The memory is not retainable;
@@ -696,7 +713,8 @@ alloc_box
   //   %1#1 has type $*T
 
 Allocates a reference-counted "box" on the heap large enough to hold a value of
-type ``T``. The result of the instruction is a two-value operand;
+type ``T``, along with a retain count and any other metadata required by the
+runtime.  The result of the instruction is a two-value operand;
 the first value is the reference-counted ``ObjectPointer`` that owns the box,
 and the second value is the address of the value inside the box.
 
@@ -785,12 +803,13 @@ store
 `````
 ::
 
-  store %0 : $T to %1 : $*T
+  store %0 to %1 : $*T
   // $T must be a loadable type
 
-Stores the value ``%0`` to memory at address ``%1``. ``%0`` must be of a
-loadable type. This will overwrite the memory at ``%1``; ``%1`` must reference
-uninitialized or destroyed memory.
+Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
+and the type of ``%0 is ``T``, which must be of a loadable type. This will
+overwrite the memory at ``%1``; ``%1`` must reference uninitialized or destroyed
+memory.
 
 initialize_var
 ``````````````
@@ -1245,7 +1264,7 @@ apply
                         '(' (sil-operand (',' sil-operand)?)? ')'
                         ':' sil-type
 
-  %r = apply %0(%1 : $A, %2 : $B, ...) : $(A, B, ...) -> R
+  %r = apply %0(%1, %2, ...) : $(A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
   // %0 must be of a concrete function type $(A, B, ...) -> R
   // %1, %2, etc. must be of the argument types $A, $B, etc.
@@ -1270,7 +1289,7 @@ partial_apply
                         '(' (sil-operand (',' sil-operand)?)? ')'
                         ':' sil-type
 
-  %c = partial_apply %0(%1 : $A, %2 : $B, ...) : $[thin] (T..., A, B, ...) -> R
+  %c = partial_apply %0(%1, %2, ...) : $[thin] (T..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
   // %0 must be of a thin concrete function type $[thin] (T..., A, B, ...) -> R
   // %1, %2, etc. must be of the argument types $A, $B, etc.,
@@ -1295,21 +1314,21 @@ clarity)::
   func @foo : $[thin] A -> B -> C -> D -> E {
   entry(%a : $A):
     %foo_1 = function_ref @foo_1 : $[thin] (B, A) -> C -> D -> E
-    %thunk = partial_apply %foo_1(%a : $A) : $[thin] (B, A) -> C -> D -> E
+    %thunk = partial_apply %foo_1(%a) : $[thin] (B, A) -> C -> D -> E
     return %thunk : $B -> C -> D -> E
   }
 
   func @foo_1 : $[thin] (B, A) -> C -> D -> E {
   entry(%b : $B, %a : $A):
     %foo_2 = function_ref @foo_2 : $[thin] (C, B, A) -> D -> E
-    %thunk = partial_apply %foo_2(%b : $B, %a : $A) : $[thin] (C, B, A) -> D -> E
+    %thunk = partial_apply %foo_2(%b, %a) : $[thin] (C, B, A) -> D -> E
     return %thunk : $(B, A) -> C -> D -> E
   }
 
   func @foo_2 : $[thin] (C, B, A) -> D -> E {
   entry(%c : $C, %b : $B, %a : $A):
     %foo_3 = function_ref @foo_3 : $[thin] (D, C, B, A) -> E
-    %thunk = partial_apply %foo_3(%c : $C, %b : $B, %a : $A) : $[thin] (D, C, B, A) -> E
+    %thunk = partial_apply %foo_3(%c, %b, %a) : $[thin] (D, C, B, A) -> E
     return %thunk : $(C, B, A) -> D -> E
   }
 
@@ -1339,11 +1358,11 @@ lowers to an uncurried entry point and is curried in the enclosing function::
   entry(%x : $Int):
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-    %bar = partial_apply %bar_uncurried(%x : $Int) : $(Int, Int) -> Int
+    %bar = partial_apply %bar_uncurried(%x) : $(Int, Int) -> Int
 
     // Apply it
     %1 = integer_literal $Int, 1
-    %ret = apply %bar(%1 : $Int) : $(Int) -> Int
+    %ret = apply %bar(%1) : $(Int) -> Int
 
     // Clean up
     release %bar : $(Int) -> Int
@@ -1676,7 +1695,7 @@ compiles to this SIL sequence::
   %bar = protocol_method %foo : $*Foo, #Foo.bar!1
   %foo_p = project_existential %foo : $*Foo
   %one_two_three = integer_literal $Int, 123
-  %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.OpaquePointer) : $(Int, Builtin.OpaquePointer) -> ()
+  %_ = apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
 
 It is undefined behavior if the result of ``project_existential`` is used as
 anything other than the "this" argument of an instance method reference
@@ -1739,7 +1758,7 @@ compiles to this SIL sequence::
   %bar = protocol_method %foo : $Foo, #Foo.bar!1
   %foo_p = project_existential_ref %foo : $Foo
   %one_two_three = integer_literal $Int, 123
-  %_ = apply %bar(%one_two_three : $Int, %foo_p : $Builtin.ObjCPointer) : $(Int, Builtin.ObjCPointer) -> ()
+  %_ = apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
 
 It is undefined behavior if the result of ``project_existential_ref`` is used
 as anything other than the "this" argument of an instance method reference
@@ -2222,7 +2241,7 @@ For example::
     %a = tuple_extract %ab : $(Int, Int), 0
     %b = tuple_extract %ab : $(Int, Int), 1
     %add = function_ref @add : $(Int, Int) -> Int
-    %result = apply %add(%a : $Int, %b : $Int) : $(Int, Int) -> Int
+    %result = apply %add(%a, %b) : $(Int, Int) -> Int
     return %result : $Int
   }
 
