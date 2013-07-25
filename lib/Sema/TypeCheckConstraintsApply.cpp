@@ -2190,6 +2190,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceToType(expr, toType, locator);
   }
 
+  // Coercions to an lvalue: materialize the value.
+  // FIXME: When we remember 'implicit' byref bits, sanity check that
+  // toType is an implicit byref.
+  if (auto toLValue = toType->getAs<LValueType>()) {
+    // Convert the expression to the expected object type.
+    expr = coerceToType(expr, toLValue->getObjectType(), locator);
+    if (!expr)
+      return nullptr;
+
+    // Materialize.
+    return new (tc.Context) MaterializeExpr(expr, toType);
+  }
+
   // Coercion from a subclass to a superclass.
   if (fromType->mayHaveSuperclass() &&
       toType->getClassOrBoundGenericClass()) {
