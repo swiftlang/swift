@@ -58,7 +58,7 @@ emitted by SILGen has the following properties:
   instead of being in strict SSA form. This is similar to the initial
   ``alloca``-heavy LLVM IR emitted by frontends such as Clang. However, Swift
   represents variables as reference-counted "boxes" in the most general case,
-  which can be retained, released, and shared.
+  which can be retained, released, and captured into closures.
 - Dataflow requirements, such as definitive assignment, function returns,
   switch coverage (TBD), etc. have not yet been enforced.
 - ``always_inline``, ``always_instantiate``, and other function optimization
@@ -67,19 +67,24 @@ emitted by SILGen has the following properties:
 These properties are addressed by subsequent guaranteed optimization and
 diagnostic passes which are always run against the raw SIL.
 
-Guaranteed Optimization Passes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Guaranteed Optimization and Diagnostic Passes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 After SILGen, a deterministic sequence of optimization passes is run over the
-raw SIL. These passes are more concerned with predictability and exposing
-dataflow for diagnostic passes than performance.  Notably, we do not want the
-diagnostics produced by the compiler to change as the compiler evolves, so these
-passes are intended to be simple and predictable.
+raw SIL. We do not want the diagnostics produced by the compiler to change as
+the compiler evolves, so these passes are intended to be simple and
+predictable.
 
 - Memory promotion: this is implemented as two optimization phases, the first
   of which performs capture analysis to promote alloc_box instructions to
   alloc_stack, and the second of which promotes non-address-exposed alloc_stack
   instructions to SSA registers.
+- Return analysis. This verifies that functions always return a value on every
+  code path and don't "fall of the end" of their definition, which is an error.
+
+If the diagnostic passes all succeed, the final result is the *canonical SIL*
+for the program. Performance optimization and native code generation are
+derived from this form, and a module can be built from this (or later) forms.
 
 TODO:
 
@@ -87,27 +92,11 @@ TODO:
 - Constant folding/guaranteed simplifications (including constant overflow
   warnings)
 - Basic ARC optimization for acceptable performance at -O0.
-
-Diagnostic Passes
-~~~~~~~~~~~~~~~~~
-
-The following passes are run after guaranteed optimization to diagnose the
-validity of the Swift program that generated the SIL:
-
-- Return analysis. This verifies that functions always return a value on every
-  code path and don't "fall of the end" of their definition, which is an error.
-
-TODO:
-
 - Noreturn verification as a part of return analysis.
 - Switch statement coverage.
 - Dead code detection/elimination. Non-implicit dead code is an error.
 - Definitive assignment of local variables, and of instance variables in
   constructors.
-
-If the diagnostic passes all succeed, the final result is the *canonical SIL*
-for the program. Performance optimization and, native code generation are
-derived from this form, and a module can be built from this (or later) forms.
 
 General Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
