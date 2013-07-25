@@ -17,8 +17,6 @@
 #ifndef SWIFT_IRGEN_GENPROTO_H
 #define SWIFT_IRGEN_GENPROTO_H
 
-#include "GenPoly.h"
-
 namespace llvm {
   class Type;
 }
@@ -46,7 +44,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class TypeInfo;
-  
+
   /// Emit the metadata and witness table initialization for an allocated
   /// opaque existential container.
   Address emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
@@ -93,24 +91,11 @@ namespace irgen {
   Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                           Address base,
                                           SILType baseTy);
-  Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                          Address base,
-                                          CanType baseTy);
   
   /// Extract the instance pointer from a class existential value.
   llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
-                                              Explosion &base,
-                                              SILType baseTy);
-  llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
-                                              Explosion &base,
-                                              CanType baseTy);
-
-  /// Extract the witness tables and instance pointer from a class existential
-  /// value.
-  std::pair<ArrayRef<llvm::Value*>, llvm::Value*>
-  emitClassExistentialProjectionWithWitnesses(IRGenFunction &IGF,
-                                              Explosion &base,
-                                              CanType baseTy);
+                                                     Explosion &base,
+                                                     SILType baseTy);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
@@ -126,14 +111,6 @@ namespace irgen {
                                      SILType baseTy,
                                      SILDeclRef member,
                                      Explosion &out);
-  
-  /// Load the type metadata and witnesses out of an opaque existential
-  /// container.
-  void emitOpaqueExistentialMetadataAndWitnesses(IRGenFunction &IGF,
-                                         Address existAddr,
-                                         CanType baseTy,
-                                         llvm::Value *&metadata,
-                                         std::vector<llvm::Value*> &witnesses);
   
   /// Extract the method pointer and metadata from a class existential
   /// container's protocol witness table as a function value.
@@ -158,11 +135,10 @@ namespace irgen {
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
-                            PolymorphicFunctionType *type,
-                            CanType substInputType,
-                            ArrayRef<Substitution> subs,
-                            Explosion &args,
-                            const ExistentialSubstitutionMap &existentialSubs);
+                                PolymorphicFunctionType *type,
+                                CanType substInputType,
+                                ArrayRef<Substitution> subs,
+                                Explosion &args);
 
   /// Emit a value-witness table for the given type, which is assumed
   /// to be non-dependent.

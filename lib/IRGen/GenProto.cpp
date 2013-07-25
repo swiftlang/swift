@@ -68,9 +68,7 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  /// \brief The layout of an existential buffer.
-  ///
-  /// OpaqueExistentialLayout is intended to be a
+  /// The layout of an existential buffer.  This is intended to be a
   /// small, easily-computed type that can be passed around by value.
   class OpaqueExistentialLayout {
   private:
@@ -2499,7 +2497,6 @@ namespace {
         sigInputTypeForImpl = TupleType::get(sigInputFieldsForImpl,
                                              sigInputType->getASTContext())
           ->getCanonicalType();
-
       }
       
       // The impl type is the result of some substitution
@@ -2511,8 +2508,7 @@ namespace {
       if (auto implPoly =
             dyn_cast<PolymorphicFunctionType>(argSite.ImplFnType)) {
         emitPolymorphicArguments(IGF, implPoly, sigInputTypeForImpl,
-                                 Substitutions, implArgs,
-                                 ExistentialSubstitutionMap());
+                                 Substitutions, implArgs);
       }
       
       emission.addArg(implArgs);
@@ -2555,12 +2551,8 @@ namespace {
 
       // Otherwise, re-emit.
       Explosion sigResult(ExplosionLevel);
-      ExistentialSubstitutionMap existentialSubs;
       reemitAsUnsubstituted(IGF, sigResultType, implResultType,
-                            Substitutions, implResult, sigResult,
-                            existentialSubs);
-      assert(existentialSubs.empty() &&
-           "should not have any existential substitutions in a witness thunk");
+                            Substitutions, implResult, sigResult);
       IGF.emitScalarReturn(sigResult);
     }
 
@@ -2986,10 +2978,10 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     }
     
     return ClassArchetypeTypeInfo::create(archetype,
-                                          reprTy,
-                                          IGM.getPointerSize(),
-                                          IGM.getPointerAlignment(),
-                                          protocols, swiftRefcount);
+                                                 reprTy,
+                                                 IGM.getPointerSize(),
+                                                 IGM.getPointerAlignment(),
+                                                 protocols, swiftRefcount);
   }
   
   // Otherwise, for now, always use an opaque indirect type.
@@ -3479,13 +3471,10 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
 namespace {
   class EmitPolymorphicArguments : public PolymorphicConvention {
     IRGenFunction &IGF;
-    const ExistentialSubstitutionMap &ExistentialSubs;
   public:
     EmitPolymorphicArguments(IRGenFunction &IGF,
-                             PolymorphicFunctionType *polyFn,
-                             const ExistentialSubstitutionMap &existentialSubs)
-      : PolymorphicConvention(polyFn), IGF(IGF),
-        ExistentialSubs(existentialSubs) {}
+                             PolymorphicFunctionType *polyFn)
+      : PolymorphicConvention(polyFn), IGF(IGF) {}
 
     void emit(CanType substInputType, ArrayRef<Substitution> subs,
               Explosion &out);
@@ -3505,22 +3494,16 @@ namespace {
       }
       llvm_unreachable("bad source kind!");
     }
-    
-    void emitExistentialSubstitution(ArchetypeType *archetype,
-                                     const ExistentialSubstitution &sub,
-                                     Explosion &out);
   };
 }
 
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
-                           PolymorphicFunctionType *polyFn,
-                           CanType substInputType,
-                           ArrayRef<Substitution> subs,
-                           Explosion &out,
-                           const ExistentialSubstitutionMap &existentialSubs) {
-  EmitPolymorphicArguments(IGF, polyFn, existentialSubs)
-    .emit(substInputType, subs, out);
+                                     PolymorphicFunctionType *polyFn,
+                                     CanType substInputType,
+                                     ArrayRef<Substitution> subs,
+                                     Explosion &out) {
+  EmitPolymorphicArguments(IGF, polyFn).emit(substInputType, subs, out);
 }
 
 void EmitPolymorphicArguments::emit(CanType substInputType,
@@ -3537,13 +3520,6 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
   for (auto *archetype : generics.getAllArchetypes()) {
-    // If we had an existential substitution for the archetype, emit it now.
-    auto foundExistSub = ExistentialSubs.find(archetype);
-    if (foundExistSub != ExistentialSubs.end()) {
-      emitExistentialSubstitution(archetype, foundExistSub->second, out);
-      continue;
-    }
-    
     // Find the substitution for the archetype.
     auto const *subp = std::find_if(subs.begin(), subs.end(),
                                     [&](Substitution const &sub) {
@@ -3554,7 +3530,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     
     CanType argType = sub.Replacement->getCanonicalType();
 
-    // Add the metadata reference unless it's fulfilled.
+    // Add the metadata reference unelss it's fulfilled.
     if (!Fulfillments.count(FulfillmentKey(archetype, nullptr))) {
       out.add(IGF.emitTypeMetadataRef(argType));
     }
@@ -3592,45 +3568,6 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       llvm::Value *wtable = confI.getTable(IGF);
       out.add(wtable);
     }
-  }
-}
-
-void EmitPolymorphicArguments::emitExistentialSubstitution(
-                                             ArchetypeType *archetype,
-                                             const ExistentialSubstitution &sub,
-                                             Explosion &out) {
-  assert(!Fulfillments.count(FulfillmentKey(archetype, nullptr))
-         && "fulfillment for existential substitution?!");
-  
-  // Add the metadata reference.
-  out.add(sub.metadata);
-
-  // Nothing else to do if there aren't any protocols to witness.
-  auto protocols = archetype->getConformsTo();
-  if (protocols.empty())
-    return;
-
-  // Add witness tables for each of the required protocols.
-  for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-    auto protocol = protocols[i];
-    
-    assert(!Fulfillments.count(FulfillmentKey(archetype, protocol))
-           && "fulfillment for existential substitution?!");
-    
-    ArrayRef<ProtocolEntry> protocolEntries;
-    auto &protoTI = IGF.getFragileTypeInfo(sub.protocolType);
-    if (sub.protocolType->isClassExistentialType()) {
-      auto &classProtoTI = protoTI.as<ClassExistentialTypeInfo>();
-      protocolEntries = classProtoTI.getProtocols();
-    } else {
-      auto &opaqueProtoTI = protoTI.as<OpaqueExistentialTypeInfo>();
-      protocolEntries = opaqueProtoTI.getProtocols();
-    }
-    
-    ProtocolPath path(IGF.IGM, protocolEntries, protocol);
-    auto wtable = sub.witnesses[path.getOriginIndex()];
-    wtable = path.apply(IGF, wtable);
-    out.add(wtable);
   }
 }
 
@@ -4029,6 +3966,7 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
   assert(!baseTy.isClassExistentialType() &&
          "emitting class existential as opaque existential");
   // The protocol we're calling on.
+  // TODO: support protocol compositions here.
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   
   // The function we're going to call.
@@ -4048,28 +3986,6 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
 
   // Build the value.
   getWitnessMethodValue(IGF, fn, fnProto, wtable, metadata, out);
-}
-
-void
-irgen::emitOpaqueExistentialMetadataAndWitnesses(IRGenFunction &IGF,
-                                         Address existAddr,
-                                         CanType baseTy,
-                                         llvm::Value *&metadata,
-                                         std::vector<llvm::Value*> &witnesses) {
-  assert(baseTy->isExistentialType());
-  assert(!baseTy->isClassExistentialType() &&
-         "emitting class existential as opaque existential");
-  // The protocol we're calling on.
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
-
-  // Load the metadata.
-  auto existLayout = baseTI.getLayout();
-  metadata = existLayout.loadMetadataRef(IGF, existAddr);
-  
-  // Load the witness tables.
-  for (unsigned i = 0, e = existLayout.getNumTables(); i < e; ++i) {
-    witnesses.push_back(existLayout.loadWitnessTable(IGF, existAddr, i));
-  }
 }
 
 /// Extract the method pointer and metadata from a class existential
@@ -4154,9 +4070,9 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
 static std::pair<Address, llvm::Value*>
 emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
                                             Address base,
-                                            CanType baseTy) {
-  assert(baseTy->isExistentialType());
-  assert(!baseTy->isClassExistentialType());
+                                            SILType baseTy) {
+  assert(baseTy.isExistentialType());
+  assert(!baseTy.isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
   auto layout = baseTI.getLayout();
 
@@ -4172,48 +4088,20 @@ emitOpaqueExistentialProjectionWithMetadata(IRGenFunction &IGF,
 Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                                Address base,
                                                SILType baseTy) {
-  return emitOpaqueExistentialProjectionWithMetadata(IGF, base,
-                                                   baseTy.getSwiftRValueType())
-    .first;
-}
-
-/// Emit a projection from an existential container to its concrete value
-/// buffer.
-Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                               Address base,
-                                               CanType baseTy) {
   return emitOpaqueExistentialProjectionWithMetadata(IGF, base, baseTy)
     .first;
 }
 
 /// Extract the instance pointer from a class existential value.
 llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
-                                                   Explosion &base,
-                                                   SILType baseTy) {
-  return emitClassExistentialProjection(IGF, base, baseTy.getSwiftRValueType());
-}
-
-llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
-                                                   Explosion &base,
-                                                   CanType baseTy) {
-  assert(baseTy->isClassExistentialType());
+                                                          Explosion &base,
+                                                          SILType baseTy) {
+  assert(baseTy.isClassExistentialType());
   auto &baseTI = IGF.getFragileTypeInfo(baseTy)
     .as<ClassExistentialTypeInfo>();
   
   return baseTI.getValue(IGF, base);
 }
-
-std::pair<ArrayRef<llvm::Value*>, llvm::Value*>
-irgen::emitClassExistentialProjectionWithWitnesses(IRGenFunction &IGF,
-                                                   Explosion &base,
-                                                   CanType baseTy) {
-  assert(baseTy->isClassExistentialType());
-  auto &baseTI = IGF.getFragileTypeInfo(baseTy)
-    .as<ClassExistentialTypeInfo>();
-  
-  return baseTI.getWitnessTablesAndValue(base);
-}
-
 
 static Address
 emitOpaqueDowncast(IRGenFunction &IGF,
@@ -4277,8 +4165,7 @@ Address irgen::emitOpaqueExistentialDowncast(IRGenFunction &IGF,
   Address value;
   llvm::Value *srcMetadata;
   std::tie(value, srcMetadata)
-    = emitOpaqueExistentialProjectionWithMetadata(IGF, container,
-                                                  srcType.getSwiftRValueType());
+    = emitOpaqueExistentialProjectionWithMetadata(IGF, container, srcType);
 
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }

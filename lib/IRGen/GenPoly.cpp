@@ -28,9 +28,7 @@
 #include "TypeInfo.h"
 #include "TypeVisitor.h"
 
-#include "GenMeta.h"
 #include "GenPoly.h"
-#include "GenProto.h"
 
 using namespace swift;
 using namespace irgen;
@@ -395,13 +393,10 @@ namespace {
     ArrayRef<Substitution> Subs;
     Explosion &In;
     Explosion &Out;
-    ExistentialSubstitutionMap &ExistentialSubs;
   public:
     ReemitAsUnsubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
-                          Explosion &in, Explosion &out,
-                          ExistentialSubstitutionMap &existentialSubs)
-      : IGF(IGF), Subs(subs), In(in), Out(out), ExistentialSubs(existentialSubs)
-    {
+                          Explosion &in, Explosion &out)
+      : IGF(IGF), Subs(subs), In(in), Out(out) {
       assert(in.getKind() == out.getKind());
     }
 
@@ -409,90 +404,8 @@ namespace {
       assert(origTy == substTy);
       In.transferInto(Out, IGF.IGM.getExplosionSize(origTy, Out.getKind()));
     }
-    
-    void emitExistentialSubstitution(CanArchetypeType origTy,
-                                     CanType substTy) {
-      if (substTy->isClassExistentialType()) {
-        // Decompose the container.
-        ArrayRef<llvm::Value *> witnesses;
-        llvm::Value *value;
-        std::tie(witnesses, value)
-        = emitClassExistentialProjectionWithWitnesses(IGF, In, substTy);
-        if (origTy->requiresClass()) {
-          // Bitcast to the archetype's representation type.
-          auto &ti = IGF.getFragileTypeInfo(origTy);
-          value = IGF.Builder.CreateBitCast(value,
-                                            ti.StorageType,
-                                            "substitution.class_bound");
-          Out.add(value);
-        } else {
-          // Create a temporary to hold the class pointer as an opaque
-          // value.
-          auto &ti = IGF.getFragileTypeInfo(substTy);
-          auto addr = ti.allocate(IGF, NotOnHeap, "substitution.temp")
-          .getAddress();
-          Explosion initValue(ExplosionKind::Minimal);
-          initValue.add(value);
-          ti.initialize(IGF, initValue, addr);
-          llvm::Value *outAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                                           IGF.IGM.OpaquePtrTy,
-                                                           "temp.cast");
-          Out.add(outAddr);
-        }
-
-        // Save the type metadata and witnesses away for the archetype
-        // substitution.
-        llvm::Value *metadata
-          = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
-        
-        assert(!ExistentialSubs.count(origTy)
-               && "multiple existential substitutions for archetype?!");
-        ExistentialSubstitution &sub = ExistentialSubs[origTy];
-        sub.protocolType = substTy;
-        sub.metadata = metadata;
-        sub.witnesses.insert(sub.witnesses.end(),
-                             witnesses.begin(), witnesses.end());
-        return;
-      }
-      
-      auto &ti = IGF.getFragileTypeInfo(substTy);
-      Address inAddr = ti.getAddressForPointer(In.claimNext());
-      Address valueAddr
-        = emitOpaqueExistentialProjection(IGF, inAddr, substTy);
-      llvm::Value *outValue = IGF.Builder.CreateBitCast(
-                                                  valueAddr.getAddress(),
-                                                  IGF.IGM.OpaquePtrTy,
-                                                  "substitution.reinterpret");
-      Out.add(outValue);
-      
-      // Save the type metadata and witnesses away for the archetype
-      // substitution.
-      assert(!ExistentialSubs.count(origTy)
-             && "multiple existential substitutions for archetype?!");
-      ExistentialSubstitution &sub = ExistentialSubs[origTy];
-      sub.protocolType = substTy;
-      emitOpaqueExistentialMetadataAndWitnesses(IGF, inAddr, substTy,
-                                                sub.metadata,
-                                                sub.witnesses);
-    }
 
     void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
-      // If we used an existential type to fulfill the type variable, then
-      // project the value out of the container.
-      if (substTy->isExistentialType()) {
-        if (origTy->getSuperclass() || origTy->requiresClass()
-            || !origTy->getConformsTo().empty()) {
-          // FIXME: If the archetype has no requirements, assume that the
-          // protocol itself is the substituted type and carry on. This covers
-          // cases like when a function 'foo<T>(x:T[], y:T)' is called with an
-          // array of existentials. We need the AST to distinguish these cases
-          // since this is wrong.
-          // Here, we have a requirement, so we probably need to open the
-          // existential.
-          return emitExistentialSubstitution(origTy, substTy);
-        }
-      }
-
       // For class protocols, bitcast to the archetype class pointer
       // representation.
       if (origTy->requiresClass()) {
@@ -636,10 +549,8 @@ namespace {
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   CanType expectedTy, CanType substTy,
                                   ArrayRef<Substitution> subs,
-                                  Explosion &in, Explosion &out,
-                                  ExistentialSubstitutionMap &existentialSubs) {
-  ReemitAsUnsubstituted(IGF, subs, in, out, existentialSubs)
-    .visit(expectedTy, substTy);
+                                  Explosion &in, Explosion &out) {
+  ReemitAsUnsubstituted(IGF, subs, in, out).visit(expectedTy, substTy);
 }
 
 namespace {
@@ -683,7 +594,7 @@ namespace {
       // Otherwise, load as a take.
       substTI.loadAsTake(IGF, substTI.getAddressForPointer(inAddr), Out);
     }
-    
+
     void visitArrayType(CanArrayType origTy, CanArrayType substTy) {
       llvm_unreachable("remapping values of array type");
     }
