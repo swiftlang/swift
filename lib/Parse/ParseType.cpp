@@ -192,7 +192,7 @@ IdentTypeRepr *Parser::parseTypeIdentifier() {
 
   // Lookup element #0 through our current scope chains in case it is some thing
   // local (this returns null if nothing is found).
-  if (auto Entry = ScopeInfo.lookupValueName(ComponentsR[0].getIdentifier()))
+  if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
     ComponentsR[0].setValue(Entry);
 
   return IdentTypeRepr::create(Context, ComponentsR);

@@ -79,7 +79,7 @@ GenericParamList *Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     GenericParams.push_back(Param);
 
     // Add this parameter to the scope.
-    ScopeInfo.addToScope(Param);
+    addToScope(Param);
 
     // Parse the comma, if the list continues.
   } while (consumeIf(tok::comma));

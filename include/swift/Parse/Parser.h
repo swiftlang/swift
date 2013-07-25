@@ -311,6 +311,17 @@ public:
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
 
+  swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
+
+  /// \brief Add the given Decl to the current scope.
+  void addToScope(ValueDecl *D) {
+    getScopeInfo().addToScope(D);
+  }
+
+  ValueDecl *lookupInScope(Identifier Name) {
+    return getScopeInfo().lookupValueName(Name);
+  }
+
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
 

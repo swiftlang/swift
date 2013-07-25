@@ -48,7 +48,7 @@ static bool isResolvableScope(ScopeKind SK) {
 }
 
 Scope::Scope(Parser *P, ScopeKind SC):
-    SI(P->ScopeInfo),
+    SI(P->getScopeInfo()),
     HTScope(SI.HT, SI.CurScope ? &SI.CurScope->HTScope : 0),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
@@ -64,7 +64,7 @@ Scope::Scope(Parser *P, ScopeKind SC):
 }
 
 Scope::Scope(Parser *P, SavedScope &&SS):
-    SI(P->ScopeInfo),
+    SI(P->getScopeInfo()),
     HTScope(std::move(SS.HTDetachedScope)),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),

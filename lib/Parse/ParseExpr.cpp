@@ -1276,7 +1276,7 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
     }
   }
   
-  ValueDecl *D = ScopeInfo.lookupValueName(text);
+  ValueDecl *D = lookupInScope(text);
   Expr *E;
   if (D == 0) {
     auto refKind = DeclRefKind::Ordinary;
@@ -1570,7 +1570,7 @@ static void AddFuncArgumentsToScope(const Pattern *pat, CapturingExpr *CE,
     // Reparent the decl and add it to the scope.
     VarDecl *var = cast<NamedPattern>(pat)->getDecl();
     var->setDeclContext(CE);
-    P.ScopeInfo.addToScope(var);
+    P.addToScope(var);
     return;
   }
 

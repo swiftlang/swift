@@ -711,25 +711,25 @@ TypeAliasDecl *Parser::parseDeclTypeAlias(bool WantDefinition) {
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc, UnderlyingTy,
                                 CurDeclContext,
                                 Context.AllocateCopy(Inherited));
-  ScopeInfo.addToScope(TAD);
+  addToScope(TAD);
   return TAD;
 }
 
 namespace {
   class AddVarsToScope : public ASTWalker {
   public:
-    swift::ScopeInfo &ScopeInfo;
+    Parser &TheParser;
     ASTContext &Context;
     DeclContext *CurDeclContext;
     SmallVectorImpl<Decl*> &Decls;
     DeclAttributes &Attributes;
     
-    AddVarsToScope(swift::ScopeInfo &ScopeInfo,
+    AddVarsToScope(Parser &P,
                    ASTContext &Context,
                    DeclContext *CurDeclContext,
                    SmallVectorImpl<Decl*> &Decls,
                    DeclAttributes &Attributes)
-      : ScopeInfo(ScopeInfo),
+      : TheParser(P),
         Context(Context),
         CurDeclContext(CurDeclContext),
         Decls(Decls),
@@ -757,7 +757,7 @@ namespace {
         }
         
         Decls.push_back(VD);
-        ScopeInfo.addToScope(VD);
+        TheParser.addToScope(VD);
       }
       return P;
     }
@@ -767,7 +767,7 @@ namespace {
 void Parser::addVarsToScope(Pattern *Pat,
                             SmallVectorImpl<Decl*> &Decls,
                             DeclAttributes &Attributes) {
-  Pat->walk(AddVarsToScope(ScopeInfo, Context, CurDeclContext,
+  Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
                            Decls, Attributes));
 }
 
@@ -1370,7 +1370,7 @@ FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
   if (FE)
     FE->setDecl(FD);
   if (Attributes.isValid()) FD->getMutableAttrs() = Attributes;
-  ScopeInfo.addToScope(FD);
+  addToScope(FD);
   return FD;
 }
 
@@ -1486,7 +1486,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
   
   OOD->setMembers(Context.AllocateCopy(MemberDecls), {LBLoc, RBLoc});
-  ScopeInfo.addToScope(OOD);
+  addToScope(OOD);
   
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(OneOfLoc, diag::disallowed_type);
@@ -1666,7 +1666,7 @@ bool Parser::parseDeclStruct(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
-  ScopeInfo.addToScope(SD);
+  addToScope(SD);
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(StructLoc, diag::disallowed_type);
@@ -1768,7 +1768,7 @@ bool Parser::parseDeclClass(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
-  ScopeInfo.addToScope(CD);
+  addToScope(CD);
 
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ClassLoc, diag::disallowed_type);
@@ -2004,7 +2004,7 @@ static void AddConstructorArgumentsToScope(const Pattern *pat,
     // Reparent the decl and add it to the scope.
     VarDecl *var = cast<NamedPattern>(pat)->getDecl();
     var->setDeclContext(CD);
-    P.ScopeInfo.addToScope(var);
+    P.addToScope(var);
     return;
   }
 
@@ -2083,7 +2083,7 @@ ConstructorDecl *Parser::parseDeclConstructor(bool HasContainerType) {
       Param.setDeclContext(CD);
   }
   AddConstructorArgumentsToScope(Arguments.get(), CD, *this);
-  ScopeInfo.addToScope(ThisDecl);
+  addToScope(ThisDecl);
   ContextChange CC(*this, CD);
 
   NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
@@ -2119,7 +2119,7 @@ DestructorDecl *Parser::parseDeclDestructor(unsigned Flags) {
       new (Context) DestructorDecl(Context.getIdentifier("destructor"),
                                    DestructorLoc, ThisDecl, CurDeclContext);
   ThisDecl->setDeclContext(DD);
-  ScopeInfo.addToScope(ThisDecl);
+  addToScope(ThisDecl);
   ContextChange CC(*this, DD);
 
   NullablePtr<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
