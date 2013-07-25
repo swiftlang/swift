@@ -75,7 +75,7 @@ static bool isStartOfIdentifier(char c) {
   return c == 'o';
 }
 
-enum class swiftContextType {
+enum class SwiftContextType {
   swiftClass,
   swiftStruct,
   swiftOneOf,
@@ -84,20 +84,20 @@ enum class swiftContextType {
   swiftSubstitution
 };
 
-static bool isStartOfNominalType(char c, swiftContextType* context = NULL) {
+static bool isStartOfNominalType(char c, SwiftContextType* context = NULL) {
   if (c == 'C') {
     if (context)
-      *context = swiftContextType::swiftClass;
+      *context = SwiftContextType::swiftClass;
     return true;
   }
   if (c == 'V') {
     if (context)
-      *context = swiftContextType::swiftStruct;
+      *context = SwiftContextType::swiftStruct;
     return true;
   }
   if (c == 'O') {
     if (context)
-      *context = swiftContextType::swiftOneOf;
+      *context = SwiftContextType::swiftOneOf;
     return true;
   }
   return false;
@@ -150,14 +150,17 @@ public:
 
 private:
 
-  enum class isProtocol : bool {
+  enum class IsProtocol : bool {
     yes = true, no = false
   };
 
-  enum class isVariadic : bool {
+  enum class IsVariadic : bool {
     yes = true, no = false
   };
   
+  // this tuple is meant to represent a Substitution + the notion of whether
+  // the name of the item is a protocol or not. read it as
+  // (itemName : String, isOK : Bool, isProtocol : Bool)
   typedef std::tuple<std::string, bool, bool> SubstitutionWithProtocol;
 
   class MangledNameSource {
@@ -197,7 +200,7 @@ private:
 
   Substitution demangleValueWitnessKind();
 
-  Substitution demangleContext(swiftContextType* context = NULL);
+  Substitution demangleContext(SwiftContextType* context = NULL);
 
   Substitution demangleModule();
 
@@ -232,13 +235,13 @@ private:
 
   Substitution demangleArchetypeRef(size_t depth, size_t i);
 
-  Substitution demangleDeclarationName(isProtocol protocol);
+  Substitution demangleDeclarationName(IsProtocol protocol);
 
   Substitution demangleProtocolList();
 
   Substitution demangleList(std::function<Substitution(void)> element);
 
-  Substitution demangleTuple(isVariadic variadic);
+  Substitution demangleTuple(IsVariadic variadic);
 
   Substitution failure();
 
@@ -462,11 +465,11 @@ Demangler::Substitution Demangler::demangleGlobal() {
 }
 
 Demangler::Substitution Demangler::demangleEntity() {
-  swiftContextType contextType;
+  SwiftContextType contextType;
   Substitution context = demangleContext(&contextType);
   if (context) {
     if (Mangled.nextIf('D')) {
-      if (contextType == swiftContextType::swiftClass)
+      if (contextType == SwiftContextType::swiftClass)
         return success(DemanglerPrinter() << context.first()
                        << ".__deallocating_destructor");
       return success(DemanglerPrinter() << context.first() << ".destructor");
@@ -478,7 +481,7 @@ Demangler::Substitution Demangler::demangleEntity() {
       Substitution type = demangleType();
       if (!type)
         return failure();
-      if (contextType == swiftContextType::swiftClass)
+      if (contextType == SwiftContextType::swiftClass)
         return success(DemanglerPrinter() << context.first()
                        << ".__allocating_constructor : " << type.first());
       return success(DemanglerPrinter() << context.first()
@@ -546,7 +549,7 @@ Demangler::Substitution Demangler::demangleValueWitnessKind() {
   return failure();
 }
 
-Demangler::Substitution Demangler::demangleContext(swiftContextType* context) {
+Demangler::Substitution Demangler::demangleContext(SwiftContextType* context) {
   if (!Mangled)
     return failure();
   char c = Mangled.peek();
@@ -554,9 +557,9 @@ Demangler::Substitution Demangler::demangleContext(swiftContextType* context) {
   {
     if (context) {
       if (c == 'S')
-        *context = swiftContextType::swiftSubstitution;
+        *context = SwiftContextType::swiftSubstitution;
       else
-        *context = swiftContextType::swiftModule;
+        *context = SwiftContextType::swiftModule;
     }
     return demangleModule();
   }
@@ -565,7 +568,7 @@ Demangler::Substitution Demangler::demangleContext(swiftContextType* context) {
   if (c == 'P') {
     Mangled.next();
     if (context)
-      *context = swiftContextType::swiftProtocol;
+      *context = SwiftContextType::swiftProtocol;
     return demangleProtocolName();
   }
   return failure();
@@ -731,7 +734,7 @@ Demangler::Substitution Demangler::demangleNominalType() {
   if (c == 'S')
     return demangleSubstitutionIndex();
   if (isStartOfNominalType(c))
-    return demangleDeclarationName(isProtocol::no);
+    return demangleDeclarationName(IsProtocol::no);
   return failure();
 }
 
@@ -749,7 +752,7 @@ Demangler::Substitution Demangler::demangleProtocolName() {
     Substitutions.push_back(success(identifier));
     return success(identifier);
   }
-  return demangleDeclarationName(isProtocol::yes);
+  return demangleDeclarationName(IsProtocol::yes);
 }
 
 Demangler::Substitution Demangler::demangleDirectness() {
@@ -926,11 +929,11 @@ Demangler::Substitution Demangler::demangleType() {
     return failure();
   }
   if (c == 'T')
-    return demangleTuple(isVariadic::no);
+    return demangleTuple(IsVariadic::no);
   if (c == 't')
-    return demangleTuple(isVariadic::yes);
+    return demangleTuple(IsVariadic::yes);
   if (isStartOfNominalType(c))
-    return demangleDeclarationName(isProtocol::no);
+    return demangleDeclarationName(IsProtocol::no);
   if (c == 'S')
     return demangleSubstitutionIndex();
   if (c == 'U') {
@@ -992,14 +995,14 @@ Demangler::Substitution Demangler::demangleArchetypeRef(size_t depth,
   return success(archetypeName(index));
 }
 
-Demangler::Substitution Demangler::demangleDeclarationName(isProtocol isA) {
+Demangler::Substitution Demangler::demangleDeclarationName(IsProtocol isA) {
   Substitution context = demangleContext();
   if (context) {
     Substitution identifier = demangleIdentifier();
     if (identifier) {
       Substitutions.push_back(Substitution(
           DemanglerPrinter() << context.first() << "." << identifier.first(),
-          isA == isProtocol::yes));
+          isA == IsProtocol::yes));
       return success(DemanglerPrinter() << context.first() << "."
                                         << identifier.first());
     }
@@ -1040,7 +1043,7 @@ Demangler::demangleList(std::function<Substitution(void)> element) {
   return success(result);
 }
 
-Demangler::Substitution Demangler::demangleTuple(isVariadic isA) {
+Demangler::Substitution Demangler::demangleTuple(IsVariadic isA) {
   Substitution list = demangleList([this]() {
     if (!Mangled)
       return failure();
@@ -1058,7 +1061,7 @@ Demangler::Substitution Demangler::demangleTuple(isVariadic isA) {
   });
   if (!list)
     return failure();
-  if (isA == isVariadic::yes)
+  if (isA == IsVariadic::yes)
     return success(DemanglerPrinter() << "(" << list.first() << "...)");
   return success(DemanglerPrinter() << "(" << list.first() << ")");
 }
