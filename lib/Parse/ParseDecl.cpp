@@ -1380,6 +1380,10 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
   auto EndLexerState = L->getStateForBeginningOfTokenLoc(FE->getEndLoc());
 
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeToken();
+
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 

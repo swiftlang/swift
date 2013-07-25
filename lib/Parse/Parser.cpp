@@ -94,10 +94,6 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletion(CodeCompletionOffset, CodeCompletion.get());
     }
-    // Prime the parser.
-    // FIXME: This is only necessary because ParserPositionRAII asserts without
-    // a primed parser.
-    TheParser.consumeToken();
     TheParser.parseDeclFuncBodyDelayed(FD);
   }
 };
