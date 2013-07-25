@@ -1378,7 +1378,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
     return false;
 
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
-  auto EndLexerState = L->getStateForBeginningOfTokenLoc(FE->getEndLoc());
+  auto EndLexerState = L->getStateForEndOfTokenLoc(FE->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))

@@ -151,6 +151,10 @@ public:
     return getStateForBeginningOfTokenLoc(Tok.getLoc());
   }
 
+  State getStateForEndOfTokenLoc(SourceLoc Loc) const {
+    return getStateForBeginningOfTokenLoc(getLocForEndOfToken(SourceMgr, Loc));
+  }
+
   /// \brief Restore the lexer state to a given one, that can be located either
   /// before or after the current position.
   void restoreState(State S) {
