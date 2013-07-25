@@ -215,13 +215,11 @@ public:
 
   class FunctionBodyParserState {
     FunctionBodyParserState(ParserPosition BeginParserPosition,
-                            SavedScope &&Scope, unsigned Flags):
-        BeginParserPosition(BeginParserPosition), Scope(std::move(Scope)),
-        Flags(Flags)
+                            SavedScope &&Scope):
+        BeginParserPosition(BeginParserPosition), Scope(std::move(Scope))
     {}
     ParserPosition BeginParserPosition;
     SavedScope Scope;
-    unsigned Flags;
     friend class Parser;
 
     SavedScope takeScope() {

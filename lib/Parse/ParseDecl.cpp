@@ -1221,8 +1221,7 @@ Parser::consumeFunctionBody(unsigned Flags) {
   return ParserTokenRange(
             Context.AllocateObjectCopy(
                 FunctionBodyParserState(BeginParserPosition,
-                                        ScopeInfo.saveCurrentScope(),
-                                        Flags)),
+                                        ScopeInfo.saveCurrentScope())),
             Context.AllocateObjectCopy(EndLexerState));
 }
 
