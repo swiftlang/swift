@@ -1221,7 +1221,7 @@ void Parser::consumeFunctionBody(FuncExpr *FE) {
                                     BeginParserPosition.PreviousLoc);
     FE->setBodyDelayed(BodyRange.End);
   } else {
-    FE->setBodySkipped();
+    FE->setBodySkipped(BodyRange.End);
   }
 }
 

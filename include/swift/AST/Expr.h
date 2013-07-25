@@ -1824,7 +1824,9 @@ public:
 
   /// \brief Note that the body was skipped for this function.  Function body
   /// can not be attached after this call.
-  void setBodySkipped() {
+  void setBodySkipped(SourceLoc EndLoc) {
+    assert(getBodyKind() == BodyKind::None);
+    BodyEndLoc = EndLoc;
     setBodyKind(BodyKind::Skipped);
   }
 
