@@ -238,10 +238,30 @@ Some additional meaningful categories of type:
   ``release``-d. Reference types also have *ownership semantics* for their
   referenced heap object; see `Reference Counting`_ below.
 
-Swift types may not translate one-to-one to SIL types. In particular, tuple
-types are canonicalized, and function types are canonicalized and mangled in
-order to encode calling convention and resilience rules. Function input argument
-tuples are flattened.
+Swift types may not translate one-to-one to SIL types. In particular, function
+types are canonicalized and transformed in order to encode additional
+attributes:
+
+- The calling convention of the function, indicated by the ``[cc(convention)]``
+  attribute, where ``convention`` can currently be ``swift``, ``method``,
+  ``cdecl``, or ``objc``.  These describe a machine-level calling convention
+  below the concern of SIL.
+- The "thinness" of the function reference, indicated by the ``[thin]``
+  attribute, which tracks whether a function reference requires a context value
+  to reference captured closure state. Standalone functions and methods are
+  always ``[thin]``, but function-local functions or closure expressions that
+  capture context are thick. Partial applications of curried functions or
+  methods are also thick.
+- Curried function definitions are emitted at their "natural" uncurry level,
+  that is, with all of the curried argument clauses flattened into a single
+  argument clause. For instance, a curried function
+  ``func foo(x:A)(y:B) -> C`` is emitted as a function of type
+  ``((y:B), (x:A)) -> C``. Methods are treated as a form of curried function.
+  The exact ordering of currying clauses depends on the `calling convention`_
+  of the function.
+
+TODO: Type-checking of cc and thin attributes will move into Swift's
+type-checker and out of SIL eventually.
 
 Values and Operands
 ~~~~~~~~~~~~~~~~~~~
