@@ -386,7 +386,7 @@ Demangler::Substitution Demangler::demangleGlobal() {
     if (!type)
       return failure();
     return success(DemanglerPrinter() << directness.first()
-                                      << "  type metadata for "
+                                      << " type metadata for "
                                       << type.first());
   }
 
