@@ -20,6 +20,7 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
+#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -82,6 +83,21 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (Invocation.getTUKind() == TranslationUnit::SIL)
     createSILModule();
 
+  auto CodeCompletePoint = Invocation.getCodeCompletionPoint();
+  if (CodeCompletePoint.first) {
+    auto MemBuf = CodeCompletePoint.first;
+    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
+    unsigned BufID = SourceMgr.AddNewSourceBuffer(
+        llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
+                                             MemBuf->getBufferIdentifier()),
+                                             llvm::SMLoc());
+    BufferIDs.push_back(BufID);
+    CodeCompleteLoc =
+        SourceLoc(llvm::SMLoc::getFromPointer(
+                            SourceMgr.getMemoryBuffer(BufID)->getBufferStart() +
+                                CodeCompletePoint.second));
+  }
+
   for (auto &File : Invocation.getInputFilenames()) {
     // Open the input file.
     llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
@@ -107,6 +123,32 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   return false;
 }
 
+namespace {
+class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
+  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
+                                      FuncExpr *FE,
+                                      SourceRange BodyRange) override {
+    return true;
+  }
+};
+
+class CodeCompleteDelayedCallbacks : public DelayedParsingCallbacks {
+  SourceLoc CodeCompleteLoc;
+public:
+  explicit CodeCompleteDelayedCallbacks(SourceLoc CodeCompleteLoc)
+    : CodeCompleteLoc(CodeCompleteLoc) {
+  }
+
+  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
+                                      FuncExpr *FE,
+                                      SourceRange BodyRange) override {
+    return CodeCompleteLoc.Value.getPointer() >
+               BodyRange.Start.Value.getPointer() &&
+        CodeCompleteLoc.Value.getPointer() <= BodyRange.End.Value.getPointer();
+  }
+};
+}
+
 void swift::CompilerInstance::doIt() {
   const TranslationUnit::TUKind Kind = Invocation.getTUKind();
   Component *Comp = new (Context->Allocate<Component>(1)) Component();
@@ -122,21 +164,34 @@ void swift::CompilerInstance::doIt() {
   if (Kind != TranslationUnit::SIL && !Invocation.getParseOnly())
     performAutoImport(TU);
 
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
+  if (Invocation.isCodeCompletion()) {
+    DelayedCB.reset(new CodeCompleteDelayedCallbacks(CodeCompleteLoc));
+  } else if (Invocation.isDelayedFunctionBodyParsing()) {
+    DelayedCB.reset(new AlwaysDelayedCallbacks);
+  }
+
+  PersistentParserState PersistentState;
+
   if (Kind == TranslationUnit::Library) {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
       bool Done;
-      parseIntoTranslationUnit(TU, BufferID, &Done, nullptr, &TheParser);
+      parseIntoTranslationUnit(TU, BufferID, &Done, nullptr, &PersistentState,
+                               DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
-      performDelayedParsing(TU, TheParser.get(),
-                            Invocation.getCodeCompletionFactory());
-      TheParser.reset(nullptr);
     }
 
     // Finally, if enabled, type check the whole thing in one go.
     if (!Invocation.getParseOnly())
       performTypeChecking(TU);
+
+    if (DelayedCB) {
+      performDelayedParsing(TU, PersistentState,
+                            Invocation.getCodeCompletionFactory(),
+                            Invocation.getCodeCompletionPoint().second);
+    }
     return;
   }
 
@@ -156,12 +211,16 @@ void swift::CompilerInstance::doIt() {
     // with 'sil' definitions.
     parseIntoTranslationUnit(TU, BufferID, &Done,
                              TheSILModule ? &SILContext : nullptr,
-                             &TheParser);
+                             &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
       performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (!Done);
-  performDelayedParsing(TU, TheParser.get(),
-                        Invocation.getCodeCompletionFactory());
+
+  if (DelayedCB) {
+    performDelayedParsing(TU, PersistentState,
+                          Invocation.getCodeCompletionFactory(),
+                          Invocation.getCodeCompletionPoint().second);
+  }
 }
 

@@ -139,26 +139,16 @@ public:
   /// actually lexing it.
   const Token &peekNextToken() const { return NextToken; }
 
+  /// \brief Returns the lexer state for the beginning of the given token
+  /// location. After restoring the state, lexer will return this token and
+  /// continue from there.
+  State getStateForBeginningOfTokenLoc(SourceLoc Loc) const;
+
   /// \brief Returns the lexer state for the beginning of the given token.
   /// After restoring the state, lexer will return this token and continue from
   /// there.
   State getStateForBeginningOfToken(const Token &Tok) const {
-    const char *Ptr = Tok.getText().begin();
-    // Skip whitespace backwards until we hit a newline.  This is needed to
-    // correctly lex the token if it is at the beginning of the line.
-    while (Ptr >= BufferStart + 1) {
-      char C = Ptr[-1];
-      if (C == ' ' || C == '\t' || C == 0) {
-        Ptr--;
-        continue;
-      }
-      if (C == '\n' || C == '\r') {
-        Ptr--;
-        break;
-      }
-      break;
-    }
-    return State(Ptr);
+    return getStateForBeginningOfTokenLoc(Tok.getLoc());
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either

@@ -40,21 +40,17 @@ public:
   typedef ScopedHTTy::DetachedScopeTy ScopedHTDetachedScopeTy;
 
 private:
-  Parser &TheParser;
   ScopedHTTy HT;
 
   Scope *CurScope = nullptr;
   unsigned ResolvableDepth = 0;
 
 public:
-  ScopeInfo(Parser &TheParser) : TheParser(TheParser) {}
-  ~ScopeInfo() {}
-
   ValueDecl *lookupValueName(Identifier Name);
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void addToScope(ValueDecl *D);  
+  void addToScope(ValueDecl *D, Parser &TheParser);  
 
   SavedScope saveCurrentScope();
 };

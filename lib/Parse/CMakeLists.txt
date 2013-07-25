@@ -8,5 +8,6 @@ add_swift_library(swiftParse
   ParseSIL.cpp
   ParseStmt.cpp
   ParseType.cpp
+  PersistentParserState.cpp
   Scope.cpp
   DEPENDS swiftAST swiftSIL)

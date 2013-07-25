@@ -347,6 +347,8 @@ FuncExpr *FuncExpr::create(ASTContext &C, SourceLoc funcLoc,
 }
 
 SourceRange FuncExpr::getSourceRange() const {
+  if (getBodyKind() == BodyKind::Unparsed)
+    return { FuncLoc, BodyEndLoc };
   if (auto *B = getBody())
     return { FuncLoc, B->getEndLoc() };
   if (FnRetType.hasLocation())

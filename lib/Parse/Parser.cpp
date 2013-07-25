@@ -21,6 +21,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -29,6 +30,8 @@
 #include "llvm/ADT/Twine.h"
 
 using namespace swift;
+
+void DelayedParsingCallbacks::anchor() { }
 
 static StringRef ComputeLexStart(StringRef File, unsigned Offset,
                                  unsigned EndOffset, bool IsMainModule);
@@ -49,20 +52,53 @@ namespace {
 
 /// A visitor that does delayed parsing of function bodies.
 class ParseDelayedFunctionBodies : public ASTWalker {
-  Parser &P;
+  TranslationUnit *TU;
+  PersistentParserState &ParserState;
+  CodeCompletionCallbacksFactory *CodeCompletionFactory;
+  unsigned CodeCompletionOffset;
 
 public:
-  ParseDelayedFunctionBodies(Parser &P) : P(P) {}
+  ParseDelayedFunctionBodies(TranslationUnit *TU,
+                             PersistentParserState &ParserState,
+                          CodeCompletionCallbacksFactory *CodeCompletionFactory,
+                          unsigned CodeCompletionOffset)
+    : TU(TU), ParserState(ParserState),
+      CodeCompletionFactory(CodeCompletionFactory),
+      CodeCompletionOffset(CodeCompletionOffset) {}
 
   virtual bool walkToDeclPre(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
       if (auto FE = FD->getBody()) {
         if (FE->getBodyKind() != FuncExpr::BodyKind::Unparsed)
           return false;
-        P.parseDeclFuncBodyDelayed(FD);
+        parseFunctionBody(FD);
       }
     }
     return true;
+  }
+
+private:
+  void parseFunctionBody(FuncDecl *FD) {
+    auto FE = FD->getBody();
+    assert(FE);
+    assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
+
+    int BufferID = TU->Ctx.SourceMgr.FindBufferContainingLoc(FD->getLoc().Value);
+    Parser TheParser(BufferID, TU,
+                     TU->Kind == TranslationUnit::Main ||
+                     TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
+
+    std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
+    if (CodeCompletionFactory) {
+      CodeCompletion.reset(
+          CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
+      TheParser.setCodeCompletion(CodeCompletionOffset, CodeCompletion.get());
+    }
+    // Prime the parser.
+    // FIXME: This is only necessary because ParserPositionRAII asserts without
+    // a primed parser.
+    TheParser.consumeToken();
+    TheParser.parseDeclFuncBodyDelayed(FD);
   }
 };
 } // unnamed namespace
@@ -72,50 +108,31 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      bool *Done,
                                      SILParserState *SIL,
-                                     std::unique_ptr<Parser> *PersistentParser) {
-  Parser *P = nullptr;
-  if (PersistentParser)
-    P = PersistentParser->get();
+                                     PersistentParserState *PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB) {
+  Parser P(BufferID, TU,
+           TU->Kind == TranslationUnit::Main ||
+           TU->Kind == TranslationUnit::REPL, SIL, PersistentState);
+  if (DelayedParseCB)
+    P.setDelayedParsingCallbacks(DelayedParseCB);
 
-  if (!P)
-    P = new Parser(BufferID, TU,
-                   TU->Kind == TranslationUnit::Main ||
-                   TU->Kind == TranslationUnit::REPL, SIL);
+  PrettyStackTraceParser stackTrace(P);
+  bool FoundSideEffects = P.parseTranslationUnit(TU);
 
-  PrettyStackTraceParser stackTrace(*P);
-  bool FoundSideEffects = P->parseTranslationUnit(TU);
-
-  const llvm::MemoryBuffer *Buffer = P->SourceMgr.getMemoryBuffer(BufferID);
-  *Done = P->Tok.getLoc().Value.getPointer() ==
+  const llvm::MemoryBuffer *Buffer = P.SourceMgr.getMemoryBuffer(BufferID);
+  *Done = P.Tok.getLoc().Value.getPointer() ==
           Buffer->getBuffer().end();
-
-  if (PersistentParser && !PersistentParser->get())
-    PersistentParser->reset(P);
 
   return FoundSideEffects;
 }
 
 void swift::performDelayedParsing(
-    TranslationUnit *TU, Parser *TheParser,
-    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
-  bool NeedSecondPass = false;
-  if (TU->Ctx.LangOpts.DelayFunctionBodyParsing)
-    NeedSecondPass = true;
-
-  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
-  if (TU->Ctx.LangOpts.isCodeCompletion() && CodeCompletionFactory) {
-    CodeCompletion.reset(
-        CodeCompletionFactory->createCodeCompletionCallbacks(*TheParser));
-    TheParser->setCodeCompletion(TU->Ctx.LangOpts.CodeCompletionOffset,
-                                 CodeCompletion.get());
-    NeedSecondPass = true;
-  }
-
-  if (!NeedSecondPass)
-    return;
-
-  TheParser->setDelayedParsingSecondPass();
-  ParseDelayedFunctionBodies Walker(*TheParser);
+    TranslationUnit *TU, PersistentParserState &PersistentState,
+    CodeCompletionCallbacksFactory *CodeCompletionFactory,
+    unsigned CodeCompletionOffset) {
+  ParseDelayedFunctionBodies Walker(TU, PersistentState,
+                                    CodeCompletionFactory,
+                                    CodeCompletionOffset);
   for (Decl *D : TU->Decls) {
     D->walk(Walker);
   }
@@ -178,45 +195,54 @@ static StringRef ComputeLexStart(StringRef File, unsigned Offset,
   return File;
 }
 
-
-Parser::Parser(unsigned BufferID, TranslationUnit *TU,
-               bool IsMainModule, SILParserState *SIL)
+Parser::Parser(Lexer *Lex, TranslationUnit *TU,
+               DiagnosticEngine &Diags, SILParserState *SIL,
+               PersistentParserState *PersistentState)
   : SourceMgr(TU->getASTContext().SourceMgr),
-    Diags(TU->getASTContext().Diags),
+    Diags(Diags),
     TU(TU),
-    L(new Lexer(ComputeLexStart(
-                    SourceMgr.getMemoryBuffer(BufferID)->getBuffer(),
-                    0, 0, IsMainModule),
-                 SourceMgr, &Diags, SIL != nullptr)),
+    L(Lex),
     SIL(SIL),
     Component(TU->getComponent()),
     Context(TU->getASTContext()),
-    ScopeInfo(*this),
-    IsMainModule(IsMainModule) {
+    IsMainModule(false) {
+
+  State = PersistentState;
+  if (!State) {
+    OwnedState.reset(new PersistentParserState());
+    State = OwnedState.get();
+  }
 
   // Set the token to a sentinel so that we know the lexer isn't primed yet.
   // This cannot be tok::unknown, since that is a token the lexer could produce.
   Tok.setKind(tok::NUM_TOKENS);
+}
+
+Parser::Parser(unsigned BufferID, TranslationUnit *TU,
+               bool IsMainModule, SILParserState *SIL,
+               PersistentParserState *PersistentState)
+  : Parser(new Lexer(ComputeLexStart(
+           TU->getASTContext().SourceMgr.getMemoryBuffer(BufferID)->getBuffer(),
+                               0, 0, IsMainModule),
+                     TU->getASTContext().SourceMgr, &TU->getASTContext().Diags,
+                     SIL != nullptr),
+           TU, TU->getASTContext().Diags, SIL, PersistentState) {
+  this->IsMainModule = IsMainModule;
+  auto ParserPos = State->takeParserPosition();
+  if (ParserPos.first.isValid() &&
+      SourceMgr.FindBufferContainingLoc(ParserPos.first.Value)== int(BufferID)){
+    auto BeginParserPosition =
+        getParserPosition(ParserPos.first, ParserPos.second);
+    restoreParserPosition(BeginParserPosition);
+  }
 }
 
 Parser::Parser(TranslationUnit *TU,
                llvm::StringRef fragment, DiagnosticEngine &Diags,
-               SILParserState *SIL)
-  : SourceMgr(TU->getASTContext().SourceMgr),
-    Diags(Diags),
-    TU(TU),
-    L(new Lexer(fragment, SourceMgr, &Diags, SIL != nullptr)),
-    SIL(SIL),
-    Component(TU->getComponent()),
-    Context(TU->getASTContext()),
-    ScopeInfo(*this),
-    IsMainModule(false)
-{
-  // Set the token to a sentinel so that we know the lexer isn't primed yet.
-  // This cannot be tok::unknown, since that is a token the lexer could produce.
-  Tok.setKind(tok::NUM_TOKENS);
+               SILParserState *SIL, PersistentParserState *PersistentState)
+  : Parser(new Lexer(fragment, SourceMgr, &Diags, SIL != nullptr),
+           TU, Diags, SIL, PersistentState) {
 }
-
 
 Parser::~Parser() {
   delete L;

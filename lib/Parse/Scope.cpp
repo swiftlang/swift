@@ -96,7 +96,7 @@ static bool checkValidOverload(const ValueDecl *D1, const ValueDecl *D2,
 
 /// addToScope - Register the specified decl as being in the current lexical
 /// scope.
-void ScopeInfo::addToScope(ValueDecl *D) {
+void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser) {
   if (!CurScope->isResolvable())
     return;
 

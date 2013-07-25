@@ -54,7 +54,15 @@ class CompilerInvocation {
   std::vector<std::string> InputFilenames;
   std::vector<llvm::MemoryBuffer *> InputBuffers;
 
+  llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
+
+  /// \brief Code completion offset in bytes from the beginning of the main
+  /// source file.  Valid only if \c isCodeCompletion() == true.
+  unsigned CodeCompletionOffset = ~0U;
+
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
+
+  bool DelayFunctionBodyParsing = false;
 
   typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
   ClangImporterCtorTy ImporterCtor = nullptr;
@@ -159,6 +167,21 @@ public:
   ArrayRef<std::string> getInputFilenames() const { return InputFilenames; }
   ArrayRef<llvm::MemoryBuffer*> getInputBuffers() const { return InputBuffers; }
 
+  void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
+    assert(Buf);
+    CodeCompletionBuffer = Buf;
+    CodeCompletionOffset = Offset;
+  }
+
+  std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
+    return std::make_pair(CodeCompletionBuffer, CodeCompletionOffset);
+  }
+
+  /// \returns true if we are doing code completion.
+  bool isCodeCompletion() const {
+    return CodeCompletionOffset != ~0U;
+  }
+
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
   }
@@ -166,6 +189,12 @@ public:
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
     return CodeCompletionFactory;
   }
+
+  void setDelayFunctionBodyParsing(bool Val) {
+    DelayFunctionBodyParsing = Val;
+  }
+
+  bool isDelayedFunctionBodyParsing() const { return DelayFunctionBodyParsing; }
 };
 
 class CompilerInstance {
@@ -175,9 +204,10 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics;
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
-  std::unique_ptr<Parser> TheParser;
 
   TranslationUnit *TU;
+
+  SourceLoc CodeCompleteLoc;
 
   void createSILModule();
 

@@ -21,7 +21,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Scope.h"
+#include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -37,7 +37,9 @@ namespace swift {
   struct TypeLoc;
   class TupleType;
   class SILParserState;
+  class PersistentParserState;
   class CodeCompletionCallbacks;
+  class DelayedParsingCallbacks;
   
   struct OneOfElementInfo;
   
@@ -68,27 +70,27 @@ public:
   TranslationUnit *TU;
   Lexer *L;
   SILParserState *SIL;    // Non-null when parsing a .sil file.
+  PersistentParserState *State;
+  std::unique_ptr<PersistentParserState> OwnedState;
   DeclContext *CurDeclContext;
   swift::Component *Component;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  ScopeInfo ScopeInfo;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   unsigned VarPatternDepth = 0;
   bool IsMainModule;
 
-  /// \brief True if we are doing a second pass over the AST during delayed
-  /// parsing.  We should not delay anything in this case.
-  bool IsDelayedParsingSecondPass = false;
+  DelayedParsingCallbacks *DelayedParseCB = nullptr;
 
-  void setDelayedParsingSecondPass() {
-    IsDelayedParsingSecondPass = true;
+  bool isDelayedParsingEnabled() const { return DelayedParseCB != nullptr; }
+
+  void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
+    this->DelayedParseCB = DelayedParseCB;
   }
 
   void setCodeCompletion(unsigned Offset,
                          CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
-    IsDelayedParsingSecondPass = true;
     L->setCodeCompletion(Offset);
   }
 
@@ -122,11 +124,17 @@ public:
     }
   };
 
+private:
+  Parser(Lexer *Lex, TranslationUnit *TU,
+         DiagnosticEngine &Diags, SILParserState *SIL,
+         PersistentParserState *PersistentState = nullptr);
 
+public:
   Parser(unsigned BufferID, TranslationUnit *TU,
-         bool IsMainModule, SILParserState *SIL);
+         bool IsMainModule, SILParserState *SIL,
+         PersistentParserState *PersistentState);
   Parser(TranslationUnit *TU, llvm::StringRef fragment, DiagnosticEngine &Diags,
-         SILParserState *SIL);
+         SILParserState *SIL, PersistentParserState *PersistentState = nullptr);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }
@@ -151,6 +159,10 @@ public:
   ParserPosition getParserPosition() {
     return ParserPosition(L->getStateForBeginningOfToken(Tok),
                           PreviousLoc);
+  }
+
+  ParserPosition getParserPosition(SourceLoc Start, SourceLoc PrevLoc) {
+    return ParserPosition(L->getStateForBeginningOfTokenLoc(Start), PrevLoc);
   }
 
   void restoreParserPosition(ParserPosition PP) {
@@ -210,20 +222,6 @@ public:
 
     ~ParserPositionRAII() {
       P.restoreParserPosition(PP);
-    }
-  };
-
-  class FunctionBodyParserState {
-    FunctionBodyParserState(ParserPosition BeginParserPosition,
-                            SavedScope &&Scope):
-        BeginParserPosition(BeginParserPosition), Scope(std::move(Scope))
-    {}
-    ParserPosition BeginParserPosition;
-    SavedScope Scope;
-    friend class Parser;
-
-    SavedScope takeScope() {
-      return std::move(Scope);
     }
   };
 
@@ -309,11 +307,11 @@ public:
   /// e.g., '>>'.
   SourceLoc consumeStartingGreater();
 
-  swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
+  swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
   /// \brief Add the given Decl to the current scope.
   void addToScope(ValueDecl *D) {
-    getScopeInfo().addToScope(D);
+    getScopeInfo().addToScope(D, *this);
   }
 
   ValueDecl *lookupInScope(Identifier Name) {
@@ -444,7 +442,7 @@ public:
   void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType);
   
   Pattern *buildImplicitThisParameter();
-  Optional<ParserTokenRange> consumeFunctionBody(unsigned Flags);
+  void consumeFunctionBody(FuncExpr *FE);
   FuncDecl *parseDeclFunc(SourceLoc StaticLoc, unsigned Flags);
   bool parseDeclFuncBodyDelayed(FuncDecl *FD);
   Decl *parseDeclProtocol(unsigned Flags);

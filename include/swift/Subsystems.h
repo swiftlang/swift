@@ -39,6 +39,8 @@ namespace swift {
   class Parser;
   class Token;
   class CodeCompletionCallbacksFactory;
+  class PersistentParserState;
+  class DelayedParsingCallbacks;
 
   namespace irgen {
     class Options;
@@ -75,14 +77,16 @@ namespace swift {
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL = nullptr,
-                                std::unique_ptr<Parser> *PersistentParser =
-                                    nullptr);
+                              PersistentParserState *PersistentState = nullptr,
+                             DelayedParsingCallbacks *DelayedParseCB = nullptr);
 
   /// \brief Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
   void
-  performDelayedParsing(TranslationUnit *TU, Parser *TheParser,
-                        CodeCompletionCallbacksFactory *CodeCompletionFactory);
+  performDelayedParsing(TranslationUnit *TU,
+                        PersistentParserState &PersistentState,
+                        CodeCompletionCallbacksFactory *CodeCompletionFactory,
+                        unsigned CodeCompletionOffset);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,

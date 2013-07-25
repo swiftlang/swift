@@ -209,6 +209,26 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
 
+Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
+  const char *Ptr = Loc.Value.getPointer();
+  assert(Ptr >= BufferStart && Ptr < BufferEnd);
+  // Skip whitespace backwards until we hit a newline.  This is needed to
+  // correctly lex the token if it is at the beginning of the line.
+  while (Ptr >= BufferStart + 1) {
+    char C = Ptr[-1];
+    if (C == ' ' || C == '\t' || C == 0) {
+      Ptr--;
+      continue;
+    }
+    if (C == '\n' || C == '\r') {
+      Ptr--;
+      break;
+    }
+    break;
+  }
+  return State(Ptr);
+}
+
 //===----------------------------------------------------------------------===//
 // Lexer Subroutines
 //===----------------------------------------------------------------------===//

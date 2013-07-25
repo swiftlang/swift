@@ -19,7 +19,6 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/ParserTokenRange.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -1671,14 +1670,14 @@ class FuncExpr : public CapturingExpr {
   unsigned NumPatterns;
 
   // If a function has a body at all, we have either a parsed body AST node or
-  // we have saved tokens for it.
+  // we have saved the end location of the unparsed body.
   union {
     /// This union member is active if getBodyKind() == BodyKind::Parsed.
     BraceStmt *Body;
 
-    /// Tokens of the function body saved for delayed parsing.
+    /// End location of the function body saved for delayed parsing.
     /// This union member is active if getBodyKind() == BodyKind::Unparsed.
-    ParserTokenRange BodyTokenRange;
+    SourceLoc BodyEndLoc;
   };
 
   FuncDecl *TheFuncDecl;
@@ -1697,7 +1696,7 @@ public:
     /// The function did not have a body in the source code file.
     None,
 
-    /// Function body is delayed as a token range in \c BodyTokenRange.
+    /// Function body is delayed, to be parsed later.
     Unparsed,
 
     /// Function body is parsed and available as an AST subtree.
@@ -1829,13 +1828,10 @@ public:
     setBodyKind(BodyKind::Skipped);
   }
 
-  ParserTokenRange getBodyTokenRange() {
-    assert(getBodyKind() == BodyKind::Unparsed);
-    return BodyTokenRange;
-  }
-  void setBodyTokenRange(ParserTokenRange R) {
+  /// \brief Note that parsing for the body was delayed.
+  void setBodyDelayed(SourceLoc EndLoc) {
     assert(getBodyKind() == BodyKind::None);
-    BodyTokenRange = R;
+    BodyEndLoc = EndLoc;
     setBodyKind(BodyKind::Unparsed);
   }
 

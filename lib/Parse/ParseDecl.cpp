@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
@@ -83,6 +84,11 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   // Note that the translation unit is fully parsed and verify it.
   TU->ASTStage = TranslationUnit::Parsed;
   verify(TU);
+
+  bool Done = Tok.getLoc().Value.getPointer() == L->getBufferEnd();
+  if (!Done) {
+    State->markParserPosition(Tok.getLoc(), PreviousLoc);
+  }
 
   return FoundTopLevelCodeToExecute;
 }
@@ -1177,9 +1183,10 @@ Pattern *Parser::buildImplicitThisParameter() {
   return new (Context) TypedPattern(P, TypeLoc());
 }
 
-Optional<ParserTokenRange>
-Parser::consumeFunctionBody(unsigned Flags) {
+void Parser::consumeFunctionBody(FuncExpr *FE) {
   auto BeginParserPosition = getParserPosition();
+  SourceRange BodyRange;
+  BodyRange.Start = Tok.getLoc();
 
   // Consume the '{', and find the matching '}'.
   consumeToken(tok::l_brace);
@@ -1207,22 +1214,15 @@ Parser::consumeFunctionBody(unsigned Flags) {
     }
   }
 
-  auto EndLexerState = L->getStateForBeginningOfToken(Tok);
+  BodyRange.End = PreviousLoc;
 
-  // When doing code completion, skip function bodies that don't contain a code
-  // completion token.
-  if (Context.LangOpts.isCodeCompletion() &&
-      !L->stateRangeHasCodeCompletionToken(
-          BeginParserPosition.LS,
-          EndLexerState,
-          Context.LangOpts.CodeCompletionOffset))
-    return Nothing;
-
-  return ParserTokenRange(
-            Context.AllocateObjectCopy(
-                FunctionBodyParserState(BeginParserPosition,
-                                        ScopeInfo.saveCurrentScope())),
-            Context.AllocateObjectCopy(EndLexerState));
+  if (DelayedParseCB->shouldDelayFunctionBodyParsing(*this, FE, BodyRange)) {
+    State->delayFunctionBodyParsing(FE, BodyRange,
+                                    BeginParserPosition.PreviousLoc);
+    FE->setBodyDelayed(BodyRange.End);
+  } else {
+    FE->setBodySkipped();
+  }
 }
 
 /// parseDeclFunc - Parse a 'func' declaration, returning null on error.  The
@@ -1339,9 +1339,7 @@ FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
         return 0;
       }
     } else if (Attributes.AsmName.empty() || Tok.is(tok::l_brace)) {
-      if ((!Context.LangOpts.DelayFunctionBodyParsing &&
-           !Context.LangOpts.isCodeCompletion()) ||
-          IsDelayedParsingSecondPass) {
+      if (!isDelayedParsingEnabled()) {
         NullablePtr<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
@@ -1350,11 +1348,7 @@ FuncDecl *Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags) {
           FE->setBody(Body.get());
         }
       } else {
-        Optional<ParserTokenRange> TR = consumeFunctionBody(Flags);
-        if (TR.hasValue())
-          FE->setBodyTokenRange(TR.getValue());
-        else
-          FE->setBodySkipped();
+        consumeFunctionBody(FE);
       }
     }
   }
@@ -1379,26 +1373,28 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed &&
          "function body should be delayed");
 
-  auto TokenRange = FE->getBodyTokenRange();
-  auto FunctionParserState =
-      TokenRange.getBeginParserState<FunctionBodyParserState>();
+  auto FunctionParserState = State->takeBodyState(FE);
   if (!FunctionParserState)
     return false;
 
-  auto EndLexerState = TokenRange.getEndLexerState<Lexer::State>();
+  auto BeginParserPosition =
+      getParserPosition(FunctionParserState->BodyRange.Start,
+                        FunctionParserState->PreviousLoc);
+  auto EndLexerState =
+      L->getStateForBeginningOfTokenLoc(FunctionParserState->BodyRange.End);
 
   // Ensure that we restore the parser state at exit.
   ParserPositionRAII PPR(*this);
 
   // Create a lexer that can not go past the end state.
-  Lexer LocalLex(*L, FunctionParserState->BeginParserPosition.LS,
-                 *EndLexerState, SourceMgr, &Diags, nullptr /*not SIL*/);
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState, SourceMgr, &Diags,
+                 nullptr /*not SIL*/);
 
   // Temporarily swap out the parser's current lexer with our new one.
   llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
 
   // Rewind to '{' of the function body.
-  restoreParserPosition(FunctionParserState->BeginParserPosition);
+  restoreParserPosition(BeginParserPosition);
 
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
