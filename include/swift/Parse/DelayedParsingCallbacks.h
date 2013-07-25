@@ -13,11 +13,10 @@
 #ifndef SWIFT_PARSE_DELAYED_PARSING_CALLBACKS_H
 #define SWIFT_PARSE_DELAYED_PARSING_CALLBACKS_H
 
-#include "swift/Basic/SourceLoc.h"
-
 namespace swift {
   class FuncExpr;
   class Parser;
+  class SourceRange;
 
 /// \brief Callbacks for Parser's delayed parsing.
 class DelayedParsingCallbacks {
