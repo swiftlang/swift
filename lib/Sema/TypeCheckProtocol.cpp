@@ -830,6 +830,14 @@ existentialConformsToItself(TypeChecker &tc,
                             ProtocolDecl *proto,
                             SourceLoc complainLoc,
                             llvm::SmallPtrSet<ProtocolDecl *, 4> &checking) {
+  // If we already know whether this protocol's existential conforms to itself
+  // use the cached value... unless it's negative and we're supposed to
+  // complain, in which case we fall through.
+  if (auto known = proto->existentialConformsToSelf()) {
+    if (*known || complainLoc.isInvalid())
+      return *known;
+  }
+
   // Check that all inherited protocols conform to themselves.
   for (auto inheritedProto : proto->getProtocols()) {
     // If we're already checking this protocol, assume it's fine.
@@ -847,7 +855,9 @@ existentialConformsToItself(TypeChecker &tc,
                     diag::inherited_protocol_does_not_conform, type,
                     inheritedProto->getType());
       }
-      return nullptr;
+
+      proto->setExistentialConformsToSelf(false);
+      return false;
     }
   }
 
@@ -862,6 +872,7 @@ existentialConformsToItself(TypeChecker &tc,
         continue;
 
       // A protocol cannot conform to itself if it has an associated type.
+      proto->setExistentialConformsToSelf(false);
       if (complainLoc.isInvalid())
         return false;
 
@@ -902,6 +913,7 @@ existentialConformsToItself(TypeChecker &tc,
 
     // A protocol cannot conform to itself if any of its value members
     // refers to 'This'.
+    proto->setExistentialConformsToSelf(false);
     if (complainLoc.isInvalid())
       return false;
 
@@ -912,6 +924,7 @@ existentialConformsToItself(TypeChecker &tc,
     return false;
   }
 
+  proto->setExistentialConformsToSelf(true);
   return true;
 }
 

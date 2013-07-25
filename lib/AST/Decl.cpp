@@ -619,6 +619,8 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
 
   ProtocolDeclBits.RequiresClassValid = false;
   ProtocolDeclBits.RequiresClass = false;
+  ProtocolDeclBits.ExistentialConformsToSelfValid = false;
+  ProtocolDeclBits.ExistentialConformsToSelf = false;
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {

@@ -145,8 +145,14 @@ class alignas(8) Decl {
 
     /// Whether this is a [class_bounded] protocol.
     unsigned RequiresClass : 1;
+
+    /// Whether the \c ExistentialConformsToSelf bit is valid.
+    unsigned ExistentialConformsToSelfValid : 1;
+
+    /// Whether the existential of this protocol conforms to itself.
+    unsigned ExistentialConformsToSelf : 1;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 2 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 4 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class InfixOperatorDeclBitFields {
@@ -1377,7 +1383,26 @@ public:
 
     return requiresClassSlow();
   }
-  
+
+  /// Determine whether an existential value conforming to just this protocol
+  /// conforms to the protocol itself.
+  ///
+  /// \returns an empty optional if not yet known, true if the existential
+  /// does conform to this protocol, and false otherwise.
+  Optional<bool> existentialConformsToSelf() const {
+    if (ProtocolDeclBits.ExistentialConformsToSelfValid)
+      return ProtocolDeclBits.ExistentialConformsToSelf;
+
+    return Nothing;
+  }
+
+  /// Set whether the existential of this protocol type conforms to this
+  /// protocol.
+  void setExistentialConformsToSelf(bool conforms) {
+    ProtocolDeclBits.ExistentialConformsToSelfValid = true;
+    ProtocolDeclBits.ExistentialConformsToSelf = conforms;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
