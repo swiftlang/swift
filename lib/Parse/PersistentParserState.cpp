@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
 #include "swift/Parse/PersistentParserState.h"
 
 using namespace swift;
@@ -31,12 +32,10 @@ void PersistentParserState::delayFunctionBodyParsing(FuncExpr *FE,
 
 std::unique_ptr<PersistentParserState::FunctionBodyState>
 PersistentParserState::takeBodyState(FuncExpr *FE) {
-  std::unique_ptr<FunctionBodyState> State;
+  assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
   DelayedBodiesTy::iterator I = DelayedBodies.find(FE);
-  if (I != DelayedBodies.end()) {
-    State = std::move(I->second);
-    DelayedBodies.erase(I);
-  }
-
+  assert(I != DelayedBodies.end() && "State should be saved");
+  std::unique_ptr<FunctionBodyState> State = std::move(I->second);
+  DelayedBodies.erase(I);
   return State;
 }

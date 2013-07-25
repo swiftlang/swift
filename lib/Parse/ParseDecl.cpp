@@ -1374,8 +1374,7 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
          "function body should be delayed");
 
   auto FunctionParserState = State->takeBodyState(FE);
-  if (!FunctionParserState)
-    return false;
+  assert(FunctionParserState.get() && "should have a valid state");
 
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
   auto EndLexerState = L->getStateForEndOfTokenLoc(FE->getEndLoc());
