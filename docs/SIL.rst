@@ -34,11 +34,11 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
 
 - The *Parse* module constructs an AST from Swift source code.
 - The *Sema* module type-checks the AST and annotates it with type information.
-- The *SILGen* module generates "raw" SIL from an AST.
+- The *SILGen* module generates *raw SIL* from an AST.
 - A series of *Guaranteed Optimization Passes* and *Diagnostic Passes* are run
-  over the "raw" to both perform optimizations, but also to emit
+  over the raw SIL to both perform optimizations, but also to emit
   language-specific diagnostics.  These are always run, even at -O0, and produce
-  "canonical" SIL.
+  *canonical SIL*.
 - General SIL *Optimization Passes* optionally run over the canonical SIL to
   improve performance of the resultant executable.  These are enabled and
   controlled by the optimization level and are not run at -O0.
@@ -51,7 +51,7 @@ The stages pertaining to SIL processing in particular are as follows:
 SILGen
 ~~~~~~
 
-SILGen produces "raw" SIL by walking a type-checked Swift AST. The form of SIL
+SILGen produces *raw SIL* by walking a type-checked Swift AST. The form of SIL
 emitted by SILGen has the following properties:
 
 - Variables are represented by loading and storing mutable memory locations
@@ -283,7 +283,7 @@ to multiple-value instructions choose the value by following the ``%name`` with
   // Refer to the refcounted pointer
   %1 = retain %box#0 : $Builtin.ObjectPointer
   // Refer to the address
-  store %value : $Int64 to %box#1 : $*Int64
+  store %value to %box#1 : $*Int64
 
 Unlike LLVM IR, SIL instructions that take value operands *only* accept
 value operands. References to literal constants, functions, global variables, or
@@ -303,16 +303,19 @@ Functions
 
 SIL functions are defined at the top level with the ``sil`` keyword. SIL
 function names are introduced with the ``@`` sigil and named by an
-alphanumeric identifier. This name is usually the mangled name of a Swift
-function. The ``sil`` syntax declares the function's name and SIL type then
+alphanumeric identifier. This name will become the LLVM IR name for the
+function, and is usually the mangled name of the originating Swift declaration.
+The ``sil`` syntax declares the function's name and SIL type then
 defines the body of the function inside braces. The declared type must be a
 function type, which may be generic.
 
 The ``sil`` keyword may be optionally followed by a linkage specifier. By
-default, SIL functions are externally visible from their enclosing module.
+default, SIL functions are externally visible from their enclosing module and
+given LLVM ``external`` linkage.
 
 - The ``internal`` specifier indicates that the function is internal to its
-  module. Internal functions may be freely transformed by optimizations.
+  module. Internal functions may be freely transformed by optimizations. This
+  corresponds to LLVM's ``private`` linkage.
 - The ``clang_thunk`` specifier indicates that the function was generated as
   an adapter thunk to interface with a C or Objective-C declaration imported
   from Clang. These are currently generated lazily and given ``linkonce_odr``
@@ -326,17 +329,31 @@ Basic Blocks
   sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
   sil-argument ::= sil-value ':' sil-type
 
-  sil-instruction-def ::= sil-value '=' sil-instruction
-  sil-terminator-def ::= sil-value '=' sil-terminator
+  sil-instruction-def ::= (sil-value '=')? sil-instruction
+  sil-terminator-def ::= (sil-value '=')? sil-terminator
 
 A function body consists of one or more basic blocks. These form the nodes of
 the control flow graph. Each basic block contains one or more instructions and
-is terminated by a terminator instructor—either a branch to another block,
-a return, or an ``unreachable`` marker. The entry point for the function is
+is terminated by a terminator instruction. The entry point for the function is
 always the first basic block in its body.
 
-Basic blocks can take arguments. The entry point block's argument values are
-received from the function caller::
+In SIL, basic blocks take arguments, which are used as an alternative to LLVM's
+phi nodes. Basic block arguments are bound by the branch from the predecessor
+block::
+
+  sil @iif : $(Builtin.Int1, Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+  bb0(%cond : $Builtin.Int1, %then : $Builtin.Int64, %else : $Builtin.Int64):
+    condbranch %cond : $Builtin.Int1, then, else
+  then:
+    br finish(%then : $Builtin.Int64)
+  else:
+    br finish(%else : $Builtin.Int64)
+  finish(%result : $Builtin.Int64):
+    return %result : $Builtin.Int64
+  }
+
+The entry point basic block for a function
+receives the argument values from the function caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
@@ -350,21 +367,6 @@ received from the function caller::
     %2 = apply %foo(%y) : $(Int) -> Int
     %3 = tuple ()
     %4 = return %3 : $()
-  }
-
-Arguments for other basic blocks are bound by the branch instructions that
-transfer control to that block. This is how SIL expresses branching dataflow in
-SSA as an alternative to phi instructions::
-
-  sil @iif : $(Builtin.Int1, Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
-  bb0(%cond : $Builtin.Int1, %then : $Builtin.Int64, %else : $Builtin.Int64):
-    condbranch %cond : $Builtin.Int1, then, else
-  then:
-    br finish(%then : $Builtin.Int64)
-  else:
-    br finish(%else : $Builtin.Int64)
-  finish(%result : $Builtin.Int64):
-    return %result : $Builtin.Int64
   }
 
 Declaration References
@@ -442,8 +444,8 @@ flow, such as a non-``Void`` function failing to ``return`` a value, or a
 The guaranteed dead code elimination pass can eliminate truly unreachable
 basic blocks, or ``unreachable`` instructions may be dominated by applications
 of ``[noreturn]`` functions. An ``unreachable`` instruction that survives
-guaranteed DCE and is not dominated by a ``[noreturn]`` application is a
-dataflow error.
+guaranteed DCE and is not immediately preceded by a ``[noreturn]``
+application is a dataflow error.
 
 Runtime Failure
 ---------------
@@ -581,7 +583,7 @@ gets called in SIL as::
   %bas = function_ref @bas : $(A, Int) -> A
   %z = alloc_stack $A
   %x_arg = alloc_stack $A
-  copy_addr %x : $*A to [initialize] %x_arg : $*A
+  copy_addr %x to [initialize] %x_arg : $*A
   apply %bas(%z, %x_arg, %y) : $(A, Int) -> A
   dealloc_stack %x_arg : $*A // callee consumes %x.arg, caller deallocs
   // ... use %z ...
@@ -605,10 +607,10 @@ gets called in SIL as::
 
   %zim = function_ref @zim : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
   %y_arg = alloc_stack $A
-  copy_addr %y : $*A to [initialize] %y_arg : $*A
+  copy_addr %y to [initialize] %y_arg : $*A
   %w_0_addr = element_addr %w : $*(A, Int), 0
   %w_0_arg = alloc_stack $A
-  copy_addr %w_0_addr : $*A to [initialize] %w_0_arg : $*A
+  copy_addr %w_0_addr to [initialize] %w_0_arg : $*A
   %w_1_addr = element_addr %w : $*(A, Int), 1
   %w_1 = load %w_1_addr : $*Int
   apply %zim(%x, %y_arg, %z, %w_0_arg, %w_1) : $(x:Int, y:A, (z:Int, w:(A, Int))) -> ()
@@ -662,7 +664,7 @@ passed last::
     func method(x:Int) -> Int {}
   }
 
-  sil @Foo_method_1 : $((x : Int), Foo) -> Int { ... }
+  sil @Foo_method_1 : $((x : Int), [byref] Foo) -> Int { ... }
 
 Instruction Set
 ---------------
@@ -775,7 +777,7 @@ dealloc_ref
 Deallocates a box or reference type instance, bypassing the reference counting
 mechanism. The box must have a retain count of one. This does not
 destroy the reference type instance or the values inside the box. The contents
-of the reference-counted instance must be fully initialized or destroyed before
+of the heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
 Accessing Memory
@@ -803,17 +805,22 @@ store
 `````
 ::
 
+  sil-instruction ::= 'store' sil-value 'to' sil-operand
+
   store %0 to %1 : $*T
   // $T must be a loadable type
 
 Stores the value ``%0`` to memory at address ``%1``.  The type of %1 is ``*T``
 and the type of ``%0 is ``T``, which must be of a loadable type. This will
-overwrite the memory at ``%1``; ``%1`` must reference uninitialized or destroyed
-memory.
+overwrite the memory at ``%1``. If ``%1`` already references a value that
+requires ``release`` or other cleanup, that value must be loaded before being
+stored over and cleaned up.
 
 initialize_var
 ``````````````
 ::
+
+  sil-instruction ::= 'initialize_var' sil-operand
 
   initialize_var %0 : $*T
   // %0 must be an address $*T
@@ -851,16 +858,16 @@ copy_addr
 `````````
 ::
 
-  sil-instruction ::= 'copy_addr' '[take]'? sil-operand
+  sil-instruction ::= 'copy_addr' '[take]'? sil-value
                         'to' '[initialization]'? sil-operand
 
-  %_ = copy_addr [take] %0 : $*T to [initialization] %1 : $*T
+  copy_addr [take] %0 to [initialization] %1 : $*T
   // %0 and %1 must be of the same $*T address type
 
 Loads the value at address ``%0`` from memory and assigns a copy of it back
 into memory at address ``%1``. A bare ``copy_addr`` instruction::
 
-  copy_addr %0 : $*T to %1 : $*T
+  copy_addr %0 to %1 : $*T
 
 is equivalent to::
 
@@ -868,7 +875,7 @@ is equivalent to::
   %old = load %1 : $*T        // Load the old value from the destination
   retain %new : $T            // Retain the new value
   release %old : $T           // Release the old
-  store %new : $T to %1 : $*T // Store the new value to the destination
+  store %new to %1 : $*T      // Store the new value to the destination
 
 except that ``copy_addr`` may be used even if ``%0`` is of an address-only
 type. The ``copy`` may be given one or both of the ``[take]`` or
@@ -885,29 +892,29 @@ The three attributed forms thus behave like the following loadable type
 operations::
 
   // take-assignment
-    copy_addr [take] %0 : $*T to %1 : $*T
+    copy_addr [take] %0 to %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     %old = load %1 : $*T
     // no retain of %new!
     release %old : $T
-    store %new : $T to %1 : $*T
+    store %new to %1 : $*T
 
   // copy-initialization
-    copy_addr %0 : $*T to [initialization] %1 : $*T
+    copy_addr %0 to [initialization] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     retain %new : $T
     // no load/release of %old!
-    store %new : $T to %1 : $*T
+    store %new to %1 : $*T
 
   // take-initialization
-    copy_addr [take] %0 : $*T to [initialization] %1 : $*T
+    copy_addr [take] %0 to [initialization] %1 : $*T
   // is equivalent to:
     %new = load %0 : $*T
     // no retain of %new!
     // no load/release of %old!
-    store %new : $T to %1 : $*T
+    store %new to %1 : $*T
 
 destroy_addr
 ````````````
@@ -915,7 +922,7 @@ destroy_addr
 
   sil-instruction ::= 'destroy_addr' sil-operand
 
-  %_ = destroy_addr %0 : $*T
+  destroy_addr %0 : $*T
   // %0 must be of an address $*T type
 
 Destroys the value in memory at address ``%0``. This is equivalent to::
@@ -981,7 +988,7 @@ retain
   
   sil-instruction ::= 'retain' sil-operand
 
-  %_ = retain %0 : $T
+  retain %0 : $T
   // %0 must be of a reference type
 
 Retains the heap object referenced by ``%0``.
@@ -992,7 +999,7 @@ retain_autoreleased
 
   sil-instruction ::= 'retain_autoreleased' sil-operand
 
-  %_ = retain_autoreleased %0 : $T
+  retain_autoreleased %0 : $T
   // %0 must be of a reference type
 
 Retains the heap object referenced by ``%0`` using the Objective-C ARC
@@ -1007,7 +1014,7 @@ release
 ```````
 ::
 
-  %_ = release %0
+  release %0
   // %0 must be of a reference type.
 
 Releases the heap object referenced by ``%0``. If the release
@@ -1070,7 +1077,8 @@ integer_literal
   // %1 has type $Builtin.Int<n>
 
 Creates an integer literal value. The result will be of type
-``Builtin.Int<n>``, which must be a builtin integer type.
+``Builtin.Int<n>``, which must be a builtin integer type. The literal value
+is specified using Swift's integer literal syntax.
 
 float_literal
 `````````````
@@ -1078,12 +1086,13 @@ float_literal
 
   sil-instruction ::= 'float_literal' sil-type ',' float-literal
 
-  %1 = float_literal $Builtin.FP<n>, 1.23
+  %1 = float_literal $Builtin.FP<n>, 0x1.23ABCp4
   // $Builtin.FP<n> must be a builtin floating-point type
   // %1 has type $Builtin.FP<n>
 
 Creates a floating-point literal value. The result will be of type ``
-``Builtin.FP<n>``, which must be a builtin floating-point type.
+``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
+value is specified using Swift's floating-point literal syntax.
 
 string_literal
 ``````````````
@@ -1100,7 +1109,8 @@ Creates a reference to a string in the global string table. The value can be
 either a lone ``Builtin.RawPointer`` referencing the start of the string, or
 a ``(Builtin.RawPointer, Builtin.Int64)`` pair of both the start of
 the string and its length. In either case, the referenced string is
-null-terminated.
+null-terminated. The string literal value is specified using Swift's string
+literal syntax (though ``\()`` interpolations are not allowed).
 
 builtin_zero
 ````````````
@@ -1261,7 +1271,7 @@ apply
 ::
 
   sil-instruction ::= 'apply' sil-value
-                        '(' (sil-operand (',' sil-operand)?)? ')'
+                        '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
 
   %r = apply %0(%1, %2, ...) : $(A, B, ...) -> R
@@ -1286,7 +1296,7 @@ partial_apply
 ::
 
   sil-instruction ::= 'partial_apply' sil-value
-                        '(' (sil-operand (',' sil-operand)?)? ')'
+                        '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
 
   %c = partial_apply %0(%1, %2, ...) : $[thin] (T..., A, B, ...) -> R
@@ -1349,16 +1359,21 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $[thin] (Int, Int) -> Int {
-  entry(%y : $Int, %x : $Int):
+  func @bar : $[thin] (Int, Builtin.ObjectPointer, *Int) -> Int {
+  entry(%y : $Int, %x_box : $Builtin.ObjectPointer, %x_address : $*Int):
     // ... body of bar ...
   }
 
   func @foo : $[thin] Int -> Int {
   entry(%x : $Int):
+    // Create a box for the 'x' variable
+    %x_box = alloc_box $Int
+    store %x to %x_box#1 : $*Int
+
     // Create the bar closure
     %bar_uncurried = function_ref @bar : $(Int, Int) -> Int
-    %bar = partial_apply %bar_uncurried(%x) : $(Int, Int) -> Int
+    %bar = partial_apply %bar_uncurried(%x_box#0, %x_box#1) \
+      : $(Int, Builtin.ObjectPointer, *Int) -> Int
 
     // Apply it
     %1 = integer_literal $Int, 1
@@ -1636,7 +1651,7 @@ upcast_existential
   sil-instruction ::= 'upcast_existential' '[take]'? sil-operand
                         'to' sil-operand
 
-  %_ = upcast_existential %0 : $*protocol<P, Q> to %1 : $*P
+  upcast_existential %0 : $*protocol<P, Q> to %1 : $*P
   // %0 must be the address of a non-class protocol or protocol composition
   //   type
   // %1 must be the address of a non-class protocol or protocol composition
@@ -1655,7 +1670,7 @@ deinit_existential
 
   sil-instruction ::= 'deinit_existential' sil-operand
 
-  %_ = deinit_existential %0 : $*P
+  deinit_existential %0 : $*P
   // %0 must be of a $*P address type for non-class protocol or protocol
   // composition type P
 
@@ -1695,7 +1710,7 @@ compiles to this SIL sequence::
   %bar = protocol_method %foo : $*Foo, #Foo.bar!1
   %foo_p = project_existential %foo : $*Foo
   %one_two_three = integer_literal $Int, 123
-  %_ = apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
+  apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
 
 It is undefined behavior if the result of ``project_existential`` is used as
 anything other than the "this" argument of an instance method reference
@@ -1758,7 +1773,7 @@ compiles to this SIL sequence::
   %bar = protocol_method %foo : $Foo, #Foo.bar!1
   %foo_p = project_existential_ref %foo : $Foo
   %one_two_three = integer_literal $Int, 123
-  %_ = apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
+  apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.ObjCPointer) -> ()
 
 It is undefined behavior if the result of ``project_existential_ref`` is used
 as anything other than the "this" argument of an instance method reference
@@ -1927,9 +1942,13 @@ in the following ways:
 - A class tuple element of the destination type may be a superclass of the
   source type's corresponding tuple element.
 
-The function types may also differ in ``[auto_closure]`` attributes. A
-``[noreturn]`` function may additionally be converted to a non-``[noreturn]``
-type.
+The function types may also differ in attributes, with the following
+exceptions:
+
+- The ``cc``, ``thin``, and ``objc_block`` attributes cannot be changed.
+- A ``[noreturn]`` function may be converted to a non-``[noreturn]``
+  type, but a non-``[noreturn]`` function may not be converted to a
+  ``[noreturn]`` function.
 
 convert_cc
 ``````````
@@ -1974,7 +1993,7 @@ thin_to_thick_function
   // %1 will be of type $T -> U
 
 Converts a thin function value, that is, a bare function pointer with no
-context information, into a thick function value with empty context.
+context information, into a thick function value with ignored context.
 
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
@@ -1991,6 +2010,23 @@ the desired behavior of the runtime check::
   the ``is_nonnull`` instruction.
 - ``unconditional`` requires the conversion to succeed. It is a runtime failure
   if the cast fails.
+
+is_nonnull
+``````````
+::
+
+  sil-instruction ::= 'is_nonnull' sil-operand
+
+  %1 = is_nonnull %0 : $C
+  %1 = is_nonnull %0 : $*T
+  // %0 must be of reference type $C or of address type $*T
+  // %1 will be of type swift.Bool
+
+TODO: The instruction should produce a Builtin.i1 and we should emit a
+conversion to swift.Bool when needed.
+
+Checks whether a reference type or address value is null, returning true if
+the value is not null, or false if it is null.
 
 downcast
 ````````
@@ -2016,7 +2052,7 @@ super_to_archetype_ref
 
   %1 = super_to_archetype_ref conditional %0 : $B to $T
   // %0 must be of a class type $B that is the superclass constraint of
-  //  archetype $T (or a superclass of its superclass)
+  //   archetype $T (or a superclass of its superclass)
   // %1 will be of type $T
 
 Performs a checked downcast operation on the class instance reference ``%0``
@@ -2085,23 +2121,6 @@ Performs a checked conversion on the class instance reference inside of a
 class existential container. If the conversion succeeds, the contained
 class instance is returned.
 
-is_nonnull
-``````````
-::
-
-  sil-instruction ::= 'is_nonnull' sil-operand
-
-  %1 = is_nonnull %0 : $C
-  %1 = is_nonnull %0 : $*T
-  // %0 must be of reference type $C or of address type $*T
-  // %1 will be of type swift.Bool
-
-TODO: The instruction should produce a Builtin.i1 and we should emit a
-conversion to swift.Bool when needed.
-
-Checks whether a reference type or address value is null, returning true if
-the value is not null, or false if it is null.
-
 Terminators
 ~~~~~~~~~~~
 
@@ -2115,11 +2134,12 @@ unreachable
   
   sil-terminator ::= 'unreachable'
 
-  %_ = unreachable
+  unreachable
 
 Indicates that control flow must not reach the end of the current basic block.
 It is a dataflow error if an unreachable terminator is reachable from the entry
-point of a function and is not dominated by calls to ``[noreturn]`` functions.
+point of a function and is not immediately preceded by an ``apply`` of a
+``[noreturn]`` function.
 
 return
 ``````
@@ -2127,7 +2147,7 @@ return
   
   sil-terminator ::= 'return' sil-operand
 
-  %_ = return %0 : $T
+  return %0 : $T
   // $T must be the return type of the current function
 
 Exits the current function and returns control to the calling function. The
@@ -2141,7 +2161,7 @@ autorelease_return
 
   sil-terminator ::= 'autorelease_return' sil-operand
 
-  %_ = autorelease_return %0 : $T
+  autorelease_return %0 : $T
   // $T must be the return type of the current function, which must be of
   //   class type
 
@@ -2159,7 +2179,7 @@ br
   sil-terminator ::= 'br' sil-identifier
                        '(' (sil-operand (',' sil-operand)*)? ')'
 
-  %_ = br label (%0 : $A, %1 : $B, ...)
+  br label (%0 : $A, %1 : $B, ...)
   // `label` must refer to a basic block label within the current function
   // %0, %1, etc. must be of the types of `label`'s arguments
 
