@@ -100,7 +100,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
   //   - relocation model
   //   - code model
   TargetOptions TargetOpts;
-  TargetOpts.NoFramePointerElimNonLeaf = true;
+//  TargetOpts.NoFramePointerElimNonLeaf = true;
   
   // Create a target machine.
   TargetMachine *TargetMachine
