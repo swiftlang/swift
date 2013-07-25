@@ -616,6 +616,9 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   DeclaredTy = new (Ctx, AllocationArena::Permanent) ProtocolType(this, Ctx);
   // Set the type of the ProtocolDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
+
+  ProtocolDeclBits.RequiresClassValid = false;
+  ProtocolDeclBits.RequiresClass = false;
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
@@ -669,24 +672,24 @@ void ProtocolDecl::collectInherited(
   }
 }
 
-bool ProtocolDecl::requiresClass() {
-  return RequiresClass.cache([&] {
-    // If we have the [class_protocol] attribute, we're trivially a class
-    // protocol.
-    if (getAttrs().isClassProtocol())
+bool ProtocolDecl::requiresClassSlow() {
+  ProtocolDeclBits.RequiresClass = false;
+  ProtocolDeclBits.RequiresClassValid = true;
+
+  if (getAttrs().isClassProtocol()) {
+    ProtocolDeclBits.RequiresClass = true;
+    return true;
+  }
+
+  // Check inherited protocols for class-ness.
+  for (auto *proto : getProtocols()) {
+    if (proto->requiresClass()) {
+      ProtocolDeclBits.RequiresClass = true;
       return true;
-    
-    // Check inherited protocols for class-ness.
-    for (TypeLoc inherited : getInherited()) {
-      SmallVector<ProtocolDecl*, 2> inheritedProtos;
-      if (inherited.getType()->isExistentialType(inheritedProtos))
-        for (auto *proto : inheritedProtos)
-          if (proto->requiresClass())
-            return true;
     }
-    
-    return false;    
-  });
+  }
+
+  return false;
 }
 
 TypeAliasDecl *ProtocolDecl::getThis() const {

@@ -133,6 +133,22 @@ class alignas(8) Decl {
   enum { NumTypeAliasDeclBits = NumTypeDeclBits + 1 };
   static_assert(NumTypeAliasDeclBits <= 32, "fits in an unsigned");
 
+  enum { NumNominalTypeDeclBits = NumTypeDeclBits};
+  static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
+
+  class ProtocolDeclBitFields {
+    friend class ProtocolDecl;
+    unsigned : NumNominalTypeDeclBits;
+
+    /// Whether the \c RequiresClass bit is valid.
+    unsigned RequiresClassValid : 1;
+
+    /// Whether this is a [class_bounded] protocol.
+    unsigned RequiresClass : 1;
+  };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 2 };
+  static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
+
   class InfixOperatorDeclBitFields {
     friend class InfixOperatorDecl;
     unsigned : NumDeclBits;
@@ -149,6 +165,7 @@ protected:
     ValueDeclBitfields ValueDeclBits;
     FuncDeclBitFields FuncDeclBits;
     TypeAliasDeclBitFields TypeAliasDeclBits;
+    ProtocolDeclBitFields ProtocolDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
   };
 
@@ -1320,8 +1337,9 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
   SourceLoc NameLoc;
-  Optional<bool> RequiresClass;
-  
+
+  bool requiresClassSlow();
+
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited);
@@ -1353,7 +1371,12 @@ public:
   TypeAliasDecl *getThis() const;
 
   /// True if this protocol can only be conformed to by class types.
-  bool requiresClass();
+  bool requiresClass() {
+    if (ProtocolDeclBits.RequiresClassValid)
+      return ProtocolDeclBits.RequiresClass;
+
+    return requiresClassSlow();
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
