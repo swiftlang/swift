@@ -228,15 +228,18 @@ public:
     assert(getNaturalUncurryLevel() >= callDepth
            && "specializations below uncurry level?!");
     AbstractCC cc = cast<AnyFunctionType>(specializedType)->getAbstractCC();
+    bool wasThin = cast<AnyFunctionType>(specializedType)->isThin();
     if (callDepth == 0) {
-      specializedType = getThinFunctionType(subType, cc)
-        ->getCanonicalType();
+      Type subFnType = wasThin
+        ? getThinFunctionType(subType, cc)
+        : getThickFunctionType(subType, cc);
+      specializedType = subFnType->getCanonicalType();
     } else {
       FunctionType *ft = cast<FunctionType>(specializedType);
       Type outerInput = ft->getInput();
       auto Info = FunctionType::ExtInfo()
                     .withCallingConv(cc)
-                    .withIsThin(true);
+                    .withIsThin(ft->isThin());
       specializedType = CanType(FunctionType::get(outerInput,
                                                   subType,
                                                   Info,

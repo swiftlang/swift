@@ -305,8 +305,6 @@ public:
   void checkSpecializeInst(SpecializeInst *SI) {
     require(SI->getType().is<FunctionType>(),
             "Specialize result should have a function type");
-    require(SI->getType().castTo<FunctionType>()->isThin(),
-            "Specialize result should have a thin function type");
     
     SILType operandTy = SI->getOperand().getType();
     require((operandTy.is<PolymorphicFunctionType>()
@@ -314,8 +312,9 @@ public:
                 && operandTy.castTo<FunctionType>()->getResult()
                   ->is<PolymorphicFunctionType>())),
             "Specialize source should have a polymorphic function type");
-    require(operandTy.castTo<AnyFunctionType>()->isThin(),
-            "Specialize source should have a thin function type");
+    require(operandTy.castTo<AnyFunctionType>()->isThin() ==
+              SI->getType().castTo<FunctionType>()->isThin(),
+            "Specialize source and result should have the same thinness");
   }
 
   void checkStructInst(StructInst *SI) {
