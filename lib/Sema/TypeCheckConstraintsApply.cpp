@@ -248,7 +248,37 @@ namespace {
           result = new (context) ArchetypeMemberRefExpr(base, dotLoc,
                                                         member, memberLoc);
 
-        // Simplify the type of this reference.
+        // If we have a function declaration, determine whether it is
+        // polymorphic. If so, we need to specialize the result.
+        if (isa<FuncDecl>(member)) {
+          if (auto funcTy = member->getType()->getAs<AnyFunctionType>()) {
+            auto resultTy = funcTy->getResult();
+            if (auto polyFn = resultTy->getAs<PolymorphicFunctionType>()) {
+              // Figure out the type of the expression we've built so
+              // far. For existentials, this is trivial (it's
+              // resultTy, but FIXME: this may change if we start
+              // introducing archetypes for existentials). For
+              // archetypes, we need to substitute 'this' through.
+              if (baseTy->is<ArchetypeType>()) {
+                auto protocol = containerTy->castTo<ProtocolType>()->getDecl();
+                auto thisArchetype
+                  = protocol->getThis()->getDeclaredType()
+                      ->castTo<ArchetypeType>();
+                TypeSubstitutionMap substitutions;
+                substitutions[thisArchetype] = baseTy;
+                resultTy = tc.substType(resultTy, substitutions);
+                if (!resultTy)
+                  return nullptr;
+              }
+              result->setType(resultTy);
+
+              // Specialize the result.
+              return solution.specialize(result, polyFn, openedType);
+            }
+          }
+        }
+
+        // Otherwise, just simplify the type of this reference directly.
         result->setType(simplifyType(openedType));
         return result;
       }
