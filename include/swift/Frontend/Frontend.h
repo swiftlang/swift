@@ -62,7 +62,7 @@ class CompilerInvocation {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
-  bool DelayFunctionBodyParsing = false;
+  bool DelayedFunctionBodyParsing = false;
 
   typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
   ClangImporterCtorTy ImporterCtor = nullptr;
@@ -190,11 +190,11 @@ public:
     return CodeCompletionFactory;
   }
 
-  void setDelayFunctionBodyParsing(bool Val) {
-    DelayFunctionBodyParsing = Val;
+  void setDelayedFunctionBodyParsing(bool Val) {
+    DelayedFunctionBodyParsing = Val;
   }
 
-  bool isDelayedFunctionBodyParsing() const { return DelayFunctionBodyParsing; }
+  bool isDelayedFunctionBodyParsing() const { return DelayedFunctionBodyParsing; }
 };
 
 class CompilerInstance {
