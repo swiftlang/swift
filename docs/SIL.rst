@@ -1320,13 +1320,16 @@ apply
   // %1, %2, etc. must be of the argument types $A, $B, etc.
   // %r will be of the return type $R
 
-Transfers control to function ``%0``, passing it the given arguments. The
-input argument tuple type is destructured. The
-``apply`` instruction does no retaining or releasing of its arguments by
-itself; the calling convention's retain/release policy must be handled by
-separate explicit ``retain`` and ``release`` instructions. The return value
-will likewise not be implicitly retained or released. ``%0`` must be an object
-of a concrete function type; generic functions must have all of their generic
+Transfers control to function ``%0``, passing it the given arguments. In
+the instruction syntax, the type of the callee is specified after the argument
+list; the types of the argument and of the defined value are derived from the
+function type of the callee. The input argument tuple type is destructured,
+and each element is passed as an individual argument. The ``apply``
+instruction does no retaining or releasing of its arguments by itself; the
+`calling convention`_'s retain/release policy must be handled by separate
+explicit ``retain`` and ``release`` instructions. The return value will
+likewise not be implicitly retained or released. ``%0`` must be an object of a
+concrete function type; generic functions must have all of their generic
 parameters bound with a ``specialize`` instruction before they can be applied.
 
 TODO: should have normal/unwind branch targets, like LLVM ``invoke``.
@@ -1347,11 +1350,14 @@ partial_apply
   // %c will be of the partially-applied thick function type (T...) -> R
 
 Creates a closure by partially applying the function ``%0`` to a partial
-sequence of its arguments. The closure context will be allocated with retain
-count 1 and initialized to contain the values ``%1``, ``%2``, etc.
-The closed-over values will not be retained; that must be done separately before
-the ``partial_apply``. The closure does take ownership of the partially applied
-arguments.
+sequence of its arguments. In the instruction syntax, the type of the callee is
+specified after the argument list; the types of the argument and of the defined
+value are derived from the function type of the callee. The closure context will
+be allocated with retain count 1 and initialized to contain the values ``%1``,
+``%2``, etc.  The closed-over values will not be retained; that must be done
+separately before the ``partial_apply``. The closure does take ownership of the
+partially applied arguments; when the closure reference count reaches zero,
+the contained values will be destroyed.
 
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::
