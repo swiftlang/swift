@@ -158,8 +158,8 @@ static void doMemberLookup(Type BaseTy,
     if (!Visited.insert(PT->getDecl()))
       return;
       
-    for (auto Inherited : PT->getDecl()->getInherited())
-      doMemberLookup(Inherited.getType(), Consumer, CurrDC, LK, Visited);
+    for (auto Proto : PT->getDecl()->getProtocols())
+      doMemberLookup(Proto->getDeclaredType(), Consumer, CurrDC, LK, Visited);
 
     lookupTypeMembers(PT, Consumer, CurrDC, LK);
     return;

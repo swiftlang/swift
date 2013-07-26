@@ -681,8 +681,8 @@ static void addMinimumProtocols(Type T,
     }
 
     if (Visited.insert(Proto->getDecl())) {
-      for (auto Inherited : Proto->getDecl()->getInherited())
-        addProtocols(Inherited.getType(), Stack);
+      for (auto Inherited : Proto->getDecl()->getProtocols())
+        addProtocols(Inherited->getDeclaredType(), Stack);
     }
     return;
   }
@@ -728,9 +728,9 @@ static void minimizeProtocols(SmallVectorImpl<ProtocolDecl *> &Protocols) {
     Stack.pop_back();
     
     // Add the protocols we inherited.
-    for (auto Inherited : Current->getInherited()) {
-      addMinimumProtocols(Inherited.getType(), Protocols, Known, Visited,
-                          Stack, ZappedAny);
+    for (auto Inherited : Current->getProtocols()) {
+      addMinimumProtocols(Inherited->getDeclaredType(), Protocols, Known,
+                          Visited, Stack, ZappedAny);
     }
   }
   

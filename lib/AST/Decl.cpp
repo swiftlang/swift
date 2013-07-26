@@ -635,18 +635,13 @@ bool ProtocolDecl::inheritsFrom(const ProtocolDecl *Super) const {
   while (!Stack.empty()) {
     const ProtocolDecl *Current = Stack.back();
     Stack.pop_back();
-    
-    for (auto Inherited : Current->getInherited()) {
-      SmallVector<ProtocolDecl *, 4> InheritedDecls;
-      if (Inherited.getType()->isExistentialType(InheritedDecls)) {
-        for (auto InheritedProto : InheritedDecls) {
-          if (InheritedProto == Super)
-            return true;
-            
-          else if (Visited.insert(InheritedProto))
-            Stack.push_back(InheritedProto);
-        }
-      }
+
+    for (auto InheritedProto : Current->getProtocols()) {
+      if (InheritedProto == Super)
+        return true;
+
+      if (Visited.insert(InheritedProto))
+        Stack.push_back(InheritedProto);
     }
   }
   
@@ -661,15 +656,10 @@ void ProtocolDecl::collectInherited(
   while (!Stack.empty()) {
     const ProtocolDecl *Current = Stack.back();
     Stack.pop_back();
-    
-    for (auto IType : Current->getInherited()) {
-      SmallVector<ProtocolDecl *, 4> InheritedDecls;
-      if (IType.getType()->isExistentialType(InheritedDecls)) {
-        for (auto InheritedProto : InheritedDecls) {
-          if (Inherited.insert(InheritedProto))
-            Stack.push_back(InheritedProto);
-        }
-      }
+
+    for (auto InheritedProto : Current->getProtocols()) {
+      if (Inherited.insert(InheritedProto))
+        Stack.push_back(InheritedProto);
     }
   }
 }
