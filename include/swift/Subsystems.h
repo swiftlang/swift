@@ -78,6 +78,7 @@ namespace swift {
   /// bodies.
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 bool *Done,
+                                unsigned CodeCompletionOffset = ~0U,
                                 SILParserState *SIL = nullptr,
                               PersistentParserState *PersistentState = nullptr,
                              DelayedParsingCallbacks *DelayedParseCB = nullptr);

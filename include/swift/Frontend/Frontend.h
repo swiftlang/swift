@@ -201,6 +201,7 @@ class CompilerInstance {
   CompilerInvocation Invocation;
   llvm::SourceMgr SourceMgr;
   std::vector<unsigned> BufferIDs;
+  unsigned CodeCompletionBufferID = ~0U;
   DiagnosticEngine Diagnostics;
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;

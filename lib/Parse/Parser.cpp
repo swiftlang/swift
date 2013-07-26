@@ -73,6 +73,7 @@ public:
           return false;
         parseFunctionBody(FD);
       }
+      return true;
     }
     return true;
   }
@@ -92,7 +93,8 @@ private:
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-      TheParser.setCodeCompletion(CodeCompletionOffset, CodeCompletion.get());
+      TheParser.setCodeCompletion(CodeCompletionOffset);
+      TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     TheParser.parseDeclFuncBodyDelayed(FD);
   }
@@ -103,16 +105,20 @@ private:
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      bool *Done,
+                                     unsigned CodeCompletionOffset,
                                      SILParserState *SIL,
                                      PersistentParserState *PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB) {
   Parser P(BufferID, TU,
            TU->Kind == TranslationUnit::Main ||
            TU->Kind == TranslationUnit::REPL, SIL, PersistentState);
+  PrettyStackTraceParser StackTrace(P);
+
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
+  if (CodeCompletionOffset != ~0U)
+    P.setCodeCompletion(CodeCompletionOffset);
 
-  PrettyStackTraceParser stackTrace(P);
   bool FoundSideEffects = P.parseTranslationUnit(TU);
 
   const llvm::MemoryBuffer *Buffer = P.SourceMgr.getMemoryBuffer(BufferID);

@@ -88,10 +88,16 @@ public:
     this->DelayedParseCB = DelayedParseCB;
   }
 
-  void setCodeCompletion(unsigned Offset,
-                         CodeCompletionCallbacks *Callbacks) {
-    CodeCompletion = Callbacks;
+  void setCodeCompletion(unsigned Offset) {
     L->setCodeCompletion(Offset);
+  }
+
+  void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
+    CodeCompletion = Callbacks;
+  }
+
+  bool isCodeCompletionFirstPass() {
+    return L->isCodeCompletion() && !CodeCompletion;
   }
 
   /// Tok - This is the current token being considered by the parser.

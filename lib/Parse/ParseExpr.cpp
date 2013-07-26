@@ -630,7 +630,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 
       // The result of the called constructor is used to rebind 'this'.
       return new (Context) RebindThisInConstructorExpr(result, thisDecl);
-    } else if (Tok.is(tok::code_complete)) {
+    } else if (Tok.is(tok::code_complete) && CodeCompletion) {
       if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
         CodeCompletion->completeExprSuperDot(SRE);
       }
@@ -658,7 +658,7 @@ NullablePtr<Expr> Parser::parseExprSuper() {
       return 0;
     return new (Context) SubscriptExpr(superRef, idx.get());
   }
-  if (Tok.is(tok::code_complete)) {
+  if (Tok.is(tok::code_complete) && CodeCompletion) {
     if (auto *SRE = dyn_cast<SuperRefExpr>(superRef)) {
       CodeCompletion->completeExprSuper(SRE);
       return nullptr;
@@ -791,7 +791,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     break;
 
   case tok::code_complete:
-    CodeCompletion->completePostfixExprBeginning();
+    if (CodeCompletion)
+      CodeCompletion->completePostfixExprBeginning();
     return nullptr;
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
@@ -824,7 +825,7 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
-        if (Tok.is(tok::code_complete) && Result.isNonNull()) {
+        if (Tok.is(tok::code_complete) && CodeCompletion && Result.isNonNull()) {
           CodeCompletion->completeDotExpr(Result.get());
           return nullptr;
         }
@@ -898,8 +899,9 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
       continue;
     }
 
-    if (Tok.is(tok::code_complete) && Result.isNonNull()) {
-      CodeCompletion->completePostfixExpr(Result.get());
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion && Result.isNonNull())
+        CodeCompletion->completePostfixExpr(Result.get());
       return nullptr;
     }
     break;

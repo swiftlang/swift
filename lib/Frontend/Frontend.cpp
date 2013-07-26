@@ -87,15 +87,14 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (CodeCompletePoint.first) {
     auto MemBuf = CodeCompletePoint.first;
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    unsigned BufID = SourceMgr.AddNewSourceBuffer(
+    llvm::MemoryBuffer *CodeCompletionBuffer =
         llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
-                                             MemBuf->getBufferIdentifier()),
-                                             llvm::SMLoc());
-    BufferIDs.push_back(BufID);
-    CodeCompleteLoc =
-        SourceLoc(llvm::SMLoc::getFromPointer(
-                            SourceMgr.getMemoryBuffer(BufID)->getBufferStart() +
-                                CodeCompletePoint.second));
+                                             MemBuf->getBufferIdentifier());
+    CodeCompletionBufferID = SourceMgr.AddNewSourceBuffer(CodeCompletionBuffer,
+                                                          llvm::SMLoc());
+    BufferIDs.push_back(CodeCompletionBufferID);
+    CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
+        CodeCompletionBuffer->getBufferStart() + CodeCompletePoint.second));
   }
 
   for (auto &File : Invocation.getInputFilenames()) {
@@ -121,32 +120,6 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   }
 
   return false;
-}
-
-namespace {
-class AlwaysDelayedCallbacks : public DelayedParsingCallbacks {
-  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      FuncExpr *FE,
-                                      SourceRange BodyRange) override {
-    return true;
-  }
-};
-
-class CodeCompleteDelayedCallbacks : public DelayedParsingCallbacks {
-  SourceLoc CodeCompleteLoc;
-public:
-  explicit CodeCompleteDelayedCallbacks(SourceLoc CodeCompleteLoc)
-    : CodeCompleteLoc(CodeCompleteLoc) {
-  }
-
-  bool shouldDelayFunctionBodyParsing(Parser &TheParser,
-                                      FuncExpr *FE,
-                                      SourceRange BodyRange) override {
-    return CodeCompleteLoc.Value.getPointer() >
-               BodyRange.Start.Value.getPointer() &&
-        CodeCompleteLoc.Value.getPointer() <= BodyRange.End.Value.getPointer();
-  }
-};
 }
 
 void swift::CompilerInstance::doIt() {
@@ -176,9 +149,12 @@ void swift::CompilerInstance::doIt() {
   if (Kind == TranslationUnit::Library) {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
+      unsigned CodeCompletionOffset = ~0U;
+      if (BufferID == CodeCompletionBufferID)
+        CodeCompletionOffset = Invocation.getCodeCompletionPoint().second;
       bool Done;
-      parseIntoTranslationUnit(TU, BufferID, &Done, nullptr, &PersistentState,
-                               DelayedCB.get());
+      parseIntoTranslationUnit(TU, BufferID, &Done, CodeCompletionOffset,
+                               nullptr, &PersistentState, DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
     }
@@ -210,6 +186,7 @@ void swift::CompilerInstance::doIt() {
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
     parseIntoTranslationUnit(TU, BufferID, &Done,
+                             Invocation.getCodeCompletionPoint().second,
                              TheSILModule ? &SILContext : nullptr,
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
