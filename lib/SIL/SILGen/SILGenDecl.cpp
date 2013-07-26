@@ -854,7 +854,7 @@ public:
                                  ProtocolConformance *conformance) {
     assert(conformance);
     if (protocol->isObjC())
-      for (auto &mapping : conformance->getValueWitnesses()) {
+      for (auto &mapping : conformance->getWitnesses()) {
         ValueDecl *vd = mapping.second.Decl;
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);

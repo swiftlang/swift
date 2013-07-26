@@ -2657,7 +2657,7 @@ namespace {
     }
 
     void addStaticMethod(FuncDecl *iface) {
-      const auto &witness = Conformance.getValueWitness(iface);
+      const auto &witness = Conformance.getWitness(iface);
       
       FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getStaticMethodWitness(impl,
@@ -2666,7 +2666,7 @@ namespace {
     }
 
     void addInstanceMethod(FuncDecl *iface) {
-      const auto &witness = Conformance.getValueWitness(iface);
+      const auto &witness = Conformance.getWitness(iface);
 
       FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getInstanceMethodWitness(impl,

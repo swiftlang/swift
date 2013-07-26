@@ -455,7 +455,7 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
-  ValueWitnessMap Mapping;
+  WitnessMap Mapping;
   TypeSubstitutionMap TypeMapping;
   InheritedConformanceMap InheritedMapping;
 

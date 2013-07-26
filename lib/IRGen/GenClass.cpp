@@ -611,7 +611,7 @@ namespace {
       assert(TheExtension &&
              "should only consider objc conformances for extensions");
       if (protocol->isObjC())
-        for (auto &mapping : conformance->getValueWitnesses()) {
+        for (auto &mapping : conformance->getWitnesses()) {
           ValueDecl *vd = mapping.second.Decl;
           if (vd->getDeclContext() != TheExtension)
             visit(vd);

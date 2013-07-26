@@ -574,10 +574,10 @@ namespace {
 
         for (unsigned I = 0, N = Subst.Conformance.size(); I != N; ++I) {
           const auto &Conformance = Subst.Conformance[I];
-          if (!Conformance || Conformance->getValueWitnesses().empty())
+          if (!Conformance || Conformance->getWitnesses().empty())
             continue;
 
-          if (Conformance->getValueWitnesses().begin()->first->getDeclContext()
+          if (Conformance->getWitnesses().begin()->first->getDeclContext()
                 != Archetype->getConformsTo()[I]) {
             Out << "Protocol conformance doesn't match up with archetype "
                    "requirement\n";

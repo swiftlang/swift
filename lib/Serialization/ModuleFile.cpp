@@ -290,7 +290,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     proto = cast<ProtocolDecl>(getDecl(protoID));
   }
 
-  ValueWitnessMap valueWitnesses;
+  WitnessMap valueWitnesses;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
     ValueDecl *first, *second;

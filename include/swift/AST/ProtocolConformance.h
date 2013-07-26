@@ -46,8 +46,8 @@ struct ProtocolConformanceWitness {
   ArrayRef<Substitution> Substitutions;
 };
 
-/// Map from value requirements to the corresponding conformance witnesses.
-typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> ValueWitnessMap;
+/// Map from non-type requirements to the corresponding conformance witnesses.
+typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> WitnessMap;
 
 /// Map from a directly-inherited protocol to its corresponding protocol
 /// conformance.
@@ -60,7 +60,7 @@ typedef llvm::DenseMap<ProtocolDecl *, ProtocolConformance *>
 class ProtocolConformance {
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
-  ValueWitnessMap Mapping;
+  WitnessMap Mapping;
   
   /// \brief The mapping of individual archetypes in the protocol over to
   /// the types used to satisy the type requirements.
@@ -76,7 +76,7 @@ class ProtocolConformance {
   llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 
 public:
-  ProtocolConformance(ValueWitnessMap &&valueWitnesses,
+  ProtocolConformance(WitnessMap &&valueWitnesses,
                       TypeSubstitutionMap &&typeWitnesses,
                       InheritedConformanceMap &&inheritedConformances,
                       llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
@@ -88,7 +88,6 @@ public:
       DefaultedDefinitions.insert(def);
   }
 
-
   /// Retrieve the type witness for the given associated type.
   Type getTypeWitness(TypeAliasDecl *assocType) const;
 
@@ -97,18 +96,18 @@ public:
     return TypeMapping;
   }
 
-  /// Retrieve the value witness for the given requirement.
-  ProtocolConformanceWitness getValueWitness(ValueDecl *requirement) const {
+  /// Retrieve the non-type witness for the given requirement.
+  ProtocolConformanceWitness getWitness(ValueDecl *requirement) const {
     auto known = Mapping.find(requirement);
     assert(known != Mapping.end());
     return known->second;
   }
 
-  /// Retrieve the complete set of value witnesses.
-  ValueWitnessMap &getValueWitnesses() { return Mapping; }
+  /// Retrieve the complete set of non-type witnesses.
+  WitnessMap &getWitnesses() { return Mapping; }
 
-  /// Retrieve the complete set of value witnesses.
-  const ValueWitnessMap &getValueWitnesses() const { return Mapping; }
+  /// Retrieve the complete set of non-type witnesses.
+  const WitnessMap &getWitnesses() const { return Mapping; }
 
   /// Retrieve the protocol conformance for a directly-inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const {

@@ -347,7 +347,7 @@ public:
       } else if (Name.equals("next") && isa<FuncDecl>(Value)) {
         if (Conformance) {
           // FIXME: Ignoring substitutions here (?).
-          nextFn = cast<FuncDecl>(Conformance->getValueWitness(Value).Decl);
+          nextFn = cast<FuncDecl>(Conformance->getWitness(Value).Decl);
         } else
           nextFn = cast<FuncDecl>(Value);
       }
