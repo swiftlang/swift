@@ -36,7 +36,7 @@ TEST_F(LexerTest, TokenizeSkipComments) {
   const char *Source =
       "// Blah\n"
       "(/*yo*/)";
-  std::vector<tok> ExpectedTokens{ tok::l_paren, tok::r_paren };
+  std::vector<tok> ExpectedTokens{ tok::l_paren, tok::r_paren, tok::eof };
   checkLex(Source, ExpectedTokens, /*KeepComments=*/false);
 }
 
@@ -45,7 +45,7 @@ TEST_F(LexerTest, TokenizeWithComments) {
       "// Blah\n"
       "(/*yo*/)";
   std::vector<tok> ExpectedTokens{
-    tok::comment, tok::l_paren, tok::comment, tok::r_paren
+    tok::comment, tok::l_paren, tok::comment, tok::r_paren, tok::eof
   };
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
                                      /*KeepComments=*/true);
@@ -54,3 +54,12 @@ TEST_F(LexerTest, TokenizeWithComments) {
   EXPECT_EQ(getLocForEndOfToken(Toks[0].getLoc()),
             Toks[0].getLoc().getAdvancedLoc(8));
 }
+
+TEST_F(LexerTest, EOFTokenLengthIsZero) {
+  const char *Source = "meow";
+  std::vector<tok> ExpectedTokens{ tok::identifier, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
+}
+
