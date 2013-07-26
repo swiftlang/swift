@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -emit-sil -verify
 
 func singleBlock() -> Int {
   var y = 0 
@@ -28,8 +28,13 @@ func multipleBlocksAllMissing(x:Int) -> Int {
   x++
 } // expected-warning {{missing return in the function expected to return Int}}
 
-// FIXME: We should not report the missing return here as this is a 
-// no-return function. After we fix this, we can turn the warning into error.
-func MYsubscriptNonASCII(idx : Int) -> Char {
-  alwaysTrap() 
-} // expected-warning {{missing return in the function expected to return Char}}
+func [noreturn] MYsubscriptNonASCII(idx : Int) -> Char {
+} // no-warning
+
+func [noreturn] exit ()->(){}
+func [noreturn] tryingToReturn (x:Bool) -> () {
+  if x {
+    return // expected-error {{return from a 'noreturn' function}}
+  }
+  exit()
+}

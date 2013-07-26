@@ -1497,6 +1497,9 @@ ERROR(invalid_sil_builtin,sil_gen,none,
 WARNING(missing_return,sil_analysis,none,
       "missing return in the function expected to return %0", (StringRef))
 
+ERROR(return_from_noreturn,sil_analysis,none, 
+      "return from a 'noreturn' function", ())
+
 //==============================================================================
 // IR Generation Diagnostics
 //==============================================================================
