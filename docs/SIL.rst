@@ -268,13 +268,12 @@ type-checker and out of SIL eventually.
 
 Values and Operands
 ~~~~~~~~~~~~~~~~~~~
+::
 
-  .. line-block::
-
-    *sil-identifier* ::= [``A-Za``-``z_0``-``9``]+
-    *sil-value-name* ::= '``%``' *sil-identifier*
-    *sil-value* ::= *sil-value-name* ('``#``' [``0``-``9``]+)?
-    *sil-operand* ::= *sil-value* '``:``' *sil-type*
+  sil-identifier ::= [A-Za-z_0-9]+
+  sil-value-name ::= '%' sil-identifier
+  sil-value ::= sil-value-name ('#' [0-9]+)?
+  sil-operand ::= sil-value ':' sil-type
 
 SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
@@ -298,16 +297,14 @@ other entities require specialized instructions such as ``integer_literal``,
 
 Functions
 ~~~~~~~~~
+::
 
-  .. line-block::
+  sil-function ::= 'sil' sil-linkage? sil-function-name ':' sil-type
+                     '{' sil-basic-block+ '}'
+  sil-function-name ::= '@' [A-Za-z_0-9]+
 
-    *sil-function* ::= '``sil``' *sil-linkage*? *sil-function-name* '``:``' *sil-type*
-                       '``{``' *sil-basic-block*\ + '``}``'
-
-    *sil-function-name* ::= '``@``' [``A-Za``-``z_0``-``9``]+
-
-    *sil-linkage* ::= '``internal``'
-    *sil-linkage* ::= '``clang_thunk``'
+  sil-linkage ::= 'internal'
+  sil-linkage ::= 'clang_thunk'
 
 SIL functions are defined with the ``sil`` keyword. SIL function names
 are introduced with the ``@`` sigil and named by an alphanumeric
@@ -332,14 +329,13 @@ given LLVM ``external`` linkage.
 
 Basic Blocks
 ~~~~~~~~~~~~
-  .. line-block::
+::
 
-    *sil-basic-block* ::= *sil-label* *sil-instruction-def* *sil-terminator*
-    *sil-label* ::= *sil-identifier* *sil-argument-list*? '``:``'
-    *sil-argument-list* ::= '``(``' *sil-argument* ('``,``' *sil-argument*)\* '``)``'
-    *sil-argument* ::= *sil-value-name* '``:``' *sil-type*
-  
-    *sil-instruction-def* ::= (*sil-value-name* '``=``')? *sil-instruction*
+  sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
+  sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
+  sil-argument ::= sil-value-name ':' sil-type
+
+  sil-instruction-def ::= (sil-value-name '=')? sil-instruction
 
 A function body consists of one or more basic blocks that correspond
 to the nodes of the function's control flow graph. Each basic block
@@ -381,23 +377,22 @@ are bound by the function's caller::
 
 Declaration References
 ~~~~~~~~~~~~~~~~~~~~~~
+::
 
-  .. line-block::
-
-    *sil-decl-ref* ::= '``#``' *sil-identifier* ('``.``' *sil-identifier*)* *sil-decl-subref*?
-    *sil-decl-subref* ::= '``!``' *sil-decl-subref-part* ('``.``' *sil-decl-uncurry-level*)? ('``.``' *sil-decl-lang*)?
-    *sil-decl-subref* ::= '``!``' *sil-decl-uncurry-level* ('``.``' *sil-decl-lang*)?
-    *sil-decl-subref* ::= '``!``' *sil-decl-lang*
-    *sil-decl-subref-part* ::= '``getter``'
-    *sil-decl-subref-part* ::= '``setter``'
-    *sil-decl-subref-part* ::= '``allocator``'
-    *sil-decl-subref-part* ::= '``initializer``'
-    *sil-decl-subref-part* ::= '``oneofelt``'
-    *sil-decl-subref-part* ::= '``destroyer``'
-    *sil-decl-subref-part* ::= '``globalaccessor``'
-    *sil-decl-subref-part* ::= '``defaultarg``' '``.``' [``0``-``9``]+
-    *sil-decl-uncurry-level* ::= [``0``-``9``]+
-    *sil-decl-lang* ::= '``objc``'
+  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
+  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)? ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+  sil-decl-subref ::= '!' sil-decl-lang
+  sil-decl-subref-part ::= 'getter'
+  sil-decl-subref-part ::= 'setter'
+  sil-decl-subref-part ::= 'allocator'
+  sil-decl-subref-part ::= 'initializer'
+  sil-decl-subref-part ::= 'oneofelt'
+  sil-decl-subref-part ::= 'destroyer'
+  sil-decl-subref-part ::= 'globalaccessor'
+  sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
+  sil-decl-uncurry-level ::= [0-9]+
+  sil-decl-lang ::= 'objc'
 
 Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
