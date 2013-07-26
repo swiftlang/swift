@@ -127,6 +127,11 @@ the Swift type system:
   to an archetype. This is a very specific kind of constraint that is
   only used for calls to operators in protocols.
 
+**ApplicableFunction**
+  An applicable function requires that both types are function types 
+  with the same input and output types. Note, that it does not require 
+  the type attributes to match.
+
 Constraint Generation
 ``````````````````````````
 The process of constraint generation produces a constraint system
@@ -185,7 +190,7 @@ and types generated from the primary expression kinds are:
 
 **Function application**
   A function application ``a(b)`` generates two
-  constraints. First, the rvalue equality constraint ``T0 -> T1 ==R
+  constraints. First, the applicable function constraint ``T0 -> T1 ==Fn
   T(a)`` (for fresh type variables ``T0`` and ``T1``) captures the
   rvalue-to-lvalue conversion applied on the function (``a``) and
   decomposes the function type into its argument and result
