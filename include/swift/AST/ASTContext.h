@@ -18,6 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
@@ -68,44 +69,6 @@ namespace swift {
   class Substitution;
 
   typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
-
-/// \brief Type substitution mapping from substitutable types to their
-/// replacements.
-typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
-
-/// \brief Describes a declaration used to satisfy, or "witness", a protocol
-/// requirement.
-struct ProtocolConformanceWitness {
-  /// The declaration that satisfies the requirement.
-  ValueDecl *Decl;
-  
-  /// The substitutions necessary to map the declaration's type to the
-  /// requirement.
-  ArrayRef<Substitution> Substitutions;
-};
-  
-/// \brief Describes how a particular type conforms to a given protocol,
-/// providing the mapping from the protocol members to the type (or extension)
-/// members that provide the functionality for the concrete type.
-class ProtocolConformance {
-public:
-  /// \brief The mapping of individual requirements in the protocol over to
-  /// the declarations that satisfy those requirements.
-  llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> Mapping;
-  
-  /// \brief The mapping of individual archetypes in the protocol over to
-  /// the types used to satisy the type requirements.
-  TypeSubstitutionMap TypeMapping;
-  
-  /// \brief The mapping from any directly-inherited protocols over to the
-  /// protocol conformance structures that indicate how the given type meets
-  /// the requirements of those protocols.
-  llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
-
-  /// The set of requirements for which we have used default definitions or
-  /// otherwise deduced the result.
-  llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
-};
 
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
