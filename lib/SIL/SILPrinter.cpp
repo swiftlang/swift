@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/Demangle.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -31,7 +32,9 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FormattedStream.h"
+
 using namespace swift;
+using namespace Demangle;
 
 struct ID {
   enum {
@@ -351,6 +354,7 @@ public:
     OS << "function_ref ";
     DRI->getFunction()->printName(OS);
     OS << " : " << DRI->getType();
+    OS << " // " << demangleSymbol(DRI->getFunction()->getName());
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
@@ -800,6 +804,7 @@ void SILFunction::dump() const {
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(llvm::raw_ostream &OS) const {
+  OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
   switch (getLinkage()) {
   case SILLinkage::Internal:
