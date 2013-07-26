@@ -200,7 +200,7 @@ llvm::Value *irgen::emitLoadOfOpaqueWitness(IRGenFunction &IGF,
   return witness;
 }
 
-/// Given a witness table, load one of the value witnesses.
+/// Given a value witness table, load one of the value witnesses.
 /// The result has the appropriate type for the witness.
 static llvm::Value *emitLoadOfValueWitness(IRGenFunction &IGF,
                                            llvm::Value *table,
@@ -213,6 +213,15 @@ static llvm::Value *emitLoadOfValueWitness(IRGenFunction &IGF,
   } else {
     return IGF.Builder.CreatePtrToInt(witness, type, label);
   }
+}
+
+/// Given a type metadata pointer, load one of the value witnesses from its
+/// value witness table.
+static llvm::Value *emitLoadOfValueWitnessFromMetadata(IRGenFunction &IGF,
+                                                       llvm::Value *metadata,
+                                                       ValueWitness index) {
+  llvm::Value *vwtable = IGF.emitValueWitnessTableRefForMetadata(metadata);
+  return emitLoadOfValueWitness(IGF, vwtable, index);
 }
 
 /// Given a call to a helper function that produces a result
@@ -247,11 +256,10 @@ static void setHelperAttributes(llvm::CallInst *call) {
 
 /// Emit a call to do an 'initializeBufferWithCopyOfBuffer' operation.
 llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
-                                                     llvm::Value *witnessTable,
                                                      llvm::Value *metadata,
                                                      Address destBuffer,
                                                      Address srcBuffer) {
-  llvm::Value *copyFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                              ValueWitness::InitializeBufferWithCopyOfBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
@@ -264,10 +272,9 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
 
 /// Emit a call to do an 'allocateBuffer' operation.
 llvm::Value *irgen::emitAllocateBufferCall(IRGenFunction &IGF,
-                                           llvm::Value *witnessTable,
                                            llvm::Value *metadata,
                                            Address buffer) {
-  llvm::Value *allocateFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *allocateFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                              ValueWitness::AllocateBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall2(allocateFn, buffer.getAddress(), metadata);
@@ -278,10 +285,9 @@ llvm::Value *irgen::emitAllocateBufferCall(IRGenFunction &IGF,
 
 /// Emit a call to do a 'projectBuffer' operation.
 llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
-                                          llvm::Value *witnessTable,
                                           llvm::Value *metadata,
                                           Address buffer) {
-  llvm::Value *projectFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *projectFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                             ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
     IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), metadata);
@@ -292,11 +298,10 @@ llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
 
 /// Emit a call to do an 'initializeWithCopy' operation.
 void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
-                                       llvm::Value *witnessTable,
                                        llvm::Value *metadata,
                                        llvm::Value *destObject,
                                        llvm::Value *srcObject) {
-  llvm::Value *copyFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                          ValueWitness::InitializeWithCopy);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
@@ -306,11 +311,10 @@ void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
 
 /// Emit a call to do an 'initializeWithTake' operation.
 void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
-                                       llvm::Value *witnessTable,
                                        llvm::Value *metadata,
                                        llvm::Value *destObject,
                                        llvm::Value *srcObject) {
-  llvm::Value *copyFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                          ValueWitness::InitializeWithTake);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
@@ -320,11 +324,10 @@ void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
 
 /// Emit a call to do an 'assignWithCopy' operation.
 void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
-                                   llvm::Value *witnessTable,
                                    llvm::Value *metadata,
                                    llvm::Value *destObject,
                                    llvm::Value *srcObject) {
-  llvm::Value *copyFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                          ValueWitness::AssignWithCopy);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
@@ -334,11 +337,10 @@ void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
 
 /// Emit a call to do an 'assignWithTake' operation.
 void irgen::emitAssignWithTakeCall(IRGenFunction &IGF,
-                                   llvm::Value *witnessTable,
                                    llvm::Value *metadata,
                                    llvm::Value *destObject,
                                    llvm::Value *srcObject) {
-  llvm::Value *copyFn = emitLoadOfValueWitness(IGF, witnessTable,
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                          ValueWitness::AssignWithTake);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
@@ -348,10 +350,10 @@ void irgen::emitAssignWithTakeCall(IRGenFunction &IGF,
 
 /// Emit a call to do a 'destroy' operation.
 void irgen::emitDestroyCall(IRGenFunction &IGF,
-                            llvm::Value *witnessTable,
                             llvm::Value *metadata,
                             llvm::Value *object) {
-  auto fn = emitLoadOfValueWitness(IGF, witnessTable, ValueWitness::Destroy);
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                                   ValueWitness::Destroy);
   llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
@@ -359,10 +361,9 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
 
 /// Emit a call to do a 'destroyBuffer' operation.
 void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
-                                  llvm::Value *witnessTable,
                                   llvm::Value *metadata,
                                   Address buffer) {
-  auto fn = emitLoadOfValueWitness(IGF, witnessTable,
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
@@ -372,10 +373,9 @@ void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
 
 /// Emit a call to do a 'deallocateBuffer' operation.
 void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
-                                     llvm::Value *witnessTable,
                                      llvm::Value *metadata,
                                      Address buffer) {
-  auto fn = emitLoadOfValueWitness(IGF, witnessTable,
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
@@ -385,10 +385,9 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
 
 /// Emit a call to the 'typeof' operation.
 llvm::Value *irgen::emitTypeofCall(IRGenFunction &IGF,
-                                   llvm::Value *witnessTable,
                                    llvm::Value *metadata,
                                    llvm::Value *object) {
-  auto fn = emitLoadOfValueWitness(IGF, witnessTable,
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::TypeOf);
   llvm::CallInst *call =
     IGF.Builder.CreateCall2(fn, object, metadata);

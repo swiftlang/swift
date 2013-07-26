@@ -65,10 +65,9 @@ public:
                                       name);
 
     // Allocate an object of the appropriate type within it.
-    llvm::Value *wtable = asImpl().getValueWitnessTable(IGF);
     llvm::Value *metadata = asImpl().getMetadataRef(IGF);
     llvm::Value *address =
-      emitAllocateBufferCall(IGF, wtable, metadata, buffer);
+      emitAllocateBufferCall(IGF, metadata, buffer);
     address = IGF.Builder.CreateBitCast(address,
                                         getStorageType()->getPointerTo());
     return OwnedAddress(getAddressForPointer(address), IGF.IGM.RefCountedNull);

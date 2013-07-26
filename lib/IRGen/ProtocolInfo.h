@@ -37,16 +37,17 @@ namespace irgen {
 
 /// A class which encapsulates an index into a witness table.
 class WitnessIndex {
-  unsigned Value;
+  unsigned Value : 31;
+  unsigned IsPrefix : 1;
 public:
   WitnessIndex() = default;
   WitnessIndex(ValueWitness index) : Value(unsigned(index)) {}
-  explicit WitnessIndex(unsigned index) : Value(index) {}
+  explicit WitnessIndex(unsigned index, bool isPrefix)
+    : Value(index), IsPrefix(isPrefix) {}
 
   unsigned getValue() const { return Value; }
 
-  bool isZero() const { return Value == 0; }
-  bool isValueWitness() const { return Value < NumValueWitnesses; }
+  bool isPrefix() const { return IsPrefix; }
 };
 
 /// A witness to a specific element of a protocol.  Every
@@ -74,12 +75,11 @@ public:
   }
 
   static WitnessTableEntry forPrefixBase(ProtocolDecl *proto) {
-    return WitnessTableEntry(proto, WitnessIndex(0));
+    return WitnessTableEntry(proto, WitnessIndex(0, /*isPrefix=*/ true));
   }
 
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto,
                                             WitnessIndex index) {
-    assert(!index.isValueWitness());
     return WitnessTableEntry(proto, index);
   }
 
@@ -91,7 +91,7 @@ public:
   /// it a prefix of the layout of this protocol?
   bool isOutOfLineBase() const {
     assert(isBase());
-    return !BeginIndex.isZero();
+    return !BeginIndex.isPrefix();
   }
 
   /// Return the index at which to find the table for this
@@ -102,7 +102,6 @@ public:
   }
 
   static WitnessTableEntry forFunction(FuncDecl *func, WitnessIndex index) {
-    assert(!index.isValueWitness());
     return WitnessTableEntry(func, index);
   }
 
