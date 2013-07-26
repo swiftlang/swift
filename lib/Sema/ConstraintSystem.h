@@ -272,6 +272,9 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
+  /// \brief Both types are function types with the same input and output types.
+  /// Note, we do not require the function type attributes to match.
+  ApplicableFunction,
   /// \brief The first type has a member with the given name, and the
   /// type of that member, when referenced as a value, is the second type.
   ValueMember,
@@ -748,6 +751,8 @@ public:
     TypesNotConvertible,
     /// \brief Types are not constructible.
     TypesNotConstructible,
+    /// \brief Function types mismatch.
+    FunctionTypesMismatch,
     /// \brief Lvalue type qualifiers mismatch.
     LValueQualifiers,
     /// \brief The first type doesn't conform to a protocol in the second
@@ -807,6 +812,7 @@ public:
   /// \brief Profile the given failure.
   void Profile(llvm::FoldingSetNodeID &id) {
     switch (kind) {
+    case FunctionTypesMismatch:
     case FunctionAutoclosureMismatch:
     case FunctionNoReturnMismatch:
     case LValueQualifiers:
@@ -949,6 +955,11 @@ public:
     case ConstraintKind::ConformsTo:
       assert(Member.empty() && "Relational constraint cannot have a member");
       break;
+    case ConstraintKind::ApplicableFunction:
+      assert(First->is<FunctionType>()
+             && "The left-hand side type should be a function type");
+      assert(Member.empty() && "Relational constraint cannot have a member");
+      break;
 
     case ConstraintKind::TypeMember:
     case ConstraintKind::ValueMember:
@@ -977,6 +988,7 @@ public:
     case ConstraintKind::Conversion:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::ApplicableFunction:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
@@ -2094,6 +2106,9 @@ private:
 
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);
+
+  /// \brief Attempt to simplify the ApplicableFunction constraint.
+  SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the given archetype constraint.
   SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);

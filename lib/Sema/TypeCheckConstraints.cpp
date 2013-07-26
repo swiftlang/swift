@@ -233,6 +233,7 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
   case ConstraintKind::Conversion: Out << " <c "; break;
   case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
+  case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
   case ConstraintKind::ValueMember:
     Out << "[." << Member.str() << ": value] == ";
     break;
@@ -1180,6 +1181,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
+
   // Input types can be contravariant (or equal).
   SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
                                    subKind, subFlags,
@@ -1258,10 +1260,8 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   llvm_unreachable("unhandled type matching kind");
 }
 
-/// \brief Retrieve the fixed type for this type variable, looking through a
-/// chain of type variables to get at the undlying type.
-static Type getFixedTypeRecursive(ConstraintSystem &cs,
-                                  TypeVariableType *typeVar) {
+static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
+                                        TypeVariableType *typeVar) {
   while (auto fixed = cs.getFixedType(typeVar)) {
     typeVar = fixed->getAs<TypeVariableType>();
     if (!typeVar)
@@ -1270,36 +1270,36 @@ static Type getFixedTypeRecursive(ConstraintSystem &cs,
   return nullptr;
 }
 
+/// \brief Retrieve the fixed type for this type variable, looking through a
+/// chain of type variables to get at the undlying type.
+static Type getFixedTypeRecursive(ConstraintSystem &cs,
+                                  Type type, TypeVariableType *&typeVar) {
+  auto desugar = type->getDesugaredType();
+  typeVar = desugar->getAs<TypeVariableType>();
+  if (typeVar) {
+    if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar)) {
+      fixed = cs.simplifyType(fixed);
+      type = fixed;
+      typeVar = nullptr;
+    }
+  }
+  return type;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
                              ConstraintLocatorBuilder locator,
                              bool &trivial) {
-  // Desugar both types.
-  auto desugar1 = type1->getDesugaredType();
-  auto desugar2 = type2->getDesugaredType();
-
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  auto typeVar1 = dyn_cast<TypeVariableType>(desugar1);
-  if (typeVar1) {
-    if (auto fixed = getFixedTypeRecursive(*this, typeVar1)) {
-      fixed = simplifyType(fixed);
-      type1 = fixed;
-      desugar1 = fixed->getDesugaredType();
-      typeVar1 = nullptr;
-    }
-  }
+  TypeVariableType *typeVar1;
+  type1 = getFixedTypeRecursive(*this, type1, typeVar1);
+  auto desugar1 = type1->getDesugaredType();
 
-  auto typeVar2 = dyn_cast<TypeVariableType>(desugar2);
-  if (typeVar2) {
-    if (auto fixed = getFixedTypeRecursive(*this, typeVar2)) {
-      fixed = simplifyType(fixed);
-      type2 = fixed;
-      desugar2 = fixed->getDesugaredType();
-      typeVar2 = nullptr;
-    }
-  }
+  TypeVariableType *typeVar2;
+  type2 = getFixedTypeRecursive(*this, type2, typeVar2);
+  auto desugar2 = type2->getDesugaredType();
 
   // If we have a same-type-as-rvalue constraint, and the right-hand side
   // has a form that is either definitely an lvalue or definitely an rvalue,
@@ -1316,20 +1316,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     } else if (!type2->is<TypeVariableType>()) {
       // The right-hand side is guaranteed to be an rvalue type. Call this
       // a normal same-type constraint.
-      kind = TypeMatchKind::SameType;
-      flags |= TMF_GenerateConstraints;
-    }
-
-    if (auto desugarFunc2 = dyn_cast<FunctionType>(desugar2)) {
-      // The right-hand side is a function type, which is guaranteed to be
-      // an rvalue type. Call this a normal same-type constraint, and
-      // strip off the [auto_closure], which is not part of the type.
-      if (desugarFunc2->isAutoClosure()) {
-        auto func2 = type2->castTo<FunctionType>();
-        type2 = FunctionType::get(func2->getInput(), func2->getResult(),
-                                  TC.Context);
-        desugar2 = type2.getPointer();
-      }
       kind = TypeMatchKind::SameType;
       flags |= TMF_GenerateConstraints;
     }
@@ -2360,6 +2346,74 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   return SolutionKind::Error;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
+
+  // By construction, the left hand side is a type that looks like the
+  // following: $T1 -> $T2.
+  Type type1 = constraint.getFirstType();
+  assert(type1->is<FunctionType>());
+
+  // Drill down to the concrete type on the right hand side.
+  TypeVariableType *typeVar2;
+  Type type2 = getFixedTypeRecursive(*this,constraint.getSecondType(),typeVar2);
+  auto desugar2 = type2->getDesugaredType();
+
+  // Force the right-hand side to be an rvalue.
+  unsigned flags = TMF_None;
+  while (isa<LValueType>(desugar2)) {
+    type2 = type2->castTo<LValueType>()->getObjectType();
+    type2 = getFixedTypeRecursive(*this, type2, typeVar2);
+    desugar2 = type2->getDesugaredType();
+    flags |= TMF_GenerateConstraints;
+  }
+
+  // If the types are obviously equivalent, we're done.
+  if (type1.getPointer() == desugar2)
+    return SolutionKind::TriviallySolved;
+
+  // If right-hand side is a type variable, the constraint is unsolved.
+  if (typeVar2) {
+    return SolutionKind::Unsolved;
+  }
+
+  // Bind the inputs and outputs.
+  ConstraintLocatorBuilder locator = constraint.getLocator();
+  if (desugar2->getKind() == TypeKind::Function) {
+    auto func1 = type1->castTo<FunctionType>();
+    auto func2 = cast<FunctionType>(desugar2);
+    bool trivial = true;
+
+    assert(func1->getInput()->is<TypeVariableType>() &&
+           "the input of funct1 is a free variable by construction");
+    assert(func1->getResult()->is<TypeVariableType>() &&
+           "the output of funct1 is a free variable by construction");
+
+    if (matchTypes(func1->getInput(), func2->getInput(),
+                   TypeMatchKind::BindType, flags,
+                   locator.withPathElement(ConstraintLocator::FunctionArgument),
+                   trivial) == SolutionKind::Error)
+      return SolutionKind::Error;
+
+    if (matchTypes(func1->getResult(), func2->getResult(),
+                   TypeMatchKind::BindType,
+                   flags,
+                   locator.withPathElement(ConstraintLocator::FunctionResult),
+                   trivial) == SolutionKind::Error)
+      return SolutionKind::Error;
+    return SolutionKind::Solved;
+  }
+
+  // If we are supposed to record failures, do so.
+  if (shouldRecordFailures()) {
+    recordFailure(getConstraintLocator(locator),
+                  Failure::FunctionTypesMismatch,
+                  type1, type2);
+  }
+
+  return SolutionKind::Error;
+}
+
 /// \brief Retrieve the type-matching kind corresponding to the given
 /// constraint kind.
 static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
@@ -2370,6 +2424,10 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+
+  case ConstraintKind::ApplicableFunction:
+    llvm_unreachable("ApplicableFunction constraints don't involve "
+                     "type matches");
 
   case ConstraintKind::Construction:
     llvm_unreachable("Construction constraints don't involve type matches");
@@ -2400,6 +2458,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return matchTypes(constraint.getFirstType(), constraint.getSecondType(),
                       getTypeMatchKind(constraint.getKind()),
                       TMF_None, constraint.getLocator(), trivial);
+  }
+
+  case ConstraintKind::ApplicableFunction: {
+    return simplifyApplicableFnConstraint(constraint);
   }
 
   case ConstraintKind::Construction:

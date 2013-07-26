@@ -1018,7 +1018,7 @@ ERROR(funcexpr_incompatible_result,sema_tcc,none,
 //------------------------------------------------------------------------------
 ERROR(invalid_relation,sema_tcc,none,
   "%1 is not %select{identical to|a trivial subtype of|a subtype of|"
-  "convertible to|constructible with}0 %2", (unsigned, Type, Type))
+  "convertible to|constructible with|identical to}0 %2", (unsigned, Type, Type))
 ERROR(invalid_tuple_size,sema_tcc,none,
   "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
   (Type, Type, unsigned, unsigned))

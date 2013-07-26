@@ -38,6 +38,11 @@ void Failure::dump(llvm::SourceMgr *sm) {
         << getName().str() << "'";
     break;
 
+  case FunctionTypesMismatch:
+    out << "function type" << getFirstType().getString() << " is not equal to "
+    << getSecondType().getString();
+    break;
+
   case FunctionAutoclosureMismatch:
     out << "autoclosure mismatch " << getFirstType().getString() << " vs. "
         << getSecondType().getString();
@@ -235,6 +240,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
   case Failure::TypesNotSubtypes:
   case Failure::TypesNotConvertible:
   case Failure::TypesNotConstructible:
+  case Failure::FunctionTypesMismatch:
     tc.diagnose(loc, diag::invalid_relation,
                 failure.getKind() - Failure::TypesNotEqual,
                 failure.getFirstType(),
