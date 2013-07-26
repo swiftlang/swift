@@ -99,6 +99,30 @@ private:
     TheParser.parseDeclFuncBodyDelayed(FD);
   }
 };
+
+void
+parseDelayedTopLevelDecl(TranslationUnit *TU,
+                         PersistentParserState &ParserState,
+                         CodeCompletionCallbacksFactory *CodeCompletionFactory,
+                         unsigned CodeCompletionOffset) {
+  assert(CodeCompletionFactory &&
+         "delayed parsing of decls only makes sense for code completion");
+
+  if (!ParserState.hasDelayedDecl())
+    return;
+
+  int BufferID = TU->Ctx.SourceMgr
+      .FindBufferContainingLoc(ParserState.getDelayedDeclLoc().Value);
+  Parser TheParser(BufferID, TU,
+                   TU->Kind == TranslationUnit::Main ||
+                   TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
+
+  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
+      CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
+  TheParser.setCodeCompletion(CodeCompletionOffset);
+  TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
+  TheParser.parseTopLevelCodeDeclDelayed();
+}
 } // unnamed namespace
 
 /// parseIntoTranslationUnit - Entrypoint for the parser.
@@ -138,6 +162,10 @@ void swift::performDelayedParsing(
   for (Decl *D : TU->Decls) {
     D->walk(Walker);
   }
+
+  if (CodeCompletionFactory)
+    parseDelayedTopLevelDecl(TU, PersistentState, CodeCompletionFactory,
+                             CodeCompletionOffset);
 }
 
 std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,

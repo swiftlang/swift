@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Parse/PersistentParserState.h"
 
@@ -39,3 +40,13 @@ PersistentParserState::takeBodyState(FuncExpr *FE) {
   DelayedBodies.erase(I);
   return State;
 }
+
+void PersistentParserState::delayTopLevelCodeDecl(TopLevelCodeDecl *TLCD,
+                                                  SourceRange BodyRange,
+                                                  SourceLoc PreviousLoc) {
+  assert(!CodeCompletionDelayedDeclState.get() &&
+         "only one decl can be delayed for code completion");
+  CodeCompletionDelayedDeclState.reset(new DelayedDeclState(
+      TLCD, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope()));
+}
+

@@ -392,11 +392,16 @@ public:
   bool parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
                  std::function<bool()> callback);
-  
+
+  void consumeTopLevelDecl(TopLevelCodeDecl *TLCD,
+                           ParserPosition BeginParserPosition);
+
   void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                        bool IsTopLevel,
                        BraceItemListKind Kind = BraceItemListKind::Brace);
   NullablePtr<BraceStmt> parseBraceItemList(Diag<> ID);
+
+  void parseTopLevelCodeDeclDelayed();
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing

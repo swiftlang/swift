@@ -132,6 +132,16 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   }
 }
 
+void Parser::consumeTopLevelDecl(TopLevelCodeDecl *TLCD,
+                                 ParserPosition BeginParserPosition) {
+  backtrackToPosition(BeginParserPosition);
+  SourceLoc BeginLoc = Tok.getLoc();
+  skipUntilDeclStmtRBrace();
+  SourceLoc EndLoc = Tok.getLoc();
+  State->delayTopLevelCodeDecl(TLCD, { BeginLoc, EndLoc },
+                               BeginParserPosition.PreviousLoc);
+}
+
 ///   brace-item:
 ///     decl
 ///     expr
@@ -194,8 +204,19 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
       ContextChange CC(*this, TLCD);
       SourceLoc StartLoc = Tok.getLoc();
-      
-      if (parseExprOrStmt(Result)) {
+
+      ParserPosition BeginParserPosition;
+      if (isCodeCompletionFirstPass())
+        BeginParserPosition = getParserPosition();
+
+      bool FailedToParse = parseExprOrStmt(Result);
+
+      if (Tok.is(tok::code_complete)) {
+        consumeTopLevelDecl(TLCD, BeginParserPosition);
+        return;
+      }
+
+      if (FailedToParse) {
         NeedParseErrorRecovery = true;
       } else {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
@@ -242,6 +263,41 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       previousHadSemi = true;
     }
   }
+}
+
+void Parser::parseTopLevelCodeDeclDelayed() {
+  auto DelayedState = State->takeDelayedDeclState();
+  assert(DelayedState.get() && "should have delayed state");
+
+  auto *TLCD = dyn_cast<TopLevelCodeDecl>(DelayedState->D);
+  assert(!TLCD->getBody() && "should not have a parsed body");
+
+  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
+  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
+
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeToken();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that can not go past the end state.
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState, SourceMgr, &Diags,
+                 nullptr /*not SIL*/);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to '{' of the function body.
+  restoreParserPosition(BeginParserPosition);
+
+  // Re-enter the lexical scope.
+  Scope S(this, DelayedState->takeScope());
+  ContextChange CC(*this, TLCD);
+
+  ExprStmtOrDecl Result;
+  parseExprOrStmt(Result);
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to
