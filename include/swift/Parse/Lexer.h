@@ -73,12 +73,16 @@ class Lexer {
 
   Lexer(llvm::SourceMgr &SourceMgr, llvm::StringRef Buffer,
         DiagnosticEngine *Diags, const char *CurrentPosition,
-        bool InSILMode, bool KeepComments);
+        bool InSILMode, bool KeepComments, bool Prime);
+
+  void primeLexer();
 
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
-    : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode, KeepComments){}
+      : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode,
+              KeepComments, /*Prime=*/true) {
+  }
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
@@ -104,7 +108,8 @@ public:
         llvm::SourceMgr &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
     : Lexer(SourceMgr,
             StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
-            Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments()) {
+            Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments(),
+            /*Prime=*/false) {
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
@@ -123,6 +128,8 @@ public:
         Parent.CodeCompletionPtr >= BufferStart &&
         Parent.CodeCompletionPtr <= BufferEnd)
       CodeCompletionPtr = Parent.CodeCompletionPtr;
+
+    primeLexer();
   }
 
   bool isKeepingComments() const { return KeepComments; }
@@ -164,7 +171,7 @@ public:
   }
 
   State getStateForEndOfTokenLoc(SourceLoc Loc) const {
-    return getStateForBeginningOfTokenLoc(getLocForEndOfToken(SourceMgr, Loc));
+    return State(getLocForEndOfToken(SourceMgr, Loc).Value.getPointer());
   }
 
   /// \brief Restore the lexer state to a given one, that can be located either

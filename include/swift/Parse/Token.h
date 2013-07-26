@@ -63,7 +63,7 @@ class Token {
   StringRef Text;
   
 public:
-  Token() : Kind(tok::unknown), AtStartOfLine(false) {}
+  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }

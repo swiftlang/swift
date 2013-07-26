@@ -162,7 +162,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 
 Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
-             bool InSILMode, bool KeepComments)
+             bool InSILMode, bool KeepComments, bool Prime)
   : SourceMgr(SourceMgr), Diags(Diags), ArtificialEOF(nullptr),
     InSILMode(InSILMode), KeepComments(KeepComments) {
   BufferStart = Buffer.begin();
@@ -170,10 +170,15 @@ Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
   CurPtr = CurrentPosition;
   assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
          "Current position is out-of-range");
-    
-  // Prime the lexer.
+
+  if (Prime)
+    primeLexer();
+}
+
+void Lexer::primeLexer() {
+  assert(NextToken.is(tok::NUM_TOKENS));
   lexImpl();
-  assert((NextToken.isAtStartOfLine() || CurrentPosition != BufferStart) &&
+  assert((NextToken.isAtStartOfLine() || CurPtr != BufferStart) &&
          "The token should be at the beginning of the line, "
          "or we should be lexing from the middle of the buffer");
 }
@@ -189,7 +194,8 @@ tok Lexer::getTokenKind(StringRef Text) {
   assert(Text.data() >= BufferStart && Text.data() <= BufferEnd &&
          "Text string does not fall within lexer's buffer");
   Lexer L(SourceMgr, StringRef(BufferStart, BufferEnd - BufferStart), Diags,
-          Text.data(), /*not SIL mode*/ false, isKeepingComments());
+          Text.data(), /*not SIL mode*/ false, isKeepingComments(),
+          /*Prime=*/true);
   Token Result;
   L.lex(Result);
   return Result.getKind();
@@ -1363,7 +1369,7 @@ SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
   // KeepComments irrelevant), or the caller lexed comments and KeepComments
   // must be true.
   Lexer L(SM, Buffer->getBuffer(), nullptr, Loc.Value.getPointer(), false,
-          /*KeepComments=*/true);
+          /*KeepComments=*/true, /*Prime=*/true);
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
 }
