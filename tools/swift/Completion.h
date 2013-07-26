@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
@@ -47,12 +48,12 @@ class Completions {
   CompletionState state;
   std::unique_ptr<llvm::BumpPtrAllocator> strings;
   
-  std::vector<llvm::StringRef> completions;
+  std::vector<StringRef> completions;
   size_t enteredLength;
   size_t rootLength;
   size_t currentStem;
   
-  llvm::StringRef allocateCopy(llvm::StringRef s);
+  StringRef allocateCopy(StringRef s);
   
 public:
   /// Create an invalid completion set.
@@ -60,8 +61,7 @@ public:
   
   /// Create a completion set containing completions appropriate to the given
   /// string.
-  Completions(DeclContext *dc,
-              llvm::StringRef prefix);
+  Completions(DeclContext *dc, StringRef prefix);
   
   /// Returns true if this is a valid completion set.
   explicit operator bool() const { return state != CompletionState::Invalid; }
@@ -80,17 +80,17 @@ public:
   
   /// Returns the common root of all the found completions (or the entire
   /// completion for a unique completion).
-  llvm::StringRef getRoot() const;
+  StringRef getRoot() const;
   
   /// Returns the stem (if any) returned by the previous getNextStem() call.
-  llvm::StringRef getPreviousStem() const;
+  StringRef getPreviousStem() const;
   
   /// Returns the next completion stem. Cycles to the beginning of the list if
   /// the end was reached.
-  llvm::StringRef getNextStem();
+  StringRef getNextStem();
   
   /// Returns a list of all complete names for which completions were found.
-  llvm::ArrayRef<llvm::StringRef> getCompletionList() const {
+  ArrayRef<StringRef> getCompletionList() const {
     return completions;
   }
   
