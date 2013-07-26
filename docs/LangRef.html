@@ -1349,6 +1349,7 @@ if vec[3] {
     attribute      ::= attribute-resilience
     attribute      ::= attribute-byref
     attribute      ::= attribute-auto_closure
+    attribute      ::= attribute-noreturn
   </pre>
   
   <p>An attribute is a (possibly empty) comma separated list of attributes.</p>
@@ -1443,6 +1444,29 @@ if vec[3] {
   assert(i &lt; j)
   if (a == 0 || b == 42) { ... }
   </pre>
+
+  <!-- _____________________________________________________________________ -->
+  <h4 id="attribute-noreturn">No Return Attribute</h4>
+
+  <pre class="grammar">
+    attribute-noreturn ::= 'noreturn'
+  </pre>
+
+  <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a 
+	function declaration or in the attribute list of a <tt>type-annotation</tt> 
+	that describes a syntactic function type.
+  </p>
+
+  <p><tt>noreturn</tt> indicates to the compiler that the function will not 
+	return to the caller. This attribute should be used to suppress the 
+	uninitialized variable, missing return warnings and errors. The compiler is
+	also allowed to more aggressively optimize the code in presence of this 
+	attribute.
+  </p>
+
+  <p>If a function with no a <tt>noreturn</tt> attribute contains a 
+	<tt>return</tt> statement, an error will be raised. 
+  </p>
 
   
   <!-- ********************************************************************* -->
