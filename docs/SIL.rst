@@ -239,10 +239,11 @@ Some additional meaningful categories of type:
 SILGen does not always map Swift function types one-to-one to SIL function
 types. Function types are transformed in order to encode additional attributes:
 
-- The **calling convention** of the function, indicated by the 
+- The **calling convention** of the function, indicated by the
+
   .. parsed-literal::
 
-    [cc\ *convention*]
+    [cc(*convention*)]
 
   attribute—where *convention* can currently be ``swift``, ``method``,
   ``cdecl``, or ``objc``\ —describing a machine-level calling convention
