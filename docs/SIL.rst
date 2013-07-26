@@ -93,37 +93,6 @@ TODO:
   warnings)
 - Basic ARC optimization for acceptable performance at -O0.
 
-Diagnostic Passes
-~~~~~~~~~~~~~~~~~
-
-The following passes are run after guaranteed optimization to diagnose the
-validity of the Swift program that generated the SIL:
-
-- **Return analysis** verifies that each function always returns a
-  value on every code path and doesn't "fall of the end" of its
-  definition, which is an error.
-
-TODO:
-
-####### Ancestor
-
-Diagnostic Passes
-~~~~~~~~~~~~~~~~~
-
-The following passes are run after guaranteed optimization to diagnose the
-validity of the Swift program that generated the SIL:
-
-- Return analysis. This verifies that functions always return a value on every
-  code path and don't "fall of the end" of their definition, which is an error.
-
-TODO:
-
-- Noreturn verification as a part of return analysis.
-- Switch statement coverage.
-- Dead code detection/elimination. Non-implicit dead code is an error.
-- Definitive assignment of local variables, and of instance variables in
-  constructors.
-
 General Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
