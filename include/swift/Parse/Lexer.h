@@ -46,7 +46,11 @@ class Lexer {
 
   /// Pointer to the artificial EOF that is located before BufferEnd.  Useful
   /// for lexing subranges of a buffer.
-  const char *ArtificialEOF;
+  const char *ArtificialEOF = nullptr;
+
+  /// If non-null, points to the '\0' character in the buffer where we should
+  /// produce a code completion token.
+  const char *CodeCompletionPtr = nullptr;
 
   /// Pointer to the next not consumed character.
   const char *CurPtr;
@@ -63,10 +67,6 @@ class Lexer {
   
   /// \brief Set to true to return comment tokens, instead of skipping them.
   bool KeepComments = false;
-
-  /// \brief Set to true if we should produce a code completion token when we
-  /// hit \c ArtificialEOF.
-  bool DoingCodeCompletion = false;
 
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
@@ -108,23 +108,35 @@ public:
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
-    // If the parent lexer is doing code completion and the completion position
-    // is in this subrange, then we should stop at that point, too.
-    if (Parent.DoingCodeCompletion &&
+    // If the parent lexer should stop prematurely, and the ArtificialEOF
+    // position is in this subrange, then we should stop at that point, too.
+    if (Parent.ArtificialEOF &&
         Parent.ArtificialEOF >= BufferStart &&
         Parent.ArtificialEOF <= BufferEnd) {
-      DoingCodeCompletion = true;
       ArtificialEOF = Parent.ArtificialEOF;
     } else
       ArtificialEOF = EndState.CurPtr;
+
+    // Do code completion if the parent lexer is doing code completion and the
+    // code completion token is in subrange.
+    if (Parent.CodeCompletionPtr &&
+        Parent.CodeCompletionPtr >= BufferStart &&
+        Parent.CodeCompletionPtr <= BufferEnd)
+      CodeCompletionPtr = Parent.CodeCompletionPtr;
   }
 
   bool isKeepingComments() const { return KeepComments; }
 
+  /// \brief Returns true if this lexer will produce a code completion token.
+  bool isCodeCompletion() const {
+    return CodeCompletionPtr != nullptr;
+  }
+
   void setCodeCompletion(unsigned Offset) {
-    ArtificialEOF = BufferStart + Offset;
-    assert(ArtificialEOF <= BufferEnd);
-    DoingCodeCompletion = true;
+    assert(CodeCompletionPtr == nullptr ||
+           CodeCompletionPtr == BufferStart + Offset);
+    CodeCompletionPtr = BufferStart + Offset;
+    assert(CodeCompletionPtr <= BufferEnd);
   }
 
   const char *getBufferEnd() const { return BufferEnd; }

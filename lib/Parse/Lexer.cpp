@@ -198,13 +198,9 @@ tok Lexer::getTokenKind(StringRef Text) {
 void Lexer::formToken(tok Kind, const char *TokStart) {
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
-  // we are past the imaginary EOF, and synthesize a tok::code_complete or
-  // tok::eof in this case.
+  // we are past the imaginary EOF, and synthesize a tok::eof in this case.
   if (Kind != tok::eof && ArtificialEOF && TokStart >= ArtificialEOF) {
-    if (DoingCodeCompletion)
-      Kind = tok::code_complete;
-    else
-      Kind = tok::eof;
+    Kind = tok::eof;
   }
   NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
 }
@@ -1229,6 +1225,9 @@ Restart:
   case '\t':
     goto Restart;  // Skip whitespace.
   case 0:
+    if (CurPtr-1 == CodeCompletionPtr)
+      return formToken(tok::code_complete, TokStart);
+
     // If this is a random nul character in the middle of a buffer, skip it as
     // whitespace.
     if (CurPtr-1 != BufferEnd) {

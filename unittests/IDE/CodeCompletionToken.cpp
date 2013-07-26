@@ -4,6 +4,15 @@
 using namespace swift;
 using namespace code_completion;
 
+static std::string replaceAtWithNull(const std::string &S) {
+  std::string Result = S;
+  for (char &C : Result) {
+    if (C == '@')
+      C = '\0';
+  }
+  return Result;
+}
+
 TEST(CodeCompletionToken, FindInEmptyFile) {
   std::string Source = "";
   unsigned Offset;
@@ -33,7 +42,7 @@ TEST(CodeCompletionToken, FindBegin) {
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
   EXPECT_EQ(0U, Offset);
-  EXPECT_EQ(" func", Clean);
+  EXPECT_EQ(replaceAtWithNull("@ func"), Clean);
 }
 
 TEST(CodeCompletionToken, FindEnd) {
@@ -41,7 +50,7 @@ TEST(CodeCompletionToken, FindEnd) {
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
   EXPECT_EQ(5U, Offset);
-  EXPECT_EQ("func ", Clean);
+  EXPECT_EQ(replaceAtWithNull("func @"), Clean);
 }
 
 TEST(CodeCompletionToken, FindSingleLine) {
@@ -49,7 +58,7 @@ TEST(CodeCompletionToken, FindSingleLine) {
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
   EXPECT_EQ(12U, Offset);
-  EXPECT_EQ("func zzz() {}", Clean);
+  EXPECT_EQ(replaceAtWithNull("func zzz() {@}"), Clean);
 }
 
 TEST(CodeCompletionToken, FindMultiline) {
@@ -60,6 +69,6 @@ TEST(CodeCompletionToken, FindMultiline) {
   unsigned Offset;
   std::string Clean = removeCodeCompletionTokens(Source, "A", &Offset);
   EXPECT_EQ(19U, Offset);
-  EXPECT_EQ("func zzz() {\n  1 + \r\n}\n", Clean);
+  EXPECT_EQ(replaceAtWithNull("func zzz() {\n  1 + @\r\n}\n"), Clean);
 }
 
