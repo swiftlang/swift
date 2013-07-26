@@ -414,8 +414,29 @@ entity discriminators:
 - ``objc``: a specific entry point for objective-C interoperability
 
 Methods and curried function definitions in Swift also have multiple
-“uncurry levels” in SIL, representing the function at each possible
-partial application level.
+"uncurry levels" in SIL, representing the function at each possible
+partial application level. For a curried function declaration::
+
+  // Module example
+  func foo(x:A)(y:B)(z:C) -> D
+
+The declaration references and types for the different uncurry levels are as
+follows::
+
+  #example.foo!0 : $[thin] (x:A) -> (y:B) -> (z:C) -> D
+  #example.foo!1 : $[thin] ((y:B), (x:A)) -> (z:C) -> D
+  #example.foo!2 : $[thin] ((z:C), (y:B), (x:A)) -> D
+
+The deepest uncurry level is referred to as the **natural uncurry level**.
+Note that the uncurried argument clauses are composed right-to-left, as
+specified in the `calling convention`_. For uncurry levels less than the
+uncurry level, the entry point itself is ``[thin]`` but returns a thick
+function value.
+
+`Dynamic dispatch`_ instructions such as ``class method`` require their method
+declaration reference to be uncurried to at least uncurry level 1 (which applies
+both the "this" argument and the method arguments), because uncurry level zero
+is the level at which dynamic dispatch semantically occurs in Swift.
 
 Dataflow Errors
 ---------------
@@ -1638,7 +1659,8 @@ ref_element_addr
   //   of C
 
 Given an instance of a class, derives the address of a physical instance
-variable inside the instance. The class value must not be null.
+variable inside the instance. It is undefined behavior if the class value
+is null.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
