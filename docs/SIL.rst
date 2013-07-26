@@ -75,14 +75,14 @@ raw SIL. We do not want the diagnostics produced by the compiler to change as
 the compiler evolves, so these passes are intended to be simple and
 predictable.
 
-- Memory promotion: this is implemented as two optimization phases, the first
-  of which performs capture analysis to promote alloc_box instructions to
-  alloc_stack, and the second of which promotes non-address-exposed alloc_stack
+- **Memory promotion** is implemented as two optimization phases, the first
+  of which performs capture analysis to promote ``alloc_box`` instructions to
+  ``alloc_stack``, and the second of which promotes non-address-exposed ``alloc_stack``
   instructions to SSA registers.
-- Return analysis. This verifies that functions always return a value on every
-  code path and don't "fall of the end" of their definition, which is an error.
+- **Return analysis** verifies that each function returns a value on every
+  code path and doesn't "fall of the end" of its definition, which is an error.
 
-If the diagnostic passes all succeed, the final result is the *canonical SIL*
+If all diagnostic passes succeed, the final result is the *canonical SIL*
 for the program. Performance optimization and native code generation are
 derived from this form, and a module can be built from this (or later) forms.
 
@@ -92,6 +92,32 @@ TODO:
 - Constant folding/guaranteed simplifications (including constant overflow
   warnings)
 - Basic ARC optimization for acceptable performance at -O0.
+
+Diagnostic Passes
+~~~~~~~~~~~~~~~~~
+
+The following passes are run after guaranteed optimization to diagnose the
+validity of the Swift program that generated the SIL:
+
+- **Return analysis** verifies that each function always returns a
+  value on every code path and doesn't "fall of the end" of its
+  definition, which is an error.
+
+TODO:
+
+####### Ancestor
+
+Diagnostic Passes
+~~~~~~~~~~~~~~~~~
+
+The following passes are run after guaranteed optimization to diagnose the
+validity of the Swift program that generated the SIL:
+
+- Return analysis. This verifies that functions always return a value on every
+  code path and don't "fall of the end" of their definition, which is an error.
+
+TODO:
+
 - Noreturn verification as a part of return analysis.
 - Switch statement coverage.
 - Dead code detection/elimination. Non-implicit dead code is an error.
@@ -101,20 +127,22 @@ TODO:
 General Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-SIL captures language-specific type information, which makes it possible to
-perform high-level optimizations such as generics specialization that are
-difficult to perform on LLVM IR.  The details of these have not been fully
-nailed down, but we expect this to be important.
+SIL captures language-specific type information, making it possible to
+perform high-level optimizations—such as specialization of
+generics—that are difficult to perform on LLVM IR.  The details of
+these high-level optimizations have not been fully nailed down, but we
+expect them to be important.
 
 Syntax
 ------
 
-SIL is reliant on Swift's type system and declarations, so SIL syntax is
-an extension of Swift's. A ``.sil`` file is a Swift source file with added
-SIL definitions. The Swift source is parsed only for its declarations;
-Swift ``func`` bodies and top-level code are ignored except for nested
-declarations. In a ``.sil`` file, there are no implicit imports; the ``swift``
-and/or ``Builtin`` standard modules must be imported explicitly if used.
+SIL is reliant on Swift's type system and declarations, so SIL syntax
+is an extension of Swift's. A ``.sil`` file is a Swift source file
+with added SIL definitions. The Swift source is parsed only for its
+declarations; Swift ``func`` bodies (except for nested declarations)
+and top-level code are ignored by the SIL parser. In a ``.sil`` file,
+there are no implicit imports; the ``swift`` and/or ``Builtin``
+standard modules must be imported explicitly if used.
 
 Here is an example of a ``.sil`` file::
 
@@ -163,9 +191,9 @@ type grammar. SIL adds some additional kinds of type of its own:
   instructions that manipulate their operands indirectly by address, such
   as ``copy_addr``, ``destroy_addr``, and ``dealloc_stack``, or as arguments
   to functions. For an address-only type ``T``, only the SIL address ``$*T``
-  can be formed. ``$T`` for address-only ``T`` is an invalid SIL type.
+  can be formed, and ``$T`` is an invalid SIL type.
   
-  Addresses are not reference-counted pointers like class values are. They
+  Addresses are not reference-counted pointers like class references are. They
   cannot be retained or released.
   
   The address of an address cannot be taken. ``$**T`` is not a representable
@@ -219,10 +247,11 @@ generic constraints:
   * Archetypes not constrained by a class protocol
   * Non-class protocol types
 
-  Values of address-only types must reside in memory and can only be referenced
-  in SIL by address. Address-only type addresses cannot be loaded from or
-  stored to. SIL provides special instructions for indirectly manipulating
-  address-only values, such as ``copy_addr`` and ``destroy_addr``.
+  Values of address-only type (“address-only values”) must reside in
+  memory and can only be referenced in SIL by address. Addresses of
+  address-only values cannot be loaded from or stored to. SIL provides
+  special instructions for indirectly manipulating address-only
+  values, such as ``copy_addr`` and ``destroy_addr``.
 
 Some additional meaningful categories of type:
 
@@ -241,35 +270,42 @@ Some additional meaningful categories of type:
 SILGen does not always map Swift function types one-to-one to SIL function
 types. Function types are transformed in order to encode additional attributes:
 
-- The calling convention of the function, indicated by the ``[cc(convention)]``
-  attribute, where ``convention`` can currently be ``swift``, ``method``,
-  ``cdecl``, or ``objc``.  These describe a machine-level calling convention
+- The **calling convention** of the function, indicated by the 
+  .. parsed-literal::
+
+    [cc\ *convention*]
+
+  attribute—where *convention* can currently be ``swift``, ``method``,
+  ``cdecl``, or ``objc``\ —describing a machine-level calling convention
   below the concern of SIL.
-- The "thinness" of the function reference, indicated by the ``[thin]``
+
+- The **thinness** of the function reference, indicated by the ``[thin]``
   attribute, which tracks whether a function reference requires a context value
   to reference captured closure state. Standalone functions and methods are
   always ``[thin]``, but function-local functions or closure expressions that
   capture context are thick. Partial applications of curried functions or
   methods are also thick.
-- Curried function definitions are emitted at their "natural" uncurry level,
-  that is, with all of the curried argument clauses flattened into a single
-  argument clause. For instance, a curried function
-  ``func foo(x:A)(y:B) -> C`` is emitted as a function of type
-  ``((y:B), (x:A)) -> C``. Methods are treated as a form of curried function.
-  The exact ordering of currying clauses depends on the `calling convention`_
-  of the function.
+
+- The **fully uncurried representation** of the function type, with
+  all of the curried argument clauses flattened into a single argument
+  clause. For instance, a curried function ``func foo(x:A)(y:B) -> C``
+  might be emitted as a function of type ``((y:B), (x:A)) -> C``.  The
+  exact representation depends on the function's `calling
+  convention`_, which determines the exact ordering of currying
+  clauses.  Methods are treated as a form of curried function.
 
 TODO: Type-checking of cc and thin attributes will move into Swift's
 type-checker and out of SIL eventually.
 
 Values and Operands
 ~~~~~~~~~~~~~~~~~~~
-::
 
-  sil-identifier ::= [A-Za-z_0-9]+
-  sil-value-name ::= '%' sil-identifier
-  sil-value ::= sil-value-name ('#' [0-9]+)?
-  sil-operand ::= sil-value ':' sil-type
+  .. line-block::
+
+    *sil-identifier* ::= [``A-Za``-``z_0``-``9``]+
+    *sil-value-name* ::= '``%``' *sil-identifier*
+    *sil-value* ::= *sil-value-name* ('``#``' [``0``-``9``]+)?
+    *sil-operand* ::= *sil-value* '``:``' *sil-type*
 
 SIL values are introduced with the ``%`` sigil and named by an
 alphanumeric identifier, which references the instruction or basic block
@@ -293,49 +329,54 @@ other entities require specialized instructions such as ``integer_literal``,
 
 Functions
 ~~~~~~~~~
-::
 
-  sil-function ::= 'sil' sil-linkage? sil-function-name ':' sil-type
-                     '{' sil-basic-block+ '}'
-  sil-function-name ::= '@' [A-Za-z_0-9]+
+  .. line-block::
 
-  sil-linkage ::= 'internal'
-  sil-linkage ::= 'clang_thunk'
+    *sil-function* ::= '``sil``' *sil-linkage*? *sil-function-name* '``:``' *sil-type*
+                       '``{``' *sil-basic-block*\ + '``}``'
 
-SIL functions are defined at the top level with the ``sil`` keyword. SIL
-function names are introduced with the ``@`` sigil and named by an
-alphanumeric identifier. This name will become the LLVM IR name for the
-function, and is usually the mangled name of the originating Swift declaration.
-The ``sil`` syntax declares the function's name and SIL type then
-defines the body of the function inside braces. The declared type must be a
-function type, which may be generic.
+    *sil-function-name* ::= '``@``' [``A-Za``-``z_0``-``9``]+
+
+    *sil-linkage* ::= '``internal``'
+    *sil-linkage* ::= '``clang_thunk``'
+
+SIL functions are defined with the ``sil`` keyword. SIL function names
+are introduced with the ``@`` sigil and named by an alphanumeric
+identifier. This name will become the LLVM IR name for the function,
+and is usually the mangled name of the originating Swift declaration.
+The ``sil`` syntax declares the function's name and SIL type, and
+defines the body of the function inside braces. The declared type must
+be a function type, which may be generic.
 
 The ``sil`` keyword may be optionally followed by a linkage specifier. By
 default, SIL functions are externally visible from their enclosing module and
 given LLVM ``external`` linkage.
 
-- The ``internal`` specifier indicates that the function is internal to its
-  module. Internal functions may be freely transformed by optimizations. This
-  corresponds to LLVM's ``private`` linkage.
+- The ``internal`` specifier indicates that the function is internal
+  to its module. Internal functions may be freely transformed by
+  optimizations that might otherwise break code in other modules. Internal
+  functions are given ``private`` linkage in LLVM IR.
 - The ``clang_thunk`` specifier indicates that the function was generated as
   an adapter thunk to interface with a C or Objective-C declaration imported
-  from Clang. These are currently generated lazily and given ``linkonce_odr``
-  linkage at the LLVM level.
+  from Clang. These thunks are generated lazily and given ``linkonce_odr``
+  linkage in LLVM IR.
 
 Basic Blocks
 ~~~~~~~~~~~~
-::
+  .. line-block::
 
-  sil-basic-block ::= sil-label sil-instruction-def* sil-terminator
-  sil-label ::= sil-identifier ('(' sil-argument (',' sil-argument)* ')')? ':'
-  sil-argument ::= sil-value-name ':' sil-type
+    *sil-basic-block* ::= *sil-label* *sil-instruction-def* *sil-terminator*
+    *sil-label* ::= *sil-identifier* *sil-argument-list*? '``:``'
+    *sil-argument-list* ::= '``(``' *sil-argument* ('``,``' *sil-argument*)\* '``)``'
+    *sil-argument* ::= *sil-value-name* '``:``' *sil-type*
+  
+    *sil-instruction-def* ::= (*sil-value-name* '``=``')? *sil-instruction*
 
-  sil-instruction-def ::= (sil-value-name '=')? sil-instruction
-
-A function body consists of one or more basic blocks. These form the nodes of
-the control flow graph. Each basic block contains one or more instructions and
-is terminated by a terminator instruction. The entry point for the function is
-always the first basic block in its body.
+A function body consists of one or more basic blocks that correspond
+to the nodes of the function's control flow graph. Each basic block
+contains one or more instructions and ends with a terminator
+instruction. The function's entry point is always the first basic
+block in its body.
 
 In SIL, basic blocks take arguments, which are used as an alternative to LLVM's
 phi nodes. Basic block arguments are bound by the branch from the predecessor
@@ -352,8 +393,8 @@ block::
     return %result : $Builtin.Int64
   }
 
-The entry point basic block for a function
-receives the argument values from the function caller::
+Arguments to the entry point basic block, which has no predecessor,
+are bound by the function's caller::
 
   sil @foo : $(Int) -> Int {
   bb0(%x : $Int):
@@ -371,49 +412,45 @@ receives the argument values from the function caller::
 
 Declaration References
 ~~~~~~~~~~~~~~~~~~~~~~
-::
 
-  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)? ('.' sil-decl-lang)?
-  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
-  sil-decl-subref ::= '!' sil-decl-lang
-  sil-decl-subref-part ::= 'getter'
-  sil-decl-subref-part ::= 'setter'
-  sil-decl-subref-part ::= 'allocator'
-  sil-decl-subref-part ::= 'initializer'
-  sil-decl-subref-part ::= 'oneofelt'
-  sil-decl-subref-part ::= 'destroyer'
-  sil-decl-subref-part ::= 'globalaccessor'
-  sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
-  sil-decl-uncurry-level ::= [0-9]+
-  sil-decl-lang ::= 'objc'
+  .. line-block::
+
+    *sil-decl-ref* ::= '``#``' *sil-identifier* ('``.``' *sil-identifier*)* *sil-decl-subref*?
+    *sil-decl-subref* ::= '``!``' *sil-decl-subref-part* ('``.``' *sil-decl-uncurry-level*)? ('``.``' *sil-decl-lang*)?
+    *sil-decl-subref* ::= '``!``' *sil-decl-uncurry-level* ('``.``' *sil-decl-lang*)?
+    *sil-decl-subref* ::= '``!``' *sil-decl-lang*
+    *sil-decl-subref-part* ::= '``getter``'
+    *sil-decl-subref-part* ::= '``setter``'
+    *sil-decl-subref-part* ::= '``allocator``'
+    *sil-decl-subref-part* ::= '``initializer``'
+    *sil-decl-subref-part* ::= '``oneofelt``'
+    *sil-decl-subref-part* ::= '``destroyer``'
+    *sil-decl-subref-part* ::= '``globalaccessor``'
+    *sil-decl-subref-part* ::= '``defaultarg``' '``.``' [``0``-``9``]+
+    *sil-decl-uncurry-level* ::= [``0``-``9``]+
+    *sil-decl-lang* ::= '``objc``'
 
 Some SIL instructions need to reference Swift declarations directly. These
 references are introduced with the ``#`` sigil followed by the fully qualified
-dotted path naming the Swift declaration. Some Swift declarations are
-decomposed into multiple entities at the SIL level. These are discriminated by
-following the qualified name with a ``!`` then naming the component entity:
+name of the Swift declaration. Some Swift declarations are
+decomposed into multiple entities at the SIL level. These are distinguished by
+following the qualified name with ``!`` and one or more ``.``-separated component 
+entity discriminators:
 
-- ``getter`` references the getter function for a ``var`` declaration.
-- ``setter`` references the setter function for a ``var`` declaration.
-- ``allocator`` references the allocating constructor for a class's
-  ``constructor`` declaration, or the constructor for a struct or oneof's
-  ``constructor``.
-- ``initializer`` references the allocating constructor for a class's
-  ``constructor`` declaration.
-- ``oneofelt`` references a member of a oneof type.
-- ``destroyer`` references the destroying destructor for a class's
-  ``destructor`` declaration.
-- ``globalaccessor`` references the addressor function for a global variable.
-- ``defaultarg.<n>`` references the default argument generating function for
-  the ``<n>``-th argument of a Swift ``func``.
+- ``getter``: the getter function for a ``var`` declaration
+- ``setter``:  the setter function for a ``var`` declaration
+- ``allocator``: a ``struct`` or ``oneof`` constructor, or a ``class``\ 's *allocating constructor*
+- ``initializer``: a ``class``\ 's *initializing constructor*
+- ``oneofelt``: a member of a ``oneof`` type.
+- ``destroyer``: a class's deallocating destructor
+- ``globalaccessor``: the addressor function for a global variable
+- ``defaultarg.``\ *n*: the default argument-generating function for
+  the *n*\ -th argument of a Swift ``func``
+- ``objc``: a specific entry point for objective-C interoperability
 
-Methods and curried function definitions in Swift also have multiple "uncurry
-levels" in SIL, representing the function at each possible partial application
-level.
-
-Methods may also have multiple entry points for foreign language interop which
-can be discriminated. Currently ``objc`` is the only such discriminator.
+Methods and curried function definitions in Swift also have multiple
+“uncurry levels” in SIL, representing the function at each possible
+partial application level.
 
 Dataflow Errors
 ---------------
@@ -426,7 +463,7 @@ Definitive Initialization
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Swift requires that all local variables be initialized before use. In
-constructors, all instance variables of a struct, oneof, or class value must
+constructors, all instance variables of a struct, oneof, or class reference must
 be initialized before the object is used and before the constructor is returned
 from.
 
