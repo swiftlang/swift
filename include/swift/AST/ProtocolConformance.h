@@ -16,6 +16,7 @@
 #ifndef SWIFT_AST_PROTOCOLCONFORMANCE_H
 #define SWIFT_AST_PROTOCOLCONFORMANCE_H
 
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -27,7 +28,6 @@ namespace swift {
 class ProtocolConformance;
 class ProtocolDecl;
 class SubstitutableType;
-class Substitution;
 class TypeAliasDecl;
 class ValueDecl;
 
@@ -49,6 +49,10 @@ struct ProtocolConformanceWitness {
 /// Map from non-type requirements to the corresponding conformance witnesses.
 typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> WitnessMap;
 
+/// Map from associated type requirements to the corresponding substitution,
+/// which captures the replacement type along with any conformances it requires.
+typedef llvm::DenseMap<TypeAliasDecl *, Substitution> TypeWitnessMap;
+
 /// Map from a directly-inherited protocol to its corresponding protocol
 /// conformance.
 typedef llvm::DenseMap<ProtocolDecl *, ProtocolConformance *>
@@ -61,10 +65,9 @@ class ProtocolConformance {
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   WitnessMap Mapping;
-  
-  /// \brief The mapping of individual archetypes in the protocol over to
-  /// the types used to satisy the type requirements.
-  TypeSubstitutionMap TypeMapping;
+
+  /// The mapping from associated type requirements to their substitutions.
+  TypeWitnessMap TypeWitnesses;
   
   /// \brief The mapping from any directly-inherited protocols over to the
   /// protocol conformance structures that indicate how the given type meets
@@ -76,12 +79,12 @@ class ProtocolConformance {
   llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 
 public:
-  ProtocolConformance(WitnessMap &&valueWitnesses,
-                      TypeSubstitutionMap &&typeWitnesses,
+  ProtocolConformance(WitnessMap &&witnesses,
+                      TypeWitnessMap &&typeWitnesses,
                       InheritedConformanceMap &&inheritedConformances,
                       llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
-    : Mapping(std::move(valueWitnesses)),
-      TypeMapping(std::move(typeWitnesses)),
+    : Mapping(std::move(witnesses)),
+      TypeWitnesses(std::move(typeWitnesses)),
       InheritedMapping(std::move(inheritedConformances))
   {
     for (auto def : defaultedDefinitions)
@@ -89,11 +92,15 @@ public:
   }
 
   /// Retrieve the type witness for the given associated type.
-  Type getTypeWitness(TypeAliasDecl *assocType) const;
+  const Substitution &getTypeWitness(TypeAliasDecl *assocType) const {
+    auto known = TypeWitnesses.find(assocType);
+    assert(known != TypeWitnesses.end());
+    return known->second;
+  }
 
   /// Retrieve the complete set of type witnesses.
-  const TypeSubstitutionMap &getTypeWitnesses() const {
-    return TypeMapping;
+  const TypeWitnessMap &getTypeWitnesses() const {
+    return TypeWitnesses;
   }
 
   /// Retrieve the non-type witness for the given requirement.

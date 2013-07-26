@@ -369,7 +369,8 @@ namespace decls_block {
   using BoundGenericSubstitutionLayout = BCRecordLayout<
     BOUND_GENERIC_SUBSTITUTION,
     TypeIDField, // archetype
-    TypeIDField // replacement
+    TypeIDField, // replacement
+    BCVBR<6>     // # of conformances
     // Trailed by the protocol conformance info (if any)
   >;
 

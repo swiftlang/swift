@@ -727,8 +727,8 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
       ++numValueWitnesses;
     }
     for (auto typeMapping : conf->getTypeWitnesses()) {
-      data.push_back(addTypeRef(typeMapping.first));
-      data.push_back(addTypeRef(typeMapping.second));
+      data.push_back(addDeclRef(typeMapping.first));
+      // The substitution record is serialized later.
       ++numTypeWitnesses;
     }
     for (auto defaulted : conf->getDefaultedDefinitions()) {
@@ -756,6 +756,8 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
     writeConformances(inheritedProtos, inheritedConformance);
     for (auto valueMapping : conf->getWitnesses())
       writeSubstitutions(valueMapping.second.Substitutions);
+    for (auto typeMapping : conf->getTypeWitnesses())
+      writeSubstitutions(typeMapping.second);
   });
 }
 
@@ -763,9 +765,11 @@ void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions) {
   using namespace decls_block;
   auto abbrCode = DeclTypeAbbrCodes[BoundGenericSubstitutionLayout::Code];
   for (auto &sub : substitutions) {
-    BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                               addTypeRef(sub.Archetype),
-                                               addTypeRef(sub.Replacement));
+    BoundGenericSubstitutionLayout::emitRecord(
+      Out, ScratchRecord, abbrCode,
+      addTypeRef(sub.Archetype),
+      addTypeRef(sub.Replacement),
+      sub.Archetype->getConformsTo().size());
     writeConformances(sub.Archetype->getConformsTo(), sub.Conformance);
   }
 }

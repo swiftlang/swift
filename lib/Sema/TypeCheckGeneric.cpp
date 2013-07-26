@@ -171,5 +171,5 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
 
   assert(conformance && "Missing conformance information");
   // FIXME: substMemberTypeWithBase when we deal with generic conformance.
-  return conformance->getTypeWitness(requirement);
+  return conformance->getTypeWitness(requirement).Replacement;
 }

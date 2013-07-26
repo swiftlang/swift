@@ -450,12 +450,34 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
   }
 }
 
+/// Compute the substitution for the given archetype and its replacement
+/// type.
+static Substitution getArchetypeSubstitution(TypeChecker &tc,
+                                             ArchetypeType *archetype,
+                                             Type replacement) {
+  Substitution result;
+  result.Archetype = archetype;
+  result.Replacement = replacement;
+  llvm::SmallVector<ProtocolConformance *, 4> conformances;
+
+  for (auto proto : archetype->getConformsTo()) {
+    ProtocolConformance *conformance = nullptr;
+    bool conforms = tc.conformsToProtocol(replacement, proto, &conformance);
+    assert(conforms && "Conformance should already have been verified");
+    conformances.push_back(conformance);
+  }
+
+  result.Conformance = tc.Context.AllocateCopy(conformances);
+  return result;
+}
+
 /// \brief Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
   WitnessMap Mapping;
+  TypeWitnessMap TypeWitnesses;
   TypeSubstitutionMap TypeMapping;
   InheritedConformanceMap InheritedMapping;
 
@@ -530,7 +552,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           return nullptr;
 
         for (auto ReqProto : ReqProtos) {
-          if (!TC.conformsToProtocol(candidate.second, ReqProto)) {
+          if (!TC.conformsToProtocol(candidate.second, ReqProto)){
             SatisfiesRequirements = false;
 
             NonViable.push_back({candidate.first, ReqProto});
@@ -547,8 +569,11 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     }
     
     if (Viable.size() == 1) {
-      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-        = Viable.front().second;
+      auto archetype
+        = AssociatedType->getUnderlyingType()->getAs<ArchetypeType>();
+      TypeMapping[archetype] = Viable.front().second;
+      TypeWitnesses[AssociatedType]
+        = getArchetypeSubstitution(TC, archetype, Viable.front().second);
       continue;
     }
     
@@ -569,8 +594,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       for (auto Candidate : Viable)
         TC.diagnose(Candidate.first, diag::protocol_witness_type);
       
-      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-        = ErrorType::get(TC.Context);
+      TypeMapping[archetype] = ErrorType::get(TC.Context);
       continue;
     }
 
@@ -591,8 +615,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     Candidate.second->getDeclaredType());
       }
 
-      TypeMapping[AssociatedType->getUnderlyingType()->getAs<ArchetypeType>()]
-        = ErrorType::get(TC.Context);
+      TypeMapping[archetype] = ErrorType::get(TC.Context);
       continue;
     }
     
@@ -718,9 +741,13 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         if (!best.AssociatedTypeDeductions.empty()) {
           // Record the deductions.
           for (auto deduction : best.AssociatedTypeDeductions) {
-            auto archetype
-              = deduction.first->getDeclaredType()->castTo<ArchetypeType>();
+            auto assocType = deduction.first;
+            auto archetype = assocType->getDeclaredType()->castTo<ArchetypeType>();
             TypeMapping[archetype] = deduction.second;
+
+            // Compute the archetype substitution.
+            TypeWitnesses[assocType]
+              = getArchetypeSubstitution(TC, archetype, deduction.second);
           }
 
           // Remove the now-resolved associated types from the set of
@@ -809,7 +836,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   std::unique_ptr<ProtocolConformance> Result(
     new ProtocolConformance(std::move(Mapping),
-                            std::move(TypeMapping),
+                            std::move(TypeWitnesses),
                             std::move(InheritedMapping),
                             defaultedDefinitions));
   return Result;

@@ -833,11 +833,3 @@ ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
 void TypeLoc::setInvalidType(ASTContext &C) {
   TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
 }
-
-
-Type ProtocolConformance::getTypeWitness(TypeAliasDecl *assocType) const {
-  auto known
-  = TypeMapping.find(assocType->getDeclaredType()->castTo<ArchetypeType>());
-  assert(known != TypeMapping.end());
-  return known->second;
-}

@@ -29,7 +29,7 @@ class Substitution {
 public:
   ArchetypeType *Archetype;
   Type Replacement;
-  ArrayRef<ProtocolConformance *> Conformance;
+  llvm::ArrayRef<ProtocolConformance *> Conformance;
 };
 
 } // end namespace swift

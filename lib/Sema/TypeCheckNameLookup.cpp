@@ -103,7 +103,8 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
       if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
         continue;
 
-      memberType = conformance->getTypeWitness(cast<TypeAliasDecl>(typeDecl));
+      memberType = conformance->getTypeWitness(cast<TypeAliasDecl>(typeDecl))
+                     .Replacement;
     } else {
       // Substitute the the base into the member's type.
       memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),

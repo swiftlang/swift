@@ -227,24 +227,6 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-/// Returns the equivalent archetype in the given protocol.
-static ArchetypeType *getActualArchetype(ProtocolDecl *proto,
-                                         ArchetypeType *ty) {
-  if (!ty->isPrimary()) {
-    auto parent = getActualArchetype(proto, ty->getParent());
-    return parent->getNestedType(ty->getName());
-  }
-
-  auto matchingNames = proto->lookupDirect(ty->getName());
-  for (auto member : matchingNames) {
-    if (auto associatedType = dyn_cast<TypeAliasDecl>(member))
-      return associatedType->getUnderlyingType()->castTo<ArchetypeType>();
-  }
-
-  // Failed to find actual type?
-  return ty;
-}
-
 Optional<ConformancePair> ModuleFile::maybeReadConformance() {
   using namespace decls_block;
 
@@ -290,7 +272,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     proto = cast<ProtocolDecl>(getDecl(protoID));
   }
 
-  WitnessMap valueWitnesses;
+  WitnessMap witnesses;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
     ValueDecl *first, *second;
@@ -309,21 +291,18 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     }
 
     ProtocolConformanceWitness witness{second, ctx.AllocateCopy(substitutions)};
-    valueWitnesses.insert(std::make_pair(first, witness));
+    witnesses.insert(std::make_pair(first, witness));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
-  // Reset the offset RAII to the end of the trailing records.
-  lastRecordOffset.reset();
-
-  TypeSubstitutionMap typeWitnesses;
+  TypeWitnessMap typeWitnesses;
   while (typeCount--) {
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
-    auto first = getType(*rawIDIter++)->castTo<ArchetypeType>();
-    first = getActualArchetype(proto, first);
-    auto second = getType(*rawIDIter++);
-    typeWitnesses.insert(std::make_pair(first, second));
+    auto first = cast<TypeAliasDecl>(getDecl(*rawIDIter++));
+    auto second = maybeReadSubstitution();
+    assert(second.hasValue());
+    typeWitnesses[first] = *second;
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
@@ -334,8 +313,11 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
+  // Reset the offset RAII to the end of the trailing records.
+  lastRecordOffset.reset();
+
   std::unique_ptr<ProtocolConformance> conformance(
-    new ProtocolConformance(std::move(valueWitnesses),
+    new ProtocolConformance(std::move(witnesses),
                             std::move(typeWitnesses),
                             std::move(inheritedConformances),
                             defaultedDefinitions));
@@ -415,9 +397,11 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution() {
 
 
   TypeID archetypeID, replacementID;
+  unsigned numConformances;
   decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
                                                           archetypeID,
-                                                          replacementID);
+                                                          replacementID,
+                                                          numConformances);
 
   ArchetypeType *archetypeTy;
   Type replacementTy;
@@ -431,7 +415,9 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution() {
   ASTContext &ctx = ModuleContext->Ctx;
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
-  while (auto conformancePair = maybeReadConformance()) {
+  while (numConformances--) {
+    auto conformancePair = maybeReadConformance();
+    assert(conformancePair.hasValue() && "Missing conformance");
     auto conformance = processConformance(ctx, nullptr, canReplTy,
                                           conformancePair->first,
                                           conformancePair->second);

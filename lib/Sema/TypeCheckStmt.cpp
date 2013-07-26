@@ -285,7 +285,8 @@ public:
         StringRef Name = Value->getName().str();
         if (Name.equals("EnumeratorType") && isa<TypeDecl>(Value)) {
           if (Conformance) {
-            RangeTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value));
+            RangeTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value))
+                        .Replacement;
           } else {
             RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
           }
@@ -339,7 +340,8 @@ public:
       StringRef Name = Value->getName().str();
       if (Name.equals("Element") && isa<TypeDecl>(Value)) {
         if (Conformance) {
-          ElementTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value));
+          ElementTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value))
+                        .Replacement;
         } else {
           ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
         }
