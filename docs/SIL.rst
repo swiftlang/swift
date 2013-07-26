@@ -162,7 +162,7 @@ type grammar. SIL adds some additional kinds of type of its own:
   to functions. For an address-only type ``T``, only the SIL address ``$*T``
   can be formed, and ``$T`` is an invalid SIL type.
   
-  Addresses are not reference-counted pointers like class references are. They
+  Addresses are not reference-counted pointers like class values are. They
   cannot be retained or released.
   
   The address of an address cannot be taken. ``$**T`` is not a representable
@@ -432,7 +432,7 @@ Definitive Initialization
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Swift requires that all local variables be initialized before use. In
-constructors, all instance variables of a struct, oneof, or class reference must
+constructors, all instance variables of a struct, oneof, or class type must
 be initialized before the object is used and before the constructor is returned
 from.
 
@@ -1227,7 +1227,7 @@ class_method
   // %1 will be of type $U -> V
 
 Looks up a method based on the dynamic type of a class or class metatype
-instance. It is undefined behavior if the class reference is null and the
+instance. It is undefined behavior if the class value is null and the
 method is not an Objective-C method.
 
 super_method
@@ -1246,7 +1246,7 @@ super_method
 Looks up a method in the superclass of a class or class metatype instance.
 Note that for native Swift methods, ``super.method`` calls are statically
 dispatched, so this instruction is only valid for Objective-C methods.
-It is undefined behavior if the class reference is null and the method is
+It is undefined behavior if the class value is null and the method is
 not an Objective-C method.
 
 archetype_method
@@ -1642,7 +1642,7 @@ ref_element_addr
   //   of C
 
 Given an instance of a class, derives the address of a physical instance
-variable inside the instance. The class reference must not be null.
+variable inside the instance. The class value must not be null.
 
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
