@@ -432,9 +432,17 @@ namespace decls_block {
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
-  using ProtocolLayout = NominalLayout<PROTOCOL_DECL>;
   using ClassLayout = NominalLayout<CLASS_DECL>;
   using OneOfLayout = NominalLayout<ONEOF_DECL>;
+
+  using ProtocolLayout = BCRecordLayout<
+    PROTOCOL_DECL,
+    IdentifierIDField, // name
+    DeclIDField, // context decl
+    BCFixed<1>,  // implicit flag
+    BCVBR<6>, // # of protocols preceding the inherited types
+    BCArray<TypeIDField> // protocols and inherited types
+  >;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,

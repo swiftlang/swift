@@ -1096,6 +1096,8 @@ bool Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
     SmallVector<TypeID, 4> inherited;
+    for (auto proto : proto->getProtocols())
+      inherited.push_back(addDeclRef(proto));
     for (auto parent : proto->getInherited())
       inherited.push_back(addTypeRef(parent.getType()));
 
@@ -1104,6 +1106,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
+                               proto->getProtocols().size(),
                                inherited);
 
     writeMembers(proto->getMembers());

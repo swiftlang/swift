@@ -285,14 +285,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
     return false;
 
   // Add all of the inherited protocol requirements, recursively.
-  for (auto Inherited : Proto->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (Inherited.getType()->isExistentialType(InheritedProtos)) {
-      for (auto InheritedProto : InheritedProtos) {
-        if (addConformanceRequirement(T, InheritedProto))
-          return true;
-      }
-    }
+  for (auto InheritedProto : Proto->getProtocols()) {
+    if (addConformanceRequirement(T, InheritedProto))
+      return true;
   }
 
   // Add requirements for each of the associated types.

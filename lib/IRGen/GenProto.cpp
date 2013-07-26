@@ -175,31 +175,24 @@ namespace {
 
   public:
     void visit(ProtocolDecl *protocol) {
-      visitInherited(protocol->getInherited());
+      // Visit inherited protocols.
+      // TODO: We need to figure out all the guarantees we want here.
+      // It would be abstractly good to allow conversion to a base
+      // protocol to be trivial, but it's not clear that there's
+      // really a structural guarantee we can rely on here.
+      for (auto baseProto : protocol->getProtocols()) {
+        // ObjC protocols do not have witnesses.
+        if (baseProto->isObjC())
+          continue;
+
+        asDerived().addOutOfLineBaseProtocol(baseProto);
+      }
+
       visitMembers(protocol->getMembers());
     }
 
   private:
     T &asDerived() { return *static_cast<T*>(this); }
-
-    void visitInherited(ArrayRef<TypeLoc> inherited) {
-      if (inherited.empty()) return;
-
-      // TODO: We need to figure out all the guarantees we want here.
-      // It would be abstractly good to allow conversion to a base
-      // protocol to be trivial, but it's not clear that there's
-      // really a structural guarantee we can rely on here.
-      for (TypeLoc baseType : inherited) {
-        SmallVector<ProtocolDecl *, 4> baseProtos;
-        baseType.getType()->isExistentialType(baseProtos);
-        for (auto baseProto : baseProtos) {
-          // ObjC protocols do not have witnesses.
-          if (baseProto->isObjC())
-            continue;
-          asDerived().addOutOfLineBaseProtocol(baseProto);
-        }
-      }
-    }
 
     /// Visit the witnesses for the direct members of a protocol.
     void visitMembers(ArrayRef<Decl*> members) {
@@ -373,9 +366,7 @@ namespace {
       // Keep track of whether we found a better path than the
       // previous best.
       bool foundBetter = false;
-      for (TypeLoc inherited : proto->getInherited()) {
-        ProtocolDecl *base =
-            inherited.getType()->castTo<ProtocolType>()->getDecl();
+      for (auto base : proto->getProtocols()) {
         auto &baseEntry = protoInfo.getWitnessEntry(base);
         assert(baseEntry.isBase());
 

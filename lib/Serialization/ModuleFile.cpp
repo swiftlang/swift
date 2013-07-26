@@ -1023,10 +1023,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
+    unsigned numProtocols;
     ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, inheritedIDs);
+                                            isImplicit, numProtocols,
+                                            inheritedIDs);
 
     DeclContext *DC;
     MutableArrayRef<TypeLoc> inherited;
@@ -1037,7 +1039,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       if (declOrOffset.isComplete())
         break;
 
-      inherited = getTypes(inheritedIDs);
+      inherited = getTypes(inheritedIDs.slice(numProtocols));
     }
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
                                         getIdentifier(nameID), inherited);
@@ -1049,6 +1051,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       proto->setImplicit();
+
+    // Deserialize the list of protocols.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    for (auto protoID : inheritedIDs.slice(0, numProtocols)) {
+      protocols.push_back(cast<ProtocolDecl>(getDecl(protoID)));
+    }
+    proto->setProtocols(ctx.AllocateCopy(protocols));
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
