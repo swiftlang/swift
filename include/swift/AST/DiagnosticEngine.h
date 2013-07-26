@@ -347,6 +347,14 @@ namespace swift {
       Consumers.push_back(&Consumer);
     }
 
+    /// \brief Remove and return all \c DiagnosticConsumers.
+    std::vector<DiagnosticConsumer *> takeConsumers() {
+      auto Result = std::vector<DiagnosticConsumer*>(Consumers.begin(),
+                                                     Consumers.end());
+      Consumers.clear();
+      return Result;
+    }
+
     /// \brief Emit a diagnostic using a preformatted array of diagnostic
     /// arguments.
     ///

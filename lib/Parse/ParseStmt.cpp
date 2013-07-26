@@ -137,6 +137,7 @@ void Parser::consumeTopLevelDecl(TopLevelCodeDecl *TLCD,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   skipUntilDeclStmtRBrace();
+  consumeIf(tok::code_complete);
   SourceLoc EndLoc = Tok.getLoc();
   State->delayTopLevelCodeDecl(TLCD, { BeginLoc, EndLoc },
                                BeginParserPosition.PreviousLoc);

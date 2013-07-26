@@ -15,15 +15,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
+#include "swift/IDE/CodeCompletion.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Allocator.h"
 #include <memory>
 #include <vector>
+#include <string>
+#include <utility>
 
 namespace swift {
-  class DeclContext;
-  class SourceLoc;
+  class TranslationUnit;
+
+namespace code_completion {
+  class CodeCompletionResult;
+} // namespace code_completion
 
 /// State of a completion operation.
 enum class CompletionState {
@@ -41,59 +47,62 @@ enum class CompletionState {
   /// cycle through completing different stems.
   DisplayedCompletionList
 };
-  
+
 /// Represents a completion set and maintains state for navigating through
 /// a set of completions.
-class Completions {
-  CompletionState state;
-  std::unique_ptr<llvm::BumpPtrAllocator> strings;
-  
-  std::vector<StringRef> completions;
-  size_t enteredLength;
-  size_t rootLength;
-  size_t currentStem;
-  
-  StringRef allocateCopy(StringRef s);
-  
+class REPLCompletions {
+  friend class REPLCodeCompletionConsumer;
+  CompletionState State;
+
+  code_completion::CodeCompletionContext CompletionContext;
+  std::unique_ptr<code_completion::CodeCompletionConsumer> Consumer;
+  std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory;
+
+  std::vector<StringRef> CompletionStrings;
+  std::vector<StringRef> CompletionInsertableStrings;
+
+  std::string Prefix;
+  mutable Optional<std::string> Root;
+  size_t CurrentCompletionIdx;
+
 public:
   /// Create an invalid completion set.
-  Completions() : state(CompletionState::Invalid) {}
-  
-  /// Create a completion set containing completions appropriate to the given
-  /// string.
-  Completions(DeclContext *dc, StringRef prefix);
-  
+  REPLCompletions();
+
+  /// Create completion results for the given string.
+  void populate(TranslationUnit *TU, StringRef EnteredCode);
+
   /// Returns true if this is a valid completion set.
-  explicit operator bool() const { return state != CompletionState::Invalid; }
-  bool isValid() const { return state != CompletionState::Invalid; }
-  
+  explicit operator bool() const { return State != CompletionState::Invalid; }
+  bool isValid() const { return State != CompletionState::Invalid; }
+
   // True if no completions were found.
-  bool isEmpty() const { return state == CompletionState::Empty; }
-  
+  bool isEmpty() const { return State == CompletionState::Empty; }
+
   /// True if the completion is unique.
-  bool isUnique() const { return state == CompletionState::Unique; }
-  
+  bool isUnique() const { return State == CompletionState::Unique; }
+
   /// Returns the current state of the completion.
-  CompletionState getState() const { return state; }
+  CompletionState getState() const { return State; }
   /// Sets the state of the completion.
-  void setState(CompletionState s) { state = s; }
-  
+  void setState(CompletionState S) { State = S; }
+
   /// Returns the common root of all the found completions (or the entire
   /// completion for a unique completion).
   StringRef getRoot() const;
-  
+
   /// Returns the stem (if any) returned by the previous getNextStem() call.
   StringRef getPreviousStem() const;
-  
+
   /// Returns the next completion stem. Cycles to the beginning of the list if
   /// the end was reached.
   StringRef getNextStem();
-  
+
   /// Returns a list of all complete names for which completions were found.
   ArrayRef<StringRef> getCompletionList() const {
-    return completions;
+    return CompletionStrings;
   }
-  
+
   /// Reset the completion set to an invalid state.
   void reset();
 };

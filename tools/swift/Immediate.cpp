@@ -414,7 +414,7 @@ class REPLInput {
   bool ShowColors;
   bool PromptedForLine;
   bool Outdented;
-  Completions completions;
+  REPLCompletions completions;
   
   llvm::SmallVector<wchar_t, 80> PromptString;
 
@@ -842,7 +842,7 @@ private:
     
     if (!completions) {
       // If we aren't currently working with a completion set, generate one.
-      completions = Completions(getTU(), prefix);
+      completions.populate(getTU(), prefix);
       // Display the common root of the found completions and beep unless we
       // found a unique one.
       insertStringRef(completions.getRoot());

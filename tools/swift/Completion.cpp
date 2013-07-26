@@ -14,422 +14,222 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "swift-completion"
-
 #include "Completion.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/DeclContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
-#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/Parser.h"
+#include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "clang/Sema/Lookup.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
+#include <algorithm>
 
 using namespace swift;
+using namespace code_completion;
 
-static bool isIdentifier(char c) {
-  return isalnum(c) || c == '_';
-}
-
-struct CompletionContext {
-  enum class Kind {
-    Invalid,
-    Unqualified,
-    Qualified
-  } Kind;
-
-  DeclContext *DC;
-  union {
-    struct {
-      SourceLoc loc;
-    } Unqualified;
-    struct {
-      TypeBase *baseTy;
-    } Qualified;
-  };
-  
-  CompletionContext(const CompletionContext &) = default;
-  CompletionContext(CompletionContext &&) = default;
-  CompletionContext &operator=(const CompletionContext &) = default;
-  CompletionContext &operator=(CompletionContext &&) = default;
-  
-  CompletionContext() : Kind(Kind::Invalid) {}
-  
-  CompletionContext(DeclContext *DC, SourceLoc loc)
-    : Kind(Kind::Unqualified), DC(DC), Unqualified{loc} {
-  }
-  
-  CompletionContext(DeclContext *DC, Type baseTy)
-    : Kind(Kind::Qualified), DC(DC), Qualified{baseTy.getPointer()} {
-  }
-  
-  explicit operator bool() { return Kind != Kind::Invalid; }
-  
-  DeclContext *getDeclContext() const {
-    assert(Kind != Kind::Invalid);
-    return DC;
-  }
-  SourceLoc getLoc() const {
-    assert(Kind == Kind::Unqualified);
-    return Unqualified.loc;
-  }
-  
-  Type getBaseType() const {
-    assert(Kind == Kind::Qualified);
-    return Qualified.baseTy;
-  }
-};
-
-static SourceLoc getTUEndLoc(TranslationUnit *TU) {
-  return TU->Decls.empty()
-    ? SourceLoc()
-    : TU->Decls.back()->getSourceRange().End;
-}
-
-static void findBalancedBracket(char const *begin,
-                                char const *&p,
-                                char open,
-                                char close) {
-  unsigned depth = 1;
-  if (p == begin) {
-    --p;
-    return;
-  }
-  do {
-    --p;
-    if (*p == close)
-      ++depth;
-    else if (*p == open)
-      --depth;
-  } while (depth != 0 && p > begin);
-  
-  --p;
-}
-
-static CompletionContext getCompletionContextFromDotExpression(
-                                                           TranslationUnit *TU,
-                                                           DeclContext *dc,
-                                                           StringRef expr) {
-  char const *begin = expr.begin(), *p = expr.end()-1, *end = expr.end();
-  
-  // Walk backward through identifier '.' identifier '.' ...
-  while (true) {
-    while (p >= begin && isspace(*p))
-      --p;
-    if (p < begin)
+std::string toInsertableString(CodeCompletionResult *Result) {
+  std::string Str;
+  for (auto C : Result->getCompletionString()->getChunks()) {
+    switch (C.getKind()) {
+    case CodeCompletionString::Chunk::ChunkKind::Text:
+    case CodeCompletionString::Chunk::ChunkKind::LeftParen:
+    case CodeCompletionString::Chunk::ChunkKind::RightParen:
+    case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
+    case CodeCompletionString::Chunk::ChunkKind::RightBracket:
+    case CodeCompletionString::Chunk::ChunkKind::Dot:
+    case CodeCompletionString::Chunk::ChunkKind::Comma:
+      Str += C.getText();
       break;
 
-    bool requireIdentifier = true;
-    if (*p == ')') {
-      findBalancedBracket(begin, p, '(', ')');
-      requireIdentifier = false;
-    } else if (*p == ']') {
-      findBalancedBracket(begin, p, '[', ']');
-      requireIdentifier = false;
-    } else if (*p == '>') {
-      findBalancedBracket(begin, p, '<', '>');
-      requireIdentifier = true;
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterNameAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterColonAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
+    case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+      return Str;
     }
-    
-    while (p >= begin && isspace(*p))
-      --p;
-    if (p < begin)
-      break;
-    if (requireIdentifier && !isIdentifier(*p))
-      break;
-    
-    while (p >= begin && isIdentifier(*p)) {
-      --p;
-    }
-    
-    
-    while (p >= begin && isspace(*p))
-      --p;
-    if (p < begin || *p != '.')
-      break;
-    --p;
   }
-  ++p;
-  
-  // Try to parse and typecheck the thing we found as an expression.
-  StringRef exprPart = StringRef(p, end - p);
-  DEBUG(llvm::dbgs() << "\ncompletion context string: " << exprPart << "\n");
-
-  Expr *parsedExpr = parseCompletionContextExpr(TU, exprPart);
-  
-  // If we couldn't parse, give up.
-  if (!parsedExpr)
-    return CompletionContext();
-
-  DEBUG(llvm::dbgs() << "\nparsed:\n";
-        parsedExpr->print(llvm::dbgs());
-        llvm::dbgs() << "\n");
-  
-  // Try to typecheck the expression.
-  if (!typeCheckCompletionContextExpr(TU, parsedExpr))
-    return CompletionContext();
-  
-  DEBUG(llvm::dbgs() << "\ntypechecked:\n";
-        parsedExpr->print(llvm::dbgs());
-        llvm::dbgs() << "\n");
-  
-  // Use the type as the context for qualified lookup.
-  return CompletionContext(dc, parsedExpr->getType());
+  return Str;
 }
 
-/// Determine the DeclContext, lookup kind, and starting prefix in which to
-/// perform a completion given an initial DeclContext and user-entered string.
-static CompletionContext getCompletionContext(DeclContext *dc,
-                                              StringRef &prefix) {
-  // Find the TranslationUnit.
-  DeclContext *tuDC = dc;
-  while (!isa<TranslationUnit>(tuDC))
-    tuDC = dc->getParent();
-  TranslationUnit *TU = cast<TranslationUnit>(tuDC);
-  
-  SourceLoc tuEndLoc = getTUEndLoc(TU);
-  
-  if (prefix.empty())
-    return CompletionContext(dc, tuEndLoc);
-  
-  if (isIdentifier(prefix.back())) {
-    // If the character preceding us looks like a named identifier character,
-    // walk backward to find as much of a name as we can.
-    char const *p = prefix.end(), *end = p, *begin = prefix.begin();
-    
-    for (; p != begin; --p) {
-      if (!isIdentifier(*(p-1))) {
-        prefix = StringRef(p, end - p);
-        break;
-      }
-    }
-    
-    // See if we were preceded by a dot.
-    while (p >= begin && isspace(*--p));
+namespace swift {
+class REPLCodeCompletionConsumer : public CodeCompletionConsumer {
+  REPLCompletions &Completions;
 
-    if (p >= begin && *p == '.') {
-      // Try to figure out a qualified lookup context from the expression
-      // preceding the dot.
-      return getCompletionContextFromDotExpression(TU, dc,
-                                                   StringRef(begin, p - begin));
-    }
-    
-    // If there was no dot, do unqualified completion on the name.
-    return CompletionContext(dc, tuEndLoc);
-  } else if (prefix.back() == '.') {
-    // Try to figure out a qualified lookup context from the expression
-    // preceding the dot.
-    // FIXME: Unicode.
-    StringRef beforeDot = prefix.slice(0, prefix.size() - 1);
-    prefix = StringRef();
-    return getCompletionContextFromDotExpression(TU, dc, beforeDot);
-  } else if (Identifier::isOperatorStartCodePoint(prefix.back())) {
-    // If the character preceding us looks like an operator character,
-    // walk backward to find as much of an operator name as we can.
-    for (char const *p = prefix.end(), *end = p, *begin = prefix.begin();
-         p != begin;
-         --p) {
-      if (!Identifier::isOperatorStartCodePoint(*(p-1))) {
-        prefix = StringRef(p, end - p);
-        return CompletionContext(dc, tuEndLoc);
-      }
-    }
-    
-    // Operators only appear unqualified.
-    return CompletionContext(dc, tuEndLoc);
-  }
-
-  // Complete everything at the top level.
-  prefix = StringRef();
-  return CompletionContext(dc, tuEndLoc);
-}
-
-/// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : swift::VisibleDeclConsumer,
-                         clang::VisibleDeclConsumer
-{
 public:
-  CompletionContext Context;
-  llvm::StringRef Prefix;
-  llvm::StringSet<> Results;
-  Optional<StringRef> Root;
-  
-  void updateRoot(StringRef S) {
-    if (!Root) {
-      Root = S;
-      return;
-    }
-    
-    size_t len = 0;
-    for (char const *r = Root->begin(), *s = S.begin();
-         r != Root->end() && s != S.end();
-         ++r, ++s) {
-      if (*r == *s)
-        ++len;
-      else
-        break;
-    }
-    Root = StringRef(Root->data(), len);
-  }
-  
-  bool shouldCompleteDecl(ValueDecl *vd) {
-    // Don't complete nameless values.
-    if (vd->getName().empty())
-      return false;
-    
-    // Don't complete constructors, destructors, or subscripts, since references
-    // to them can't be spelled.
-    // FIXME: except for super.constructor!
-    if (isa<ConstructorDecl>(vd))
-      return false;
-    if (isa<DestructorDecl>(vd))
-      return false;
-    if (isa<SubscriptDecl>(vd))
-      return false;
-    
-    // Don't complete class methods of instances.
-    if (Context.Kind == CompletionContext::Kind::Qualified)
-      if (auto *fd = dyn_cast<FuncDecl>(vd))
-        if (fd->isStatic() && !Context.getBaseType()->is<MetaTypeType>())
-          return false;
-    
-    return true;
-  }
-  
-  void addCompletionString(llvm::StringRef name) {
-    if (!name.startswith(Prefix))
-      return;
+  REPLCodeCompletionConsumer(REPLCompletions &Completions)
+      : Completions(Completions) {}
 
-    if (Results.insert(name))
-      updateRoot(name);
-  }
-  
-  // Implement swift::VisibleDeclConsumer
-  void foundDecl(ValueDecl *vd) override {
-    if (!shouldCompleteDecl(vd))
-      return;
-    StringRef name = vd->getName().get();
+  void handleResults(ArrayRef<CodeCompletionResult *> Results) override {
+    for (auto Result : Results) {
+      std::string InsertableString = toInsertableString(Result);
+      if (StringRef(InsertableString).startswith(Completions.Prefix)) {
+        llvm::SmallString<128> PrintedResult;
+        {
+          llvm::raw_svector_ostream OS(PrintedResult);
+          Result->print(OS);
+        }
+        Completions.CompletionStrings.push_back(
+            Completions.CompletionContext.copyString(PrintedResult));
 
-    addCompletionString(name);
-  }
-  
-  // Implement clang::VisibleDeclConsumer
-  void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
-                 clang::DeclContext *Ctx,
-                 bool InBaseClass) override {
-    StringRef name = ND->getName();
-    
-    addCompletionString(name);
-  }
-  
-  CompletionLookup(CompletionContext context, StringRef prefix)
-    : Context(context), Prefix(prefix)
-  {
-    assert(context && "invalid completion lookup context!");
-    
-    if (context.Kind == CompletionContext::Kind::Unqualified) {
-      lookupVisibleDecls(*this, context.getDeclContext(), context.getLoc());
-
-      // TODO: Integrate Clang LookupVisibleDecls with Swift LookupVisibleDecls.
-      // Doing so now makes REPL interaction too slow.
-      ASTContext &ast = context.getDeclContext()->getASTContext();
-      if (auto clangImporter = ast.getClangModuleLoader())
-        static_cast<ClangImporter&>(*clangImporter).lookupVisibleDecls(
-            static_cast<clang::VisibleDeclConsumer &>(*this));
-
-    } else {
-      lookupVisibleDecls(*this, context.getBaseType(),
-                         context.getDeclContext());
-    
-      // Add the special qualified keyword 'metatype' so that, for example,
-      // 'Int.metatype' can be completed.
-      addCompletionString("metatype");
+        InsertableString = InsertableString.substr(Completions.Prefix.size());
+        Completions.CompletionInsertableStrings.push_back(
+            Completions.CompletionContext.copyString(InsertableString));
+      }
     }
   }
 };
-  
-StringRef Completions::allocateCopy(StringRef s) {
-  size_t size = s.size();
-  char *copy = static_cast<char*>(strings->Allocate(size + 1, 1));
-  memcpy(copy, s.data(), size);
-  copy[size] = '\0';
-  return StringRef(copy, size);
+} // namespace swift
+
+REPLCompletions::REPLCompletions() : State(CompletionState::Invalid) {
+  // Create a CodeCompletionConsumer.
+  Consumer.reset(new REPLCodeCompletionConsumer(*this));
+
+  // Cerate a factory for code completion callbacks that will feed the
+  // Consumer.
+  CompletionCallbacksFactory.reset(
+      code_completion::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                          *Consumer.get()));
 }
 
-Completions::Completions(DeclContext *dc, StringRef prefix)
-  : strings(new llvm::BumpPtrAllocator()),
-    enteredLength(0),
-    rootLength(0),
-    currentStem((size_t)-1)
-{
-  Type lookupType;
-  CompletionContext context = getCompletionContext(dc, prefix);
-  enteredLength = prefix.size();
-  
-  if (!context) {
-    rootLength = 0;
-    state = CompletionState::Empty;
-    return;
-  }
+static void
+doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
+                 CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
+  // Temporarily disable priting the diagnostics.
+  auto DiagnosticConsumers = TU->getASTContext().Diags.takeConsumers();
 
-  CompletionLookup lookup(context, prefix);
+  std::string AugmentedCode = EnteredCode.str();
+  AugmentedCode += '\0';
 
-  if (lookup.Results.empty()) {
-    rootLength = 0;
-    state = CompletionState::Empty;
-    return;
-  }
-  
-  rootLength = lookup.Root->size();
+  const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
 
-  assert(rootLength >= enteredLength && "completions don't match prefix?!");
-  for (auto &c : lookup.Results) {
-    completions.push_back(allocateCopy(c.getKey()));
-  }
-  std::sort(completions.begin(), completions.end(),
-            [](StringRef a, StringRef b) { return a < b; });
-  
-  if (lookup.Results.size() == 1) {
-    state = CompletionState::Unique;
-    return;
-  }
-  state = CompletionState::CompletedRoot;
-  return;
+  auto Buffer =
+      llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
+  *BufferID =
+      TU->getASTContext().SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
+
+  SourceLoc CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
+      Buffer->getBufferStart() + CodeCompletionOffset));
+
+  // Parse, typecheck and temporarily insert the incomplete code into the AST.
+  const unsigned OriginalDeclCount = TU->Decls.size();
+
+  unsigned CurTUElem = TU->Decls.size();
+  PersistentParserState PersistentState;
+  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
+      new CodeCompleteDelayedCallbacks(CodeCompleteLoc));
+  bool Done;
+  do {
+    parseIntoTranslationUnit(TU, *BufferID, &Done, CodeCompletionOffset,
+                             nullptr, &PersistentState, DelayedCB.get());
+    performTypeChecking(TU, CurTUElem);
+    CurTUElem = TU->Decls.size();
+  } while (!Done);
+
+  performDelayedParsing(TU, PersistentState, CompletionCallbacksFactory,
+                        CodeCompletionOffset);
+
+  // Now we are done with code completion.  Remove the declarations we
+  // temporarily inserted.
+  TU->Decls.resize(OriginalDeclCount);
+
+  // Add the diagnostic consumers back.
+  for (auto DC : DiagnosticConsumers)
+    TU->getASTContext().Diags.addConsumer(*DC);
+
+  TU->getASTContext().Diags.resetHadAnyError();
 }
-  
-StringRef Completions::getRoot() const {
-  if (completions.empty())
+
+void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
+  Prefix = "";
+  Root.reset();
+  CurrentCompletionIdx = ~size_t(0);
+
+  CompletionStrings.clear();
+  CompletionInsertableStrings.clear();
+
+  assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
+
+  unsigned BufferID;
+  doCodeCompletion(TU, EnteredCode, &BufferID,
+                   CompletionCallbacksFactory.get());
+
+  std::vector<Token> Tokens = tokenize(TU->getASTContext().SourceMgr, BufferID);
+  if (Tokens.size() >= 2) {
+    Token &LastToken = Tokens[Tokens.size() - 2];
+    switch (LastToken.getKind()) {
+    default:
+      break;
+
+    case tok::identifier:
+#define KEYWORD(kw) \
+    case tok::kw_##kw:
+#include "swift/Parse/Tokens.def"
+      Prefix = LastToken.getText();
+
+      const llvm::MemoryBuffer *Buffer =
+          TU->getASTContext().SourceMgr.getMemoryBuffer(BufferID);
+
+      unsigned Offset =
+          LastToken.getLoc().Value.getPointer() - Buffer->getBuffer().begin();
+
+      doCodeCompletion(TU, EnteredCode.substr(0, Offset),
+                       &BufferID, CompletionCallbacksFactory.get());
+    }
+  }
+
+  if (CompletionInsertableStrings.empty())
+    State = CompletionState::Empty;
+  else if (CompletionInsertableStrings.size() == 1)
+    State = CompletionState::Unique;
+  else
+    State = CompletionState::CompletedRoot;
+}
+
+StringRef REPLCompletions::getRoot() const {
+  if (Root)
+    return Root.getValue();
+
+  if (CompletionInsertableStrings.empty()) {
+    Root = std::string();
+    return Root.getValue();
+  }
+
+  std::string RootStr = CompletionInsertableStrings[0];
+  for (auto S : CompletionInsertableStrings) {
+    auto MismatchPlace =
+        std::mismatch(RootStr.begin(), RootStr.end(), S.begin());
+    RootStr.resize(MismatchPlace.first - RootStr.begin());
+  }
+  Root = RootStr;
+  return Root.getValue();
+}
+
+StringRef REPLCompletions::getPreviousStem() const {
+  if (CurrentCompletionIdx == ~size_t(0) || CompletionInsertableStrings.empty())
     return StringRef();
-  return StringRef(completions[0].data() + enteredLength,
-                   rootLength - enteredLength);
-}
-  
-StringRef Completions::getPreviousStem() const {
-  if (currentStem == (size_t)-1 || completions.empty())
-    return StringRef();
-  StringRef s = completions[currentStem];
-  return StringRef(s.data() + rootLength, s.size() - rootLength);
-}
-  
-StringRef Completions::getNextStem() {
-  if (completions.empty())
-    return StringRef();
-  currentStem += 1;
-  if (currentStem >= completions.size())
-    currentStem = 0;
-  StringRef s = completions[currentStem];
-  return StringRef(s.data() + rootLength, s.size() - rootLength);
+
+  return CompletionInsertableStrings[CurrentCompletionIdx]
+      .substr(getRoot().size());
 }
 
-void Completions::reset() {
-  if (isValid()) {
-    state = CompletionState::Invalid;
-    strings.reset();
-    completions.clear();
-  }
+StringRef REPLCompletions::getNextStem() {
+  if (CompletionInsertableStrings.empty())
+    return StringRef();
+
+  CurrentCompletionIdx++;
+  if (CurrentCompletionIdx >= CompletionInsertableStrings.size())
+    CurrentCompletionIdx = 0;
+
+  return CompletionInsertableStrings[CurrentCompletionIdx]
+      .substr(getRoot().size());
 }
+
+void REPLCompletions::reset() { State = CompletionState::Invalid; }
+
