@@ -216,8 +216,17 @@ static llvm::Constant *getRuntimeFn(IRGenModule &IGM,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
+    llvm::AttrBuilder b;
+
     for (auto Attr : attrs)
-      fn->addFnAttr(Attr);
+      b.addAttribute(Attr);
+
+    fn->getAttributes().
+      addAttributes(IGM.LLVMContext,
+                    llvm::AttributeSet::FunctionIndex,
+                    llvm::AttributeSet::get(IGM.LLVMContext,
+                                            llvm::AttributeSet::FunctionIndex,
+                                            b));
   }
 
   return cache;
