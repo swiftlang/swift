@@ -631,10 +631,9 @@ namespace decls_block {
     BCVBR<5>, // defaulted definitions count
     BCArray<DeclIDField>
     // The array contains value-value-substitutionCount triplets,
-    // then type-type pairs, then defaulted definitions.
+    // then type declarations, then defaulted definitions.
     // The inherited conformances trail the record, followed by substitution
-    // records for the values. The substitution records must come second because
-    // they greedily consume trailing conformance records.
+    // records for the values and then types.
   >;
 
   using DeclContextLayout = BCRecordLayout<
