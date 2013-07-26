@@ -2645,9 +2645,8 @@ namespace {
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
       // Look for a protocol type info.
       const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
-      const ProtocolConformance *astConf =
-        Conformance.InheritedMapping.find(baseProto)->second;
-      assert(astConf && "couldn't find base conformance!");
+      const ProtocolConformance *astConf
+        = Conformance.getInheritedConformance(baseProto);
       const ConformanceInfo &conf =
         basePI.getConformance(IGM, ConcreteType, ConcreteTI,
                               baseProto, *astConf);
@@ -2658,7 +2657,7 @@ namespace {
     }
 
     void addStaticMethod(FuncDecl *iface) {
-      auto &witness = Conformance.Mapping.find(iface)->second;
+      const auto &witness = Conformance.getValueWitness(iface);
       
       FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getStaticMethodWitness(impl,
@@ -2667,7 +2666,7 @@ namespace {
     }
 
     void addInstanceMethod(FuncDecl *iface) {
-      auto &witness = Conformance.Mapping.find(iface)->second;
+      const auto &witness = Conformance.getValueWitness(iface);
 
       FuncDecl *impl = cast<FuncDecl>(witness.Decl);
       Table.push_back(getInstanceMethodWitness(impl,

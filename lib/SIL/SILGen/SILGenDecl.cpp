@@ -854,7 +854,7 @@ public:
                                  ProtocolConformance *conformance) {
     assert(conformance);
     if (protocol->isObjC())
-      for (auto &mapping : conformance->Mapping) {
+      for (auto &mapping : conformance->getValueWitnesses()) {
         ValueDecl *vd = mapping.second.Decl;
         if (auto *method = cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);
@@ -863,7 +863,7 @@ public:
         else
           llvm_unreachable("unexpected conformance mapping");
       }
-    for (auto &inherited : conformance->InheritedMapping)
+    for (auto &inherited : conformance->getInheritedConformances())
       emitObjCConformanceThunks(inherited.first, inherited.second);
   }
   

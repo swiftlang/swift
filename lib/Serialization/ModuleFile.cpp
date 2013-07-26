@@ -274,13 +274,13 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
                                         inheritedCount, defaultedCount,
                                         rawIDs);
 
-  std::unique_ptr<ProtocolConformance> conformance(new ProtocolConformance);
+  InheritedConformanceMap inheritedConformances;
 
   while (inheritedCount--) {
     auto inherited = maybeReadConformance();
     assert(inherited.hasValue());
 
-    conformance->InheritedMapping.insert(inherited.getValue());
+    inheritedConformances.insert(inherited.getValue());
   }
 
   ASTContext &ctx = ModuleContext->Ctx;
@@ -290,6 +290,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     proto = cast<ProtocolDecl>(getDecl(protoID));
   }
 
+  ValueWitnessMap valueWitnesses;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
     ValueDecl *first, *second;
@@ -308,29 +309,36 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     }
 
     ProtocolConformanceWitness witness{second, ctx.AllocateCopy(substitutions)};
-    conformance->Mapping.insert(std::make_pair(first, witness));
+    valueWitnesses.insert(std::make_pair(first, witness));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
   // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
+  TypeSubstitutionMap typeWitnesses;
   while (typeCount--) {
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = getType(*rawIDIter++)->castTo<ArchetypeType>();
     first = getActualArchetype(proto, first);
     auto second = getType(*rawIDIter++);
-    conformance->TypeMapping.insert(std::make_pair(first, second));
+    typeWitnesses.insert(std::make_pair(first, second));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
+  llvm::SmallVector<ValueDecl *, 4> defaultedDefinitions;
   while (defaultedCount--) {
     auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
-    conformance->DefaultedDefinitions.insert(decl);
+    defaultedDefinitions.push_back(decl);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
+  std::unique_ptr<ProtocolConformance> conformance(
+    new ProtocolConformance(std::move(valueWitnesses),
+                            std::move(typeWitnesses),
+                            std::move(inheritedConformances),
+                            defaultedDefinitions));
   return std::make_pair(proto, conformance.release());
 }
 
@@ -350,7 +358,7 @@ ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
   if (!conformance)
     return nullptr;
 
-  for (auto &inherited : conformance->InheritedMapping) {
+  for (auto &inherited : conformance->getInheritedConformances()) {
     inherited.second = processConformance(ctx, decl, canTy, inherited.first,
                                           inherited.second);
   }

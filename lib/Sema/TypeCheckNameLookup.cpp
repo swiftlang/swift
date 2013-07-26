@@ -103,8 +103,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name) {
       if (!conformsToProtocol(type, protocol, &conformance) || !conformance)
         continue;
 
-      memberType = conformance->TypeMapping[typeDecl->getDeclaredType()
-                                              ->castTo<ArchetypeType>()];
+      memberType = conformance->getTypeWitness(cast<TypeAliasDecl>(typeDecl));
     } else {
       // Substitute the the base into the member's type.
       memberType = substMemberTypeWithBase(typeDecl->getDeclaredType(),

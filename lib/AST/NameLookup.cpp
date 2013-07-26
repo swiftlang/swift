@@ -852,7 +852,7 @@ bool Module::lookupQualified(Type type,
             knownConformances[proto] = conformances[protoIndex];
 
             // Push inherited conformances.
-            for (auto inherited : conformance->InheritedMapping) {
+            for (auto inherited : conformance->getInheritedConformances()) {
               if (knownConformances.find(inherited.first)
                     == knownConformances.end())
                 conformsStack.push_back(inherited);
@@ -888,7 +888,7 @@ bool Module::lookupQualified(Type type,
         // used a default definition or otherwise inferred the witness.
         auto knownProtocol = knownConformances.find(protocol);
         if (knownProtocol != knownConformances.end() &&
-            knownProtocol->second->DefaultedDefinitions.count(decl) == 0) {
+            !knownProtocol->second->usesDefaultDefinition(decl)) {
           overridden.insert(decl);
         }
       } else if (auto fd = dyn_cast<FuncDecl>(decl)) {

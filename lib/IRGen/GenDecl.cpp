@@ -1438,7 +1438,7 @@ static bool protocolExtensionRequiresCategory(ProtocolDecl *protocol,
                                             ProtocolConformance *conformance) {
   if (protocol->isObjC())
     return true;
-  for (auto &inherited : conformance->InheritedMapping)
+  for (auto &inherited : conformance->getInheritedConformances())
     if (protocolExtensionRequiresCategory(inherited.first, inherited.second))
       return true;
   return false;

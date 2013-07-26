@@ -716,38 +716,45 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
     }
 
     SmallVector<DeclID, 16> data;
-    for (auto valueMapping : conf->Mapping) {
+    unsigned numValueWitnesses = 0;
+    unsigned numTypeWitnesses = 0;
+    unsigned numDefaultedDefinitions = 0;
+    for (auto valueMapping : conf->getValueWitnesses()) {
       data.push_back(addDeclRef(valueMapping.first));
       data.push_back(addDeclRef(valueMapping.second.Decl));
       // The substitution records are serialized later.
       data.push_back(valueMapping.second.Substitutions.size());
+      ++numValueWitnesses;
     }
-    for (auto typeMapping : conf->TypeMapping) {
+    for (auto typeMapping : conf->getTypeWitnesses()) {
       data.push_back(addTypeRef(typeMapping.first));
       data.push_back(addTypeRef(typeMapping.second));
+      ++numTypeWitnesses;
     }
-    for (auto defaulted : conf->DefaultedDefinitions) {
+    for (auto defaulted : conf->getDefaultedDefinitions()) {
       data.push_back(addDeclRef(defaulted));
+      ++numDefaultedDefinitions;
     }
 
+    unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
     ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                           addDeclRef(proto),
-                                          conf->Mapping.size(),
-                                          conf->TypeMapping.size(),
-                                          conf->InheritedMapping.size(),
-                                          conf->DefaultedDefinitions.size(),
+                                          numValueWitnesses,
+                                          numTypeWitnesses,
+                                          numInheritedConformances,
+                                          numDefaultedDefinitions,
                                           data);
 
     // FIXME: Unfortunate to have to copy these.
     SmallVector<ProtocolDecl *, 8> inheritedProtos;
     SmallVector<ProtocolConformance *, 8> inheritedConformance;
-    for (auto inheritedMapping : conf->InheritedMapping) {
+    for (auto inheritedMapping : conf->getInheritedConformances()) {
       inheritedProtos.push_back(inheritedMapping.first);
       inheritedConformance.push_back(inheritedMapping.second);
     }
     writeConformances(inheritedProtos, inheritedConformance);
-    for (auto valueMapping : conf->Mapping)
+    for (auto valueMapping : conf->getValueWitnesses())
       writeSubstitutions(valueMapping.second.Substitutions);
   });
 }

@@ -496,9 +496,9 @@ public:
     if (!conformance)
       return;
     if (protocol->isObjC())
-      for (auto &mapping : conformance->Mapping)
+      for (auto &mapping : conformance->getValueWitnesses())
         mapping.second.Decl->setIsObjC(true);
-    for (auto &inherited : conformance->InheritedMapping)
+    for (auto &inherited : conformance->getInheritedConformances())
       checkObjCConformance(inherited.first, inherited.second);
   }
   

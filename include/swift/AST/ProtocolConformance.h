@@ -20,13 +20,16 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include <utility>
 
 namespace swift {
 
+class ProtocolConformance;
+class ProtocolDecl;
 class SubstitutableType;
 class Substitution;
+class TypeAliasDecl;
 class ValueDecl;
-class ProtocolDecl;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -42,15 +45,22 @@ struct ProtocolConformanceWitness {
   /// requirement.
   ArrayRef<Substitution> Substitutions;
 };
-  
+
+/// Map from value requirements to the corresponding conformance witnesses.
+typedef llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> ValueWitnessMap;
+
+/// Map from a directly-inherited protocol to its corresponding protocol
+/// conformance.
+typedef llvm::DenseMap<ProtocolDecl *, ProtocolConformance *>
+  InheritedConformanceMap;
+
 /// \brief Describes how a particular type conforms to a given protocol,
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
 class ProtocolConformance {
-public:
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
-  llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> Mapping;
+  ValueWitnessMap Mapping;
   
   /// \brief The mapping of individual archetypes in the protocol over to
   /// the types used to satisy the type requirements.
@@ -59,11 +69,81 @@ public:
   /// \brief The mapping from any directly-inherited protocols over to the
   /// protocol conformance structures that indicate how the given type meets
   /// the requirements of those protocols.
-  llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
+  InheritedConformanceMap InheritedMapping;
 
   /// The set of requirements for which we have used default definitions or
   /// otherwise deduced the result.
   llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
+
+public:
+  ProtocolConformance(ValueWitnessMap &&valueWitnesses,
+                      TypeSubstitutionMap &&typeWitnesses,
+                      InheritedConformanceMap &&inheritedConformances,
+                      llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
+    : Mapping(std::move(valueWitnesses)),
+      TypeMapping(std::move(typeWitnesses)),
+      InheritedMapping(std::move(inheritedConformances))
+  {
+    for (auto def : defaultedDefinitions)
+      DefaultedDefinitions.insert(def);
+  }
+
+
+  /// Retrieve the type witness for the given associated type.
+  Type getTypeWitness(TypeAliasDecl *assocType) const;
+
+  /// Retrieve the complete set of type witnesses.
+  const TypeSubstitutionMap &getTypeWitnesses() const {
+    return TypeMapping;
+  }
+
+  /// Retrieve the value witness for the given requirement.
+  ProtocolConformanceWitness getValueWitness(ValueDecl *requirement) const {
+    auto known = Mapping.find(requirement);
+    assert(known != Mapping.end());
+    return known->second;
+  }
+
+  /// Retrieve the complete set of value witnesses.
+  ValueWitnessMap &getValueWitnesses() { return Mapping; }
+
+  /// Retrieve the complete set of value witnesses.
+  const ValueWitnessMap &getValueWitnesses() const { return Mapping; }
+
+  /// Retrieve the protocol conformance for a directly-inherited protocol.
+  ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const {
+    auto known = InheritedMapping.find(protocol);
+    assert(known != InheritedMapping.end());
+    return known->second;
+  }
+
+  /// Retrieve the complete set of protocol conformances for directly inherited
+  /// protocols.
+  InheritedConformanceMap &getInheritedConformances() {
+    return InheritedMapping;
+  }
+
+  /// Retrieve the complete set of protocol conformances for directly inherited
+  /// protocols.
+  const InheritedConformanceMap &getInheritedConformances() const {
+    return InheritedMapping;
+  }
+
+  /// Determine whether the witness for the given requirement
+  /// is either the default definition or was otherwise deduced.
+  bool usesDefaultDefinition(ValueDecl *requirement) const {
+    return DefaultedDefinitions.count(requirement) > 0;
+  }
+
+  /// Retrieve the complete set of defaulted definitions.
+  llvm::SmallPtrSet<ValueDecl *, 4> &getDefaultedDefinitions() {
+    return DefaultedDefinitions;
+  }
+
+  /// Retrieve the complete set of defaulted definitions.
+  const llvm::SmallPtrSet<ValueDecl *, 4> &getDefaultedDefinitions() const {
+    return DefaultedDefinitions;
+  }
 };
 
 } // end namespace swift

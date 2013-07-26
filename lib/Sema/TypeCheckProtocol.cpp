@@ -455,9 +455,9 @@ diagnoseMatch(TypeChecker &tc, ValueDecl *req,
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                         SourceLoc ComplainLoc) {
-  llvm::DenseMap<ValueDecl *, ProtocolConformanceWitness> Mapping;
+  ValueWitnessMap Mapping;
   TypeSubstitutionMap TypeMapping;
-  llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> InheritedMapping;
+  InheritedConformanceMap InheritedMapping;
 
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
@@ -802,16 +802,16 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     return nullptr;
   }
 
-  std::unique_ptr<ProtocolConformance> Result(new ProtocolConformance);
-  // FIXME: Make DenseMap movable to make this efficient.
-  Result->Mapping = std::move(Mapping);
-  Result->TypeMapping = std::move(TypeMapping);
-  Result->InheritedMapping = std::move(InheritedMapping);
-
-  // Record each of the deduced associated types.
+  llvm::SmallVector<ValueDecl *, 4> defaultedDefinitions;
   for (auto deduced : deducedAssocTypes) {
-    Result->DefaultedDefinitions.insert(deduced.first);
+    defaultedDefinitions.push_back(deduced.first);
   }
+
+  std::unique_ptr<ProtocolConformance> Result(
+    new ProtocolConformance(std::move(Mapping),
+                            std::move(TypeMapping),
+                            std::move(InheritedMapping),
+                            defaultedDefinitions));
   return Result;
 }
 

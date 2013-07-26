@@ -170,8 +170,6 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   }
 
   assert(conformance && "Missing conformance information");
-  auto reqType = requirement->getDeclaredType()->castTo<SubstitutableType>();
-  assert(conformance->TypeMapping.count(reqType) && "Missing conformance");
   // FIXME: substMemberTypeWithBase when we deal with generic conformance.
-  return conformance->TypeMapping[reqType];
+  return conformance->getTypeWitness(requirement);
 }

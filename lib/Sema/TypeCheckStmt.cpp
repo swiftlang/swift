@@ -285,9 +285,7 @@ public:
         StringRef Name = Value->getName().str();
         if (Name.equals("EnumeratorType") && isa<TypeDecl>(Value)) {
           if (Conformance) {
-            ArchetypeType *Archetype
-              = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
-            RangeTy = Conformance->TypeMapping[Archetype];
+            RangeTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value));
           } else {
             RangeTy = cast<TypeDecl>(Value)->getDeclaredType();
           }
@@ -341,17 +339,16 @@ public:
       StringRef Name = Value->getName().str();
       if (Name.equals("Element") && isa<TypeDecl>(Value)) {
         if (Conformance) {
-          ArchetypeType *Archetype
-            = cast<TypeDecl>(Value)->getDeclaredType()->getAs<ArchetypeType>();
-          ElementTy = Conformance->TypeMapping[Archetype];
+          ElementTy = Conformance->getTypeWitness(cast<TypeAliasDecl>(Value));
         } else {
           ElementTy = cast<TypeDecl>(Value)->getDeclaredType();
         }
         ElementTy = TC.substMemberTypeWithBase(ElementTy, Value, RangeTy);
       } else if (Name.equals("next") && isa<FuncDecl>(Value)) {
-        if (Conformance)
-          nextFn = cast<FuncDecl>(Conformance->Mapping[Value].Decl);
-        else
+        if (Conformance) {
+          // FIXME: Ignoring substitutions here (?).
+          nextFn = cast<FuncDecl>(Conformance->getValueWitness(Value).Decl);
+        } else
           nextFn = cast<FuncDecl>(Value);
       }
     }
