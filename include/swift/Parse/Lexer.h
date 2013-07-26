@@ -184,15 +184,6 @@ public:
     restoreState(S);
   }
 
-  bool stateRangeHasCodeCompletionToken(State Begin, State End,
-                                        unsigned TokenOffset) {
-    assert(Begin.isValid() && End.isValid());
-    assert(Begin.CurPtr <= End.CurPtr && "states don't form a range");
-    const char *CodeCompletePtr = BufferStart + TokenOffset;
-    return Begin.CurPtr <= CodeCompletePtr &&
-           CodeCompletePtr < End.CurPtr;
-  }
-
   /// \brief Retrieve the source location that points just past the
   /// end of the token refered to by \c Loc.
   ///
