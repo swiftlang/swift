@@ -372,12 +372,12 @@ public:
     OS << "integer_literal " << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
-    llvm::SmallString<12> Buffer;
-    FLI->getValue().toString(Buffer);
     OS << "float_literal " << FLI->getType() << ", 0x";
     APInt bits = FLI->getValue().bitcastToAPInt();
     OS << bits.toString(16, /*Signed*/ false);
-    OS << " // " << Buffer;
+    llvm::SmallString<12> decimal;
+    FLI->getValue().toString(decimal);
+    OS << " // " << decimal;
   }
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     OS << "string_literal " << SLI->getType()
