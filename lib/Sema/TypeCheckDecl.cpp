@@ -578,8 +578,9 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    if (IsSecondPass)
+    if (IsSecondPass) {
       return;
+    }
     
     // If the protocol is [objc], it may only refine other [objc] protocols.
     // FIXME: Revisit this restriction.
@@ -1342,11 +1343,10 @@ void TypeChecker::definePendingImplicitDecls() {
   }
 }
 
-void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
-  DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
-  checker.checkInherited(D, D->getInherited());
-
-  // Compute the set of all of the protocols this protocol inherits.
+/// Gather the list of protocols for the given type declaration with
+/// null conformances.
+static void gatherProtocolsWithoutConformances(ASTContext &context,
+                                               TypeDecl *D) {
   llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
   SmallVector<ProtocolDecl *, 4> allProtocols;
   for (auto inherited : D->getInherited()) {
@@ -1359,11 +1359,29 @@ void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
       }
     }
   }
-  D->setProtocols(Context.AllocateCopy(allProtocols));
+  D->setProtocols(context.AllocateCopy(allProtocols));
+
+  // Set null conformances.
+  unsigned conformancesSize = sizeof(ProtocolConformance *) * allProtocols.size();
+  ProtocolConformance **conformances
+    = (ProtocolConformance **)context.Allocate(conformancesSize,
+                                               alignof(ProtocolConformance *));
+  memset(conformances, 0, conformancesSize);
+  D->setConformances(llvm::makeArrayRef(conformances, allProtocols.size()));
+}
+
+void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
+  DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
+  checker.checkInherited(D, D->getInherited());
+
+  // Set the protocols this protocol inherits (directly or indirectly).
+  gatherProtocolsWithoutConformances(Context, D);
 
   for (auto member : D->getMembers()) {
-    if (auto assocType = dyn_cast<TypeAliasDecl>(member))
+    if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
       checker.checkInherited(assocType, assocType->getInherited());
+      gatherProtocolsWithoutConformances(Context, assocType);
+    }
   }
 }
 
