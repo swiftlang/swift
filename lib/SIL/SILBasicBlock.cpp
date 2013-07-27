@@ -52,7 +52,9 @@ SILBasicBlock::SILBasicBlock(SILFunction *Parent)
   : Parent(Parent), PredList(0) {
   Parent->getBlocks().push_back(this);
 }
-SILBasicBlock::~SILBasicBlock() {}
+SILBasicBlock::~SILBasicBlock() {
+  // iplist's destructor is going to destroy the InstList.
+}
 
 SILModule *SILBasicBlock::getModule() {
   return getParent()->getParent();

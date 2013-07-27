@@ -186,7 +186,7 @@ public:
   SILBasicBlock *provideInitialHead() const { return createSentinel(); }
   SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
   static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
-  static void deleteNode(SILBasicBlock *V) {}
+  static void deleteNode(SILBasicBlock *V) { V->~SILBasicBlock(); }
   
 private:
   void createNode(const SILBasicBlock &);
