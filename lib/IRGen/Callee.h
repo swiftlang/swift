@@ -178,9 +178,6 @@ namespace irgen {
       assert(cast<llvm::PointerType>(fn->getType())
                ->getElementType()->isFunctionTy());
 
-      // Invariant on the data value.
-      assert(data == nullptr || !isa<llvm::ConstantPointerNull>(data));
-
       Callee result;
       result.ExplosionLevel = explosionLevel;
       result.Convention = convention;

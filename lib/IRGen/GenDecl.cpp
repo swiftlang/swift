@@ -234,7 +234,7 @@ void IRGenModule::emitTranslationUnit(TranslationUnit *tunit,
   emitGlobalTopLevel(tunit, StartElem);
   
   llvm::Function *topLevelCodeFn = Module.getFunction("top_level_code");
-  assert(topLevelCodeFn && "no top_level_code in SIL function?!");
+  assert(topLevelCodeFn && "no top_level_code in SIL module?!");
   
   Type emptyTuple = TupleType::getEmpty(Context);
   auto unitToUnit = CanType(FunctionType::get(emptyTuple, emptyTuple, Context));
