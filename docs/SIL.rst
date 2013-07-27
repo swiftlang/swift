@@ -432,12 +432,14 @@ The deepest uncurry level is referred to as the **natural uncurry level**.
 Note that the uncurried argument clauses are composed right-to-left, as
 specified in the `calling convention`_. For uncurry levels less than the
 uncurry level, the entry point itself is ``[thin]`` but returns a thick
-function value.
+function value carrying the partially applied arguments for its context.
 
 `Dynamic dispatch`_ instructions such as ``class method`` require their method
 declaration reference to be uncurried to at least uncurry level 1 (which applies
 both the "this" argument and the method arguments), because uncurry level zero
-is the level at which dynamic dispatch semantically occurs in Swift.
+represents the application of the method to its "this" argument, as in
+``foo.method``, which is where the dynamic dispatch semantically occurs
+in Swift.
 
 Dataflow Errors
 ---------------
@@ -584,6 +586,9 @@ gets called in SIL as::
   %z_1 = tuple_extract %z : $(Int, A), 1
   release %z_1
 
+When applying a thick function value as a callee, the function value is also
+consumed at +1 retain count.
+
 Address-Only Types
 ``````````````````
 
@@ -711,6 +716,8 @@ Objective-C methods use the same argument and return value ownership rules as
 ARC Objective-C. Selector families and the ``ns_consumed``,
 ``ns_returns_retained``, etc. attributes from imported Objective-C definitions
 are honored.
+
+Applying an ``[objc_block]`` value does not consume the block.
 
 Method Currying
 ```````````````
@@ -2056,6 +2063,9 @@ thin_to_thick_function
 
 Converts a thin function value, that is, a bare function pointer with no
 context information, into a thick function value with ignored context.
+Applying the resulting thick function value is equivalent to applying the
+original thin value. The ``thin_to_thick_function`` conversion may be
+eliminated if the context is proven not to be needed.
 
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
