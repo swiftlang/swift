@@ -112,12 +112,6 @@ public:
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//
 
-  typedef SILSuccessorIterator pred_iterator;
-  
-  bool pred_empty() const { return PredList == nullptr; }
-  pred_iterator pred_begin() const { return pred_iterator(PredList); }
-  pred_iterator pred_end() const { return pred_iterator(); }
-     
   typedef ArrayRef<SILSuccessor> Successors;
 
   /// The successors of a SILBasicBlock are defined either explicitly as
@@ -125,6 +119,21 @@ public:
   Successors getSuccs() const {
     return getTerminator()->getSuccessors();
   }
+
+  typedef Successors::const_iterator const_succ_iterator;
+  typedef Successors::iterator succ_iterator;
+
+  bool succ_empty() const { return getSuccs().empty(); }
+  succ_iterator succ_begin() { return getSuccs().begin(); }
+  succ_iterator succ_end() { return getSuccs().end(); }
+  const_succ_iterator succ_begin() const { return getSuccs().begin(); }
+  const_succ_iterator succ_end() const { return getSuccs().end(); }
+
+  typedef SILSuccessorIterator pred_iterator;
+
+  bool pred_empty() const { return PredList == nullptr; }
+  pred_iterator pred_begin() const { return pred_iterator(PredList); }
+  pred_iterator pred_end() const { return pred_iterator(); }
 
   /// Pretty-print the SILBasicBlock.
   void dump() const;
