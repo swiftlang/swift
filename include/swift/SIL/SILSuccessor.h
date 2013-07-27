@@ -42,11 +42,11 @@ public:
   SILSuccessor() {}
 
   SILSuccessor(TermInst *CI)
-    : ContainingInst(CI), SuccessorBlock(nullptr) {
+    : ContainingInst(CI) {
   }
 
   SILSuccessor(TermInst *CI, SILBasicBlock *Succ)
-    : ContainingInst(CI), SuccessorBlock(nullptr) {
+    : ContainingInst(CI) {
     *this = Succ;
   }
   
