@@ -81,6 +81,7 @@ predictable.
   instructions to SSA registers.
 - **Return analysis** verifies that each function returns a value on every
   code path and doesn't "fall of the end" of its definition, which is an error.
+  It also issues an error when a ``noreturn`` function returns.
 
 If all diagnostic passes succeed, the final result is the *canonical SIL*
 for the program. Performance optimization and native code generation are
