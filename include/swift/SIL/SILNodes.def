@@ -111,7 +111,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ClassMetatypeInst, SILInstruction)
   INST(ArchetypeMetatypeInst, SILInstruction)
   INST(ProtocolMetatypeInst, SILInstruction)
-  INST(AssociatedMetatypeInst, SILInstruction)
 
   // Aggregate Types
   INST(TupleInst, SILInstruction)

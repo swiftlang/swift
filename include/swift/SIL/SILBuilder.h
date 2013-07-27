@@ -556,13 +556,6 @@ public:
                     ModuleInst(Loc, ModuleType));
   }
   
-  AssociatedMetatypeInst *createAssociatedMetatype(SILLocation Loc,
-                                                   SILValue MetatypeSrc,
-                                                   SILType MetatypeDest) {
-    return insert(new (F.getModule())
-                    AssociatedMetatypeInst(Loc, MetatypeSrc, MetatypeDest));
-  }
-  
   void createRetain(SILLocation Loc, SILValue Operand) {
     // Retaining a function_ref is a no-op.
     if (!isa<FunctionRefInst>(Operand))

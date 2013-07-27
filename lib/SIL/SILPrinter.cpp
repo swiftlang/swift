@@ -641,10 +641,6 @@ public:
   void visitModuleInst(ModuleInst *MI) {
     OS << "module #" << MI->getType().castTo<ModuleType>()->getModule()->Name;
   }
-  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
-    OS << "associated_metatype " << getIDAndType(MI->getOperand())
-       << ", " << MI->getType();
-  }
   
   void visitRetainInst(RetainInst *RI) {
     OS << "retain " << getIDAndType(RI->getOperand());

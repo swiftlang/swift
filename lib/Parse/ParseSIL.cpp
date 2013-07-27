@@ -748,7 +748,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("archetype_metatype", ValueKind::ArchetypeMetatypeInst)
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
     .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
-    .Case("associated_metatype", ValueKind::AssociatedMetatypeInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
@@ -1211,15 +1210,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createProtocolMetatype(SILLocation(), Ty, Val);
       break;
     }
-    break;
-  }
-  case ValueKind::AssociatedMetatypeInst: {
-    SILType Ty;
-    if (parseTypedValueRef(Val) || 
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILType(Ty))
-      return true;
-    ResultVal = B.createAssociatedMetatype(SILLocation(), Val, Ty);
     break;
   }
   case ValueKind::TupleInst: {

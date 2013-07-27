@@ -386,12 +386,6 @@ public:
     require(MI->getType(0).is<ModuleType>(),
             "module instruction must be of module type");
   }
-  void checkAssociatedMetatypeInst(AssociatedMetatypeInst *MI) {
-    require(MI->getType(0).is<MetaTypeType>(),
-            "associated_metatype instruction must be of metatype type");
-    require(MI->getOperand().getType().is<MetaTypeType>(),
-            "associated_metatype operand must be of metatype type");
-  }
   
   void checkRetainInst(RetainInst *RI) {
     require(!RI->getOperand().getType().isAddress(),

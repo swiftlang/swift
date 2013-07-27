@@ -833,14 +833,12 @@ RValue RValueEmitter::visitGenericMemberRefExpr(GenericMemberRefExpr *E,
                                                 SGFContext C)
 {
   if (E->getBase()->getType()->is<MetaTypeType>()) {
+    // Emit the metatype for the associated type.
     assert(E->getType()->is<MetaTypeType>() &&
            "generic_member_ref of metatype should give metatype");
-    // If the base and member are metatypes, emit an associated_metatype inst
-    // to extract the associated type from the type metadata.
-    SILValue baseMetatype = visit(E->getBase()).getUnmanagedSingleValue(SGF);
+    visit(E->getBase());
     return RValue(SGF,
-                  ManagedValue(SGF.B.createAssociatedMetatype(E,
-                                baseMetatype,
+                  ManagedValue(SGF.B.createMetatype(E,
                                 SGF.getLoweredLoadableType(E->getType())),
                         ManagedValue::Unmanaged));
 

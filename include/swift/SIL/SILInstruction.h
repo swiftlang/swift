@@ -1049,16 +1049,6 @@ public:
   }
 };
   
-/// AssociatedMetatypeInst - Extract the metatype of an associated type from a
-/// metatype.
-class AssociatedMetatypeInst
-  : public UnaryInstructionBase<ValueKind::AssociatedMetatypeInst>
-{
-public:
-  AssociatedMetatypeInst(SILLocation Loc, SILValue Base, SILType Metatype)
-    : UnaryInstructionBase(Loc, Base, Metatype) {}
-};
-
 /// Extract a numbered element out of a value of tuple type.
 class TupleExtractInst
   : public UnaryInstructionBase<ValueKind::TupleExtractInst>

@@ -1535,22 +1535,6 @@ protocol_metatype
 Obtains the metatype of the concrete value
 referenced by the existential container referenced by ``%0``.
 
-associated_metatype
-```````````````````
-::
-
-  sil-instruction ::= 'associated_metatype' sil-operand ',' sil-type
-
-  %1 = associated_metatype %0 : $T.metatype, $T.U.metatype
-  // %0 must be a metatype value of type $T.metatype
-  // $T.U must be an associated type of $T
-  // %1 has type $T.U.metatype
-
-Obtains the metatype object for the associated type ``$T.U`` of the type with
-metatype ``%0``.
-
-TODO: This doesn't need to be different from ``metatype``.
-
 Aggregate Types
 ~~~~~~~~~~~~~~~
 

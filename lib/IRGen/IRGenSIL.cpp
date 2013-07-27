@@ -508,7 +508,6 @@ public:
   void visitClassMetatypeInst(ClassMetatypeInst *i);
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *i);
-  void visitAssociatedMetatypeInst(AssociatedMetatypeInst *i);
   void visitTupleExtractInst(TupleExtractInst *i);
   void visitTupleElementAddrInst(TupleElementAddrInst *i);
   void visitStructExtractInst(StructExtractInst *i);
@@ -1106,12 +1105,6 @@ void IRGenSILFunction::visitProtocolMetatypeInst(
   Explosion result(ExplosionKind::Maximal);
   result.add(metatype);
   setLoweredExplosion(SILValue(i, 0), result);
-}
-
-void IRGenSILFunction::visitAssociatedMetatypeInst(
-                                             swift::AssociatedMetatypeInst *i) {
-  CanType instanceType(i->getType().castTo<MetaTypeType>()->getInstanceType());
-  emitMetatypeInst(*this, i, instanceType);  
 }
 
 static void emitApplyArgument(IRGenSILFunction &IGF,
