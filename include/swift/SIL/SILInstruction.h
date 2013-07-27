@@ -419,21 +419,17 @@ public:
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
 class IntegerLiteralInst : public SILInstruction {
-  unsigned length;
+  unsigned numBits;
   
-  StringRef getText() const {
-    return {reinterpret_cast<char const *>(this + 1), length};
-  }
-  
-  IntegerLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  IntegerLiteralInst(SILLocation Loc, SILType Ty, const APInt &Value);
   
 public:
   static IntegerLiteralInst *create(IntegerLiteralExpr *E, SILFunction &B);
   static IntegerLiteralInst *create(CharacterLiteralExpr *E, SILFunction &B);
   static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
-                                    StringRef Text, SILFunction &B);
-  static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
                                     intmax_t Value, SILFunction &B);
+  static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
+                                    const APInt &Value, SILFunction &B);
   
   /// getValue - Return the APInt for the underlying integer literal.
   APInt getValue() const;
@@ -451,22 +447,21 @@ public:
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
 class FloatLiteralInst : public SILInstruction {
-  unsigned length;
+  unsigned numBits;
   
-  StringRef getText() const {
-    return {reinterpret_cast<char const *>(this + 1), length};
-  }
-  
-  FloatLiteralInst(SILLocation Loc, SILType Ty, StringRef Text);
+  FloatLiteralInst(SILLocation Loc, SILType Ty, const APInt &Bits);
   
 public:
   static FloatLiteralInst *create(FloatLiteralExpr *E, SILFunction &B);
   static FloatLiteralInst *create(SILLocation Loc, SILType Ty,
-                                  StringRef Text, SILFunction &B);
+                                  const APFloat &Value, SILFunction &B);
 
-  /// getValue - Return the APFloat for the underlying FP literal.
+  /// \brief Return the APFloat for the underlying FP literal.
   APFloat getValue() const;
 
+  /// \brief Return the bitcast representation of the FP literal as an APInt.
+  APInt getBits() const;
+  
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 

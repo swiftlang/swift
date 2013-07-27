@@ -413,8 +413,8 @@ bb0:
   %1 = alloc_stack $Float64                 // CHECK: alloc_stack $Float64
   %2 = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
   %3 = metatype $Float64.metatype
-  // CHECK: float_literal $Builtin.FPIEEE64, 1.1
-  %4 = float_literal $Builtin.FPIEEE64, 1.1
+  // CHECK: float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
+  %4 = float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %5 = apply %2(%4, %3) : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
   %6 = store %5 to %1 : $*Float64
   %7 = alloc_stack $String                 // CHECK: alloc_stack $String
@@ -463,7 +463,7 @@ bb0:
   %0 = global_addr #x : $*Int64
   %1 = function_ref @global_callee : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %2 = metatype $Int64.metatype
-  %3 = integer_literal $Builtin.Int128, 0         // CHECK: integer_literal
+  %3 = integer_literal $Builtin.Int128, 0 // CHECK: integer_literal $Builtin.Int128, 0
   %4 = apply %1(%3, %2) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   %5 = store %4 to %0 : $*Int64
   %6 = tuple ()

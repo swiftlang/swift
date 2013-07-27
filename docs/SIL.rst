@@ -1146,15 +1146,16 @@ float_literal
 `````````````
 ::
 
-  sil-instruction ::= 'float_literal' sil-type ',' float-literal
+  sil-instruction ::= 'float_literal' sil-type ',' int-literal
 
-  %1 = float_literal $Builtin.FP<n>, 0x1.23ABCp4
+  %1 = float_literal $Builtin.FP<n>, 0x3F800000
   // $Builtin.FP<n> must be a builtin floating-point type
   // %1 has type $Builtin.FP<n>
 
 Creates a floating-point literal value. The result will be of type ``
 ``Builtin.FP<n>``, which must be a builtin floating-point type. The literal
-value is specified using Swift's floating-point literal syntax.
+value is specified as the bitwise representation of the floating point value,
+using Swift's hexadecimal integer literal syntax.
 
 string_literal
 ``````````````

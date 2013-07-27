@@ -903,7 +903,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
-    ResultVal = B.createIntegerLiteral(SILLocation(), Ty, P.Tok.getText());
+    auto *intTy = Ty.getAs<BuiltinIntegerType>();
+    if (!intTy) {
+      P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
+      return true;
+    }
+    
+    APInt value(intTy->getBitWidth(), 0);
+    bool error = P.Tok.getText().getAsInteger(0, value);
+    assert(!error && "integer_literal token did not parse as APInt?!");
+    (void)error;
+    
+    if (value.getBitWidth() != intTy->getBitWidth())
+      value = value.zextOrTrunc(intTy->getBitWidth());
+    
+    ResultVal = B.createIntegerLiteral(SILLocation(), Ty, value);
     P.consumeToken(tok::integer_literal);
     break;
   }
@@ -913,13 +927,30 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
       return true;
    
-    if (P.Tok.getKind() != tok::floating_literal) {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "float");
+    // The value is expressed as bits.
+    if (P.Tok.getKind() != tok::integer_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "integer");
       return true;
     }
-   
-    ResultVal = B.createFloatLiteral(SILLocation(), Ty, P.Tok.getText());
-    P.consumeToken(tok::floating_literal);
+    
+    auto *floatTy = Ty.getAs<BuiltinFloatType>();
+    if (!floatTy) {
+      P.diagnose(P.Tok, diag::sil_float_literal_not_float_type);
+      return true;
+    }
+    
+    APInt bits(floatTy->getBitWidth(), 0);
+    bool error = P.Tok.getText().getAsInteger(0, bits);
+    assert(!error && "float_literal token did not parse as APInt?!");
+    (void)error;
+    
+    if (bits.getBitWidth() != floatTy->getBitWidth())
+      bits = bits.zextOrTrunc(floatTy->getBitWidth());
+    
+    APFloat value(floatTy->getAPFloatSemantics(), bits);
+    
+    ResultVal = B.createFloatLiteral(SILLocation(), Ty, value);
+    P.consumeToken(tok::integer_literal);
     break;
   }
   case ValueKind::StringLiteralInst: {

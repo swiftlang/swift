@@ -19,6 +19,7 @@
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 using namespace swift;
@@ -240,45 +241,58 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
     Function(F) {
 }
 
+static unsigned getWordsForBitWidth(unsigned bits) {
+  return (bits + llvm::integerPartWidth - 1)/llvm::integerPartWidth;
+}
+
 template<typename INST>
 static void *allocateLiteralInstWithTextSize(SILFunction &F, unsigned length) {
   return F.getModule().allocate(sizeof(INST) + length, alignof(INST));
 }
 
+template<typename INST>
+static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
+  unsigned words = getWordsForBitWidth(bits);
+  return F.getModule().allocate(sizeof(INST) + sizeof(llvm::integerPart)*words,
+                                alignof(INST));
+}
+
 IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,
-                                       StringRef Text)
+                                       const llvm::APInt &Value)
   : SILInstruction(ValueKind::IntegerLiteralInst, Loc, Ty),
-    length(Text.size())
+    numBits(Value.getBitWidth())
 {
-  memcpy(this + 1, Text.data(), Text.size());
+  memcpy(this + 1, Value.getRawData(),
+         Value.getNumWords() * sizeof(llvm::integerPart));
+}
+
+IntegerLiteralInst *
+IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
+                           SILFunction &B) {
+  auto *intTy = Ty.castTo<BuiltinIntegerType>();
+  assert(intTy->getBitWidth() == Value.getBitWidth() &&
+         "IntegerLiteralInst APInt value's bit width doesn't match type");
+  
+  void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(B,
+                                                          Value.getBitWidth());
+  return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
 IntegerLiteralInst *
 IntegerLiteralInst::create(SILLocation Loc, SILType Ty,
-                           StringRef Text, SILFunction &B) {
-  void *buf = allocateLiteralInstWithTextSize<IntegerLiteralInst>(B,
-                                                                  Text.size());
-  return ::new (buf) IntegerLiteralInst(Loc, Ty, Text);
+                           intmax_t Value, SILFunction &B) {
+  auto *intTy = Ty.castTo<BuiltinIntegerType>();
+  return create(Loc, Ty,
+                APInt(intTy->getBitWidth(), Value), B);
 }
 
 IntegerLiteralInst *
-IntegerLiteralInst::create(SILLocation Loc, SILType Ty, intmax_t Value,
-                           SILFunction &B) {
-  llvm::SmallString<12> s;
-  llvm::raw_svector_ostream ss(s);
-  ss << Value;
-  ss.flush();
-  
-  return create(Loc, Ty, s, B);
-}
-
-IntegerLiteralInst *
-IntegerLiteralInst::create(swift::IntegerLiteralExpr *E, SILFunction &F) {
+IntegerLiteralInst::create(IntegerLiteralExpr *E, SILFunction &F) {
   return create(E,
                 SILType::getBuiltinIntegerType(
                      E->getType()->castTo<BuiltinIntegerType>()->getBitWidth(),
                      F.getASTContext()),
-                E->getText(), F);
+                E->getValue(), F);
 }
 
 IntegerLiteralInst *
@@ -292,22 +306,32 @@ IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &F) {
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return IntegerLiteralExpr::getValue(getText(),
-                        getType().castTo<BuiltinIntegerType>()->getBitWidth());
+  return APInt(numBits,
+               {reinterpret_cast<const llvm::integerPart *>(this + 1),
+                 getWordsForBitWidth(numBits)});
 }
 
-FloatLiteralInst::FloatLiteralInst(SILLocation Loc, SILType Ty, StringRef Text)
+FloatLiteralInst::FloatLiteralInst(SILLocation Loc, SILType Ty,
+                                   const APInt &Bits)
   : SILInstruction(ValueKind::FloatLiteralInst, Loc, Ty),
-    length(Text.size())
+    numBits(Bits.getBitWidth())
 {
-  memcpy(this + 1, Text.data(), Text.size());
+  memcpy(this + 1, Bits.getRawData(),
+         Bits.getNumWords() * sizeof(llvm::integerPart));
 }
 
 FloatLiteralInst *
-FloatLiteralInst::create(SILLocation Loc, SILType Ty, StringRef Text,
+FloatLiteralInst::create(SILLocation Loc, SILType Ty, const APFloat &Value,
                          SILFunction &B) {
-  void *buf = allocateLiteralInstWithTextSize<FloatLiteralInst>(B, Text.size());
-  return ::new (buf) FloatLiteralInst(Loc, Ty, Text);
+  auto *floatTy = Ty.castTo<BuiltinFloatType>();
+  assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
+         "FloatLiteralInst value's APFloat semantics do not match type");
+  
+  APInt Bits = Value.bitcastToAPInt();
+  
+  void *buf = allocateLiteralInstWithTextSize<FloatLiteralInst>(B,
+                                                            Bits.getBitWidth());
+  return ::new (buf) FloatLiteralInst(Loc, Ty, Bits);
 }
 
 FloatLiteralInst *
@@ -317,12 +341,15 @@ FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &F) {
                 SILType::getBuiltinFloatType(
                          E->getType()->castTo<BuiltinFloatType>()->getFPKind(),
                          F.getASTContext()),
-                E->getText(), F);
+                E->getValue(), F);
 }
 
 APFloat FloatLiteralInst::getValue() const {
-  return FloatLiteralExpr::getValue(getText(),
-                  getType().castTo<BuiltinFloatType>()->getAPFloatSemantics());
+  APInt bits(numBits,
+             {reinterpret_cast<const llvm::integerPart *>(this + 1),
+               getWordsForBitWidth(numBits)});
+  return APFloat(getType().castTo<BuiltinFloatType>()->getAPFloatSemantics(),
+                 bits);
 }
 
 StringLiteralInst::StringLiteralInst(SILLocation Loc, SILType Ty,

@@ -188,11 +188,11 @@ public:
     return insert(IntegerLiteralInst::create(E, F));
   }
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
-                                           StringRef Text) {
-    return insert(IntegerLiteralInst::create(Loc, Ty, Text, F));
+                                           intmax_t Value) {
+    return insert(IntegerLiteralInst::create(Loc, Ty, Value, F));
   }
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
-                                           intmax_t Value) {
+                                           const APInt &Value) {
     return insert(IntegerLiteralInst::create(Loc, Ty, Value, F));
   }
 
@@ -200,8 +200,8 @@ public:
     return insert(FloatLiteralInst::create(E, F));
   }
   FloatLiteralInst *createFloatLiteral(SILLocation Loc, SILType Ty,
-                                       StringRef Text) {
-    return insert(FloatLiteralInst::create(Loc, Ty, Text, F));
+                                       const APFloat &Value) {
+    return insert(FloatLiteralInst::create(Loc, Ty, Value, F));
   }
   
   StringLiteralInst *createStringLiteral(StringLiteralExpr *E, SILType Ty) {
