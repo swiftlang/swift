@@ -195,7 +195,6 @@ public:
 /// would require considering resilience, a job we want to delegate to IRGen).
 class RValue {
   std::vector<ManagedValue> values;
-  std::vector<unsigned> elementOffsets;
   CanType type;
   unsigned elementsToBeAdded;
   
@@ -210,7 +209,6 @@ class RValue {
   void makeUsed() {
     elementsToBeAdded = Used;
     values = {};
-    elementOffsets = {};
   }
   
   /// Private constructor used by copy().
@@ -222,7 +220,6 @@ public:
   
   RValue(RValue &&rv)
     : values(std::move(rv.values)),
-      elementOffsets(std::move(rv.elementOffsets)),
       type(rv.type),
       elementsToBeAdded(rv.elementsToBeAdded)
   {
@@ -236,7 +233,6 @@ public:
     assert((rv.isComplete() || rv.isUsed())
            && "moving rvalue that wasn't complete?!");
     values = std::move(rv.values);
-    elementOffsets = std::move(rv.elementOffsets);
     type = rv.type;
     elementsToBeAdded = rv.elementsToBeAdded;
     rv.elementsToBeAdded = Used;

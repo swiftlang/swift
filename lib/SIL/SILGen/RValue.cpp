@@ -42,18 +42,12 @@ class ExplodeTupleValue
 {
 public:
   std::vector<ManagedValue> &values;
-  std::vector<unsigned> &elementOffsets;
   SILGenFunction &gen;
-  unsigned depth;
   
   ExplodeTupleValue(std::vector<ManagedValue> &values,
-                    std::vector<unsigned> &elementOffsets,
-                    SILGenFunction &gen,
-                    unsigned depth)
-    : values(values), elementOffsets(elementOffsets), gen(gen), depth(depth)
+                    SILGenFunction &gen)
+    : values(values), gen(gen)
   {
-    // The first element is always at offset 0.
-    elementOffsets.push_back(0);
   }
   
   void visitType(CanType t, ManagedValue v) {
@@ -61,7 +55,6 @@ public:
   }
   
   void visitTupleType(CanTupleType t, ManagedValue mv) {
-    ++depth;
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
@@ -75,8 +68,6 @@ public:
             && !isa<LValueType>(fieldCanTy))
           member = gen.B.createLoad(SILLocation(), member);
         visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
-        if (depth == 1)
-          elementOffsets.push_back(values.size());
       }
     } else {
       // Extract the elements from loadable tuples.
@@ -87,11 +78,8 @@ public:
                                                    v, i,
                                                    fieldTy);
         visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
-        if (depth == 1)
-          elementOffsets.push_back(values.size());
       }
     }
-    --depth;
   }
 };
 
@@ -202,40 +190,6 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   return ImplodeLoadableTupleValue<KIND>(values, gen).visit(tupleType);
 }
   
-class ComputeElementOffsets : public CanTypeVisitor<ComputeElementOffsets>
-{
-public:
-  unsigned offset = 0;
-  
-  void visitType(CanType t) {
-    ++offset;
-  }
-  
-  void visitTupleType(CanTupleType t) {
-    for (auto fieldType : t.getElementTypes())
-      visit(fieldType);
-  }
-};
-  
-static void computeElementOffsets(std::vector<unsigned> &offsets,
-                                  CanType type) {
-  // The first element is always at offset zero.
-  offsets.push_back(0);
-  CanTupleType tuple = dyn_cast<TupleType>(type);
-  // Non-tuples always have a single value.
-  if (!tuple) {
-    offsets.push_back(1);
-    return;
-  }
-  
-  // Visit each field and record its ending value offset.
-  ComputeElementOffsets visitor;
-  for (auto fieldType : tuple.getElementTypes()) {
-    visitor.visit(fieldType);
-    offsets.push_back(visitor.offset);
-  }
-}
-  
 class InitializeTupleValues
   : public CanTypeVisitor<InitializeTupleValues,
                           /*RetTy=*/ void,
@@ -328,18 +282,16 @@ public:
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
   : values(values.begin(), values.end()), type(type), elementsToBeAdded(0)
 {
-  computeElementOffsets(elementOffsets, type);
 }
 
 RValue::RValue(SILGenFunction &gen, ManagedValue v)
   : type(v.getSwiftType()), elementsToBeAdded(0)
 {
-  ExplodeTupleValue(values, elementOffsets, gen, 0).visit(type, v);
+  ExplodeTupleValue(values, gen).visit(type, v);
 }
 
 RValue::RValue(CanType type)
   : type(type), elementsToBeAdded(getTupleSize(type)) {
-  elementOffsets.push_back(0);
 }
 
 RValue RValue::emitBBArguments(CanType type,
@@ -354,7 +306,6 @@ void RValue::addElement(RValue &&element) & {
   --elementsToBeAdded;
   values.insert(values.end(),
                 element.values.begin(), element.values.end());
-  elementOffsets.push_back(values.size());
   element.makeUsed();
 }
 
@@ -363,9 +314,7 @@ void RValue::addElement(SILGenFunction &gen, ManagedValue element) & {
   assert(!isUsed() && "rvalue already used");
   --elementsToBeAdded;
 
-  ExplodeTupleValue(values, elementOffsets, gen, 1)
-    .visit(element.getSwiftType(), element);
-  elementOffsets.push_back(values.size());
+  ExplodeTupleValue(values, gen).visit(element.getSwiftType(), element);
 }
 
 SILValue RValue::forwardAsSingleValue(SILGenFunction &gen) && {
@@ -427,13 +376,39 @@ void RValue::getAllUnmanaged(SmallVectorImpl<SILValue> &dest) const & {
     dest.push_back(value.getUnmanagedValue());
 }
 
+/// Return the number of rvalue elements in the given canonical type.
+static unsigned getRValueSize(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    unsigned count = 0;
+    for (auto eltType : tupleType.getElementTypes())
+      count += getRValueSize(eltType);
+    return count;
+  }
+
+  return 1;
+}
+
+/// Return the range of indexes for the given tuple type element.
+static std::pair<unsigned,unsigned>
+getElementRange(CanTupleType tupleType, unsigned eltIndex) {
+  assert(eltIndex < tupleType->getNumElements());
+  unsigned begin = 0;
+  for (unsigned i = 0; i < eltIndex; ++i) {
+    begin += getRValueSize(tupleType.getElementType(i));
+  }
+  unsigned end = begin + getRValueSize(tupleType.getElementType(eltIndex));
+  return { begin, end };
+}
+
 RValue RValue::extractElement(unsigned n) && {
   assert(isComplete() && "rvalue is not complete");
-  
-  unsigned from = elementOffsets[n], to = elementOffsets[n+1];
-  CanType eltTy = cast<TupleType>(type).getElementType(n);
-  
-  RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltTy);
+
+  auto tupleTy = cast<TupleType>(type);
+  auto range = getElementRange(tupleTy, n);
+  unsigned from = range.first, to = range.second;
+
+  CanType eltType = cast<TupleType>(type).getElementType(n);  
+  RValue element(llvm::makeArrayRef(values).slice(from, to - from), eltType);
   makeUsed();
   return element;
 }
@@ -441,19 +416,20 @@ RValue RValue::extractElement(unsigned n) && {
 void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
   assert(isComplete() && "rvalue is not complete");
 
-  auto elementTypes = cast<TupleType>(type).getElementTypes();
-  
-  for (unsigned n = 0, size = elementTypes.size(); n < size; ++n) {
-    unsigned from = elementOffsets[n], to = elementOffsets[n+1];
+  unsigned from = 0;  
+  for (auto eltType : cast<TupleType>(type).getElementTypes()) {
+    unsigned to = from + getRValueSize(eltType);
     elements.push_back({llvm::makeArrayRef(values).slice(from, to - from),
-                        elementTypes[n]});
+                        eltType});
+    from = to;
   }
+  assert(from == values.size());
+
   makeUsed();
 }
 
 RValue::RValue(const RValue &copied, SILGenFunction &gen)
-  : elementOffsets(copied.elementOffsets),
-    type(copied.type),
+  : type(copied.type),
     elementsToBeAdded(copied.elementsToBeAdded)
 {
   assert((copied.isComplete() || copied.isUsed())
