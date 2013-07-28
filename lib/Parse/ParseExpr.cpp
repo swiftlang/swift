@@ -709,17 +709,30 @@ NullablePtr<Expr> Parser::parseExprSuper() {
 ///     expr-call
 ///     expr-postfix operator-postfix
 
+/// Copy a numeric literal value into AST-owned memory, stripping underscores
+/// so the semantic part of the value can be parsed by APInt/APFloat parsers.
+static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
+  char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
+  char *p = start;
+  
+  for (char c : orig)
+    if (c != '_')
+      *p++ = c;
+  
+  return StringRef(start, p - start);
+}
+
 NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   NullablePtr<Expr> Result;
   switch (Tok.getKind()) {
   case tok::integer_literal: {
-    StringRef Text = Tok.getText();
+    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
     Result = new (Context) IntegerLiteralExpr(Text, Loc);
     break;
   }
   case tok::floating_literal: {
-    StringRef Text = Tok.getText();
+    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
     Result = new (Context) FloatLiteralExpr(Text, Loc);
     break;

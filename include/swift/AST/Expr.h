@@ -201,6 +201,8 @@ public:
 /// IntegerLiteralExpr - Integer literal, like '4'.  After semantic analysis
 /// assigns types, this is guaranteed to only have a BuiltinIntegerType.
 class IntegerLiteralExpr : public LiteralExpr {
+  /// The value of the literal as an ASTContext-owned string. Underscores must
+  /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt, APInt leaks.
   SourceLoc Loc;
 
@@ -225,6 +227,8 @@ public:
 /// analysis assigns types, this is guaranteed to only have a
 /// BuiltinFloatingPointType.
 class FloatLiteralExpr : public LiteralExpr {
+  /// The value of the literal as an ASTContext-owned string. Underscores must
+  /// be stripped.
   StringRef Val; // Use StringRef instead of APFloat, APFloat leaks.
   SourceLoc Loc;
 

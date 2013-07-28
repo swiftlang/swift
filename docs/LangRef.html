@@ -300,14 +300,35 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    integer_literal ::= [0-9]+
-    integer_literal ::= 0x[0-9a-fA-F]+
-    integer_literal ::= 0o[0-7]+
-    integer_literal ::= 0b[01]+
+    integer_literal ::= [0-9][0-9_]*
+    integer_literal ::= 0x[0-9a-fA-F][0-9a-fA-F_]*
+    integer_literal ::= 0o[0-7][0-7_]*
+    integer_literal ::= 0b[01][01_]*
   </pre>
 
-  <p>integer_literal tokens represent simple integer values of unspecified
-     precision.</p>
+  <p>Integer literal tokens represent simple integer values of unspecified
+     precision. They may be expressed in decimal, binary with the '<tt>0b</tt>'
+     prefix, octal with the '<tt>0o</tt>' prefix, or hexadecimal with the
+     '<tt>0x</tt>' prefix. Unlike C, a leading zero does not affect the base
+     of the literal.
+     
+  <p>Integer literals may contain underscores at arbitrary positions after
+     the first digit. These underscores may be used for human readability
+     and do not affect the value of the literal.</p>
+
+  <pre class="example">
+    789
+    0789
+
+    1000000
+    1_000_000
+
+    0b111_101_101
+    0o755
+
+    0b1111_1011
+    0xFB
+  </pre>
 
   <!-- ===================================================================== -->
   <h3 id="floating_literal">Floating Point Literals</h3>
@@ -322,14 +343,32 @@
   </div>
 
   <pre class="grammar">
-    floating_literal ::= [0-9]+\.[0-9]+
-    floating_literal ::= [0-9]+\.[0-9]+[eE][+-]?[0-9]+
-    floating_literal ::= [0-9]+[eE][+-]?[0-9]+
-    floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
+    floating_literal ::= [0-9][0-9_]*\.[0-9][0-9_]*
+    floating_literal ::= [0-9][0-9_]*\.[0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
+    floating_literal ::= [0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
+    floating_literal ::= 0x[0-9A-Fa-f][0-9A-Fa-f_]*
+                           (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?[pP][+-]?[0-9][0-9_]*
   </pre>
 
-  <p>floating_literal tokens represent floating point values of unspecified
-  precision. Decimal and hexadecimal floating-point literals are supported.</p>
+  <p>Floating point literal tokens represent floating point values of
+     unspecified precision. Decimal and hexadecimal floating-point literals are
+     supported.
+
+  <p>The integer, fraction, and exponent of a floating point literal may each
+     contain underscores at arbitrary positions after their first digits. These
+     underscores may be used for human readability and do not affect the value
+     of the literal. Each part of the floating point literal must however start
+     with a digit; <tt>1._0</tt> would be a reference to the <tt>_0</tt> member
+     of <tt>1</tt>.
+
+  <pre class="example">
+    1.0
+    1000000.75
+    1_000_000.75
+
+    0x1.FFFFFFFFFFFFFp1022
+    0x1.FFFF_FFFF_FFFF_Fp1_022
+  </pre>
   
   <!-- ===================================================================== -->
   <h3 id="character_literal">Character Literals</h3>

@@ -638,9 +638,15 @@ void Lexer::lexHexNumber() {
   const char *TokStart = CurPtr-1;
   assert(*TokStart == '0' && "not a hex literal");
 
-  // 0x[0-9a-fA-F]+
+  // 0x[0-9a-fA-F][0-9a-fA-F_]*
   ++CurPtr;
-  while (isxdigit(*CurPtr))
+  if (!isxdigit(*CurPtr)) {
+    diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
+    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+    return formToken(tok::unknown, TokStart);
+  }
+    
+  while (isxdigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
   if (CurPtr - TokStart == 2) {
     diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
@@ -651,7 +657,7 @@ void Lexer::lexHexNumber() {
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
   
-  // (\.[0-9A-Fa-f]+)?
+  // (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?
   if (*CurPtr == '.') {
     ++CurPtr;
     
@@ -662,7 +668,7 @@ void Lexer::lexHexNumber() {
       return formToken(tok::integer_literal, TokStart);
     }
     
-    while (isxdigit(*CurPtr))
+    while (isxdigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
     if (*CurPtr != 'p' && *CurPtr != 'P') {
       diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
@@ -670,7 +676,7 @@ void Lexer::lexHexNumber() {
     }
   }
   
-  // [pP][+-]?[0-9]+
+  // [pP][+-]?[0-9][0-9_]*
   assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
   ++CurPtr;
   
@@ -682,57 +688,63 @@ void Lexer::lexHexNumber() {
     return formToken(tok::unknown, TokStart);
   }
   
-  while (isdigit(*CurPtr))
+  while (isdigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
   return formToken(tok::floating_literal, TokStart);
 }
 
 /// lexNumber:
-///   integer_literal  ::= [0-9]+
-///   integer_literal  ::= 0x[0-9a-fA-F]+
-///   integer_literal  ::= 0o[0-7]+
-///   integer_literal  ::= 0b[01]+
-///   floating_literal ::= [0-9]+\.[0-9]+
-///   floating_literal ::= [0-9]+\.[0-9]+[eE][+-]?[0-9]+
-///   floating_literal ::= [0-9][eE][+-]?[0-9]+
-///   floating_literal ::= 0x[0-9A-Fa-f]+(\.[0-9A-Fa-f]+)?[pP][+-]?[0-9]+
+///   integer_literal  ::= [0-9][0-9_]*
+///   integer_literal  ::= 0x[0-9a-fA-F][0-9a-fA-F_]*
+///   integer_literal  ::= 0o[0-7][0-7_]*
+///   integer_literal  ::= 0b[01][01_]*
+///   floating_literal ::= [0-9][0-9]_*\.[0-9][0-9_]*
+///   floating_literal ::= [0-9][0-9]*\.[0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
+///   floating_literal ::= [0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
+///   floating_literal ::= 0x[0-9A-Fa-f][0-9A-Fa-f_]*
+///                          (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?[pP][+-]?[0-9][0-9_]*
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
   assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
+  
+  auto expected_digit = [&](const char *loc, Diag<> msg) {
+    diagnose(loc, msg);
+    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+    return formToken(tok::unknown, TokStart);
+  };
 
   if (*TokStart == '0' && *CurPtr == 'x')
     return lexHexNumber();
   
   if (*TokStart == '0' && *CurPtr == 'o') {
-    // 0o[0-7]+
+    // 0o[0-7][0-7_]*
     ++CurPtr;
-    while (*CurPtr >= '0' && *CurPtr <= '7')
+    if (*CurPtr < '0' || *CurPtr > '7')
+      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
+      
+    while ((*CurPtr >= '0' && *CurPtr <= '7') || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2) {
-      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-      return formToken(tok::unknown, TokStart);
-    }
+    if (CurPtr - TokStart == 2)
+      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
   
   if (*TokStart == '0' && *CurPtr == 'b') {
-    // 0b[01]+
+    // 0b[01][01_]*
     ++CurPtr;
-    while (*CurPtr == '0' || *CurPtr == '1')
+    if (*CurPtr != '0' && *CurPtr != '1')
+      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
+    while (*CurPtr == '0' || *CurPtr == '1' || *CurPtr == '_')
       ++CurPtr;
-    if (CurPtr - TokStart == 2) {
-      diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
-      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-      return formToken(tok::unknown, TokStart);
-    }
+    if (CurPtr - TokStart == 2)
+      return expected_digit(CurPtr, diag::lex_expected_digit_in_int_literal);
     return formToken(tok::integer_literal, TokStart);
   }
 
   // Handle a leading [0-9]+, lexing an integer or falling through if we have a
   // floating point value.
-  while (isdigit(*CurPtr))
+  while (isdigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
   // Lex things like 4.x as '4' followed by a tok::period.
@@ -746,11 +758,9 @@ void Lexer::lexNumber() {
     // something else, then this is the end of the token.
     if (*CurPtr != 'e' && *CurPtr != 'E') {
       char const *tmp = CurPtr;
-      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
-        diagnose(tmp, diag::lex_expected_digit_in_int_literal);
-        while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-        return formToken(tok::unknown, TokStart);
-      }
+      if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
+        return expected_digit(tmp, diag::lex_expected_digit_in_int_literal);
+
       return formToken(tok::integer_literal, TokStart);
     }
   }
@@ -760,7 +770,7 @@ void Lexer::lexNumber() {
     ++CurPtr;
    
     // Lex any digits after the decimal point.
-    while (isdigit(*CurPtr))
+    while (isdigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
   
@@ -770,13 +780,10 @@ void Lexer::lexNumber() {
     if (*CurPtr == '+' || *CurPtr == '-')
       ++CurPtr;  // Eat the sign.
       
-    if (!isdigit(*CurPtr)) {
-      diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
-      while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-      return formToken(tok::unknown, TokStart);
-    }
+    if (!isdigit(*CurPtr))
+      return expected_digit(CurPtr, diag::lex_expected_digit_in_fp_exponent);
     
-    while (isdigit(*CurPtr))
+    while (isdigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
   
