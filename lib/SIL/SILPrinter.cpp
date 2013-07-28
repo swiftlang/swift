@@ -373,7 +373,7 @@ public:
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
     OS << "float_literal " << FLI->getType() << ", 0x";
-    APInt bits = FLI->getValue().bitcastToAPInt();
+    APInt bits = FLI->getBits();
     OS << bits.toString(16, /*Signed*/ false);
     llvm::SmallString<12> decimal;
     FLI->getValue().toString(decimal);

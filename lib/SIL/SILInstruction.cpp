@@ -329,7 +329,7 @@ FloatLiteralInst::create(SILLocation Loc, SILType Ty, const APFloat &Value,
   
   APInt Bits = Value.bitcastToAPInt();
   
-  void *buf = allocateLiteralInstWithTextSize<FloatLiteralInst>(B,
+  void *buf = allocateLiteralInstWithBitSize<FloatLiteralInst>(B,
                                                             Bits.getBitWidth());
   return ::new (buf) FloatLiteralInst(Loc, Ty, Bits);
 }
@@ -344,12 +344,15 @@ FloatLiteralInst::create(FloatLiteralExpr *E, SILFunction &F) {
                 E->getValue(), F);
 }
 
+APInt FloatLiteralInst::getBits() const {
+  return APInt(numBits,
+               {reinterpret_cast<const llvm::integerPart *>(this + 1),
+                 getWordsForBitWidth(numBits)});
+}
+
 APFloat FloatLiteralInst::getValue() const {
-  APInt bits(numBits,
-             {reinterpret_cast<const llvm::integerPart *>(this + 1),
-               getWordsForBitWidth(numBits)});
   return APFloat(getType().castTo<BuiltinFloatType>()->getAPFloatSemantics(),
-                 bits);
+                 getBits());
 }
 
 StringLiteralInst::StringLiteralInst(SILLocation Loc, SILType Ty,
