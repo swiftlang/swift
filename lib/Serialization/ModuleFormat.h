@@ -416,8 +416,7 @@ namespace decls_block {
     TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
     BCFixed<1>,  // implicit flag
-    TypeIDField, // superclass type
-    BCArray<TypeIDField> // inherited types
+    TypeIDField  // superclass type
     // Trailed by the conformance info (if any).
   >;
 
@@ -426,14 +425,23 @@ namespace decls_block {
     Code,
     IdentifierIDField, // name
     DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    BCArray<TypeIDField> // inherited types
+    BCFixed<1>  // implicit flag
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
-  using ClassLayout = NominalLayout<CLASS_DECL>;
+
+  using ClassLayout = BCRecordLayout<
+    CLASS_DECL,
+    IdentifierIDField, // name
+    DeclIDField,       // context decl
+    BCFixed<1>,        // implicit flag
+    TypeIDField        // superclass
+    // Trailed by the generic parameters (if any), conformance info (if any),
+    // and finally the decl context record.
+  >;
+
   using OneOfLayout = NominalLayout<ONEOF_DECL>;
 
   using ProtocolLayout = BCRecordLayout<
@@ -441,8 +449,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCVBR<6>, // # of protocols preceding the inherited types
-    BCArray<TypeIDField> // protocols and inherited types
+    BCArray<DeclIDField> // protocols
   >;
 
   using ConstructorLayout = BCRecordLayout<
@@ -532,8 +539,7 @@ namespace decls_block {
     EXTENSION_DECL,
     TypeIDField, // base type
     DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
-    BCArray<TypeIDField> // inherited types
+    BCFixed<1>   // implicit flag
     // Trailed by conformance info (if any), then the decl context record.
   >;
 

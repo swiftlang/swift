@@ -215,17 +215,6 @@ private:
   /// without moving the cursor.
   GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
-  /// Creates an array of types from the given IDs.
-  ///
-  /// The returned array is owned by the ASTContext.
-  ///
-  /// \param rawTypeIDs An array of TypeID values, but using \c uint64_t for
-  ///                   compatibility with BitstreamReader.
-  /// \param[out] classType If non-null, and one of the type IDs resolves to a
-  ///                       class type, this will be set to that type.
-  MutableArrayRef<TypeLoc> getTypes(ArrayRef<uint64_t> rawTypeIDs,
-                                    Type *classType = nullptr);
-
   /// Reads members of a DeclContext from \c DeclTypeCursor.
   ///
   /// The returned array is owned by the ASTContext.

@@ -901,16 +901,11 @@ bool Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
 
-    SmallVector<TypeID, 4> inherited;
-    for (auto parent : extension->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(extension->getExtendedType()),
                                 addDeclRef(DC),
-                                extension->isImplicit(),
-                                inherited);
+                                extension->isImplicit());
 
     writeConformances(extension->getProtocols(), extension->getConformances());
     writeMembers(extension->getMembers());
@@ -989,10 +984,6 @@ bool Serializer::writeDecl(const Decl *D) {
     if (typeAlias->hasUnderlyingType())
       underlying = typeAlias->getUnderlyingType();
 
-    SmallVector<TypeID, 4> inherited;
-    for (auto parent : typeAlias->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[TypeAliasLayout::Code];
     TypeAliasLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(typeAlias->getName()),
@@ -1002,8 +993,7 @@ bool Serializer::writeDecl(const Decl *D) {
                                 typeAlias->isImplicit(),
                                 typeAlias->isGenericParameter()
                                   ? addTypeRef(typeAlias->getSuperclass())
-                                  : addTypeRef(Type()),
-                                inherited);
+                                  : addTypeRef(Type()));
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances());
     return true;
@@ -1018,16 +1008,11 @@ bool Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
-    SmallVector<TypeID, 4> inherited;
-    for (auto parent : theStruct->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[StructLayout::Code];
     StructLayout::emitRecord(Out, ScratchRecord, abbrCode,
                              addIdentifierRef(theStruct->getName()),
                              addDeclRef(DC),
-                             theStruct->isImplicit(),
-                             inherited);
+                             theStruct->isImplicit());
 
     writeGenericParams(theStruct->getGenericParams());
     writeConformances(theStruct->getProtocols(), theStruct->getConformances());
@@ -1044,16 +1029,11 @@ bool Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(oneOf->getDeclContext());
 
-    SmallVector<TypeID, 4> inherited;
-    for (auto parent : oneOf->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[OneOfLayout::Code];
     OneOfLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(oneOf->getName()),
                             addDeclRef(DC),
-                            oneOf->isImplicit(),
-                            inherited);
+                            oneOf->isImplicit());
 
     writeGenericParams(oneOf->getGenericParams());
     writeConformances(oneOf->getProtocols(), oneOf->getConformances());
@@ -1070,16 +1050,12 @@ bool Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
-    SmallVector<TypeID, 4> inherited;
-    for (auto parent : theClass->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addIdentifierRef(theClass->getName()),
                             addDeclRef(DC),
                             theClass->isImplicit(),
-                            inherited);
+                            addTypeRef(theClass->getBaseClass()));
 
     writeGenericParams(theClass->getGenericParams());
     writeConformances(theClass->getProtocols(), theClass->getConformances());
@@ -1098,19 +1074,16 @@ bool Serializer::writeDecl(const Decl *D) {
     assert(!proto->getGenericParams() && "protocols can't be generic");
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
-    SmallVector<TypeID, 4> inherited;
+    SmallVector<DeclID, 4> protocols;
     for (auto proto : proto->getProtocols())
-      inherited.push_back(addDeclRef(proto));
-    for (auto parent : proto->getInherited())
-      inherited.push_back(addTypeRef(parent.getType()));
+      protocols.push_back(addDeclRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolLayout::Code];
     ProtocolLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
-                               proto->getProtocols().size(),
-                               inherited);
+                               protocols);
 
     writeMembers(proto->getMembers());
     return true;

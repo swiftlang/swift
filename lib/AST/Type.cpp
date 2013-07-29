@@ -1550,8 +1550,41 @@ void PolymorphicFunctionType::printGenericParams(raw_ostream &OS) const {
     TypeAliasDecl *paramTy = params[i].getAsTypeParam();
     OS << paramTy->getName().str();
     auto inherited = paramTy->getInherited();
-    for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
-      OS << (ii ? StringRef(", ") : " : ") << inherited[ii].getType();
+    if (inherited.empty()) {
+      if (unsigned printSize = (paramTy->getSuperclass()? 1 : 0)
+                             + paramTy->getProtocols().size()) {
+        OS << " : ";
+        if (printSize > 1)
+          OS << "protocol<";
+        bool printedFirst = false;
+        if (auto superclass = paramTy->getSuperclass()) {
+          printedFirst = true;
+          superclass->print(OS);
+        }
+        for (auto proto : paramTy->getProtocols()) {
+          if (printedFirst) {
+            OS << ", ";
+          } else {
+            printedFirst = true;
+          }
+
+          proto->getDeclaredType()->print(OS);
+        }
+        if (printSize > 1)
+          OS << ">";
+      }
+    } else {
+      OS << " : ";
+      if (inherited.size() > 1)
+        OS << "protocol<";
+      for (unsigned ii = 0, ie = inherited.size(); ii != ie; ++ii) {
+        if (ii)
+          OS << ", ";
+
+        OS << inherited[ii].getType();
+      }
+      if (inherited.size() > 1)
+        OS << ">";
     }
   }
   OS << '>';

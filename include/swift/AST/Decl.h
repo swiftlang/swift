@@ -1332,8 +1332,8 @@ public:
     return SourceRange(ClassLoc, getBraces().End);
   }
 
-  bool hasBaseClass() { return (bool)BaseClass.getType(); }
-  Type getBaseClass() { return BaseClass.getType(); }
+  bool hasBaseClass() const { return (bool)BaseClass.getType(); }
+  Type getBaseClass() const { return BaseClass.getType(); }
   TypeLoc &getBaseClassLoc() { return BaseClass; }
   void setBaseClassLoc(TypeLoc base) { BaseClass = base; }
 

@@ -542,29 +542,6 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   return paramList;
 }
 
-MutableArrayRef<TypeLoc> ModuleFile::getTypes(ArrayRef<uint64_t> rawTypeIDs,
-                                              Type *classType) {
-  ASTContext &ctx = ModuleContext->Ctx;
-  auto result =
-    MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(rawTypeIDs.size()),
-                             rawTypeIDs.size());
-  if (classType)
-    *classType = nullptr;
-
-  TypeLoc *nextType = result.data();
-  for (TypeID rawID : rawTypeIDs) {
-    auto type = getType(rawID);
-    if (classType && type->getClassOrBoundGenericClass()) {
-      assert(!*classType && "already found a class type");
-      *classType = type;
-    }
-    new (nextType) auto(TypeLoc::withoutLoc(type));
-    ++nextType;
-  }
-
-  return result;
-}
-
 Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
   using namespace decls_block;
 
@@ -717,17 +694,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isGeneric;
     bool isImplicit;
     TypeID superclassTypeID;
-    ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID,
                                              isGeneric, isImplicit,
-                                             superclassTypeID,
-                                             inheritedIDs);
+                                             superclassTypeID);
 
-    auto inherited =
-      MutableArrayRef<TypeLoc>(ctx.Allocate<TypeLoc>(inheritedIDs.size()),
-                               inheritedIDs.size());
     TypeLoc underlyingType;
     DeclContext *DC;
 
@@ -739,19 +711,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       if (declOrOffset.isComplete())
         break;
 
-      TypeLoc *nextInheritedType = inherited.data();
-      for (TypeID TID : inheritedIDs) {
-        auto type = getType(TID);
-        new (nextInheritedType) TypeLoc(TypeLoc::withoutLoc(type));
-        ++nextInheritedType;
-      }
-
       underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
     }
 
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType,
-                                         DC, inherited);
+                                         DC, { });
     declOrOffset = alias;
 
     if (isImplicit)
@@ -775,12 +740,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit, inheritedIDs);
+                                          isImplicit);
 
-    MutableArrayRef<TypeLoc> inherited;
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
@@ -788,15 +751,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DC = getDeclContext(contextID);
       if (declOrOffset.isComplete())
         break;
-
-      inherited = getTypes(inheritedIDs);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
-                                          SourceLoc(), inherited,
-                                          genericParams, DC);
+                                          SourceLoc(), { }, genericParams, DC);
     declOrOffset = theStruct;
     if (DidRecord) {
       (*DidRecord)(theStruct);
@@ -1027,26 +987,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> inheritedIDs;
+    ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, numProtocols,
-                                            inheritedIDs);
+                                            isImplicit, protocolIDs);
 
     DeclContext *DC;
-    MutableArrayRef<TypeLoc> inherited;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
 
       DC = getDeclContext(contextID);
       if (declOrOffset.isComplete())
         break;
-
-      inherited = getTypes(inheritedIDs.slice(numProtocols));
     }
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
-                                        getIdentifier(nameID), inherited);
+                                        getIdentifier(nameID), { });
     declOrOffset = proto;
     if (DidRecord) {
       (*DidRecord)(proto);
@@ -1058,7 +1013,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     // Deserialize the list of protocols.
     SmallVector<ProtocolDecl *, 4> protocols;
-    for (auto protoID : inheritedIDs.slice(0, numProtocols)) {
+    for (auto protoID : protocolIDs) {
       protocols.push_back(cast<ProtocolDecl>(getDecl(protoID)));
     }
     proto->setProtocols(ctx.AllocateCopy(protocols));
@@ -1127,13 +1082,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> inheritedIDs;
-
+    TypeID superclassID;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, inheritedIDs);
+                                         isImplicit, superclassID);
 
-    MutableArrayRef<TypeLoc> inherited;
-    Type baseClassTy;
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
@@ -1141,15 +1093,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DC = getDeclContext(contextID);
       if (declOrOffset.isComplete())
         break;
-
-      inherited = getTypes(inheritedIDs, &baseClassTy);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
 
     auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
-                                        SourceLoc(), inherited,
-                                        genericParams, DC);
+                                        SourceLoc(), { }, genericParams, DC);
     declOrOffset = theClass;
     if (DidRecord) {
       (*DidRecord)(theClass);
@@ -1158,8 +1107,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       theClass->setImplicit();
-    if (baseClassTy)
-      theClass->setBaseClassLoc(TypeLoc::withoutLoc(baseClassTy));
+    if (superclassID) {
+      BCOffsetRAII restoreOffset(DeclTypeCursor);
+      theClass->setBaseClassLoc(TypeLoc::withoutLoc(getType(superclassID)));
+    }
     if (genericParams)
       for (auto &genericParam : *theClass->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theClass);
@@ -1182,12 +1133,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::OneOfLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, inheritedIDs);
+                                         isImplicit);
 
-    MutableArrayRef<TypeLoc> inherited;
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
@@ -1195,8 +1144,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DC = getDeclContext(contextID);
       if (declOrOffset.isComplete())
         break;
-
-      inherited = getTypes(inheritedIDs);
     }
 
     auto genericParams = maybeReadGenericParams(DC);
@@ -1205,7 +1152,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto oneOf = new (ctx) OneOfDecl(SourceLoc(),
                                      /*isEnum*/ false,
                                      getIdentifier(nameID),
-                                     SourceLoc(), inherited,
+                                     SourceLoc(), { },
                                      genericParams, DC);
     declOrOffset = oneOf;
     if (DidRecord) {
@@ -1317,13 +1264,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     TypeID baseID;
     DeclID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, inheritedIDs);
+                                             isImplicit);
 
     TypeLoc baseTy;
-    MutableArrayRef<TypeLoc> inherited;
     DeclContext *DC;
     {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
@@ -1333,11 +1278,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         break;
 
       baseTy = TypeLoc::withoutLoc(getType(baseID));
-      inherited = getTypes(inheritedIDs);
     }
 
-    auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, inherited,
-                                             DC);
+    auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, { }, DC);
     declOrOffset = extension;
 
     if (isImplicit)
