@@ -65,7 +65,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
       if (L)
         diagnose(Context,
                  L.getEndSourceLoc(),
-                 diag::missing_return, ResTy.getString());
+                 diag::missing_return, ResTy);
     }
   }
 }
