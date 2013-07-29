@@ -319,22 +319,26 @@ SourceLoc Parser::consumeStartingGreater() {
   return Loc;
 }
 
-void Parser::skipSingle() {
+void Parser::skipSingle(bool StopAtCodeComplete) {
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren);
+    skipUntil(tok::r_paren, StopAtCodeComplete);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
     consumeToken();
-    skipUntil(tok::r_brace);
+    skipUntil(tok::r_brace, StopAtCodeComplete);
     consumeIf(tok::r_brace);
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square);
+    skipUntil(tok::r_square, StopAtCodeComplete);
     consumeIf(tok::r_square);
+    break;
+  case tok::code_complete:
+    if (!StopAtCodeComplete)
+      consumeToken();
     break;
   default:
     consumeToken();
@@ -342,12 +346,13 @@ void Parser::skipSingle() {
   }
 }
 
-void Parser::skipUntil(tok T1, tok T2) {
+void Parser::skipUntil(tok T1, tok T2, bool StopAtCodeComplete) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T1 == tok::unknown && T2 == tok::unknown) return;
   
-  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2))
-    skipSingle();
+  while (Tok.isNot(tok::eof) && Tok.isNot(T1) && Tok.isNot(T2) &&
+         (!StopAtCodeComplete || Tok.isNot(tok::code_complete)))
+    skipSingle(StopAtCodeComplete);
 }
 
 void Parser::skipUntilAnyOperator() {
@@ -361,11 +366,12 @@ void Parser::skipUntilDeclRBrace() {
     skipSingle();
 }
 
-void Parser::skipUntilDeclStmtRBrace() {
+void Parser::skipUntilDeclStmtRBrace(bool StopAtCodeComplete) {
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
          !isStartOfStmt(Tok) &&
-         !isStartOfDecl(Tok, peekToken())) {
-    skipSingle();
+         !isStartOfDecl(Tok, peekToken()) &&
+         (!StopAtCodeComplete || Tok.isNot(tok::code_complete))) {
+    skipSingle(StopAtCodeComplete);
   }
 }
 
@@ -486,7 +492,7 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       skipUntil(RightK, SeparatorK);
       if (Tok.is(RightK))
         break;
-      if (Tok.is(tok::eof))
+      if (Tok.is(tok::eof) || Tok.is(tok::code_complete))
         return true;
       consumeIf(SeparatorK);
     }

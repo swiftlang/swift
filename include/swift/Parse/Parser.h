@@ -265,14 +265,17 @@ public:
   /// return without consuming it.  Because we cannot guarantee that the token 
   /// will ever occur, this skips to some likely good stopping point.
   ///
-  void skipUntil(tok T1, tok T2 = tok::unknown);
+  void skipUntil(tok T1, bool StopAtCodeComplete = true) {
+    skipUntil(T1, tok::unknown, StopAtCodeComplete);
+  }
+  void skipUntil(tok T1, tok T2, bool StopAtCodeComplete = true);
   void skipUntilAnyOperator();
   
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl, statement or '}'.
-  void skipUntilDeclStmtRBrace();
+  void skipUntilDeclStmtRBrace(bool StopAtCodeComplete = true);
 
 private:
   /// Skip a single token, but match parentheses, braces, and square brackets.
@@ -280,7 +283,7 @@ private:
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type, 
   /// but not when used as comparison operators.
-  void skipSingle();
+  void skipSingle(bool StopAtCodeComplete = true);
 
 public:
   template<typename ...ArgTypes>
@@ -393,8 +396,7 @@ public:
                  tok SeparatorK, bool OptionalSep, Diag<> ErrorDiag,
                  std::function<bool()> callback);
 
-  void consumeTopLevelDecl(TopLevelCodeDecl *TLCD,
-                           ParserPosition BeginParserPosition);
+  void consumeTopLevelDecl(ParserPosition BeginParserPosition);
 
   void parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Decls,
                        bool IsTopLevel,

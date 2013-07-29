@@ -132,14 +132,20 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   }
 }
 
-void Parser::consumeTopLevelDecl(TopLevelCodeDecl *TLCD,
-                                 ParserPosition BeginParserPosition) {
+void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  skipUntilDeclStmtRBrace();
+  // Consume tokens up to code completion token.
+  while (Tok.isNot(tok::code_complete)) {
+    consumeToken();
+  }
+  // Consume the code completion token, if there is one.
   consumeIf(tok::code_complete);
+  // Also perform the same recovery as the main parser to capture tokens from
+  // this decl that are past the code completion token.
+  skipUntilDeclStmtRBrace();
   SourceLoc EndLoc = Tok.getLoc();
-  State->delayTopLevelCodeDecl(TLCD, { BeginLoc, EndLoc },
+  State->delayTopLevelCodeDecl(nullptr, { BeginLoc, EndLoc },
                                BeginParserPosition.PreviousLoc);
 }
 
@@ -186,10 +192,23 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       // FIXME: Add semicolon to the AST?
     }
 
+    ParserPosition BeginParserPosition;
+    if (isCodeCompletionFirstPass())
+      BeginParserPosition = getParserPosition();
+
     // Parse the decl, stmt, or expression.
     previousHadSemi = false;
     if (isStartOfDecl(Tok, peekToken())) {
-      if (parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default))
+      bool FailedToParse =
+          parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
+      if (Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
+        bool ShouldDelay = FailedToParse;
+        if (ShouldDelay) {
+          consumeTopLevelDecl(BeginParserPosition);
+          return;
+        }
+      }
+      if (FailedToParse)
         NeedParseErrorRecovery = true;
       else {
         for (Decl *D : TmpDecls)
@@ -206,17 +225,11 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
       ContextChange CC(*this, TLCD);
       SourceLoc StartLoc = Tok.getLoc();
 
-      ParserPosition BeginParserPosition;
-      if (isCodeCompletionFirstPass())
-        BeginParserPosition = getParserPosition();
-
       bool FailedToParse = parseExprOrStmt(Result);
-
-      if (Tok.is(tok::code_complete)) {
-        consumeTopLevelDecl(TLCD, BeginParserPosition);
+      if (Tok.is(tok::code_complete) && isCodeCompletionFirstPass()) {
+        consumeTopLevelDecl(BeginParserPosition);
         return;
       }
-
       if (FailedToParse) {
         NeedParseErrorRecovery = true;
       } else {
@@ -257,6 +270,9 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
     // but distinguishing the start of an expression from the middle of one is
     // "hard".
     if (NeedParseErrorRecovery) {
+      // If there was a parse error and we stopped at the code completion
+      // token, then it should have been already handled, so just skip it.
+      consumeIf(tok::code_complete);
       skipUntilDeclStmtRBrace();
 
       // If we have to recover, pretend that we had a semicolon; it's less
@@ -269,9 +285,6 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 void Parser::parseTopLevelCodeDeclDelayed() {
   auto DelayedState = State->takeDelayedDeclState();
   assert(DelayedState.get() && "should have delayed state");
-
-  auto *TLCD = dyn_cast<TopLevelCodeDecl>(DelayedState->D);
-  assert(!TLCD->getBody() && "should not have a parsed body");
 
   auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
   auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
@@ -293,12 +306,14 @@ void Parser::parseTopLevelCodeDeclDelayed() {
   // Rewind to '{' of the function body.
   restoreParserPosition(BeginParserPosition);
 
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, TLCD);
+  // No need to re-enter the scope: parseBraceItems() will create a scope
+  // anyway.
 
-  ExprStmtOrDecl Result;
-  parseExprOrStmt(Result);
+  // Re-enter the top-level decl context.
+  ContextChange CC(*this, TU);
+
+  SmallVector<ExprStmtOrDecl, 4> Entries;
+  parseBraceItems(Entries, true, BraceItemListKind::TopLevelCode);
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to
