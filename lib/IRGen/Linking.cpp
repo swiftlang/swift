@@ -93,6 +93,11 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
     return;
 
+  //   global ::= 't' type                       // value witness
+  case Kind::DebuggerTypeMangling:
+    buffer << "_Tt";
+    // Fall through.
+
   // Abstract type manglings just follow <type>.
   case Kind::TypeMangling:
     mangler.mangleType(getType(), ExplosionKind::Minimal, 0);

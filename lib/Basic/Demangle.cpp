@@ -405,6 +405,13 @@ Demangler::Substitution Demangler::demangleGlobal() {
     return failure();
   }
 
+  if (Mangled.nextIf('t')) {
+    Substitution type = demangleType();
+    if (!type)
+      return failure();
+    return success(DemanglerPrinter() << type.first());
+  }
+
   if (Mangled.nextIf('w')) {
     Substitution kind = demangleValueWitnessKind();
     if (!kind)
@@ -792,6 +799,7 @@ bool Demangler::demangleBuiltinSize(size_t &num) {
 Demangler::Substitution Demangler::demangleType() {
   if (!Mangled)
     return failure();
+
   char c = Mangled.next();
   if (c == 'A') {
     size_t size;

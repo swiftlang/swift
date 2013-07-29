@@ -22,6 +22,7 @@ All Swift-mangled names begin with this prefix.
 
 ::
 
+  global ::= 't' type                        // standalone type (for DWARF)
   global ::= 'M' directness type             // type metadata
   global ::= 'MP' directness type            // type metadata pattern
   global ::= 'Mm' type                       // class metaclass

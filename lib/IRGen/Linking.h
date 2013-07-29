@@ -150,6 +150,10 @@ class LinkEntity {
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
+
+    /// A type which is being mangled for the DWARF debug info.
+    /// The pointer is a canonical TypeBase*.
+    DebuggerTypeMangling,
     
     /// A Swift-to-ObjC block converter function.
     /// The pointer is a canonical TypeBase*.
@@ -320,6 +324,12 @@ public:
   static LinkEntity forTypeMangling(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMangling, type);
+    return entity;
+  }
+
+  static LinkEntity forDebuggerTypeMangling(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::DebuggerTypeMangling, type);
     return entity;
   }
   

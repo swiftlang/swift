@@ -155,6 +155,7 @@ private:
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(CanType CanTy);
+  StringRef getMangledName(StringRef MangledName);
   llvm::DIArray createParameterTypes(SILModule &SILMod,
                                      SILType SILTy,
                                      llvm::FunctionType *IRTy,

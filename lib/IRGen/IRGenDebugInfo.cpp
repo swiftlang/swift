@@ -60,7 +60,7 @@ StringRef BumpAllocatedString(const char* Data, size_t Length,
   return StringRef(Ptr, Length);
 }
 
-/// Strdup std::string S using the bump pointer.
+/// Strdup S using the bump pointer.
 static
 StringRef BumpAllocatedString(std::string S, llvm::BumpPtrAllocator &BP) {
   return BumpAllocatedString(S.c_str(), S.length(), BP);
@@ -525,10 +525,11 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
-/// Return the mangled name of any nominal type.
+/// Return the mangled name of any nominal type, including the global
+/// _Tt prefix, which marks the Swift namespace for types in DWARF.
 StringRef IRGenDebugInfo::getMangledName(CanType CanTy) {
   llvm::SmallString<128> Buffer;
-  LinkEntity::forTypeMangling(CanTy).mangle(Buffer);
+  LinkEntity::forDebuggerTypeMangling(CanTy).mangle(Buffer);
   return BumpAllocatedString(Buffer, DebugInfoNames);
 }
 
@@ -577,14 +578,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   case TypeKind::BuiltinInteger: {
     auto IntTy = BaseTy->castTo<BuiltinIntegerType>();
     Size = IntTy->getBitWidth();
-    Name = "int";
+    Name = "_TtSi";
     break;
   }
 
   case TypeKind::BuiltinFloat: {
     auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     Size = FloatTy->getBitWidth();
-    Name = "float";
+    Name = "_TtSf";
     break;
   }
 
