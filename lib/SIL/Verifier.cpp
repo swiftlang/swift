@@ -656,6 +656,15 @@ public:
             "operand must be of a class type");
     require(isClassOrClassMetatype(getMethodThisType(methodType)),
             "result must be a method of a class");
+    
+    Type methodClass = CMI->getMember().getDecl()->getDeclContext()
+      ->getDeclaredTypeInContext();
+    
+    require(methodClass->getClassOrBoundGenericClass(),
+            "super_method must look up a class method");
+    require(!methodClass->isEqual(operandType.getSwiftType()),
+            "super_method operand should be a subtype of the "
+            "lookup class type");
   }
   
   void checkProjectExistentialInst(ProjectExistentialInst *PEI) {
@@ -703,6 +712,8 @@ public:
   void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
     SILType srcType = UEI->getSrcExistential().getType();
     SILType destType = UEI->getDestExistential().getType();
+    require(srcType != destType,
+            "can't upcast_existential to same type");
     require(srcType.isExistentialType(),
             "upcast_existential source must be existential");
     require(destType.isAddress(),
@@ -714,6 +725,8 @@ public:
   }
   
   void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
+    require(UEI->getOperand().getType() != UEI->getType(),
+            "can't upcast_existential_ref to same type");
     require(!UEI->getOperand().getType().isAddress(),
             "upcast_existential_ref operand must not be an address");
     require(UEI->getOperand().getType().isClassExistentialType(),
@@ -873,6 +886,9 @@ public:
   }
   
   void checkUpcastInst(UpcastInst *UI) {
+    require(UI->getType() != UI->getOperand().getType(),
+            "can't upcast to same type");
+    
     if (UI->getType().is<MetaTypeType>()) {
       CanType instTy(UI->getType().castTo<MetaTypeType>()->getInstanceType());
       require(UI->getOperand().getType().is<MetaTypeType>(),
@@ -893,6 +909,9 @@ public:
   }
   
   void checkDowncastInst(DowncastInst *DI) {
+    require(DI->getType() != DI->getOperand().getType(),
+            "can't downcast to same type");
+
     require(DI->getOperand().getType().getSwiftType()
               ->getClassOrBoundGenericClass(),
             "downcast operand must be a class type");
