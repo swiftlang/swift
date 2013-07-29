@@ -174,14 +174,13 @@ std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
   // This is mainly to check for "#!" at the beginning.
   bool IsMainModule = (Offset == 0);
   const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
-  std::unique_ptr<Lexer> L(
-      new Lexer(ComputeLexStart(Buffer->getBuffer(),
-                                Offset, EndOffset, IsMainModule),
-                SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments));
+  Lexer L(ComputeLexStart(Buffer->getBuffer(),
+                          Offset, EndOffset, IsMainModule),
+          SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
-    L->lex(Tokens.back());
+    L.lex(Tokens.back());
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.
   return Tokens;
