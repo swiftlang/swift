@@ -161,8 +161,8 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
                    CompletionCallbacksFactory.get());
 
   std::vector<Token> Tokens = tokenize(TU->getASTContext().SourceMgr, BufferID);
-  if (Tokens.size() >= 2) {
-    Token &LastToken = Tokens[Tokens.size() - 2];
+  if (Tokens.size() >= 1) {
+    Token &LastToken = Tokens[Tokens.size() - 1];
     switch (LastToken.getKind()) {
     default:
       break;
