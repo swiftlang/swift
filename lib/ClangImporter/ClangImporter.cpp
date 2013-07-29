@@ -274,10 +274,9 @@ Module *ClangImporter::loadModule(
   auto result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, *this,
                                                     component, clangModule);
 
-  // FIXME: Total hacks.
+  // FIXME: Total hack.
   if (!Impl.firstClangModule)
     Impl.firstClangModule = result;
-  Impl.SwiftContext.LoadedClangModules.push_back(result);
 
   // Bump the generation count.
   ++Impl.Generation;
