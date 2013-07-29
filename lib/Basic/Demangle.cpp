@@ -14,7 +14,7 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "swift/SIL/Demangle.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -84,7 +84,7 @@ enum class SwiftContextType {
   swiftSubstitution
 };
 
-static bool isStartOfNominalType(char c, SwiftContextType* context = NULL) {
+static bool isStartOfNominalType(char c, SwiftContextType *context = nullptr) {
   if (c == 'C') {
     if (context)
       *context = SwiftContextType::swiftClass;
@@ -158,10 +158,10 @@ private:
     yes = true, no = false
   };
   
-  // this tuple is meant to represent a Substitution + the notion of whether
-  // the name of the item is a protocol or not. read it as
-  // (itemName : String, isOK : Bool, isProtocol : Bool)
-  typedef std::tuple<std::string, bool, bool> SubstitutionWithProtocol;
+
+  /// This type represents a Substitution that also declares whether or not it
+  /// contains a Swift protocol
+  typedef std::tuple<std::string, bool, IsProtocol> SubstitutionWithProtocol;
 
   class MangledNameSource {
   public:
@@ -682,37 +682,37 @@ Demangler::Substitution Demangler::demangleSubstitutionIndex() {
 Demangler::SubstitutionWithProtocol
 Demangler::demangleSubstitutionIndexWithProtocol() {
   if (!Mangled)
-    return { Mangled.getString(), false, false };
+    return { Mangled.getString(), false, IsProtocol::no };
   if (Mangled.nextIf('o'))
-    return { "ObjectiveC", true, false };
+    return { "ObjectiveC", true, IsProtocol::no };
   if (Mangled.nextIf('C'))
-    return { "C", true, false };
+    return { "C", true, IsProtocol::no };
   if (Mangled.nextIf('s'))
-    return { "swift", true, false };
+    return { "swift", true, IsProtocol::no };
   if (Mangled.nextIf('a'))
-    return { "swift.Slice", true, false };
+    return { "swift.Slice", true, IsProtocol::no };
   if (Mangled.nextIf('b'))
-    return { "swift.Bool", true, false };
+    return { "swift.Bool", true, IsProtocol::no };
   if (Mangled.nextIf('c'))
-    return { "swift.Char", true, false };
+    return { "swift.Char", true, IsProtocol::no };
   if (Mangled.nextIf('d'))
-    return { "swift.Float64", true, false };
+    return { "swift.Float64", true, IsProtocol::no };
   if (Mangled.nextIf('f'))
-    return { "swift.Float32", true, false };
+    return { "swift.Float32", true, IsProtocol::no };
   if (Mangled.nextIf('i'))
-    return { "swift.Int64", true, false };
+    return { "swift.Int64", true, IsProtocol::no };
   if (Mangled.nextIf('S'))
-    return { "swift.String", true, false };
+    return { "swift.String", true, IsProtocol::no };
   if (Mangled.nextIf('u'))
-    return { "swift.UInt64", true, false };
+    return { "swift.UInt64", true, IsProtocol::no };
   Substitution index_sub = demangleIndex();
   if (!index_sub)
-    return { Mangled.getString(), false, false };
+    return { Mangled.getString(), false, IsProtocol::no };
   size_t index = stringToNumber(index_sub.first());
   if (index >= Substitutions.size())
-    return { Mangled.getString(), false, false };
+    return { Mangled.getString(), false, IsProtocol::no };
   Substitution sub = Substitutions[index];
-  return { sub.first(), true, sub.second() };
+  return { sub.first(), true, sub.second() ? IsProtocol::yes : IsProtocol::no };
 }
 
 Demangler::Substitution Demangler::demangleIndex() {
@@ -744,7 +744,7 @@ Demangler::Substitution Demangler::demangleProtocolName() {
         demangleSubstitutionIndexWithProtocol();
     if (std::get<1>(sub_with_proto) == false)
       return failure();
-    if (std::get<2>(sub_with_proto) == true)
+    if (std::get<2>(sub_with_proto) == IsProtocol::yes)
       return success(std::get<0>(sub_with_proto));
     Substitution identifier = demangleIdentifier();
     if (!identifier)

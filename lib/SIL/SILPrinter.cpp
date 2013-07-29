@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/Demangle.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"

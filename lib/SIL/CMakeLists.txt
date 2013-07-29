@@ -1,7 +1,6 @@
 add_subdirectory(SILGen)
 add_subdirectory(Passes)
 add_swift_library(swiftSIL
-  Demangle.cpp
   Dominance.cpp
   Mangle.cpp
   SIL.cpp

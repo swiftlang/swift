@@ -1,6 +1,6 @@
 add_swift_executable(swift-demangle
   swift-demangle.cpp
-  DEPENDS swiftSIL
+  DEPENDS swiftBasic
   COMPONENT_DEPENDS support ${LLVM_TARGETS_TO_BUILD})
 
 if(HAVE_DARWIN_MODULES_SDK)

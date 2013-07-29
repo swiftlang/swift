@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_DEMANGLE_H
-#define SWIFT_SIL_DEMANGLE_H
+#ifndef SWIFT_BASIC_DEMANGLE_H
+#define SWIFT_BASIC_DEMANGLE_H
 
 #include "llvm/ADT/StringRef.h"
 #include <string>
