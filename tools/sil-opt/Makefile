@@ -22,21 +22,7 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := option bitreader
 USEDLIBS = swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPasses.a swiftAST.a swiftBasic.a
 
-## FIXME: None of this should be necessary, but we have to link in clang
-## because of rdar://14513108
 LLVMLibsOptions :=     \
-  -lclangDriver        \
-  -lclangFrontendTool  \
-  -lclangFrontend      \
-  -lclangSerialization \
-  -lclangParse         \
-  -lclangSema          \
-  -lclangAnalysis      \
-  -lclangEdit          \
-  -lclangRewriteCore   \
-  -lclangLex           \
-  -lclangAST           \
-  -lclangBasic         \
   $(LLVMLibsOptions)   \
   -ledit               \
   -framework CoreFoundation
