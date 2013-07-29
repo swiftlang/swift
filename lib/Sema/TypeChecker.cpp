@@ -429,7 +429,7 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
 }
 
 /// \brief Check the given set of members for any members that override a member
-/// of a base class (or its extensions).
+/// of a superclass (or its extensions).
 ///
 /// \param TC The type checker.
 ///
@@ -438,21 +438,21 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
 /// \param Members The set of members for which we are checking overrides.
 static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
                                 ArrayRef<Decl *> Members) {
-  if (!CD->hasBaseClass())
+  if (!CD->hasSuperclass())
     return;
 
   // The overall process of checking a method which might override
-  // a base class method with the same name has three phases:
+  // a superclass method with the same name has three phases:
   // 1. If there's an exact match, the method overrides
-  // the base class method.
+  // the superclass method.
   // 2. If there's a subtyping relationship with a single method not yet
-  // overriden, the method overrides that base class method.  It's an error
-  // if there are multiple potential base class methods.
-  // 3. If all the base class methods with a given name have been overridden,
+  // overriden, the method overrides that superclass method.  It's an error
+  // if there are multiple potential superclass methods.
+  // 3. If all the superclass methods with a given name have been overridden,
   // the method introduces a new overload.
 
-  Type Base = CD->getBaseClass();
-  auto BaseMetaTy = MetaTypeType::get(Base, TC.Context);
+  Type superclassTy = CD->getSuperclass();
+  auto superclassMetaTy = MetaTypeType::get(superclassTy, TC.Context);
   llvm::DenseMap<Identifier, std::vector<ValueDecl*>> FoundDecls;
   llvm::SmallPtrSet<ValueDecl*, 16> ExactOverriddenDecls;
   llvm::SmallVector<ValueDecl*, 16> PossiblyOverridingDecls;
@@ -468,7 +468,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
                                                std::vector<ValueDecl*>() });
     auto& CurDecls = FoundDeclResult.first->second;
     if (FoundDeclResult.second) {
-      for (auto BaseMember : TC.lookupMember(BaseMetaTy, MemberVD->getName()))
+      for (auto BaseMember : TC.lookupMember(superclassMetaTy,
+                                             MemberVD->getName()))
         CurDecls.push_back(BaseMember);
     }
     if (!CurDecls.empty()) {
@@ -490,7 +491,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         if (MemberVD->getKind() != CurDecls[i]->getKind())
           continue;
         bool isTypeEqual = false;
-        Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], Base);
+        Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
         if (isa<FuncDecl>(MemberVD)) {
           AnyFunctionType *MemberFTy =
               MemberVD->getType()->getAs<AnyFunctionType>();
@@ -507,7 +508,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
             continue;
           }
           if (OverriddenDecl) {
-            // Two decls from the base class have the same type; this will
+            // Two decls from the superclass have the same type; this will
             // trigger an error elsewhere.
             // FIXME: That doesn't actually happen at the moment.
             continue;
@@ -540,7 +541,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
       if (MemberVD->getKind() != CurDecls[i]->getKind())
         continue;
       bool isSubtype = false;
-      Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], Base);
+      Type BaseMemberTy = getBaseMemberDeclType(TC, CurDecls[i], superclassTy);
       if (isa<FuncDecl>(MemberVD)) {
         AnyFunctionType *MemberFTy =
             MemberVD->getType()->getAs<AnyFunctionType>();
@@ -884,8 +885,9 @@ void swift::performTypeChecking(TranslationUnit *TU, unsigned StartElem) {
     // Check overrides in all of the classes and their extensions.
     while (!QueuedClasses.empty()) {
       auto classDecl = QueuedClasses.back();
-      if (classDecl->hasBaseClass()) {
-        ClassDecl *Base = classDecl->getBaseClass()->getClassOrBoundGenericClass();
+      if (classDecl->hasSuperclass()) {
+        ClassDecl *Base
+          = classDecl->getSuperclass()->getClassOrBoundGenericClass();
         if (CheckedClasses[Base] != CheckNone) {
           QueuedClasses.push_back(Base);
           continue;

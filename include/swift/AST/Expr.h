@@ -373,7 +373,7 @@ public:
 };
   
 /// A reference to 'super'. References to members of 'super' resolve to members
-/// of the base class of 'this'.
+/// of the superclass of 'this'.
 class SuperRefExpr : public Expr {
   ValueDecl *This;
   SourceLoc Loc;
@@ -1496,8 +1496,8 @@ public:
   }
 };
 
-/// \brief Describes an implicit conversion from a derived class to one of its
-/// base classes.
+/// \brief Describes an implicit conversion from a subclass to one of its
+/// superclasses.
 class DerivedToBaseExpr : public ImplicitConversionExpr {
 public:
   DerivedToBaseExpr(Expr *subExpr, Type type)
@@ -2446,7 +2446,7 @@ enum class CheckedCastKind {
   /// A cast from a class to one of its subclasses.
   Downcast = First_Resolved,
   /// A cast from a class to a type parameter constrained by that class as a
-  /// base class.
+  /// superclass.
   SuperToArchetype,
   /// A cast from a type parameter to another type parameter.
   ArchetypeToArchetype,

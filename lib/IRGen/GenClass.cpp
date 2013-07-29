@@ -53,8 +53,8 @@ using namespace irgen;
 /// Does the given class have a Swift refcount?
 bool irgen::hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
   // Scan to the root class.
-  while (theClass->hasBaseClass()) {
-    theClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
+  while (theClass->hasSuperclass()) {
+    theClass = theClass->getSuperclass()->getClassOrBoundGenericClass();
     assert(theClass && "base type of class not a class?");
   }
 
@@ -181,12 +181,12 @@ namespace {
       // TODO: use the full type information to potentially make
       // generic layouts concrete.
 
-      // First, collect information about the base class.
-      if (theClass->hasBaseClass()) {
-        CanType baseType = theClass->getBaseClass()->getCanonicalType();
-        auto baseClass = type->getClassOrBoundGenericClass();
-        assert(baseClass);
-        layout(baseClass, baseType);
+      // First, collect information about the superclass.
+      if (theClass->hasSuperclass()) {
+        CanType superclassType = theClass->getSuperclass()->getCanonicalType();
+        auto superclass = type->getClassOrBoundGenericClass();
+        assert(superclass);
+        layout(superclass, superclassType);
       } else {
         Root = theClass;
       }
@@ -293,15 +293,16 @@ namespace {
 
   private:
     void addFieldsForClass(ClassDecl *theClass) {
-      if (theClass->hasBaseClass()) {
+      if (theClass->hasSuperclass()) {
         // TODO: apply substitutions when computing base-class layouts!
-        auto baseClass = theClass->getBaseClass()->getClassOrBoundGenericClass();
-        assert(baseClass);
+        auto superclass
+          = theClass->getSuperclass()->getClassOrBoundGenericClass();
+        assert(superclass);
 
         // Recur.
-        addFieldsForClass(baseClass);
+        addFieldsForClass(superclass);
 
-        // Forget about the fields from the base class.
+        // Forget about the fields from the superclass.
         LastElements.clear();
       }
 
@@ -635,8 +636,8 @@ namespace {
       // If this class has no formal superclass, then its actual
       // superclass is SwiftObject, i.e. the root class.
       llvm::Constant *superPtr;
-      if (TheClass->hasBaseClass()) {
-        auto base = TheClass->getBaseClass()->getClassOrBoundGenericClass();
+      if (TheClass->hasSuperclass()) {
+        auto base = TheClass->getSuperclass()->getClassOrBoundGenericClass();
         superPtr = IGM.getAddrOfMetaclassObject(base);
       } else {
         superPtr = rootPtr;
@@ -720,8 +721,8 @@ namespace {
       //   uint32_t instanceSize;
       // The runtime requires that the ivar offsets be initialized to
       // a valid layout of the ivars of this class, bounded by these
-      // two values.  If the instanceSize of the base class equals the
-      // stored instanceStart of the derived class, the ivar offsets
+      // two values.  If the instanceSize of the superclass equals the
+      // stored instanceStart of the subclass, the ivar offsets
       // will not be changed.
       Size instanceStart = Size(0);
       Size instanceSize = Size(0);

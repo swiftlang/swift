@@ -827,15 +827,15 @@ namespace {
         return Type();
       }
       ClassDecl *classDecl = classType->getDecl();
-      if (!classDecl->hasBaseClass()) {
+      if (!classDecl->hasSuperclass()) {
         tc.diagnose(diagLoc, diag_no_base_class);
         return Type();
       }
 
-      Type baseTy = classDecl->getBaseClass();
+      Type superclassTy = classDecl->getSuperclass();
       if (thisDecl->getType()->is<MetaTypeType>())
-        baseTy = MetaTypeType::get(baseTy, CS.getASTContext());
-      return baseTy;
+        superclassTy = MetaTypeType::get(superclassTy, CS.getASTContext());
+      return superclassTy;
     }
     
     Type visitRebindThisInConstructorExpr(RebindThisInConstructorExpr *expr) {

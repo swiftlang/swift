@@ -88,8 +88,8 @@ private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass) {
     // Add any fields associated with the superclass.
-    if (Type base = theClass->getBaseClass()) {
-      addClassMembers(base->getClassOrBoundGenericClass());
+    if (Type superclass = theClass->getSuperclass()) {
+      addClassMembers(superclass->getClassOrBoundGenericClass());
     }
 
     // Add a reference to the parent class, if applicable.
@@ -140,7 +140,7 @@ private:
 
 private:
   /// Add fields related to the generics of this class declaration.
-  /// TODO: don't add new fields that are implied by base class
+  /// TODO: don't add new fields that are implied by the superclass.
   /// fields.  e.g., if B<T> extends A<T>, the witness for T in A's
   /// section should be enough.
   void addGenericClassFields(ClassDecl *theClass,

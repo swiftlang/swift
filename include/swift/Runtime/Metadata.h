@@ -615,7 +615,7 @@ struct ClassMetadata : public HeapMetadata {
   }
 
   // After this come the class members, laid out as follows:
-  //   - class members for the base class (recursively)
+  //   - class members for the superclass (recursively)
   //   - metadata reference for the parent, if applicable
   //   - generic parameters for this class
   //   - class variables (if we choose to support these)

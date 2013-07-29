@@ -1109,7 +1109,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setImplicit();
     if (superclassID) {
       BCOffsetRAII restoreOffset(DeclTypeCursor);
-      theClass->setBaseClassLoc(TypeLoc::withoutLoc(getType(superclassID)));
+      theClass->setSuperclass(getType(superclassID));
     }
     if (genericParams)
       for (auto &genericParam : *theClass->getGenericParams())

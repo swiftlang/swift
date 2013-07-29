@@ -782,7 +782,7 @@ public:
 };
 
 /// ArchetypeRefToSuperInst - Given a class archetype value with a base
-/// class constraint, returns a reference to the base class instance.
+/// class constraint, returns a reference to the superclass instance.
 class ArchetypeRefToSuperInst
   : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst, ConversionInst>
 {
@@ -829,7 +829,7 @@ public:
 };
 
 /// SuperToArchetypeRefInst - Given a value of a class type, initializes a
-/// class archetype with a base class constraint to contain a reference to
+/// class archetype with a superclass constraint to contain a reference to
 /// the value.
 class SuperToArchetypeRefInst
   : public UnaryInstructionBase<ValueKind::SuperToArchetypeRefInst,

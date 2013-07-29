@@ -1055,7 +1055,7 @@ bool Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(theClass->getName()),
                             addDeclRef(DC),
                             theClass->isImplicit(),
-                            addTypeRef(theClass->getBaseClass()));
+                            addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());
     writeConformances(theClass->getProtocols(), theClass->getConformances());

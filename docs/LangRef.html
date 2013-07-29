@@ -1116,7 +1116,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
      declare members with storage in the class. Non-static 'var' and 'func'
      decls declare instance members; static 'var' and 'func' decls declare
      members of the class itself.  Both class and instance members can
-     be overridden by a derived class.</p>
+     be overridden by a subclass.</p>
   <p>Type declarations inside a class act essentially the same way as type
      declarations outside a class.</p>
 
@@ -1320,9 +1320,9 @@ if vec[3] {
     var a = X(10)
   </pre>
 
-  <p>If a class is derived from a base class, it must explicitly invoke a
-  base class constructor using the <tt>super.constructor</tt> syntax.
-  <tt>super.constructor</tt> may only be used in a derived class constructor;
+  <p>If a class is derived from a superclass, it must explicitly invoke a
+  superclass constructor using the <tt>super.constructor</tt> syntax.
+  <tt>super.constructor</tt> may only be used in a subclass constructor;
   it is not valid in a struct, oneof, or root class constructor. Additionally,
   <tt>super.constructor</tt> may only be referenced exactly once per derived
   constructor. An example:</p>
@@ -1355,8 +1355,8 @@ if vec[3] {
   <p>'destructor' declares a destructor for a class.  This function is called
      when there are no longer any references to a class object, just before it
      is destroyed.  Note that destructors can only be declared for classes,
-     and cannot be declared in extensions. Derived class destructors implicitly
-     invoke their base class destructors after executing.</p>
+     and cannot be declared in extensions. Subclass destructors implicitly
+     invoke their superclass destructors after executing.</p>
 
   <p>FIXME: We haven't really decided the precise rules here, but it's probably
      a fatal error to either throw an exception or stash a reference to 'this'
@@ -2435,10 +2435,10 @@ ill-formed if the type does not conform to the protocol.</p>
 
     class B { }
     class D : B { }
-    new D as B  // A derived class instance coerced to a base class.
+    new D as B  // A subclass instance coerced to a superclass.
   </pre>
 
-    A cast that can fail, such as from a base class to a derived class, cannot
+    A cast that can fail, such as from a superclass to a subclass, cannot
     be expressed with <tt>as</tt>.
 
   <li><tt>x as! T</tt> will try to cast the value of the expression
@@ -2659,20 +2659,20 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
 
   <p>The keyword <tt>super</tt> is used to refer to superclass members from
-  a derived class method. This can be used to access members of a base class
-  overridden by the derived class. The following forms are allowed:
+  a subclass method. This can be used to access members of a superclass
+  overridden by the subclass. The following forms are allowed:
 
   <ul>
-  <li>A base class property or method can be accessed with the form
+  <li>A superclass property or method can be accessed with the form
     <tt>super.name</tt>.</li>
-  <li>A base class subscript accessor can be accessed with the form
+  <li>A superclass subscript accessor can be accessed with the form
     <tt>super[index]</tt>.</li>
-  <li>Within a constructor, a base class constructor can be accessed with the
+  <li>Within a constructor, a superclass constructor can be accessed with the
     form <tt>super.constructor</tt>.</li>
   </ul>
 
-  <p><tt>super</tt> expressions are invalid outside of a derived class method.
-  <tt>super.constructor</tt> is invalid outside of a derived class constructor.
+  <p><tt>super</tt> expressions are invalid outside of a subclass method.
+  <tt>super.constructor</tt> is invalid outside of a subclass constructor.
   <tt>super.constructor</tt> furthermore may only be called once per derived
   constructor, and must be called before the derived constructor accesses
   <tt>this</tt> or any instance variables.

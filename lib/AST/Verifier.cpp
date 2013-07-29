@@ -821,8 +821,8 @@ namespace {
         }
 
         assert(srcClass != destClass);
-        while (srcClass->hasBaseClass()) {
-          srcClass = srcClass->getBaseClass()->getClassOrBoundGenericClass();
+        while (srcClass->hasSuperclass()) {
+          srcClass = srcClass->getSuperclass()->getClassOrBoundGenericClass();
           assert(srcClass);
           if (srcClass == destClass) return;
         }

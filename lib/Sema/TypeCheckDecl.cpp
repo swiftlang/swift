@@ -589,7 +589,7 @@ public:
         // Inheritance from classes.
         if (inheritedTy->getClassOrBoundGenericClass()) {
           // FIXME: Complain about multiple inheritance.
-          CD->setBaseClassLoc(inherited[i]);
+          CD->setSuperclass(inherited[i].getType());
           continue;
         }
 
@@ -601,8 +601,8 @@ public:
 
       validateAttributes(CD);
       
-      ClassDecl *baseClassDecl = CD->getBaseClass()
-        ? CD->getBaseClass()->getClassOrBoundGenericClass()
+      ClassDecl *baseClassDecl = CD->hasSuperclass()
+        ? CD->getSuperclass()->getClassOrBoundGenericClass()
         : nullptr;
       
       CD->setIsObjC(CD->getAttrs().isObjC()

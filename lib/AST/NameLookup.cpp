@@ -811,8 +811,8 @@ bool Module::lookupQualified(Type type,
 
     // Visit superclass.
     if (auto classDecl = dyn_cast<ClassDecl>(current)) {
-      if (auto superclassType = classDecl->getBaseClass())
-        if (auto superclassDecl = superclassType->getAnyNominal())
+      if (auto superclassType = classDecl->getSuperclass())
+        if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
           if (visited.insert(superclassDecl))
             stack.push_back(superclassDecl);
       continue;

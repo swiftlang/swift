@@ -448,7 +448,7 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                  SGFContext C) {
   ManagedValue archetype = visit(E->getSubExpr()).getAsSingleValue(SGF);
-  // Replace the cleanup with a new one on the base class value so we always use
+  // Replace the cleanup with a new one on the superclass value so we always use
   // concrete retain/release operations.
   SILValue base = SGF.B.createArchetypeRefToSuper(E,
                                     archetype.forward(SGF),
@@ -1352,7 +1352,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   SILValue thisValue = emitDestructorProlog(cd, dd);
 
   // Create a basic block to jump to for the implicit destruction behavior
-  // of releasing the elements and calling the base class destructor.
+  // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
   epilogBB = new (SGM.M) SILBasicBlock(&F);
   
@@ -1384,22 +1384,22 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     }
   }
   
-  // If we have a base class, invoke its destructor.
+  // If we have a superclass, invoke its destructor.
   SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
-  if (Type baseTy = cd->getBaseClass()) {
-    ClassDecl *baseClass = baseTy->getClassOrBoundGenericClass();
+  if (Type superclassTy = cd->getSuperclass()) {
+    ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
     
     // FIXME: We can't sensibly call up to ObjC dealloc methods right now
     // because they aren't really destroying destructors.
-    if (baseClass->hasClangNode() && baseClass->isObjC()) {
+    if (superclass->hasClangNode() && superclass->isObjC()) {
       thisValue = B.createRefToObjectPointer(dd, thisValue, objectPtrTy);
       B.createReturn(dd, thisValue);
       return;
     }
     
     SILDeclRef dtorConstant =
-      SILDeclRef(baseClass, SILDeclRef::Kind::Destroyer);
-    SILType baseSILTy = getLoweredLoadableType(baseTy);
+      SILDeclRef(superclass, SILDeclRef::Kind::Destroyer);
+    SILType baseSILTy = getLoweredLoadableType(superclassTy);
     SILValue baseThis = B.createUpcast(dd, thisValue, baseSILTy);
     ManagedValue dtorValue = emitMethodRef(dd, baseThis, dtorConstant,
                                            /*innerSubstitutions*/ {});

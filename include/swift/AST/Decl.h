@@ -1319,7 +1319,7 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   SourceLoc NameLoc;
-  TypeLoc BaseClass;
+  Type Superclass;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -1332,10 +1332,14 @@ public:
     return SourceRange(ClassLoc, getBraces().End);
   }
 
-  bool hasBaseClass() const { return (bool)BaseClass.getType(); }
-  Type getBaseClass() const { return BaseClass.getType(); }
-  TypeLoc &getBaseClassLoc() { return BaseClass; }
-  void setBaseClassLoc(TypeLoc base) { BaseClass = base; }
+  /// Determine whether this class has a superclass.
+  bool hasSuperclass() const { return (bool)Superclass; }
+
+  /// Retrieve the superclass of this class, or null if there is no superclass.
+  Type getSuperclass() const { return Superclass; }
+
+  /// Set the superclass of this class.
+  void setSuperclass(Type superclass) { Superclass = superclass; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

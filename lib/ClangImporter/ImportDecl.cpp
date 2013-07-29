@@ -544,7 +544,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl->getCanonicalDecl());
 
-      // FIXME: Figure out what to do with base classes in C++. One possible
+      // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
       // functions.
 
@@ -983,7 +983,7 @@ namespace {
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
       if (auto thisClassTy = thisTy->getAs<ClassType>()) {
-        if (auto superTy = thisClassTy->getDecl()->getBaseClass()) {
+        if (auto superTy = thisClassTy->getDecl()->getSuperclass()) {
           auto superDecl = superTy->castTo<ClassType>()->getDecl();
           if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                                       superDecl->getClangDecl())) {
@@ -1091,7 +1091,7 @@ namespace {
         if (classDecl->getName().str() == "NSObject")
           break;
 
-        checkTy = classDecl->getBaseClass();
+        checkTy = classDecl->getSuperclass();
         if (!checkTy)
           return nullptr;
       } while (true);
@@ -2148,7 +2148,7 @@ namespace {
         if (!super)
           return nullptr;
 
-        result->setBaseClassLoc(TypeLoc::withoutLoc(super->getDeclaredType()));
+        result->setSuperclass(super->getDeclaredType());
       }
 
       // Import protocols this class conforms to.

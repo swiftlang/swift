@@ -194,7 +194,7 @@ static void doMemberLookup(Type BaseTy,
       Consumer.foundDecl(VD);
     }
 
-    // If we have a class type, look into its base class.
+    // If we have a class type, look into its superclass.
     ClassDecl *CurClass = nullptr;
     if (auto CT = BaseTy->getAs<ClassType>())
       CurClass = CT->getDecl();
@@ -203,8 +203,8 @@ static void doMemberLookup(Type BaseTy,
     else if (UnboundGenericType *UGT = BaseTy->getAs<UnboundGenericType>())
       CurClass = dyn_cast<ClassDecl>(UGT->getDecl());
 
-    if (CurClass && CurClass->hasBaseClass()) {
-      BaseTy = CurClass->getBaseClass();
+    if (CurClass && CurClass->hasSuperclass()) {
+      BaseTy = CurClass->getSuperclass();
     } else {
       break;
     }

@@ -1254,28 +1254,28 @@ Type TypeChecker::substMemberTypeWithBase(Type T, ValueDecl *Member,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-  Type baseTy;
+  Type superclassTy;
   Type specializedTy;
   if (auto classTy = type->getAs<ClassType>()) {
-    baseTy = classTy->getDecl()->getBaseClass();
+    superclassTy = classTy->getDecl()->getSuperclass();
     if (auto parentTy = classTy->getParent()) {
       if (parentTy->isSpecialized())
         specializedTy = parentTy;
     }
   } else if (auto boundTy = type->getAs<BoundGenericType>()) {
     if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
-      baseTy = classDecl->getBaseClass();
+      superclassTy = classDecl->getSuperclass();
       specializedTy = type;
     }
   } else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
-    baseTy = archetypeTy->getSuperclass();
+    superclassTy = archetypeTy->getSuperclass();
   } else {
-    // No other types have base classes.
+    // No other types have superclasses.
     return nullptr;
   }
 
-  if (!specializedTy || !baseTy)
-    return baseTy;
+  if (!specializedTy || !superclassTy)
+    return superclassTy;
 
   // If the type is specialized, we need to gather all of the substitutions.
   // We've already dealt with the top level, but continue gathering
@@ -1300,5 +1300,5 @@ Type TypeChecker::getSuperClassOf(Type type) {
   }
 
   // Perform substitutions into the base type.
-  return substType(baseTy, substitutions);
+  return substType(superclassTy, substitutions);
 }

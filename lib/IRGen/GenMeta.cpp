@@ -783,8 +783,8 @@ namespace {
         }
 
         
-      } while (cls->hasBaseClass() &&
-               (cls = cls->getBaseClass()->getClassOrBoundGenericClass()));
+      } while (cls->hasSuperclass() &&
+               (cls = cls->getSuperclass()->getClassOrBoundGenericClass()));
     }
 
   public:
@@ -830,7 +830,7 @@ namespace {
 
     void addSuperClass() {
       // If this is a root class, use SwiftObject as our formal parent.
-      if (!TargetClass->hasBaseClass()) {
+      if (!TargetClass->hasSuperclass()) {
         // This is only required for ObjC interoperation.
         if (!IGM.ObjCInterop) {
           Fields.push_back(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
@@ -844,7 +844,7 @@ namespace {
         return;
       }
 
-      addReferenceToType(TargetClass->getBaseClass()->getCanonicalType());
+      addReferenceToType(TargetClass->getSuperclass()->getCanonicalType());
     }
 
     void addReferenceToType(CanType type) {
