@@ -1002,7 +1002,82 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     // For explicit conformance, force the check again.
     Context.ConformsTo.erase(Known);
   }
-  
+
+  // If we're checking for conformance (rather than stating it),
+  // look for the explicit declaration of conformance in the list of protocols.
+  if (!Explicit) {
+    // Look through the metatype.
+    // FIXME: This feels like a hack to work around bugs in the solver.
+    auto instanceT = T;
+    if (auto metaT = T->getAs<MetaTypeType>()) {
+      instanceT = metaT->getInstanceType();
+    }
+
+    // Only nominal types conform to protocols.
+    auto nominal = instanceT->getAnyNominal();
+    if (!nominal)
+      return nullptr;
+
+    // Walk the nominal type, its extensions, superclasses, and so on.
+    llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
+    SmallVector<NominalTypeDecl *, 4> stack;
+    bool foundExplicitConformance = false;
+
+    // Local function that checks for our protocol in the given array of
+    // protocols.
+    auto isProtocolInList = [&](ArrayRef<ProtocolDecl *> protocols) -> bool {
+      for (auto testProto : protocols) {
+        if (testProto == Proto) {
+          foundExplicitConformance = true;
+          return true;
+        }
+
+        if (visitedProtocols.insert(testProto))
+          stack.push_back(testProto);
+      }
+
+      return false;
+    };
+
+    // Walk the stack of types.
+    stack.push_back(nominal);
+    while (!stack.empty()) {
+      auto current = stack.back();
+      stack.pop_back();
+
+      // Visit the superclass of a class.
+      if (auto classDecl = dyn_cast<ClassDecl>(current)) {
+        if (auto superclassTy = classDecl->getSuperclass())
+          stack.push_back(superclassTy->getAnyNominal());
+      }
+
+      // Visit the protocols this type conforms to directly.
+      if (isProtocolInList(getDirectConformsTo(current)))
+        break;
+
+      // Visit the extensions of this type.
+      for (auto ext : current->getExtensions()) {
+        if (isProtocolInList(getDirectConformsTo(ext)))
+          break;
+      }
+    }
+
+    // If we did not find explicit conformance, we're done.
+    if (!foundExplicitConformance) {
+      // FIXME: Check whether the type *implicitly* conforms. If so, produce
+      // a cleaner diagnostic along with a Fix-It that adds the explicit
+      // conformance either via a new extension or onto an existing extension.
+      if (ComplainLoc.isValid()) {
+        diagnose(ComplainLoc, diag::type_does_not_conform,
+                 T, Proto->getDeclaredType());
+      }
+
+      return nullptr;
+    }
+
+    // We found explicit conformance. Compute and record the conformance below.
+  }
+
   // Assume that the type does not conform to this protocol while checking
   // whether it does in fact conform. This eliminates both infinite recursion
   // (if the protocol hierarchies are circular) as well as tautologies.

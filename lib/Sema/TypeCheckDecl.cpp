@@ -1175,6 +1175,18 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
+ArrayRef<ProtocolDecl *>
+TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
+  checkInheritanceClause(*this, nominal);
+  return nominal->getProtocols();
+}
+
+ArrayRef<ProtocolDecl *>
+TypeChecker::getDirectConformsTo(ExtensionDecl *ext) {
+  checkInheritanceClause(*this, ext);
+  return ext->getProtocols();
+}
+
 /// \brief Create an implicit struct constructor.
 ///
 /// \param structDecl The struct for which a constructor will be created.
