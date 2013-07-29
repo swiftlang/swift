@@ -143,7 +143,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
 
       tc.diagnose(inherited.getSourceRange().Start,
                   diag::duplicate_inheritance, inheritedTy)
-        .fixItRemove(DiagnosticInfo::Range(afterPriorLoc, afterMyEndLoc))
+        .fixItRemove(Diagnostic::Range(afterPriorLoc, afterMyEndLoc))
         .highlight(knownType->second);
       continue;
     }
@@ -185,6 +185,25 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
                     getDeclaredType(decl), inheritedTy)
           .highlight(inherited.getSourceRange());
         continue;
+      }
+
+      // If this is not the first entry in the inheritance clause, complain.
+      if (i > 0) {
+        SourceLoc afterPriorLoc
+          = Lexer::getLocForEndOfToken(
+              tc.Context.SourceMgr,
+              inheritedClause[i-1].getSourceRange().End);
+        SourceLoc afterMyEndLoc
+          = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                       inherited.getSourceRange().End);
+
+        tc.diagnose(inherited.getSourceRange().Start,
+                    diag::superclass_not_first, inheritedTy)
+          .fixItRemove(Diagnostic::Range(afterPriorLoc, afterMyEndLoc))
+          .fixItInsert(inheritedClause[0].getSourceRange().Start,
+                       inheritedTy.getString() + ", ");
+
+        // Fall through to record the superclass.
       }
 
       // Record the superclass.

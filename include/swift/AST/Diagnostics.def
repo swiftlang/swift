@@ -1225,6 +1225,8 @@ ERROR(inheritance_from_non_protocol_or_class,sema_tcd,none,
   "inheritance from non-protocol, non-class type %0", (Type))
 ERROR(inheritance_from_non_protocol,sema_tcd,none,
   "inheritance from non-protocol type %0", (Type))
+ERROR(superclass_not_first,sema_tcd,none,
+  "superclass %0 must appear first in the inheritance clause", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
