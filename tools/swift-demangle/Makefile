@@ -15,13 +15,7 @@ SWIFT_LEVEL := ../..
 TOOLNAME = swift-demangle
 
 LINK_COMPONENTS := support
-USEDLIBS = swiftSIL.a swiftBasic.a
-
-# if $(SWIFT_SDK) is installed, include that
-SWIFT_SDK := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-ifeq ($(shell test -d $(SWIFT_SDK) && echo OK), OK)
-  CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(SWIFT_SDK)\""
-endif
+USEDLIBS = swiftBasic.a
 
 include $(SWIFT_LEVEL)/Makefile
 
