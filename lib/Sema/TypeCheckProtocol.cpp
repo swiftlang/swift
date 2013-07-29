@@ -544,20 +544,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
     for (auto candidate : candidates) {
       // Check this type against the protocol requirements.
+      // FIXME: Check superclass requirement as well.
       bool SatisfiesRequirements = true;
+      for (auto ReqProto : AssociatedType->getProtocols()) {
+        if (!TC.conformsToProtocol(candidate.second, ReqProto)){
+          SatisfiesRequirements = false;
 
-      for (auto Req : AssociatedType->getInherited()) {
-        SmallVector<ProtocolDecl *, 4> ReqProtos;
-        if (!Req.getType()->isExistentialType(ReqProtos))
-          return nullptr;
-
-        for (auto ReqProto : ReqProtos) {
-          if (!TC.conformsToProtocol(candidate.second, ReqProto)){
-            SatisfiesRequirements = false;
-
-            NonViable.push_back({candidate.first, ReqProto});
-            break;
-          }
+          NonViable.push_back({candidate.first, ReqProto});
+          break;
         }
 
         if (!SatisfiesRequirements)
