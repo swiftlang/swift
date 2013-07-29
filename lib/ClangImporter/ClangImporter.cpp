@@ -265,14 +265,19 @@ Module *ClangImporter::loadModule(
                                                /*IsInclusionDirective=*/false);
   if (!clangModule)
     return nullptr;
+  auto &result = Impl.ModuleWrappers[clangModule];
+  if (result)
+    return result;
 
   // FIXME: Revisit this once components are fleshed out. Clang components
   // are likely born-fragile.
   auto component = new (Impl.SwiftContext.Allocate<Component>(1)) Component();
 
   // Build the representation of the Clang module in Swift.
-  auto result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, *this,
-                                                    component, clangModule);
+  // FIXME: The name of this module could end up as a key in the ASTContext,
+  // but that's not correct for submodules.
+  result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, *this,
+                                               component, clangModule);
 
   // FIXME: Total hack.
   if (!Impl.firstClangModule)
@@ -281,9 +286,26 @@ Module *ClangImporter::loadModule(
   // Bump the generation count.
   ++Impl.Generation;
   Impl.SwiftContext.bumpGeneration();
-  
+
   return result;
 }
+
+ClangModule *
+ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
+                                                clang::Module *underlying,
+                                                Component *component) {
+  auto &result = ModuleWrappers[underlying];
+  if (result)
+    return result;
+
+  if (!component)
+    component = new (SwiftContext.Allocate<Component>(1)) Component();
+
+  result = new (SwiftContext) ClangModule(SwiftContext, importer, component,
+                                          underlying);
+  return result;
+}
+
 
 #pragma mark Source locations
 clang::SourceLocation
@@ -495,10 +517,34 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
+void ClangImporter::getReexportedModules(
+    const Module *module,
+    SmallVectorImpl<Module::ImportedModule> &exports) {
+
+  auto underlying = cast<ClangModule>(module)->clangModule;
+  auto topLevelAdapter = cast<ClangModule>(module)->getAdapterModule();
+
+  SmallVector<clang::Module *, 8> exported;
+  underlying->getExportedModules(exported);
+
+  for (auto exportMod : exported) {
+    auto exportWrapper = Impl.getWrapperModule(*this, exportMod,
+                                               module->getComponent());
+
+    // FIXME: Include proper access path.
+    auto actualExport = exportWrapper->getAdapterModule();
+    if (!actualExport || actualExport == topLevelAdapter)
+      actualExport = exportWrapper;
+
+    exports.push_back({Module::AccessPathTy(), actualExport});
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
+
 ClangModule::ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
                          clang::Module *clangModule)
   : LoadedModule(DeclContextKind::ClangModule,
@@ -516,4 +562,27 @@ bool ClangModule::isTopLevel() const {
 
 StringRef ClangModule::getTopLevelModuleName() const {
   return clangModule->getTopLevelModuleName();
+}
+
+Module *ClangModule::getAdapterModule() const {
+  if (!isTopLevel()) {
+    // FIXME: Is this correct for submodules?
+    auto &importer = static_cast<ClangImporter&>(getOwner());
+    auto topLevel = clangModule->getTopLevelModule();
+    auto wrapper = importer.Impl.getWrapperModule(importer, topLevel,
+                                                  getComponent());
+    return wrapper->getAdapterModule();
+  }
+
+  if (!adapterModule.getInt()) {
+    // FIXME: Include proper access path.
+    auto adapter = Ctx.getModule(Module::AccessPathTy({Name, SourceLoc()}),
+                                 false);
+    if (isa<ClangModule>(adapter))
+      adapter = nullptr;
+    auto mutableThis = const_cast<ClangModule *>(this);
+    mutableThis->adapterModule.setPointerAndInt(adapter, true);
+  }
+
+  return adapterModule.getPointer();
 }

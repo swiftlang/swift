@@ -33,6 +33,9 @@ class ModuleLoader;
 class ClangModule : public LoadedModule {
   friend class ClangImporter;
   clang::Module *clangModule;
+  llvm::PointerIntPair<Module *, 1, bool> adapterModule;
+
+  Module *getAdapterModule() const;
 
 public:
   ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,

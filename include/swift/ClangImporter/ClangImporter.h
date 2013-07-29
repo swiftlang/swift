@@ -36,6 +36,7 @@ public:
 
 private:
   Implementation &Impl;
+  friend class ClangModule;
 
   ClangImporter(ASTContext &ctx);
 
@@ -126,6 +127,10 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
+
+  virtual void getReexportedModules(
+    const Module *module,
+    SmallVectorImpl<Module::ImportedModule> &exports) override;
 };
 
 }

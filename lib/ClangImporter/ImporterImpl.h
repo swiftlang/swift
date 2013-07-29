@@ -215,6 +215,9 @@ private:
   Module *swiftModule = nullptr;
 
 public:
+  /// A map from Clang modules to their Swift wrapper modules.
+  llvm::SmallDenseMap<clang::Module *, ClangModule *, 16> ModuleWrappers;
+
   /// \brief The first Clang module we loaded.
   ///
   /// FIXME: This horrible hack is used because we don't have a nice way to
@@ -312,6 +315,12 @@ public:
   ///
   /// \returns The named module, or null if the module has not been imported.
   Module *getNamedModule(StringRef name);
+
+  /// \brief Retrieves the Swift wrapper for the given Clang module, creating
+  /// it if necessary.
+  ClangModule *getWrapperModule(ClangImporter &importer,
+                                clang::Module *underlying,
+                                Component *component = nullptr);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

@@ -28,4 +28,7 @@ target_link_libraries(swiftClangImporter
   clangLex
   clangAST
   clangBasic
+  LLVMBitReader
+  LLVMMC
+  LLVMMCParser
   LLVMOption)
