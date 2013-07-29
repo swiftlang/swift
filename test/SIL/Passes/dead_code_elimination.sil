@@ -1,0 +1,134 @@
+// RUN: %sil-opt %s -dead-code-elimination | FileCheck %s
+
+import Builtin
+import swift
+
+sil internal @test1 : $() -> () {
+bb0:
+  %5 = integer_literal $Builtin.Int1, 1
+  %7 = condbranch %5, bb1, bb2
+bb1:                                              // Preds: bb0
+  %8 = br bb2
+bb2:                                              // Preds: bb1 bb0
+  %9 = tuple ()                                   // user: %10
+  %10 = return %9 : $()
+}
+// CHECK: @test1
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:  %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  %1 = br bb1
+// CHECK: bb1:                                              // Preds: bb0
+// CHECK-NEXT:  %2 = br bb2
+// CHECK: bb2:                                              // Preds: bb1
+// CHECK-NEXT:  %3 = tuple ()                                   // user: %4
+// CHECK-NEXT:  %4 = return %3 : $()
+// CHECK-NEXT: }
+
+sil @test2 : $[thin] () -> () {
+bb0:
+  %0 = tuple ()
+  %11 = integer_literal $Builtin.Int1, 0
+  %13 = condbranch %11, bb1, bb2
+bb1:                                              // Preds: bb0
+  %22 = br bb2
+bb2:                                              // Preds: bb1 bb0
+  %32 = tuple ()                                  // user: %33
+  %33 = return %32 : $()
+}
+// CHECK: @test2
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:  %0 = tuple ()
+// CHECK-NEXT:  %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:  %2 = br bb1
+// CHECK:bb1:                                              // Preds: bb0
+// CHECK-NEXT:  %3 = tuple ()                                   // user: %4
+// CHECK-NEXT:  %4 = return %3 : $()
+// CHECK-NEXT: }
+
+// func loopWithFalse() -> () {
+//  while false {
+//    if (false)
+//      return
+//  }
+//}
+sil @loopWithFalse : $[thin] () -> () {
+bb0:
+  %0 = tuple ()
+  %6 = br bb1
+
+bb1:                                              // Preds: bb4 bb0
+  %12 = integer_literal $Builtin.Int1, 0
+  %14 = condbranch %12, bb2, bb5
+
+bb2:                                              // Preds: bb1
+  %20 = integer_literal $Builtin.Int1, 0
+  %22 = condbranch %20, bb3, bb4
+
+bb3:                                              // Preds: bb2
+  %23 = tuple ()                                  // user: %25
+  %25 = return %23 : $()
+
+bb4:                                              // Preds: bb2
+  %26 = br bb1
+
+bb5:                                              // Preds: bb1
+  %28 = tuple ()                                  // user: %29
+  %29 = return %28 : $()
+}
+// CHECK: @loopWithFalse
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:  %0 = tuple ()
+// CHECK-NEXT:  %1 = br bb1
+// CHECK:bb1:                                              // Preds: bb0
+// CHECK-NEXT:  %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:  %3 = br bb2
+// CHECK:bb2:                                              // Preds: bb1
+// CHECK-NEXT:  %4 = tuple ()                              // user: %5
+// CHECK-NEXT:  %5 = return %4 : $()
+// CHECK-NEXT:}
+
+
+// func InfLoop() -> () {
+//  while true {
+//    if (false)
+//      return
+//  }
+//}
+sil @InfLoop : $[thin] () -> () {
+bb0:
+  %0 = tuple ()
+  %6 = br bb1
+
+bb1:                                              // Preds: bb4 bb0
+  %12 = integer_literal $Builtin.Int1, 1
+  %14 = condbranch %12, bb2, bb5
+
+bb2:                                              // Preds: bb1
+  %20 = integer_literal $Builtin.Int1, 0
+  %22 = condbranch %20, bb3, bb4
+
+bb3:                                              // Preds: bb2
+  %23 = tuple ()                                  // user: %25
+  %25 = return %23 : $()
+
+bb4:                                              // Preds: bb2
+  %26 = br bb1
+
+bb5:                                              // Preds: bb1
+  %28 = tuple ()                                  // user: %29
+  %29 = return %28 : $()
+}
+// CHECK: @InfLoop
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:  %0 = tuple ()
+// CHECK-NEXT:  %1 = br bb1
+// CHECK:bb1:                                              // Preds: bb3 bb0
+// CHECK-NEXT:  %2 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  %3 = br bb2
+// CHECK:bb2:                                              // Preds: bb1
+// CHECK-NEXT:  %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:  %5 = br bb3
+// CHECK:bb3:                                              // Preds: bb2
+// CHECK-NEXT:  %6 = br bb1
+// CHECK-NEXT: }
+

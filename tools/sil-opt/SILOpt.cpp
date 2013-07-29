@@ -26,6 +26,7 @@ using namespace swift;
 enum class PassKind {
   AllocBoxToStack,
   StackToSSA,
+  DCE,
   DataflowDiagnostics
 };
 
@@ -45,6 +46,8 @@ Passes(llvm::cl::desc("Passes:"),
                                    "allocbox-to-stack", "Promote memory"),
                         clEnumValN(PassKind::StackToSSA,
                                    "stack-to-ssa", "alloc_stack to SSA"),
+                        clEnumValN(PassKind::DCE,
+                                   "dead-code-elimination", "Remove dead code"),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
@@ -99,6 +102,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::StackToSSA:
       performSILStackToSSAPromotion(CI.getSILModule());
+      break;
+    case PassKind::DCE:
+      performSILDeadCodeElimination(CI.getSILModule());
       break;
     case PassKind::DataflowDiagnostics:
       emitSILDataflowDiagnostics(CI.getSILModule());
