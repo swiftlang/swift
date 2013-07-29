@@ -353,13 +353,11 @@ void TranslationUnit::clearLookupCache() {
 void LoadedModule::lookupValue(AccessPathTy accessPath, Identifier name,
                                NLKind lookupKind,
                                SmallVectorImpl<ValueDecl*> &result) {
-  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
-  return owner->lookupValue(this, accessPath, name, lookupKind, result);
+  return getOwner().lookupValue(this, accessPath, name, lookupKind, result);
 }
 
 OperatorDecl *LoadedModule::lookupOperator(Identifier name, DeclKind fixity) {
-  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
-  return owner->lookupOperator(this, name, fixity);
+  return getOwner().lookupOperator(this, name, fixity);
 }
 
 template<>
@@ -385,15 +383,13 @@ LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name) {
 
 void LoadedModule::getReexportedModules(
     SmallVectorImpl<ImportedModule> &exports) const {
-  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
-  return owner->getReexportedModules(this, exports);
+  return getOwner().getReexportedModules(this, exports);
 }
 
 void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
                                       VisibleDeclConsumer &consumer,
                                       NLKind lookupKind) const {
-  auto owner = static_cast<ModuleLoader*>(LookupCachePimpl);
-  return owner->lookupVisibleDecls(this, accessPath, consumer, lookupKind);
+  return getOwner().lookupVisibleDecls(this, accessPath, consumer, lookupKind);
 }
 
 

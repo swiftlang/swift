@@ -316,6 +316,10 @@ protected:
     LookupCachePimpl = static_cast<void *>(&owner);
   }
 
+  ModuleLoader &getOwner() const {
+    return *static_cast<ModuleLoader *>(LookupCachePimpl);
+  }
+
 public:
   // Inherited from Module.
   void lookupValue(AccessPathTy accessPath, Identifier name, NLKind lookupKind,
