@@ -99,6 +99,15 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       case TypeKind::Class:
         ExtNominal = cast<ClassType>(Base)->getDecl();
         break;
+      case TypeKind::BoundGenericOneOf:
+        ExtNominal = cast<BoundGenericOneOfType>(Base)->getDecl();
+        break;
+      case TypeKind::BoundGenericStruct:
+        ExtNominal = cast<BoundGenericStructType>(Base)->getDecl();
+        break;
+      case TypeKind::BoundGenericClass:
+        ExtNominal = cast<BoundGenericClassType>(Base)->getDecl();
+        break;
     }
     printFullContext(ExtNominal->getDeclContext(), Buffer);
     Buffer << ExtNominal->getName() << ".";
