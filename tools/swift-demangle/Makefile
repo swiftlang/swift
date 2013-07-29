@@ -14,8 +14,7 @@ SWIFT_LEVEL := ../..
 
 TOOLNAME = swift-demangle
 
-# bitreader and bitwriter are necessary to use the serialization library.
-LINK_COMPONENTS := bitreader bitwriter support
+LINK_COMPONENTS := support
 USEDLIBS = swiftSIL.a
 
 # if $(SWIFT_SDK) is installed, include that

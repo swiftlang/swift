@@ -1,7 +1,7 @@
 add_swift_executable(swift-demangle
   swift-demangle.cpp
   DEPENDS swiftSIL
-  COMPONENT_DEPENDS bitreader bitwriter support ${LLVM_TARGETS_TO_BUILD})
+  COMPONENT_DEPENDS support ${LLVM_TARGETS_TO_BUILD})
 
 if(HAVE_DARWIN_MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
