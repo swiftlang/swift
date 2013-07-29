@@ -58,8 +58,8 @@ public:
 ///   - a function requires a single witness, the function;
 ///   - a variable requires two witnesses, a getter and a setter;
 ///   - a subscript requires two witnesses, a getter and a setter;
-///   - a type requires a pointer to a witness for that type and
-///     the protocols it obeys.
+///   - a type requires a pointer to the metadata for that type and
+///     to witness tables for each of the protocols it obeys.
 class WitnessTableEntry {
   Decl *Member;
   WitnessIndex BeginIndex;
@@ -109,6 +109,18 @@ public:
 
   WitnessIndex getFunctionIndex() const {
     assert(isFunction());
+    return BeginIndex;
+  }
+  
+  static WitnessTableEntry forAssociatedType(TypeAliasDecl *ty,
+                                             WitnessIndex index) {
+    return WitnessTableEntry(ty, index);
+  }
+  
+  bool isAssociatedType() const { return isa<TypeAliasDecl>(Member); }
+  
+  WitnessIndex getAssociatedTypeIndex() const {
+    assert(isAssociatedType());
     return BeginIndex;
   }
 };

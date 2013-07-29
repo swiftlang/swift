@@ -232,9 +232,7 @@ namespace {
         return;
 
       case DeclKind::TypeAlias:
-        // Nothing to do for associated types.
-        // FIXME: Is this always true? We might want a type descriptor.
-        return;
+        return visitAssociatedType(cast<TypeAliasDecl>(member));
       }
       llvm_unreachable("bad decl kind");
     }
@@ -245,6 +243,14 @@ namespace {
       } else {
         asDerived().addInstanceMethod(func);
       }
+    }
+    
+    void visitAssociatedType(TypeAliasDecl *ty) {
+      // Don't need to do anything for the implicit "This" type.
+      if (ty->getName().str() == "This")
+        return;
+      
+      asDerived().addAssociatedType(ty);
     }
   };
 
@@ -273,6 +279,14 @@ namespace {
 
     void addInstanceMethod(FuncDecl *func) {
       Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
+    }
+    
+    void addAssociatedType(TypeAliasDecl *ty) {
+      // An associated type takes up a spot for the type metadata and for the
+      // witnesses to all its conformances.
+      Entries.push_back(
+                      WitnessTableEntry::forAssociatedType(ty, getNextIndex()));
+      NumWitnesses += ty->getProtocols().size();
     }
 
     unsigned getNumWitnesses() const { return NumWitnesses; }
@@ -2610,6 +2624,21 @@ namespace {
       Table.push_back(getInstanceMethodWitness(impl,
                                       iface->getType()->getCanonicalType(),
                                       witness.Substitutions));
+    }
+    
+    void addAssociatedType(TypeAliasDecl *ty) {
+      // Determine whether the associated type has static metadata. If it
+      // doesn't, then this witness table is a template that requires runtime
+      // instantiation.
+      
+      // FIXME: Add static type metadata.
+      Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+
+      // FIXME: Add static witness tables for type conformances.
+      for (auto protocol : ty->getProtocols()) {
+        (void)protocol;
+        Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      }
     }
 
     /// Returns a function which calls the given implementation under
