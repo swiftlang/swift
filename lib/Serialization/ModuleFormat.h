@@ -416,6 +416,7 @@ namespace decls_block {
     TypeIDField, // underlying type
     BCFixed<1>,  // generic flag
     BCFixed<1>,  // implicit flag
+    TypeIDField, // superclass type
     BCArray<TypeIDField> // inherited types
     // Trailed by the conformance info (if any).
   >;

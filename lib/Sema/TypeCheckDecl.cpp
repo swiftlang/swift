@@ -43,6 +43,46 @@ static bool isPatternProperty(Pattern *pattern) {
   return false;
 }
 
+/// Gather the list of protocols for the given type declaration with
+/// null conformances.
+static void gatherProtocolsWithoutConformances(ASTContext &context,
+                                               TypeDecl *D) {
+  llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
+  SmallVector<ProtocolDecl *, 4> allProtocols;
+  for (auto inherited : D->getInherited()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    if (inherited.getType()->isExistentialType(protocols)) {
+      for (auto proto : protocols) {
+        if (knownProtocols.insert(proto)) {
+          allProtocols.push_back(proto);
+        }
+      }
+      continue;
+    }
+
+    // If this is a class and we're gathering protocols for a generic parameter,
+    // record the superclass requirement.
+    // FIXME: Diagnose if we already saw a class, this is not the first
+    // entry, or we're not allowed to have a superclass.
+    if (inherited.getType()->getClassOrBoundGenericClass()) {
+      if (auto typeAlias = dyn_cast<TypeAliasDecl>(D)) {
+        if (typeAlias->isGenericParameter())
+          typeAlias->setSuperclass(inherited.getType());
+      }
+    }
+  }
+  D->setProtocols(context.AllocateCopy(allProtocols));
+
+  // Set null conformances.
+  unsigned conformancesSize
+    = sizeof(ProtocolConformance *) * allProtocols.size();
+  ProtocolConformance **conformances
+    = (ProtocolConformance **)context.Allocate(conformancesSize,
+                                               alignof(ProtocolConformance *));
+  memset(conformances, 0, conformancesSize);
+  D->setConformances(llvm::makeArrayRef(conformances, allProtocols.size()));
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
@@ -136,7 +176,8 @@ public:
 
       // Check the constraints on the type parameter.
       checkInherited(TypeParam, TypeParam->getInherited());
-
+      gatherProtocolsWithoutConformances(TC.Context, TypeParam);
+      
       // Add the generic parameter to the builder.
       Builder.addGenericParameter(TypeParam, Index++);
     }
@@ -1341,33 +1382,6 @@ void TypeChecker::definePendingImplicitDecls() {
     if (structsNeedingImplicitDefaultConstructor.count(structDecl))
       defineDefaultConstructor(structDecl);
   }
-}
-
-/// Gather the list of protocols for the given type declaration with
-/// null conformances.
-static void gatherProtocolsWithoutConformances(ASTContext &context,
-                                               TypeDecl *D) {
-  llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-  SmallVector<ProtocolDecl *, 4> allProtocols;
-  for (auto inherited : D->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (knownProtocols.insert(proto)) {
-          allProtocols.push_back(proto);
-        }
-      }
-    }
-  }
-  D->setProtocols(context.AllocateCopy(allProtocols));
-
-  // Set null conformances.
-  unsigned conformancesSize = sizeof(ProtocolConformance *) * allProtocols.size();
-  ProtocolConformance **conformances
-    = (ProtocolConformance **)context.Allocate(conformancesSize,
-                                               alignof(ProtocolConformance *));
-  memset(conformances, 0, conformancesSize);
-  D->setConformances(llvm::makeArrayRef(conformances, allProtocols.size()));
 }
 
 void TypeChecker::preCheckProtocol(ProtocolDecl *D) {

@@ -716,11 +716,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     TypeID underlyingTypeID;
     bool isGeneric;
     bool isImplicit;
+    TypeID superclassTypeID;
     ArrayRef<uint64_t> inheritedIDs;
 
     decls_block::TypeAliasLayout::readRecord(scratch, nameID, contextID,
                                              underlyingTypeID,
                                              isGeneric, isImplicit,
+                                             superclassTypeID,
                                              inheritedIDs);
 
     auto inherited =
@@ -754,8 +756,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       alias->setImplicit();
-    if (isGeneric)
+    if (isGeneric) {
       alias->setGenericParameter();
+      alias->setSuperclass(getType(superclassTypeID));
+    }
 
     CanType canBaseTy = underlyingType.getType()->getCanonicalType();
 

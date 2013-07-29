@@ -223,26 +223,22 @@ bool checkProtocolCircularity(TypeChecker &TC, ProtocolDecl *Proto,
                               llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
                               llvm::SmallPtrSet<ProtocolDecl *, 16> &Local,
                               llvm::SmallVectorImpl<ProtocolDecl *> &Path) {
-  for (auto InheritedTy : Proto->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> InheritedProtos;
-    if (!InheritedTy.getType()->isExistentialType(InheritedProtos))
+  for (auto inheritedProto : Proto->getProtocols()) {
+    if (Visited.count(inheritedProto)) {
+      // We've seen this protocol as part of another protocol search;
+      // it's not circular.
       continue;
-    
-    for (auto InheritedProto : InheritedProtos) {
-      if (Visited.count(InheritedProto)) {
-        // We've seen this protocol as part of another protocol search;
-        // it's not circular.
-        continue;
-      }
-
-      // Whether we've seen this protocol before in our search or visiting it
-      // detects a circularity, record it in the path and abort.
-      if (!Local.insert(InheritedProto) ||
-          checkProtocolCircularity(TC, InheritedProto, Visited, Local, Path)) {
-        Path.push_back(InheritedProto);
-        return true;
-      }
     }
+
+    // Whether we've seen this protocol before in our search or visiting it
+    // detects a circularity, record it in the path and abort.
+    if (!Local.insert(inheritedProto) ||
+        checkProtocolCircularity(TC, inheritedProto, Visited, Local, Path)) {
+      Path.push_back(inheritedProto);
+      return true;
+    }
+
+
   }
   
   return false;

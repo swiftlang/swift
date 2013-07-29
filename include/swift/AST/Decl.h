@@ -1077,6 +1077,9 @@ class TypeAliasDecl : public TypeDecl {
   SourceLoc NameLoc; // The location of the declared type
   TypeLoc UnderlyingTy;
 
+  /// Complete hack, which stores the superclass type of a generic parameter.
+  Type SuperclassTy;
+
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
                 SourceLoc NameLoc, TypeLoc UnderlyingTy,
@@ -1105,6 +1108,18 @@ public:
 
   /// \brief Determine whether this type alias is a generic parameter.
   bool isGenericParameter() const { return TypeAliasDeclBits.GenericParameter; }
+
+  /// Return the superclass of a generic parameter.
+  Type getSuperclass() const {
+    assert(isGenericParameter() && "Not a generic parameter");
+    return SuperclassTy;
+  }
+
+  /// Set the superclass of a generic parameter.
+  void setSuperclass(Type superclassTy) {
+    assert(isGenericParameter() && "Not a generic parameter");
+    SuperclassTy = superclassTy;
+  }
 
   /// \brief Set whether this type alias is a generic parameter.
   void setGenericParameter(bool GP = true) {

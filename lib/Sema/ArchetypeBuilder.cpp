@@ -262,16 +262,17 @@ bool ArchetypeBuilder::addGenericParameter(TypeAliasDecl *GenericParam,
   auto PA = new PotentialArchetype(nullptr, GenericParam->getName(), Index);
   Impl->PotentialArchetypes[GenericParam] = PA;
 
-  // Add each of the requirements placed on this generic parameter.
-  for (auto Inherited : GenericParam->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (Inherited.getType()->isExistentialType(ConformsTo)) {
-      for (auto Proto : ConformsTo)
-        if (addConformanceRequirement(PA, Proto))
-          return true;
-    } else if (Inherited.getType()->getClassOrBoundGenericClass()) {
+  // Add each of the conformance requirements placed on this generic parameter.
+  for (auto Proto : GenericParam->getProtocols()) {
+    if (addConformanceRequirement(PA, Proto))
+      return true;
+  }
+
+  // If the generic parameter has a superclass, add that requirement.
+  if (GenericParam->isGenericParameter()) {
+    if (auto superclassTy = GenericParam->getSuperclass()) {
       // FIXME: Poor location info.
-      addSuperclassRequirement(PA, GenericParam->getLoc(), Inherited.getType());
+      addSuperclassRequirement(PA, GenericParam->getLoc(), superclassTy);
     }
   }
 
@@ -299,14 +300,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
 
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName());
-      for (auto Inherited : AssocType->getInherited()) {
-        SmallVector<ProtocolDecl *, 4> InheritedProtos;
-        if (Inherited.getType()->isExistentialType(InheritedProtos)) {
-          for (auto InheritedProto : InheritedProtos) {
-            if (addConformanceRequirement(AssocPA, InheritedProto))
-              return true;
-          }
-        }
+      for (auto InheritedProto : AssocType->getProtocols()) {
+        if (addConformanceRequirement(AssocPA, InheritedProto))
+          return true;
       }
 
       continue;

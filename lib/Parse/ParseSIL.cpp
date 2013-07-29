@@ -461,10 +461,30 @@ bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
   for (auto GP : *GenericParams) {
     auto TypeParam = GP.getAsTypeParam();
     // Do some type checking / name binding for Inherited.
+    // FIXME: This is a hack. We shouldn't ever have to build these.
+    SmallVector<ProtocolDecl *, 4> allProtocols;
+    llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
     for (auto &Inherited : TypeParam->getInherited()) {
       if (performTypeLocChecking(Inherited))
         return true;
+
+      // Collect the protocols mentioned by this existential type.
+      SmallVector<ProtocolDecl *, 4> protocols;
+      if (Inherited.getType()->isExistentialType(protocols)) {
+        for (auto proto : protocols) {
+          if (knownProtocols.insert(proto))
+            allProtocols.push_back(proto);
+        }
+      }
+      // Set the superclass.
+      else if (Inherited.getType()->getClassOrBoundGenericClass()) {
+        TypeParam->setSuperclass(Inherited.getType());
+      }
     }
+
+    // Set this list of all protocols.
+    TypeParam->setProtocols(P.Context.AllocateCopy(allProtocols));
+
     // Add the generic parameter to the builder.
     Builder.addGenericParameter(TypeParam, Index++);
   }

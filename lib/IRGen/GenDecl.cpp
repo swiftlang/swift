@@ -514,8 +514,11 @@ static bool isLocalLinkageGenericClause(const GenericParamList &params) {
   // Type parameters are local-linkage if any of their constraining
   // types are.
   for (auto &param : params) {
-    for (auto inherited : param.getAsTypeParam()->getInherited())
-      if (isLocalLinkageType(CanType(inherited.getType())))
+    for (auto proto : param.getAsTypeParam()->getProtocols())
+      if (isLocalLinkageType(CanType(proto->getDeclaredType())))
+        return true;
+    if (auto superclass = param.getAsTypeParam()->getSuperclass())
+      if (isLocalLinkageType(superclass->getCanonicalType()))
         return true;
   }
   return false;

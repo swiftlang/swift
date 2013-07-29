@@ -1000,6 +1000,9 @@ bool Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(underlying),
                                 typeAlias->isGenericParameter(),
                                 typeAlias->isImplicit(),
+                                typeAlias->isGenericParameter()
+                                  ? addTypeRef(typeAlias->getSuperclass())
+                                  : addTypeRef(Type()),
                                 inherited);
 
     writeConformances(typeAlias->getProtocols(), typeAlias->getConformances());
