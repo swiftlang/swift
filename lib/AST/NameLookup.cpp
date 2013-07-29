@@ -837,7 +837,7 @@ bool Module::lookupQualified(Type type,
         // If our current declaration isn't a protocol, only consider this
         // inherited protocol if we have protocol-conformance information.
         if (!currentIsProtocol) {
-          if (conformances.size() < protoIndex || !conformances[protoIndex]) {
+          if (conformances.size() <= protoIndex || !conformances[protoIndex]) {
             ++protoIndex;
             continue;
           }

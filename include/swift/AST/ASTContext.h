@@ -259,6 +259,16 @@ public:
     return StringRef(Result.data(), Result.size());
   }
 
+  template<typename T, typename Vector, typename Set>
+  MutableArrayRef<T>
+  AllocateCopy(llvm::SetVector<T, Vector, Set> setVector,
+               AllocationArena arena = AllocationArena::Permanent) const {
+    return MutableArrayRef<T>(AllocateCopy<T>(setVector.begin(),
+                                              setVector.end(),
+                                              arena),
+                              setVector.size());
+  }
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str);

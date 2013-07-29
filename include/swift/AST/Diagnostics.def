@@ -1122,8 +1122,6 @@ ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
 
 // Protocols
-ERROR(nonprotocol_inherit,sema_tcd,none,
-      "cannot inherit non-protocol type %0", (Type))
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
@@ -1213,6 +1211,20 @@ ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
       "cannot use member initializer when one of the variables is '_'", ())
 NOTE(decl_init_here,sema_tcd,none,
      "member initializer is here", ())
+
+// Inheritance
+ERROR(duplicate_inheritance,sema_tcd,none,
+  "duplicate inheritance from class %0", (Type))
+ERROR(multiple_inheritance,sema_tcd,none,
+  "multiple inheritance from classes %0 and %1", (Type, Type))
+ERROR(non_class_inheritance,sema_tcd,none,
+  "non-class type %0 cannot inherit from class %1", (Type, Type))
+ERROR(extension_class_inheritance,sema_tcd,none,
+  "extension of type %0 cannot inherit from class %1", (Type, Type))
+ERROR(inheritance_from_non_protocol_or_class,sema_tcd,none,
+  "inheritance from non-protocol, non-class type %0", (Type))
+ERROR(inheritance_from_non_protocol,sema_tcd,none,
+  "inheritance from non-protocol type %0", (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

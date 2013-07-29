@@ -18,6 +18,7 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
@@ -43,44 +44,202 @@ static bool isPatternProperty(Pattern *pattern) {
   return false;
 }
 
-/// Gather the list of protocols for the given type declaration with
-/// null conformances.
-static void gatherProtocolsWithoutConformances(ASTContext &context,
-                                               TypeDecl *D) {
-  llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-  SmallVector<ProtocolDecl *, 4> allProtocols;
-  for (auto inherited : D->getInherited()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (knownProtocols.insert(proto)) {
-          allProtocols.push_back(proto);
-        }
-      }
+/// Determine whether the given declaration can inherit a class.
+static bool canInheritClass(Decl *decl) {
+  if (isa<ClassDecl>(decl))
+    return true;
+
+  // FIXME: Can any typealias declare inheritance from a class?
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(decl))
+    return typeAlias->isGenericParameter();
+
+  return false;
+}
+
+/// Retrieve the declared type of a type declaration or extension.
+static Type getDeclaredType(Decl *decl) {
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl))
+    return typeDecl->getDeclaredType();
+  return cast<ExtensionDecl>(decl)->getExtendedType();
+}
+
+/// Determine whether the given declaration already had its inheritance
+/// clause checked.
+static bool alreadyCheckedInheritanceClause(Decl *decl) {
+  // FIXME: Should we simply record when the inheritance clause was checked,
+  // so we don't need this approximation?
+
+  // If it's an extension with a non-empty protocol list, we're done.
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    return !ext->getProtocols().empty();
+  }
+
+  // If it's a nominal declaration with a non-empty protocol list, we're done.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (!nominal->getProtocols().empty())
+      return true;
+
+    // If it's a class declaration with a superclass, we're done.
+    if (auto classDecl = dyn_cast<ClassDecl>(nominal))
+      return classDecl->hasSuperclass();
+
+    return false;
+  }
+
+  // For a typealias with a non-empty protocol list, we're done.
+  auto typeAlias = cast<TypeAliasDecl>(decl);
+  if (!typeAlias->getProtocols().empty())
+    return true;
+
+  // For a generic parameter with a superclass, we're done.
+  return typeAlias->isGenericParameter() && typeAlias->getSuperclass();
+}
+
+/// Retrieve the inheritance clause as written from the given declaration.
+static MutableArrayRef<TypeLoc> getInheritanceClause(Decl *decl) {
+  if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    return ext->getInherited();
+
+  return cast<TypeDecl>(decl)->getInherited();
+}
+
+/// Check the inheritance clause of a type declaration or extension thereof.
+///
+/// This routine validates all of the types in the parsed inheritance clause,
+/// recording the superclass (if any and if allowed) as well as the protocols
+/// to which this type declaration conforms.
+static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
+  // If we already checked the inheritance clause, we're done.
+  if (alreadyCheckedInheritanceClause(decl))
+    return;
+
+  // Check all of the types listed in the inheritance clause.
+  Type superclassTy;
+  SourceRange superclassRange;
+  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
+  auto inheritedClause = getInheritanceClause(decl);
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    auto &inherited = inheritedClause[i];
+
+    // Validate the type.
+    if (tc.validateType(inherited)) {
+      inherited.setInvalidType(tc.Context);
       continue;
     }
 
-    // If this is a class and we're gathering protocols for a generic parameter,
-    // record the superclass requirement.
-    // FIXME: Diagnose if we already saw a class, this is not the first
-    // entry, or we're not allowed to have a superclass.
-    if (inherited.getType()->getClassOrBoundGenericClass()) {
-      if (auto typeAlias = dyn_cast<TypeAliasDecl>(D)) {
-        if (typeAlias->isGenericParameter())
-          typeAlias->setSuperclass(inherited.getType());
-      }
-    }
-  }
-  D->setProtocols(context.AllocateCopy(allProtocols));
+    auto inheritedTy = inherited.getType();
 
-  // Set null conformances.
-  unsigned conformancesSize
-    = sizeof(ProtocolConformance *) * allProtocols.size();
-  ProtocolConformance **conformances
-    = (ProtocolConformance **)context.Allocate(conformancesSize,
-                                               alignof(ProtocolConformance *));
-  memset(conformances, 0, conformancesSize);
-  D->setConformances(llvm::makeArrayRef(conformances, allProtocols.size()));
+    // If this is a protocol or protocol composition type, record the
+    // protocols.
+    if (inheritedTy->isExistentialType()) {
+      SmallVector<ProtocolDecl *, 4> protocols;
+      inheritedTy->isExistentialType(protocols);
+      allProtocols.insert(protocols.begin(), protocols.end());
+      continue;
+    }
+
+    // If this is a class type, it may be the superclass.
+    if (inheritedTy->getClassOrBoundGenericClass()) {
+      // First, check if we already had a superclass.
+      if (superclassTy) {
+        // FIXME: Check for shadowed protocol names, i.e., NSObject?
+
+        // Check whether we inherited from the same class twice.
+        if (superclassTy->isEqual(inheritedTy)) {
+          SourceLoc afterPriorLoc
+            = Lexer::getLocForEndOfToken(
+                tc.Context.SourceMgr,
+                inheritedClause[i-1].getSourceRange().End);
+          SourceLoc afterMyEndLoc
+            = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                         inherited.getSourceRange().End);
+
+          tc.diagnose(inherited.getSourceRange().Start,
+                      diag::duplicate_inheritance, superclassTy)
+            .fixItRemove(DiagnosticInfo::Range(afterPriorLoc, afterMyEndLoc));
+          continue;
+        }
+
+        // Complain about multiple inheritance.
+        // Don't emit a Fix-It here. The user has to think harder about this.
+        tc.diagnose(inherited.getSourceRange().Start,
+                    diag::multiple_inheritance, superclassTy, inheritedTy)
+          .highlight(superclassRange);
+        continue;
+      }
+
+      // If the declaration we're looking at doesn't allow a superclass,
+      // complain.
+      //
+      // FIXME: Allow type aliases to 'inherit' from classes, as an additional
+      // kind of requirement?
+      if (!canInheritClass(decl)) {
+        tc.diagnose(decl->getLoc(),
+                    isa<ExtensionDecl>(decl)
+                      ? diag::extension_class_inheritance
+                      : diag::non_class_inheritance,
+                    getDeclaredType(decl), inheritedTy)
+          .highlight(inherited.getSourceRange());
+        continue;
+      }
+
+      // Record the superclass.
+      superclassTy = inheritedTy;
+      superclassRange = inherited.getSourceRange();
+      continue;
+    }
+
+    // If this is an error type, ignore it.
+    if (inheritedTy->is<ErrorType>())
+      continue;
+
+    // We can't inherit from a non-class, non-protocol type.
+    tc.diagnose(decl->getLoc(),
+                canInheritClass(decl)
+                  ? diag::inheritance_from_non_protocol_or_class
+                  : diag::inheritance_from_non_protocol,
+                inheritedTy);
+    // FIXME: Note pointing to the declaration 'inheritedTy' references?
+  }
+
+  // Record the protocols to which this declaration conforms along with the
+  // superclass.
+  if (allProtocols.empty() && !superclassTy)
+    return;
+
+  auto allProtocolsCopy = tc.Context.AllocateCopy(allProtocols);
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    assert(!superclassTy && "Extensions can't add superclasses");
+    ext->setProtocols(allProtocolsCopy);
+    return;
+  }
+
+  auto typeDecl = cast<TypeDecl>(decl);
+  typeDecl->setProtocols(allProtocolsCopy);
+  if (superclassTy) {
+    if (auto classDecl = dyn_cast<ClassDecl>(decl))
+      classDecl->setSuperclass(superclassTy);
+    else
+      cast<TypeAliasDecl>(decl)->setSuperclass(superclassTy);
+  }
+
+  // For protocols, generic parameters, and associated types, fill in null
+  // conformances.
+  if (isa<ProtocolDecl>(decl) ||
+      (isa<TypeAliasDecl>(decl) &&
+       (isa<ProtocolDecl>(decl->getDeclContext()) ||
+        cast<TypeAliasDecl>(decl)->isGenericParameter()))) {
+     // Set null conformances.
+     unsigned conformancesSize
+         = sizeof(ProtocolConformance *) * allProtocols.size();
+     ProtocolConformance **conformances
+         = (ProtocolConformance **)tc.Context.Allocate(
+             conformancesSize,
+             alignof(ProtocolConformance *));
+     memset(conformances, 0, conformancesSize);
+     cast<TypeDecl>(decl)->setConformances(
+       llvm::makeArrayRef(conformances, allProtocols.size()));
+  }
 }
 
 namespace {
@@ -105,28 +264,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   void validateAttributes(ValueDecl *VD);
-
-  /// \brief Check the list of inherited protocols on the declaration D.
-  void checkInherited(Decl *D, MutableArrayRef<TypeLoc> Inherited) {
-    // Check the list of inherited protocols.
-    for (unsigned i = 0, e = Inherited.size(); i != e; ++i) {
-      if (TC.validateType(Inherited[i])) {
-        Inherited[i].setInvalidType(TC.Context);
-        continue;
-      }
-
-      // FIXME: TypeAliasDecl check here is bogus.
-      if (!Inherited[i].getType()->isExistentialType() &&
-          !Inherited[i].getType()->is<ErrorType>() &&
-          !(Inherited[i].getType()->getClassOrBoundGenericClass() &&
-            isa<TypeAliasDecl>(D))) {
-        // FIXME: Terrible location information.
-        TC.diagnose(D->getStartLoc(), diag::nonprotocol_inherit,
-                    Inherited[i].getType());
-      }
-    }
-  }
-
 
   template<typename DeclType>
   void gatherExplicitConformances(DeclType *D, Type T) {
@@ -153,7 +290,13 @@ public:
     }
 
     // Set the protocols and conformances.
-    D->setProtocols(D->getASTContext().AllocateCopy(allProtocols));
+    if (D->getProtocols().size() == allProtocols.size()) {
+      // Do nothing: we've already set the list of protocols.
+      assert(std::equal(D->getProtocols().begin(), D->getProtocols().end(),
+                        allProtocols.begin()) && "Protocol list changed?");
+    } else {
+      D->setProtocols(D->getASTContext().AllocateCopy(allProtocols));
+    }
     D->setConformances(D->getASTContext().AllocateCopy(allConformances));
   }
   
@@ -175,9 +318,8 @@ public:
       auto TypeParam = GP.getAsTypeParam();
 
       // Check the constraints on the type parameter.
-      checkInherited(TypeParam, TypeParam->getInherited());
-      gatherProtocolsWithoutConformances(TC.Context, TypeParam);
-      
+      checkInheritanceClause(TC, TypeParam);
+
       // Add the generic parameter to the builder.
       Builder.addGenericParameter(TypeParam, Index++);
     }
@@ -467,7 +609,7 @@ public:
     if (!IsSecondPass) {
       TC.validateType(TAD->getUnderlyingTypeLoc());
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
-        checkInherited(TAD, TAD->getInherited());
+        checkInheritanceClause(TC, TAD);
     }
 
     if (!IsFirstPass)
@@ -490,7 +632,7 @@ public:
 
       validateAttributes(OOD);
 
-      checkInherited(OOD, OOD->getInherited());
+      checkInheritanceClause(TC, OOD);
     }
     
     for (Decl *member : OOD->getMembers())
@@ -516,7 +658,7 @@ public:
 
       validateAttributes(SD);
 
-      checkInherited(SD, SD->getInherited());
+      checkInheritanceClause(TC, SD);
     }
 
     // Visit each of the members.
@@ -569,44 +711,15 @@ public:
       CD->overwriteDeclaredType(CD->getDeclaredType()->getCanonicalType());
       TC.validateTypeSimple(CD->getDeclaredTypeInContext());
 
-      // Check the types we inherited from.
-      auto inherited = CD->getInherited();
-      for (unsigned i = 0, n = inherited.size(); i != n; ++i) {
-        // Validate the inherited type.
-        if (TC.validateType(inherited[i])) {
-          inherited[i].setInvalidType(TC.Context);
-          continue;
-        }
-
-        // Check the actual type we're inheriting from.
-        auto inheritedTy = inherited[i].getType();
-
-        // Protocol types and compositions thereof are fine; we'll check
-        // conformance separately.
-        if (inheritedTy->isExistentialType())
-          continue;
-
-        // Inheritance from classes.
-        if (inheritedTy->getClassOrBoundGenericClass()) {
-          // FIXME: Complain about multiple inheritance.
-          CD->setSuperclass(inherited[i].getType());
-          continue;
-        }
-
-        // FIXME: Crummy diagnostic.
-        TC.diagnose(CD->getStartLoc(), diag::nonprotocol_inherit,
-                    inheritedTy);
-        inherited[i].setInvalidType(TC.Context);
-      }
-
       validateAttributes(CD);
-      
-      ClassDecl *baseClassDecl = CD->hasSuperclass()
+      checkInheritanceClause(TC, CD);
+
+      ClassDecl *superclassDecl = CD->hasSuperclass()
         ? CD->getSuperclass()->getClassOrBoundGenericClass()
         : nullptr;
       
       CD->setIsObjC(CD->getAttrs().isObjC()
-                    || (baseClassDecl && baseClassDecl->isObjC()));
+                    || (superclassDecl && superclassDecl->isObjC()));
     }
 
     for (Decl *Member : CD->getMembers())
@@ -939,7 +1052,7 @@ public:
         nominal->addExtension(ED);
       }
     
-      checkInherited(ED, ED->getInherited());
+      checkInheritanceClause(TC, ED);
     }
 
     for (Decl *Member : ED->getMembers())
@@ -1383,15 +1496,11 @@ void TypeChecker::definePendingImplicitDecls() {
 
 void TypeChecker::preCheckProtocol(ProtocolDecl *D) {
   DeclChecker checker(*this, /*isFirstPass=*/true, /*isSecondPass=*/false);
-  checker.checkInherited(D, D->getInherited());
-
-  // Set the protocols this protocol inherits (directly or indirectly).
-  gatherProtocolsWithoutConformances(Context, D);
+  checkInheritanceClause(*this, D);
 
   for (auto member : D->getMembers()) {
     if (auto assocType = dyn_cast<TypeAliasDecl>(member)) {
-      checker.checkInherited(assocType, assocType->getInherited());
-      gatherProtocolsWithoutConformances(Context, assocType);
+      checkInheritanceClause(*this, assocType);
     }
   }
 }
