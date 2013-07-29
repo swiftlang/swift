@@ -1,3 +1,11 @@
+* Numeric literals can now use underscores as separators. For example:
+
+    var billion = 1_000_000_000
+    var crore = 1_00_00_000
+    var MAXINT = 0x7FFF_FFFF_FFFF_FFFF
+    var SMALLEST_DENORM = 0x0.0000_0000_0000_1p-1022
+
+
 * Arithmetic operators "+", "-", "*", and "/" on integer types now do
   overflow checking and trap on overflow. A parallel set of masking operators,
   "&+", "&-", "&*", and "&/", are defined to perform two's complement wrapping
