@@ -627,6 +627,7 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadata:
   case Kind::TypeMangling:
+  case Kind::DebuggerTypeMangling:
     return isLocalLinkageType(getType());
 
   case Kind::WitnessTableOffset:
