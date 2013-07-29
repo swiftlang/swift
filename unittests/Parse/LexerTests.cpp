@@ -12,13 +12,31 @@ class LexerTest : public ::testing::Test {
   SourceMgr SourceMgr;
 
 public:
+
+  std::vector<Token> tokenizeAndKeepEOF(llvm::SourceMgr &SM,
+                                        unsigned BufferID) {
+    const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
+    Lexer L(Buffer->getBuffer(), SM, /*Diags=*/nullptr, /*InSILMode=*/false);
+    std::vector<Token> Tokens;
+    do {
+      Tokens.emplace_back();
+      L.lex(Tokens.back());
+    } while (Tokens.back().isNot(tok::eof));
+    return Tokens;
+  }
+
   std::vector<Token> checkLex(StringRef Source,
                               ArrayRef<tok> ExpectedTokens,
-                              bool KeepComments) {
+                              bool KeepComments,
+                              bool KeepEOF = false) {
     MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
     unsigned BufID = SourceMgr.AddNewSourceBuffer(Buf, llvm::SMLoc());
 
-    std::vector<Token> Toks = tokenize(SourceMgr, BufID, 0, 0, KeepComments);
+    std::vector<Token> Toks;
+    if (KeepEOF)
+      Toks = tokenizeAndKeepEOF(SourceMgr, BufID);
+    else
+      Toks = tokenize(SourceMgr, BufID, 0, 0, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
       EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind());
@@ -36,7 +54,7 @@ TEST_F(LexerTest, TokenizeSkipComments) {
   const char *Source =
       "// Blah\n"
       "(/*yo*/)";
-  std::vector<tok> ExpectedTokens{ tok::l_paren, tok::r_paren, tok::eof };
+  std::vector<tok> ExpectedTokens{ tok::l_paren, tok::r_paren };
   checkLex(Source, ExpectedTokens, /*KeepComments=*/false);
 }
 
@@ -45,7 +63,7 @@ TEST_F(LexerTest, TokenizeWithComments) {
       "// Blah\n"
       "(/*yo*/)";
   std::vector<tok> ExpectedTokens{
-    tok::comment, tok::l_paren, tok::comment, tok::r_paren, tok::eof
+    tok::comment, tok::l_paren, tok::comment, tok::r_paren
   };
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
                                      /*KeepComments=*/true);
@@ -59,7 +77,8 @@ TEST_F(LexerTest, EOFTokenLengthIsZero) {
   const char *Source = "meow";
   std::vector<tok> ExpectedTokens{ tok::identifier, tok::eof };
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
-                                     /*KeepComments=*/true);
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
   EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 

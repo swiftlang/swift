@@ -183,6 +183,7 @@ std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
     Tokens.emplace_back();
     L->lex(Tokens.back());
   } while (Tokens.back().isNot(tok::eof));
+  Tokens.pop_back(); // Remove EOF.
   return Tokens;
 }
 
