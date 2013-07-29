@@ -679,6 +679,13 @@ namespace {
                     expr->getElseExpr()->getType(),
                     "then and else branches of an if-expr");
     }
+    
+    void verifyChecked(SuperRefExpr *expr) {
+      if (!expr->getType()->is<LValueType>()) {
+        Out << "Type of SuperRefExpr should be an LValueType";
+        abort();
+      }
+    }
 
     void verifyChecked(VarDecl *var) {
       // The fact that this is *directly* be a reference storage type

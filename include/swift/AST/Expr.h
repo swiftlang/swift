@@ -373,7 +373,7 @@ public:
 };
   
 /// A reference to 'super'. References to members of 'super' resolve to members
-/// of the superclass of 'this'.
+/// of a superclass of 'this'.
 class SuperRefExpr : public Expr {
   ValueDecl *This;
   SourceLoc Loc;

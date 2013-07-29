@@ -1029,6 +1029,7 @@ namespace {
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
+      simplifyExprType(expr);
       return expr;
     }
 
@@ -2170,10 +2171,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceScalarToTuple(expr, toTuple, toScalarIdx, locator);
     }
   }
-
+  
   // Coercions from an lvalue: requalify and load. We perform these coercions
   // first because they are often the first step in a multi-step coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
+    // Coercion of a SuperRefExpr. Refine the type of the 'super' reference
+    // so we don't insert a DerivedToBase conversion later.
+    if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
+      assert(tc.isSubtypeOf(fromLValue->getObjectType(),
+                            toType->getRValueType())
+             && "coercing super expr to non-supertype?!");
+      fromLValue = LValueType::get(toType->getRValueType(),
+                                   fromLValue->getQualifiers(),
+                                   tc.Context);
+      superRef->setType(fromLValue);
+    }
+
     if (auto toLValue = toType->getAs<LValueType>()) {
       // Update the qualifiers on the lvalue.
       expr = new (tc.Context) RequalifyExpr(

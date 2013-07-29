@@ -42,6 +42,7 @@ typedef long NSInteger;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 + (void) runce;
+- (void) funge;
 @end
 
 @interface NSString : NSObject

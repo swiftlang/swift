@@ -257,7 +257,7 @@ enum class ConstraintKind : char {
   EqualRvalue,
   /// \brief The first type is a "trivial" subtype of the second type,
   /// meaning that it is a subtype that is also guaranteed to have the same
-  // in-memory representation.
+  /// in-memory representation.
   TrivialSubtype,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
