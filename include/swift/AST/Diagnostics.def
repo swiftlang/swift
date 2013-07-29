@@ -1214,7 +1214,7 @@ NOTE(decl_init_here,sema_tcd,none,
 
 // Inheritance
 ERROR(duplicate_inheritance,sema_tcd,none,
-  "duplicate inheritance from class %0", (Type))
+  "duplicate inheritance from %0", (Type))
 ERROR(multiple_inheritance,sema_tcd,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,sema_tcd,none,

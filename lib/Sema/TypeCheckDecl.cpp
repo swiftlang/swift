@@ -117,6 +117,7 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
   Type superclassTy;
   SourceRange superclassRange;
   llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
+  llvm::SmallDenseMap<CanType, SourceRange> inheritedTypes;
   auto inheritedClause = getInheritanceClause(decl);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
@@ -128,6 +129,25 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
     }
 
     auto inheritedTy = inherited.getType();
+
+    // Check whether we inherited from the same type twice.
+    CanType inheritedCanTy = inheritedTy->getCanonicalType();
+    auto knownType = inheritedTypes.find(inheritedCanTy);
+    if (knownType != inheritedTypes.end()) {
+      SourceLoc afterPriorLoc
+        = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                     inheritedClause[i-1].getSourceRange().End);
+      SourceLoc afterMyEndLoc
+        = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                     inherited.getSourceRange().End);
+
+      tc.diagnose(inherited.getSourceRange().Start,
+                  diag::duplicate_inheritance, inheritedTy)
+        .fixItRemove(DiagnosticInfo::Range(afterPriorLoc, afterMyEndLoc))
+        .highlight(knownType->second);
+      continue;
+    }
+    inheritedTypes[inheritedCanTy] = inherited.getSourceRange();
 
     // If this is a protocol or protocol composition type, record the
     // protocols.
@@ -143,22 +163,6 @@ static void checkInheritanceClause(TypeChecker &tc, Decl *decl) {
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
-
-        // Check whether we inherited from the same class twice.
-        if (superclassTy->isEqual(inheritedTy)) {
-          SourceLoc afterPriorLoc
-            = Lexer::getLocForEndOfToken(
-                tc.Context.SourceMgr,
-                inheritedClause[i-1].getSourceRange().End);
-          SourceLoc afterMyEndLoc
-            = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                         inherited.getSourceRange().End);
-
-          tc.diagnose(inherited.getSourceRange().Start,
-                      diag::duplicate_inheritance, superclassTy)
-            .fixItRemove(DiagnosticInfo::Range(afterPriorLoc, afterMyEndLoc));
-          continue;
-        }
 
         // Complain about multiple inheritance.
         // Don't emit a Fix-It here. The user has to think harder about this.
