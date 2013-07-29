@@ -61,7 +61,11 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   // and point it at that SDK.
   if (!Invocation.getSDKPath().empty()) {
     auto ImporterCtor = Invocation.getClangImporterCtor();
-    assert(ImporterCtor && "SDK patch can't be empty without importer set!");
+    if (!ImporterCtor) {
+      Diagnostics.diagnose(SourceLoc(),
+                           diag::error_clang_importer_not_linked_in);
+      return true;
+    }
     auto clangImporter =
         ImporterCtor(*Context, Invocation.getSDKPath(),
                      Invocation.getTargetTriple(),
