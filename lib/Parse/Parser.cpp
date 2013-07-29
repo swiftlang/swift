@@ -465,10 +465,10 @@ bool Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     Invalid |= callback();
     if (Tok.is(RightK))
       break;
-    // If the lexer stopped with an EOF token whose spelling is ')', then this
+    // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
-    // Just accept the ) and build the tuple as we usually do.
-    if (Tok.is(tok::eof) && Tok.getText()[0] == ')') {
+    // Just accept the ")" and build the tuple as we usually do.
+    if (Tok.is(tok::eof) && Tok.getText() == ")") {
       RightLoc = Tok.getLoc();
       return Invalid;
     }
