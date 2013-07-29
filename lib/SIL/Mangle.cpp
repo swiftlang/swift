@@ -17,6 +17,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Punycode.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/SaveAndRestore.h"

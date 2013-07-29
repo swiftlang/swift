@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SmallPtrSet.h"

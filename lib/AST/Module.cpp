@@ -397,21 +397,6 @@ void LoadedModule::lookupVisibleDecls(AccessPathTy accessPath,
 }
 
 
-
-//===----------------------------------------------------------------------===//
-// ClangModule Implementation
-//===----------------------------------------------------------------------===//
-ClangModule::ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
-                         clang::Module *clangModule)
-  : LoadedModule(DeclContextKind::ClangModule,
-                 ctx.getIdentifier(clangModule->Name),
-                 comp, ctx, owner),
-    clangModule(clangModule)
-{
-  // Clang modules are always well-formed.
-  ASTStage = TypeChecked;
-}
-
 //===----------------------------------------------------------------------===//
 // ModuleLoader Implementation
 //===----------------------------------------------------------------------===//

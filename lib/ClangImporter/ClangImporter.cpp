@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Component.h"
@@ -493,4 +494,27 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
        I != E; ++I) {
     Impl.importDecl(*I);
   }
+}
+
+
+//===----------------------------------------------------------------------===//
+// ClangModule Implementation
+//===----------------------------------------------------------------------===//
+ClangModule::ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
+                         clang::Module *clangModule)
+  : LoadedModule(DeclContextKind::ClangModule,
+                 ctx.getIdentifier(clangModule->Name),
+                 comp, ctx, owner),
+    clangModule(clangModule)
+{
+  // Clang modules are always well-formed.
+  ASTStage = TypeChecked;
+}
+
+bool ClangModule::isTopLevel() const {
+  return !clangModule->isSubModule();
+}
+
+StringRef ClangModule::getTopLevelModuleName() const {
+  return clangModule->getTopLevelModuleName();
 }

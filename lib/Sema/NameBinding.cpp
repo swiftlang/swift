@@ -22,6 +22,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/OwningPtr.h"

@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/Mangle.h"

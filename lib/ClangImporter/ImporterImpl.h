@@ -41,6 +41,7 @@ class QualType;
 namespace swift {
 
 class ASTContext;
+class ClangModule;
 class ClassDecl;
 class ExtensionDecl;
 class FuncDecl;

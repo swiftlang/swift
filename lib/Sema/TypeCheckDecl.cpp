@@ -1102,10 +1102,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
   // If the struct in which this constructor is being added was imported,
   // add it as an external definition.
-  auto dc = structDecl->getDeclContext();
-  while (dc->getParent())
-    dc = dc->getParent();
-  if (isa<ClangModule>(dc)) {
+  if (structDecl->hasClangNode()) {
     tc.Context.ExternalDefinitions.insert(ctor);
   }
 

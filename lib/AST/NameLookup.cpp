@@ -498,7 +498,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
   M.lookupValue(Module::AccessPathTy(), Name, NLKind::UnqualifiedLookup,
                 CurModuleResults);
-  searchedClangModule = isa<ClangModule>(&M);
+  searchedClangModule = M.getContextKind() == DeclContextKind::ClangModule;
   for (ValueDecl *VD : CurModuleResults)
     if (!IsTypeLookup || isa<TypeDecl>(VD))
       Results.push_back(Result::getModuleMember(VD));
@@ -524,7 +524,7 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       continue;
 
     // FIXME: Only searching Clang modules once.
-    if (isa<ClangModule>(ImpEntry.second)) {
+    if (ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
       if (searchedClangModule)
         continue;
 

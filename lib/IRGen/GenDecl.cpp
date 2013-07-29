@@ -24,6 +24,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"

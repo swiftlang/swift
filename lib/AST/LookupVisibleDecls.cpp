@@ -502,7 +502,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // Do a local lookup within the current module.
   M.lookupVisibleDecls(Module::AccessPathTy(), Consumer,
                        NLKind::UnqualifiedLookup);
-  searchedClangModule = isa<ClangModule>(&M);
+  searchedClangModule = M.getContextKind() == DeclContextKind::ClangModule;
 
   SmallVector<Module::ImportedModule, 8> Imports;
   M.getReexportedModules(Imports);
@@ -515,7 +515,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       continue;
 
     // FIXME: Only searching Clang modules once.
-    if (isa<ClangModule>(ImpEntry.second)) {
+    if (ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
       if (searchedClangModule)
         continue;
 

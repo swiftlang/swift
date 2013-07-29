@@ -350,25 +350,6 @@ public:
   }
 };
 
-/// \brief Represents a Clang module that has been imported into Swift.
-///
-/// This is exposed at the AST level because we want to do special things with
-/// the module's synthesized definitions.
-class ClangModule : public LoadedModule {
-  clang::Module *clangModule;
-
-public:
-  ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
-              clang::Module *clangModule);
-
-  /// \brief Retrieve the underlying Clang module.
-  clang::Module *getClangModule() const { return clangModule; }
-
-  static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::ClangModule;
-  }
-};
-
 template <>
 PrefixOperatorDecl *
 LoadedModule::lookupOperator<PrefixOperatorDecl>(Identifier name);

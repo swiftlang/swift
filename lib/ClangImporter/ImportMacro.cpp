@@ -27,6 +27,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
 
