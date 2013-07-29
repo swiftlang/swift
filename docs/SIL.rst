@@ -11,20 +11,20 @@ Abstract
 SIL is an SSA-form IR with high-level semantic information designed to implement
 the Swift programming language. SIL accommodates the following use cases:
 
-- High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation
-  promotion, and generic function instantiation;
-- A set of guaranteed optimizations that provide a predictable baseline for
-  runtime and diagnostic behavior;
+- A set of guaranteed high-level optimizations that provide a predictable 
+  baseline for runtime and diagnostic behavior.
 - Diagnostic dataflow analysis passes that enforce Swift language requirements,
   such as definitive initialization of variables and constructors, code
-  reachability, switch coverage; and
+  reachability, switch coverage.
+- High-level optimization passes, including retain/release optimization,
+  dynamic method devirtualization, closure inlining, memory allocation promotion, 
+  and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
 
 In contrast to LLVM IR, SIL is a generally target-independent format
-representation that can be used for code distribution, but can also express
+representation that can be used for code distribution, but it can also express
 target-specific concepts as well as Swift can.
 
 SIL in the Swift Compiler
