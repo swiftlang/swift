@@ -132,33 +132,11 @@ void NameBinder::addImport(ImportDecl *ID,
     diagnose(Path[2].second, diag::invalid_declaration_imported);
     return;
   }
-  
-  Result.push_back(ImportedModule(Path.slice(1), M));
 
-  if (auto loaded = dyn_cast<LoadedModule>(M)) {
-    loaded->getReexportedModules(Result);
-
-  } else if (Context.getClangModuleLoader()) {
-    // If the module we loaded is a translation unit that imports a Clang
-    // module with the same name, add that Clang module to our own set of imports.
-    // FIXME: This is a horrible, horrible way to provide transitive inclusion.
-    // We really need a re-export syntax.
-    if (auto tu = dyn_cast<TranslationUnit>(M)) {
-      for (auto imported : tu->getImportedModules()) {
-        // Only check for Clang modules.
-        auto clangMod = dyn_cast<ClangModule>(imported.second);
-        if (!clangMod)
-          continue;
-
-        // With the same name as the module we imported.
-        if (clangMod->Name != Path[0].first)
-          continue;
-
-        Result.push_back(ImportedModule(Path.slice(1), clangMod));
-        break;
-      }
-    }
-  }
+  M->forAllVisibleModules(Path.slice(1), [&](const ImportedModule &import) {
+    Result.push_back(import);
+    return true;
+  });
 }
 
 /// performAutoImport - When a translation unit is first set up, this handles
@@ -182,33 +160,6 @@ void swift::performAutoImport(TranslationUnit *TU) {
 //===----------------------------------------------------------------------===//
 // performNameBinding
 //===----------------------------------------------------------------------===//
-
-/// \brief Collect all of the Clang modules exported from this module
-/// and its implicit submodules.
-static void collectExportedClangModules(clang::Module *mod, SourceLoc importLoc,
-              SmallVectorImpl<std::pair<clang::Module *, SourceLoc>> &results,
-              llvm::SmallPtrSet<clang::Module *, 8> &visited) {
-  // Collect Clang modules exported from this particular module.
-  SmallVector<clang::Module *, 4> exported;
-  mod->getExportedModules(exported);
-  for (auto exportedModule : exported) {
-    if (visited.insert(exportedModule)) {
-      results.push_back({ exportedModule, importLoc });
-
-      collectExportedClangModules(exportedModule, importLoc, results, visited);
-    }
-  }
-
-  // Recurse into available, implicit submodules.
-  for (auto sm = mod->submodule_begin(), smEnd = mod->submodule_end();
-       sm != smEnd; ++sm) {
-    if ((*sm)->IsExplicit || !(*sm)->IsAvailable)
-      continue;
-
-    if (visited.insert(*sm))
-      collectExportedClangModules(*sm, importLoc, results, visited);
-  }
-}
 
 template<typename OP_DECL>
 static void insertOperatorDecl(NameBinder &Binder,
@@ -295,81 +246,11 @@ void swift::performNameBinding(TranslationUnit *TU, unsigned StartElem) {
       insertOperatorDecl(Binder, TU->InfixOperators, OD);
   }
 
-  // Walk the dependencies of imported Clang modules. For any imported
-  // dependencies, also load the corresponding Swift module, if it exists.
-  // FIXME: The Swift modules themselves should re-export their dependencies,
-  // if they show up in the interface.
-  {
-    SmallVector<std::pair<clang::Module*, SourceLoc>, 4> importedClangModules;
-    llvm::SmallPtrSet<clang::Module*, 8> visited;
-    for (auto imported : ImportedModules) {
-      auto mod = dyn_cast<ClangModule>(imported.second);
-      if (!mod)
-        continue;
-
-      SourceLoc loc;
-      if (imported.first.empty())
-        loc = TU->Decls[0]->getStartLoc();
-      else
-        loc = imported.first[0].second;
-      
-      auto clangMod = mod->getClangModule();
-      if (visited.insert(clangMod))
-        collectExportedClangModules(clangMod, loc, importedClangModules,
-                                    visited);
-    }
-
-    ASTContext &ctx = TU->getASTContext();
-    llvm::DenseMap<clang::Module *, bool> topModules;
-    for (auto clangImport : importedClangModules) {
-      // Look at the top-level module.
-      auto topClangMod = clangImport.first->getTopLevelModule();
-      auto knownTop = topModules.find(topClangMod);
-      bool hasSwiftModule;
-      if (knownTop == topModules.end()) {
-        // If we haven't looked for a Swift module corresponding to the
-        // top-level module yet, do so now.
-
-        ImportDecl::AccessPathElement importPair =
-          { ctx.getIdentifier(topClangMod->Name), clangImport.second };
-
-        // It's a little wasteful to load the module here and then again below,
-        // but the one below should pick up the same (already-loaded) module.
-        auto module = ctx.getModule(importPair, false);
-
-        hasSwiftModule = !isa<ClangModule>(module);
-        topModules[topClangMod] = hasSwiftModule;
-      } else {
-        hasSwiftModule = knownTop->second;
-      }
-
-      if (!hasSwiftModule)
-        continue;
-
-      // Form an implicit import of the Swift module.
-      SmallVector<ImportDecl::AccessPathElement, 4> accessPath;
-      for (auto mod = clangImport.first; mod; mod = mod->Parent) {
-        accessPath.push_back({ ctx.getIdentifier(mod->Name),
-                               clangImport.second });
-      }
-      std::reverse(accessPath.begin(), accessPath.end());
-
-      // Create an implicit import declaration and import it.
-      // FIXME: Mark as implicit!
-      // FIXME: Actually pass through the whole access path.
-      auto import = ImportDecl::create(ctx, TU, clangImport.second,
-                                       accessPath[0], false);
-      TU->Decls.push_back(import);
-      Binder.addImport(import, ImportedModules);
-    }
-  }
-
-  // FIXME: This algorithm has quadratic memory usage.  (In practice,
-  // import statements after the first "chunk" should be rare, though.)
   if (ImportedModules.size() > TU->getImportedModules().size())
     TU->setImportedModules(TU->Ctx.AllocateCopy(ImportedModules));
 
-  // FIXME: This is quadratic time for TUs with multiple chunks.
+  // FIXME: This algorithm has quadratic memory usage.  (In practice,
+  // import statements after the first "chunk" should be rare, though.)
   // FIXME: Can we make this more efficient?
 
   llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;

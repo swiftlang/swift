@@ -24,6 +24,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 
 namespace clang {
@@ -192,6 +193,19 @@ public:
 
   /// Looks up which modules are re-exported by this module.
   void getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const;
+
+  /// Perform an action for every module visible from this module.
+  ///
+  /// For most modules this means any re-exports, but for a translation unit
+  /// all imports are considered.
+  ///
+  /// \param topLevelAccessPath If present, include the top-level module in the
+  ///                           results, with the given access path.
+  /// \param fn A callback of type bool(ImportedModule). Return \c false to
+  ///           abort iteration.
+  template <typename F>
+  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+                            F fn);
 
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
@@ -365,6 +379,43 @@ LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name);
 template <>
 InfixOperatorDecl *
 LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name);
+
+template <typename F>
+void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath, F fn) {
+  class OrderImportedModules {
+  public:
+    bool operator()(const ImportedModule &lhs, const ImportedModule &rhs) {
+      if (lhs.second != rhs.second)
+        return std::less<const Module *>()(lhs.second, rhs.second);
+      if (lhs.first.data() != rhs.first.data())
+        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
+                                                   rhs.first.begin());
+      return lhs.first.size() < rhs.first.size();
+    }
+  };
+
+  llvm::SmallSet<ImportedModule, 32, OrderImportedModules> visited;
+  SmallVector<ImportedModule, 32> queue;
+
+  if (thisPath.hasValue()) {
+    queue.push_back(ImportedModule(thisPath.getValue(), this));
+  } else {
+    // FIXME: The same module with different access paths may have different
+    // re-exports.
+    visited.insert(ImportedModule({}, this));
+    getReexportedModules(queue);
+  }
+
+  while (!queue.empty()) {
+    auto next = queue.pop_back_val();
+    if (!visited.insert(next))
+      continue;
+
+    if (!fn(next))
+      break;
+    next.second->getReexportedModules(queue);
+  }
+}
 
 
 } // end namespace swift

@@ -498,39 +498,23 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
   // FIXME: This is a weird hack. We either need to filter within the
   // Clang module importer, or we need to change how this works.
   bool searchedClangModule = false;
-  
-  // Do a local lookup within the current module.
-  M.lookupVisibleDecls(Module::AccessPathTy(), Consumer,
-                       NLKind::UnqualifiedLookup);
-  searchedClangModule = M.getContextKind() == DeclContextKind::ClangModule;
 
-  SmallVector<Module::ImportedModule, 8> Imports;
-  M.getReexportedModules(Imports);
-
-  // Scrape through all of the imports looking for additional results.
-  // FIXME: Implement DAG-based shadowing rules.
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : Imports) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-
+  auto &mutableM = const_cast<Module&>(M);
+  mutableM.forAllVisibleModules(Module::AccessPathTy(),
+                                [&](const Module::ImportedModule &import) {
     // FIXME: Only searching Clang modules once.
-    if (ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
+    if (import.second->getContextKind() == DeclContextKind::ClangModule) {
       if (searchedClangModule)
-        continue;
+        return true;
 
       searchedClangModule = true;
     }
 
-    ImpEntry.second->lookupVisibleDecls(ImpEntry.first, Consumer,
-                                        NLKind::UnqualifiedLookup);
-  }
+    import.second->lookupVisibleDecls(import.first, Consumer,
+                                      NLKind::UnqualifiedLookup);
 
-  // Look for a module with the given name.
-  // FIXME: Modules aren't ValueDecls
-  //Consumer.foundDecl(&M);
-  //for (const auto &ImpEntry : Imports)
-  //  Consumer.foundDecl(&ImpEntry.second);
+    return true;
+  });
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,

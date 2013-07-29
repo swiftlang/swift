@@ -316,6 +316,9 @@ Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
     return;
 
   if (auto TU = dyn_cast<TranslationUnit>(this)) {
+    // A translation unit doesn't really re-export all of its imported modules,
+    // but for the purposes of lookup a TU is always top-level, so we want to
+    // look at regular imports as well as re-exports.
     modules.append(TU->getImportedModules().begin(),
                    TU->getImportedModules().end());
     return;

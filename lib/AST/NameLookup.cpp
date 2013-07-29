@@ -515,24 +515,18 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
 
   // Scrape through all of the imports looking for additional results.
   // FIXME: Implement DAG-based shadowing rules.
-  SmallVector<TranslationUnit::ImportedModule, 16> Imported;
-  M.getReexportedModules(Imported);
-
-  llvm::SmallPtrSet<Module *, 16> Visited;
-  for (auto &ImpEntry : Imported) {
-    if (!Visited.insert(ImpEntry.second))
-      continue;
-
+  M.forAllVisibleModules(Nothing, [&](const Module::ImportedModule &ImpEntry) {
     // FIXME: Only searching Clang modules once.
     if (ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
       if (searchedClangModule)
-        continue;
+        return true;
 
       searchedClangModule = true;
     }
 
     SmallVector<ValueDecl*, 8> ImportedModuleResults;
-    ImpEntry.second->lookupValue(ImpEntry.first, Name, NLKind::UnqualifiedLookup,
+    ImpEntry.second->lookupValue(ImpEntry.first, Name,
+                                 NLKind::UnqualifiedLookup,
                                  ImportedModuleResults);
     for (ValueDecl *VD : ImportedModuleResults) {
       if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
@@ -541,7 +535,9 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         CurModuleTypes.insert(VD->getType()->getCanonicalType());
       }
     }
-  }
+
+    return true;
+  });
 
   // If we've found something, we're done.
   if (!Results.empty())
@@ -550,13 +546,22 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   // Look for a module with the given name.
   if (Name == M.Name) {
     Results.push_back(Result::getModuleName(&M));
-  } else {
-    for (const auto &ImpEntry : Imported)
-      if (ImpEntry.second->Name == Name) {
-        Results.push_back(Result::getModuleName(ImpEntry.second));
-        break;
-      }
+    return;
   }
+
+  M.forAllVisibleModules(Nothing, [&](const Module::ImportedModule &ImpEntry){
+    if (ImpEntry.second->Name == Name) {
+      Results.push_back(Result::getModuleName(ImpEntry.second));
+      return false;
+    }
+    return true;
+  });
+
+  auto last = std::unique(Results.begin(), Results.end(),
+              [](const Result &LHS, const Result &RHS) {
+    return LHS.getNamedModule() == RHS.getNamedModule();
+  });
+  Results.erase(last, Results.end());
 }
 
 Optional<UnqualifiedLookup>
