@@ -1,4 +1,4 @@
-2012-07-31
+2013-07-31
 ----------
 
 * Numeric literals can now use underscores as separators. For example:
@@ -17,7 +17,7 @@
   greatly improving build times.
 
 
-2012-07-24
+2013-07-24
 ----------
 
 * Arithmetic operators "+", "-", "*", and "/" on integer types now do
@@ -59,7 +59,7 @@
   Also try "s", "n", "up", "down".
 
 
-2012-07-17
+2013-07-17
 ----------
 
 * Swift now has a 'switch' statement, supporting pattern matching of
@@ -92,7 +92,7 @@
     }
 
 
-2012-07-10
+2013-07-10
 ----------
 
 * Swift has a new closure syntax. The new syntax eliminates the use of
