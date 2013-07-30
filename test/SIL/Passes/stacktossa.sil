@@ -21,3 +21,34 @@ bb0(%0 : $Int64):
   // CHECK-NEXT: return %0 : $Int64
 }
 
+sil @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
+
+
+// func used_by_byref(a : Int) -> (Int, Int) {
+//  var t = a
+//  takes_Int_byref(&a)
+//  return (t,a)
+//}
+// CHECK-LABEL: sil @used_by_byref
+sil @used_by_byref : $[thin] (a : Int64) -> (Int64, Int64) {
+bb0(%0 : $Int64):
+  // This alloc_stack can't be removed since it is used by a byref call.
+  // CHECK: %1 = alloc_stack $Int64
+  %1 = alloc_stack $Int64
+  %2 = store %0 to %1 : $*Int64
+  
+  // This load should be eliminated.
+  %3 = load %1 : $*Int64
+  %5 = function_ref @takes_Int_byref : $[thin] (a : [byref] Int64) -> ()
+  %6 = apply %5(%1) : $[thin] (a : [byref] Int64) -> ()
+  
+  // This load is needed in case the callee modifies the allocation.
+  // CHECK: [[RES:%[0-9]+]] = load %1
+  %7 = load %1 : $*Int64
+  
+  // This should use the incoming argument to the function.
+  // CHECK: tuple (%0 : $Int64, [[RES]] : $Int64)
+  %8 = tuple (%3 : $Int64, %7 : $Int64)
+  %10 = dealloc_stack %1 : $*Int64
+  %11 = return %8 : $(Int64, Int64)
+}
