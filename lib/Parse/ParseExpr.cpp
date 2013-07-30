@@ -1310,6 +1310,15 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     }
   }
+
+  if (CurDeclContext == CurVars.first) {
+    for (auto activeVar : CurVars.second) {
+      if (activeVar->getName() == text) {
+        diagnose(loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(loc);
+      }
+    }
+  }
   
   ValueDecl *D = lookupInScope(text);
   Expr *E;

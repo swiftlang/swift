@@ -1089,6 +1089,12 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
 
     NullablePtr<Expr> Init;
     if (Tok.is(tok::equal)) {
+      // Record the variable that we're trying to initialize.
+      SmallVector<VarDecl *, 4> Vars;
+      pattern.get()->collectVariables(Vars);
+      using RestoreVarsRAII = llvm::SaveAndRestore<decltype(CurVars)>;
+      RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
+
       SourceLoc EqualLoc = consumeToken(tok::equal);
       Init = parseExpr(diag::expected_initializer_expr);
       if (Init.isNull()) {

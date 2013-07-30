@@ -77,6 +77,7 @@ public:
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
+  std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
   unsigned VarPatternDepth = 0;
   bool IsMainModule;
 
