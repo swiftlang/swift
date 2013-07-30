@@ -30,7 +30,6 @@ def load_as_transcript(f):
             # Strip off any trailing newline.
             if script.endswith('\n'):
                 script = script[:-1]
-
             demo_script.append({ 'command' :  script})
 
             # Clear the block.
@@ -113,36 +112,19 @@ for example::
     # continue.
     for item in demo_script:
         command = str(item['command'])
-        is_code_completion = False
-        if command == '#':
-            is_code_completion = True
-            command = '\t'
-        if command.endswith('#'):
-            is_code_completion = True
-            command = command[:-1]
-        if command == '@':
-            command = ''
-        if command == '$':
-            is_code_completion = True
-            command = ' \b'
 
         # Send the command slowly, as if it was typed.
         print "sending command: %r" % (command.replace('\n', '<cr>'),)
         for c in command:
             send(c)
             if c == "\n":
-                pass
-                #time.sleep(0.75)
+                time.sleep(0.75)
             else:
-                pass
-                #time.sleep(0.005)
+                time.sleep(0.005)
 
-        # Wait for user input, then send a return, unless this command will be
-        # subject to code completion.
-        if not is_code_completion:
-            raw_input('press enter to send return...')
-            send('\n')
-
+        # Wait for user input, then send a return.
+        raw_input('press enter to send return...')
+        send('\n')
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
 
