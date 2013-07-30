@@ -338,11 +338,16 @@ ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
 
   auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
 
-  if (conformanceRecord && conformanceRecord != conformance) {
+  if (conformanceRecord.getPointer() &&
+      conformanceRecord.getPointer() != conformance) {
     delete conformance;
-    conformance = conformanceRecord;
+    conformance = conformanceRecord.getPointer();
+    // Only explicit conformances ever get serialized.
+    conformanceRecord.setInt(true);
   } else {
-    conformanceRecord = conformance;
+    // Only explicit conformances ever get serialized.
+    conformanceRecord.setPointer(conformance);
+    conformanceRecord.setInt(true);
   }
 
   if (decl)

@@ -26,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include <functional>
@@ -121,6 +122,14 @@ public:
 typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
   TypeOrExtensionDecl;
 
+/// An entry in the protocol conformance map.
+///
+/// The pointer is the actual conformance providing the witnesses used to
+/// provide conformance. The Boolean indicates whether the type explicitly
+/// conforms to the protocol. A non-null conformance with a false Bool occurs
+/// when error recovery has suggested implicit conformance.
+typedef llvm::PointerIntPair<ProtocolConformance *, 1, bool> ConformanceEntry;
+
 /// ASTContext - This object creates and owns the AST objects.
 class ASTContext {
   ASTContext(const ASTContext&) = delete;
@@ -158,7 +167,7 @@ public:
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
   // and remove the explicit delete loop in the destructor.
   typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
-                         ProtocolConformance*> ConformsToMap;
+                         ConformanceEntry> ConformsToMap;
   
   /// ConformsTo - Caches the results of checking whether a given (canonical)
   /// type conforms to a given protocol.

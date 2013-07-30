@@ -256,10 +256,13 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::DoesNotConformToProtocol:
-    tc.diagnose(loc, diag::type_does_not_conform,
-                failure.getFirstType(),
-                failure.getSecondType())
-      .highlight(range1).highlight(range2);
+    // FIXME: Probably want to do this within the actual solver, because at
+    // this point it's too late to actually recover fully.
+    tc.conformsToProtocol(failure.getFirstType(),
+                          failure.getSecondType()->castTo<ProtocolType>()
+                            ->getDecl(),
+                          nullptr,
+                          loc);
     break;
 
   default:

@@ -1126,6 +1126,10 @@ ERROR(non_nominal_extension,sema_tcd,none,
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+ERROR(type_does_not_explicitly_conform,sema_tcd,none,
+      "type %0 does not explicitly conform to protocol %1", (Type, Type))
+NOTE(note_add_conformance,sema_tcd,none,
+     "introduce explicit conformance to protocol %0", (Type))
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))

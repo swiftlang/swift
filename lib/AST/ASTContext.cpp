@@ -183,7 +183,7 @@ ASTContext::~ASTContext() {
   delete &Impl;
 
   for (auto &entry : ConformsTo)
-    delete const_cast<ProtocolConformance*>(entry.second);
+    delete const_cast<ProtocolConformance*>(entry.second.getPointer());
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {

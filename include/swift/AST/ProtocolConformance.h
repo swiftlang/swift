@@ -117,6 +117,9 @@ public:
   /// original NominalTypeDecl for the type, or an ExtensionDecl.
   Decl *getConformingDecl() const { return ConformingDecl; }
 
+  /// Override the declaration that provides the conformance.
+  void setConformingDecl(Decl *conforming) { ConformingDecl = conforming; }
+
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(TypeAliasDecl *assocType) const {
     auto known = TypeWitnesses.find(assocType);

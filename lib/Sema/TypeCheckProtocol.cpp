@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
@@ -951,6 +952,126 @@ existentialConformsToItself(TypeChecker &tc,
   return true;
 }
 
+/// Retrieve the given declaration context as either a nominal or extension
+/// declaration, or null if it is neither.
+static Decl *getNominalOrExtensionDecl(DeclContext *dc) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal;
+
+  return dyn_cast<ExtensionDecl>(dc);
+}
+
+/// Given an implicitly-generated protocol conformance, complain and
+/// suggest explicit conformance.
+static void suggestExplicitConformance(TypeChecker &tc,
+                                       SourceLoc complainLoc,
+                                       Type type,
+                                       ProtocolConformance *conformance) {
+  auto proto = conformance->getProtocol();
+
+  // Complain that we don't have explicit conformance.
+  tc.diagnose(complainLoc, diag::type_does_not_explicitly_conform,
+              type, proto->getDeclaredType());
+
+  // Figure out where to hang the explicit conformance for the Fix-It.
+  Decl *owner = nullptr;
+  for (auto req : proto->getMembers()) {
+    auto valueReq = dyn_cast<ValueDecl>(req);
+    if (!valueReq)
+      continue;
+
+    // If we used a default definition, ignore this requirement.
+    if (conformance->usesDefaultDefinition(valueReq))
+      continue;
+
+    // Look for the owner of this witness.
+    Decl *witnessOwner = nullptr;
+    if (auto assocType = dyn_cast<TypeAliasDecl>(req)) {
+      // Ignore the 'This' declaration.
+      if (assocType == proto->getThis())
+        continue;
+
+      auto witnessTy = conformance->getTypeWitness(assocType).Replacement;
+      if (auto nameAlias = dyn_cast<NameAliasType>(witnessTy.getPointer())) {
+        witnessOwner = getNominalOrExtensionDecl(
+                         nameAlias->getDecl()->getDeclContext());
+      } else if (auto nominal = witnessTy->getAnyNominal()) {
+        witnessOwner = getNominalOrExtensionDecl(nominal->getDeclContext());
+      }
+    } else {
+      auto witness = conformance->getWitness(valueReq).Decl;
+      witnessOwner = getNominalOrExtensionDecl(witness->getDeclContext());
+    }
+
+    // If the owner was not a declaration, or if we found the same owner
+    // twice, there's nothing to update.
+    if (!witnessOwner || witnessOwner == owner)
+      continue;
+
+    // If the witness owner is not this translation unit, then we don't want
+    // to suggest it as a place to hang the explicit conformance.
+    if (witnessOwner->getDeclContext()->getParentModule() != &tc.TU)
+      continue;
+
+    // We have an owner.
+
+    // If we didn't have an owner, record this as our owner.
+    if (!owner) {
+      owner = witnessOwner;
+      continue;
+    }
+
+    // We have two potential owners. Keep the owner that occurs earlier in the
+    // translation unit
+    // FIXME: < on character pointers is a horrible hack.
+    assert(owner != witnessOwner && "Owners cannot match here.");
+
+    if (witnessOwner->getLoc().Value.getPointer() <
+          owner->getLoc().Value.getPointer())
+      owner = witnessOwner;
+  }
+
+  // If we don't have an owner, don't even try to suggest where the explicit
+  // conformance should go.
+  if (!owner)
+    return;
+
+  // Find the inheritance clause and the location where the inheritance clause
+  // would be (if it were missing).
+  ArrayRef<TypeLoc> inherited;
+  SourceLoc inheritedStartLoc;
+  if (auto type = dyn_cast<TypeDecl>(owner)) {
+    inherited = type->getInherited();
+    inheritedStartLoc = type->getLoc();
+  } else {
+    auto ext = cast<ExtensionDecl>(owner);
+    inherited = ext->getInherited();
+    inheritedStartLoc = ext->getExtendedTypeLoc().getSourceRange().End;
+  }
+
+  // If there is no inheritance clause, introduce a new one with just this
+  // conformance...
+  if (inherited.empty()) {
+    auto insertLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                inheritedStartLoc);
+    tc.diagnose(owner->getLoc(), diag::note_add_conformance,
+                proto->getDeclaredType())
+      .fixItInsert(insertLoc, " : " + proto->getDeclaredType()->getString());
+  } else {
+    // ... or tack this conformance onto the end of the existing clause.
+    auto insertLoc
+      = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                   inherited.back().getSourceRange().End);
+    tc.diagnose(inheritedStartLoc, diag::note_add_conformance,
+                proto->getDeclaredType())
+      .fixItInsert(insertLoc, ", " + proto->getDeclaredType()->getString());
+  }
+
+  // FIXME: Update the list of conformances? Update the inheritance clause
+  // itself?
+  conformance->setConformingDecl(owner);
+}
+
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc, 
@@ -965,7 +1086,15 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (AP == Proto || AP->inheritsFrom(Proto))
         return true;
     }
-    
+
+    // If we need to complain, do so.
+    if (ComplainLoc.isValid()) {
+      // FIXME: Fix-It to add a requirement on the corresponding type
+      // parameter?
+      diagnose(ComplainLoc, diag::type_does_not_conform, T,
+               Proto->getDeclaredType());
+    }
+
     return false;
   }
 
@@ -986,7 +1115,11 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       }
 
       // We didn't find the protocol we were looking for.
-      // FIXME: Complain here.
+      // If we need to complain, do so.
+      if (ComplainLoc.isValid()) {
+        diagnose(ComplainLoc, diag::type_does_not_conform, T,
+                 Proto->getDeclaredType());
+      }
       return false;
     }
   }
@@ -994,14 +1127,40 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known != Context.ConformsTo.end()) {
-    if (!ExplicitConformance) {
+    // If we conform, set the conformance and return true.
+    if (Known->second.getInt()) {
       if (Conformance)
-        *Conformance = Known->second;
-    
-      return Known->second != nullptr;
+        *Conformance = Known->second.getPointer();
+
+      return true;
+    }
+
+    // If we're just checking for conformance, we already know the answer.
+    if (!ExplicitConformance) {
+      // Check whether we know we implicitly conform...
+      if (Known->second.getPointer()) {
+        // We're not allowed to complain; fail.
+        if (ComplainLoc.isInvalid())
+          return false;
+
+        // Complain about explicit conformance and continue as if the user
+        // had written the explicit conformance.
+        suggestExplicitConformance(*this, ComplainLoc, T,
+                                   Known->second.getPointer());
+        return true;
+      }
+
+      // If we need to complain, do so.
+      if (ComplainLoc.isValid()) {
+        diagnose(ComplainLoc, diag::type_does_not_conform, T,
+                 Proto->getDeclaredType());
+      }
+
+      return false;
     }
 
     // For explicit conformance, force the check again.
+    // FIXME: Detect duplicates here?
     Context.ConformsTo.erase(Known);
   }
 
@@ -1066,15 +1225,35 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
     // If we did not find explicit conformance, we're done.
     if (!ExplicitConformance) {
-      // FIXME: Check whether the type *implicitly* conforms. If so, produce
-      // a cleaner diagnostic along with a Fix-It that adds the explicit
-      // conformance either via a new extension or onto an existing extension.
+      // Cache the failure.
+      Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
+
+      // Check whether the type *implicitly* conforms to the protocol.
+      if (std::unique_ptr<ProtocolConformance> ComputedConformance
+            = checkConformsToProtocol(*this, T, Proto, nullptr, SourceLoc())) {
+        // Success! Record the conformance in the cache.
+        auto result = ComputedConformance.release();
+        Context.ConformsTo[Key].setPointer(result);
+
+        if (Conformance)
+          *Conformance = result;
+
+        // If we can't complain about this, just return now.
+        if (ComplainLoc.isInvalid()) {
+          return false;
+        }
+
+        // Suggest the addition of the explicit conformance.
+        suggestExplicitConformance(*this, ComplainLoc, T, result);
+        return true;
+      }
+
       if (ComplainLoc.isValid()) {
         diagnose(ComplainLoc, diag::type_does_not_conform,
                  T, Proto->getDeclaredType());
       }
 
-      return nullptr;
+      return false;
     }
 
     // We found explicit conformance. Compute and record the conformance below.
@@ -1083,12 +1262,12 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // Assume that the type does not conform to this protocol while checking
   // whether it does in fact conform. This eliminates both infinite recursion
   // (if the protocol hierarchies are circular) as well as tautologies.
-  Context.ConformsTo[Key] = nullptr;
+  Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
   if (std::unique_ptr<ProtocolConformance> ComputedConformance
         = checkConformsToProtocol(*this, T, Proto, ExplicitConformance,
                                   ComplainLoc)) {
     auto result = ComputedConformance.release();
-    Context.ConformsTo[Key] = result;
+    Context.ConformsTo[Key] = ConformanceEntry(result, true);
 
     if (Conformance)
       *Conformance = result;
