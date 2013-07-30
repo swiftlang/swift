@@ -1,4 +1,4 @@
-//===--- ClangModule.h - An imported Clang module ---------------*- c++ -*-===//
+//===--- ClangModule.h - An imported Clang module ---------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -38,7 +38,8 @@ class ClangModule : public LoadedModule {
   Module *getAdapterModule() const;
 
 public:
-  ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
+  ClangModule(ASTContext &ctx, std::string DebugModuleName,
+              ModuleLoader &owner, Component *comp,
               clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.

@@ -16,6 +16,8 @@
 
 #include "IRGenDebugInfo.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -122,6 +124,18 @@ void IRGenDebugInfo::finalize() {
   DBuilder.finalize();
 }
 
+
+Location getDeserializedLoc(Expr*) { return {}; }
+Location getDeserializedLoc(Stmt*) { return {}; }
+Location getDeserializedLoc(Decl* D) {
+  Location L = {};
+  if (auto LM = dyn_cast<LoadedModule>(D->getModuleContext())) {
+    L.Filename = LM->getDebugModuleName().c_str();
+    L.Line = 1;
+  }
+  return L;
+}
+
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
 Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
@@ -131,7 +145,10 @@ Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
   SourceLoc Start = S->getStartLoc();
   int BufferIndex = SM.FindBufferContainingLoc(Start.Value);
   if (BufferIndex == -1)
-    return L;
+    // This may be a deserialized or clang-imported decl. And modules
+    // don't come with SourceLocs right now. Get at least the name of
+    // the module.
+    return getDeserializedLoc(S);
 
   L.Filename = SM.getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
   L.Line = SM.FindLineNumber(Start.Value, BufferIndex);
@@ -549,8 +566,10 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
 ///
 /// At this point we do not plan to emit full DWARF for all swift
 /// types, the goal is to emit only the name and provenance of the
-/// type, where possible. A consumer would then load the type
-/// definition directly from the "module" the type is specified in.
+/// type, where possible. A can import the type definition directly
+/// from the module/framework/source file the type is specified in.
+/// For this reason we emit the fully qualified (=mangled) name for
+/// each type whenever possible.
 ///
 /// The final goal, once we forked LLVM, is to emit something like a
 /// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a

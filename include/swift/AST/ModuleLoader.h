@@ -1,4 +1,4 @@
-//===--- ModuleLoader.h - Module Loader Interface -------------------------===//
+//===--- ModuleLoader.h - Module Loader Interface ----------- -*- C++ -*- -===//
 //
 // This source file is part of the Swift.org open source project
 //

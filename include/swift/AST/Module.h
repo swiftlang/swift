@@ -322,9 +322,11 @@ public:
 /// This may be a Swift module or a Clang module.
 class LoadedModule : public Module {
 protected:
-  LoadedModule(DeclContextKind kind, Identifier name, Component *comp,
+  LoadedModule(DeclContextKind kind, Identifier name,
+               std::string DebugModuleName, Component *comp,
                ASTContext &ctx, ModuleLoader &owner)
-    : Module(kind, name, comp, ctx) {
+    : Module(kind, name, comp, ctx),
+      DebugModuleName(DebugModuleName) {
     // Loaded modules are always well-formed.
     ASTStage = TypeChecked;
     LookupCachePimpl = static_cast<void *>(&owner);
@@ -333,6 +335,8 @@ protected:
   ModuleLoader &getOwner() const {
     return *static_cast<ModuleLoader *>(LookupCachePimpl);
   }
+
+  std::string DebugModuleName;
 
 public:
   // Inherited from Module.
@@ -366,6 +370,12 @@ public:
     return DC->getContextKind() >= DeclContextKind::First_LoadedModule &&
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
   }
+
+
+  /// \brief \return the name of the module as it should be
+  /// represented in the debug info.
+  std::string getDebugModuleName() const { return DebugModuleName; }
+
 };
 
 template <>

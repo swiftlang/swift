@@ -276,8 +276,9 @@ Module *ClangImporter::loadModule(
   // Build the representation of the Clang module in Swift.
   // FIXME: The name of this module could end up as a key in the ASTContext,
   // but that's not correct for submodules.
-  result = new (Impl.SwiftContext) ClangModule(Impl.SwiftContext, *this,
-                                               component, clangModule);
+  result = new (Impl.SwiftContext)
+    ClangModule(Impl.SwiftContext, (*clangModule).getFullModuleName(),
+                *this, component, clangModule);
 
   // FIXME: Total hack.
   if (!Impl.firstClangModule)
@@ -301,8 +302,9 @@ ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
   if (!component)
     component = new (SwiftContext.Allocate<Component>(1)) Component();
 
-  result = new (SwiftContext) ClangModule(SwiftContext, importer, component,
-                                          underlying);
+  result = new (SwiftContext)
+    ClangModule(SwiftContext, underlying->getFullModuleName(),
+                importer, component, underlying);
   return result;
 }
 
@@ -545,10 +547,12 @@ void ClangImporter::getReexportedModules(
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
 
-ClangModule::ClangModule(ASTContext &ctx, ModuleLoader &owner, Component *comp,
+ClangModule::ClangModule(ASTContext &ctx, std::string DebugModuleName,
+                         ModuleLoader &owner, Component *comp,
                          clang::Module *clangModule)
   : LoadedModule(DeclContextKind::ClangModule,
                  ctx.getIdentifier(clangModule->Name),
+                 DebugModuleName,
                  comp, ctx, owner),
     clangModule(clangModule)
 {

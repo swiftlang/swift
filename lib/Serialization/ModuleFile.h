@@ -313,8 +313,10 @@ public:
   ModuleFile *File;
 
   SerializedModule(ASTContext &ctx, SerializedModuleLoader &owner,
-                   Identifier name, Component *comp, ModuleFile *file)
-    : LoadedModule(DeclContextKind::SerializedModule, name, comp, ctx, owner),
+                   Identifier name, std::string DebugModuleName,
+                   Component *comp, ModuleFile *file)
+    : LoadedModule(DeclContextKind::SerializedModule, name, DebugModuleName,
+                   comp, ctx, owner),
       File(file) {}
 
   static bool classof(const DeclContext *DC) {
