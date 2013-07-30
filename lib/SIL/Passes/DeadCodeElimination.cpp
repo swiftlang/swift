@@ -17,7 +17,69 @@
 using namespace swift;
 
 STATISTIC(NumBlocksRemoved, "Number of unreachable basic blocks removed");
+STATISTIC(NumInstructionsRemoved, "Number of unreachable instructions removed");
 
+/// \brief Perform a fast local check to see if the instruction is dead.
+///
+/// This rutine only examines the state of the instruction at hand.
+/// \param checkUses - The flag that allows not to check if the instruction is
+///        used by others. This should be used when we already know that the
+//         instruction is not used or is only used by dead instructions.
+static bool isInstructionTriviallyDead(SILInstruction *I,
+                                       bool checkUses = true) {
+  if ((!I->use_empty() && checkUses) || isa<TermInst>(I))
+    return false;
+
+  if (!I->mayHaveSideEffects())
+    return true;
+
+  return false;
+}
+
+/// \brief Check if the operand is only used by the given user.
+static bool isTheOnlyUser(SILValue Op, SILValue User) {
+  for (auto UseI = Op.use_begin(), UseE = Op.use_end(); UseI != UseE; ++UseI) {
+    if (UseI.getUser() != User.getDef())
+      return false;
+  }
+  return true;
+}
+
+/// \brief If the given instruction is dead, delete it along with its dead
+/// operands.
+///
+/// \return Returns true if any instructions were deleted.
+static bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I) {
+  // If the instruction is not dead, there is nothing to do.
+  if (!I || !isInstructionTriviallyDead(I))
+    return false;
+
+  // Delete this instruction and others that become dead after it's deleted.
+  SmallVector<SILInstruction*, 16> DeadInsts;
+  DeadInsts.push_back(I);
+  do {
+    I = DeadInsts.pop_back_val();
+
+    // Check if any of the operands will become dead as well.
+    ArrayRef<Operand> Ops = I->getAllOperands();
+    for (auto OpI = Ops.begin(), OpE = Ops.end(); OpI != OpE; ++OpI) {
+
+      // If the operand is an instruction that is only used by the instruction
+      // being deleted, delete it in a future loop iteration.
+      SILValue OpVal = (*OpI).get();
+      if (!isTheOnlyUser(OpVal, I))
+        continue;
+      if (SILInstruction *OpI = dyn_cast<SILInstruction>(OpVal))
+        if (isInstructionTriviallyDead(OpI, false))
+          DeadInsts.push_back(OpI);
+    }
+
+    // This will remove this instruction and all its uses.
+    I->eraseFromParent();
+  } while (!DeadInsts.empty());
+  
+  return true;
+}
 
 static void constantFoldTerminator(SILBasicBlock &BB) {
   TermInst *TI = BB.getTerminator();
@@ -27,7 +89,8 @@ static void constantFoldTerminator(SILBasicBlock &BB) {
     SILValue V = CBI->getCondition();
     SILInstruction *CondI = dyn_cast<SILInstruction>(V.getDef());
 
-    if (IntegerLiteralInst *ConstCond = dyn_cast<IntegerLiteralInst>(CondI)) {
+    if (IntegerLiteralInst *ConstCond =
+          dyn_cast_or_null<IntegerLiteralInst>(CondI)) {
       SILBuilder B(&BB);
 
       // Determine which of the successors is unreachable.
@@ -47,9 +110,8 @@ static void constantFoldTerminator(SILBasicBlock &BB) {
       // contains user code.
       
       CBI->eraseFromParent();
-
-      // TODO: Some of the instructions the terminator was using are now dead.
-      // We need to remove them as well.
+      // Note that some of the instructions the terminator was using are now
+      // dead. We rely on later stages of the pass to remove them.
     }
   }
 }
@@ -112,8 +174,24 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
 
   for (auto &Fn : *M) {
     for (auto &BB : Fn) {
+      // Simplify the blocks with terminators that rely on constant conditions.
       constantFoldTerminator(BB);
     }
+
+    // Remove unreachable blocks.
     removeUnreachableBlocks(Fn);
+
+    // Remove dead instructions.
+    for (auto &BB : Fn) {
+      auto I = BB.begin(), E = BB.end();
+      while (I != E) {
+        auto CurrentInst = I;
+        // Move the iterator before we remove instructions to avoid iterator
+        // invalidation issues.
+        ++I;
+        if (recursivelyDeleteTriviallyDeadInstructions(CurrentInst))
+          NumInstructionsRemoved++;
+      }
+    }
   }
 }

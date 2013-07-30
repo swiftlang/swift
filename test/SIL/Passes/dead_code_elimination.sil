@@ -15,13 +15,12 @@ bb2:                                              // Preds: bb1 bb0
 }
 // CHECK: @test1
 // CHECK-NEXT: bb0:
-// CHECK-NEXT:  %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:  br bb1
 // CHECK: bb1:
 // CHECK-NEXT:  br bb2
 // CHECK: bb2:
-// CHECK-NEXT:  %1 = tuple ()
-// CHECK-NEXT:  return %1 : $()
+// CHECK-NEXT:  %2 = tuple ()
+// CHECK-NEXT:  return %2 : $()
 // CHECK-NEXT: }
 
 sil @test2 : $[thin] () -> () {
@@ -36,11 +35,10 @@ bb2:                                              // Preds: bb1 bb0
 }
 // CHECK: @test2
 // CHECK-NEXT: bb0:
-// CHECK-NEXT:  %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb0
-// CHECK-NEXT:  %2 = tuple ()
-// CHECK-NEXT:  return %2 : $()
+// CHECK-NEXT:  %1 = tuple ()
+// CHECK-NEXT:  return %1 : $()
 // CHECK-NEXT: }
 
 // func loopWithFalse() -> () {
@@ -74,13 +72,12 @@ bb5:                                              // Preds: bb1
 }
 // CHECK: @loopWithFalse
 // CHECK-NEXT: bb0:
-// CHECK-NEXT:  %0 = br bb1
+// CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb0
-// CHECK-NEXT:  %1 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
 // CHECK-NEXT:  %2 = tuple ()                          
-// CHECK-NEXT:  %3 = return %2 : $()
+// CHECK-NEXT:  return %2 : $()
 // CHECK-NEXT:}
 
 
@@ -115,14 +112,56 @@ bb5:                                              // Preds: bb1
 }
 // CHECK: @InfLoop
 // CHECK-NEXT: bb0:
-// CHECK-NEXT:  %0 = br bb1
+// CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb3 bb0
-// CHECK-NEXT:  %1 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
-// CHECK-NEXT:  %3 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:  br bb3
 // CHECK:bb3:                                              // Preds: bb2
 // CHECK-NEXT:  br bb1
 // CHECK-NEXT: }
 
+class B { }
+class E : B { }
+
+// CHECK: @removeTriviallyDeadInstructions
+sil @removeTriviallyDeadInstructions : $[thin] (b : B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B                           
+  %2 = store %0 to %1#1 : $*B                 // CHECK: store
+  %3 = load %1#1 : $*B                        
+  %4 = retain %3 : $B                         // CHECK: retain
+  %5 = downcast conditional %3 : $B to $E     // CHECK-NOT: downcast
+  %6 = is_nonnull %5 : $E                     // CHECK_NOT: is_nonnull
+  %7 = release %3 : $B                        // CHECK: release
+  %8 = release %1#0 : $Builtin.ObjectPointer
+  %9 = tuple()
+  %10 = return %9 : $()                       // CHECK: return
+}                                             // CHECK: }
+
+// CHECK: @removeTriviallyDeadButUsedByUnreachableBlock
+sil @removeTriviallyDeadButUsedByUnreachableBlock : $[thin] (b : B) -> () {
+bb0(%0 : $B):
+  %5 = downcast conditional %0 : $B to $E         // CHECK-NOT: downcast
+  %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
+  %13 = condbranch %11, bb1, bb2                  // CHECK: br
+bb1:                                              // Preds: bb0
+  %21 = is_nonnull %5 : $E                        // CHECK-NOT: is_nonnull
+  %22 = br bb2
+bb2:                                              // Preds: bb1 bb0
+  %32 = tuple ()                                
+  %33 = return %32 : $()                          // CHECK: return
+}                                                 // CHECK: }
+
+// CHECK: @removeTriviallyDeadCrossBasicBlocks
+sil @removeTriviallyDeadCrossBasicBlocks : $[thin] (b : B, m : Builtin.Int1) -> () {
+bb0(%0:  $B, %1: $Builtin.Int1):
+  %5 = downcast conditional %0 : $B to $E         // CHECK-NOT: downcast
+  %13 = condbranch %1, bb1, bb2                   // CHECK: condbranch
+bb1:                                              // Preds: bb0
+  %21 = is_nonnull %5 : $E                        // CHECK-NOT: is_nonnull
+  %22 = br bb2
+bb2:                                              // Preds: bb1 bb0
+  %32 = tuple ()                                
+  %33 = return %32 : $()                          // CHECK: return
+}                                                 // CHECK: }
