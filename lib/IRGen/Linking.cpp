@@ -96,7 +96,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 't' type                       // value witness
   case Kind::DebuggerTypeMangling:
     buffer << "_Tt";
-    // Fall through.
+    SWIFT_FALLTHROUGH;
 
   // Abstract type manglings just follow <type>.
   case Kind::TypeMangling:
