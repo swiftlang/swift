@@ -1,3 +1,6 @@
+2012-07-31
+----------
+
 * Numeric literals can now use underscores as separators. For example:
 
     var billion = 1_000_000_000
@@ -5,6 +8,17 @@
     var MAXINT = 0x7FFF_FFFF_FFFF_FFFF
     var SMALLEST_DENORM = 0x0.0000_0000_0000_1p-1022
 
+
+* Types conforming to protocols now must always declare the conformance in
+  their inheritance clause.
+
+
+* The build process now produces serialized modules for the standard library,
+  greatly improving build times.
+
+
+2012-07-24
+----------
 
 * Arithmetic operators "+", "-", "*", and "/" on integer types now do
   overflow checking and trap on overflow. A parallel set of masking operators,
@@ -45,6 +59,9 @@
   Also try "s", "n", "up", "down".
 
 
+2012-07-17
+----------
+
 * Swift now has a 'switch' statement, supporting pattern matching of
   multiple values with variable bindings, guard expressions, and range
   comparisons. For example:
@@ -74,6 +91,9 @@
       }
     }
 
+
+2012-07-10
+----------
 
 * Swift has a new closure syntax. The new syntax eliminates the use of
   pipes. Instead, the closure signature is written the same way as a
