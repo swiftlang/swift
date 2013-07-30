@@ -1651,7 +1651,7 @@ void LValueType::print(raw_ostream &OS) const {
 #undef APPEND_QUAL
   }
   OS << "] ";
-  getObjectType()->print(OS);
+  getObjectType().print(OS);
 }
 
 void UnboundGenericType::print(raw_ostream &OS) const {
@@ -1705,7 +1705,7 @@ void ArchetypeType::print(raw_ostream &OS) const {
 }
 
 void SubstitutedType::print(raw_ostream &OS) const {
-  getReplacementType()->print(OS);
+  getReplacementType().print(OS);
 }
 
 void ReferenceStorageType::print(raw_ostream &OS) const {
@@ -1714,5 +1714,5 @@ void ReferenceStorageType::print(raw_ostream &OS) const {
   case Ownership::Unowned: OS << "[unowned] "; break;
   case Ownership::Weak: OS << "[weak] "; break;
   }
-  getReferentType()->print(OS);
+  getReferentType().print(OS);
 }

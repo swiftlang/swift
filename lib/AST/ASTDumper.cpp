@@ -75,7 +75,7 @@ namespace {
 
       if (P->hasType()) {
         OS << " type='";
-        P->getType()->print(OS);
+        P->getType().print(OS);
         OS << '\'';
       }
       return OS;
@@ -118,12 +118,12 @@ namespace {
     
     void visitIsaPattern(IsaPattern *P) {
       printCommon(P, "pattern_isa") << ' ';
-      P->getCastTypeLoc().getType()->print(OS);
+      P->getCastTypeLoc().getType().print(OS);
       OS << ')';
     }
     void visitNominalTypePattern(NominalTypePattern *P) {
       printCommon(P, "pattern_nominal") << ' ';
-      P->getCastTypeLoc().getType()->print(OS);
+      P->getCastTypeLoc().getType().print(OS);
       OS << '\n';
       printRec(P->getSubPattern());
       OS << ')';
@@ -143,7 +143,7 @@ namespace {
     void visitOneOfElementPattern(OneOfElementPattern *P) {
       printCommon(P, "pattern_oneof_element");
       OS << ' ';
-      P->getParentType().getType()->print(OS);
+      P->getParentType().getType().print(OS);
       OS << '.' << P->getName();
       if (P->hasSubPattern()) {
         OS << '\n';
@@ -187,7 +187,7 @@ namespace {
         OS << P.getDecl()->getName();
         if (!P.getAsTypeParam()->getInherited().empty()) {
           OS << " : ";
-          P.getAsTypeParam()->getInherited()[0].getType()->print(OS);
+          P.getAsTypeParam()->getInherited()[0].getType().print(OS);
         }
       }
       OS << '>';
@@ -229,7 +229,7 @@ namespace {
         else
           OS << ", ";
 
-        Super.getType()->print(OS);
+        Super.getType().print(OS);
       }
     }
 
@@ -244,7 +244,7 @@ namespace {
     void visitExtensionDecl(ExtensionDecl *ED) {
       printCommon(ED, "extension_decl", ExtensionColor);
       OS << ' ';
-      ED->getExtendedType()->print(OS);
+      ED->getExtendedType().print(OS);
       printInherited(ED->getInherited());
       for (Decl *Member : ED->getMembers()) {
         if (Member->isImplicit())
@@ -267,7 +267,7 @@ namespace {
       printCommon(TAD, "typealias");
       OS << " type='";
       if (TAD->hasUnderlyingType())
-        TAD->getUnderlyingType()->print(OS);
+        TAD->getUnderlyingType().print(OS);
       else
         OS << "<<<unresolved>>>";
       printInherited(TAD->getInherited());
@@ -300,7 +300,7 @@ namespace {
 
       OS << " type='";
       if (VD->hasType())
-        VD->getType()->print(OS);
+        VD->getType().print(OS);
       else
         OS << "<null type>";
       OS << '\'';
@@ -810,7 +810,7 @@ public:
     for (TypeLoc T : E->getUnresolvedParams()) {
       OS << '\n';
       OS.indent(Indent+2);
-      T.getType()->print(OS);
+      T.getType().print(OS);
     }
     OS << ')';
   }
@@ -1124,7 +1124,7 @@ public:
 
   void printExplicitCastExpr(ExplicitCastExpr *E, const char *name) {
     printCommon(E, name) << ' ';
-    E->getCastTypeLoc().getType()->print(OS);
+    E->getCastTypeLoc().getType().print(OS);
     OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';

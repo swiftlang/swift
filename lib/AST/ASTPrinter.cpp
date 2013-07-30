@@ -238,7 +238,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Isa: {
     auto isa = cast<IsaPattern>(pattern);
     OS << "is ";
-    isa->getCastTypeLoc().getType()->print(OS);
+    isa->getCastTypeLoc().getType().print(OS);
     break;
   }
       
@@ -329,7 +329,7 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited) {
       OS << ", ";
     }
 
-    tl.getType()->print(OS);
+    tl.getType().print(OS);
   }
 }
 
@@ -549,7 +549,7 @@ void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
 
   if (decl->hasArgumentType()) {
     OS << " : ";
-    decl->getArgumentType()->print(OS);
+    decl->getArgumentType().print(OS);
   }
 }
 
@@ -559,7 +559,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   printAttributes(decl->getAttrs());
   printPattern(decl->getIndices());
   OS << " -> ";
-  decl->getElementType()->print(OS);
+  decl->getElementType().print(OS);
   OS << " {";
   {
     IndentRAII indentMore(*this);

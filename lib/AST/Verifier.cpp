@@ -381,7 +381,7 @@ namespace {
       FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
       if (!FT) {
         Out << "callee of apply expression does not have function type:";
-        E->getFn()->getType()->print(Out);
+        E->getFn()->getType().print(Out);
         Out << "\n";
         abort();
       }
@@ -389,7 +389,7 @@ namespace {
       CanType ResultExprTy = E->getType()->getCanonicalType();
       if (ResultExprTy != FT->getResult()->getCanonicalType()) {
         Out << "result of ApplyExpr does not match result type of callee:";
-        E->getType()->print(Out);
+        E->getType().print(Out);
         Out << " vs. ";
         FT->getResult()->print(Out);
         Out << "\n";
@@ -418,7 +418,7 @@ namespace {
                      != InputExprTy) {
           Out << "Argument type does not match parameter type in ApplyExpr:"
                  "\nArgument type: ";
-          E->getArg()->getType()->print(Out);
+          E->getArg()->getType().print(Out);
           Out << "\nParameter type: ";
           FT->getInput()->print(Out);
           Out << "\n";

@@ -199,7 +199,7 @@ void SILType::print(raw_ostream &OS) const {
     OS << '*';
 
   // Print other types as their Swift representation.
-  getSwiftRValueType()->print(OS);
+  getSwiftRValueType().print(OS);
 }
 
 void SILType::dump() const {
