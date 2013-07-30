@@ -109,6 +109,11 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
 
   const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
 
+  // Workaround for rdar://14592634:
+  // Code completion returns zero results at EOF in a function without a closing brace.
+  AugmentedCode += " #";
+  // End workaround
+
   auto Buffer =
       llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
   *BufferID =
