@@ -1,4 +1,4 @@
-//===-- Completion.h - Completion engine for swift immediate mode -* C++ *-===//
+//===--- REPLCodeCompletion.h - Code completion for REPL ----------* C++ *-===//
 //
 // This source file is part of the Swift.org open source project
 //

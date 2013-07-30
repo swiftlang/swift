@@ -1,4 +1,4 @@
-//===-- Completion.cpp - Completion engine for swift immediate mode -------===//
+//===--- REPLCodeCompletion.cpp - Code completion for REPL ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Completion.h"
+#include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
