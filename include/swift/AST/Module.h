@@ -372,7 +372,7 @@ public:
   }
 
 
-  /// \brief \return the name of the module as it should be
+  /// \return the name of the module as it should be
   /// represented in the debug info.
   std::string getDebugModuleName() const { return DebugModuleName; }
 
