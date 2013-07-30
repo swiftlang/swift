@@ -572,11 +572,16 @@ public:
   /// be placed at this location, with notes for each of the protocol
   /// requirements not satisfied.
   ///
+  /// \param ExplicitConformance If non-null, the ExtensionDecl or
+  /// NominalTypeDecl that explicitly declares conformance. If null, an explicit
+  /// conformance will be looked for in the AST, or implicit conformance will
+  /// be checked and diagnosed as a fallback.
+  ///
   /// \returns true if T conforms to the protocol Proto, false otherwise.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto,
                           ProtocolConformance **Conformance = 0,
                           SourceLoc ComplainLoc = SourceLoc(),
-                          bool Explicit = false);
+                          Decl *ExplicitConformance = nullptr);
 
   /// \brief Given a set of archetype substitutions, verify and record all of
   /// the required protocol-conformance relationships.

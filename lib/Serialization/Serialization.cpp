@@ -740,6 +740,7 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
     ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                           addDeclRef(proto),
+                                          addDeclRef(conf->getConformingDecl()),
                                           numValueWitnesses,
                                           numTypeWitnesses,
                                           numInheritedConformances,

@@ -640,6 +640,7 @@ namespace decls_block {
   using ProtocolConformanceLayout = BCRecordLayout<
     PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
+    DeclIDField, // the conforming type or extension decl
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count

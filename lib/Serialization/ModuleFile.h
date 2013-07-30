@@ -202,7 +202,7 @@ private:
   /// If the record at the cursor is not a protocol conformance, returns
   /// Nothing. Note that a null pointer is a valid conformance value.
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
-  maybeReadConformance();
+  maybeReadConformance(Type conformingType);
 
   /// Reads a substitution record from \c DeclTypeCursor.
   ///

@@ -475,6 +475,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
 /// recording the complete witness table if it does.
 static std::unique_ptr<ProtocolConformance>
 checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
+                        Decl *ExplicitConformance,
                         SourceLoc ComplainLoc) {
   WitnessMap Mapping;
   TypeWitnessMap TypeWitnesses;
@@ -829,7 +830,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   std::unique_ptr<ProtocolConformance> Result(
-    new ProtocolConformance(std::move(Mapping),
+    new ProtocolConformance(T, Proto, ExplicitConformance,
+                            std::move(Mapping),
                             std::move(TypeWitnesses),
                             std::move(InheritedMapping),
                             defaultedDefinitions));
@@ -952,7 +954,7 @@ existentialConformsToItself(TypeChecker &tc,
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      ProtocolConformance **Conformance,
                                      SourceLoc ComplainLoc, 
-                                     bool Explicit) {
+                                     Decl *ExplicitConformance) {
   if (Conformance)
     *Conformance = nullptr;
 
@@ -992,7 +994,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
   ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
   if (Known != Context.ConformsTo.end()) {
-    if (!Explicit) {
+    if (!ExplicitConformance) {
       if (Conformance)
         *Conformance = Known->second;
     
@@ -1005,7 +1007,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
   // If we're checking for conformance (rather than stating it),
   // look for the explicit declaration of conformance in the list of protocols.
-  if (!Explicit) {
+  if (!ExplicitConformance) {
     // Look through the metatype.
     // FIXME: This feels like a hack to work around bugs in the solver.
     auto instanceT = T;
@@ -1021,14 +1023,14 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     // Walk the nominal type, its extensions, superclasses, and so on.
     llvm::SmallPtrSet<ProtocolDecl *, 4> visitedProtocols;
     SmallVector<NominalTypeDecl *, 4> stack;
-    bool foundExplicitConformance = false;
 
     // Local function that checks for our protocol in the given array of
     // protocols.
-    auto isProtocolInList = [&](ArrayRef<ProtocolDecl *> protocols) -> bool {
+    auto isProtocolInList = [&](Decl *decl,
+                                ArrayRef<ProtocolDecl *> protocols) -> bool {
       for (auto testProto : protocols) {
         if (testProto == Proto) {
-          foundExplicitConformance = true;
+          ExplicitConformance = decl;
           return true;
         }
 
@@ -1052,18 +1054,18 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       }
 
       // Visit the protocols this type conforms to directly.
-      if (isProtocolInList(getDirectConformsTo(current)))
+      if (isProtocolInList(current, getDirectConformsTo(current)))
         break;
 
       // Visit the extensions of this type.
       for (auto ext : current->getExtensions()) {
-        if (isProtocolInList(getDirectConformsTo(ext)))
+        if (isProtocolInList(ext, getDirectConformsTo(ext)))
           break;
       }
     }
 
     // If we did not find explicit conformance, we're done.
-    if (!foundExplicitConformance) {
+    if (!ExplicitConformance) {
       // FIXME: Check whether the type *implicitly* conforms. If so, produce
       // a cleaner diagnostic along with a Fix-It that adds the explicit
       // conformance either via a new extension or onto an existing extension.
@@ -1083,7 +1085,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   // (if the protocol hierarchies are circular) as well as tautologies.
   Context.ConformsTo[Key] = nullptr;
   if (std::unique_ptr<ProtocolConformance> ComputedConformance
-        = checkConformsToProtocol(*this, T, Proto, ComplainLoc)) {
+        = checkConformsToProtocol(*this, T, Proto, ExplicitConformance,
+                                  ComplainLoc)) {
     auto result = ComputedConformance.release();
     Context.ConformsTo[Key] = result;
 

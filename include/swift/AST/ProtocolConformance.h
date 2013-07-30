@@ -30,7 +30,8 @@ class ProtocolDecl;
 class SubstitutableType;
 class TypeAliasDecl;
 class ValueDecl;
-
+class Decl;
+  
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
@@ -62,6 +63,15 @@ typedef llvm::DenseMap<ProtocolDecl *, ProtocolConformance *>
 /// providing the mapping from the protocol members to the type (or extension)
 /// members that provide the functionality for the concrete type.
 class ProtocolConformance {
+  /// \brief The type that conforms to the protocol.
+  Type ConformingType;
+  
+  /// \brief The protocol being conformed to.
+  ProtocolDecl *Protocol;
+  
+  /// \brief The ExtensionDecl or NominalTypeDecl that declares the conformance.
+  Decl *ConformingDecl;
+  
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   WitnessMap Mapping;
@@ -79,17 +89,33 @@ class ProtocolConformance {
   llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 
 public:
-  ProtocolConformance(WitnessMap &&witnesses,
+  ProtocolConformance(Type conformingType,
+                      ProtocolDecl *protocol,
+                      Decl *conformingDecl,
+                      WitnessMap &&witnesses,
                       TypeWitnessMap &&typeWitnesses,
                       InheritedConformanceMap &&inheritedConformances,
                       llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
-    : Mapping(std::move(witnesses)),
+    : ConformingType(conformingType),
+      Protocol(protocol),
+      ConformingDecl(conformingDecl),
+      Mapping(std::move(witnesses)),
       TypeWitnesses(std::move(typeWitnesses)),
       InheritedMapping(std::move(inheritedConformances))
   {
     for (auto def : defaultedDefinitions)
       DefaultedDefinitions.insert(def);
   }
+  
+  /// Get the conforming type.
+  Type getType() const { return ConformingType; }
+  
+  /// Get the protocol being conformed to.
+  ProtocolDecl *getProtocol() const { return Protocol; }
+  
+  /// Get the declaration that provides the conformance. This can be either the
+  /// original NominalTypeDecl for the type, or an ExtensionDecl.
+  Decl *getConformingDecl() const { return ConformingDecl; }
 
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(TypeAliasDecl *assocType) const {

@@ -227,7 +227,7 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
-Optional<ConformancePair> ModuleFile::maybeReadConformance() {
+Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(DeclTypeCursor);
@@ -248,18 +248,19 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
     return std::make_pair(cast<ProtocolDecl>(getDecl(protoID)), nullptr);
   }
 
-  DeclID protoID;
+  DeclID protoID, conformingDeclID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
-  ProtocolConformanceLayout::readRecord(scratch, protoID, valueCount, typeCount,
+  ProtocolConformanceLayout::readRecord(scratch, protoID, conformingDeclID,
+                                        valueCount, typeCount,
                                         inheritedCount, defaultedCount,
                                         rawIDs);
 
   InheritedConformanceMap inheritedConformances;
 
   while (inheritedCount--) {
-    auto inherited = maybeReadConformance();
+    auto inherited = maybeReadConformance(conformingType);
     assert(inherited.hasValue());
 
     inheritedConformances.insert(inherited.getValue());
@@ -267,9 +268,15 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
 
   ASTContext &ctx = ModuleContext->Ctx;
   ProtocolDecl *proto;
+  Decl *conformingDecl;
   {
     BCOffsetRAII restoreOffset(DeclTypeCursor);
     proto = cast<ProtocolDecl>(getDecl(protoID));
+    // FIXME: Deserialize the conforming decl. This currently asserts out if the
+    // conforming decl is an ExtensionDecl, with "cannot cross-reference this
+    // kind of decl".
+    // conformingDecl = getDecl(conformingDeclID);
+    conformingDecl = nullptr;
   }
 
   WitnessMap witnesses;
@@ -317,7 +324,10 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance() {
   lastRecordOffset.reset();
 
   std::unique_ptr<ProtocolConformance> conformance(
-    new ProtocolConformance(std::move(witnesses),
+    new ProtocolConformance(conformingType,
+                            proto,
+                            conformingDecl,
+                            std::move(witnesses),
                             std::move(typeWitnesses),
                             std::move(inheritedConformances),
                             defaultedDefinitions));
@@ -416,7 +426,7 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution() {
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   while (numConformances--) {
-    auto conformancePair = maybeReadConformance();
+    auto conformancePair = maybeReadConformance(replacementTy);
     assert(conformancePair.hasValue() && "Missing conformance");
     auto conformance = processConformance(ctx, nullptr, canReplTy,
                                           conformancePair->first,
@@ -729,7 +739,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canBaseTy = underlyingType.getType()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance())
+    while (auto conformance = maybeReadConformance(underlyingType.getType()))
       conformances.push_back(*conformance);
     processConformances(ctx, alias, canBaseTy, conformances);
 
@@ -772,7 +782,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = theStruct->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance())
+    while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
     processConformances(ctx, theStruct, canTy, conformances);
 
@@ -1118,7 +1128,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance())
+    while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
     processConformances(ctx, theClass, canTy, conformances);
 
@@ -1169,7 +1179,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canTy = oneOf->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance())
+    while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
     processConformances(ctx, oneOf, canTy, conformances);
 
@@ -1289,7 +1299,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     CanType canBaseTy = baseTy.getType()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance())
+    while (auto conformance = maybeReadConformance(canBaseTy))
       conformances.push_back(*conformance);
     processConformances(ctx, extension, canBaseTy, conformances);
 
