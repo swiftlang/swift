@@ -36,8 +36,7 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 // FIXME: Copied from SourceLoader. Not bothering to fix until we decide that
 // the source loader search path should be the same as the module loader search
 // path.
-static std::pair<llvm::error_code, std::string>
-findModule(ASTContext &ctx, AccessPathElem moduleID,
+static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
            llvm::OwningPtr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
@@ -59,14 +58,14 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
       llvm::sys::path::append(inputFilename, moduleFilename.str());
       llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename, buffer);
       if (!err)
-        return std::make_pair(err, inputFilename.str());
+        return err;
     }
   }
 
   // Second, search in the current directory.
   llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename, buffer);
   if (!err)
-    return std::make_pair(err, moduleFilename.str());
+    return err;
 
   // If we fail, search each import search path.
   for (auto Path : ctx.ImportSearchPaths) {
@@ -74,10 +73,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     llvm::sys::path::append(inputFilename, moduleFilename.str());
     err = llvm::MemoryBuffer::getFile(inputFilename, buffer);
     if (!err)
-      return std::make_pair(err, inputFilename.str());
+      return err;
   }
 
-  return std::make_pair(err, std::string());
+  return err;
 }
 
 static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
@@ -130,16 +129,16 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto moduleID = path[0];
 
   llvm::OwningPtr<llvm::MemoryBuffer> inputFile;
-  auto ErrPath = findModule(Ctx, moduleID, inputFile);
-  if (ErrPath.first) {
-    if (ErrPath.first.value() != llvm::errc::no_such_file_or_directory) {
+  if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
+    if (err.value() != llvm::errc::no_such_file_or_directory) {
       Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first.str(), ErrPath.first.message());
+                         moduleID.first.str(), err.message());
     }
 
     return nullptr;
   }
   assert(inputFile);
+  std::string DebugModuleName = inputFile->getBufferIdentifier();
   
   llvm::OwningPtr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(inputFile), loadedModuleFile);
@@ -163,8 +162,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto comp = new (Ctx.Allocate<Component>(1)) Component();
   auto module = new (Ctx) SerializedModule(Ctx, *this, moduleID.first,
-                                           ErrPath.second, comp,
-                                           loadedModuleFile.get());
+                                           DebugModuleName,
+                                           comp, loadedModuleFile.get());
 
   // Whether we succeed or fail, don't try to load this module again.
   Ctx.LoadedModules[moduleID.first.str()] = module;
