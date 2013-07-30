@@ -294,12 +294,18 @@ StringRef IRGenDebugInfo::getName(const FuncDecl& FD) {
 
 /// Attempt to figure out the unmangled name of a function.
 StringRef IRGenDebugInfo::getName(SILLocation L) {
+  if (L.isNull())
+    return StringRef();
+
   if (FuncExpr* FE = L.getAs<FuncExpr>())
     if (FuncDecl* FD = FE->getDecl())
       return getName(*FD);
 
   if (FuncDecl* FD = L.getAs<FuncDecl>())
     return getName(*FD);
+
+  if (L.is<ConstructorDecl>())
+    return "constructor";
 
   return StringRef();
 }
