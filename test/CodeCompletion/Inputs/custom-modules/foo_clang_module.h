@@ -23,7 +23,9 @@ typedef int FooTypedef1;
 
 extern int fooIntVar;
 
-int fooFunc1(int a, float b, double c, int *d);
+int fooFunc1(int a);
+int fooFunc1AnonymousParam(int);
+int fooFunc3(int a, float b, double c, int *d);
 
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1

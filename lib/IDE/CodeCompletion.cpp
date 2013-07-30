@@ -360,12 +360,21 @@ public:
         CodeCompletionResult::ResultKind::Pattern);
     Builder.addLeftParen();
     bool NeedComma = false;
-    for (auto TupleElt : AFT->getInput()->castTo<TupleType>()->getFields()) {
-      if (NeedComma)
-        Builder.addComma(", ");
-      Builder.addCallParameter(TupleElt.getName(),
-                               TupleElt.getType().getString());
-      NeedComma = true;
+    if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
+      for (auto TupleElt : TT->getFields()) {
+        if (NeedComma)
+          Builder.addComma(", ");
+        Builder.addCallParameter(TupleElt.getName(),
+                                 TupleElt.getType().getString());
+        NeedComma = true;
+      }
+    } else {
+      Type T = AFT->getInput();
+      if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
+        // Only unwrap the paren shugar, if it exists.
+        T = PT->getUnderlyingType();
+      }
+      Builder.addCallParameter(Identifier(), T->getString());
     }
     Builder.addRightParen();
     addTypeAnnotation(Builder, AFT->getResult());
