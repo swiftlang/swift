@@ -100,7 +100,13 @@ public:
 
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
 
-  
+  /// \brief Returns true if the instruction may have side effects.
+  ///
+  /// Instructions that store into memory or change retain counts as well as
+  /// calls and deallocation instructions are considered to have side effects
+  /// that are not visible by merely examining their uses.
+  bool mayHaveSideEffects() const;
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
            V->getKind() <= ValueKind::Last_SILInstruction;

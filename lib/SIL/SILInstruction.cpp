@@ -143,6 +143,30 @@ unsigned Operand::getOperandNumber() const {
   return this - &cast<SILInstruction>(getUser())->getAllOperands()[0];
 }
 
+bool SILInstruction::mayHaveSideEffects() const {
+  switch (getKind()) {
+    default: return false;
+    case ValueKind::DeallocStackInst:
+    case ValueKind::DeallocRefInst:
+    case ValueKind::StoreInst:
+    case ValueKind::InitializeVarInst:
+    case ValueKind::CopyAddrInst:
+    case ValueKind::DestroyAddrInst:
+    case ValueKind::RetainInst:
+    case ValueKind::RetainAutoreleasedInst:
+    case ValueKind::ReleaseInst:
+    case ValueKind::WeakRetainInst:
+    case ValueKind::WeakReleaseInst:
+    case ValueKind::ApplyInst:
+      // FIXME: A lot of function calls should be known to have no side effects.
+    case ValueKind::PartialApplyInst:
+    case ValueKind::InitExistentialInst:
+    case ValueKind::UpcastExistentialInst:
+    case ValueKind::DeinitExistentialInst:
+      return true;
+  }
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 // SILInstruction Subclasses
