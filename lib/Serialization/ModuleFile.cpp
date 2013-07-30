@@ -749,12 +749,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit;
+    bool isImplicit, isObjC;
     TypeID signatureID;
     DeclID implicitThisID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
-                                               signatureID, implicitThisID);
+                                               isObjC, signatureID,
+                                               implicitThisID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
@@ -779,6 +780,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       ctor->setImplicit();
+    ctor->setIsObjC(isObjC);
 
     if (genericParams)
       for (auto &genericParam : *ctor->getGenericParams())
@@ -790,14 +792,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit;
+    bool isImplicit, isObjC, isIBOutlet;
     TypeID typeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       typeID, getterID, setterID,
-                                       overriddenID);
+                                       isObjC, isIBOutlet, typeID,
+                                       getterID, setterID, overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto var = new (ctx) VarDecl(SourceLoc(), getIdentifier(nameID),
@@ -814,6 +816,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       var->setImplicit();
+    var->setIsObjC(isObjC);
+    if (isIBOutlet)
+      var->getMutableAttrs().IBOutlet = true;
 
     var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
@@ -825,14 +830,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit;
     bool isClassMethod;
     bool isAssignmentOrConversion;
+    bool isObjC, isIBAction;
     TypeID signatureID;
     DeclID associatedDeclID;
     DeclID overriddenID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         isClassMethod, isAssignmentOrConversion,
-                                        signatureID, associatedDeclID,
-                                        overriddenID);
+                                        isObjC, isIBAction, signatureID,
+                                        associatedDeclID, overriddenID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -892,16 +898,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       else
         fn->getMutableAttrs().Conversion = true;
     }
+    fn->setIsObjC(isObjC);
+    if (isIBAction)
+      fn->getMutableAttrs().IBAction = true;
 
     if (Decl *associated = getDecl(associatedDeclID)) {
       if (auto op = dyn_cast<OperatorDecl>(associated)) {
         fn->setOperatorDecl(op);
 
-        DeclAttributes &attrs = fn->getMutableAttrs();
         if (isa<PrefixOperatorDecl>(op))
-          attrs.ExplicitPrefix = true;
+          fn->getMutableAttrs().ExplicitPrefix = true;
         else if (isa<PostfixOperatorDecl>(op))
-          attrs.ExplicitPostfix = true;
+          fn->getMutableAttrs().ExplicitPostfix = true;
         // Note that an explicit [infix] is not required.
       }
       // Otherwise, unknown associated decl kind.
@@ -933,11 +941,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit;
+    bool isImplicit, isClassProtocol, isObjC;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, protocolIDs);
+                                            isImplicit, isClassProtocol, isObjC,
+                                            protocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -953,6 +962,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       proto->setImplicit();
+    if (isClassProtocol)
+      proto->getMutableAttrs().ClassProtocol = true;
+    proto->setIsObjC(isObjC);
 
     // Deserialize the list of protocols.
     SmallVector<ProtocolDecl *, 4> protocols;
@@ -1024,10 +1036,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit;
+    bool isImplicit, isObjC;
     TypeID superclassID;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, superclassID);
+                                         isImplicit, isObjC, superclassID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1050,6 +1062,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (genericParams)
       for (auto &genericParam : *theClass->getGenericParams())
         genericParam.getAsTypeParam()->setDeclContext(theClass);
+    theClass->setIsObjC(isObjC);
 
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
 
@@ -1146,13 +1159,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::SUBSCRIPT_DECL: {
     DeclID contextID;
-    bool isImplicit;
+    bool isImplicit, isObjC;
     TypeID declTypeID, elemTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             declTypeID, elemTypeID,
+                                             isObjC, declTypeID, elemTypeID,
                                              getterID, setterID,
                                              overriddenID);
 
@@ -1176,6 +1189,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     subscript->setType(getType(declTypeID));
     if (isImplicit)
       subscript->setImplicit();
+    subscript->setIsObjC(isObjC);
 
     auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
     subscript->setOverriddenDecl(overriddenDecl);
@@ -1224,12 +1238,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::DESTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit;
+    bool isImplicit, isObjC;
     TypeID signatureID;
     DeclID implicitThisID;
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
-                                              signatureID, implicitThisID);
+                                              isObjC, signatureID,
+                                              implicitThisID);
 
     DeclContext *parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
@@ -1245,6 +1260,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     dtor->setType(getType(signatureID));
     if (isImplicit)
       dtor->setImplicit();
+    dtor->setIsObjC(isObjC);
 
     break;
   }

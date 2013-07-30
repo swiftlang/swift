@@ -431,31 +431,34 @@ namespace decls_block {
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
+  using OneOfLayout = NominalLayout<ONEOF_DECL>;
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
     IdentifierIDField, // name
     DeclIDField,       // context decl
-    BCFixed<1>,        // implicit flag
+    BCFixed<1>,        // implicit?
+    BCFixed<1>,        // explicitly objc?
     TypeIDField        // superclass
     // Trailed by the generic parameters (if any), conformance info (if any),
     // and finally the decl context record.
   >;
-
-  using OneOfLayout = NominalLayout<ONEOF_DECL>;
 
   using ProtocolLayout = BCRecordLayout<
     PROTOCOL_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
+    BCFixed<1>,  // class protocol?
+    BCFixed<1>,  // objc?
     BCArray<DeclIDField> // protocols
   >;
 
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
     DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
+    BCFixed<1>,  // implicit?
+    BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
     // Trailed by its generic parameters, if any, followed by the parameter
@@ -467,6 +470,8 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
+    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // iboutlet?
     TypeIDField,  // type
     DeclIDField,  // getter
     DeclIDField,  // setter
@@ -480,6 +485,8 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // class method?
     BCFixed<1>,   // assignment? / conversion?
+    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // iboutlet?
     TypeIDField,  // type (signature)
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
@@ -527,6 +534,7 @@ namespace decls_block {
     SUBSCRIPT_DECL,
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
+    BCFixed<1>,  // objc?
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
     DeclIDField, // getter
@@ -546,7 +554,8 @@ namespace decls_block {
   using DestructorLayout = BCRecordLayout<
     DESTRUCTOR_DECL,
     DeclIDField, // context decl
-    BCFixed<1>,  // implicit flag
+    BCFixed<1>,  // implicit?
+    BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
   >;

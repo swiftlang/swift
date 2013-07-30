@@ -1045,8 +1045,10 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!theClass->getAttrs().empty())
+    DeclAttributes remainingAttrs = theClass->getAttrs();
+    remainingAttrs.ObjC = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1056,6 +1058,7 @@ bool Serializer::writeDecl(const Decl *D) {
                             addIdentifierRef(theClass->getName()),
                             addDeclRef(DC),
                             theClass->isImplicit(),
+                            theClass->isObjC(),
                             addTypeRef(theClass->getSuperclass()));
 
     writeGenericParams(theClass->getGenericParams());
@@ -1068,8 +1071,11 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
     
-    // FIXME: Handle attributes.
-    if (!proto->getAttrs().empty())
+    DeclAttributes remainingAttrs = proto->getAttrs();
+    remainingAttrs.ClassProtocol = false;
+    remainingAttrs.ObjC = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     assert(!proto->getGenericParams() && "protocols can't be generic");
@@ -1084,6 +1090,8 @@ bool Serializer::writeDecl(const Decl *D) {
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
+                               proto->getAttrs().isClassProtocol(),
+                               proto->isObjC(),
                                protocols);
 
     writeMembers(proto->getMembers());
@@ -1093,8 +1101,12 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!var->getAttrs().empty())
+    DeclAttributes remainingAttrs = var->getAttrs();
+    // FIXME: We need some representation of these for source fidelity.
+    remainingAttrs.ObjC = false;
+    remainingAttrs.IBOutlet = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
@@ -1105,6 +1117,8 @@ bool Serializer::writeDecl(const Decl *D) {
                           addIdentifierRef(var->getName()),
                           addDeclRef(DC),
                           var->isImplicit(),
+                          var->isObjC(),
+                          var->getAttrs().isIBOutlet(),
                           addTypeRef(type),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
@@ -1116,19 +1130,20 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
 
-    DeclAttributes attrs = fn->getAttrs();
+    DeclAttributes remainingAttrs = fn->getAttrs();
     // FIXME: We need some representation of these for source fidelity.
-    attrs.ExplicitPrefix = false;
-    attrs.ExplicitPostfix = false;
-    attrs.ExplicitInfix = false;
-    attrs.Assignment = false;
-    attrs.Conversion = false;
-    attrs.AsmName = {};
-    attrs.NoReturn = false;
-    attrs.Thin = false;
+    remainingAttrs.ExplicitPrefix = false;
+    remainingAttrs.ExplicitPostfix = false;
+    remainingAttrs.ExplicitInfix = false;
+    remainingAttrs.Assignment = false;
+    remainingAttrs.Conversion = false;
+    remainingAttrs.AsmName = {};
+    remainingAttrs.NoReturn = false;
+    remainingAttrs.Thin = false;
+    remainingAttrs.ObjC = false;
+    remainingAttrs.IBAction = false;
 
-    // FIXME: Handle other attributes.
-    if (!attrs.empty())
+    if (!remainingAttrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
@@ -1141,6 +1156,8 @@ bool Serializer::writeDecl(const Decl *D) {
                            fn->isStatic(),
                            fn->getAttrs().isAssignment() ||
                              fn->getAttrs().isConversion(),
+                           fn->isObjC(),
+                           fn->getAttrs().isIBAction(),
                            addTypeRef(fn->getType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
@@ -1181,8 +1198,10 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!subscript->getAttrs().empty())
+    DeclAttributes remainingAttrs = subscript->getAttrs();
+    remainingAttrs.ObjC = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
@@ -1191,6 +1210,7 @@ bool Serializer::writeDecl(const Decl *D) {
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclRef(DC),
                                 subscript->isImplicit(),
+                                subscript->isObjC(),
                                 addTypeRef(subscript->getType()),
                                 addTypeRef(subscript->getElementType()),
                                 addDeclRef(subscript->getGetter()),
@@ -1206,8 +1226,10 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!ctor->getAttrs().empty())
+    DeclAttributes remainingAttrs = ctor->getAttrs();
+    remainingAttrs.ObjC = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     // FIXME: Handle allocating constructors.
@@ -1223,6 +1245,7 @@ bool Serializer::writeDecl(const Decl *D) {
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(DC),
                                   ctor->isImplicit(),
+                                  ctor->isObjC(),
                                   addTypeRef(ctor->getType()),
                                   addDeclRef(implicitThis));
 
@@ -1235,8 +1258,10 @@ bool Serializer::writeDecl(const Decl *D) {
   case DeclKind::Destructor: {
     auto dtor = cast<DestructorDecl>(D);
 
-    // FIXME: Handle attributes.
-    if (!dtor->getAttrs().empty())
+    DeclAttributes remainingAttrs = dtor->getAttrs();
+    remainingAttrs.ObjC = false;
+
+    if (!remainingAttrs.empty())
       return false;
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
@@ -1246,6 +1271,7 @@ bool Serializer::writeDecl(const Decl *D) {
     DestructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addDeclRef(DC),
                                  dtor->isImplicit(),
+                                 dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
                                  addDeclRef(implicitThis));
     
