@@ -1089,8 +1089,9 @@ bool Parser::parseDeclVar(unsigned Flags, SmallVectorImpl<Decl*> &Decls){
 
     NullablePtr<Expr> Init;
     if (Tok.is(tok::equal)) {
-      // Record the variable that we're trying to initialize.
+      // Record the variables that we're trying to initialize.
       SmallVector<VarDecl *, 4> Vars;
+      Vars.append(CurVars.second.begin(), CurVars.second.end());
       pattern.get()->collectVariables(Vars);
       using RestoreVarsRAII = llvm::SaveAndRestore<decltype(CurVars)>;
       RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});

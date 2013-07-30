@@ -1321,6 +1321,17 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
   }
   
   ValueDecl *D = lookupInScope(text);
+  // FIXME: We want this to work: "var x = { x() }", but for now it's better to
+  // disallow it than to crash.
+  if (!D && CurDeclContext != CurVars.first) {
+    for (auto activeVar : CurVars.second) {
+      if (activeVar->getName() == text) {
+        diagnose(loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(loc);
+      }
+    }
+  }
+
   Expr *E;
   if (D == 0) {
     auto refKind = DeclRefKind::Ordinary;
