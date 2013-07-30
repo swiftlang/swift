@@ -192,8 +192,16 @@ static bool optimizeAllocStack(AllocStackInst *ASI) {
     L->eraseFromParent();
   }
 
+
+  // If we promoted all the loads, have no byref uses, and have no debug
+  // information, we can completely remove the alloca.  The only uses of it left
+  // should be the dealloc_stack and stores.
   if (CanRemoveAlloc) {
-    // FIXME: remove allocation and all uses.
+    while (!ASI->use_empty()) {
+      auto *User = cast<SILInstruction>((*ASI->use_begin())->getUser());
+      assert(isa<DeallocStackInst>(User) || isa<StoreInst>(User));
+      User->eraseFromParent();
+    }
   }
 
   return PromotedLoad;
