@@ -105,6 +105,15 @@ public:
   bool isFollowingLSquare() const {
     return !isAtStartOfLine() && Kind == tok::l_square;
   }
+
+  /// True if the token is any keyword.
+  bool isKeyword() const {
+    switch (Kind) {
+#define KEYWORD(X) case tok::kw_##X: return true;
+#include "swift/Parse/Tokens.def"
+    default: return false;
+    }
+  }
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.

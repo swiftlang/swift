@@ -25,26 +25,26 @@ sil @type_ref1 : $(a : Class1, b : Int) -> ()  // CHECK: $(a : Class1, b : Int64
 sil @test1 : $() -> () {              // CHECK: sil @test1 : $() -> ()
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
-  %a = br bb1                         // CHECK: br bb1
+  br bb1                              // CHECK:   br bb1
 bb1:
   %b = alloc_box $Int64               // CHECK:   %2 = alloc_box $Int64
-  %1 = return %0 : $()                // CHECK:   %3 = return %0 : $()
+  return %0 : $()                     // CHECK:   return %0 : $()
 }
 
 // Forward referenced values.
 sil @test2 : $(x : Int64) -> () {              // CHECK: sil @test2 : $(x : Int64) -> ()
 bb0(%0 : $Int64):
-  %1 = br bb2
+  br bb2
 bb1:
   // Forward reference MRVs.
-  %2 = store %0 to %6#1 : $*Int64              // CHECK:   %2 = store %0 to %6#1
-  %3 = release %6#0 : $Builtin.ObjectPointer   // CHECK:   %3 = release %6#0
+  store %0 to %6#1 : $*Int64                   // CHECK:   store %0 to %6#1
+  release %6#0 : $Builtin.ObjectPointer        // CHECK:   release %6#0
 
-  %4 = return %5 : $()                         // CHECK:   %4 = return %5 : $()
+  return %5 : $()                              // CHECK:   return %5 : $()
 bb2:
   %5 = tuple ()                                // CHECK:   %5 = tuple ()
   %6 = alloc_box $Int64                        // CHECK:   %6 = alloc_box $Int64
-  %7 = br bb1                                  // CHECK:   %7 = br bb1
+  br bb1                                       // CHECK:   br bb1
 }
 
 sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
@@ -55,24 +55,24 @@ sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
 
 sil @return_int : $[thin] (a : Int64) -> Int64 { // CHECK: $[thin] (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64                    // CHECK: alloc_stack $Int64
-  %2 = store %0 to %1 : $*Int64            // CHECK: %2 = store %0 to %1 : $*Int64
+  %1 = alloc_stack $Int64                  // CHECK: alloc_stack $Int64
+  store %0 to %1 : $*Int64                 // CHECK: store %0 to %1 : $*Int64
   %3 = load %1 : $*Int64                   // CHECK: load {{.*}} : $*Int64
-  %4 = dealloc_stack %1 : $*Int64            // CHECK: dealloc_stack {{.*}} : $*Int64
-  %5 = return %3 : $Int64                  // CHECK: return {{.*}} : $Int64
+  dealloc_stack %1 : $*Int64               // CHECK: dealloc_stack {{.*}} : $*Int64
+  return %3 : $Int64                       // CHECK: return {{.*}} : $Int64
 }
 
 sil @call_fn_pointer : $[thin] (a : () -> Int64) -> Int64 {
 bb0(%0 : $() -> Int64):
-  %1 = alloc_stack $() -> Int64              // CHECK: alloc_stack $() -> Int64
-  %2 = store %0 to %1 : $*() -> Int64      // CHECK: store %0 to %1 : $*() -> Int64
+  %1 = alloc_stack $() -> Int64            // CHECK: alloc_stack $() -> Int64
+  store %0 to %1 : $*() -> Int64           // CHECK: store %0 to %1 : $*() -> Int64
   %3 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
-  %4 = retain %3 : $() -> Int64            // CHECK: retain %3 : $() -> Int64
+  retain %3 : $() -> Int64                 // CHECK: retain %3 : $() -> Int64
   %5 = apply %3() : $() -> Int64           // CHECK: apply %3() : $() -> Int64
   %6 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
-  %7 = release %6 : $() -> Int64           // CHECK: release {{.*}} : $() -> Int64
-  %8 = dealloc_stack %1 : $*() -> Int64      // CHECK: dealloc_stack %1 : $*() -> Int64
-  %9 = return %5 : $Int64                  // CHECK: return %5 : $Int64
+  release %3 : $() -> Int64                // CHECK: release {{.*}} : $() -> Int64
+  dealloc_stack %1 : $*() -> Int64         // CHECK: dealloc_stack %1 : $*() -> Int64
+  return %5 : $Int64                       // CHECK: return %5 : $Int64
 }
 
 sil @return_constant : $[thin] () -> Int64 {  // CHECK: @return_constant
@@ -532,8 +532,8 @@ bb0(%0 : $*SomeProtocol):
 // CHECK: sil @test_unreachable
 sil @test_unreachable : $() -> () {
 bb0:
-  %0 = unreachable
-// CHECK: %0 = unreachable
+  unreachable
+// CHECK: unreachable
 }
 
 sil @test_weak_retain : $[thin] (p : SomeClass) -> () {

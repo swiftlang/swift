@@ -266,9 +266,12 @@ public:
   // SILInstruction Printing Logic
 
   void print(SILValue V) {
-    ID Name = getID(V);
-    Name.ResultNumber = -1;  // Don't print subresult number.
-    OS << "  " << Name << " = ";
+    OS << "  ";
+    if (V->hasValue()) {
+      ID Name = getID(V);
+      Name.ResultNumber = -1;  // Don't print subresult number.
+      OS << Name << " = ";
+    }
     visit(V);
     if (!V->use_empty()) {
       OS.PadToColumn(50);
@@ -776,8 +779,9 @@ ID SILPrinter::getID(SILValue V) {
       for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
         ValueToIDMap[*I] = ++idx;
 
-      for (auto &I : BB)
+      for (auto &I : BB) {
         ValueToIDMap[&I] = ++idx;
+      }
     }
   }
 

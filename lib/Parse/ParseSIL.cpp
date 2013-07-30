@@ -153,6 +153,8 @@ namespace {
     bool parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal);
 
     bool parseSILBasicBlock();
+    
+    bool isStartOfSILInstruction();
   };
 } // end anonymous namespace.
 
@@ -865,30 +867,33 @@ Type SILParser::lookupBoolType(SourceLoc Loc) {
 }
 
 ///   sil-instruction:
-///     sil_local_name '=' identifier ...
+///     (sil_local_name '=')? identifier ...
 bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
-  if (P.Tok.isNot(tok::sil_local_name)) {
-    P.diagnose(P.Tok, diag::expected_sil_instr_name);
-    return true;
-  }
-
   // We require SIL instructions to be at the start of a line to assist
   // recovery.
   if (!P.Tok.isAtStartOfLine()) {
     P.diagnose(P.Tok, diag::expected_sil_instr_start_of_line);
     return true;
   }
-  StringRef ResultName = P.Tok.getText();
-  SourceLoc ResultNameLoc = P.Tok.getLoc();
-  P.consumeToken(tok::sil_local_name);
+
+  StringRef ResultName;
+  SourceLoc ResultNameLoc;
+
+  // If the instruction has a name '%foo =', parse it.
+  if (P.Tok.is(tok::sil_local_name)) {
+    ResultName = P.Tok.getText();
+    ResultNameLoc = P.Tok.getLoc();
+    P.consumeToken(tok::sil_local_name);
+    if (P.parseToken(tok::equal, diag::expected_equal_in_sil_instr))
+      return true;
+  }
   
   ValueKind Opcode;
   SourceLoc OpcodeLoc;
   StringRef OpcodeName;
   
-  // Parse the equal and opcode name.
-  if (P.parseToken(tok::equal, diag::expected_equal_in_sil_instr) ||
-      parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
+  // Parse the opcode name.
+  if (parseSILOpcode(Opcode, OpcodeLoc, OpcodeName))
     return true;
 
   SILBuilder B(BB);
@@ -1602,7 +1607,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   }
   
-  setLocalValue(ResultVal, ResultName, ResultNameLoc);
+  // Store the named value if we had a name.
+  if (ResultNameLoc.isValid())
+    setLocalValue(ResultVal, ResultName, ResultNameLoc);
   return false;
 }
 
@@ -1680,6 +1687,23 @@ bool SILParser::parseSILFunctionRef(SILBuilder &B, ValueBase *&ResultVal) {
   return false;
 }
 
+/// True if the current token sequence looks like the start of a SIL
+/// instruction, either:
+///   %name
+/// or:
+///   identifier | keyword
+/// where identifier is not followed by a '(' or ':', which would indicate
+/// a basic block.
+bool SILParser::isStartOfSILInstruction() {
+  if (P.Tok.is(tok::sil_local_name))
+    return true;
+  if (P.Tok.is(tok::identifier) || P.Tok.isKeyword()) {
+    auto &peek = P.peekToken();
+    return !peek.is(tok::l_paren) && !peek.is(tok::colon);
+  }
+  return false;
+}
+
 ///   sil-basic-block:
 ///     sil-instruction+
 ///     identifier sil-bb-argument-list? ':' sil-instruction+
@@ -1730,7 +1754,7 @@ bool SILParser::parseSILBasicBlock() {
   do {
     if (parseSILInstruction(BB))
       return true;
-  } while (P.Tok.is(tok::sil_local_name));
+  } while (isStartOfSILInstruction());
 
   return false;
 }

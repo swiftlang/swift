@@ -59,6 +59,10 @@ public:
   ValueKind getKind() const { return Kind; }
 
   ArrayRef<SILType> getTypes() const;
+  
+  /// True if the "value" is actually a value that can be used by other
+  /// instructions.
+  bool hasValue() const { return !TypeOrTypeList.isNull(); }
 
   SILType getType(unsigned i) const {
     SILType ty = getTypes()[i];

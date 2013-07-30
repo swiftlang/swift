@@ -16,12 +16,12 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK: @test1
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:  %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:  %1 = br bb1
-// CHECK: bb1:                                              // Preds: bb0
-// CHECK-NEXT:  %2 = br bb2
-// CHECK: bb2:                                              // Preds: bb1
-// CHECK-NEXT:  %3 = tuple ()                                   // user: %4
-// CHECK-NEXT:  %4 = return %3 : $()
+// CHECK-NEXT:  br bb1
+// CHECK: bb1:
+// CHECK-NEXT:  br bb2
+// CHECK: bb2:
+// CHECK-NEXT:  %3 = tuple ()
+// CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }
 
 sil @test2 : $[thin] () -> () {
@@ -39,10 +39,10 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:  %0 = tuple ()
 // CHECK-NEXT:  %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT:  %2 = br bb1
+// CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb0
-// CHECK-NEXT:  %3 = tuple ()                                   // user: %4
-// CHECK-NEXT:  %4 = return %3 : $()
+// CHECK-NEXT:  %3 = tuple ()
+// CHECK-NEXT:  return %3 : $()
 // CHECK-NEXT: }
 
 // func loopWithFalse() -> () {
@@ -78,13 +78,13 @@ bb5:                                              // Preds: bb1
 // CHECK: @loopWithFalse
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:  %0 = tuple ()
-// CHECK-NEXT:  %1 = br bb1
-// CHECK:bb1:                                              // Preds: bb0
+// CHECK-NEXT:  br bb1
+// CHECK:bb1:
 // CHECK-NEXT:  %2 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT:  %3 = br bb2
-// CHECK:bb2:                                              // Preds: bb1
-// CHECK-NEXT:  %4 = tuple ()                              // user: %5
-// CHECK-NEXT:  %5 = return %4 : $()
+// CHECK-NEXT:  br bb2
+// CHECK:bb2:
+// CHECK-NEXT:  %4 = tuple ()
+// CHECK-NEXT:  return %4 : $()
 // CHECK-NEXT:}
 
 
@@ -121,14 +121,14 @@ bb5:                                              // Preds: bb1
 // CHECK: @InfLoop
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:  %0 = tuple ()
-// CHECK-NEXT:  %1 = br bb1
-// CHECK:bb1:                                              // Preds: bb3 bb0
+// CHECK-NEXT:  br bb1
+// CHECK:bb1:
 // CHECK-NEXT:  %2 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:  %3 = br bb2
-// CHECK:bb2:                                              // Preds: bb1
+// CHECK-NEXT:  br bb2
+// CHECK:bb2:
 // CHECK-NEXT:  %4 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT:  %5 = br bb3
-// CHECK:bb3:                                              // Preds: bb2
-// CHECK-NEXT:  %6 = br bb1
+// CHECK-NEXT:  br bb3
+// CHECK:bb3:
+// CHECK-NEXT:  br bb1
 // CHECK-NEXT: }
 
