@@ -571,6 +571,7 @@ public:
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
+  void visitSwitchIntInst(SwitchIntInst *i);
   void visitSwitchOneofInst(SwitchOneofInst *i);
 };
 
@@ -1498,6 +1499,10 @@ void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
          "should have one objc pointer value for autorelease_return");
   emitObjCAutoreleaseReturnValue(*this, result.getAll()[0]);
   emitReturnInst(*this, i->getOperand().getType(), result);
+}
+
+void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
+  llvm_unreachable("not implemented");
 }
 
 void IRGenSILFunction::visitSwitchOneofInst(SwitchOneofInst *i) {

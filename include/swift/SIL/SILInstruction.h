@@ -1679,6 +1679,89 @@ public:
     return V->getKind() == ValueKind::CondBranchInst;
   }
 };
+
+/// A switch on a builtin integer value.
+class SwitchIntInst : public TermInst {
+  FixedOperandList<1> Operands;
+  unsigned NumCases : 31;
+  unsigned HasDefault : 1;
+  
+  SwitchIntInst(SILLocation Loc, SILValue Operand,
+                SILBasicBlock *DefaultBB,
+                ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs);
+  
+  // Tail-allocated after the SwitchIntInst record are:
+  // - `NumCases * getNumWordsForCase()` llvm::integerPart values, containing
+  //   the bitwise representations of the APInt value for each case
+  // - `NumCases + HasDefault` SILSuccessor records, referencing the
+  //   destinations for each case, ending with the default destination if
+  //   present.
+  
+  /// Returns the number of APInt bits required to represent a case value, all
+  /// of which are of the operand's type.
+  unsigned getBitWidthForCase() const {
+    return getOperand().getType().castTo<BuiltinIntegerType>()->getBitWidth();
+  }
+  
+  /// Returns the number of APInt words required to represent a case value, all
+  /// of which are of the operand's type.
+  unsigned getNumWordsForCase() const {
+    return (getBitWidthForCase() + llvm::integerPartWidth - 1)
+             / llvm::integerPartWidth;
+  }
+  
+  llvm::integerPart *getCaseBuf() {
+    return reinterpret_cast<llvm::integerPart*>(this + 1);
+  }
+  const llvm::integerPart *getCaseBuf() const {
+    return reinterpret_cast<const llvm::integerPart *>(this + 1);
+  }
+  
+  SILSuccessor *getSuccessorBuf() {
+    return reinterpret_cast<SILSuccessor*>(
+                             getCaseBuf() + (NumCases * getNumWordsForCase()));
+  }
+  const SILSuccessor *getSuccessorBuf() const {
+    return reinterpret_cast<const SILSuccessor *>(
+                             getCaseBuf() + (NumCases * getNumWordsForCase()));
+  }
+  
+public:
+  /// Clean up tail-allocated successor records for the switch cases.
+  ~SwitchIntInst();
+  
+  static SwitchIntInst *create(SILLocation Loc, SILValue Operand,
+                           SILBasicBlock *DefaultBB,
+                           ArrayRef<std::pair<APInt, SILBasicBlock*>> CaseBBs,
+                           SILFunction &F);
+  
+  SILValue getOperand() const { return Operands[0].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  
+  SuccessorListTy getSuccessors() {
+    return ArrayRef<SILSuccessor>{getSuccessorBuf(), NumCases + HasDefault};
+  }
+  
+  unsigned getNumCases() const { return NumCases; }
+  std::pair<APInt, SILBasicBlock*>
+  getCase(unsigned i) const {
+    assert(i < NumCases && "case out of bounds");
+    unsigned words = getNumWordsForCase();
+    ArrayRef<llvm::integerPart> parts{getCaseBuf() + i * words, words};
+    return {APInt(getBitWidthForCase(), parts), getSuccessorBuf()[i]};
+  }
+  
+  bool hasDefault() const { return HasDefault; }
+  SILBasicBlock *getDefaultBB() const {
+    assert(HasDefault && "doesn't have a default");
+    return getSuccessorBuf()[NumCases];
+  }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::SwitchIntInst;
+  }
+};
   
 /// A switch on a oneof discriminator. The data for each discriminator is passed
 /// into the corresponding destination block as block arguments.
@@ -1691,11 +1774,18 @@ class SwitchOneofInst : public TermInst {
                 SILBasicBlock *DefaultBB,
                 ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs);
   
+  // Tail-allocated after the SwitchOneofInst record are:
+  // - an array of `NumCases` OneOfElementDecl* pointers, referencing the case
+  //   discriminators
+  // - `NumCases + HasDefault` SILSuccessor records, referencing the
+  //   destinations for each case, ending with the default destination if
+  //   present.
+  
   OneOfElementDecl **getCaseBuf() {
     return reinterpret_cast<OneOfElementDecl**>(this + 1);
     
   }
-  OneOfElementDecl * const*getCaseBuf() const {
+  OneOfElementDecl * const* getCaseBuf() const {
     return reinterpret_cast<OneOfElementDecl* const*>(this + 1);
     
   }

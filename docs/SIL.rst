@@ -2267,7 +2267,7 @@ condbranch
                        sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
                        sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
 
-  condbranch %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...),
+  condbranch %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), \
                                  false_label (%x : $X, %y : $Y, ...)
   // %0 must be of $Builtin.Int1 type
   // `true_label` and `false_label` must refer to block labels within the
@@ -2279,17 +2279,47 @@ Conditionally branches to ``true_label`` if ``%0`` is equal to ``1`` or to
 ``false_label`` if ``%0`` is equal to ``0``, binding the corresponding set of
 values to the the arguments of the chosen destination block.
 
+switch_int
+``````````
+::
+
+  sil-terminator ::= 'switch_int' sil-operand
+                       (',' sil-switch-int-case)*
+                       (',' sil-switch-default)?
+  sil-switch-int-case ::= 'case' int-literal ':' sil-identifier
+  sil-switch-default ::= 'default' sil-identifier
+
+  switch_int %0 : $Builtin.Int<n>, case 1: label1, \
+                                   case 2: label2, \
+                                   ...,            \
+                                   default labelN
+
+  // %0 must be a value of builtin integer type $Builtin.Int<n>
+  // `label1` through `labelN` must refer to block labels within the current
+  //   function
+  // FIXME: All destination labels currently must take no arguments
+
+Conditionally branches to one of several destination basic blocks based on a
+value of builtin integer type. If the operand value matches one of the ``case``
+values of the instruction, control is transferred to the corresponding basic
+block. If there is a ``default`` basic block, control is transferred to it if
+the value does not match any of the ``case`` values. It is undefined behavior
+if the value does not match any cases and no ``default`` branch is provided.
+
 switch_oneof
 ````````````
 ::
 
   sil-terminator ::= 'switch_oneof' sil-operand
-                       (',' sil-switch-case)*
-                       (',' sil-switch-default)
-  sil-switch-case ::= 'case' sil-decl-ref ':' sil-identifier
-  sil-switch-default ::= 'default' sil-identifier
+                       (',' sil-switch-oneof-case)*
+                       (',' sil-switch-default)?
+  sil-switch-oneof-case ::= 'case' sil-decl-ref ':' sil-identifier
 
-  switch_oneof %0 : $U, case #U.Foo: label1, case #U.Bar: label2, ..., default labelN
+  switch_oneof %0 : $U, case #U.Foo: label1, \
+                        case #U.Bar: label2, \
+                        ...,                 \
+                        default labelN
+
   // %0 must be a value or address of oneof type $U
   // #U.Foo, #U.Bar, etc. must be 'case' declarations inside $U
   // `label1` through `labelN` must refer to block labels within the current
@@ -2300,7 +2330,8 @@ switch_oneof
   //   of the type of #U.Bar's data, etc.
 
 Conditionally branches to one of several destination basic blocks based on the
-discriminator in a ``oneof`` value. If the ``oneof`` type is resilient, the
+discriminator in a ``oneof`` value. Unlike ``switch_int``, ``switch_oneof``
+requires coverage of the operand type: If the ``oneof`` type is resilient, the
 ``default`` branch is required; if the ``oneof`` type is fragile, the ``default``
 branch is required unless a destination is assigned to every ``case`` of the
 ``oneof``. The destination basic block for a ``case`` may take an argument

@@ -1093,6 +1093,30 @@ public:
             "autoreleased return value must be a reference type");
   }
   
+  void checkSwitchIntInst(SwitchIntInst *SII) {
+    require(SII->getOperand().getType().is<BuiltinIntegerType>(),
+            "switch_int operand is not a builtin int type");
+    
+    auto ult = [](const APInt &a, const APInt &b) { return a.ult(b); };
+    std::set<APInt, decltype(ult)> cases(ult);
+    
+    for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
+      APInt value;
+      SILBasicBlock *dest;
+      std::tie(value, dest) = SII->getCase(i);
+      
+      require(!cases.count(value),
+              "multiple switch_int cases for same value");
+      cases.insert(value);
+      
+      require(dest->bbarg_empty(),
+              "switch_int case destination cannot take arguments");
+    }
+    if (SII->hasDefault())
+      require(SII->getDefaultBB()->bbarg_empty(),
+              "switch_int default destination cannot take arguments");
+  }
+  
   void checkSwitchOneofInst(SwitchOneofInst *SOI) {
     // Find the set of oneof elements for the type so we can verify
     // exhaustiveness.
