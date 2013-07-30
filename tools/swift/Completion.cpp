@@ -168,14 +168,7 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
   std::vector<Token> Tokens = tokenize(TU->getASTContext().SourceMgr, BufferID);
   if (!Tokens.empty()) {
     Token &LastToken = Tokens.back();
-    switch (LastToken.getKind()) {
-    default:
-      break;
-
-    case tok::identifier:
-#define KEYWORD(kw) \
-    case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
+    if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
       Prefix = LastToken.getText();
 
       const llvm::MemoryBuffer *Buffer =

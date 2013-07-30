@@ -838,26 +838,14 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
-        if (peekToken().is(tok::code_complete)) {
-          // If we have '.<keyword><code_complete>', try to recover by creating
-          // an identifier with the same spelling as the keyword.
-          switch (Tok.getKind()) {
-          default:
-            break;
-
-#define KEYWORD(kw) \
-            case tok::kw_##kw:
-#include "swift/Parse/Tokens.def"
-            {
-              Identifier Name = Context.getIdentifier(Tok.getText());
-              Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
-                                                       Name, Tok.getLoc());
-              consumeToken();
-            }
-            break;
-          }
+        // If we have '.<keyword><code_complete>', try to recover by creating
+        // an identifier with the same spelling as the keyword.
+        if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {
+          Identifier Name = Context.getIdentifier(Tok.getText());
+          Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
+                                                   Name, Tok.getLoc());
+          consumeToken();
         }
-
         if (Tok.is(tok::code_complete) && CodeCompletion && Result.isNonNull()) {
           CodeCompletion->completeDotExpr(Result.get());
           return nullptr;
