@@ -23,9 +23,7 @@ LINK_COMPONENTS := option bitreader
 USEDLIBS = swiftFrontend.a swiftParse.a swiftSema.a swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPasses.a swiftAST.a swiftBasic.a
 
 LLVMLibsOptions :=     \
-  $(LLVMLibsOptions)   \
-  -ledit               \
-  -framework CoreFoundation
+  $(LLVMLibsOptions)  
 
 include $(SWIFT_LEVEL)/Makefile
 
