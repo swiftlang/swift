@@ -839,6 +839,8 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         if (peekToken().is(tok::code_complete)) {
+          // If we have '.<keyword><code_complete>', try to recover by creating
+          // an identifier with the same spelling as the keyword.
           switch (Tok.getKind()) {
           default:
             break;
@@ -847,9 +849,6 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
             case tok::kw_##kw:
 #include "swift/Parse/Tokens.def"
             {
-              // If we have a '.<keyword><code_complete>', then try to recover
-              // by creating an identifier with the same spelling as the
-              // keyword.
               Identifier Name = Context.getIdentifier(Tok.getText());
               Result = new (Context) UnresolvedDotExpr(Result.get(), TokLoc,
                                                        Name, Tok.getLoc());
