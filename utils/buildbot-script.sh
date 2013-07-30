@@ -169,10 +169,6 @@ before installing this package. Uninstall as follows:
 When you find bugs in Swift, please report them using the 'Swift' Radar
 component.
 
-=== RECENT CHANGES ===
-
-$(cat "$RELEASE_NOTES_TXT")
-
 === GETTING STARTED WITH SWIFT ===
 
 Once installed, run 'swift' to bring up the interactive prompt:
@@ -194,6 +190,10 @@ using Clang:
 Language documentation and examples are installed under /usr/share/swift.
 
 Have fun!
+
+=== RECENT CHANGES ===
+
+$(cat "$RELEASE_NOTES_TXT")
 
 === KNOWN ISSUES ===
 
