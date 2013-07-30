@@ -38,14 +38,22 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM,
     CurFn(Fn), CurExplosionLevel(explosionLevel),
     ContextPtr(nullptr) {
   // Make sure the instructions in this function are attached its debug scope.
-  if (IGM.DebugInfo)
+  if (IGM.DebugInfo) {
+    // Functions, especially artificial helpers, are sometimes
+    // generated on-the-fly while we are in the middle of another
+    // function. Be nice and reset the current debug location after
+    // we're done.
+    IGM.DebugInfo->pushLoc();
     IGM.DebugInfo->setCurrentLoc(Builder, DbgScope, DbgLoc);
+  }
 
   emitPrologue();
 }
 
 IRGenFunction::~IRGenFunction() {
   emitEpilogue();
+  // Restore the debug location.
+  if (IGM.DebugInfo) IGM.DebugInfo->popLoc();
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already

@@ -121,6 +121,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
 }
 
 void IRGenDebugInfo::finalize() {
+  assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
   DBuilder.finalize();
 }
 
@@ -196,6 +197,8 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
 
   llvm::MDNode *InlinedAt = 0;
   auto DL = llvm::DebugLoc::get(L.Line, L.Col, Scope, InlinedAt);
+  // TODO: Write a strongly-worded letter to the person that came up
+  // with a pair of functions spelled "get" and "Set".
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -398,7 +401,6 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
 }
 
 void IRGenDebugInfo::createFunction(SILFunction *SILFn, llvm::Function *Fn) {
-
   createFunction(SILFn->getModule(),
                  SILFn->getDebugScope(), Fn,
                  SILFn->getAbstractCC(),

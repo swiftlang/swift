@@ -80,6 +80,8 @@ class IRGenDebugInfo {
   Location LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
 
+  llvm::SmallVector<std::pair<Location, SILDebugScope*>, 8> LocationStack;
+
 public:
   IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
                  llvm::SourceMgr &SM, llvm::Module &M);
@@ -91,6 +93,16 @@ public:
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                      SILLocation Loc = SILLocation());
+
+  /// Push the current debug location onto a stack.
+  void pushLoc() {
+    LocationStack.push_back(std::make_pair(LastLoc, LastScope));
+  }
+
+  /// Restore the current debug location from the stack.
+  void popLoc() {
+    std::tie(LastLoc, LastScope) = LocationStack.pop_back_val();
+  }
 
   /// Create debug info for the given function.
   /// \param DS The parent scope of the function.
