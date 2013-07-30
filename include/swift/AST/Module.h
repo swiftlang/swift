@@ -371,11 +371,8 @@ public:
            DC->getContextKind() <= DeclContextKind::Last_LoadedModule;
   }
 
-
-  /// \return the name of the module as it should be
-  /// represented in the debug info.
+  /// \brief Get the debug name for the module.
   std::string getDebugModuleName() const { return DebugModuleName; }
-
 };
 
 template <>
