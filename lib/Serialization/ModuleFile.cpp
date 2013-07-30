@@ -597,8 +597,7 @@ Module *ModuleFile::getModule(Identifier name) {
       auto importer = ModuleContext->Ctx.getClangModuleLoader();
       assert(importer && "no way to import shadowed module (recursive xref?)");
       ShadowedModule = importer->loadModule(SourceLoc(),
-                                            std::make_pair(name, SourceLoc()),
-                                            false);
+                                            std::make_pair(name, SourceLoc()));
       assert(ShadowedModule && "missing shadowed module");
     }
 
@@ -606,8 +605,7 @@ Module *ModuleFile::getModule(Identifier name) {
   }
 
   // FIXME: provide a real source location.
-  return ModuleContext->Ctx.getModule(std::make_pair(name, SourceLoc()),
-                                      false);
+  return ModuleContext->Ctx.getModule(std::make_pair(name, SourceLoc()));
 }
 
 

@@ -39,6 +39,5 @@ ATTR(objc)
 ATTR(objc_block)
 ATTR(iboutlet)
 ATTR(ibaction)
-ATTR(stdlib)
 
 #undef ATTR

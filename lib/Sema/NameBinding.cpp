@@ -75,14 +75,12 @@ namespace {
     /// Load a module referenced by an import statement.
     ///
     /// Returns null if no module can be loaded.
-    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID,
-                      bool isStdlibImport);
+    Module *getModule(llvm::ArrayRef<std::pair<Identifier,SourceLoc>> ModuleID);
   };
 }
 
 Module *
-NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
-                      bool isStdlibImport) {
+NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   assert(!modulePath.empty());
   auto moduleID = modulePath[0];
   
@@ -101,11 +99,11 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
   // This allows a Swift module to extend a Clang module of the same name.
   if (moduleID.first == TU->Name && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
-      return importer->loadModule(moduleID.second, modulePath, isStdlibImport);
+      return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
   }
   
-  return Context.getModule(modulePath, isStdlibImport);
+  return Context.getModule(modulePath);
 }
 
 
@@ -120,7 +118,7 @@ void NameBinder::addImport(ImportDecl *ID,
   if (!Context.getClangModuleLoader())
     importPath = importPath.slice(0, 1);
 
-  Module *M = getModule(importPath, ID->isStdlibImport());
+  Module *M = getModule(importPath);
   if (M == 0) {
     diagnose(Path[0].second, diag::sema_no_import, Path[0].first.str());
     return;
@@ -149,7 +147,7 @@ void swift::performAutoImport(TranslationUnit *TU) {
     M = TU->Ctx.TheBuiltinModule;
   else
     M = TU->Ctx.getModule(std::make_pair(TU->Ctx.getIdentifier("swift"),
-                                         SourceLoc()), true);
+                                         SourceLoc()));
 
   SmallVector<ImportedModule, 1> ImportedModules;
   ImportedModules.push_back({Module::AccessPathTy(), M});

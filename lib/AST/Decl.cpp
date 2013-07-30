@@ -248,18 +248,17 @@ GenericParamList::create(const ASTContext &Context,
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc,
-                               ArrayRef<AccessPathElement> Path,
-                               bool isStdlibImport) {
+                               ArrayRef<AccessPathElement> Path) {
   void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
                               Path.size() * sizeof(AccessPathElement),
                               alignof(ImportDecl));
-  return new (buffer) ImportDecl(DC, ImportLoc, Path, isStdlibImport);
+  return new (buffer) ImportDecl(DC, ImportLoc, Path);
 }
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
-                       ArrayRef<AccessPathElement> Path, bool isStdlibImport)
+                       ArrayRef<AccessPathElement> Path)
   : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc),
-    IsStdlibImport(isStdlibImport), NumPathElements(Path.size()) {
+    NumPathElements(Path.size()) {
   memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
 }
 

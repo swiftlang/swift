@@ -111,7 +111,6 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   if (Attrs.isIBOutlet()) AttrOS << "iboutlet,";
   if (Attrs.isIBAction()) AttrOS << "ibaction,";
   if (Attrs.isClassProtocol()) AttrOS << "class_protocol,";
-  if (Attrs.isStdlib()) AttrOS << "stdlib,";
   if (Attrs.isWeak()) AttrOS << "weak,";
   if (Attrs.isUnowned()) AttrOS << "unowned,";
   if (Attrs.cc.hasValue()) {

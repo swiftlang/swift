@@ -155,7 +155,6 @@ public:
   bool IBOutlet = false;
   bool IBAction = false;
   bool ClassProtocol = false;
-  bool Stdlib = false;
   bool Weak = false;
   bool Unowned = false;
   Optional<AbstractCC> cc = Nothing;
@@ -180,7 +179,6 @@ public:
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
   bool isClassProtocol() const { return ClassProtocol; }
-  bool isStdlib() const { return Stdlib; }
   bool isWeak() const { return Weak; }
   bool isUnowned() const { return Unowned; }
   bool hasOwnership() const { return Weak || Unowned; }
@@ -197,8 +195,7 @@ public:
            !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !isClassProtocol() && !hasCC() && !isStdlib() &&
-           !hasOwnership() && AsmName.empty();
+           !isClassProtocol() && !hasCC() && !hasOwnership() && AsmName.empty();
   }
 
   void clearOwnership() {

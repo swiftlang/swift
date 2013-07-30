@@ -352,8 +352,7 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath,
-                    bool isStdlibImport);
+  Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath);
 
   /// \brief Add a new module loading listener to this AST context.
   void addModuleLoadListener(ModuleLoadListener &Listener);

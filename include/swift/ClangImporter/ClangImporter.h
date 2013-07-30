@@ -83,8 +83,7 @@ public:
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual Module *loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path,
-                             bool isStdlibImport)
+                             ArrayRef<std::pair<Identifier, SourceLoc>> path)
                                                                       override;
 
   /// \brief Look for declarations associated with the given name.

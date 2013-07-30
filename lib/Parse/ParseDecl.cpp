@@ -392,15 +392,6 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
-  case AttrName::stdlib: {
-    if (Attributes.Stdlib)
-      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
-    consumeToken(tok::identifier);
-
-    Attributes.Stdlib = true;
-    return false;
-  }
-
   /// FIXME: This is a temporary hack until we can import C modules.
   case AttrName::asmname: {
     SourceLoc TokLoc = Tok.getLoc();
@@ -599,9 +590,6 @@ Decl *Parser::parseDeclImport(unsigned Flags) {
       return 0;
   }
 
-  bool isStdlibImport = Attributes.Stdlib;
-  Attributes.Stdlib = false;
-
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::import_attributes);
   
@@ -610,8 +598,7 @@ Decl *Parser::parseDeclImport(unsigned Flags) {
     return 0;
   }
 
-  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath,
-                            isStdlibImport);
+  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
 }
 
 /// parseInheritance - Parse an inheritance clause.

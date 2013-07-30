@@ -48,8 +48,7 @@ public:
   /// returns NULL.
   virtual Module *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path,
-             bool isStdlibImport) override;
+             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
   /// \brief Load extensions to the given nominal type.
   ///

@@ -74,8 +74,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 
 
 Module *SourceLoader::loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path,
-                                 bool isStdlibImport) {
+                             ArrayRef<std::pair<Identifier, SourceLoc>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -106,11 +105,6 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   auto *importTU = new (Ctx) TranslationUnit(moduleID.first, comp, Ctx,
                                              TranslationUnit::Library);
   Ctx.LoadedModules[moduleID.first.str()] = importTU;
-  
-  // FIXME: This is a terrible hack for the standard library.  It should come
-  // from metadata about the imported module.
-  importTU->HasBuiltinModuleAccess = moduleID.first.str() == "swift" ||
-                                     isStdlibImport;
 
   performAutoImport(importTU);
 
