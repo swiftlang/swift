@@ -1,170 +1,160 @@
-I don't like our current import declaration design for a couple reasons:
-
-- Importing all the exported symbols from a module is a bad default. It makes
-  name clashes easy to introduce, and we don't currently provide decent ways to
-  manage them. The potential for clashes encourages developers to defensively
-  over-namespace their APIs by prefixing their exported names, a problem the
-  module system should in theory solve for them.
-- Importing a single item from a module looks the same as importing a
-  submodule. ``import foo.bar`` could either import a single declaration
-  ``bar`` or the entire contents of a module ``foo.bar``.
-- We don't provide a good way to import multiple itemized symbols from a single
-  module, short of a series of ``import foo.Bar; import foo.Bas; ...``
-  declarations.
-- It's useful to be able to specify local aliases for imported symbols. This is
-  a nice way of disambiguating clashing imported names and providing short
-  names for commonly used imports.
-
-Here's a design I think will work well when we start to seriously support
-modules. It's the model I implemented in Clay, which is very similar
-to how Python's ``import``/``from ... import`` syntax works, but with what I
-think are more reasonable resolution rules for name clashes, and without Python's
-weirdness of two different syntactic forms for the same thing. It keeps our
-current "give me everything" behavior easily accessible for when you want it,
-but provides good support for explicit itemization of imports, and specifies
-how the language should behave in the face of name clashes.
-
 IMPORT SYNTAX
 =============
+::
 
-The ``import`` statement gains three forms: import a module name only, import
-a module's entire exported namespace, and import only selected symbols from a
-module.
+  import-decl ::= 'import' import-item-list
+  import-item-list ::= import-item (',' import-item)*
 
-- ``import foo`` imports only the module name ``foo``, whose exported
-  declarations can then be referenced with qualified names::
+  import-item ::= import-kind? identifier-path
+  import-item ::= identifier-path '.' '(' import-item-list ')'
 
-    import foo
+  import-kind ::= 'module'
+  import-kind ::= 'class'
+  import-kind ::= 'struct'
+  import-kind ::= 'oneof'
+  import-kind ::= 'var'
+  import-kind ::= 'func'
+  import-kind ::= 'typealias'
+  // ...
 
-    class A : foo.Bar { ... }
+``import`` makes declarations exported from another module available inside
+the current module. Imports are not reexported by default.
 
-    class B : foo.Bas { ... }
+Importing Modules
+-----------------
 
-- ``import foo.*`` imports all of the exported declarations from the module
-  ``foo``::
+In its simplest form, ``import`` gives the qualified name of a module and
+imports all exported symbols from the module, as well as the module name itself
+for qualified lookup::
 
-    import foo.*
+  import Cocoa
 
-    class A : Bar { ... }
+  // Reference the NSArray type from Cocoa
+  var a1 : NSArray
+  // Same, but qualified
+  var a2 : Cocoa.NSArray
 
-    class B : Bas { ... }
+In this form, the qualified name *must* refer to a module::
 
-  The module name can also be used to qualify imported names.
+  // Import the Cocoa.NSWindow module, *not* the NSWindow class from inside
+  // Cocoa
+  import Cocoa.NSWindow
 
-- ``import foo.(Bar, ...)`` imports one or more selected declarations out of a
-  module. The parens are required whether there are zero, one, or many itemized
-  imports; this makes importing a submodule ``import foo.Bar`` syntactically
-  distinct from importing a single symbol ``import foo.(Bar)``. Declarations
-  not explicitly imported can still be referenced by qualified name::
+  // Reference the NSWindow type from Cocoa.NSWindow
+  var w1 : NSWindow
+  // Same, but qualified
+  var w2 : Cocoa.NSWindow.NSWindow
 
-    import foo.(Bar, Bas)
+Multiple modules may appear in a comma-separated list::
 
-    // Imported symbols can be used unqualified
-    class A : Bar { ... }
+  import Foundation, iAd, CoreGraphics
 
-    class B : Bas { ... }
+As a shorthand, multiple submodules with a common parent module may be listed
+in parens under the parent module::
 
-    // Other symbols require qualification
-    class C : foo.Farr { ... }
+  import OpenGL.(GL3, GL3.Ext)
 
-  Additionally, modules and/or exported declarations can be imported with a
-  local name specified using ``as <identifier>``::
+Importing Individual Declarations
+---------------------------------
 
-    import foo as f
+Instead of importing the entire contents of a module, individual declarations
+may be imported. This is done by naming the kind of declaration being imported
+before the qualified name, such as ``func``, ``var``, or ``class``. The module
+name is still imported for qualified lookup of other symbols::
 
-    // Local name 'f' refers to imported module 'foo'
-    class A : f.Bar { ... }
+  // Import only the Cocoa.NSWindow class
+  import class Cocoa.NSWindow
 
-    import alpha.(Omega as AO)
-    import beta.(Omega as BO)
+  var w1 : NSWindow
+  var title : Cocoa.NSString
 
-    // Local names AO and BO refer to imported symbols
+As with modules, multiple declarations may be imported in a comma-separated
+list, or imported out of a common parent module with a parenthesized list::
 
-    class A : AO { ... }
+  import func OpenGL.GL3.glDrawArrays, func OpenGL.GL3.Ext.glTextureRangeAPPLE
+  // Equivalent
+  import OpenGL.GL3.(func glDrawArrays, func Ext.glTextureRangeAPPLE)
 
-    class B : BO { ... }
+RESOLVING NAME CLASHES
+======================
 
-    // Alias both the module name and an imported symbol from it
-    import gamma.(Omega as GO) as g
+Module imports
+--------------
 
-  (Overloading the ``as`` keyword reads well but feels icky. Other possibilities
-  include ``localName : exportedName`` or ``localName = exportedName``.)
+Because the local names introduced by a whole-module import are implicit,
+a name clash between imported modules is not an error unless a clashing name is
+actually used without qualification::
 
-RESOLVING NAME CLASHES WITH '.*' IMPORTS
-========================================
-
-Because the local names introduced by a ``.*`` import are implicit, it makes
-sense not to raise errors about name clashes unless a clashing name is actually
-used, and to resolve conflicts in favor of explicitly named declarations when
-available. Thus, if two more modules are imported with the ``.*`` syntax, and
-they export conflicting symbols, it is not an error, and non-conflicting names
-from either imported module can be referenced unqualified. It is an error,
-however, to reference conflicting names without a qualification::
-
-  import abcde.* // abcde exports A, B, C, D, E
-  import aeiou.* // aeiou exports A, E, I, O, U
+  import abcde // abcde exports A, B, C, D, E
+  import aeiou // aeiou exports A, E, I, O, U
 
   var b : B // OK, references abcde.B
   var i : I // OK, references aeiou.I
   var e : E // Error, ambiguous
   var e : abcde.E // OK, qualified reference to abcde.E
 
-The conflicting name can also be explicitly imported with ``.(...)`` syntax
-from one module or the other, in which case unqualified references refer to
-that import::
+Conflicts are resolved in favor of individually imported or
+locally defined declarations when available::
 
-  import abcde.* // abcde exports A, B, C, D, E
-  import abcde.(E) // explicitly import E from abcde
-  import aeiou.* // aeiou exports A, E, I, O, U
+  import abcde         // abcde exports A, B, C, D, E
+  import aeiou         // aeiou exports A, E, I, O, U
+  import class asdf.A  // explicitly import A from some other module
+  import class abcde.E // explicitly import E from abcde
 
+  class U { } // Local class shadows whole-module import
+
+  var a : A // OK, references asdf.A
   var e : E // OK, references abcde.E
+  var u : U // OK, references local U
 
-Local definitions may shadow names imported with ``.*`` syntax::
+Declaration imports
+-------------------
 
-  import abcde.* // abcde exports A, B, C, D, E
-  import aeiou.* // aeiou exports A, E, I, O, U
+Individual declaration imports shadow whole-module imports, as described above.
+If two declarations with the same name are invidually imported from different
+modules, references to either import must be qualified::
 
-  class E { ... } // OK
-  class U { ... } // OK
+  import class abcde.E
+  import class aeiou.E
 
-  var e : E // OK, references local definition E
-  var u : U // OK, references local definition U
+  var e : E        // Error, ambiguous
+  var e1 : abcde.E // OK
 
-Symbols explicitly imported with ``.(...)`` may also shadow names implicitly
-imported names::
+A local definition with the same name as an explicitly imported symbol
+shadows the unqualified definition::
 
-  import abcde.* // abcde exports A, B, C, D, E
-  import aeiou.* // aeiou exports A, E, I, O, U
-  import qwerty.(E) // explicit import E shadows implicit imports
+  import class abcde.E
 
-  var e : E // OK: references qwerty.E
+  class E { }
 
-RESOLVING NAME CLASHES WITH '.(...)' IMPORTS
-============================================
+  var e : E       // Refers to local E
+  var e : abcde.E // Refers to abcde.E
 
-Since the ``.(...)`` syntax fully spells out the names introduced to the local
-namespace, it makes sense to be stricter in preventing name clashes.
-It is thus an error to explicitly import the same name from multiple modules
-using the itemized ``.(...)`` syntax, or to import two symbols with the same
-local alias::
+Module names
+------------
 
-  import abcde.(E)
-  import aeiou.(E) // Error, E already imported from abcde
+FIXME: What is a good rule here? This sucks.
 
-  import abcde.(B as Z)
-  import aeiou.(U as Z) // Error, B already imported as Z from abcde
+If a module name clashes with a local definition or imported declaration, the
+declaration is favored in name lookup. If a member lookup into the declaration
+fails, we fall back to qualified lookup into the module::
 
-However, you can import same-named symbols from multiple modules using
-different local aliases::
+  import Foo // exports bas
 
-  import abcde.(E)
-  import aeiou.(E as E2)  // OK, local alias avoids clash
+  class Foo {
+    static func bar()
+  }
 
-Defining a local definition with the same name as an explicitly imported symbol
-is also an error::
+  Foo.bar() // bar method from Foo class
+  Foo.bas() // bas method from Foo module
 
-  import abcde.(E)
+FUTURE EXTENSIONS
+=================
 
-  class E { } // Error, conflicts with explicitly imported symbol E
+In the future, we should allow the import declaration to provide an alias
+for the imported module or class::
 
--Joe
+  import C = Cocoa
+  import NSW = class Cocoa.NSWindow
+  import Cocoa.(NSW = class NSWindow, NSV = class NSView)
+
