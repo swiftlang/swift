@@ -613,14 +613,12 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
-    auto IntTy = BaseTy->castTo<BuiltinIntegerType>();
     SizeInBits = TargetInfo.getIntWidth();
     Name = "_TtSi";
     break;
   }
 
   case TypeKind::BuiltinFloat: {
-    auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
     SizeInBits = TargetInfo.getFloatWidth();
     Name = "_TtSf";
     break;

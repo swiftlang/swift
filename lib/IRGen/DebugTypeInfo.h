@@ -36,11 +36,11 @@ namespace swift {
     class DebugTypeInfo {
     public:
       CanType CanTy;
-      uint64_t SizeInBits;
-      uint64_t AlignmentInBits;
+      uint64_t SizeInBytes;
+      uint64_t AlignmentInBytes;
 
       DebugTypeInfo()
-        : CanTy(),  SizeInBits(0), AlignmentInBits(0) {
+        : CanTy(),  SizeInBytes(0), AlignmentInBytes(0) {
       }
       DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align);
       DebugTypeInfo(CanType CTy, Size Size, Alignment Align);

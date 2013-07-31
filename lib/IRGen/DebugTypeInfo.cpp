@@ -23,19 +23,19 @@ using namespace swift;
 using namespace irgen;
 
 DebugTypeInfo::DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align)
-  : CanTy(CTy), SizeInBits(Size), AlignmentInBits(Align) {
+  : CanTy(CTy), SizeInBytes(Size), AlignmentInBytes(Align) {
 }
 
 DebugTypeInfo::DebugTypeInfo(CanType CTy, Size Size, Alignment Align)
-  : CanTy(CTy), SizeInBits(Size.getValue()), AlignmentInBits(Align.getValue()) {
+  : CanTy(CTy), SizeInBytes(Size.getValue()), AlignmentInBytes(Align.getValue()) {
 }
 
 DebugTypeInfo::DebugTypeInfo(CanType CTy, const TypeInfo &Info)
   : CanTy(CTy) {
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
-    SizeInBits = FixTy.getFixedSize().getValue();
-    AlignmentInBits = FixTy.getBestKnownAlignment().getValue();
+    SizeInBytes = FixTy.getFixedSize().getValue();
+    AlignmentInBytes = FixTy.getBestKnownAlignment().getValue();
   }
 }
 
@@ -44,22 +44,22 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
   // Same as above.
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
-    SizeInBits = FixTy.getFixedSize().getValue();
-    AlignmentInBits = FixTy.getBestKnownAlignment().getValue();
+    SizeInBytes = FixTy.getFixedSize().getValue();
+    AlignmentInBytes = FixTy.getBestKnownAlignment().getValue();
   }
 }
 
 DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
   : CanTy(Decl.getType()->getCanonicalType()),
-    SizeInBits(Size.getValue()),
-    AlignmentInBits(Align.getValue()) {
+    SizeInBytes(Size.getValue()),
+    AlignmentInBytes(Align.getValue()) {
 }
 
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
   return CanTy == T.CanTy
-    && SizeInBits == T.SizeInBits
-    && AlignmentInBits == T.AlignmentInBits;
+    && SizeInBytes == T.SizeInBytes
+    && AlignmentInBytes == T.AlignmentInBytes;
 }
 
 bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
