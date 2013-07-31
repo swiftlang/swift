@@ -47,6 +47,8 @@ public:
   std::string MainInputFilename;
   std::string OutputFilename;
   std::string Triple;
+  // The command line string that is to be stored in the DWARF debug info.
+  std::string DWARFDebugFlags;
 
   /// The kind of compilation we should do.
   OutputKind OutputKind : 3;

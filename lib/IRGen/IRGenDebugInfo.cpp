@@ -119,9 +119,7 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
   StringRef Producer = BumpAllocatedString(OS.str(), DebugInfoNames);
 
   bool IsOptimized = Opts.OptLevel > 0;
-
-  // FIXME.
-  StringRef Flags = StringRef();
+  StringRef Flags = Opts.DWARFDebugFlags;
 
   // FIXME.
   unsigned RuntimeVersion = 1;
