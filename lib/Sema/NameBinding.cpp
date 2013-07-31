@@ -109,6 +109,10 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
 
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
+  // FIXME: Handle importing specific decls.
+  if (ID->getImportKind() != ImportKind::Module)
+    return;
+
   ArrayRef<ImportDecl::AccessPathElement> Path = ID->getAccessPath();
 
   // FIXME: This is a hack to allow /either/ Clang submodules /or/ importing

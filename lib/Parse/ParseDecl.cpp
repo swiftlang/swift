@@ -477,7 +477,7 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   bool HadParseError = false;
   switch (Tok.getKind()) {
   case tok::kw_import:
-    Entries.push_back(parseDeclImport(Flags));
+    HadParseError = parseDeclImport(Flags, Entries);
     break;
   case tok::kw_extension:
     Entries.push_back(parseDeclExtension(Flags));
@@ -564,41 +564,81 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   return HadParseError;
 }
 
-
-/// parseDeclImport - Parse an 'import' declaration, returning null (and doing
-/// no token skipping) on error.
+/// Parse an 'import' declaration, returning true (and doing no token skipping)
+/// on error.
 ///
 ///   decl-import:
-///      'import' attribute-list any-identifier ('.' any-identifier)*
+///     'import' attribute-list import-kind? import-path (',' import-path)*
+///   import-kind:
+///     'typealias'
+///     'struct'
+///     'class'
+///     'union'
+///     'protocol'
+///     'var'
+///     'func'
+///   import-path:
+///     any-identifier ('.' any-identifier)*
 ///
-Decl *Parser::parseDeclImport(unsigned Flags) {
+bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
-  
-  SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath(1);
-  ImportPath.back().second = Tok.getLoc();
-  if (parseAnyIdentifier(ImportPath.back().first,
-                         diag::decl_expected_module_name))
-    return 0;
-  
-  while (consumeIf(tok::period)) {
-    ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
-    if (parseAnyIdentifier(ImportPath.back().first,
-                        diag::expected_identifier_in_decl, "import"))
-      return 0;
-  }
 
   if (!Attributes.empty())
     diagnose(Attributes.LSquareLoc, diag::import_attributes);
-  
+
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
-    return 0;
+    return true;
   }
 
-  return ImportDecl::create(Context, CurDeclContext, ImportLoc, ImportPath);
+  ImportKind Kind = ImportKind::Module;
+  if (Tok.isKeyword()) {
+    switch (Tok.getKind()) {
+    case tok::kw_typealias:
+      Kind = ImportKind::Type;
+      break;
+    case tok::kw_struct:
+      Kind = ImportKind::Struct;
+      break;
+    case tok::kw_class:
+      Kind = ImportKind::Class;
+      break;
+    case tok::kw_union:
+      Kind = ImportKind::Union;
+      break;
+    case tok::kw_protocol:
+      Kind = ImportKind::Protocol;
+      break;
+    case tok::kw_var:
+      Kind = ImportKind::Var;
+      break;
+    case tok::kw_func:
+      Kind = ImportKind::Func;
+      break;
+    default:
+      diagnose(Tok, diag::expected_identifier_in_decl, "import");
+      return true;
+    }
+    consumeToken();
+  }
+
+  do {
+    SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
+    do {
+      ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
+      if (parseAnyIdentifier(ImportPath.back().first,
+                          diag::expected_identifier_in_decl, "import"))
+        return true;
+    } while (consumeIf(tok::period));
+
+    Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
+                                       Kind, ImportPath));
+  } while (consumeIf(tok::comma));
+
+  return false;
 }
 
 /// parseInheritance - Parse an inheritance clause.

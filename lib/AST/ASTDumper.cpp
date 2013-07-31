@@ -235,6 +235,37 @@ namespace {
 
     void visitImportDecl(ImportDecl *ID) {
       printCommon(ID, "import_decl");
+
+      const char *KindString;
+      switch (ID->getImportKind()) {
+      case ImportKind::Module:
+        KindString = nullptr;
+        break;
+      case ImportKind::Type:
+        KindString = "type";
+        break;
+      case ImportKind::Struct:
+        KindString = "struct";
+        break;
+      case ImportKind::Class:
+        KindString = "class";
+        break;
+      case ImportKind::Union:
+        KindString = "union";
+        break;
+      case ImportKind::Protocol:
+        KindString = "protocol";
+        break;
+      case ImportKind::Var:
+        KindString = "var";
+        break;
+      case ImportKind::Func:
+        KindString = "func";
+        break;
+      }
+      if (KindString)
+        OS << " kind=" << KindString;
+
       OS << " '" << ID->getAccessPath()[0].first;
       for (unsigned i = 1, e = ID->getAccessPath().size(); i != e; ++i)
         OS << "." << ID->getAccessPath()[i].first;

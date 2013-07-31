@@ -540,7 +540,7 @@
 
     left-binder ::= [ \r\n\t\(\[\{,;]
 
-    any-identifier ::= identifier | operator
+    <a name="any-identifier">any-identifier</a> ::= identifier | operator
   </pre>
 
   <p><tt>operator-binary</tt>, <tt>operator-prefix</tt>, and
@@ -638,7 +638,17 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-import ::= 'import' <a href="#attribute-list">attribute-list</a> any-identifier ('.' any-identifier)*
+    decl-import ::= 'import' <a href="#attribute-list">attribute-list</a> import-kind? import-path (',' import-path)*
+    
+    import-kind ::= 'typealias'
+    import-kind ::= 'struct'
+    import-kind ::= 'class'
+    import-kind ::= 'union'
+    import-kind ::= 'protocol'
+    import-kind ::= 'var'
+    import-kind ::= 'func'
+    
+    import-path ::= <a href="#any-identifier">any-identifier</a> ('.' <a href="#any-identifier">any-identifier</a>)*
   </pre>  
   
   <p>'import' declarations allow named values and types to be accessed with
@@ -651,25 +661,50 @@
   swift file do not affect name lookup in another file. import directives can
   only occur at the top level of a file, not within a function or namespace.</p>
   
-  <p>If a single identifier is specified for the import declaration, then the
-  entire module is imported in its entirety into the current scope.  If a
-  scope (such as a namespace) is named, then all entities in the namespace are
-  imported.  If a specific type or variable is named (e.g. "import swift.Int")
-  then only the one type and/or value is imported.  If the named value is
-  overloaded, then the entire overload set is imported.</p>
+  <p>An import without an explicit import-kind names a module; all of the 
+  module's members are imported into the current scope. The module's name is
+  also imported into the the current scope in order to allow qualified access
+  to the module's members, which can be useful for disambiguation.</p>
+  
+  <p>If an import-kind is provided, the last element of the import path is
+  taken to be the name of a decl <em>within</em> the module named by the rest of
+  the path. Only that name is introduced into the current scope; the name of the
+  module itself is <em>not</em> accessible, nor any other decls within the
+  module.</p>
+  
+  <p>Different import-kinds perform different filters on the decls within a 
+  module:</p>
+  
+  <ul>
+    <li><code>typealias</code> can be used to import any concrete type (struct,
+    class, union, or another typealias). It cannot be used to import protocols,
+    which are often used for more than just their existential type.</li>
+    
+    <li><code>struct</code>, <code>class</code>, <code>union</code> can be used
+    to import any type whose <i>canonical type</i> is a struct, class,
+    or union, respectively. (This allows "Int" to be imported as a struct, for
+    example, even though its definition in the standard library may be a
+    typealias for another struct type.)</li>
+    
+    <li><code>protocol</code> is used to import a protocol</li>
+    
+    <li><code>var</code> is used to import a module-scoped variable</li>
+    
+    <li><code>func</code> will import all overloads of a function</li>
+  </ul>
   
   <pre class="example">
-    <i>// Import all of the top level symbols and types in a package.</i>
+    <i>// Import all of the top level symbols and types in a module.</i>
     import swift
 
-    <i>// Import all of the symbols within a namespace.</i>
+    <i>// Import all of the symbols within a submodule.</i>
     import swift.io
 
     <i>// Import a single variable, function, type, etc.</i>
-    import swift.io.bufferedstream
+    import typealias swift.io.BufferedStream
 
-    <i>// Import all multiplication overloads.</i>
-    import swift.*
+    <i>// Import all addition overloads.</i>
+    import func swift.+
   </pre>
 
   <!-- ===================================================================== -->
@@ -789,7 +824,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= 'static'? 'func' <a href="#attribute-list">attribute-list</a> <a href="#any-identifier">any-identifier</a> <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and

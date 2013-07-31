@@ -165,6 +165,15 @@ class alignas(8) Decl {
   enum { NumInfixOperatorDeclBits = NumDeclBits + 10 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
 
+  class ImportDeclBitFields {
+    friend class ImportDecl;
+    unsigned : NumDeclBits;
+
+    unsigned ImportKind : 3;
+  };
+  enum { NumImportDeclBits = NumDeclBits + 3 };
+  static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     DeclBitfields DeclBits;
@@ -173,6 +182,7 @@ protected:
     TypeAliasDeclBitFields TypeAliasDeclBits;
     ProtocolDeclBitFields ProtocolDeclBits;
     InfixOperatorDeclBitFields InfixOperatorDeclBits;
+    ImportDeclBitFields ImportDeclBits;
   };
 
 private:
@@ -635,9 +645,21 @@ public:
   SourceRange getSourceRange() const { return Brackets; }
 };
 
+/// Describes what kind of name is being imported.
+enum class ImportKind : uint8_t {
+  Module,
+  Type,
+  Struct,
+  Class,
+  Union,
+  Protocol,
+  Var,
+  Func
+};
+
 /// ImportDecl - This represents a single import declaration, e.g.:
 ///   import swift
-///   import swift.int
+///   import typealias swift.Int
 class ImportDecl : public Decl {
 public:
   typedef std::pair<Identifier, SourceLoc> AccessPathElement;
@@ -655,16 +677,20 @@ private:
     return reinterpret_cast<const AccessPathElement*>(this+1);
   }
   
-  ImportDecl(DeclContext *DC, SourceLoc ImportLoc,
+  ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
              ArrayRef<AccessPathElement> Path);
 
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
-                            SourceLoc ImportLoc,
+                            SourceLoc ImportLoc, ImportKind Kind,
                             ArrayRef<AccessPathElement> Path);
 
   ArrayRef<AccessPathElement> getAccessPath() const {
     return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
+  }
+
+  ImportKind getImportKind() const {
+    return static_cast<ImportKind>(ImportDeclBits.ImportKind);
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }

@@ -335,6 +335,31 @@ void PrintAST::printInherited(ArrayRef<TypeLoc> inherited) {
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
   OS << "import ";
+  switch (decl->getImportKind()) {
+  case ImportKind::Module:
+    break;
+  case ImportKind::Type:
+    OS << "typealias ";
+    break;
+  case ImportKind::Struct:
+    OS << "struct ";
+    break;
+  case ImportKind::Class:
+    OS << "class ";
+    break;
+  case ImportKind::Union:
+    OS << "union ";
+    break;
+  case ImportKind::Protocol:
+    OS << "protocol ";
+    break;
+  case ImportKind::Var:
+    OS << "var ";
+    break;
+  case ImportKind::Func:
+    OS << "func ";
+    break;
+  }
   recordDeclLoc(decl);
   bool first = true;
   for (auto elt : decl->getAccessPath()) {

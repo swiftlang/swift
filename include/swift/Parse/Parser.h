@@ -441,7 +441,7 @@ public:
   bool parseAttributeListPresent(DeclAttributes &Attributes);
   bool parseAttribute(DeclAttributes &Attributes);
   
-  Decl *parseDeclImport(unsigned Flags);
+  bool parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension(unsigned Flags);
   bool parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
