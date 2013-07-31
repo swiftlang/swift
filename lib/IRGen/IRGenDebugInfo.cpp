@@ -23,6 +23,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/Config/config.h"
 #include "llvm/DebugInfo.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -74,9 +75,12 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
   return BumpAllocatedString(S.data(), S.size(), BP);
 }
 
-IRGenDebugInfo::IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
-                               llvm::SourceMgr &SM, llvm::Module &M)
-  : SM(SM), DBuilder(M), Opts(Opts), Types(Types),
+IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
+                               const clang::TargetInfo &TargetInfo,
+                               TypeConverter &Types,
+                               llvm::SourceMgr &SM,
+                               llvm::Module &M)
+  : Opts(Opts), TargetInfo(TargetInfo), SM(SM), DBuilder(M), Types(Types),
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfo);
   StringRef Dir, Filename;
@@ -586,8 +590,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                         llvm::DIDescriptor Scope,
                                         llvm::DIFile File) {
   StringRef Name;
-  uint64_t Size = Ty.SizeInBits;
-  uint64_t Align = Ty.AlignmentInBits;
+  // FIXME: For SizeInBits, clang uses the actual size of the type on
+  // the target machine instead of the storage size that is alloca'd
+  // in the LLVM IR. For all types that are boxed in a struct, we are
+  // emitting the storage size of the struct, but it may be necessary
+  // to emit the (target!) size of the underlying basic type.
+  unsigned SizeOfByte = TargetInfo.getCharWidth();
+  uint64_t SizeInBits = Ty.SizeInBytes * SizeOfByte;
+  uint64_t AlignInBits = Ty.AlignmentInBytes * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
@@ -598,20 +608,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     Name = "<null>";
     return DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
                                       Name, Scope, File, /*Line*/ 0,
-                                      DW_LANG_Swift, Size, Align);
+                                      DW_LANG_Swift, SizeInBits, AlignInBits);
   }
 
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
     auto IntTy = BaseTy->castTo<BuiltinIntegerType>();
-    Size = IntTy->getBitWidth();
+    SizeInBits = TargetInfo.getIntWidth();
     Name = "_TtSi";
     break;
   }
 
   case TypeKind::BuiltinFloat: {
     auto FloatTy = BaseTy->castTo<BuiltinFloatType>();
-    Size = FloatTy->getBitWidth();
+    SizeInBits = TargetInfo.getFloatWidth();
     Name = "_TtSf";
     break;
   }
@@ -622,22 +632,22 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto IdTy = DBuilder.
       createStructType(Scope, "objc_object", File, 0, 0, 0, 0,
                        llvm::DIType(), llvm::DIArray(), DW_LANG_ObjC);
-    return DBuilder.createPointerType(IdTy, Size, Align);
+    return DBuilder.createPointerType(IdTy, SizeInBits, AlignInBits);
   }
 
   case TypeKind::BuiltinObjectPointer: {
     Name = getMangledName(Ty.CanTy);
-    auto PTy = DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+    auto PTy = DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinOpaquePointer:
     Name = getMangledName(Ty.CanTy);
-    return DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+    return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
 
   case TypeKind::BuiltinRawPointer:
     Name = getMangledName(Ty.CanTy);
-    return DBuilder.createPointerType(llvm::DIType(), Size, Align, Name);
+    return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
 
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
@@ -647,7 +657,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
       Name = getMangledName(Ty.CanTy);
       return DBuilder.createStructType(Scope, Name,
                                        getOrCreateFile(L.Filename), L.Line,
-                                       Size, Align, Flags,
+                                       SizeInBits, AlignInBits, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
                                        DW_LANG_Swift);
@@ -669,7 +679,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return DBuilder.createStructType(Scope, Name,
                                        getOrCreateFile(L.Filename), L.Line,
-                                       Size, Align, Flags,
+                                       SizeInBits, AlignInBits, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
                                        RuntimeLang);
@@ -691,7 +701,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
       Name = Decl->getName().str();
       return DBuilder.createStructType(Scope, Name,
                                        getOrCreateFile(L.Filename), L.Line,
-                                       Size, Align, Flags,
+                                       SizeInBits, AlignInBits, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
                                        DW_LANG_Swift);
@@ -710,7 +720,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       return DBuilder.createStructType(Scope, Name,
                                        getOrCreateFile(L.Filename), L.Line,
-                                       Size, Align, Flags,
+                                       SizeInBits, AlignInBits, Flags,
                                        llvm::DIType(),  // DerivedFrom
                                        llvm::DIArray(), // Elements
                                        RuntimeLang);
@@ -732,7 +742,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // is an ArcheType.
     return DBuilder.createStructType(Scope, Name,
                                      File, 0,
-                                     Size, Align, Flags,
+                                     SizeInBits, AlignInBits, Flags,
                                      llvm::DIType(),  // DerivedFrom
                                      getTupleElements(TupleTy, Scope),
                                      DW_LANG_Swift);
@@ -742,7 +752,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // FIXME: handle LValueTy->getQualifiers();
     auto LValueTy = BaseTy->castTo<LValueType>();
     auto CanTy = LValueTy->getObjectType()->getCanonicalType();
-    return getOrCreateType(DebugTypeInfo(CanTy, Size, Align), Scope);
+    return getOrCreateType(DebugTypeInfo(CanTy, SizeInBits, AlignInBits), Scope);
   }
   case TypeKind::Archetype: {
     // FIXME
@@ -754,14 +764,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // FIXME
     auto Metatype = BaseTy->castTo<MetaTypeType>();
     auto CanTy = Metatype->getInstanceType()->getCanonicalType();
-    return getOrCreateType(DebugTypeInfo(CanTy, Size, Align), Scope);
+    return getOrCreateType(DebugTypeInfo(CanTy, SizeInBits, AlignInBits), Scope);
     break;
   }
   case TypeKind::Function: {
     // FIXME: auto Function = BaseTy->castTo<AnyFunctionType>();
     // FIXME: handle parameters.
     auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
-    return DBuilder.createPointerType(FnTy, Size, Align);
+    return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
   case TypeKind::OneOf: {
     Name = getMangledName(Ty.CanTy);
@@ -773,14 +783,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
           llvm::dbgs() << "\n");
     Name = "<unknown>";
   }
-  // FIXME: For Size, clang uses the actual size of the type on the
-  // target machine instead of the storage size that is alloca'd in
-  // the LLVM IR. To look up the size of the type on the target, clang
-  // keeps a Basic/TargetInfo object around.  Right now this is not an
-  // actual problem, since all Swift types are Structs anyway, but
-  // once we describe the individual fields, this needs to be fixed as
-  // LLVM won't even accept a Bool (i1).
-  return DBuilder.createBasicType(Name, Size, Align, Encoding);
+  return DBuilder.createBasicType(Name, SizeInBits, AlignInBits, Encoding);
 }
 
 /// Get the DIType corresponding to this DebugTypeInfo from the cache,

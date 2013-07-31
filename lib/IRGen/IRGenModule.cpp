@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Options.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -178,8 +179,12 @@ IRGenModule::IRGenModule(ASTContext &Context,
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
-  if (Opts.DebugInfo)
-    DebugInfo = new IRGenDebugInfo(Opts, Types, Context.SourceMgr, Module);
+  if (Opts.DebugInfo) {
+    auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+    assert(CI && "no clang module loader");
+    DebugInfo = new IRGenDebugInfo(Opts, CI->getTargetInfo(), Types,
+                                   Context.SourceMgr, Module);
+  }
 }
 
 IRGenModule::~IRGenModule() {

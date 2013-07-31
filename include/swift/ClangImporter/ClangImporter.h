@@ -1,4 +1,4 @@
-//===--- ClangImporter.cpp - Import Clang Modules -------------------------===//
+//===--- ClangImporter.cpp - Import Clang Modules --------------*- C++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,6 +20,7 @@
 
 namespace clang {
   class VisibleDeclConsumer;
+  class TargetInfo;
 }
 
 namespace swift {
@@ -131,6 +132,8 @@ public:
   virtual void getReexportedModules(
     const Module *module,
     SmallVectorImpl<Module::ImportedModule> &exports) override;
+
+  clang::TargetInfo &getTargetInfo() const;
 };
 
 }

@@ -21,7 +21,6 @@
 #include "llvm/DebugInfo.h"
 #include "llvm/DIBuilder.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/SourceMgr.h"
 
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -36,8 +35,13 @@ namespace llvm {
   class DIBuilder;
 }
 
+namespace clang {
+  class TargetInfo;
+}
+
 namespace swift {
 
+class ASTContext;
 class SILArgument;
 class SILDebugScope;
 class SILModule;
@@ -57,9 +61,10 @@ typedef struct {
 /// CompileUnit, File, LexicalScope, and translates SILLocations into
 /// <llvm::DebugLoc>s.
 class IRGenDebugInfo {
+  const Options &Opts;
+  const clang::TargetInfo &TargetInfo;
   llvm::SourceMgr &SM;
   llvm::DIBuilder DBuilder;
-  const Options &Opts;
   TypeConverter &Types;
 
   // Various caches.
@@ -83,8 +88,11 @@ class IRGenDebugInfo {
   llvm::SmallVector<std::pair<Location, SILDebugScope*>, 8> LocationStack;
 
 public:
-  IRGenDebugInfo(const Options &Opts, TypeConverter &Types,
-                 llvm::SourceMgr &SM, llvm::Module &M);
+  IRGenDebugInfo(const Options &Opts,
+                 const clang::TargetInfo &TargetInfo,
+                 TypeConverter &Types,
+                 llvm::SourceMgr &SM,
+                 llvm::Module &M);
 
   /// Finalize the llvm::DIBuilder owned by this object.
   void finalize();

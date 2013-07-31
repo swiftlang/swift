@@ -541,6 +541,9 @@ void ClangImporter::getReexportedModules(
   }
 }
 
+clang::TargetInfo &ClangImporter::getTargetInfo() const {
+  return Impl.Instance->getTarget();
+}
 
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
