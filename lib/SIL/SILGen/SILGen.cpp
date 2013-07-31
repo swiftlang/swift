@@ -34,23 +34,6 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
 {
 }
 
-// FIXME: We should be able to simplify this after the FuncExpr and friends
-// hierarhy is refactored.
-static SILLocation getFuncBodySILLocation(SILLocation Func) {
-  if (const FuncExpr *FE = Func.getAs<FuncExpr>())
-    return SILLocation(FE->getBody());
-  if (const PipeClosureExpr *FE = Func.getAs<PipeClosureExpr>())
-    return SILLocation(FE->getBody());
-  if (const ClosureExpr *FE = Func.getAs<ClosureExpr>())
-    return SILLocation(FE->getBody());
-  if (const ConstructorDecl *CD = Func.getAs<ConstructorDecl>())
-    return SILLocation(CD->getBody());
-  if (const DestructorDecl *DD = Func.getAs<DestructorDecl>())
-    return SILLocation(DD->getBody());
-  // FIXME: Should turn into assert after properties are handled.
-  return SILLocation();
-}
-
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
