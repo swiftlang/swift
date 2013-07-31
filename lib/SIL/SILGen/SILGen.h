@@ -271,6 +271,16 @@ public:
   std::vector<JumpDest> BreakDestStack;
   std::vector<JumpDest> ContinueDestStack;
   std::vector<SwitchContext *> SwitchStack;
+  
+  /// The cleanup depth and epilog BB for "return" instructions.
+  JumpDest ReturnDest;
+  
+  /// \brief Location information for the return instruction.
+  ///
+  /// FIXME: Currently this is only ever the location of the function body, or
+  /// of the first ReturnStmt in the function body. We probably want richer
+  /// return location information.
+  SILLocation ReturnLoc;
 
   /// Cleanups - This records information about the currently active cleanups.
   CleanupManager Cleanups;
@@ -324,15 +334,10 @@ public:
   
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
-  bool hasVoidReturn;
+  bool allowsVoidReturn() const {
+    return ReturnDest.getBlock()->bbarg_empty();
+  }
   
-  /// In a constructor or destructor context, returning from the body doesn't
-  /// return from the current SIL function but instead branches to an epilog
-  /// block that executes implicit behavior. epilogBB points to the epilog
-  /// block that 'return' jumps to in those contexts, or 'null' if returning
-  /// can return normally from the function.
-  SILBasicBlock *epilogBB;
-
   /// This location, when set, is used as an override location for magic
   /// identifier expansion (e.g. __FILE__).  This allows default argument
   /// expansion to report the location of the call, instead of the location
@@ -340,7 +345,7 @@ public:
   SourceLoc overrideLocationForMagicIdentifiers;
   
 public:
-  SILGenFunction(SILGenModule &SGM, SILFunction &F, bool hasVoidReturn);
+  SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
   
   /// Return a stable reference to the current cleanup.
@@ -430,11 +435,6 @@ public:
                           ArrayRef<SILType> contArgs = {});
   
   
-  /// emitEpilogBB - Branch to and emit the epilog basic block. This will fuse
-  /// the epilog to the current basic block if the epilog bb has no predecessor.
-  /// Returns true if the epilog is reachable, false if it is unreachable.
-  bool emitEpilogBB(SILLocation loc);
-  
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
@@ -445,6 +445,28 @@ public:
                   Type resultType);
   void emitProlog(ArrayRef<Pattern*> paramPatterns,
                   Type resultType);
+
+  /// \brief Create (but do not emit) the epilog branch, and save the
+  /// current cleanups depth as the destination for return statement branches.
+  ///
+  /// \param returnType  If non-null, the epilog block will be created with an
+  ///                    argument of this type to receive the return value for
+  ///                    the function.
+  void prepareEpilog(Type returnType);
+  
+  /// \brief Branch to and emit the epilog basic block. This will fuse
+  /// the epilog to the current basic block if the epilog bb has no predecessor.
+  /// The insertion point will be moved into the epilog block if it is
+  /// reachable.
+  ///
+  /// \returns Nothing if the epilog block is unreachable. Otherwise, returns
+  ///          the epilog block's return value argument, or a null SILValue if
+  ///          the epilog doesn't take a return value.
+  Optional<SILValue> emitEpilogBB(SILLocation loc);
+  
+  /// \brief Emits a standard epilog which runs top-level cleanups then returns
+  /// the function return value, if any.
+  void emitEpilog(SILLocation loc);
   
   /// emitDestructorProlog - Generates prolog code for a destructor. Unlike
   /// a normal function, the destructor does not consume a reference to its

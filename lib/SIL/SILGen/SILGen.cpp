@@ -28,12 +28,10 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===--------------------------------------------------------------------===//
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
-                               bool hasVoidReturn)
+SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F), B(new (F.getModule()) SILBasicBlock(&F)),
-    Cleanups(*this),
-    hasVoidReturn(hasVoidReturn),
-    epilogBB(nullptr) {
+    Cleanups(*this)
+{
 }
 
 // FIXME: We should be able to simplify this after the FuncExpr and friends
@@ -56,22 +54,9 @@ static SILLocation getFuncBodySILLocation(SILLocation Func) {
 /// SILGenFunction destructor - called after the entire function's AST has been
 /// visited.  This handles "falling off the end of the function" logic.
 SILGenFunction::~SILGenFunction() {
-  // If the end of the function isn't reachable (e.g. it ended in an explicit
-  // return), then we're done.
-  if (!B.hasValidInsertionPoint())
-    return;
-  
-  // If we have an unterminated block, it is either an implicit return of an
-  // empty tuple, or a dynamically unreachable location.
-  if (hasVoidReturn) {
-    assert(!epilogBB && "epilog bb not terminated?!");
-    SILValue emptyTuple = emitEmptyTuple(SILLocation());
-    Cleanups.emitReturnAndCleanups(SILLocation(), emptyTuple);
-  } else {
-    // FIXME: Get this from the SILFunction when SILFunction has SILLocation
-    // info.
-    B.createUnreachable(getFuncBodySILLocation(F.getLocation()));
-  }
+  // If the end of the function isn't terminated, we screwed up somewhere.
+  assert(!B.hasValidInsertionPoint() &&
+         "SILGenFunction did not terminate function?!");
 }
 
 //===--------------------------------------------------------------------===//
@@ -85,11 +70,12 @@ SILGenModule::SILGenModule(SILModule &M)
   // Assign a debug scope pointing into the void to the top level function.
   toplevel->setDebugScope(new (M) SILDebugScope());
 
-  TopLevelSGF = new SILGenFunction(*this, *toplevel,
-                                   /*hasVoidReturn=*/true);
+  TopLevelSGF = new SILGenFunction(*this, *toplevel);
+  TopLevelSGF->prepareEpilog(Type());
 }
 
 SILGenModule::~SILGenModule() {
+  TopLevelSGF->emitEpilog(SILLocation());
   SILFunction *toplevel = &TopLevelSGF->getFunction();
   delete TopLevelSGF;
   DEBUG(llvm::dbgs() << "lowered toplevel sil:\n";
@@ -322,8 +308,7 @@ void SILGenModule::emitFunction(SILDeclRef::Loc decl, FuncExpr *fe) {
   
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, fe);
-  bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
-  SILGenFunction(*this, *f, hasVoidReturn).emitFunction(fe);
+  SILGenFunction(*this, *f).emitFunction(fe);
   postEmitFunction(constant, f);
 
   // If the function is a standalone function and is curried, emit the thunks
@@ -360,8 +345,7 @@ void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
                                   SILDeclRef nextEntryPoint,
                                   FuncExpr *fe) {
   SILFunction *f = preEmitFunction(entryPoint, fe);
-  bool hasVoidReturn = fe->getResultType(f->getASTContext())->isVoid();
-  SILGenFunction(*this, *f, hasVoidReturn)
+  SILGenFunction(*this, *f)
     .emitCurryThunk(fe, entryPoint, nextEntryPoint);
   postEmitFunction(entryPoint, f);
 }
@@ -380,18 +364,18 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   if (decl->getImplicitThisDecl()->getType()->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
-    SILGenFunction(*this, *f, /*hasVoidReturn=*/true)
+    SILGenFunction(*this, *f)
       .emitClassConstructorAllocator(decl);
     postEmitFunction(constant, f);
     
     SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
     SILFunction *initF = preEmitFunction(initConstant, decl);
-    SILGenFunction(*this, *initF, /*hasVoidReturn=*/true)
+    SILGenFunction(*this, *initF)
       .emitClassConstructorInitializer(decl);
     postEmitFunction(initConstant, initF);
   } else {
     // Struct constructors do everything in a single function.
-    SILGenFunction(*this, *f, /*hasVoidReturn=*/true)
+    SILGenFunction(*this, *f)
       .emitValueConstructor(decl);
     postEmitFunction(constant, f);
   }  
@@ -400,15 +384,14 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 void SILGenModule::emitClosure(PipeClosureExpr *ce) {
   SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
-  bool hasVoidReturn = ce->getResultType()->isVoid();
-  SILGenFunction(*this, *f, hasVoidReturn).emitClosure(ce);
+  SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
 }
 
 void SILGenModule::emitClosure(ClosureExpr *ce) {
   SILDeclRef constant(ce);
   SILFunction *f = preEmitFunction(constant, ce);
-  SILGenFunction(*this, *f, /*hasVoidReturn=*/false).emitClosure(ce);
+  SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
 }
 
@@ -417,13 +400,13 @@ void SILGenModule::emitDestructor(ClassDecl *cd,
   // Emit the destroying destructor.
   SILDeclRef destroyer(cd, SILDeclRef::Kind::Destroyer);
   SILFunction *f = preEmitFunction(destroyer, dd);
-  SILGenFunction(*this, *f, /*hasVoidReturn=*/true).emitDestructor(cd, dd);
+  SILGenFunction(*this, *f).emitDestructor(cd, dd);
   postEmitFunction(destroyer, f);
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
   SILFunction *f = preEmitFunction(constant, arg);
-  SILGenFunction(*this, *f, /*hasVoidReturn=*/arg->getType()->isVoid())
+  SILGenFunction(*this, *f)
     .emitGeneratorFunction(constant, arg);
   postEmitFunction(constant, f);
 }
@@ -458,7 +441,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
     return;
   // TODO: why we have getBody here?
   SILFunction *f = preEmitFunction(thunk, method->getBody());
-  SILGenFunction(*this, *f, false).emitObjCMethodThunk(thunk);
+  SILGenFunction(*this, *f).emitObjCMethodThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
@@ -472,7 +455,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
     return;
 
   SILFunction *f = preEmitFunction(getter, prop);
-  SILGenFunction(*this, *f, false).emitObjCPropertyGetter(getter);
+  SILGenFunction(*this, *f).emitObjCPropertyGetter(getter);
   postEmitFunction(getter, f);
 
   if (!prop->isSettable())
@@ -483,7 +466,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
                      /*isObjC*/ true);
 
   f = preEmitFunction(setter, prop);
-  SILGenFunction(*this, *f, false).emitObjCPropertySetter(setter);
+  SILGenFunction(*this, *f).emitObjCPropertySetter(setter);
   postEmitFunction(setter, f);
 }
 

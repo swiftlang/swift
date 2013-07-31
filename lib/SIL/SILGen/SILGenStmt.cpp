@@ -129,20 +129,26 @@ void SILGenFunction::emitReturnExpr(SILLocation loc, Expr *ret) {
     InitializationPtr returnInit(
                        new IndirectReturnInitialization(IndirectReturnAddress));
     emitExprInto(ret, returnInit.get());
-    result = emitEmptyTuple(loc);
   } else {
     // SILValue return.
     FullExpr scope(Cleanups);
-    result = emitRValue(ret).forwardAsSingleValue(*this);
+    RValue resultRValue = emitRValue(ret);
+    if (!resultRValue.getType()->isVoid()) {
+      result = std::move(resultRValue).forwardAsSingleValue(*this);
+      result = emitGeneralizedValue(loc, result);
+    }
   }
-  Cleanups.emitReturnAndCleanups(loc, result);
+  Cleanups.emitBranchAndCleanups(ReturnDest,
+                                 result ? result : ArrayRef<SILValue>{});
 }
 
 void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
+  ReturnLoc = S;
+  
   SILValue ArgV;
   if (!S->hasResult())
     // Void return.
-    Cleanups.emitReturnAndCleanups(S, emitEmptyTuple(S));
+    Cleanups.emitBranchAndCleanups(ReturnDest);
   else
     emitReturnExpr(S, S->getResult());
 }

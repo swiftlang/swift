@@ -87,7 +87,8 @@ void CleanupManager::endScope(CleanupsDepth depth) {
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
-void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
+void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
+                                           ArrayRef<SILValue> Args) {
   SILBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   auto depth = Dest.getDepth();
@@ -99,30 +100,13 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest) {
       cleanup->emit(Gen);
   }
   /// FIXME location info
-  B.createBranch(SILLocation(), Dest.getBlock());
+  B.createBranch(SILLocation(), Dest.getBlock(), Args);
 }
 
 void CleanupManager::emitCleanupsForReturn(SILLocation loc) {
   for (auto &cleanup : Stack)
     if (cleanup.isActive())
       cleanup.emit(Gen);
-}
-
-void CleanupManager::emitReturnAndCleanups(SILLocation loc, SILValue returnValue) {
-  SILBuilder &B = Gen.getBuilder();
-  assert(B.hasValidInsertionPoint() && "Inserting return in invalid spot");
-
-  emitCleanupsForReturn(loc);
-  
-  if (Gen.epilogBB) {
-    assert(Gen.hasVoidReturn && "ctor or dtor with non-void return?!");
-    B.createBranch(loc, Gen.epilogBB);
-  } else {
-    // Thicken thin function return values.
-    // FIXME: Swift type-checking should to this for us.
-    returnValue = Gen.emitGeneralizedValue(loc, returnValue);
-    B.createReturn(loc, returnValue);
-  }
 }
 
 Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,

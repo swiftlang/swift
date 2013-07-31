@@ -33,9 +33,11 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupsDepth;
 /// support indirect branches or goto, so the jump mechanism only
 /// needs to worry about branches out of scopes, not into them.
 class LLVM_LIBRARY_VISIBILITY JumpDest {
-  SILBasicBlock *Block;
-  CleanupsDepth Depth;
+  SILBasicBlock *Block = nullptr;
+  CleanupsDepth Depth = CleanupsDepth::invalid();
 public:
+  JumpDest() = default;
+  
   JumpDest(SILBasicBlock *block, CleanupsDepth depth)
     : Block(block), Depth(depth) {}
 

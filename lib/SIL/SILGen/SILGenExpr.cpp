@@ -1299,53 +1299,113 @@ RValue RValueEmitter::visitClosureExpr(ClosureExpr *e, SGFContext C) {
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   return RValue(SGF, SGF.emitClosureForCapturingExpr(e, SILDeclRef(e),
-                                              SGF.getForwardingSubstitutions(),
-                                                     e));
+                                          SGF.getForwardingSubstitutions(), e));
 }
 
 void SILGenFunction::emitFunction(FuncExpr *fe) {
-  emitProlog(fe, fe->getBodyParamPatterns(), fe->getResultType(F.getASTContext()));
+  Type resultTy = fe->getResultType(F.getASTContext());
+  emitProlog(fe, fe->getBodyParamPatterns(), resultTy);
+  prepareEpilog(resultTy);
   visit(fe->getBody());
+  emitEpilog(fe);
 }
 
 void SILGenFunction::emitClosure(PipeClosureExpr *ce) {
   emitProlog(ce, ce->getParams(), ce->getResultType());
+  prepareEpilog(ce->getResultType());
   visit(ce->getBody());
+  emitEpilog(ce);
 }
 
 void SILGenFunction::emitClosure(ClosureExpr *ce) {
-  emitProlog(ce, ce->getParamPatterns(),
-             ce->getType()->castTo<FunctionType>()->getResult());
+  Type resultTy = ce->getType()->castTo<FunctionType>()->getResult();
+  emitProlog(ce, ce->getParamPatterns(), resultTy);
+  prepareEpilog(resultTy);
 
   // Closure expressions implicitly return the result of their body expression.
   emitReturnExpr(ce, ce->getBody());
-  
-  assert(!B.hasValidInsertionPoint() &&
-         "returning closure body did not terminate closure?!");
+  emitEpilog(ce);  
 }
 
-bool SILGenFunction::emitEpilogBB(SILLocation loc) {
-  assert(epilogBB && "no epilog bb to emit?!");
+Optional<SILValue> SILGenFunction::emitEpilogBB(SILLocation loc) {
+  assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
+  SILBasicBlock *epilogBB = ReturnDest.getBlock();
+  SILValue returnValue;
   
-  // If the epilog was not branched to at all, just unwind like a "return"
-  // and emit the epilog into the current BB.
+  bool needsReturn = !epilogBB->bbarg_empty();
+
   if (epilogBB->pred_empty()) {
+    // If the epilog was not branched to at all, kill the BB and
+    // just emit the epilog into the current BB.
     epilogBB->eraseFromParent();
 
     // If the current bb is terminated then the epilog is just unreachable.
     if (!B.hasValidInsertionPoint())
-      return false;
+      return Nothing;
     
-    Cleanups.emitCleanupsForReturn(loc);
-  } else {
-    // If the body didn't explicitly return, we need to branch out of it as if
-    // returning. emitReturnAndCleanups will do that.
+    // If the epilog BB took an argument, then we were expecting to return a
+    // value, and there should have been a return somewhere. We shouldn't
+    // be able to reach here on the current code path.
+    if (needsReturn) {
+      B.createUnreachable(loc);
+      return Nothing;
+    }
+  } else if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end()
+             && (!B.hasValidInsertionPoint() || needsReturn)) {
+    // If the epilog has a single predecessor and there's no current insertion
+    // point to fall through from, then we can weld the epilog to that
+    // predecessor BB.
+    epilogBB->eraseFromParent();
+
+    // If the epilog BB took an argument, then we were expecting to return a
+    // value, and there should have been a return somewhere. We shouldn't
+    // be able to reach here on the current code path.
     if (B.hasValidInsertionPoint())
-      Cleanups.emitReturnAndCleanups(loc, SILValue());
+      B.createUnreachable(loc);
+    
+    // Steal the branch argument as the return value if present.
+    SILBasicBlock *pred = *epilogBB->pred_begin();
+    BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
+    assert(predBranch->getArgs().size() == (needsReturn ? 1 : 0)
+           && "epilog predecessor arguments does not match block params");
+    if (needsReturn)
+      returnValue = predBranch->getArgs()[0];
+
+    // Kill the branch and emit the epilog into the BB.
+    pred->getInsts().erase(predBranch);
+    B.setInsertionPoint(pred);
+  } else {
+    if (!epilogBB->bbarg_empty()) {
+      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
+      returnValue = epilogBB->bbarg_begin()[0];
+    }
     // Emit the epilog into the epilog bb.
     B.emitBlock(epilogBB);
   }
-  return true;
+  
+  // Emit top-level cleanups into the epilog block.
+  assert(getCleanupsDepth() == ReturnDest.getDepth() &&
+         "emitting epilog in wrong scope");
+  Cleanups.emitCleanupsForReturn(loc);
+  
+  return returnValue;
+}
+
+void SILGenFunction::emitEpilog(SILLocation loc) {
+  Optional<SILValue> maybeReturnValue = emitEpilogBB(loc);
+  
+  // If the epilog is unreachable, we're done.
+  if (!maybeReturnValue)
+    return;
+  
+  // Otherwise, return the return value, if any.
+  SILValue returnValue = *maybeReturnValue;
+  // Return () if no return value was given.
+  if (!returnValue)
+    returnValue = emitEmptyTuple(loc);
+  
+  // FIXME: Use the function body as the loc if ReturnLoc hasn't been set.
+  B.createReturn(ReturnLoc, returnValue);
 }
 
 void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
@@ -1354,7 +1414,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F);
+  prepareEpilog(Type());
   
   // Emit the destructor body, if any.
   if (dd)
@@ -1583,7 +1643,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit this until after we've emitted the body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F);
+  // The epilog takes a void return because the return of 'this' is implicit.
+  prepareEpilog(Type());
 
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -1807,7 +1868,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit the block until after we've emitted the body.
-  epilogBB = new (SGM.M) SILBasicBlock(&F);
+  prepareEpilog(Type());
   
   // Emit the constructor body.
   visit(ctor->getBody());
@@ -1925,7 +1986,9 @@ void SILGenFunction::emitCurryThunk(FuncExpr *fe,
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   emitProlog({ }, value->getType());
+  prepareEpilog(value->getType());
   emitReturnExpr(value, value);
+  emitEpilog(value);
 }
 
 RValue RValueEmitter::

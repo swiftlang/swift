@@ -91,18 +91,16 @@ public:
     return Stack.stable_begin();
   }
   
-  /// emitBranchAndCleanups - Emit a branch to the given jump destination,
+  /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
   /// cleanup stack.
-  void emitBranchAndCleanups(JumpDest Dest);
+  ///
+  /// \param Dest  The destination scope and block.
+  /// \param Args  Arguments to pass to the destination block.
+  void emitBranchAndCleanups(JumpDest Dest, ArrayRef<SILValue> Args = {});
   
-  /// emitReturnAndCleanups - Emit a return from the current function, threading
-  /// out through all active cleanups that need to run. This does not pop the
-  /// cleanup stack.
-  void emitReturnAndCleanups(SILLocation loc, SILValue returnValue);
-  
-  /// emitCleanupsForReturn - Emit all the cleanups necessary before a return
-  /// branch (but not the branch itself).
+  /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
+  /// return from the function.
   void emitCleanupsForReturn(SILLocation loc);
   
   /// pushCleanup - Push a new cleanup.

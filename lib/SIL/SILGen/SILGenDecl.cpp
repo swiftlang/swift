@@ -535,7 +535,7 @@ public:
   }
 };
   
-static void makeCaptureSILArguments(SILGenFunction &gen, ValueDecl *capture) {
+static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   ASTContext &c = capture->getASTContext();
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::Box: {
@@ -602,7 +602,7 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   for (auto capture : ce->getCaptures()) {
-    makeCaptureSILArguments(*this, capture);
+    emitCaptureArguments(*this, capture);
   }
 }
 
@@ -681,6 +681,19 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     Cleanups.pushCleanup<CleanupDestructorThis>(thisDecl);
   }
   return thisValue;
+}
+
+void SILGenFunction::prepareEpilog(Type resultType) {
+  auto *epilogBB = new (F.getModule()) SILBasicBlock(&F);
+  
+  // If we have a non-null, non-void, non-address-only return type, receive the
+  // return value via a BB argument.
+  if (resultType && !resultType->isVoid()) {
+    auto &resultTI = getTypeLoweringInfo(resultType);
+    if (!resultTI.isAddressOnly())
+      new (F.getModule()) SILArgument(resultTI.getLoweredType(), epilogBB);
+  }
+  ReturnDest = JumpDest(epilogBB, getCleanupsDepth());
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
