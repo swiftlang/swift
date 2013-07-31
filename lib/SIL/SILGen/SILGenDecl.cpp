@@ -498,6 +498,8 @@ struct ArgumentInitVisitor :
     SILValue arg = makeArgument(P->getType(), f.begin());
     if (arg.getType().isLoadable(gen.F.getModule()))
       gen.B.emitReleaseValue(SILLocation(), arg);
+    else
+      gen.B.createDestroyAddr(SILLocation(), arg);
     return arg;
   }
 
