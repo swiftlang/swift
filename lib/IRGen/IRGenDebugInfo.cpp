@@ -42,6 +42,10 @@
 using namespace swift;
 using namespace irgen;
 
+//===--- BEGIN "TO BE FIXED IN A SWIFT FORK OF LLVM" ---===//
+
+// DWARF constants.
+
 // DW_LANG_Haskell+1 = 0x19 is the first unused language value in
 // DWARF 5.  We can't use it, because LLVM asserts that there are no
 // languages >DW_LANG_Python=0x14.  Wouldn't it would be much more
@@ -51,8 +55,13 @@ using namespace irgen;
 // by fixing that in LLVM we would hint at developing a new language.
 // So instead, let's hijack a language with a very low potential for
 // accidental conflicts for now.
-static const unsigned DW_LANG_Swift = 0xf; /*llvm::dwarf::DW_LANG_Swift*/;
+static const unsigned DW_LANG_Swift = 0xf;
 static const unsigned DW_LANG_ObjC = llvm::dwarf::DW_LANG_ObjC; // For symmetry.
+
+// Reuse some existing tag so the verifier doesn't complain.
+static const unsigned DW_TAG_meta_type = llvm::dwarf::DW_TAG_restrict_type;
+
+//===--- END "TO BE FIXED IN A SWIFT FORK OF LLVM" ---===//
 
 /// Strdup a raw char array using the bump pointer.
 static
@@ -759,11 +768,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     break;
   }
   case TypeKind::MetaType: {
-    // FIXME
+    // Metatypes are (mostly) singleton type descriptors, often without storage.
     auto Metatype = BaseTy->castTo<MetaTypeType>();
     auto CanTy = Metatype->getInstanceType()->getCanonicalType();
-    return getOrCreateType(DebugTypeInfo(CanTy, SizeInBits, AlignInBits), Scope);
-    break;
+    // The type this metatype is describing.
+    auto InstanceDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
+    return DBuilder.createQualifiedType(DW_TAG_meta_type,
+                                        getOrCreateType(InstanceDTI, Scope));
   }
   case TypeKind::Function: {
     // FIXME: auto Function = BaseTy->castTo<AnyFunctionType>();
