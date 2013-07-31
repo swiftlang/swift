@@ -181,7 +181,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
   // Create the associated action.
   importer->Impl.Action.reset(new SwiftModuleLoaderAction);
 
-  // Execute the action. We effectively inline mosst of
+  // Execute the action. We effectively inline most of
   // CompilerInstance::ExecuteAction here, because we need to leave the AST
   // open for future module loading.
   // FIXME: This has to be cleaned up on the Clang side before we can improve
