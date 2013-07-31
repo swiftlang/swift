@@ -1001,14 +1001,9 @@ namespace {
     SILValue addr = gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
                                                  destroyType.getAddressType());
     
-    if (destroyType.isAddressOnly(gen.F.getModule())) {
-      // If the type is address-only, destroy it indirectly.
-      gen.B.createDestroyAddr(loc, addr);
-    } else {
-      // Otherwise, load and release the value.
-      SILValue value = gen.B.createLoad(loc, addr);
-      gen.B.emitReleaseValue(loc, value);
-    }
+    // Destroy the value indirectly. Canonicalization will promote to loads
+    // and releases if appropriate.
+    gen.B.createDestroyAddr(loc, addr);
     
     return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
   }

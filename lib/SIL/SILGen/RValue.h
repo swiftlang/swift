@@ -166,6 +166,10 @@ public:
                            /*isTake*/ true,
                            /*isInitialize*/ false);
     } else {
+      // FIXME: We want to introduce a new high-level 'assign' instruction here
+      // for definitive assignment analysis to canonicalize to an initialization
+      // or assignment.
+      
       // src is a loadable type; release the old value if necessary and store
       // the new.
       assert(!getType().isAddress() &&

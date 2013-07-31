@@ -960,14 +960,8 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
     // it's address-only) then deallocate the variable.
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
     const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
-    if (!ti.isTrivial()) {
-      if (ti.isAddressOnly()) {
-        B.createDestroyAddr(vd, loc.address);
-      } else {
-        SILValue value = B.createLoad(vd, loc.address);
-        B.emitReleaseValue(vd, value);
-      }
-    }
+    if (!ti.isTrivial())
+      B.createDestroyAddr(vd, loc.address);
     B.createDeallocStack(vd, loc.address);
   } else {
     // For a heap variable, the box is responsible for the value. We just need
@@ -1208,6 +1202,7 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
                      /*isTake*/ true,
                      /*isInitialize*/ false);
   } else {
+    // FIXME: Use assign instruction here?
     SILValue old = B.createLoad(var, addr);
     B.createStore(var, setValue, addr);
     B.emitReleaseValue(var, old);

@@ -431,8 +431,8 @@ public:
             "Operand of dealloc_ref must be reference type");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
-    require(DI->getOperand().getType().isAddressOnly(F.getModule()),
-            "Operand of destroy_addr must be address-only");
+    require(DI->getOperand().getType().isAddress(),
+            "Operand of destroy_addr must be address");
   }
 
   void checkIndexAddrInst(IndexAddrInst *IAI) {

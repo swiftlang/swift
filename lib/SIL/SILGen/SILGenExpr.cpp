@@ -1374,12 +1374,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
       if (!ti.isTrivial()) {
         SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());
-        if (ti.isAddressOnly()) {
-          B.createDestroyAddr(dd, addr);
-        } else {
-          SILValue field = B.createLoad(dd, addr);
-          B.emitReleaseValue(dd, field);
-        }
+        B.createDestroyAddr(dd, addr);
       }
     }
   }
