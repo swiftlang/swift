@@ -155,7 +155,7 @@ void CodeCompletionContext::clearClangCache() {
   ClangCompletionResults.clear();
 }
 
-ArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
+MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   if (IncludeClangResults) {
     CurrentCompletionResults.reserve(CurrentCompletionResults.size() +
                                      ClangCompletionResults.size());
@@ -172,7 +172,43 @@ ArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
             Results);
   CurrentCompletionResults.clear();
   IncludeClangResults = false;
-  return llvm::makeArrayRef(Results, Count);
+  return MutableArrayRef<CodeCompletionResult *>(Results, Count);
+}
+
+namespace {
+StringRef getFirstTextChunk(CodeCompletionResult *R) {
+  for (auto C : R->getCompletionString()->getChunks()) {
+    switch (C.getKind()) {
+    case CodeCompletionString::Chunk::ChunkKind::Text:
+    case CodeCompletionString::Chunk::ChunkKind::LeftParen:
+    case CodeCompletionString::Chunk::ChunkKind::RightParen:
+    case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
+    case CodeCompletionString::Chunk::ChunkKind::RightBracket:
+    case CodeCompletionString::Chunk::ChunkKind::Dot:
+    case CodeCompletionString::Chunk::ChunkKind::Comma:
+      return C.getText();
+
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterNameAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterColonAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
+    case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
+    case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+      continue;
+    }
+  }
+  return StringRef();
+}
+} // unnamed namespace
+
+void CodeCompletionContext::sortCompletionResults(
+    MutableArrayRef<CodeCompletionResult *> Results) {
+  std::sort(Results.begin(), Results.end(),
+            [](CodeCompletionResult * LHS, CodeCompletionResult * RHS) {
+    return getFirstTextChunk(LHS).compare_lower(getFirstTextChunk(RHS)) < 0;
+  });
 }
 
 namespace {
@@ -700,7 +736,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::deliverCompletionResults() {
-  ArrayRef<CodeCompletionResult *> Results = CompletionContext.takeResults();
+  auto Results = CompletionContext.takeResults();
   if (!Results.empty()) {
     Consumer.handleResults(Results);
     DeliveredResults = true;
@@ -713,7 +749,7 @@ void CodeCompletionCallbacksImpl::loadedModule(ModuleLoader *Loader,
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
-    ArrayRef<CodeCompletionResult *> Results) {
+    MutableArrayRef<CodeCompletionResult *> Results) {
   OS << "Begin completions\n";
   for (auto Result : Results) {
     Result->print(OS);

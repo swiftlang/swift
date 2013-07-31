@@ -66,7 +66,8 @@ public:
   REPLCodeCompletionConsumer(REPLCompletions &Completions)
       : Completions(Completions) {}
 
-  void handleResults(ArrayRef<CodeCompletionResult *> Results) override {
+  void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
+    CodeCompletionContext::sortCompletionResults(Results);
     for (auto Result : Results) {
       std::string InsertableString = toInsertableString(Result);
       if (StringRef(InsertableString).startswith(Completions.Prefix)) {

@@ -331,7 +331,12 @@ public:
   StringRef copyString(StringRef String);
 
   /// \brief Return current code completion results.
-  ArrayRef<CodeCompletionResult *> takeResults();
+  MutableArrayRef<CodeCompletionResult *> takeResults();
+
+  /// \brief Sort code completion results in an implementetion-defined order
+  /// in place.
+  static void sortCompletionResults(
+      MutableArrayRef<CodeCompletionResult *> Results);
 
   /// \brief Clean the cache of Clang completion results.
   void clearClangCache();
@@ -353,7 +358,8 @@ class CodeCompletionConsumer {
 public:
   virtual ~CodeCompletionConsumer() {}
 
-  virtual void handleResults(ArrayRef<CodeCompletionResult *> Results) = 0;
+  virtual void handleResults(
+      MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };
 
 /// \brief A code completion result consumer that prints the results to a
@@ -366,7 +372,8 @@ public:
       : OS(OS) {
   }
 
-  void handleResults(ArrayRef<CodeCompletionResult *> Results) override;
+  void handleResults(
+      MutableArrayRef<CodeCompletionResult *> Results) override;
 };
 
 /// \brief Create a factory for code completion callbacks.
