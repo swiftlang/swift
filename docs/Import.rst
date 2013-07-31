@@ -121,7 +121,7 @@ modules, references to either import must be qualified::
   var e1 : abcde.E // OK
 
 A local definition with the same name as an explicitly imported symbol
-shadows the unqualified definition::
+shadows the unqualified import::
 
   import class abcde.E
 
@@ -152,7 +152,7 @@ FUTURE EXTENSIONS
 =================
 
 In the future, we should allow the import declaration to provide an alias
-for the imported module or class::
+for the imported module or declaration::
 
   import C = Cocoa
   import NSW = class Cocoa.NSWindow
