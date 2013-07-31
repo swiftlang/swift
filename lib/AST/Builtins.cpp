@@ -18,7 +18,9 @@
 #include "swift/AST/AST.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/LLVMContext.h"
 #include <tuple>
 using namespace swift;
 
@@ -647,9 +649,11 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
 static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
                                              ArrayRef<Type> TypeArgs,
                                              ASTContext &Context) {
+  llvm::Intrinsic::ID ID = (llvm::Intrinsic::ID)iid;
+  
   typedef llvm::Intrinsic::IITDescriptor IITDescriptor;
   SmallVector<IITDescriptor, 8> Table;
-  getIntrinsicInfoTableEntries((llvm::Intrinsic::ID)iid, Table);
+  getIntrinsicInfoTableEntries(ID, Table);
 
   ArrayRef<IITDescriptor> TableRef = Table;
 
@@ -664,8 +668,16 @@ static Type getSwiftFunctionTypeForIntrinsic(unsigned iid,
     ArgTys.push_back(ArgTy);
   }
   
+  // Translate LLVM function attributes to Swift function attributes.
+  llvm::AttributeSet attrs
+    = llvm::Intrinsic::getAttributes(llvm::getGlobalContext(), ID);
+  FunctionType::ExtInfo Info;
+  if (attrs.hasAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::NoReturn))
+    Info = Info.withIsNoReturn(true);
+  
   Type Arg = TupleType::get(ArgTys, Context);
-  return FunctionType::get(Arg, ResultTy, Context);
+  return FunctionType::get(Arg, ResultTy, Info, Context);
 }
 
 static bool isValidFenceOrdering(StringRef Ordering) {
