@@ -592,6 +592,7 @@
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
     decl ::= <a href="#decl-union">decl-union</a>
+    decl ::= <a href="#decl-union-element">decl-union-element</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
@@ -915,9 +916,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
     <i>// A function with selector-style signature.</i>
 
-    union PersonOfInterest {ColonelMustard, MissScarlet}
-    union Room {Conservatory, Ballroom}
-    union Weapon {Candlestick, LeadPipe}
+    union PersonOfInterest { case ColonelMustard, MissScarlet }
+    union Room { case Conservatory, Ballroom }
+    union Weapon { case Candlestick, LeadPipe }
 
     func accuseSuspect(suspect:PersonOfInterest)
         inRoom(room:Room)
@@ -962,20 +963,12 @@ an lvalue unless it has a <code>var-get</code> clause but not
   <h3 id="decl-union">union Declarations</h3>
   <!-- ===================================================================== -->
   
-  <div class="commentary">
-    In actual practice, we expect union to be commonly used for "enums" and
-    "struct" below to be used for data declarations.  The use of "union" for
-    discriminated unions will be much less common than its use for "enums".  If
-    there is a compelling reason to, we could add an "enum" sugar for
-    union's.
-  </div>
-  
   <pre class="grammar">
     decl-union ::= 'union' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? union-body
-    union-body         ::= '{' (union-element (',' union-element)*)? decl* '}'
+    union-body ::= '{' decl* '}'
     
-    union-element      ::= <a href="#identifier">identifier</a>
-    union-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
+    decl-union-element ::= 'case' union-case (',' union-case)*
+    union-case ::= <a href="#identifier">identifier</a> <a href="#type-tuple">type-tuple</a>? ('->' <a href="#type">type</a>)?
   </pre>
   
   <p>A union declaration provides direct access to <a 
@@ -984,25 +977,19 @@ an lvalue unless it has a <code>var-get</code> clause but not
     see <a href="#type-union">union types</a> for more information about their
     capabilities.</p>
   
-  <p>A 'union' may include a list of decls after its member types, which is
-     syntactic sugar for defining an <a href="#decl-extension">extension</a> of
-     the type.  The limitations of an <a 
-        href="#decl-extension-union-struct">union extensions</a> apply here as
-     well.</p>  
-
   <p>Here are some examples of union declarations:</p>
   
   <pre class="example">
     <i>// Declare discriminated union with union decl.</i>
     union SomeInts {
-      None,
-      One : Int,
-      Two : (Int, Int)
+      case None
+      case One(Int)
+      case Two(Int, Int)
     }
     
     <i>// Declares three "enums".</i>
     union DataSearchFlags {
-      None, Backward, Anchored
+      case None, Backward, Anchored
     }
     
     func f1(searchpolicy : DataSearchFlags)  <i>// DataSearchFlags is a valid type name</i>
@@ -1015,9 +1002,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
     }
     
     union SomeMoreInts {
-      None,               <i>// Doesn't conflict with previous "None".</i>
-      One : Int,
-      Two : (Int, Int)
+      case None,          <i>// Doesn't conflict with previous "None".</i>
+      case One(Int)
+      case Two(Int, Int)
     }
     
     func f2(a : SomeMoreInts)
@@ -1676,9 +1663,9 @@ if vec[3] {
   <i>// union and struct declarations with tuple values.</i>
   struct S { a : Int, b : Int }
   union Vertex {
-    Point2 : (x : Int, y : Int),
-    Point3 : (x : Int, y : Int, z : Int),
-    Point4 : (w : Int, x : Int, y : Int, z : Int)
+    case Point2(x : Int, y : Int)
+    case Point3(x : Int, y : Int, z : Int)
+    case Point4(w : Int, x : Int, y : Int, z : Int)
   }
   </pre>
 
@@ -1754,8 +1741,8 @@ if vec[3] {
   
   <p>A union type is defined by a <a href="#decl-union">union decl</a>.
 
-  <p>A default initialized value of union type is initialized to the first
-  element type in the list, with the default value for its element type.</p>
+  <p>Values of union type may not be default initialized unless the user 
+  provides a no-argument constructor.</p>
 
   <p>The union metatype has a member corresponding to each declared element.
   For elements with a declared type, this member is a function which can
@@ -2777,7 +2764,7 @@ ill-formed if the type does not conform to the protocol.</p>
     context sensitive type inference.</p>
   
   <pre class="example">
-    union Direction { Up, Down }
+    union Direction { case Up, Down }
     func search(val : Int, direction : Direction)
     
     func f() {
