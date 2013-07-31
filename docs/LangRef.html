@@ -256,7 +256,7 @@
     keyword ::= 'import'
     keyword ::= 'func'
     keyword ::= 'metatype'
-    keyword ::= 'oneof'
+    keyword ::= 'union'
     keyword ::= 'protocol'
     keyword ::= 'static'
     keyword ::= 'struct'
@@ -591,7 +591,7 @@
     decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
-    decl ::= <a href="#decl-oneof">decl-oneof</a>
+    decl ::= <a href="#decl-union">decl-union</a>
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
@@ -685,7 +685,7 @@
   </p>
   
   <!-- _____________________________________________________________________ -->
-  <h4 id="decl-extension-oneof-struct"><a href="#decl-oneof">oneof</a>, <a
+  <h4 id="decl-extension-union-struct"><a href="#decl-union">union</a>, <a
     href="#decl-struct">struct</a>, and <a href="#decl-class">class</a>
     declaration extensions</h4>
 
@@ -915,9 +915,9 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
     <i>// A function with selector-style signature.</i>
 
-    oneof PersonOfInterest {ColonelMustard, MissScarlet}
-    oneof Room {Conservatory, Ballroom}
-    oneof Weapon {Candlestick, LeadPipe}
+    union PersonOfInterest {ColonelMustard, MissScarlet}
+    union Room {Conservatory, Ballroom}
+    union Weapon {Candlestick, LeadPipe}
 
     func accuseSuspect(suspect:PersonOfInterest)
         inRoom(room:Room)
@@ -959,49 +959,49 @@ an lvalue unless it has a <code>var-get</code> clause but not
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-oneof">oneof Declarations</h3>
+  <h3 id="decl-union">union Declarations</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    In actual practice, we expect oneof to be commonly used for "enums" and
-    "struct" below to be used for data declarations.  The use of "oneof" for
+    In actual practice, we expect union to be commonly used for "enums" and
+    "struct" below to be used for data declarations.  The use of "union" for
     discriminated unions will be much less common than its use for "enums".  If
     there is a compelling reason to, we could add an "enum" sugar for
-    oneof's.
+    union's.
   </div>
   
   <pre class="grammar">
-    decl-oneof ::= 'oneof' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? oneof-body
-    oneof-body         ::= '{' (oneof-element (',' oneof-element)*)? decl* '}'
+    decl-union ::= 'union' <a href="#attribute-list">attribute-list</a> <a href="#identifier">identifier</a> <a href="#inheritance">inheritance</a>? union-body
+    union-body         ::= '{' (union-element (',' union-element)*)? decl* '}'
     
-    oneof-element      ::= <a href="#identifier">identifier</a>
-    oneof-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
+    union-element      ::= <a href="#identifier">identifier</a>
+    union-element      ::= <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a>
   </pre>
   
-  <p>A oneof declaration provides direct access to <a 
-     href="#type-oneof">oneof</a> types with a <a
+  <p>A union declaration provides direct access to <a 
+     href="#type-union">union</a> types with a <a
      href="#decl-typealias">typealias</a> declaration specifying a name.  Please
-    see <a href="#type-oneof">oneof types</a> for more information about their
+    see <a href="#type-union">union types</a> for more information about their
     capabilities.</p>
   
-  <p>A 'oneof' may include a list of decls after its member types, which is
+  <p>A 'union' may include a list of decls after its member types, which is
      syntactic sugar for defining an <a href="#decl-extension">extension</a> of
      the type.  The limitations of an <a 
-        href="#decl-extension-oneof-struct">oneof extensions</a> apply here as
+        href="#decl-extension-union-struct">union extensions</a> apply here as
      well.</p>  
 
-  <p>Here are some examples of oneof declarations:</p>
+  <p>Here are some examples of union declarations:</p>
   
   <pre class="example">
-    <i>// Declare discriminated union with oneof decl.</i>
-    oneof SomeInts {
+    <i>// Declare discriminated union with union decl.</i>
+    union SomeInts {
       None,
       One : Int,
       Two : (Int, Int)
     }
     
     <i>// Declares three "enums".</i>
-    oneof DataSearchFlags {
+    union DataSearchFlags {
       None, Backward, Anchored
     }
     
@@ -1014,7 +1014,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
       var a : DataSearchFlags = .None
     }
     
-    oneof SomeMoreInts {
+    union SomeMoreInts {
       None,               <i>// Doesn't conflict with previous "None".</i>
       One : Int,
       Two : (Int, Int)
@@ -1023,7 +1023,7 @@ an lvalue unless it has a <code>var-get</code> clause but not
     func f2(a : SomeMoreInts)
     
     func test2() {
-      <i>// Constructors for oneof element can be used in the obvious way.</i>
+      <i>// Constructors for union element can be used in the obvious way.</i>
       f2(.None)
       f2(.One(4))
       f2(.Two(1, 2))
@@ -1297,15 +1297,15 @@ if vec[3] {
     decl-constructor ::= 'constructor' <a href="#attribute-list">attribute-list</a> <a href="#pattern-tuple">pattern-tuple</a> <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
-  <p>'constructor' declares a constructor for a class, struct, or oneof.  Such
+  <p>'constructor' declares a constructor for a class, struct, or union.  Such
      a declaration is used whenever an object is constructed.  Specifically,
      for classes, it is used when a new expression is written, and for structs
-     and oneofs, it is used for function application when the "function"
+     and unions, it is used for function application when the "function"
      is a metatype.</p>
 
   <p>FIXME: We haven't decided the precise rules for when constructors are
      implicitly declared.  Default construction doesn't work right for structs
-     or oneofs.  We haven't decided what the restrictions are if a member
+     or unions.  We haven't decided what the restrictions are if a member
      isn't default-constructible.</p>
   
   <p>A simple example:</p>
@@ -1323,7 +1323,7 @@ if vec[3] {
   <p>If a class is derived from a superclass, it must explicitly invoke a
   superclass constructor using the <tt>super.constructor</tt> syntax.
   <tt>super.constructor</tt> may only be used in a subclass constructor;
-  it is not valid in a struct, oneof, or root class constructor. Additionally,
+  it is not valid in a struct, union, or root class constructor. Additionally,
   <tt>super.constructor</tt> may only be referenced exactly once per derived
   constructor. An example:</p>
 
@@ -1649,7 +1649,7 @@ if vec[3] {
 
   <p>Tuples are the low-level form of data aggregation in Swift, and are used as
   the building block of <a href="#type-function">function</a> argument lists,
-  multiple return values, <a href="#decl-oneof">oneof</a> bodies, etc. Because
+  multiple return values, <a href="#decl-union">union</a> bodies, etc. Because
   tuples are widely accessible and available everywhere in the language,
   aggregate data access and transformation is uniform and powerful.</p>
 
@@ -1673,9 +1673,9 @@ if vec[3] {
   <i>// Function argument and result is a tuple type.</i>
   func foo(x : Int, y : Int) -&gt; (val : Int, err : Int)
 
-  <i>// oneof and struct declarations with tuple values.</i>
+  <i>// union and struct declarations with tuple values.</i>
   struct S { a : Int, b : Int }
-  oneof Vertex {
+  union Vertex {
     Point2 : (x : Int, y : Int),
     Point3 : (x : Int, y : Int, z : Int),
     Point4 : (w : Int, x : Int, y : Int, z : Int)
@@ -1736,42 +1736,42 @@ if vec[3] {
   </pre>
   
   <!-- ===================================================================== -->
-  <h3 id="type-oneof">oneof Types</h3>
+  <h3 id="type-union">union Types</h3>
   <!-- ===================================================================== -->
   
   <div class="commentary">
-    'oneof' types are known as <a 
+    'union' types are known as <a 
       href="http://en.wikipedia.org/wiki/Algebraic_data_type">algebraic data
-      types</a> by the broader programming language community.  The name 'oneof'
-    comes from CLU.
+      types</a> by the broader programming language community.  The name 'union'
+    is inspired by C's unions, though Swift's are much safer.
   </div>
   
-  <p>A oneof type is a simple discriminated union: the runtime representation
-  of a value of oneof type only has one of the specified elements at a time.</p>
+  <p>A union type is a simple discriminated union: the runtime representation
+  of a value of union type only has one of the specified elements at a time.</p>
 
-  <p>All of the element types of a oneof type must
+  <p>All of the element types of a union type must
   be <a href="#materializable">materializable</a>.</p>
   
-  <p>A oneof type is defined by a <a href="#decl-oneof">oneof decl</a>.
+  <p>A union type is defined by a <a href="#decl-union">union decl</a>.
 
-  <p>A default initialized value of oneof type is initialized to the first
+  <p>A default initialized value of union type is initialized to the first
   element type in the list, with the default value for its element type.</p>
 
-  <p>The oneof metatype has a member corresponding to each declared element.
+  <p>The union metatype has a member corresponding to each declared element.
   For elements with a declared type, this member is a function which can
-  construct a oneof containing that element.  For elements without a
-  declared type, the member is simply a oneof value for that element.  A
-  oneof value has no accessible members except those explicitly defined
+  construct a union containing that element.  For elements without a
+  declared type, the member is simply a union value for that element.  A
+  union value has no accessible members except those explicitly defined
   by the user.</p>
 
-  <p>A reference to a member of the oneof metatype can be shortened using <a
+  <p>A reference to a member of the union metatype can be shortened using <a
   href="#expr-delayed-identifier">delayed identifier resolution</a>
   with <a href="#typecheck_context">context sensitive type inference</a>.
   </p>
 
-  <p>TODO: Should attributes be allowed on oneof elements?
+  <p>TODO: Should attributes be allowed on union elements?
   TODO: Eventually, with generics we'll have equality and inequality operators.
-    Oneof decls should implicitly define these for their types.
+    Union decls should implicitly define these for their types.
   TODO: Need pattern matching and element extraction.
   </p>
 
@@ -1918,7 +1918,7 @@ protocol C : A, B { }
     inheritance ::= ':' <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
   </pre>
 
-  <p>A named type (e.g., a class, struct, oneof, or protocol) can
+  <p>A named type (e.g., a class, struct, union, or protocol) can
  "inherit" some set of protocols, which implies that any object of
 that type conforms to each of those protocols. When a protocol
 inherits other protocols, the set of requirements from all of those
@@ -2772,12 +2772,12 @@ ill-formed if the type does not conform to the protocol.</p>
   </pre>
   
   <p>A delayed identifier expression refers to a constructor of a <a 
-    href="type-oneof">oneof</a> type, without knowing which type it is referring
+    href="type-union">union</a> type, without knowing which type it is referring
     to.  The expression is resolved to a constructor of a concrete type through
     context sensitive type inference.</p>
   
   <pre class="example">
-    oneof Direction { Up, Down }
+    union Direction { Up, Down }
     func search(val : Int, direction : Direction)
     
     func f() {
@@ -3358,14 +3358,14 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>Value names (for <a 
   href="#decl-var">var</a> and <a href="#decl-func">func</a> declarations) and
   type names (for <a href="#decl-typealias">typealias</a>, <a
-  href="#decl-oneof">oneof</a>, and <a href="#decl-struct">struct</a>
+  href="#decl-union">union</a>, and <a href="#decl-struct">struct</a>
   declarations) follow the same <a href="#namebind_scope">scope</a> and
   <a href="#namebind_typevalue_lookup">name lookup</a> rules as described below.
   </p>
 
   <p>tuple element names</p>
   
-  <p>scope within oneof decls</p>
+  <p>scope within union decls</p>
   
   <p>Context sensitive member references are resolved <a
     href="#typecheck_context">during type checking</a>.</p>
@@ -3509,7 +3509,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="stdlib">
     <i>// Bool is a simple discriminated union.</i>
-    oneof Bool {
+    union Bool {
       true, false
     }
     

@@ -78,7 +78,7 @@ static bool isStartOfIdentifier(char c) {
 enum class SwiftContextType {
   swiftClass,
   swiftStruct,
-  swiftOneOf,
+  swiftUnion,
   swiftModule,
   swiftProtocol,
   swiftSubstitution
@@ -97,7 +97,7 @@ static bool isStartOfNominalType(char c, SwiftContextType *context = nullptr) {
   }
   if (c == 'O') {
     if (context)
-      *context = SwiftContextType::swiftOneOf;
+      *context = SwiftContextType::swiftUnion;
     return true;
   }
   return false;

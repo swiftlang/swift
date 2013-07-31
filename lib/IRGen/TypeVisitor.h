@@ -32,7 +32,7 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
     llvm_unreachable(#Id "Type is not a reference type"); \
   }
   TYPE(Array)
-  TYPE(BoundGenericOneOf)
+  TYPE(BoundGenericUnion)
   TYPE(BoundGenericStruct)
   TYPE(BuiltinFloat)
   TYPE(BuiltinInteger)
@@ -42,7 +42,7 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   TYPE(LValue)
   TYPE(MetaType)
   TYPE(Module)
-  TYPE(OneOf)
+  TYPE(Union)
   TYPE(ReferenceStorage)
   TYPE(Struct)
   TYPE(Tuple)
@@ -99,7 +99,7 @@ public:
     case TypeKind::BuiltinVector:
     case TypeKind::Class:
     case TypeKind::Module:
-    case TypeKind::OneOf:
+    case TypeKind::Union:
     case TypeKind::Protocol:
     case TypeKind::ProtocolComposition:
     case TypeKind::Struct:
@@ -117,7 +117,7 @@ public:
                                 cast<Concrete##Type>(substTy));
     DISPATCH(Array)
     DISPATCH(BoundGenericClass)
-    DISPATCH(BoundGenericOneOf)
+    DISPATCH(BoundGenericUnion)
     DISPATCH(BoundGenericStruct)
     DISPATCH(Function)
     DISPATCH(LValue)
@@ -138,7 +138,7 @@ public:
   DEFER_TO_SUPERTYPE(Function, AnyFunction)
   DEFER_TO_SUPERTYPE(PolymorphicFunction, AnyFunction)
   DEFER_TO_SUPERTYPE(BoundGenericClass, BoundGeneric)
-  DEFER_TO_SUPERTYPE(BoundGenericOneOf, BoundGeneric)
+  DEFER_TO_SUPERTYPE(BoundGenericUnion, BoundGeneric)
   DEFER_TO_SUPERTYPE(BoundGenericStruct, BoundGeneric)
 #undef DEFER_TO_SUPERTYPE
 };

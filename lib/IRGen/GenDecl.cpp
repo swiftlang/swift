@@ -573,7 +573,7 @@ static bool isLocalLinkageType(CanType type) {
     return isLocalLinkageDecl(cast<UnboundGenericType>(type)->getDecl());
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     CanBoundGenericType BGT = cast<BoundGenericType>(type);
     if (isLocalLinkageDecl(BGT->getDecl()))
@@ -585,7 +585,7 @@ static bool isLocalLinkageType(CanType type) {
     return false;
   }
 
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Protocol:
@@ -788,8 +788,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
-  case DeclKind::OneOfElement:
-    llvm_unreachable("there are no global oneof elements");
+  case DeclKind::UnionElement:
+    llvm_unreachable("there are no global union elements");
 
   case DeclKind::Constructor:
     llvm_unreachable("there are no global constructor");
@@ -800,8 +800,8 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
     return;
 
-  case DeclKind::OneOf:
-    return emitOneOfDecl(cast<OneOfDecl>(D));
+  case DeclKind::Union:
+    return emitUnionDecl(cast<UnionDecl>(D));
 
   case DeclKind::Struct:
     return emitStructDecl(cast<StructDecl>(D));
@@ -839,8 +839,8 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
-  case DeclKind::OneOfElement:
-  case DeclKind::OneOf:
+  case DeclKind::UnionElement:
+  case DeclKind::Union:
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:
@@ -928,14 +928,14 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
 }
 
 /// getAddrOfGlobalInjectionFunction - Get the address of the function to
-/// perform a particular injection into a oneof type.
-llvm::Function *IRGenModule::getAddrOfInjectionFunction(OneOfElementDecl *D) {
+/// perform a particular injection into a union type.
+llvm::Function *IRGenModule::getAddrOfInjectionFunction(UnionElementDecl *D) {
   // TODO: emit at more optimal explosion kinds when reasonable!
   ExplosionKind explosionLevel = ExplosionKind::Minimal;
   unsigned uncurryLevel = 0;
 
   LinkEntity entity =
-    LinkEntity::forFunction(CodeRef::forOneOfElement(D, ExplosionKind::Minimal,
+    LinkEntity::forFunction(CodeRef::forUnionElement(D, ExplosionKind::Minimal,
                                                      uncurryLevel));
 
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -1454,7 +1454,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   for (Decl *member : ext->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
-    case DeclKind::OneOfElement:
+    case DeclKind::UnionElement:
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
@@ -1475,8 +1475,8 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       continue;
     case DeclKind::TypeAlias:
       continue;
-    case DeclKind::OneOf:
-      emitOneOfDecl(cast<OneOfDecl>(member));
+    case DeclKind::Union:
+      emitUnionDecl(cast<UnionDecl>(member));
       continue;
     case DeclKind::Struct:
       emitStructDecl(cast<StructDecl>(member));

@@ -341,7 +341,7 @@ definition of 'EmployeeList' would be ill-formed. Therefore, explicit
 conformance provides both documentation for the user of EmployeeList and
 checking for the author and future maintainers of EmployeeList.
 
-Any nominal type (such as a oneof, struct, or class) can be specified to conform
+Any nominal type (such as a union, struct, or class) can be specified to conform
 to one or more protocols in this manner. Additionally, a typealias can be
 specified to conform to one or more protocols, e.g.,::
 
@@ -514,7 +514,7 @@ in Swift. For example, one could define a generic linked list as::
   
   struct ListNode<T> {
     var Value : T
-    oneof NextNode { Node : ListNode<T>, End }
+    union NextNode { case Node : ListNode<T>, End }
     var Next : NextNode
   }
   

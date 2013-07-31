@@ -132,7 +132,7 @@ unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
   if (FuncDecl *func = dyn_cast<FuncDecl>(val)) {
     return func->getBody()->getNaturalArgumentCount() - 1;
   }
-  if (isa<ConstructorDecl>(val) || isa<OneOfElementDecl>(val)) {
+  if (isa<ConstructorDecl>(val) || isa<UnionElementDecl>(val)) {
     return 1;
   }
   llvm_unreachable("Unexpected ValueDecl");
@@ -1934,7 +1934,7 @@ struct EmitLocalDecls : public ASTWalker {
     case DeclKind::TopLevelCode:
     case DeclKind::Protocol:
     case DeclKind::Extension:
-    case DeclKind::OneOfElement:
+    case DeclKind::UnionElement:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
     case DeclKind::InfixOperator:
@@ -1954,8 +1954,8 @@ struct EmitLocalDecls : public ASTWalker {
       IGM.emitLocalDecls(cast<FuncDecl>(D));
       return false;
       
-    case DeclKind::OneOf:
-      IGM.emitOneOfDecl(cast<OneOfDecl>(D));
+    case DeclKind::Union:
+      IGM.emitUnionDecl(cast<UnionDecl>(D));
       return false;
       
     case DeclKind::Struct:

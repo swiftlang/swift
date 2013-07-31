@@ -68,13 +68,13 @@ Resilience ValueDecl::getResilienceFrom(Component *C) const {
     case DeclContextKind::TopLevelCodeDecl:
       return Resilience::InherentlyFragile;
 
-    // For oneofs, we walk out through the oneof decl.
+    // For unions, we walk out through the union decl.
     case DeclContextKind::NominalTypeDecl:
       if (isa<ProtocolDecl>(DC)) {
         // FIXME: no attrs here, either.
         return Resilience::Fragile;
       }
-      assert(isa<StructDecl>(DC) || isa<OneOfDecl>(DC) || isa<ClassDecl>(DC) &&
+      assert(isa<StructDecl>(DC) || isa<UnionDecl>(DC) || isa<ClassDecl>(DC) &&
              "Unexpected decl");
       D = cast<NominalTypeDecl>(DC);
       goto HandleDecl;

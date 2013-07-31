@@ -67,7 +67,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::OneOfElement:
+  case SILDeclRef::Kind::UnionElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:

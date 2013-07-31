@@ -593,7 +593,7 @@ bool SILParser::parseSILType(SILType &Result) {
 ///   '!' sil-constant-uncurry-level ('.objc')?
 ///   '!objc'
 /// sil-constant-kind:
-///   'func' | 'getter' | 'setter' | 'allocator' | 'initializer' | 'oneofelt' \
+///   'func' | 'getter' | 'setter' | 'allocator' | 'initializer' | 'unionelt' \
 ///   | 'destroyer' | 'globalaccessor'
 bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
@@ -663,8 +663,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
       } else if (!ParseState && Id.str() == "initializer") {
         Kind = SILDeclRef::Kind::Initializer;
         ParseState = 1;
-      } else if (!ParseState && Id.str() == "oneofelt") {
-        Kind = SILDeclRef::Kind::OneOfElement;
+      } else if (!ParseState && Id.str() == "unionelt") {
+        Kind = SILDeclRef::Kind::UnionElement;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "destroyer") {
         Kind = SILDeclRef::Kind::Destroyer;

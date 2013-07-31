@@ -572,7 +572,7 @@ public:
   void visitReturnInst(ReturnInst *i);
   void visitAutoreleaseReturnInst(AutoreleaseReturnInst *i);
   void visitSwitchIntInst(SwitchIntInst *i);
-  void visitSwitchOneofInst(SwitchOneofInst *i);
+  void visitSwitchUnionInst(SwitchUnionInst *i);
 };
 
 }
@@ -1505,7 +1505,7 @@ void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
   llvm_unreachable("not implemented");
 }
 
-void IRGenSILFunction::visitSwitchOneofInst(SwitchOneofInst *i) {
+void IRGenSILFunction::visitSwitchUnionInst(SwitchUnionInst *i) {
   llvm_unreachable("not implemented");
 }
 

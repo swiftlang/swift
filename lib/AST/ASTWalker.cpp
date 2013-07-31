@@ -688,7 +688,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return P;
   }
   
-  Pattern *visitOneOfElementPattern(OneOfElementPattern *P) {
+  Pattern *visitUnionElementPattern(UnionElementPattern *P) {
     if (P->hasSubPattern()) {
       if (Pattern *newSub = doIt(P->getSubPattern()))
         P->setSubPattern(newSub);
@@ -850,7 +850,7 @@ public:
         if (doIt(M))
           return true;
       }
-    } else if (OneOfDecl *OOD = dyn_cast<OneOfDecl>(D)) {
+    } else if (UnionDecl *OOD = dyn_cast<UnionDecl>(D)) {
       for (Decl *Member : OOD->getMembers())
         if (doIt(Member))
           return true;

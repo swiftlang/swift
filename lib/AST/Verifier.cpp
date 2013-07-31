@@ -1003,13 +1003,13 @@ namespace {
       case TypeKind::ProtocolComposition:
         return;
         
-      case TypeKind::OneOf:
+      case TypeKind::Union:
       case TypeKind::Struct:
       case TypeKind::Class:
         return checkBoundGenericTypes(cast<NominalType>(typePtr)->getParent());
 
       case TypeKind::BoundGenericClass:
-      case TypeKind::BoundGenericOneOf:
+      case TypeKind::BoundGenericUnion:
       case TypeKind::BoundGenericStruct: {
         auto BGT = cast<BoundGenericType>(typePtr);
         if (!BGT->hasSubstitutions()) {

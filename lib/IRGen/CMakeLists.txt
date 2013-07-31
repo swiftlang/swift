@@ -9,7 +9,7 @@ add_swift_library(swiftIRGen
   GenInit.cpp
   GenMeta.cpp
   GenObjC.cpp
-  GenOneOf.cpp
+  GenUnion.cpp
   GenOpaque.cpp
   GenPoly.cpp
   GenProto.cpp

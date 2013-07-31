@@ -101,14 +101,14 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::MetaType:
   case TypeKind::Module:
   case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
     return false;
 
@@ -194,7 +194,7 @@ bool TypeBase::isSpecialized() {
     return false;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
     return true;
 
@@ -208,7 +208,7 @@ bool TypeBase::isSpecialized() {
 
   case TypeKind::Class:
   case TypeKind::Struct:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
     if (auto parentTy = cast<NominalType>(this)->getParent())
       return parentTy->isSpecialized();
     return false;
@@ -268,7 +268,7 @@ bool TypeBase::isUnspecializedGeneric() {
     return true;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
     return true;
 
@@ -281,7 +281,7 @@ bool TypeBase::isUnspecializedGeneric() {
 
   case TypeKind::Class:
   case TypeKind::Struct:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
     if (auto parentTy = cast<NominalType>(this)->getParent())
       return parentTy->isUnspecializedGeneric();
     return false;
@@ -361,7 +361,7 @@ static void gatherTypeVariables(Type wrappedTy,
     return;
   }
 
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
     return gatherTypeVariables(cast<NominalType>(ty)->getParent(),
@@ -406,7 +406,7 @@ static void gatherTypeVariables(Type wrappedTy,
                                typeVariables);
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     auto boundTy = cast<BoundGenericType>(ty);
     gatherTypeVariables(boundTy->getParent(), typeVariables);
@@ -446,12 +446,12 @@ ClassDecl *TypeBase::getClassOrBoundGenericClass() {
   return nullptr;
 }
 
-OneOfDecl *TypeBase::getOneOfOrBoundGenericOneOf() {
-  if (auto oofTy = getAs<OneOfType>())
+UnionDecl *TypeBase::getUnionOrBoundGenericUnion() {
+  if (auto oofTy = getAs<UnionType>())
     return oofTy->getDecl();
   
   if (auto boundTy = getAs<BoundGenericType>())
-    return dyn_cast<OneOfDecl>(boundTy->getDecl());
+    return dyn_cast<UnionDecl>(boundTy->getDecl());
   
   return nullptr;
 }
@@ -490,7 +490,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinVector:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::MetaType:
@@ -500,7 +500,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
   case TypeKind::ProtocolComposition:
   case TypeKind::UnboundGeneric:
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
   case TypeKind::TypeVariable:
   case TypeKind::ReferenceStorage:
@@ -786,7 +786,7 @@ CanType TypeBase::getCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(this);
@@ -879,7 +879,7 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(this);
     Type parentTy;
@@ -915,9 +915,9 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::ProtocolComposition:
   case TypeKind::MetaType:
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::ReferenceStorage:
@@ -980,7 +980,7 @@ bool TypeBase::isSpelledLike(Type other) {
 #define UNCHECKED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::NameAlias:
@@ -988,7 +988,7 @@ bool TypeBase::isSpelledLike(Type other) {
     return false;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     auto bgMe = cast<BoundGenericType>(me);
     auto bgThem = cast<BoundGenericType>(them);
@@ -1691,7 +1691,7 @@ void ClassType::print(raw_ostream &OS) const {
   OS << getDecl()->getName().get();
 }
 
-void OneOfType::print(raw_ostream &OS) const {
+void UnionType::print(raw_ostream &OS) const {
   if (auto parent = getParent()) {
     parent.print(OS);
     OS << ".";

@@ -90,8 +90,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     switch (Base->getKind()) {
       default:
         llvm_unreachable("unhandled context type in SILPrint!");
-      case TypeKind::OneOf:
-        ExtNominal = cast<OneOfType>(Base)->getDecl();
+      case TypeKind::Union:
+        ExtNominal = cast<UnionType>(Base)->getDecl();
         break;
       case TypeKind::Struct:
         ExtNominal = cast<StructType>(Base)->getDecl();
@@ -99,8 +99,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
       case TypeKind::Class:
         ExtNominal = cast<ClassType>(Base)->getDecl();
         break;
-      case TypeKind::BoundGenericOneOf:
-        ExtNominal = cast<BoundGenericOneOfType>(Base)->getDecl();
+      case TypeKind::BoundGenericUnion:
+        ExtNominal = cast<BoundGenericUnionType>(Base)->getDecl();
         break;
       case TypeKind::BoundGenericStruct:
         ExtNominal = cast<BoundGenericStructType>(Base)->getDecl();
@@ -154,8 +154,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::Initializer:
     OS << "initializer";
     break;
-  case SILDeclRef::Kind::OneOfElement:
-    OS << "oneofelt";
+  case SILDeclRef::Kind::UnionElement:
+    OS << "unionelt";
     break;
   case SILDeclRef::Kind::Destroyer:
     OS << "destroyer";
@@ -713,13 +713,13 @@ public:
       OS << ", default " << getID(SII->getDefaultBB());
   }
   
-  void visitSwitchOneofInst(SwitchOneofInst *SOI) {
-    OS << "switch_oneof " << getIDAndType(SOI->getOperand());
+  void visitSwitchUnionInst(SwitchUnionInst *SOI) {
+    OS << "switch_union " << getIDAndType(SOI->getOperand());
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      OneOfElementDecl *elt;
+      UnionElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
-      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::OneOfElement)
+      OS << ", case " << SILDeclRef(elt, SILDeclRef::Kind::UnionElement)
          << ": " << getID(dest);
     }
     if (SOI->hasDefault())

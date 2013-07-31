@@ -460,7 +460,7 @@ bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 ///     decl-extension
 ///     decl-var
 ///     decl-func
-///     decl-oneof
+///     decl-union
 ///     decl-struct
 ///     decl-import
 ///     decl-operator
@@ -493,11 +493,11 @@ bool Parser::parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags) {
   case tok::kw_typealias:
     Entries.push_back(parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef)));
     break;
-  case tok::kw_oneof:
-    HadParseError = parseDeclOneOf(Flags, Entries);
+  case tok::kw_union:
+    HadParseError = parseDeclUnion(Flags, Entries);
     break;
   case tok::kw_case:
-    HadParseError = parseDeclOneOfElement(Flags, Entries);
+    HadParseError = parseDeclUnionElement(Flags, Entries);
     break;
   case tok::kw_struct:
     HadParseError = parseDeclStruct(Flags, Entries);
@@ -1406,25 +1406,25 @@ bool Parser::parseDeclFuncBodyDelayed(FuncDecl *FD) {
   return false;
 }
 
-/// parseDeclOneOf - Parse a 'oneof' declaration, returning true (and doing no
+/// parseDeclUnion - Parse a 'union' declaration, returning true (and doing no
 /// token skipping) on error.
 ///
-///   decl-oneof:
-///      'oneof' attribute-list identifier generic-params? inheritance?
-///          '{' decl-oneof-body '}'
-///   decl-oneof-body:
+///   decl-union:
+///      'union' attribute-list identifier generic-params? inheritance?
+///          '{' decl-union-body '}'
+///   decl-union-body:
 ///      decl*
 ///
-bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
-  SourceLoc OneOfLoc = consumeToken(tok::kw_oneof);
+bool Parser::parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
+  SourceLoc UnionLoc = consumeToken(tok::kw_union);
 
   DeclAttributes Attributes;
   parseAttributeList(Attributes);
   
-  Identifier OneOfName;
-  SourceLoc OneOfNameLoc;
-  if (parseIdentifier(OneOfName, OneOfNameLoc,
-                      diag::expected_identifier_in_decl, "oneof"))
+  Identifier UnionName;
+  SourceLoc UnionNameLoc;
+  if (parseIdentifier(UnionName, UnionNameLoc,
+                      diag::expected_identifier_in_decl, "union"))
     return true;
 
   // Parse the generic-params, if present.
@@ -1434,9 +1434,9 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     GenericParams = maybeParseGenericParams();
   }
 
-  OneOfDecl *OOD = new (Context) OneOfDecl(OneOfLoc,
+  UnionDecl *OOD = new (Context) UnionDecl(UnionLoc,
                                            /*isEnum*/ false,
-                                           OneOfName, OneOfNameLoc,
+                                           UnionName, UnionNameLoc,
                                            { },
                                            GenericParams, CurDeclContext);
   Decls.push_back(OOD);
@@ -1458,7 +1458,7 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   SourceLoc LBLoc, RBLoc;
-  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_oneof_type))
+  if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_union_type))
     return true;
 
   bool Invalid = false;
@@ -1468,9 +1468,9 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
     ContextChange CC(*this, OOD);
     Scope S(this, ScopeKind::ClassBody);
     Invalid |= parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
-                                       diag::expected_rbrace_oneof_type,
+                                       diag::expected_rbrace_union_type,
                                        PD_HasContainerType
-                                         | PD_AllowOneOfElement
+                                         | PD_AllowUnionElement
                                          | PD_DisallowVar);
   }
   
@@ -1478,18 +1478,18 @@ bool Parser::parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   addToScope(OOD);
   
   if (Flags & PD_DisallowNominalTypes) {
-    diagnose(OneOfLoc, diag::disallowed_type);
+    diagnose(UnionLoc, diag::disallowed_type);
     return true;
   }
   
   return Invalid;
 }
 
-/// parseDeclOneOfElement - Parse a 'case' of a oneof, returning true on error.
+/// parseDeclUnionElement - Parse a 'case' of a union, returning true on error.
 ///
-///   decl-oneof-element:
+///   decl-union-element:
 ///      'case' identifier type-tuple? ('->' type)?
-bool Parser::parseDeclOneOfElement(unsigned Flags,
+bool Parser::parseDeclUnionElement(unsigned Flags,
                                    SmallVectorImpl<Decl*> &Decls) {
   SourceLoc CaseLoc = consumeToken(tok::kw_case);
   
@@ -1510,7 +1510,7 @@ bool Parser::parseDeclOneOfElement(unsigned Flags,
   }
   
   if (parseIdentifier(Name, NameLoc,
-                      diag::expected_identifier_in_decl, "oneof case"))
+                      diag::expected_identifier_in_decl, "union case"))
     return true;
   
   // See if there's a following argument type.
@@ -1525,7 +1525,7 @@ bool Parser::parseDeclOneOfElement(unsigned Flags,
   TypeRepr *ResultType = nullptr;
   if (Tok.is(tok::arrow)) {
     ArrowLoc = consumeToken();
-    if (!(ResultType = parseType(diag::expected_type_oneof_element_result)))
+    if (!(ResultType = parseType(diag::expected_type_union_element_result)))
       return true;
   }
   
@@ -1542,13 +1542,13 @@ bool Parser::parseDeclOneOfElement(unsigned Flags,
   }
   
   // Add the element.
-  auto *result = new (Context) OneOfElementDecl(CaseLoc, NameLoc, Name,
+  auto *result = new (Context) UnionElementDecl(CaseLoc, NameLoc, Name,
                                                 ArgType, ArrowLoc, ResultType,
                                                 CurDeclContext);
   Decls.push_back(result);
   
-  if (!(Flags & PD_AllowOneOfElement)) {
-    diagnose(CaseLoc, diag::disallowed_oneof_element);
+  if (!(Flags & PD_AllowUnionElement)) {
+    diagnose(CaseLoc, diag::disallowed_union_element);
     return true;
   }
   

@@ -41,7 +41,7 @@ namespace swift {
   class CodeCompletionCallbacks;
   class DelayedParsingCallbacks;
   
-  struct OneOfElementInfo;
+  struct UnionElementInfo;
   
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
@@ -424,7 +424,7 @@ public:
     PD_DisallowInit         = 1 << 7,
     PD_DisallowTypeAliasDef = 1 << 8,
     PD_AllowDestructor      = 1 << 9,
-    PD_AllowOneOfElement    = 1 << 10,
+    PD_AllowUnionElement    = 1 << 10,
   };
   
   TypeAliasDecl *parseDeclTypeAlias(bool WantDefinition);
@@ -444,8 +444,8 @@ public:
   Decl *parseDeclImport(unsigned Flags);
   bool parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
   Decl *parseDeclExtension(unsigned Flags);
-  bool parseDeclOneOf(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
-  bool parseDeclOneOfElement(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclUnion(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
+  bool parseDeclUnionElement(unsigned Flags, SmallVectorImpl<Decl*> &Decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
                                Diag<> ErrorDiag, unsigned flags);

@@ -1282,7 +1282,7 @@ llvm::Value *irgen::emitParentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::OneOf:
+  case DeclKind::Union:
   case DeclKind::Struct:
     // In both of these cases, 'Parent' is always the third field.
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, 2);
@@ -1358,9 +1358,9 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
     return emitLoadOfMetadataRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::OneOf:
+  case DeclKind::Union:
   case DeclKind::Struct:
-    // FIXME: should oneofs really be using the struct logic? (no)
+    // FIXME: should unions really be using the struct logic? (no)
     int index =
       FindStructArgumentIndex(IGF.IGM, cast<StructDecl>(decl), targetArchetype)
         .getTargetIndex();
@@ -1454,9 +1454,9 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
     return emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   }
 
-  case DeclKind::OneOf:
+  case DeclKind::Union:
   case DeclKind::Struct:
-    // FIXME: should oneofs really be using the struct logic? (no)
+    // FIXME: should unions really be using the struct logic? (no)
     int index =
       FindStructWitnessTableIndex(IGF.IGM, cast<StructDecl>(decl),
                                   targetArchetype, targetProtocol)

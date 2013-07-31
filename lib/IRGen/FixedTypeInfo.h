@@ -29,7 +29,7 @@ namespace irgen {
 class FixedTypeInfo : public TypeInfo {
 private:
   /// The storage size of this type in bytes.  This may be zero even
-  /// for well-formed and complete types, such as a trivial oneof or
+  /// for well-formed and complete types, such as a trivial union or
   /// tuple.
   Size StorageSize;
 

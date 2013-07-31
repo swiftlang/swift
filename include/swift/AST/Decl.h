@@ -49,7 +49,7 @@ namespace swift {
   class DeclAttributes;
   class Module;
   class NameAliasType;
-  class OneOfElementDecl;
+  class UnionElementDecl;
   class Pattern;
   class PipeClosureExpr;
   struct PrintOptions;
@@ -973,7 +973,7 @@ public:
   }
 
   /// isInstanceMember - Determine whether this value is an instance member
-  /// of a oneof or protocol.
+  /// of a union or protocol.
   bool isInstanceMember() const;
 
   /// needsCapture - Check whether referring to this decl from a nested
@@ -1212,17 +1212,17 @@ public:
   using DeclContext::operator new;
 };
 
-/// \brief This is the declaration of a oneof.
+/// \brief This is the declaration of a union.
 ///
 /// For example:
 ///
 /// \code
-///    oneof Bool {
+///    union Bool {
 ///      case false
 ///      case true
 ///    }
 ///
-///    oneof Optional<T> {
+///    union Optional<T> {
 ///      case None
 ///      case Just(T)
 ///    }
@@ -1231,40 +1231,40 @@ public:
 /// The type of the decl itself is a MetaTypeType; use getDeclaredType()
 /// to get the declared type ("Bool" or "Optional" in the above example).
 ///
-/// Enum declarations are syntactic sugar for oneofs consisting only of
+/// Enum declarations are syntactic sugar for unions consisting only of
 /// simple cases with no associated data or member methods or properties.
 /// For example, the Bool declaration above could be written equivalently as:
 ///
 /// \code
 ///   enum Bool { false, true }
 /// \endcode
-class OneOfDecl : public NominalTypeDecl {
-  SourceLoc OneOfLoc;
+class UnionDecl : public NominalTypeDecl {
+  SourceLoc UnionLoc;
   SourceLoc NameLoc;
   bool Enum;
 
 public:
-  OneOfDecl(SourceLoc OneOfLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
+  UnionDecl(SourceLoc UnionLoc, bool Enum, Identifier Name, SourceLoc NameLoc,
             MutableArrayRef<TypeLoc> Inherited,
             GenericParamList *GenericParams, DeclContext *DC);
 
-  SourceLoc getStartLoc() const { return OneOfLoc; }
+  SourceLoc getStartLoc() const { return UnionLoc; }
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
-    return SourceRange(OneOfLoc, getBraces().End);
+    return SourceRange(UnionLoc, getBraces().End);
   }
   
   /// True if this declaration uses 'enum' syntax.
   bool isEnum() const { return Enum; }
 
-  OneOfElementDecl *getElement(Identifier Name) const;
+  UnionElementDecl *getElement(Identifier Name) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::OneOf;
+    return D->getKind() == DeclKind::Union;
   }
   static bool classof(const NominalTypeDecl *D) {
-    return D->getKind() == DeclKind::OneOf;
+    return D->getKind() == DeclKind::Union;
   }
   static bool classof(const DeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
@@ -1655,12 +1655,12 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
 };
 
-/// \brief This represents a case of a 'oneof' or 'enum' declaration.
+/// \brief This represents a case of a 'union' or 'enum' declaration.
 ///
-/// For example, the X, Y, and Z in this oneof:
+/// For example, the X, Y, and Z in this union:
 ///
 /// \code
-///   oneof V {
+///   union V {
 ///     case X(Int)
 ///     case Y(Int)
 ///     case Z
@@ -1673,13 +1673,13 @@ public:
 ///   enum E { X, Y, Z }
 /// \endcode
 ///
-/// The type of a OneOfElementDecl is always the OneOfType for the containing
-/// oneof.
-class OneOfElementDecl : public ValueDecl {
+/// The type of a UnionElementDecl is always the UnionType for the containing
+/// union.
+class UnionElementDecl : public ValueDecl {
   SourceLoc CaseLoc;
   SourceLoc IdentifierLoc;
 
-  /// This is the type specified with the oneof element, for
+  /// This is the type specified with the union element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
@@ -1687,17 +1687,17 @@ class OneOfElementDecl : public ValueDecl {
   
   SourceLoc ResultArrowLoc;
   /// The optional refined type of the case. Must be an instance of the generic
-  /// type of the containing oneof.
+  /// type of the containing union.
   TypeLoc ResultType;
     
 public:
-  OneOfElementDecl(SourceLoc CaseLoc,
+  UnionElementDecl(SourceLoc CaseLoc,
                    SourceLoc IdentifierLoc, Identifier Name,
                    TypeLoc ArgumentType,
                    SourceLoc ArrowLoc,
                    TypeLoc ResultType,
                    DeclContext *DC)
-  : ValueDecl(DeclKind::OneOfElement, DC, Name, Type()),
+  : ValueDecl(DeclKind::UnionElement, DC, Name, Type()),
     CaseLoc(CaseLoc), IdentifierLoc(IdentifierLoc), ArgumentType(ArgumentType),
     ResultArrowLoc(ArrowLoc),
     ResultType(ResultType)
@@ -1726,7 +1726,7 @@ public:
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::OneOfElement;
+    return D->getKind() == DeclKind::UnionElement;
   }
 };
 

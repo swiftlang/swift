@@ -1078,12 +1078,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     break;
   }
 
-  case decls_block::ONEOF_DECL: {
+  case decls_block::UNION_DECL: {
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
 
-    decls_block::OneOfLayout::readRecord(scratch, nameID, contextID,
+    decls_block::UnionLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit);
 
     auto DC = getDeclContext(contextID);
@@ -1093,44 +1093,44 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto genericParams = maybeReadGenericParams(DC);
 
     // FIXME Preserve the isEnum bit.
-    auto oneOf = new (ctx) OneOfDecl(SourceLoc(),
+    auto theUnion = new (ctx) UnionDecl(SourceLoc(),
                                      /*isEnum*/ false,
                                      getIdentifier(nameID),
                                      SourceLoc(), { },
                                      genericParams, DC);
-    declOrOffset = oneOf;
+    declOrOffset = theUnion;
     if (DidRecord) {
-      (*DidRecord)(oneOf);
+      (*DidRecord)(theUnion);
       DidRecord.reset();
     }
 
     if (isImplicit)
-      oneOf->setImplicit();
+      theUnion->setImplicit();
     if (genericParams)
-      for (auto &genericParam : *oneOf->getGenericParams())
-        genericParam.getAsTypeParam()->setDeclContext(oneOf);
+      for (auto &genericParam : *theUnion->getGenericParams())
+        genericParam.getAsTypeParam()->setDeclContext(theUnion);
 
-    CanType canTy = oneOf->getDeclaredTypeInContext()->getCanonicalType();
+    CanType canTy = theUnion->getDeclaredTypeInContext()->getCanonicalType();
 
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
-    processConformances(ctx, oneOf, canTy, conformances);
+    processConformances(ctx, theUnion, canTy, conformances);
 
     auto members = readMembers();
-    assert(members.hasValue() && "could not read oneof members");
-    oneOf->setMembers(members.getValue(), SourceRange());
+    assert(members.hasValue() && "could not read union members");
+    theUnion->setMembers(members.getValue(), SourceRange());
 
     break;
   }
 
-  case decls_block::ONEOF_ELEMENT_DECL: {
+  case decls_block::UNION_ELEMENT_DECL: {
     IdentifierID nameID;
     DeclID contextID;
     TypeID argTypeID, resTypeID, ctorTypeID;
     bool isImplicit;
 
-    decls_block::OneOfElementLayout::readRecord(scratch, nameID, contextID,
+    decls_block::UnionElementLayout::readRecord(scratch, nameID, contextID,
                                                 argTypeID, resTypeID,
                                                 ctorTypeID,
                                                 isImplicit);
@@ -1141,7 +1141,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto argTy = getType(argTypeID);
     auto resTy = getType(resTypeID);
-    auto elem = new (ctx) OneOfElementDecl(SourceLoc(),
+    auto elem = new (ctx) UnionElementDecl(SourceLoc(),
                                            SourceLoc(),
                                            getIdentifier(nameID),
                                            TypeLoc::withoutLoc(argTy),
@@ -1801,7 +1801,7 @@ Type ModuleFile::getType(TypeID TID) {
       break;
     case DeclKind::Class:
     case DeclKind::Struct:
-    case DeclKind::OneOf:
+    case DeclKind::Union:
       paramList = cast<NominalTypeDecl>(genericContext)->getGenericParams();
       break;
     default:

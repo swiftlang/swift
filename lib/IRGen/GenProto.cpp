@@ -207,11 +207,11 @@ namespace {
       case DeclKind::Extension:
       case DeclKind::PatternBinding:
       case DeclKind::TopLevelCode:
-      case DeclKind::OneOf:
+      case DeclKind::Union:
       case DeclKind::Struct:
       case DeclKind::Class:
       case DeclKind::Protocol:
-      case DeclKind::OneOfElement:
+      case DeclKind::UnionElement:
       case DeclKind::Constructor:
       case DeclKind::Destructor:
       case DeclKind::InfixOperator:
@@ -1182,7 +1182,7 @@ static FixedPacking computePacking(IRGenModule &IGM,
   // Flat out, if we need more space than the buffer provides,
   // we always have to allocate.
   // FIXME: there might be some interesting cases where this
-  // is suboptimal for oneofs.
+  // is suboptimal for unions.
   if (requiredSize > bufferSize)
     return FixedPacking::Allocate;
 

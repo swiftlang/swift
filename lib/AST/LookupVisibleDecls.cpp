@@ -297,8 +297,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl());
     case PatternKind::NominalType:
       return checkPattern(cast<NominalTypePattern>(Pat)->getSubPattern());
-    case PatternKind::OneOfElement: {
-      auto *OP = cast<OneOfElementPattern>(Pat);
+    case PatternKind::UnionElement: {
+      auto *OP = cast<UnionElementPattern>(Pat);
       if (OP->hasSubPattern())
         checkPattern(OP->getSubPattern());
       return;

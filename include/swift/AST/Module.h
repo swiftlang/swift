@@ -42,7 +42,7 @@ namespace swift {
   class LookupCache;
   class ModuleLoader;
   class NameAliasType;
-  class OneOfElementDecl;
+  class UnionElementDecl;
   class OperatorDecl;
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;

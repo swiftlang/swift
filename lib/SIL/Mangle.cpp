@@ -386,7 +386,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
     result_t visitSubscriptDecl(SubscriptDecl *D) {
       return { true, true };
     }
-    result_t visitOneOfElementDecl(OneOfElementDecl *D) {
+    result_t visitUnionElementDecl(UnionElementDecl *D) {
       return { true, D->hasArgumentType() };
     }
 
@@ -433,7 +433,7 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= F <type> <type>       # function type
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= G <type> <type>+ _    # bound generic type
-/// <type> ::= O <decl>              # oneof (substitutable)
+/// <type> ::= O <decl>              # union (substitutable)
 /// <type> ::= P <protocol-list> _   # protocol composition
 /// <type> ::= Q <index>             # archetype with depth=0, index=N
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
@@ -539,8 +539,8 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
   }
 
-  case TypeKind::OneOf:
-    return mangleNominalType(cast<OneOfType>(type)->getDecl(), explosion);
+  case TypeKind::Union:
+    return mangleNominalType(cast<UnionType>(type)->getDecl(), explosion);
 
   case TypeKind::Protocol:
     // Protocol type manglings have a variable number of protocol names
@@ -565,7 +565,7 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     // type ::= 'G' <type> <type>+ '_'
     auto boundType = cast<BoundGenericType>(type);
@@ -676,7 +676,7 @@ static char getSpecifierForNominalType(NominalTypeDecl *decl) {
 
   case DeclKind::Protocol: return 'P';
   case DeclKind::Class: return 'C';
-  case DeclKind::OneOf: return 'O';
+  case DeclKind::Union: return 'O';
   case DeclKind::Struct: return 'V';
   }
   llvm_unreachable("bad decl kind");

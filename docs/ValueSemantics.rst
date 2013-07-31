@@ -351,8 +351,8 @@ variable-sized data:
    copy-on-write.  We can, however, use methods for mutation in lieu
    of free functions.
 
-2. Use discriminated unions (`oneof`).  Interestingly, a datatype
-   built with `oneof` automatically has value semantics.  However,
+2. Use discriminated unions (`union`).  Interestingly, a datatype
+   built with `union` automatically has value semantics.  However,
    there vocabulary of efficient data structures that can be built
    this way is extremely limited.  For example, while a singly-linked
    list is trivial to implement, an efficient doubly-linked list is

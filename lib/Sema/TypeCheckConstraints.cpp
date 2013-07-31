@@ -860,7 +860,7 @@ Type ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (auto func = dyn_cast<FuncDecl>(value)) {
     if (func->isStatic() || isInstance)
       type = type->castTo<AnyFunctionType>()->getResult();
-  } else if (isa<ConstructorDecl>(value) || isa<OneOfElementDecl>(value)) {
+  } else if (isa<ConstructorDecl>(value) || isa<UnionElementDecl>(value)) {
     type = type->castTo<AnyFunctionType>()->getResult();
   }
   return adjustLValueForReference(type, value->getAttrs().isAssignment(),
@@ -1425,7 +1425,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
     }
 
-    case TypeKind::OneOf:
+    case TypeKind::Union:
     case TypeKind::Struct:
     case TypeKind::Class:
     case TypeKind::Protocol: {
@@ -1516,7 +1516,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       llvm_unreachable("Unbound generic type should have been opened");
 
     case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericOneOf:
+    case TypeKind::BoundGenericUnion:
     case TypeKind::BoundGenericStruct: {
       auto bound1 = cast<BoundGenericType>(desugar1);
       auto bound2 = cast<BoundGenericType>(desugar2);
@@ -2002,11 +2002,11 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
                       flags|TMF_GenerateConstraints, locator, trivial);
   }
 
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
   case TypeKind::Archetype:
     // Break out to handle the actual construction below.
@@ -2057,7 +2057,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. Note that these constraints specifically require a
-  // match on the result type because the constructors for oneofs and struct
+  // match on the result type because the constructors for unions and struct
   // types always return a value of exactly that type.
   addValueMemberConstraint(valueType, name,
                            FunctionType::get(tv, valueType, context),
@@ -2300,7 +2300,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // FIXME: Mark as 'unavailable' somehow.
     if (isMetatype &&
         !(isa<FuncDecl>(result) ||
-          isa<OneOfElementDecl>(result) ||
+          isa<UnionElementDecl>(result) ||
           !result->isInstanceMember())) {
       continue;
     }

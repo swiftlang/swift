@@ -65,9 +65,9 @@ struct SILDeclRef {
     /// entry point of the class ConstructorDecl in loc.
     Initializer,
     
-    /// OneOfElement - this constant references the injection function for
-    /// a OneOfElementDecl.
-    OneOfElement,
+    /// UnionElement - this constant references the injection function for
+    /// a UnionElementDecl.
+    UnionElement,
     
     /// Destroyer - this constant references the destroying destructor for the
     /// ClassDecl in loc.
@@ -112,8 +112,8 @@ struct SILDeclRef {
   ///   Setter SILDeclRef for the property VarDecl.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef
   ///   for the constructor.
-  /// - If 'loc' is a OneOfElementDecl, this returns the OneOfElement
-  ///   SILDeclRef for the oneof element.
+  /// - If 'loc' is a UnionElementDecl, this returns the UnionElement
+  ///   SILDeclRef for the union element.
   /// - If 'loc' is a DestructorDecl, this returns the Destructor SILDeclRef
   ///   for the containing ClassDecl.
   /// - If 'loc' is a global VarDecl, this returns its GlobalAccessor
@@ -148,9 +148,9 @@ struct SILDeclRef {
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
   }
-  /// True if the SILDeclRef references a oneof entry point.
-  bool isOneOfElement() const {
-    return kind == Kind::OneOfElement;
+  /// True if the SILDeclRef references a union entry point.
+  bool isUnionElement() const {
+    return kind == Kind::UnionElement;
   }
   /// True if the SILDeclRef references a global variable accessor.
   bool isGlobal() const {

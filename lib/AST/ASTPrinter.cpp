@@ -249,8 +249,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
-  case PatternKind::OneOfElement: {
-    auto elt = cast<OneOfElementPattern>(pattern);
+  case PatternKind::UnionElement: {
+    auto elt = cast<UnionElementPattern>(pattern);
     // FIXME: Print element expr.
     if (elt->hasSubPattern())
       printPattern(elt->getSubPattern());
@@ -384,8 +384,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   }
 }
 
-void PrintAST::visitOneOfDecl(OneOfDecl *decl) {
-  OS << "oneof ";
+void PrintAST::visitUnionDecl(UnionDecl *decl) {
+  OS << "union ";
   printAttributes(decl->getAttrs());
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -542,7 +542,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 }
 
-void PrintAST::visitOneOfElementDecl(OneOfElementDecl *decl) {
+void PrintAST::visitUnionElementDecl(UnionElementDecl *decl) {
   // FIXME: Attributes?
   recordDeclLoc(decl);
   OS << decl->getName();

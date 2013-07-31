@@ -746,7 +746,7 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
   case TypeKind::Archetype:
@@ -833,7 +833,7 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
   }
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     BoundGenericType *BGT = cast<BoundGenericType>(T);
     unsigned Index = 0;
@@ -893,7 +893,7 @@ Type TypeChecker::transformType(Type type,
   case TypeKind::Error:
   case TypeKind::TypeVariable:
     return type;
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class: {
     auto nominalTy = cast<NominalType>(base);
@@ -930,7 +930,7 @@ Type TypeChecker::transformType(Type type,
   }
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     auto BGT = cast<BoundGenericType>(base);
     SmallVector<Type, 4> SubstArgs;

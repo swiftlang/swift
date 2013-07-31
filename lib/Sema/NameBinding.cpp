@@ -41,7 +41,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 typedef TranslationUnit::ImportedModule ImportedModule;
-typedef llvm::PointerUnion<const ImportedModule*, OneOfType*> BoundScope;
+typedef llvm::PointerUnion<const ImportedModule*, UnionType*> BoundScope;
 
 namespace {  
   class NameBinder {    

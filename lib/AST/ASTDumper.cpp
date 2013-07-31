@@ -140,8 +140,8 @@ namespace {
       printRec(P->getSubPattern());
       OS << ')';
     }
-    void visitOneOfElementPattern(OneOfElementPattern *P) {
-      printCommon(P, "pattern_oneof_element");
+    void visitUnionElementPattern(UnionElementPattern *P) {
+      printCommon(P, "pattern_union_element");
       OS << ' ';
       P->getParentType().getType().print(OS);
       OS << '.' << P->getName();
@@ -360,8 +360,8 @@ namespace {
       OS << ')';
     }
 
-    void visitOneOfDecl(OneOfDecl *OOD) {
-      printCommon(OOD, "oneof_decl");
+    void visitUnionDecl(UnionDecl *OOD) {
+      printCommon(OOD, "union_decl");
       printInherited(OOD->getInherited());
       for (Decl *D : OOD->getMembers()) {
         if (D->isImplicit())
@@ -373,8 +373,8 @@ namespace {
       OS << ')';
     }
 
-    void visitOneOfElementDecl(OneOfElementDecl *OOED) {
-      printCommon(OOED, "oneof_element_decl");
+    void visitUnionElementDecl(UnionElementDecl *OOED) {
+      printCommon(OOED, "union_element_decl");
       OS << ')';
     }
 

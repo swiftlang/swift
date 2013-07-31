@@ -43,7 +43,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Tuple:
   case PatternKind::Isa:
   case PatternKind::NominalType:
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
     return false;
   
   // Recur into simple wrapping patterns.
@@ -142,7 +142,7 @@ static SILBasicBlock *emitBranchAndDestructure(SILGenFunction &gen,
   }
       
   case PatternKind::NominalType:
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -170,7 +170,7 @@ unsigned getDestructuredWidth(const Pattern *specializer) {
     return 1;
       
   case PatternKind::NominalType:
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -272,7 +272,7 @@ void destructurePattern(SILGenFunction &gen,
     return;
   }
       
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
   case PatternKind::NominalType:
     llvm_unreachable("not implemented");
       
@@ -364,7 +364,7 @@ bool arePatternsOrthogonal(const Pattern *a,
   }
       
   case PatternKind::NominalType:
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -383,7 +383,7 @@ patternsFormSignature(ArrayRef<const Pattern*> set) {
   for (const Pattern *p : set) {
     p = p->getSemanticsProvidingPattern();
     switch (p->getKind()) {
-    // Tuple and non-oneof nominal type patterns trivially form a signature.
+    // Tuple and non-union nominal type patterns trivially form a signature.
     case PatternKind::Tuple:
     case PatternKind::NominalType:
       return true;
@@ -398,7 +398,7 @@ patternsFormSignature(ArrayRef<const Pattern*> set) {
     case PatternKind::Expr:
       llvm_unreachable("shouldn't have specialized on a wildcard");
         
-    case PatternKind::OneOfElement:
+    case PatternKind::UnionElement:
       llvm_unreachable("not implemented");
         
     case PatternKind::Paren:
@@ -663,7 +663,7 @@ const ExprPattern *getAsExprPattern(const Pattern *p) {
   case PatternKind::Any:
   case PatternKind::Isa:
   case PatternKind::NominalType:
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
     return nullptr;
 
   // Recur into simple wrapping patterns.
@@ -843,7 +843,7 @@ public:
   /// Returns a pair of the
   /// specialized clause matrix and the false branch for the constructor test.
   /// If the constructor is irrefutable, as for a tuple, struct, class, or
-  /// singleton oneof, the branch block will be null.
+  /// singleton union, the branch block will be null.
   std::pair<ClauseMatrix, SILBasicBlock /*nullable*/ *>
   emitSpecializedBranch(SILGenFunction &gen,
                         const Pattern *specializer, unsigned skipRows,
@@ -971,7 +971,7 @@ public:
       case PatternKind::Any:
       case PatternKind::Tuple:
       case PatternKind::NominalType:
-      case PatternKind::OneOfElement:
+      case PatternKind::UnionElement:
       case PatternKind::Isa:
         continue;
           

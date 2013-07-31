@@ -387,13 +387,13 @@ namespace {
     }
 
     // Unions depend on their enumerators.
-    RetTy visitOneOfType(CanOneOfType type) {
-      return asDerived().visitAnyOneOfType(type, type->getDecl());
+    RetTy visitUnionType(CanUnionType type) {
+      return asDerived().visitAnyUnionType(type, type->getDecl());
     }
-    RetTy visitBoundGenericOneOfType(CanBoundGenericOneOfType type) {
-      return asDerived().visitAnyOneOfType(type, type->getDecl());
+    RetTy visitBoundGenericUnionType(CanBoundGenericUnionType type) {
+      return asDerived().visitAnyUnionType(type, type->getDecl());
     }
-    RetTy visitAnyOneOfType(CanType type, OneOfDecl *D) {
+    RetTy visitAnyUnionType(CanType type, UnionDecl *D) {
       // FIXME
       return asDerived().handleTrivial(type);
     }
@@ -867,7 +867,7 @@ Type TypeConverter::makeConstantType(SILDeclRef c) {
   }
       
   case SILDeclRef::Kind::Allocator:
-  case SILDeclRef::Kind::OneOfElement:
+  case SILDeclRef::Kind::UnionElement:
     return vd->getTypeOfReference();
   
   case SILDeclRef::Kind::Initializer:

@@ -61,7 +61,7 @@ public:
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
-  static CodeRef forOneOfElement(OneOfElementDecl *fn,
+  static CodeRef forUnionElement(UnionElementDecl *fn,
                                  ExplosionKind explosionLevel,
                                  unsigned uncurryLevel) {
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);

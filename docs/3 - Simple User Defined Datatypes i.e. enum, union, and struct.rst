@@ -16,12 +16,12 @@ Enums
 
 Enums will be declared something like this::
 
-  oneof DataSearchFlags { // Example stolen from CFDataSearchFlags
-    Backwards,
-    Anchored
+  union DataSearchFlags { // Example stolen from CFDataSearchFlags
+    case Backwards
+    case Anchored
   }
 
-A major difference from C is that the elements of a 'oneof' don't get injected
+A major difference from C is that the elements of a 'union' don't get injected
 into the global scope. This means that Backwards isn't valid in the global
 scope, you have to use DataSearchFlags::Backwards or DataSearchFlags.Backwards
 or something like that. This is good because you don't have to worry about your
@@ -99,15 +99,15 @@ straight-forward, and builds off the existing tuple support we already have. The
 example above would be declared like this (the types in [[]] brackets don't
 exist yet in swift, use your imagination :-) ::
 
-  oneof ScalerStream {
-    Download,
-    FontSizeQuery : (encoding : [[const unsigned short*]],
-                     glyphBits : [[SInt32*]],
-                     name : string),
-    EncodingOnly,
-    PrerequisiteQuery : (size : int, list : int),
-    PrerequisiteItem : int,
-    VariationQuery : int
+  union ScalerStream {
+    case Download
+    case FontSizeQuery(encoding : [[const unsigned short*]],
+                       glyphBits : [[SInt32*]],
+                       name : string)
+    case EncodingOnly
+    case PrerequisiteQuery(size : int, list : int)
+    case PrerequisiteItem(int)
+    case VariationQuery(int)
   }
 
 Building on what we have from the base expression/type definition, each
@@ -151,7 +151,7 @@ union with exactly one discriminator. While structs are just a hacky special
 case :-), they are important, because this is what most people think about. The
 following would work::
 
-  oneof CGRect {
+  union CGRect {
     CGRect(origin : CGPoint, size : CGSize)
   }
 
@@ -168,11 +168,11 @@ simplest. This would give::
   var x2 = CGRect(.size = CGSize(.width = 42, .height=123), .origin = myorigin)
   var sum = x1.size.width + x1.size.height;
 
-A struct declaration is just like a declaration of a oneof containing a single
+A struct declaration is just like a declaration of a union containing a single
 element, plus it injects the (single) constructor into the global namespace. The
 injected constructor is why "CGSize" works without requiring CGSize::CGSize or
 :CGSize in an inferred context.  Internal to the compiler, this is just
-de-sugared and handled uniformly with the more general oneof case, just like
+de-sugared and handled uniformly with the more general union case, just like
 'func' is de- sugared to 'var'.
 
 In addition to injecting the constructor, a struct definition injects
@@ -183,7 +183,7 @@ syntax.
 Other Stuff
 -----------
 
-Following the uniform syntax for variable and func definitions, oneof and struct
+Following the uniform syntax for variable and func definitions, union and struct
 should allow attributes, e.g.::
 
   struct [packed] MyPoint { x : sometype1, y : sometype2 }

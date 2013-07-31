@@ -416,22 +416,22 @@ public:
   }
 };
   
-/// A pattern that matches a oneof case. If the oneof value is in the matching
+/// A pattern that matches a union case. If the union value is in the matching
 /// case, then the value is extracted. If there is a subpattern, it is then
 /// matched against the associated value for the case.
-class OneOfElementPattern : public Pattern {
+class UnionElementPattern : public Pattern {
   TypeLoc ParentType;
   SourceLoc DotLoc;
   SourceLoc NameLoc;
   Identifier Name;
-  OneOfElementDecl *ElementDecl;
+  UnionElementDecl *ElementDecl;
   Pattern /*nullable*/ *SubPattern;
   
 public:
-  OneOfElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                      Identifier Name, OneOfElementDecl *Element,
+  UnionElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
+                      Identifier Name, UnionElementDecl *Element,
                       Pattern *SubPattern, Optional<bool> Implicit = {})
-    : Pattern(PatternKind::OneOfElement),
+    : Pattern(PatternKind::UnionElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
       ElementDecl(Element), SubPattern(SubPattern) {
     if (Implicit.hasValue() ? *Implicit : !ParentType.hasLocation())
@@ -452,8 +452,8 @@ public:
   
   Identifier getName() const { return Name; }
   
-  OneOfElementDecl *getElementDecl() const { return ElementDecl; }
-  void setElementDecl(OneOfElementDecl *d) { ElementDecl = d; }
+  UnionElementDecl *getElementDecl() const { return ElementDecl; }
+  void setElementDecl(UnionElementDecl *d) { ElementDecl = d; }
   
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return DotLoc; }
@@ -469,7 +469,7 @@ public:
   TypeLoc getParentType() const { return ParentType; }
   
   static bool classof(const Pattern *P) {
-    return P->getKind() == PatternKind::OneOfElement;
+    return P->getKind() == PatternKind::UnionElement;
   }
 };
   

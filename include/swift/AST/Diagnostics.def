@@ -170,8 +170,8 @@ ERROR(disallowed_init,decl_parsing,none,
       "variable initializer is not allowed here", ())
 ERROR(var_init_self_referential,expr_parsing,none,
       "variable used within its own initializer", ())
-ERROR(disallowed_oneof_element,decl_parsing,none,
-      "oneof 'case' is not allowed outside of a oneof", ())
+ERROR(disallowed_union_element,decl_parsing,none,
+      "union 'case' is not allowed outside of a union", ())
 ERROR(decl_inner_scope,decl_parsing,none,
       "declaration is only valid at file scope", ())
 
@@ -247,7 +247,7 @@ ERROR(func_selector_with_not_one_argument,decl_parsing,none,
 ERROR(func_selector_with_curry,decl_parsing,none,
       "funcs with selector-style arguments may not be curried", ())
 
-// OneOf
+// Union
 
 // Struct
 ERROR(expected_lbrace_struct,decl_parsing,none,
@@ -438,16 +438,16 @@ ERROR(expected_rangle_generic_arg_list,type_parsing,none,
 ERROR(expected_type_function_result,type_parsing,none,
       "expected type for function result", ())
 
-// OneOf Types
-ERROR(expected_lbrace_oneof_type,type_parsing,none,
-      "expected '{' in oneof", ())
-ERROR(expected_rbrace_oneof_type,type_parsing,none,
-      "expected '}' at end of oneof", ())
-ERROR(duplicate_oneof_element,type_parsing,none,
-      "duplicate definition of oneof case '%0'", (StringRef))
-ERROR(expected_type_oneof_element,type_parsing,none,
+// Union Types
+ERROR(expected_lbrace_union_type,type_parsing,none,
+      "expected '{' in union", ())
+ERROR(expected_rbrace_union_type,type_parsing,none,
+      "expected '}' at end of union", ())
+ERROR(duplicate_union_element,type_parsing,none,
+      "duplicate definition of union case '%0'", (StringRef))
+ERROR(expected_type_union_element,type_parsing,none,
       "expected type in parentheses after 'case' name", ())
-ERROR(expected_type_oneof_element_result,type_parsing,none,
+ERROR(expected_type_union_element_result,type_parsing,none,
       "expected type after '->' in 'case'", ())
 
 // Array Types      
@@ -1069,8 +1069,8 @@ ERROR(custom_operator_addressof,sema_tcd,none,
       "cannot declare a custom unary '&' operator", ())
 ERROR(var_type_not_materializable,sema_tcd,none,
       "type %0 of variable is not materializable", (Type))
-ERROR(oneof_element_not_materializable,sema_tcd,none,
-      "type of oneof element is not materializable", ())
+ERROR(union_element_not_materializable,sema_tcd,none,
+      "type of union element is not materializable", ())
 
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
@@ -1479,8 +1479,8 @@ ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
 ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
       "tuple pattern has the wrong length for tuple type %0", (Type))
-ERROR(oneof_element_pattern_member_not_found,sema_tcp,none,
-      "oneof element '%0' not found in type %1", (StringRef, Type))
+ERROR(union_element_pattern_member_not_found,sema_tcp,none,
+      "union element '%0' not found in type %1", (StringRef, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Types

@@ -336,7 +336,7 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   FOR_NOMINAL_TYPE(Protocol)
   FOR_NOMINAL_TYPE(Struct)
   FOR_NOMINAL_TYPE(Class)
-  FOR_NOMINAL_TYPE(OneOf)
+  FOR_NOMINAL_TYPE(Union)
 #undef FOR_NOMINAL_TYPE
 
   bool visitArrayType(CanArrayType type) {
@@ -363,7 +363,7 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
     if (IGM.isResilient(decl, ResilienceScope::Local)) return true;
     return visitMembers(decl->getMembers());
   }
-  bool visitOneOfDecl(OneOfDecl *decl) {
+  bool visitUnionDecl(UnionDecl *decl) {
     if (IGM.isResilient(decl, ResilienceScope::Local)) return true;
     return visitMembers(decl->getMembers());
   }
@@ -371,7 +371,7 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
     if (var->isProperty()) return false;
     return visit(var->getType()->getCanonicalType());
   }
-  bool visitOneOfElementDecl(OneOfElementDecl *decl) {
+  bool visitUnionElementDecl(UnionElementDecl *decl) {
     return visit(decl->getType()->getCanonicalType());
   }
   bool visitDecl(Decl *decl) { return false; }

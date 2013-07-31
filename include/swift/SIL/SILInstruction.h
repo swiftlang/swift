@@ -1769,30 +1769,30 @@ public:
   }
 };
   
-/// A switch on a oneof discriminator. The data for each discriminator is passed
+/// A switch on a union discriminator. The data for each discriminator is passed
 /// into the corresponding destination block as block arguments.
-class SwitchOneofInst : public TermInst {
+class SwitchUnionInst : public TermInst {
   FixedOperandList<1> Operands;
   unsigned NumCases : 31;
   unsigned HasDefault : 1;
   
-  SwitchOneofInst(SILLocation Loc, SILValue Operand,
+  SwitchUnionInst(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs);
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs);
   
-  // Tail-allocated after the SwitchOneofInst record are:
-  // - an array of `NumCases` OneOfElementDecl* pointers, referencing the case
+  // Tail-allocated after the SwitchUnionInst record are:
+  // - an array of `NumCases` UnionElementDecl* pointers, referencing the case
   //   discriminators
   // - `NumCases + HasDefault` SILSuccessor records, referencing the
   //   destinations for each case, ending with the default destination if
   //   present.
   
-  OneOfElementDecl **getCaseBuf() {
-    return reinterpret_cast<OneOfElementDecl**>(this + 1);
+  UnionElementDecl **getCaseBuf() {
+    return reinterpret_cast<UnionElementDecl**>(this + 1);
     
   }
-  OneOfElementDecl * const* getCaseBuf() const {
-    return reinterpret_cast<OneOfElementDecl* const*>(this + 1);
+  UnionElementDecl * const* getCaseBuf() const {
+    return reinterpret_cast<UnionElementDecl* const*>(this + 1);
     
   }
   
@@ -1805,11 +1805,11 @@ class SwitchOneofInst : public TermInst {
   
 public:
   /// Clean up tail-allocated successor records for the switch cases.
-  ~SwitchOneofInst();
+  ~SwitchUnionInst();
   
-  static SwitchOneofInst *create(SILLocation Loc, SILValue Operand,
+  static SwitchUnionInst *create(SILLocation Loc, SILValue Operand,
                  SILBasicBlock *DefaultBB,
-                 ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs,
+                 ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
                  SILFunction &F);
   
   SILValue getOperand() const { return Operands[0].get(); }
@@ -1821,7 +1821,7 @@ public:
   }
   
   unsigned getNumCases() const { return NumCases; }
-  std::pair<OneOfElementDecl*, SILBasicBlock*>
+  std::pair<UnionElementDecl*, SILBasicBlock*>
   getCase(unsigned i) const {
     assert(i < NumCases && "case out of bounds");
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
@@ -1834,7 +1834,7 @@ public:
   }
   
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::SwitchOneofInst;
+    return V->getKind() == ValueKind::SwitchUnionInst;
   }
 };
   

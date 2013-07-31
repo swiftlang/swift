@@ -32,9 +32,9 @@ enum class MetadataKind : uintptr_t {
   /// A struct type.
   Struct        = 1,
 
-  /// A oneof type.
-  /// If we add reference oneofs, that needs to go here.
-  Oneof         = 2,
+  /// A union type.
+  /// If we add reference unions, that needs to go here.
+  Union         = 2,
 
   /// A type whose value is not exposed in the metadata system.
   Opaque        = 8,

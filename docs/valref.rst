@@ -45,7 +45,7 @@ The general rule we propose is that most places where you can write
 write ``val`` or ``ref`` to request value or reference semantics,
 respectively.  Writing ``var`` requests the default semantics for a
 given type.  Non-``class`` types (``struct``\ s, tuples, arrays,
-``oneof``\ s) default to ``val`` semantics, while ``class``\ es
+``union``\ s) default to ``val`` semantics, while ``class``\ es
 default to ``ref`` semantics. The types ``val SomeClass`` and
 ``ref SomeStruct`` also become part of the type system and can
 be used as generic parameters or as parts of tuple, array, and
@@ -194,39 +194,39 @@ brackets, that most users will never touch, e.g.::
 
 Rules for copying array elements follow those of instance variables.
 
-``oneof``\ s
+``union``\ s
 ============
 
-Oneof types, like structs, have default value semantics. Constructors for the
-oneof can declare the ``val``- or ``ref``-ness of their associated values, using
+Union types, like structs, have default value semantics. Constructors for the
+union can declare the ``val``- or ``ref``-ness of their associated values, using
 the same syntax as function parameters, described below::
 
-  oneof Foo {
-    Bar(ref bar:Int)
-    Bas(val bas:SomeClass)
+  union Foo {
+    case Bar(ref bar:Int)
+    case Bas(val bas:SomeClass)
   }
 
-Oneofs allow the definition of recursive types. A constructor for a oneof
-may recursively reference the oneof as a member; the necessary
+Unions allow the definition of recursive types. A constructor for a union
+may recursively reference the union as a member; the necessary
 indirection and heap allocation of the recursive data structure is implicit
 and has value semantics::
 
   // A list with value semantics--copying the list recursively copies the
   // entire list
-  oneof List<T> {
-    Nil()
-    Cons(car:T, cdr:List<T>)
+  union List<T> {
+    case Nil()
+    case Cons(car:T, cdr:List<T>)
   }
 
   // A list node with reference semantics—copying the node creates a node
   // that shares structure with the tail of the list
-  oneof Node<T> {
-    Nil()
-    Cons(car:T, ref cdr:Node<T>)
+  union Node<T> {
+    case Nil()
+    case Cons(car:T, ref cdr:Node<T>)
   }
 
-A special ``oneof`` type is the nullable type ``T?``, which is
-sugar syntax for a generic oneof type ``Nullable<T>``. Since both nullable
+A special ``union`` type is the nullable type ``T?``, which is
+sugar syntax for a generic union type ``Nullable<T>``. Since both nullable
 refs and refs-that-are-nullable are useful, we could provide sugar syntax for
 both to avoid requiring parens::
 

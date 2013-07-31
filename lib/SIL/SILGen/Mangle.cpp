@@ -31,7 +31,7 @@ static char mangleConstructorKind(SILDeclRef::Kind kind) {
   case SILDeclRef::Kind::Func:
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter:
-  case SILDeclRef::Kind::OneOfElement:
+  case SILDeclRef::Kind::UnionElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
@@ -67,7 +67,7 @@ void SILGenModule::mangleConstant(SILDeclRef c, SILFunction *f) {
     // Otherwise, fall through into the 'other decl' case.
     SWIFT_FALLTHROUGH;
 
-  case SILDeclRef::Kind::OneOfElement:
+  case SILDeclRef::Kind::UnionElement:
     // As a special case, Clang functions and globals don't get mangled at all.
     // FIXME: When we can import C++, use Clang's mangler.
     if (auto clangDecl = c.getDecl()->getClangDecl()) {

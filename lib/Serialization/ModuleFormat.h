@@ -250,8 +250,8 @@ namespace decls_block {
     POSTFIX_OPERATOR_DECL,
     INFIX_OPERATOR_DECL,
     CLASS_DECL,
-    ONEOF_DECL,
-    ONEOF_ELEMENT_DECL,
+    UNION_DECL,
+    UNION_ELEMENT_DECL,
     SUBSCRIPT_DECL,
     EXTENSION_DECL,
     DESTRUCTOR_DECL,
@@ -431,7 +431,7 @@ namespace decls_block {
   >;
 
   using StructLayout = NominalLayout<STRUCT_DECL>;
-  using OneOfLayout = NominalLayout<ONEOF_DECL>;
+  using UnionLayout = NominalLayout<UNION_DECL>;
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
@@ -520,8 +520,8 @@ namespace decls_block {
     BCFixed<8>   // precedence
   >;
 
-  using OneOfElementLayout = BCRecordLayout<
-    ONEOF_ELEMENT_DECL,
+  using UnionElementLayout = BCRecordLayout<
+    UNION_ELEMENT_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
     TypeIDField, // argument type

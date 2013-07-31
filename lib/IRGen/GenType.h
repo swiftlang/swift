@@ -34,7 +34,7 @@ namespace swift {
   class MetaTypeType;
   class ModuleType;
   class NominalTypeDecl;
-  class OneOfDecl;
+  class UnionDecl;
   class ProtocolCompositionType;
   class ProtocolDecl;
   class ProtocolType;
@@ -75,7 +75,7 @@ private:
   TypeCacheEntry convertType(CanType T);
   TypeCacheEntry convertBoundGenericType(NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
-  const TypeInfo *convertOneOfType(OneOfDecl *D);
+  const TypeInfo *convertUnionType(UnionDecl *D);
   const TypeInfo *convertStructType(StructDecl *D);
   const TypeInfo *convertClassType(ClassDecl *D);
   const TypeInfo *convertFunctionType(AnyFunctionType *T);

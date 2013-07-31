@@ -631,10 +631,10 @@ SwitchIntInst *SwitchIntInst::create(SILLocation Loc, SILValue Operand,
   return ::new (buf) SwitchIntInst(Loc, Operand, DefaultBB, CaseBBs);
 }
 
-SwitchOneofInst::SwitchOneofInst(SILLocation Loc, SILValue Operand,
+SwitchUnionInst::SwitchUnionInst(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs)
-  : TermInst(ValueKind::SwitchOneofInst, Loc),
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs)
+  : TermInst(ValueKind::SwitchUnionInst, Loc),
     Operands(this, Operand),
     NumCases(CaseBBs.size()),
     HasDefault(bool(DefaultBB))
@@ -651,7 +651,7 @@ SwitchOneofInst::SwitchOneofInst(SILLocation Loc, SILValue Operand,
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
-SwitchOneofInst::~SwitchOneofInst() {
+SwitchUnionInst::~SwitchUnionInst() {
   // Destroy the successor records to keep the CFG up to date.
   auto *succs = getSuccessorBuf();
   for (unsigned i = 0, end = NumCases + HasDefault; i < end; ++i) {
@@ -659,19 +659,19 @@ SwitchOneofInst::~SwitchOneofInst() {
   }
 }
 
-SwitchOneofInst *SwitchOneofInst::create(SILLocation Loc, SILValue Operand,
+SwitchUnionInst *SwitchUnionInst::create(SILLocation Loc, SILValue Operand,
                 SILBasicBlock *DefaultBB,
-                ArrayRef<std::pair<OneOfElementDecl*, SILBasicBlock*>> CaseBBs,
+                ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs,
                 SILFunction &F) {
   // Allocate enough room for the instruction with tail-allocated
-  // OneOfElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
+  // UnionElementDecl and SILSuccessor arrays. There are `CaseBBs.size()` decls
   // and `CaseBBs.size() + (DefaultBB ? 1 : 0)` successors.
   unsigned numCases = CaseBBs.size();
   unsigned numSuccessors = numCases + (DefaultBB ? 1 : 0);
   
-  void *buf = F.getModule().allocate(sizeof(SwitchOneofInst)
-                                       + sizeof(OneOfElementDecl*) * numCases
+  void *buf = F.getModule().allocate(sizeof(SwitchUnionInst)
+                                       + sizeof(UnionElementDecl*) * numCases
                                        + sizeof(SILSuccessor) * numSuccessors,
-                                     alignof(SwitchOneofInst));
-  return ::new (buf) SwitchOneofInst(Loc, Operand, DefaultBB, CaseBBs);
+                                     alignof(SwitchUnionInst));
+  return ::new (buf) SwitchUnionInst(Loc, Operand, DefaultBB, CaseBBs);
 }

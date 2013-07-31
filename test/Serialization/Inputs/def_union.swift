@@ -1,6 +1,6 @@
-oneof Basic {
-  Untyped,
-  HasType : Int
+union Basic {
+  case Untyped
+  case HasType(Int)
   
   constructor() {
     this = .Untyped
@@ -8,9 +8,9 @@ oneof Basic {
   func doSomething() {}
 }
 
-oneof Generic<A> {
-  Left : A,
-  Right : A
+union Generic<A> {
+  case Left(A)
+  case Right(A)
 }
 
 
@@ -18,9 +18,9 @@ protocol Computable {
   func compute()
 }
 
-oneof Lazy<T> : Computable {
-  Thunk : () -> T,
-  Value : T
+union Lazy<T> : Computable {
+  case Thunk(() -> T)
+  case Value(T)
   
   func compute() {
 //    if (this ~= .Thunk(var fn)) {

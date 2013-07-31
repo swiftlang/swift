@@ -43,12 +43,12 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name) {
       }
     }
 
-    // If we're looking for constructors in a oneof, return the oneof
+    // If we're looking for constructors in a union, return the union
     // elements.
     // FIXME: This feels like a hack.
-    if (auto oneofDecl = dyn_cast<OneOfDecl>(nominalDecl)) {
-      for (auto member : oneofDecl->getMembers()) {
-        if (auto element = dyn_cast<OneOfElementDecl>(member))
+    if (auto unionDecl = dyn_cast<UnionDecl>(nominalDecl)) {
+      for (auto member : unionDecl->getMembers()) {
+        if (auto element = dyn_cast<UnionElementDecl>(member))
           result.addResult(element);
       }
     }

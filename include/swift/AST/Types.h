@@ -42,8 +42,8 @@ namespace swift {
   class TypeAliasDecl;
   class TypeDecl;
   class NominalTypeDecl;
-  class OneOfDecl;
-  class OneOfElementDecl;
+  class UnionDecl;
+  class UnionElementDecl;
   class StructDecl;
   class ProtocolDecl;
   class TypeVariableType;
@@ -233,9 +233,9 @@ public:
   /// (possibly generic) class.
   ClassDecl *getClassOrBoundGenericClass();
   
-  /// \brief If this is a oneof or a bound generic oneof type, returns the
-  /// (possibly generic) oneof.
-  OneOfDecl *getOneOfOrBoundGenericOneOf();
+  /// \brief If this is a union or a bound generic union type, returns the
+  /// (possibly generic) union.
+  UnionDecl *getUnionOrBoundGenericUnion();
   
   /// \brief Determine whether this type may have a superclass, which holds for
   /// classes, bound generic classes, and archetypes that are only instantiable
@@ -915,36 +915,36 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
-/// BoundGenericOneOfType - A subclass of BoundGenericType for the case
-/// when the nominal type is a generic oneof type.
-class BoundGenericOneOfType : public BoundGenericType {
+/// BoundGenericUnionType - A subclass of BoundGenericType for the case
+/// when the nominal type is a generic union type.
+class BoundGenericUnionType : public BoundGenericType {
 private:
-  BoundGenericOneOfType(OneOfDecl *theDecl, Type parent,
+  BoundGenericUnionType(UnionDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
                         bool hasTypeVariable)
-    : BoundGenericType(TypeKind::BoundGenericOneOf,
+    : BoundGenericType(TypeKind::BoundGenericUnion,
                        reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
                        genericArgs, context, hasTypeVariable) {}
   friend class BoundGenericType;
 
 public:
-  static BoundGenericOneOfType* get(OneOfDecl *theDecl, Type parent,
+  static BoundGenericUnionType* get(UnionDecl *theDecl, Type parent,
                                     ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericOneOfType>(
+    return cast<BoundGenericUnionType>(
              BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
                                    parent, genericArgs));
   }
 
   /// \brief Returns the declaration that declares this type.
-  OneOfDecl *getDecl() const {
-    return reinterpret_cast<OneOfDecl*>(BoundGenericType::getDecl());
+  UnionDecl *getDecl() const {
+    return reinterpret_cast<UnionDecl*>(BoundGenericType::getDecl());
   }
 
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BoundGenericOneOf;
+    return T->getKind() == TypeKind::BoundGenericUnion;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericOneOfType, BoundGenericType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericUnionType, BoundGenericType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
@@ -1021,35 +1021,35 @@ BEGIN_CAN_TYPE_WRAPPER(NominalType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
 END_CAN_TYPE_WRAPPER(NominalType, Type)
 
-/// OneOfType - This represents the type declared by a OneOfDecl.
-class OneOfType : public NominalType, public llvm::FoldingSetNode {
+/// UnionType - This represents the type declared by a UnionDecl.
+class UnionType : public NominalType, public llvm::FoldingSetNode {
 public:
   /// getDecl() - Returns the decl which declares this type.
-  OneOfDecl *getDecl() const {
-    return reinterpret_cast<OneOfDecl *>(NominalType::getDecl());
+  UnionDecl *getDecl() const {
+    return reinterpret_cast<UnionDecl *>(NominalType::getDecl());
   }
 
-  /// \brief Retrieve the type when we're referencing the given oneof
+  /// \brief Retrieve the type when we're referencing the given union
   /// declaration in the parent type \c Parent.
-  static OneOfType *get(OneOfDecl *D, Type Parent, const ASTContext &C);
+  static UnionType *get(UnionDecl *D, Type Parent, const ASTContext &C);
 
   void print(raw_ostream &O) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent);
+  static void Profile(llvm::FoldingSetNodeID &ID, UnionDecl *D, Type Parent);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::OneOf;
+    return T->getKind() == TypeKind::Union;
   }
 
 private:
-  OneOfType(OneOfDecl *TheDecl, Type Parent, const ASTContext &Ctx,
+  UnionType(UnionDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             bool HasTypeVariable);
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(OneOfType, NominalType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnionType, NominalType)
 
 /// StructType - This represents the type declared by a StructDecl.
 class StructType : public NominalType, public llvm::FoldingSetNode {  

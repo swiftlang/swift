@@ -65,9 +65,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     assert((kind == Kind::Allocator || kind == Kind::Initializer)
            && "can only create Allocator or Initializer SILDeclRef for ctor");
     naturalUncurryLevel = 1;
-  } else if (auto *ed = dyn_cast<OneOfElementDecl>(vd)) {
-    assert(kind == Kind::OneOfElement
-           && "can only create OneOfElement SILDeclRef for oneof element");
+  } else if (auto *ed = dyn_cast<UnionElementDecl>(vd)) {
+    assert(kind == Kind::UnionElement
+           && "can only create UnionElement SILDeclRef for union element");
     naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
   } else if (isa<ClassDecl>(vd)) {
     assert(kind == Kind::Destroyer
@@ -165,10 +165,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
       kind = Kind::Allocator;
       naturalUncurryLevel = 1;
     }
-    // Map OneOfElementDecls to the OneOfElement SILDeclRef of the element.
-    else if (OneOfElementDecl *ed = dyn_cast<OneOfElementDecl>(vd)) {
+    // Map UnionElementDecls to the UnionElement SILDeclRef of the element.
+    else if (UnionElementDecl *ed = dyn_cast<UnionElementDecl>(vd)) {
       loc = ed;
-      kind = Kind::OneOfElement;
+      kind = Kind::UnionElement;
       naturalUncurryLevel = ed->hasArgumentType() ? 1 : 0;
     }
     // VarDecl constants require an explicit kind.

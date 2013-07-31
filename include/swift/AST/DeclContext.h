@@ -116,7 +116,7 @@ public:
            getContextKind() <= DeclContextKind::Last_Module;
   }
 
-  /// isTypeContext - Return true if this is a type context, e.g., a oneof,
+  /// isTypeContext - Return true if this is a type context, e.g., a union,
   /// an extension, or a protocol.
   bool isTypeContext() const {
     return getContextKind() == DeclContextKind::NominalTypeDecl ||

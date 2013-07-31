@@ -202,38 +202,38 @@ public:
   }
 };
   
-/// Find a oneof element in a oneof type.
-OneOfElementDecl *
-lookupOneOfMemberElement(TypeChecker &TC, Type ty, Identifier name) {
-  // The type must be a oneof.
-  OneOfDecl *oof = ty->getOneOfOrBoundGenericOneOf();
+/// Find a union element in a union type.
+UnionElementDecl *
+lookupUnionMemberElement(TypeChecker &TC, Type ty, Identifier name) {
+  // The type must be a union.
+  UnionDecl *oof = ty->getUnionOrBoundGenericUnion();
   if (!oof)
     return nullptr;
   
-  // Look up the case inside the oneof.
+  // Look up the case inside the union.
   LookupResult foundElements = TC.lookupMember(ty, name);
   if (!foundElements)
     return nullptr;
   
-  // See if there is any oneof element in there.
-  OneOfElementDecl *foundElement = nullptr;
+  // See if there is any union element in there.
+  UnionElementDecl *foundElement = nullptr;
   for (ValueDecl *e : foundElements) {
-    auto *oe = dyn_cast<OneOfElementDecl>(e);
+    auto *oe = dyn_cast<UnionElementDecl>(e);
     if (!oe)
       continue;
     // Ambiguities should be ruled out by parsing.
-    assert(!foundElement && "ambiguity in oneof case name lookup?!");
+    assert(!foundElement && "ambiguity in union case name lookup?!");
     foundElement = oe;
   }
   
   return foundElement;
 }
   
-/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to a oneof element
+/// Resolve a chain of unresolved dot expressions 'T.U<V>.W' to a union element
 /// reference, returning a TypeLoc over the type reference and the referenced
-/// OneOfElementDecl if successful, or returning null on failure.
-static std::pair<TypeLoc, OneOfElementDecl*>
-lookupOneOfElementReference(TypeChecker &TC,
+/// UnionElementDecl if successful, or returning null on failure.
+static std::pair<TypeLoc, UnionElementDecl*>
+lookupUnionElementReference(TypeChecker &TC,
                             UnresolvedDotExpr *refExpr,
                             DeclContext *DC) {
   // The left side of the dot needs to be a type; do type lookup on it.
@@ -243,9 +243,9 @@ lookupOneOfElementReference(TypeChecker &TC,
   if (!ty)
     return {{}, nullptr};
   
-  // Look up the case inside the oneof.
-  OneOfElementDecl *foundElement
-    = lookupOneOfMemberElement(TC, ty, refExpr->getName());
+  // Look up the case inside the union.
+  UnionElementDecl *foundElement
+    = lookupUnionMemberElement(TC, ty, refExpr->getName());
   if (!foundElement)
     return {{}, nullptr};
   
@@ -278,7 +278,7 @@ public:
   ALWAYS_RESOLVED_PATTERN(Paren)
   ALWAYS_RESOLVED_PATTERN(Tuple)
   ALWAYS_RESOLVED_PATTERN(NominalType)
-  ALWAYS_RESOLVED_PATTERN(OneOfElement)
+  ALWAYS_RESOLVED_PATTERN(UnionElement)
   ALWAYS_RESOLVED_PATTERN(Typed)
 #undef ALWAYS_RESOLVED_PATTERN
 
@@ -344,27 +344,27 @@ public:
                                 patternElts, E->getRParenLoc());
   }
   
-  // Unresolved member syntax '.Element' forms a OneOfElement pattern. The
+  // Unresolved member syntax '.Element' forms a UnionElement pattern. The
   // element will be resolved when we type-check the pattern.
   Pattern *visitUnresolvedMemberExpr(UnresolvedMemberExpr *ume) {
-    return new (TC.Context) OneOfElementPattern(TypeLoc(), ume->getDotLoc(),
+    return new (TC.Context) UnionElementPattern(TypeLoc(), ume->getDotLoc(),
                                                 ume->getNameLoc(),
                                                 ume->getName(),
                                                 nullptr, nullptr);
   }
   
-  // Member syntax 'T.Element' forms a pattern if 'T' is a oneof and the
-  // member name is a member of the oneof.
+  // Member syntax 'T.Element' forms a pattern if 'T' is a union and the
+  // member name is a member of the union.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
     TypeLoc referencedType;
-    OneOfElementDecl *referencedDecl;
+    UnionElementDecl *referencedDecl;
     std::tie(referencedType, referencedDecl)
-      = lookupOneOfElementReference(TC, ude, DC);
+      = lookupUnionElementReference(TC, ude, DC);
     
     if (!referencedDecl)
       return nullptr;
     
-    return new (TC.Context) OneOfElementPattern(referencedType,
+    return new (TC.Context) UnionElementPattern(referencedType,
                                                 ude->getDotLoc(),
                                                 ude->getNameLoc(),
                                                 ude->getName(),
@@ -375,34 +375,34 @@ public:
   }
   
   // Call syntax 'T.Element(x...)' or '.Element(x...)' forms a pattern if
-  // the callee references a oneof element. The arguments then form a tuple
+  // the callee references a union element. The arguments then form a tuple
   // pattern matching the element's data.
   Pattern *visitCallExpr(CallExpr *ce) {
-    // '.Element(x...)' is always treated as a OneOfElementPattern.
+    // '.Element(x...)' is always treated as a UnionElementPattern.
     if (auto *ume = dyn_cast<UnresolvedMemberExpr>(ce->getFn())) {
       auto *subPattern = getSubExprPattern(ce->getArg());
-      return new (TC.Context) OneOfElementPattern(TypeLoc(), ume->getDotLoc(),
+      return new (TC.Context) UnionElementPattern(TypeLoc(), ume->getDotLoc(),
                                          ume->getNameLoc(),
                                          ume->getName(),
                                          nullptr,
                                          subPattern);
     }
     
-    // 'T.Element(x...)' is treated as a OneOfElementPattern if the dotted path
-    // references a oneof element.
+    // 'T.Element(x...)' is treated as a UnionElementPattern if the dotted path
+    // references a union element.
     
     if (auto *ude = dyn_cast<UnresolvedDotExpr>(ce->getFn())) {
       TypeLoc referencedType;
-      OneOfElementDecl *referencedDecl;
+      UnionElementDecl *referencedDecl;
       std::tie(referencedType, referencedDecl)
-        = lookupOneOfElementReference(TC, ude, DC);
+        = lookupUnionElementReference(TC, ude, DC);
       
       if (!referencedDecl)
         return nullptr;
       
-      if (auto oofElt = dyn_cast<OneOfElementDecl>(referencedDecl)) {
+      if (auto oofElt = dyn_cast<UnionElementDecl>(referencedDecl)) {
         auto *subPattern = getSubExprPattern(ce->getArg());
-        return new (TC.Context) OneOfElementPattern(referencedType,
+        return new (TC.Context) UnionElementPattern(referencedType,
                                                     ude->getDotLoc(),
                                                     ude->getNameLoc(),
                                                     ude->getName(),
@@ -687,23 +687,23 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
     return false;
   }
       
-  case PatternKind::OneOfElement: {
-    auto *OP = cast<OneOfElementPattern>(P);
+  case PatternKind::UnionElement: {
+    auto *OP = cast<UnionElementPattern>(P);
     
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
-      OneOfElementDecl *element
-        = lookupOneOfMemberElement(*this, type, OP->getName());
+      UnionElementDecl *element
+        = lookupUnionMemberElement(*this, type, OP->getName());
       if (!element) {
-        diagnose(OP->getLoc(), diag::oneof_element_pattern_member_not_found,
+        diagnose(OP->getLoc(), diag::union_element_pattern_member_not_found,
                  OP->getName().str(), type);
         return true;
       }
       OP->setElementDecl(element);
     }
     
-    // If there is a subpattern, push the oneof element type down onto it.
+    // If there is a subpattern, push the union element type down onto it.
     if (OP->hasSubPattern()) {
       Type elementType = OP->getElementDecl()->getArgumentType();
       if (!elementType)

@@ -839,8 +839,8 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
       
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
-  case DeclKind::OneOfElement:
-  case DeclKind::OneOf:
+  case DeclKind::UnionElement:
+  case DeclKind::Union:
   case DeclKind::Class:
   case DeclKind::TopLevelCode:
   case DeclKind::TypeAlias:

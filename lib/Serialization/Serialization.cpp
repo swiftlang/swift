@@ -318,7 +318,7 @@ DeclID Serializer::addDeclRef(const Decl *D) {
     break;
   case DeclKind::Class:
   case DeclKind::Struct:
-  case DeclKind::OneOf:
+  case DeclKind::Union:
     paramList = cast<NominalTypeDecl>(D)->getGenericParams();
     break;
   default:
@@ -446,8 +446,8 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, POSTFIX_OPERATOR_DECL);
   RECORD(decls_block, INFIX_OPERATOR_DECL);
   RECORD(decls_block, CLASS_DECL);
-  RECORD(decls_block, ONEOF_DECL);
-  RECORD(decls_block, ONEOF_ELEMENT_DECL);
+  RECORD(decls_block, UNION_DECL);
+  RECORD(decls_block, UNION_ELEMENT_DECL);
   RECORD(decls_block, SUBSCRIPT_DECL);
   RECORD(decls_block, EXTENSION_DECL);
   RECORD(decls_block, DESTRUCTOR_DECL);
@@ -643,7 +643,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     writePattern(nom->getSubPattern());
     break;
   }
-  case PatternKind::OneOfElement:
+  case PatternKind::UnionElement:
   case PatternKind::Expr:
     llvm_unreachable("FIXME: not implemented");
 
@@ -1021,24 +1021,24 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::OneOf: {
-    auto oneOf = cast<OneOfDecl>(D);
+  case DeclKind::Union: {
+    auto theUnion = cast<UnionDecl>(D);
 
     // FIXME: Handle attributes.
-    if (!oneOf->getAttrs().empty())
+    if (!theUnion->getAttrs().empty())
       return false;
 
-    const Decl *DC = getDeclForContext(oneOf->getDeclContext());
+    const Decl *DC = getDeclForContext(theUnion->getDeclContext());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[OneOfLayout::Code];
-    OneOfLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                            addIdentifierRef(oneOf->getName()),
+    unsigned abbrCode = DeclTypeAbbrCodes[UnionLayout::Code];
+    UnionLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                            addIdentifierRef(theUnion->getName()),
                             addDeclRef(DC),
-                            oneOf->isImplicit());
+                            theUnion->isImplicit());
 
-    writeGenericParams(oneOf->getGenericParams());
-    writeConformances(oneOf->getProtocols(), oneOf->getConformances());
-    writeMembers(oneOf->getMembers());
+    writeGenericParams(theUnion->getGenericParams());
+    writeConformances(theUnion->getProtocols(), theUnion->getConformances());
+    writeMembers(theUnion->getMembers());
     return true;
   }
 
@@ -1175,8 +1175,8 @@ bool Serializer::writeDecl(const Decl *D) {
     return true;
   }
 
-  case DeclKind::OneOfElement: {
-    auto elem = cast<OneOfElementDecl>(D);
+  case DeclKind::UnionElement: {
+    auto elem = cast<UnionElementDecl>(D);
 
     // FIXME: Handle attributes.
     if (!elem->getAttrs().empty())
@@ -1184,8 +1184,8 @@ bool Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(elem->getDeclContext());
 
-    unsigned abbrCode = DeclTypeAbbrCodes[OneOfElementLayout::Code];
-    OneOfElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[UnionElementLayout::Code];
+    UnionElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addIdentifierRef(elem->getName()),
                                    addDeclRef(DC),
                                    addTypeRef(elem->getArgumentType()),
@@ -1365,7 +1365,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::Struct:
-  case TypeKind::OneOf:
+  case TypeKind::Union:
   case TypeKind::Class:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(ty.getPointer());
@@ -1541,7 +1541,7 @@ bool Serializer::writeType(Type ty) {
   }
 
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct: {
     auto generic = cast<BoundGenericType>(ty.getPointer());
 
@@ -1602,8 +1602,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<PostfixOperatorLayout>();
     registerDeclTypeAbbr<InfixOperatorLayout>();
     registerDeclTypeAbbr<ClassLayout>();
-    registerDeclTypeAbbr<OneOfLayout>();
-    registerDeclTypeAbbr<OneOfElementLayout>();
+    registerDeclTypeAbbr<UnionLayout>();
+    registerDeclTypeAbbr<UnionElementLayout>();
     registerDeclTypeAbbr<SubscriptLayout>();
     registerDeclTypeAbbr<ExtensionLayout>();
     registerDeclTypeAbbr<DestructorLayout>();

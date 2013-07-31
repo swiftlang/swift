@@ -156,7 +156,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::Destructor:
-    case DeclKind::OneOfElement:
+    case DeclKind::UnionElement:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
@@ -172,8 +172,8 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       continue;
     case DeclKind::TypeAlias:
       continue;
-    case DeclKind::OneOf:
-      emitOneOfDecl(cast<OneOfDecl>(member));
+    case DeclKind::Union:
+      emitUnionDecl(cast<UnionDecl>(member));
       continue;
     case DeclKind::Struct:
       emitStructDecl(cast<StructDecl>(member));

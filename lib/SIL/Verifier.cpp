@@ -1117,37 +1117,37 @@ public:
               "switch_int default destination cannot take arguments");
   }
   
-  void checkSwitchOneofInst(SwitchOneofInst *SOI) {
-    // Find the set of oneof elements for the type so we can verify
+  void checkSwitchUnionInst(SwitchUnionInst *SOI) {
+    // Find the set of union elements for the type so we can verify
     // exhaustiveness.
-    // FIXME: We also need to consider if the oneof is resilient, in which case
+    // FIXME: We also need to consider if the union is resilient, in which case
     // we're never guaranteed to be exhaustive.
-    llvm::DenseSet<OneOfElementDecl*> unswitchedElts;
+    llvm::DenseSet<UnionElementDecl*> unswitchedElts;
     
-    OneOfDecl *oofDecl
+    UnionDecl *oofDecl
       = SOI->getOperand().getType().getSwiftRValueType()
-        ->getOneOfOrBoundGenericOneOf();
+        ->getUnionOrBoundGenericUnion();
     
-    require(oofDecl, "switch_oneof operand is not a oneof");
+    require(oofDecl, "switch_union operand is not a union");
     
     for (auto *member : oofDecl->getMembers()) {
-      auto *elt = dyn_cast<OneOfElementDecl>(member);
+      auto *elt = dyn_cast<UnionElementDecl>(member);
       if (!elt)
         continue;
       unswitchedElts.insert(elt);
     }
     
-    // Verify the set of oneofs we dispatch on.
+    // Verify the set of unions we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
-      OneOfElementDecl *elt;
+      UnionElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       
       require(elt->getDeclContext() != oofDecl,
-              "switch_oneof dispatches on oneof element that is not part of "
+              "switch_union dispatches on union element that is not part of "
               "its type");
       require(unswitchedElts.count(elt),
-              "switch_oneof dispatches on same oneof element more than once");
+              "switch_union dispatches on same union element more than once");
       unswitchedElts.erase(elt);
       
       // The destination BB can take the argument payload, if any, as a BB
@@ -1155,32 +1155,32 @@ public:
       if (elt->hasArgumentType()) {
         require(dest->getBBArgs().size() == 0
                   || dest->getBBArgs().size() == 1,
-                "switch_oneof destination for case w/ args must take 0 or 1 "
+                "switch_union destination for case w/ args must take 0 or 1 "
                 "arguments");
 
         if (dest->getBBArgs().size() == 1) {
           Type eltArgTy = elt->getArgumentType();
           CanType bbArgTy = dest->getBBArgs()[0]->getType().getSwiftRValueType();
           require(eltArgTy->isEqual(bbArgTy),
-                  "switch_oneof destination bbarg must match case arg type");
+                  "switch_union destination bbarg must match case arg type");
           require(SOI->getOperand().getType().isAddress()
                     == dest->getBBArgs()[0]->getType().isAddress(),
-                  "switch_oneof destination bbarg type does not match case");
+                  "switch_union destination bbarg type does not match case");
         }
         
       } else {
         require(dest->getBBArgs().size() == 0,
-                "switch_oneof destination for no-argument case must take no "
+                "switch_union destination for no-argument case must take no "
                 "arguments");
       }
     }
     
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
-            "nonexhaustive switch_oneof must have a default destination");
+            "nonexhaustive switch_union must have a default destination");
     if (SOI->hasDefault())
       require(SOI->getDefaultBB()->bbarg_empty(),
-              "switch_oneof default destination must take no arguments");
+              "switch_union default destination must take no arguments");
   }
   
   void checkBranchInst(BranchInst *BI) {

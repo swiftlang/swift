@@ -389,7 +389,7 @@ Declaration References
   sil-decl-subref-part ::= 'setter'
   sil-decl-subref-part ::= 'allocator'
   sil-decl-subref-part ::= 'initializer'
-  sil-decl-subref-part ::= 'oneofelt'
+  sil-decl-subref-part ::= 'unionelt'
   sil-decl-subref-part ::= 'destroyer'
   sil-decl-subref-part ::= 'globalaccessor'
   sil-decl-subref-part ::= 'defaultarg' '.' [0-9]+
@@ -405,9 +405,9 @@ entity discriminators:
 
 - ``getter``: the getter function for a ``var`` declaration
 - ``setter``:  the setter function for a ``var`` declaration
-- ``allocator``: a ``struct`` or ``oneof`` constructor, or a ``class``\ 's *allocating constructor*
+- ``allocator``: a ``struct`` or ``union`` constructor, or a ``class``\ 's *allocating constructor*
 - ``initializer``: a ``class``\ 's *initializing constructor*
-- ``oneofelt``: a member of a ``oneof`` type.
+- ``unionelt``: a member of a ``union`` type.
 - ``destroyer``: a class's deallocating destructor
 - ``globalaccessor``: the addressor function for a global variable
 - ``defaultarg.``\ *n*: the default argument-generating function for
@@ -452,7 +452,7 @@ Definitive Initialization
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Swift requires that all local variables be initialized before use. In
-constructors, all instance variables of a struct, oneof, or class type must
+constructors, all instance variables of a struct, union, or class type must
 be initialized before the object is used and before the constructor is returned
 from.
 
@@ -2306,21 +2306,21 @@ block. If there is a ``default`` basic block, control is transferred to it if
 the value does not match any of the ``case`` values. It is undefined behavior
 if the value does not match any cases and no ``default`` branch is provided.
 
-switch_oneof
+switch_union
 ````````````
 ::
 
-  sil-terminator ::= 'switch_oneof' sil-operand
-                       (',' sil-switch-oneof-case)*
+  sil-terminator ::= 'switch_union' sil-operand
+                       (',' sil-switch-union-case)*
                        (',' sil-switch-default)?
-  sil-switch-oneof-case ::= 'case' sil-decl-ref ':' sil-identifier
+  sil-switch-union-case ::= 'case' sil-decl-ref ':' sil-identifier
 
-  switch_oneof %0 : $U, case #U.Foo: label1, \
+  switch_union %0 : $U, case #U.Foo: label1, \
                         case #U.Bar: label2, \
                         ...,                 \
                         default labelN
 
-  // %0 must be a value or address of oneof type $U
+  // %0 must be a value or address of union type $U
   // #U.Foo, #U.Bar, etc. must be 'case' declarations inside $U
   // `label1` through `labelN` must refer to block labels within the current
   //   function
@@ -2330,17 +2330,17 @@ switch_oneof
   //   of the type of #U.Bar's data, etc.
 
 Conditionally branches to one of several destination basic blocks based on the
-discriminator in a ``oneof`` value. Unlike ``switch_int``, ``switch_oneof``
-requires coverage of the operand type: If the ``oneof`` type is resilient, the
-``default`` branch is required; if the ``oneof`` type is fragile, the ``default``
-branch is required unless a destination is assigned to every ``case`` of the
-``oneof``. The destination basic block for a ``case`` may take an argument
-of the corresponding ``oneof`` ``case``'s data type (or of the address type,
-if the operand is an address). If the branch is taken, the argument will be
-bound to the associated data (or its address) inside the original oneof value.
-For example::
+discriminator in a ``union`` value. Unlike ``switch_int``, ``switch_union``
+requires coverage of the operand type: If the ``union`` type is resilient, the
+``default`` branch is required; if the ``union`` type is fragile, the
+``default`` branch is required unless a destination is assigned to every
+``case`` of the ``union``. The destination basic block for a ``case`` may take
+an argument of the corresponding ``union`` ``case``'s data type (or of the
+address type, if the operand is an address). If the branch is taken, the
+argument will be bound to the associated data (or its address) inside the
+original union value. For example::
 
-  oneof Foo {
+  union Foo {
     case Nothing
     case OneInt(Int)
     case TwoInts(Int, Int)
@@ -2348,7 +2348,7 @@ For example::
 
   sil @sum_of_foo : $Foo -> Int {
   entry(%x : $Foo):
-    switch_oneof %x : $Foo,       \
+    switch_union %x : $Foo,       \
       case #Foo.Nothing: nothing, \
       case #Foo.OneInt:  one_int, \
       case #Foo.TwoInts: two_ints

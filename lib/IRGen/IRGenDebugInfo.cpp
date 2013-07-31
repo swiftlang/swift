@@ -780,7 +780,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto FnTy = DBuilder.createSubroutineType(getFile(Scope), llvm::DIArray());
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
-  case TypeKind::OneOf: {
+  case TypeKind::Union: {
     Name = getMangledName(Ty.CanTy);
     break;
   }

@@ -1,30 +1,30 @@
 // RUN: %swift -parse -verify %s
 
-oneof Boolish {
+union Boolish {
   case falsy
   case truthy
 
   constructor() { this = .falsy }
 }
 
-oneof Optional<T> {
+union Optional<T> {
   case None
   case Just(T)
 }
 
-// Cases are excluded from oneofs.
-case FloatingCase // expected-error{{oneof 'case' is not allowed outside of a oneof}}
+// Cases are excluded from unions.
+case FloatingCase // expected-error{{union 'case' is not allowed outside of a union}}
 
 struct SomeStruct {
-  case StructCase // expected-error{{oneof 'case' is not allowed outside of a oneof}}
+  case StructCase // expected-error{{union 'case' is not allowed outside of a union}}
 }
 
 class SomeClass {
-  case ClassCase // expected-error{{oneof 'case' is not allowed outside of a oneof}}
+  case ClassCase // expected-error{{union 'case' is not allowed outside of a union}}
 }
 
-// Recover when a switch 'case' label is spelled inside a oneof (or outside).
-oneof SwitchEnvy {
+// Recover when a switch 'case' label is spelled inside a union (or outside).
+union SwitchEnvy {
   case X: // expected-error{{'case' label can only appear inside a 'switch' statement}}
   case X(Y): // expected-error{{'case' label can only appear inside a 'switch' statement}}
   case X, Y: // expected-error{{'case' label can only appear inside a 'switch' statement}}
@@ -36,7 +36,7 @@ oneof SwitchEnvy {
   case (_, var x, 0): // expected-error{{'case' label can only appear inside a 'switch' statement}}
 }
 
-oneof HasMethodsPropertiesAndCtors {
+union HasMethodsPropertiesAndCtors {
   case TweedleDee
   case TweedleDum
 
@@ -54,7 +54,7 @@ oneof HasMethodsPropertiesAndCtors {
   }
 }
 
-oneof ImproperlyHasIVars {
+union ImproperlyHasIVars {
   case Flopsy
   case Mopsy
 

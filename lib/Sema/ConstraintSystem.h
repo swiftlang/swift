@@ -1049,11 +1049,11 @@ enum class OverloadChoiceKind : int {
   Decl,
   /// \brief The overload choice equates the member type with the
   /// base type. Used for unresolved member expressions like ".none" that
-  /// refer to oneof members with unit type.
+  /// refer to union members with unit type.
   BaseType,
   /// \brief The overload choice equates the member type with a function
   /// of arbitrary input type whose result type is the base type. Used for
-  /// unresolved member expressions like ".internal" that refer to oneof
+  /// unresolved member expressions like ".internal" that refer to union
   /// members with non-unit type.
   FunctionReturningBaseType,
   /// \brief The overload choice equates the member type with a function

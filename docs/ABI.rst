@@ -106,7 +106,7 @@ types where the metadata itself has unknown layout.)
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name
   nominal-type-kind ::= 'C'                  // class
-  nominal-type-kind ::= 'O'                  // oneof
+  nominal-type-kind ::= 'O'                  // union
   nominal-type-kind ::= 'V'                  // struct
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type

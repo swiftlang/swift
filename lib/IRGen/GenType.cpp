@@ -424,15 +424,15 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericOneOf:
+  case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
     return convertBoundGenericType(cast<BoundGenericType>(ty)->getDecl());
   case TypeKind::LValue:
     return convertLValueType(cast<LValueType>(ty));
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
-  case TypeKind::OneOf:
-    return convertOneOfType(cast<OneOfType>(ty)->getDecl());
+  case TypeKind::Union:
+    return convertUnionType(cast<UnionType>(ty)->getDecl());
   case TypeKind::Struct:
     return convertStructType(cast<StructType>(ty)->getDecl());
   case TypeKind::Class:
@@ -520,8 +520,8 @@ TypeCacheEntry TypeConverter::convertBoundGenericType(NominalTypeDecl *decl) {
     return result;
   }
 
-  case DeclKind::OneOf: {
-    auto result = convertOneOfType(cast<OneOfDecl>(decl));
+  case DeclKind::Union: {
+    auto result = convertUnionType(cast<UnionDecl>(decl));
     overwriteForwardDecl(Types.Cache, key, result);
     return result;
   }

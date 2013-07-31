@@ -44,14 +44,14 @@ KEYWORD(destructor)
 KEYWORD(extension)
 KEYWORD(func)
 KEYWORD(import)
-KEYWORD(oneof)
 IDENTIFIER_KEYWORD(metatype)
 KEYWORD(protocol)
-KEYWORD(struct)
-KEYWORD(typealias)
-KEYWORD(var)
 KEYWORD(static)
+KEYWORD(struct)
 KEYWORD(subscript)
+KEYWORD(typealias)
+KEYWORD(union)
+KEYWORD(var)
 
 KEYWORD(sil)        // This is only enabled when parsing .sil files.
 

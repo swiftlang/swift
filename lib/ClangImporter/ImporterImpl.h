@@ -108,9 +108,9 @@ struct ClangImporter::Implementation {
   /// into Swift. All of the possibilities have the same storage
   /// representation, but can be used in different ways.
   enum class EnumKind {
-    /// \brief The enumeration type should map to a oneof, which means that
+    /// \brief The enumeration type should map to a union, which means that
     /// all of the options are independent.
-    OneOf,
+    Union,
     /// \brief The enumeration type should map to a distinct type that acts
     /// as a bitset, for which each of the possible values represents a
     /// specific bit.

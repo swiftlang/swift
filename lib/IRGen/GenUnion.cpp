@@ -1,4 +1,4 @@
-//===--- GenOneOf.cpp - Swift IR Generation For 'oneof' Types -------------===//
+//===--- GenUnion.cpp - Swift IR Generation For 'union' Types -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 //  This file implements IR generation for algebraic data types (ADTs,
-//  or 'oneof' types) in Swift.  This includes creating the IR type as
+//  or 'union' types) in Swift.  This includes creating the IR type as
 //  well as emitting the basic access operations.
 //
 //  The current scheme is that all such types with are represented
@@ -42,10 +42,10 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-  /// An abstract base class for TypeInfo implementations of oneof types.
-  class OneofTypeInfo : public FixedTypeInfo { // FIXME: not always fixed!
+  /// An abstract base class for TypeInfo implementations of union types.
+  class UnionTypeInfo : public FixedTypeInfo { // FIXME: not always fixed!
   public:
-    OneofTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
+    UnionTypeInfo(llvm::StructType *T, Size S, Alignment A, IsPOD_t isPOD)
       : FixedTypeInfo(T, S, A, isPOD) {}
 
     llvm::StructType *getStorageType() const {
@@ -59,11 +59,11 @@ namespace {
 
     /// Map the given element to the appropriate value in the
     /// discriminator type.
-    llvm::ConstantInt *getDiscriminatorIndex(OneOfElementDecl *target) const {
+    llvm::ConstantInt *getDiscriminatorIndex(UnionElementDecl *target) const {
       // FIXME: using a linear search here is fairly ridiculous.
       unsigned index = 0;
-      for (auto elt : cast<OneOfDecl>(target->getDeclContext())->getMembers()) {
-        if (!isa<OneOfElementDecl>(elt)) continue;
+      for (auto elt : cast<UnionDecl>(target->getDeclContext())->getMembers()) {
+        if (!isa<UnionElementDecl>(elt)) continue;
         if (elt == target) break;
         index++;
       }
@@ -71,16 +71,16 @@ namespace {
     }
 
     virtual void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                           OneOfElementDecl *elt,
+                                           UnionElementDecl *elt,
                                            Explosion &params) const = 0;
   };
 
   /// A TypeInfo implementation which uses an aggregate.
-  class AggregateOneofTypeInfo : public OneofTypeInfo {
+  class AggregateUnionTypeInfo : public UnionTypeInfo {
   public:
-    AggregateOneofTypeInfo(llvm::StructType *T, Size S, Alignment A,
+    AggregateUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : OneofTypeInfo(T, S, A, isPOD) {}
+      : UnionTypeInfo(T, S, A, isPOD) {}
 
     void getSchema(ExplosionSchema &schema) const {
       schema.add(ExplosionSchema::Element::forAggregate(getStorageType(),
@@ -128,7 +128,7 @@ namespace {
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   OneOfElementDecl *elt,
+                                   UnionElementDecl *elt,
                                    Explosion &params) const {
       // FIXME
       params.markClaimed(params.size());
@@ -136,8 +136,8 @@ namespace {
     }
   };
 
-  /// A TypeInfo implementation for singleton oneofs.
-  class SingletonOneofTypeInfo : public OneofTypeInfo {
+  /// A TypeInfo implementation for singleton unions.
+  class SingletonUnionTypeInfo : public UnionTypeInfo {
   public:
     static Address getSingletonAddress(IRGenFunction &IGF, Address addr) {
       llvm::Value *singletonAddr =
@@ -148,9 +148,9 @@ namespace {
     /// The type info of the singleton member, or null if it carries no data.
     const TypeInfo *Singleton;
 
-    SingletonOneofTypeInfo(llvm::StructType *T, Size S, Alignment A,
+    SingletonUnionTypeInfo(llvm::StructType *T, Size S, Alignment A,
                            IsPOD_t isPOD)
-      : OneofTypeInfo(T, S, A, isPOD), Singleton(nullptr) {}
+      : UnionTypeInfo(T, S, A, isPOD), Singleton(nullptr) {}
 
     void getSchema(ExplosionSchema &schema) const {
       assert(isComplete());
@@ -211,9 +211,9 @@ namespace {
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   OneOfElementDecl *elt,
+                                   UnionElementDecl *elt,
                                    Explosion &params) const {
-      // If this oneof carries no data, the function must take no
+      // If this union carries no data, the function must take no
       // arguments and return void.
       if (!Singleton) {
         IGF.Builder.CreateRetVoid();
@@ -234,9 +234,9 @@ namespace {
     }
   };
 
-  /// A TypeInfo implementation for oneofs with no payload.
+  /// A TypeInfo implementation for unions with no payload.
   class EnumTypeInfo :
-    public PODSingleScalarTypeInfo<EnumTypeInfo,OneofTypeInfo> {
+    public PODSingleScalarTypeInfo<EnumTypeInfo,UnionTypeInfo> {
   public:
     EnumTypeInfo(llvm::StructType *T, Size S, Alignment A)
       : PODSingleScalarTypeInfo(T, S, A) {}
@@ -251,7 +251,7 @@ namespace {
     }
 
     void emitInjectionFunctionBody(IRGenFunction &IGF,
-                                   OneOfElementDecl *elt,
+                                   UnionElementDecl *elt,
                                    Explosion &params) const {
       IGF.Builder.CreateRet(getDiscriminatorIndex(elt));
     }
@@ -268,8 +268,8 @@ namespace {
     return false;
   }
 
-  /// An implementation strategy for a oneof.
-  class OneofImplStrategy {
+  /// An implementation strategy for a union.
+  class UnionImplStrategy {
   public:
     enum Kind {
       Singleton,
@@ -282,12 +282,12 @@ namespace {
     Kind TheKind;
 
   public:
-    explicit OneofImplStrategy(OneOfDecl *oneof) {
+    explicit UnionImplStrategy(UnionDecl *theUnion) {
       NumElements = 0;
 
       bool hasApparentPayload = false;
-      for (auto member : oneof->getMembers()) {
-        auto elt = dyn_cast<OneOfElementDecl>(member);
+      for (auto member : theUnion->getMembers()) {
+        auto elt = dyn_cast<UnionElementDecl>(member);
         if (!elt) continue;
 
         NumElements++;
@@ -314,17 +314,17 @@ namespace {
     Kind getKind() const { return TheKind; }
     unsigned getNumElements() const { return NumElements; }
 
-    /// Create a forward declaration for the oneof.
-    OneofTypeInfo *create(llvm::StructType *convertedStruct) const {
+    /// Create a forward declaration for the union.
+    UnionTypeInfo *create(llvm::StructType *convertedStruct) const {
       switch (getKind()) {
       case Singleton:
-        return new SingletonOneofTypeInfo(convertedStruct,
+        return new SingletonUnionTypeInfo(convertedStruct,
                                           Size(0), Alignment(0), IsPOD);
       case Enum:
         return new EnumTypeInfo(convertedStruct,
                                 Size(0), Alignment(0));
       case Aggregate:
-        return new AggregateOneofTypeInfo(convertedStruct,
+        return new AggregateUnionTypeInfo(convertedStruct,
                                           Size(0), Alignment(0), IsPOD);
       }
       llvm_unreachable("bad strategy kind");
@@ -332,46 +332,46 @@ namespace {
   };
 }
 
-const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
-  llvm::StructType *convertedStruct = IGM.createNominalType(oneof);
+const TypeInfo *TypeConverter::convertUnionType(UnionDecl *theUnion) {
+  llvm::StructType *convertedStruct = IGM.createNominalType(theUnion);
 
   // Create a forward declaration for that type.
-  auto typeCacheKey = oneof->getDeclaredType().getPointer();
+  auto typeCacheKey = theUnion->getDeclaredType().getPointer();
   addForwardDecl(typeCacheKey, convertedStruct);
 
   // Compute the implementation strategy.
-  OneofImplStrategy strategy(oneof);
+  UnionImplStrategy strategy(theUnion);
 
   // Create the TI as a forward declaration and map it in the table.
-  OneofTypeInfo *convertedTI = strategy.create(convertedStruct);
+  UnionTypeInfo *convertedTI = strategy.create(convertedStruct);
 
   // We don't need a discriminator if this is a singleton ADT.
-  if (strategy.getKind() == OneofImplStrategy::Singleton) {
-    auto oneofTI = static_cast<SingletonOneofTypeInfo*>(convertedTI);
+  if (strategy.getKind() == UnionImplStrategy::Singleton) {
+    auto unionTI = static_cast<SingletonUnionTypeInfo*>(convertedTI);
 
     Type eltType =
-      cast<OneOfElementDecl>(oneof->getMembers()[0])->getArgumentType();
+      cast<UnionElementDecl>(theUnion->getMembers()[0])->getArgumentType();
 
     llvm::Type *storageType;
     if (eltType.isNull()) {
       storageType = IGM.Int8Ty;
-      oneofTI->StorageAlignment = Alignment(1);
-      oneofTI->Singleton = nullptr;
+      unionTI->StorageAlignment = Alignment(1);
+      unionTI->Singleton = nullptr;
     } else {
       const TypeInfo &eltTI = getCompleteTypeInfo(eltType->getCanonicalType());
 
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI); // FIXME
       storageType = eltTI.StorageType;
-      oneofTI->completeFixed(fixedEltTI.getFixedSize(),
+      unionTI->completeFixed(fixedEltTI.getFixedSize(),
                              fixedEltTI.getFixedAlignment());
-      oneofTI->Singleton = &eltTI;
-      oneofTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
+      unionTI->Singleton = &eltTI;
+      unionTI->setPOD(eltTI.isPOD(ResilienceScope::Local));
     }
 
     llvm::Type *body[] = { storageType };
     convertedStruct->setBody(body);
 
-    return oneofTI;
+    return unionTI;
   }
 
   // Otherwise, we need a discriminator.
@@ -401,8 +401,8 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
   IsPOD_t isPOD = IsPOD;
 
   // Figure out how much storage we need for the union.
-  for (Decl *member : oneof->getMembers()) {
-    OneOfElementDecl *elt = dyn_cast<OneOfElementDecl>(member);
+  for (Decl *member : theUnion->getMembers()) {
+    UnionElementDecl *elt = dyn_cast<UnionElementDecl>(member);
     if (!elt)
       continue;
 
@@ -448,7 +448,7 @@ const TypeInfo *TypeConverter::convertOneOfType(OneOfDecl *oneof) {
 /// Emit the injection function for the given element.
 static void emitInjectionFunction(IRGenModule &IGM,
                                   llvm::Function *fn,
-                                  OneOfElementDecl *elt) {
+                                  UnionElementDecl *elt) {
   ExplosionKind explosionKind = ExplosionKind::Minimal;
   IRGenFunction IGF(IGM, explosionKind, fn);
   if (IGM.DebugInfo)
@@ -461,22 +461,22 @@ static void emitInjectionFunction(IRGenModule &IGM,
   }
 
   Explosion explosion = IGF.collectParameters();
-  OneOfDecl *ood = cast<OneOfDecl>(elt->getDeclContext());
+  UnionDecl *ood = cast<UnionDecl>(elt->getDeclContext());
   if (ood->getGenericParamsOfContext()) {
     auto polyFn =
       cast<PolymorphicFunctionType>(elt->getType()->getCanonicalType());
     emitPolymorphicParameters(IGF, polyFn, explosion);
   }
-  const OneofTypeInfo &oneofTI =
-      IGM.getFragileTypeInfo(ood->getDeclaredTypeInContext()).as<OneofTypeInfo>();
-  oneofTI.emitInjectionFunctionBody(IGF, elt, explosion);
+  const UnionTypeInfo &unionTI =
+    IGM.getFragileTypeInfo(ood->getDeclaredTypeInContext()).as<UnionTypeInfo>();
+  unionTI.emitInjectionFunctionBody(IGF, elt, explosion);
 }
 
-/// emitOneOfDecl - Emit all the declarations associated with this oneof type.
-void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
+/// emitUnionDecl - Emit all the declarations associated with this union type.
+void IRGenModule::emitUnionDecl(UnionDecl *theUnion) {
   // FIXME: This is mostly copy-paste from emitExtension;
   // figure out how to refactor! 
-  for (Decl *member : oneof->getMembers()) {
+  for (Decl *member : theUnion->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
@@ -498,8 +498,8 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
       continue;
     case DeclKind::TypeAlias:
       continue;
-    case DeclKind::OneOf:
-      emitOneOfDecl(cast<OneOfDecl>(member));
+    case DeclKind::Union:
+      emitUnionDecl(cast<UnionDecl>(member));
       continue;
     case DeclKind::Struct:
       emitStructDecl(cast<StructDecl>(member));
@@ -519,8 +519,8 @@ void IRGenModule::emitOneOfDecl(OneOfDecl *oneof) {
     case DeclKind::Constructor:
       emitLocalDecls(cast<ConstructorDecl>(member));
       continue;
-    case DeclKind::OneOfElement: {
-      OneOfElementDecl *elt = cast<OneOfElementDecl>(member);
+    case DeclKind::UnionElement: {
+      UnionElementDecl *elt = cast<UnionElementDecl>(member);
       llvm::Function *fn = getAddrOfInjectionFunction(elt);
       emitInjectionFunction(*this, fn, elt);
       continue;

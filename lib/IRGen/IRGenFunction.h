@@ -40,8 +40,8 @@ namespace swift {
   class Decl;
   class ExtensionDecl;
   class FuncDecl;
-  class OneOfElementDecl;
-  class OneOfType;
+  class UnionElementDecl;
+  class UnionType;
   template<typename T> class Optional;
   class Pattern;
   class PatternBindingDecl;

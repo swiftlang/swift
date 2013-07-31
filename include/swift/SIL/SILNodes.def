@@ -167,8 +167,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(BranchInst, TermInst)
     INST(CondBranchInst, TermInst)
     INST(SwitchIntInst, TermInst)
-    INST(SwitchOneofInst, TermInst)
-    VALUE_RANGE(TermInst, UnreachableInst, SwitchOneofInst)
+    INST(SwitchUnionInst, TermInst)
+    VALUE_RANGE(TermInst, UnreachableInst, SwitchUnionInst)
 
   VALUE_RANGE(SILInstruction, AllocStackInst, CondBranchInst)
 

@@ -347,8 +347,8 @@ bool ValueDecl::isDefinition() const {
     return cast<FuncDecl>(this)->getBody() != 0;
 
   case DeclKind::Var:
-  case DeclKind::OneOf:
-  case DeclKind::OneOfElement:
+  case DeclKind::Union:
+  case DeclKind::UnionElement:
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::TypeAlias:
@@ -373,7 +373,7 @@ bool ValueDecl::isInstanceMember() const {
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
-  case DeclKind::OneOf:
+  case DeclKind::Union:
   case DeclKind::Protocol:
   case DeclKind::Struct:
   case DeclKind::TypeAlias:
@@ -393,8 +393,8 @@ bool ValueDecl::isInstanceMember() const {
     // Non-static methods are instance members.
     return !cast<FuncDecl>(this)->isStatic();
 
-  case DeclKind::OneOfElement:
-    // oneof elements are not instance members.
+  case DeclKind::UnionElement:
+    // union elements are not instance members.
     return false;
 
   case DeclKind::Subscript:
@@ -542,21 +542,21 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, NameLoc };
 }
 
-OneOfDecl::OneOfDecl(SourceLoc OneOfLoc, bool Enum,
+UnionDecl::UnionDecl(SourceLoc UnionLoc, bool Enum,
                      Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
-  : NominalTypeDecl(DeclKind::OneOf, Parent, Name, Inherited, GenericParams),
-    OneOfLoc(OneOfLoc), NameLoc(NameLoc) {
-  // Compute the associated type for this OneOfDecl.
+  : NominalTypeDecl(DeclKind::Union, Parent, Name, Inherited, GenericParams),
+    UnionLoc(UnionLoc), NameLoc(NameLoc) {
+  // Compute the associated type for this UnionDecl.
   ASTContext &Ctx = Parent->getASTContext();
   if (!GenericParams)
-    DeclaredTy = OneOfType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
+    DeclaredTy = UnionType::get(this, Parent->getDeclaredTypeInContext(), Ctx);
   else
     DeclaredTy = UnboundGenericType::get(this,
                                          Parent->getDeclaredTypeInContext(),
                                          Ctx);
-  // Set the type of the OneOfDecl to the right MetaTypeType.
+  // Set the type of the UnionDecl to the right MetaTypeType.
   setType(MetaTypeType::get(DeclaredTy, Ctx));
 }
 
@@ -595,10 +595,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 
-OneOfElementDecl *OneOfDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large oneof decls.
+UnionElementDecl *UnionDecl::getElement(Identifier Name) const {
+  // FIXME: Linear search is not great for large union decls.
   for (Decl *D : getMembers())
-    if (OneOfElementDecl *Elt = dyn_cast<OneOfElementDecl>(D))
+    if (UnionElementDecl *Elt = dyn_cast<UnionElementDecl>(D))
       if (Elt->getName() == Name)
         return Elt;
   return 0;
@@ -915,7 +915,7 @@ SourceRange FuncDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
 
-SourceRange OneOfElementDecl::getSourceRange() const {
+SourceRange UnionElementDecl::getSourceRange() const {
   if (ResultType.hasLocation())
     return {getStartLoc(), ResultType.getSourceRange().End};
   if (ArgumentType.hasLocation())

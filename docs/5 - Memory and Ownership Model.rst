@@ -34,7 +34,7 @@ reference types. As a silly example::
     arr[4] = 1; // Updates myarray.
   }
 
-Aggregates (structs and oneof) default to being value types, but can be declared
+Aggregates (structs and union) default to being value types, but can be declared
 as reference types with the byref attribute::
 
   struct [byref] MyList {

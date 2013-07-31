@@ -347,7 +347,7 @@ OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(BO)
-// FIXME: The compiler should generate OneOf metadata for Bool.
+// FIXME: The compiler should generate Union metadata for Bool.
 OPAQUE_METADATA(Sb)
 
 /// The standard metadata for the empty tuple.

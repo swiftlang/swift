@@ -317,12 +317,12 @@ namespace {
     }
 
     Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
-      auto oneofLocator = CS.getConstraintLocator(
+      auto unionLocator = CS.getConstraintLocator(
                             expr,
                             ConstraintLocator::MemberRefBase);
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto oneofTy = CS.createTypeVariable(oneofLocator);
+      auto unionTy = CS.createTypeVariable(unionLocator);
       auto memberTy = CS.createTypeVariable(memberLocator);
 
       // An unresolved member expression '.member' is modeled as a value member
@@ -338,15 +338,15 @@ namespace {
       // form (T2 -> T0) until T0 has been deduced, we cannot model this
       // directly within the constraint system. Instead, we introduce a new
       // overload set with two entries: one for T0 and one for T2 -> T0.
-      auto oneofMetaTy = MetaTypeType::get(oneofTy, CS.getASTContext());
-      CS.addValueMemberConstraint(oneofMetaTy, expr->getName(), memberTy,
+      auto unionMetaTy = MetaTypeType::get(unionTy, CS.getASTContext());
+      CS.addValueMemberConstraint(unionMetaTy, expr->getName(), memberTy,
                                   memberLocator);
 
       OverloadChoice choices[2] = {
-        OverloadChoice(oneofTy, OverloadChoiceKind::BaseType),
-        OverloadChoice(oneofTy, OverloadChoiceKind::FunctionReturningBaseType),
+        OverloadChoice(unionTy, OverloadChoiceKind::BaseType),
+        OverloadChoice(unionTy, OverloadChoiceKind::FunctionReturningBaseType),
       };
-      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, oneofLocator,
+      CS.addOverloadSet(OverloadSet::getNew(CS, memberTy, unionLocator,
                                             choices));
       return memberTy;
     }

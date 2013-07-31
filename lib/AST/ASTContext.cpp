@@ -76,7 +76,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, LValueType::Qual::opaque_type>, LValueType*>
       LValueTypes;
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
-    llvm::FoldingSet<OneOfType> OneOfTypes;
+    llvm::FoldingSet<UnionType> UnionTypes;
     llvm::FoldingSet<StructType> StructTypes;
     llvm::FoldingSet<ClassType> ClassTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
@@ -525,8 +525,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                                     IsCanonical ? &C : 0,
                                                     HasTypeVariable);
   } else {
-    auto theOneOf = cast<OneOfDecl>(TheDecl);
-    newType = new (C, arena) BoundGenericOneOfType(theOneOf, Parent, ArgsCopy,
+    auto theUnion = cast<UnionDecl>(TheDecl);
+    newType = new (C, arena) BoundGenericUnionType(theUnion, Parent, ArgsCopy,
                                                    IsCanonical ? &C : 0,
                                                    HasTypeVariable);
   }
@@ -537,8 +537,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
 
 NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext &C) {
   switch (D->getKind()) {
-  case DeclKind::OneOf:
-    return OneOfType::get(cast<OneOfDecl>(D), Parent, C);
+  case DeclKind::Union:
+    return UnionType::get(cast<UnionDecl>(D), Parent, C);
   case DeclKind::Struct:
     return StructType::get(cast<StructDecl>(D), Parent, C);
   case DeclKind::Class:
@@ -551,28 +551,28 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
   }
 }
 
-OneOfType::OneOfType(OneOfDecl *TheDecl, Type Parent, const ASTContext &C,
+UnionType::UnionType(UnionDecl *TheDecl, Type Parent, const ASTContext &C,
                      bool HasTypeVariable)
-  : NominalType(TypeKind::OneOf, &C, TheDecl, Parent, HasTypeVariable) { }
+  : NominalType(TypeKind::Union, &C, TheDecl, Parent, HasTypeVariable) { }
 
-OneOfType *OneOfType::get(OneOfDecl *D, Type Parent, const ASTContext &C) {
+UnionType *UnionType::get(UnionDecl *D, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID id;
-  OneOfType::Profile(id, D, Parent);
+  UnionType::Profile(id, D, Parent);
 
   bool hasTypeVariable = Parent && Parent->hasTypeVariable();
   auto arena = getArena(hasTypeVariable);
 
   void *insertPos = 0;
-  if (auto oneOfTy
-        = C.Impl.getArena(arena).OneOfTypes.FindNodeOrInsertPos(id, insertPos))
-    return oneOfTy;
+  if (auto unionTy
+        = C.Impl.getArena(arena).UnionTypes.FindNodeOrInsertPos(id, insertPos))
+    return unionTy;
 
-  auto oneOfTy = new (C, arena) OneOfType(D, Parent, C, hasTypeVariable);
-  C.Impl.getArena(arena).OneOfTypes.InsertNode(oneOfTy, insertPos);
-  return oneOfTy;
+  auto unionTy = new (C, arena) UnionType(D, Parent, C, hasTypeVariable);
+  C.Impl.getArena(arena).UnionTypes.InsertNode(unionTy, insertPos);
+  return unionTy;
 }
 
-void OneOfType::Profile(llvm::FoldingSetNodeID &ID, OneOfDecl *D, Type Parent) {
+void UnionType::Profile(llvm::FoldingSetNodeID &ID, UnionDecl *D, Type Parent) {
   ID.AddPointer(D);
   ID.AddPointer(Parent.getPointer());
 }

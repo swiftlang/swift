@@ -28,7 +28,7 @@ using namespace swift;
 static bool isResolvableScope(ScopeKind SK) {
   switch (SK) {
   case ScopeKind::Extension:
-  case ScopeKind::OneofBody:
+  case ScopeKind::UnionBody:
   case ScopeKind::StructBody:
   case ScopeKind::ClassBody:
   case ScopeKind::ProtocolBody:

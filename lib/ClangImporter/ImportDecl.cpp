@@ -406,9 +406,9 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // Create the oneof declaration and record it.
+      // Create the union declaration and record it.
       Decl *result;
-      OneOfDecl *oneOfDecl = nullptr;
+      UnionDecl *unionDecl = nullptr;
       switch (Impl.classifyEnum(decl)) {
       case EnumKind::Constants: {
         // There is no declaration. Rather, the type is mapped to the
@@ -461,14 +461,14 @@ namespace {
         break;
       }
 
-      case EnumKind::OneOf:
-        oneOfDecl = new (Impl.SwiftContext)
-          OneOfDecl(Impl.importSourceLoc(decl->getLocStart()),
+      case EnumKind::Union:
+        unionDecl = new (Impl.SwiftContext)
+          UnionDecl(Impl.importSourceLoc(decl->getLocStart()),
                     /*isEnum*/ true,
                     name,
                     Impl.importSourceLoc(decl->getLocation()),
                     { }, nullptr, dc);
-        result = oneOfDecl;
+        result = unionDecl;
         break;
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
@@ -489,8 +489,8 @@ namespace {
       // location of the '{'.
       // FIXME: Eventually, we'd like to be able to do this for structs as well,
       // but we need static variables first.
-      if (oneOfDecl) {
-        oneOfDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
+      if (unionDecl) {
+        unionDecl->setMembers(Impl.SwiftContext.AllocateCopy(members),
                                 Impl.importSourceRange(clang::SourceRange(
                                                        decl->getLocation(),
                                                        decl->getRBraceLoc())));
@@ -500,7 +500,7 @@ namespace {
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
-      // FIXME: Skip unions for now. We can't properly map them to oneofs,
+      // FIXME: Skip unions for now. We can't properly map them to Swift unions,
       // because they aren't discriminated in any way. We could map them to
       // structs, but that would make them very, very unsafe to use.
       if (decl->isUnion())
@@ -683,10 +683,9 @@ namespace {
         return result;
       }
 
-      case EnumKind::OneOf: {
-        // The enumeration was mapped to a oneof. Create an element of that
-        // oneof.
-        // The enumeration was mapped to a oneof.
+      case EnumKind::Union: {
+        // The enumeration was mapped to a Swift union. Create an element of
+        // that union.
         auto dc = Impl.importDeclContext(decl->getDeclContext());
         if (!dc)
           return nullptr;
@@ -699,16 +698,16 @@ namespace {
           return known->second;
 
         auto element
-          = new (context) OneOfElementDecl(SourceLoc(), SourceLoc(),
+          = new (context) UnionElementDecl(SourceLoc(), SourceLoc(),
                                            name, TypeLoc(),
                                            SourceLoc(), TypeLoc(),
                                            dc);
 
-        // Give the oneof element the appropriate type.
-        auto oneof = cast<OneOfDecl>(dc);
-        auto argTy = MetaTypeType::get(oneof->getDeclaredType(), context);
+        // Give the union element the appropriate type.
+        auto theUnion = cast<UnionDecl>(dc);
+        auto argTy = MetaTypeType::get(theUnion->getDeclaredType(), context);
         element->overwriteType(FunctionType::get(argTy,
-                                                 oneof->getDeclaredType(),
+                                                 theUnion->getDeclaredType(),
                                                  context));
         Impl.ImportedDecls[decl->getCanonicalDecl()] = element;
         return element;
@@ -2412,7 +2411,7 @@ EnumKind ClangImporter::Implementation::classifyEnum(const clang::EnumDecl *decl
   if (name.empty())
     return EnumKind::Constants;
 
-  // FIXME: For now, Options is the only usable answer, because oneofs
+  // FIXME: For now, Options is the only usable answer, because unions
   // are broken in IRgen.
   return EnumKind::Options;
 }

@@ -402,7 +402,7 @@ PrintReplExpr(TypeChecker &TC, VarDecl *Arg,
     return;
   }
 
-  // FIXME: We should handle OneOfTypes at some point, but
+  // FIXME: We should handle UnionTypes at some point, but
   // it's tricky to represent in the AST without a "match" statement.
 
   PrintLiteralString("<unprintable value>", TC, Loc, PrintDecls,
