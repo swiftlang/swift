@@ -146,8 +146,6 @@ public:
 
   Substitution demangleSymbol();
 
-  Substitution demangleType();
-
 private:
 
   enum class IsProtocol : bool {
@@ -219,6 +217,8 @@ private:
   SubstitutionWithProtocol demangleSubstitutionIndexWithProtocol();
 
   Substitution demangleIndex();
+    
+  Substitution demangleType();
 
   Substitution demangleNominalType();
 
@@ -1147,13 +1147,6 @@ Demangler::Substitution Demangler::success(Substitution &SN) {
 
 std::string swift::Demangle::demangleSymbol(StringRef mangled) {
   Demangler::Substitution demangled = Demangler(mangled).demangleSymbol();
-  if (demangled)
-    return demangled.first();
-  return mangled.data();
-}
-
-std::string swift::Demangle::demangleType(StringRef mangled) {
-  Demangler::Substitution demangled = Demangler(mangled).demangleType();
   if (demangled)
     return demangled.first();
   return mangled.data();

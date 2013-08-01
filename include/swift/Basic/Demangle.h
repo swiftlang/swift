@@ -33,20 +33,6 @@ namespace Demangle {
 ///
 std::string demangleSymbol(llvm::StringRef mangled);
 
-/// \brief Demangle the given string as a Swift type.
-///
-/// Typical usage:
-/// \code
-///   std::string aDemangledName =
-/// swift::Demangler::demangleType("SomeSwiftMangledName")
-/// \endcode
-///
-/// \param mangled The mangled string.
-///
-///
-/// \returns The demangled string - or the mangled string on failure.
-std::string demangleType(llvm::StringRef mangled);
-
 } // end namespace Demangle
 } // end namespace swift
 
