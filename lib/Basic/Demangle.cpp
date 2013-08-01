@@ -793,8 +793,12 @@ Demangler::Substitution Demangler::demangleProtocolName() {
     Substitution identifier = demangleIdentifier();
     if (!identifier)
       return failure();
-    Substitutions.push_back(success(identifier));
-    return success(identifier);
+    
+    auto result = success(DemanglerPrinter() << std::get<0>(sub_with_proto)
+                                             << "." << identifier.first());
+    
+    Substitutions.push_back(result);
+    return success(result);
   }
   return demangleDeclarationName(IsProtocol::yes);
 }
