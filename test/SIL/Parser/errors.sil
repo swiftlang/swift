@@ -41,3 +41,9 @@ bb0:
 }
 
 sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_stage'}}
+
+sil @missing_type : $[thin] (i :Int) -> () {
+bb0(%0 : $Int):
+  br bb3(%0) // expected-error {{expected ':' before type in SIL value reference}}
+  // FIXME: The next error is unexpected.
+} // expected-error {{extraneous '}' at top level}}

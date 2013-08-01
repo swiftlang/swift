@@ -511,11 +511,7 @@ BranchInst::BranchInst(SILLocation Loc,
                        SILBasicBlock *DestBB,
                        ArrayRef<SILValue> Args)
   : TermInst(ValueKind::BranchInst, Loc),
-    DestBB(this, DestBB), Operands(this, Args)
-{
-  assert(Args.size() == DestBB->bbarg_size() &&
-         "branch argument count does not match target bb");
-}
+    DestBB(this, DestBB), Operands(this, Args) {}
 
 BranchInst *BranchInst::create(SILLocation Loc,
                                SILBasicBlock *DestBB,
@@ -549,13 +545,9 @@ CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
 }
 
 CondBranchInst *CondBranchInst::create(SILLocation Loc, SILValue Condition,
-                               SILBasicBlock *TrueBB, ArrayRef<SILValue> TrueArgs,
-                               SILBasicBlock *FalseBB, ArrayRef<SILValue> FalseArgs,
-                               SILFunction &F) {
-  assert(TrueArgs.size() == TrueBB->bbarg_size() &&
-         FalseArgs.size() == FalseBB->bbarg_size() &&
-         "branch argument counts do not match target bbs");
-
+                          SILBasicBlock *TrueBB, ArrayRef<SILValue> TrueArgs,
+                          SILBasicBlock *FalseBB, ArrayRef<SILValue> FalseArgs,
+                          SILFunction &F) {
   SmallVector<SILValue, 4> Args;
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());

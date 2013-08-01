@@ -327,7 +327,7 @@ ERROR(expected_infix_operator_precedence,decl_parsing,none,
 ERROR(expected_sil_type, decl_parsing,none,
       "expected type in SIL code", ())
 ERROR(expected_sil_colon_value_ref,decl_parsing,none,
-      "expected ':' after type in SIL value reference", ())
+      "expected ':' before type in SIL value reference", ())
 ERROR(expected_sil_value_name,decl_parsing,none,
       "expected SIL value name", ())
 ERROR(expected_sil_value_name_result_number,decl_parsing,none,

@@ -151,6 +151,10 @@ namespace {
     }
     bool parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
                         StringRef &OpcodeName);
+
+    /// \brief Parses the basic block arguments as part of branch instruction.
+    bool parseSILBBArgsAtBranch(llvm::SmallVector<SILValue, 6> &Args);
+
     bool parseSILInstruction(SILBasicBlock *BB);
     bool parseCallInstruction(ValueKind Opcode, SILBuilder &B,
                               ValueBase *&ResultVal);
@@ -870,6 +874,27 @@ Type SILParser::lookupBoolType(SourceLoc Loc) {
   return Ty.getType();
 }
 
+bool SILParser::parseSILBBArgsAtBranch(llvm::SmallVector<SILValue, 6> &Args) {
+  if (P.Tok.is(tok::l_paren)) {
+    SourceLoc LParenLoc = P.consumeToken(tok::l_paren);
+    SourceLoc RParenLoc;
+
+    if (P.parseList(tok::r_paren, LParenLoc, RParenLoc,
+                    tok::comma, false,
+                    diag::sil_basicblock_arg_rparen,
+                    [&] () -> bool {
+                      SILValue Arg;
+                      SourceLoc ArgLoc;
+                      if (parseTypedValueRef(Arg, ArgLoc))
+                        return true;
+                      Args.push_back(Arg);
+                      return false;
+                    }))
+      return true;
+  }
+  return false;
+}
+
 ///   sil-instruction:
 ///     (sil_local_name '=')? identifier ...
 bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
@@ -1350,27 +1375,40 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc NameLoc;
     if (P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name))
       return true;
+
+    llvm::SmallVector<SILValue, 6> Args;
+    if (parseSILBBArgsAtBranch(Args))
+      return true;
+
+    // Note, the basic block here could be a reference to an undefined
+    // basic block, which will be parsed later on.
     ResultVal = B.createBranch(SILLocation(),
-                               getBBForReference(BBName, NameLoc));
+                               getBBForReference(BBName, NameLoc),
+                               Args);
     break;
   }
   case ValueKind::CondBranchInst: {
     UnresolvedValueName Cond;
     Identifier BBName, BBName2;
     SourceLoc NameLoc, NameLoc2;
+    llvm::SmallVector<SILValue, 6> Args,  Args2;
     if (parseValueName(Cond) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         P.parseIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
+        parseSILBBArgsAtBranch(Args) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseIdentifier(BBName2, NameLoc2, diag::expected_sil_block_name))
+        P.parseIdentifier(BBName2, NameLoc2, diag::expected_sil_block_name) ||
+        parseSILBBArgsAtBranch(Args2))
       return true;
-   
+
     auto I1Ty =
       SILType::getBuiltinIntegerType(1, BB->getParent()->getASTContext());
     SILValue CondVal = getLocalValue(Cond, I1Ty);
     ResultVal = B.createCondBranch(SILLocation(), CondVal,
                                    getBBForReference(BBName, NameLoc),
-                                   getBBForReference(BBName2, NameLoc2));
+                                   Args,
+                                   getBBForReference(BBName2, NameLoc2),
+                                   Args2);
     break;
   }
   case ValueKind::UnreachableInst:
@@ -1762,7 +1800,6 @@ bool SILParser::parseSILBasicBlock() {
 
   return false;
 }
-
 
 ///   decl-sil:   [[only in SIL mode]]
 ///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body

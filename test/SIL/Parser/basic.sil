@@ -554,3 +554,31 @@ bb0(%0 : $SomeClass):
   %4 = return %3 : $()
 }
 
+// CHECK: sil @test_basic_block_arguments
+sil @test_basic_block_arguments : $[thin] (i : Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1):
+  condbranch %0, bb1, bb2
+bb1:                                        
+  %2 = integer_literal $Builtin.Int64, 5       
+  br bb3(%2 : $Builtin.Int64)
+//CHECK: br bb3(%2 : $Builtin.Int64)
+bb2:                                            
+  %4 = integer_literal $Builtin.Int64, 6        
+  br bb3(%4 : $Builtin.Int64)
+//CHECK: br bb3(%4 : $Builtin.Int64)
+bb3(%6 : $Builtin.Int64):                               
+//CHECK: bb3(%6 : $Builtin.Int64)
+  return %6 : $Builtin.Int64
+}
+
+// CHECK: sil @test_cond_branch_basic_block_args
+sil @test_cond_branch_basic_block_args : $[thin] (i : Int64, b : Builtin.Int1) -> Int64 {
+bb0(%0 : $Int64, %1 : $Builtin.Int1):
+  condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
+// CHECK: condbranch %1, bb1(%0 : $Int64), bb2(%0 : $Int64)
+bb1(%3 : $Int64):
+  return %3 : $Int64
+bb2(%2 : $Int64):
+  return %2 : $Int64
+}
+

@@ -731,7 +731,7 @@ public:
 
     OS << '(';
     interleave(args,
-               [&](SILValue v) { OS << getID(v); },
+               [&](SILValue v) { OS << getIDAndType(v); },
                [&] { OS << ", "; });
     OS << ')';
   }
