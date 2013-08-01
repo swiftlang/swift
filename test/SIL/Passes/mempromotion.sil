@@ -119,8 +119,8 @@ bb0:
   %2 = alloc_box $P
   %3 = apply %1(%2#1) : $[thin] () -> P
   %5 = release %2#0 : $Builtin.ObjectPointer
-  %6 = return %0 : $()
   %0 = tuple ()
+  %6 = return %0 : $()
   // CHECK: return
 }
 

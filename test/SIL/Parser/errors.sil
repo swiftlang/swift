@@ -26,6 +26,8 @@ sil @global_value_errors : $() -> () {
 bb0:
   %0 = function_ref @global_value_errors : $ () // expected-error {{value '$()' defined with mismatching type '$() -> ()'}}
   %1 = function_ref @not_defined : $ () // expected-error {{use of undefined value 'not_defined'}}
+  %2 = tuple ()
+  %3 = return %2 : $()
 }
 
 sil @global_value_errors : $() -> () {  // expected-error {{redefinition of value 'global_value_errors'}}

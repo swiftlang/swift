@@ -10,8 +10,12 @@ import swift
 // CHECK: sil clang_thunk @clang_thunk : $() -> ()
 sil clang_thunk @clang_thunk : $() -> ()
 
-// CHECK: sil internal @internal_fn : $() -> Int
-sil internal @internal_fn : $() -> Int
+// CHECK: sil internal @internal_fn : $() -> ()
+sil internal @internal_fn : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
 
 // Type references
 
@@ -195,6 +199,8 @@ bb0:
 
 
   %5 = downcast unconditional %C : $C to $D   // CHECK: downcast unconditional {{.*}} : $C to $D
+  %6 = tuple ()
+  %7 = return %6 : $()
 }
 
 // Generated from:
@@ -547,3 +553,4 @@ bb0(%0 : $SomeClass):
   %3 = tuple ()
   %4 = return %3 : $()
 }
+

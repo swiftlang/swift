@@ -1818,7 +1818,15 @@ bool Parser::parseDeclSIL() {
     } 
   }
 
-  return FunctionState.diagnoseProblems();
+  if (FunctionState.diagnoseProblems())
+    return true;
+
+  // If SIL prsing succeeded, verify the generated SIL.
+  if (!FunctionState.P.Diags.hadAnyError())
+    FunctionState.F->verify();
+  
+
+  return false;
 }
 
 ///   decl-sil-stage:   [[only in SIL mode]]
