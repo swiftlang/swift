@@ -112,6 +112,9 @@ public:
     std::tie(LastLoc, LastScope) = LocationStack.pop_back_val();
   }
 
+  /// Emit debug info for an import declaration.
+  void emitImport(ImportDecl *D);
+
   /// Create debug info for the given function.
   /// \param DS The parent scope of the function.
   /// \param Fn The IR representation of the function.

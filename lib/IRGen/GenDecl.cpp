@@ -818,8 +818,10 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::Class:
     return emitClassDecl(cast<ClassDecl>(D));
 
-  // These declarations don't require IR-gen support.
+  // These declarations are only included in the debug info.
   case DeclKind::Import:
+    if (DebugInfo)
+      DebugInfo->emitImport(cast<ImportDecl>(D));
     return;
 
   // We emit these as part of the PatternBindingDecl.

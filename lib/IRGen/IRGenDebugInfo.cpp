@@ -417,6 +417,27 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
   ScopeCache[DS] = SP;
 }
 
+void IRGenDebugInfo::emitImport(ImportDecl *D) {
+  std::string Printed;
+  {
+    llvm::raw_string_ostream OS(Printed);
+    bool first = true;
+    for (auto elt : D->getAccessPath()) {
+      if (first) {
+        first = false;
+      } else {
+        OS << '.';
+      }
+      OS << elt.first.str();
+    }
+  }
+  StringRef Name = BumpAllocatedString(Printed, DebugInfoNames);
+  Location L = getStartLoc(SM, D);
+  auto Namespace = DBuilder.createNameSpace(MainFile, Name, MainFile, L.Line);
+  DBuilder.createImportedModule(MainFile, Namespace, L.Line, Name);
+}
+
+
 void IRGenDebugInfo::createFunction(SILFunction *SILFn, llvm::Function *Fn) {
   createFunction(SILFn->getModule(),
                  SILFn->getDebugScope(), Fn,
