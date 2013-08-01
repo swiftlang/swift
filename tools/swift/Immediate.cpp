@@ -462,12 +462,10 @@ public:
            BindingFn<&REPLInput::onIndentOrComplete>);
     el_wset(e, EL_BIND, L"\t", L"swift-indent-or-complete", nullptr);
 
-    // Escape triggers code completion.
     el_wset(e, EL_ADDFN, L"swift-complete",
-            L"Trigger code completion",
+            L"Trigger completion",
             BindingFn<&REPLInput::onComplete>);
-    el_wset(e, EL_BIND, L"\e", L"swift-complete", nullptr);
-
+    
     // Provide some common bindings to complement editline's defaults.
     // ^W should delete previous word, not the entire line.
     el_wset(e, EL_BIND, L"\x17", L"ed-delete-prev-word", nullptr);
