@@ -172,6 +172,23 @@ Lexer::Lexer(SourceManager &SourceMgr, StringRef Buffer,
   assert(CurPtr >= BufferStart && CurPtr <= BufferEnd &&
          "Current position is out-of-range");
 
+  llvm::SMLoc StartLoc = getLocForStartOfBuffer().Value;
+  int BufferID = SourceMgr->FindBufferContainingLoc(StartLoc);
+  assert(BufferID != -1 && "StringRef does not point into a valid buffer");
+  if (unsigned(BufferID) == SourceMgr.getCodeCompletionBufferID()) {
+    auto OriginalBuffer = SourceMgr->getMemoryBuffer(BufferID);
+
+    // The Buffer StringRef might not point at the beginning of the buffer.
+    // Adjust the code completion offset.
+    unsigned CodeCompletionOffset = SourceMgr.getCodeCompletionOffset();
+    CodeCompletionOffset -=
+        Buffer.begin() - OriginalBuffer->getBuffer().begin();
+
+    const char *Ptr = BufferStart + CodeCompletionOffset;
+    if (Ptr >= BufferStart && Ptr <= BufferEnd)
+      CodeCompletionPtr = Ptr;
+  }
+
   if (Prime)
     primeLexer();
 }

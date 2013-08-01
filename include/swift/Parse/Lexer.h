@@ -141,13 +141,6 @@ public:
     return CodeCompletionPtr != nullptr;
   }
 
-  void setCodeCompletion(unsigned Offset) {
-    assert(CodeCompletionPtr == nullptr ||
-           CodeCompletionPtr == BufferStart + Offset);
-    CodeCompletionPtr = BufferStart + Offset;
-    assert(CodeCompletionPtr <= BufferEnd);
-  }
-
   const char *getBufferEnd() const { return BufferEnd; }
 
   void lex(Token &Result) {

@@ -78,7 +78,6 @@ namespace swift {
   /// bodies.
   bool parseIntoTranslationUnit(TranslationUnit *TU, unsigned BufferID,
                                 bool *Done,
-                                unsigned CodeCompletionOffset = ~0U,
                                 SILParserState *SIL = nullptr,
                               PersistentParserState *PersistentState = nullptr,
                              DelayedParsingCallbacks *DelayedParseCB = nullptr);
@@ -88,8 +87,7 @@ namespace swift {
   void
   performDelayedParsing(TranslationUnit *TU,
                         PersistentParserState &PersistentState,
-                        CodeCompletionCallbacksFactory *CodeCompletionFactory,
-                        unsigned CodeCompletionOffset);
+                        CodeCompletionCallbacksFactory *CodeCompletionFactory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(SourceManager &SM, unsigned BufferID,

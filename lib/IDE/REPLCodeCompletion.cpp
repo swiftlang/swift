@@ -108,18 +108,12 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
 
   const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
 
-  // Workaround for rdar://14592634:
-  // Code completion returns zero results at EOF in a function without a closing brace.
-  AugmentedCode += " #";
-  // End workaround
-
   auto Buffer =
       llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
   *BufferID =
       TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
 
-  SourceLoc CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
-      Buffer->getBufferStart() + CodeCompletionOffset));
+  TU->Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = TU->Decls.size();
@@ -127,17 +121,17 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
   unsigned CurTUElem = TU->Decls.size();
   PersistentParserState PersistentState;
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      new CodeCompleteDelayedCallbacks(CodeCompleteLoc));
+      new CodeCompleteDelayedCallbacks(
+          TU->Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
-    parseIntoTranslationUnit(TU, *BufferID, &Done, CodeCompletionOffset,
+    parseIntoTranslationUnit(TU, *BufferID, &Done,
                              nullptr, &PersistentState, DelayedCB.get());
     performTypeChecking(TU, CurTUElem);
     CurTUElem = TU->Decls.size();
   } while (!Done);
 
-  performDelayedParsing(TU, PersistentState, CompletionCallbacksFactory,
-                        CodeCompletionOffset);
+  performDelayedParsing(TU, PersistentState, CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.

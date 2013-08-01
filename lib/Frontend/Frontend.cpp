@@ -94,11 +94,11 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     llvm::MemoryBuffer *CodeCompletionBuffer =
         llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
                                              MemBuf->getBufferIdentifier());
-    CodeCompletionBufferID = SourceMgr->AddNewSourceBuffer(CodeCompletionBuffer,
-                                                           llvm::SMLoc());
+    unsigned CodeCompletionBufferID =
+        SourceMgr->AddNewSourceBuffer(CodeCompletionBuffer, llvm::SMLoc());
     BufferIDs.push_back(CodeCompletionBufferID);
-    CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
-        CodeCompletionBuffer->getBufferStart() + CodeCompletePoint.second));
+    SourceMgr.setCodeCompletionPoint(CodeCompletionBufferID,
+                                     CodeCompletePoint.second);
   }
 
   for (auto &File : Invocation.getInputFilenames()) {
@@ -146,7 +146,8 @@ void swift::CompilerInstance::doIt() {
 
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
   if (Invocation.isCodeCompletion()) {
-    DelayedCB.reset(new CodeCompleteDelayedCallbacks(CodeCompleteLoc));
+    DelayedCB.reset(
+        new CodeCompleteDelayedCallbacks(SourceMgr.getCodeCompletionLoc()));
   } else if (Invocation.isDelayedFunctionBodyParsing()) {
     DelayedCB.reset(new AlwaysDelayedCallbacks);
   }
@@ -156,11 +157,8 @@ void swift::CompilerInstance::doIt() {
   if (Kind == TranslationUnit::Library) {
     // Parse all of the files into one big translation unit.
     for (auto &BufferID : BufferIDs) {
-      unsigned CodeCompletionOffset = ~0U;
-      if (BufferID == CodeCompletionBufferID)
-        CodeCompletionOffset = Invocation.getCodeCompletionPoint().second;
       bool Done;
-      parseIntoTranslationUnit(TU, BufferID, &Done, CodeCompletionOffset,
+      parseIntoTranslationUnit(TU, BufferID, &Done,
                                nullptr, &PersistentState, DelayedCB.get());
       assert(Done && "Parser returned early?");
       (void) Done;
@@ -172,8 +170,7 @@ void swift::CompilerInstance::doIt() {
 
     if (DelayedCB) {
       performDelayedParsing(TU, PersistentState,
-                            Invocation.getCodeCompletionFactory(),
-                            Invocation.getCodeCompletionPoint().second);
+                            Invocation.getCodeCompletionFactory());
     }
     return;
   }
@@ -193,7 +190,6 @@ void swift::CompilerInstance::doIt() {
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
     parseIntoTranslationUnit(TU, BufferID, &Done,
-                             Invocation.getCodeCompletionPoint().second,
                              TheSILModule ? &SILContext : nullptr,
                              &PersistentState, DelayedCB.get());
     if (!Invocation.getParseOnly())
@@ -203,8 +199,7 @@ void swift::CompilerInstance::doIt() {
 
   if (DelayedCB) {
     performDelayedParsing(TU, PersistentState,
-                          Invocation.getCodeCompletionFactory(),
-                          Invocation.getCodeCompletionPoint().second);
+                          Invocation.getCodeCompletionFactory());
   }
 }
 

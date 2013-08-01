@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #ifndef SWIFT_SOURCEMANAGER_H
 #define SWIFT_SOURCEMANAGER_H
 
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
 
 namespace swift {
@@ -21,6 +21,9 @@ namespace swift {
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
+
+  unsigned CodeCompletionBufferID = ~0U;
+  unsigned CodeCompletionOffset;
 
 public:
   SourceManager() {}
@@ -31,6 +34,25 @@ public:
   const llvm::SourceMgr &getLLVMSourceMgr() const {
     return LLVMSourceMgr;
   }
+
+  void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
+    assert(BufferID != ~0U && "Buffer should be valid");
+    assert(CodeCompletionBufferID == ~0U &&
+           "Code completion point already set");
+
+    CodeCompletionBufferID = BufferID;
+    CodeCompletionOffset = Offset;
+  }
+
+  unsigned getCodeCompletionBufferID() const {
+    return CodeCompletionBufferID;
+  }
+
+  unsigned getCodeCompletionOffset() const {
+    return CodeCompletionOffset;
+  }
+
+  SourceLoc getCodeCompletionLoc() const;
 };
 
 } // namespace swift

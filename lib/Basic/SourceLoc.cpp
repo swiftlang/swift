@@ -17,6 +17,14 @@
 
 using namespace swift;
 
+SourceLoc SourceManager::getCodeCompletionLoc() const {
+  const llvm::MemoryBuffer *Buffer =
+      LLVMSourceMgr.getMemoryBuffer(CodeCompletionBufferID);
+
+  return SourceLoc(llvm::SMLoc::getFromPointer(
+      Buffer->getBufferStart() + CodeCompletionOffset));
+}
+
 void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
                       int &LastBuffer) const {
   if (isInvalid()) {

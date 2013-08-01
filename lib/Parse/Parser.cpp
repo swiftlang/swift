@@ -52,16 +52,13 @@ class ParseDelayedFunctionBodies : public ASTWalker {
   TranslationUnit *TU;
   PersistentParserState &ParserState;
   CodeCompletionCallbacksFactory *CodeCompletionFactory;
-  unsigned CodeCompletionOffset;
 
 public:
   ParseDelayedFunctionBodies(TranslationUnit *TU,
                              PersistentParserState &ParserState,
-                          CodeCompletionCallbacksFactory *CodeCompletionFactory,
-                          unsigned CodeCompletionOffset)
+                          CodeCompletionCallbacksFactory *CodeCompletionFactory)
     : TU(TU), ParserState(ParserState),
-      CodeCompletionFactory(CodeCompletionFactory),
-      CodeCompletionOffset(CodeCompletionOffset) {}
+      CodeCompletionFactory(CodeCompletionFactory) {}
 
   virtual bool walkToDeclPre(Decl *D) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
@@ -90,18 +87,16 @@ private:
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-      TheParser.setCodeCompletion(CodeCompletionOffset);
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
     TheParser.parseDeclFuncBodyDelayed(FD);
   }
 };
 
-void
-parseDelayedTopLevelDecl(TranslationUnit *TU,
-                         PersistentParserState &ParserState,
-                         CodeCompletionCallbacksFactory *CodeCompletionFactory,
-                         unsigned CodeCompletionOffset) {
+void parseDelayedTopLevelDecl(
+    TranslationUnit *TU,
+    PersistentParserState &ParserState,
+    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   assert(CodeCompletionFactory &&
          "delayed parsing of decls only makes sense for code completion");
 
@@ -116,7 +111,6 @@ parseDelayedTopLevelDecl(TranslationUnit *TU,
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
       CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-  TheParser.setCodeCompletion(CodeCompletionOffset);
   TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
   TheParser.parseTopLevelCodeDeclDelayed();
 }
@@ -126,7 +120,6 @@ parseDelayedTopLevelDecl(TranslationUnit *TU,
 bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
                                      unsigned BufferID,
                                      bool *Done,
-                                     unsigned CodeCompletionOffset,
                                      SILParserState *SIL,
                                      PersistentParserState *PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB) {
@@ -137,8 +130,6 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
-  if (CodeCompletionOffset != ~0U)
-    P.setCodeCompletion(CodeCompletionOffset);
 
   bool FoundSideEffects = P.parseTranslationUnit(TU);
 
@@ -151,18 +142,15 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 
 void swift::performDelayedParsing(
     TranslationUnit *TU, PersistentParserState &PersistentState,
-    CodeCompletionCallbacksFactory *CodeCompletionFactory,
-    unsigned CodeCompletionOffset) {
+    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   ParseDelayedFunctionBodies Walker(TU, PersistentState,
-                                    CodeCompletionFactory,
-                                    CodeCompletionOffset);
+                                    CodeCompletionFactory);
   for (Decl *D : TU->Decls) {
     D->walk(Walker);
   }
 
   if (CodeCompletionFactory)
-    parseDelayedTopLevelDecl(TU, PersistentState, CodeCompletionFactory,
-                             CodeCompletionOffset);
+    parseDelayedTopLevelDecl(TU, PersistentState, CodeCompletionFactory);
 }
 
 std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,

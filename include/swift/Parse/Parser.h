@@ -89,10 +89,6 @@ public:
     this->DelayedParseCB = DelayedParseCB;
   }
 
-  void setCodeCompletion(unsigned Offset) {
-    L->setCodeCompletion(Offset);
-  }
-
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
     CodeCompletion = Callbacks;
   }
