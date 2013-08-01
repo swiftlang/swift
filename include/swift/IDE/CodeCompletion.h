@@ -81,15 +81,9 @@ public:
       CallParameterBegin,
       /// Function call parameter name.  Can be omitted in the editor buffer.
       CallParameterName,
-      /// Function call parameter name.  Only for exposition, may *not* be
-      /// inserted in the editor buffer.
-      CallParameterNameAnnotation,
       /// A colon between parameter name and value.  Should be inserted in the
       /// editor buffer if the preceding CallParameterName was inserted.
       CallParameterColon,
-      /// A colon between parameter name and value.  Only for exposition,
-      /// may *not* be inserted in the editor buffer.
-      CallParameterColonAnnotation,
       /// Required parameter type.
       CallParameterType,
 
@@ -110,9 +104,7 @@ public:
              Kind == ChunkKind::Dot ||
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::CallParameterName ||
-             Kind == ChunkKind::CallParameterNameAnnotation ||
              Kind == ChunkKind::CallParameterColon ||
-             Kind == ChunkKind::CallParameterColonAnnotation ||
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::TypeAnnotation;
     }
@@ -121,16 +113,25 @@ public:
     unsigned Kind : 8;
     unsigned NestingLevel : 8;
 
+    /// \brief If true, then this chunk is an annotation that is included only
+    /// for exposition and may not be inserted in the editor buffer.
+    unsigned IsAnnotation : 1;
+
     StringRef Text;
 
     Chunk(ChunkKind Kind, unsigned NestingLevel, StringRef Text)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel), Text(Text) {
+        : Kind(unsigned(Kind)), NestingLevel(NestingLevel), IsAnnotation(0),
+          Text(Text) {
       assert(chunkHasText(Kind));
     }
 
     Chunk(ChunkKind Kind, unsigned NestingLevel)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel) {
+        : Kind(unsigned(Kind)), NestingLevel(NestingLevel), IsAnnotation(0) {
       assert(!chunkHasText(Kind));
+    }
+
+    void setIsAnnotation() {
+      IsAnnotation = 1;
     }
 
 public:
@@ -140,6 +141,10 @@ public:
 
     unsigned getNestingLevel() const {
       return NestingLevel;
+    }
+
+    bool isAnnotation() const {
+      return IsAnnotation;
     }
 
     StringRef getText() const {
@@ -231,6 +236,10 @@ class CodeCompletionResultBuilder {
                                                   CurrentNestingLevel));
   }
 
+  CodeCompletionString::Chunk &getLastChunk() {
+    return Chunks.back();
+  }
+
   CodeCompletionResult *takeResult();
   void finishResult();
 
@@ -284,22 +293,20 @@ public:
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
-      if (NameStr == "this") {
-        // 'this' is a keyword, we can not allow to insert it into the source
-        // buffer.
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterNameAnnotation,
-            Name.str());
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterColonAnnotation,
-            ": ");
-      } else {
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterName,
-            Name.str());
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
-      }
+
+      // 'this' is a keyword, we can not allow to insert it into the source
+      // buffer.
+      bool IsAnnotation = (NameStr == "this");
+
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterName, NameStr);
+      if (IsAnnotation)
+        getLastChunk().setIsAnnotation();
+
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+      if (IsAnnotation)
+        getLastChunk().setIsAnnotation();
     }
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);
@@ -309,6 +316,7 @@ public:
   void addTypeAnnotation(StringRef Type) {
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::TypeAnnotation, Type);
+    getLastChunk().setIsAnnotation();
   }
 };
 

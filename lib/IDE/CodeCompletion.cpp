@@ -67,9 +67,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::Dot:
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::CallParameterName:
-    case Chunk::ChunkKind::CallParameterNameAnnotation:
     case Chunk::ChunkKind::CallParameterColon:
-    case Chunk::ChunkKind::CallParameterColonAnnotation:
     case Chunk::ChunkKind::CallParameterType:
       OS << C.getText();
       break;
@@ -189,9 +187,7 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
       return C.getText();
 
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterNameAnnotation:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
-    case CodeCompletionString::Chunk::ChunkKind::CallParameterColonAnnotation:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
