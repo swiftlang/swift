@@ -643,6 +643,15 @@ bool LinkEntity::isLocalLinkage() const {
   case Kind::FieldOffset:
     return isLocalLinkageDecl(getDecl());
   
+  case Kind::DirectProtocolWitnessTable:
+  case Kind::LazyProtocolWitnessTableAccessor:
+  case Kind::DependentProtocolWitnessTableGenerator:
+    return false;
+      
+  case Kind::LazyProtocolWitnessTableTemplate:
+  case Kind::DependentProtocolWitnessTableTemplate:
+    return true;
+  
   case Kind::AnonymousFunction:
     return true;
 

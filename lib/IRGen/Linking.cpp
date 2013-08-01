@@ -133,7 +133,37 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleDirectness(isOffsetIndirect());
     mangler.mangleEntity(getDecl(), ExplosionKind::Minimal, 0);
     return;
+      
+  //   global ::= 'WP' protocol-conformance
+  case Kind::DirectProtocolWitnessTable:
+    buffer << "_TWP";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+
+  //   global ::= 'WZ' protocol-conformance
+  case Kind::LazyProtocolWitnessTableAccessor:
+    buffer << "_TWZ";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+      
+  //   global ::= 'Wz' protocol-conformance
+  case Kind::LazyProtocolWitnessTableTemplate:
+    buffer << "_TWz";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
   
+  //   global ::= 'WD' protocol-conformance
+  case Kind::DependentProtocolWitnessTableGenerator:
+    buffer << "_TWD";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+      
+  //   global ::= 'Wd' protocol-conformance
+  case Kind::DependentProtocolWitnessTableTemplate:
+    buffer << "_TWd";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+
   //   global ::= 'Tb' type
   case Kind::BridgeToBlockConverter:
     buffer << "_TTb";

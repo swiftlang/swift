@@ -76,6 +76,7 @@ public:
   void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind);
   void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
+  void mangleProtocolConformance(ProtocolConformance *conformance);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,

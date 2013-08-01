@@ -22,26 +22,31 @@ All Swift-mangled names begin with this prefix.
 
 ::
 
-  global ::= 't' type                        // standalone type (for DWARF)
-  global ::= 'M' directness type             // type metadata
-  global ::= 'MP' directness type            // type metadata pattern
-  global ::= 'Mm' type                       // class metaclass
-  global ::= 'nk_' entity                    // protocol witness
-  global ::= 'w' value-witness-kind type     // value witness
-  global ::= 'WV' type                       // value witness table
-  global ::= 'Wo' entity                     // witness table offset
-  global ::= 'Wv' directness entity          // field offset
-  global ::= local-marker? entity            // some identifiable thing
-  global ::= 'To' global                     // swift-as-ObjC thunk
-  global ::= 'Tb' type                       // swift-to-ObjC block converter
-  entity ::= context 'D'                     // deallocating destructor
-  entity ::= context 'd'                     // non-deallocating destructor
-  entity ::= context 'C' type                // allocating constructor
-  entity ::= context 'c' type                // non-allocating constructor
-  entity ::= declaration 'g'                 // getter
-  entity ::= declaration 's'                 // setter
-  entity ::= declaration 'a'                 // addressor
-  entity ::= declaration                     // other declaration
+  global ::= 't' type                    // standalone type (for DWARF)
+  global ::= 'M' directness type         // type metadata
+  global ::= 'MP' directness type        // type metadata pattern
+  global ::= 'Mm' type                   // class metaclass
+  global ::= 'nk_' entity                // protocol witness
+  global ::= 'w' value-witness-kind type // value witness
+  global ::= 'WV' type                   // value witness table
+  global ::= 'Wo' entity                 // witness table offset
+  global ::= 'Wv' directness entity      // field offset
+  global ::= 'WP' protocol-conformance   // protocol witness table
+  global ::= 'WZ' protocol-conformance   // lazy protocol witness table accessor
+  global ::= 'Wz' protocol-conformance   // lazy protocol witness table template
+  global ::= 'WD' protocol-conformance   // dependent proto witness table generator
+  global ::= 'Wd' protocol-conformance   // dependent proto witness table template
+  global ::= local-marker? entity        // some identifiable thing
+  global ::= 'To' global                 // swift-as-ObjC thunk
+  global ::= 'Tb' type                   // swift-to-ObjC block converter
+  entity ::= context 'D'                 // deallocating destructor
+  entity ::= context 'd'                 // non-deallocating destructor
+  entity ::= context 'C' type            // allocating constructor
+  entity ::= context 'c' type            // non-allocating constructor
+  entity ::= declaration 'g'             // getter
+  entity ::= declaration 's'             // setter
+  entity ::= declaration 'a'             // addressor
+  entity ::= declaration                 // other declaration
   declaration ::= declaration-name type
   declaration-name ::= context identifier
   local-marker ::= 'L'
@@ -129,6 +134,14 @@ which are juxtaposed and terminated with a trailing underscore.
 
 <protocol-list> is unambiguous because protocols are always top-level,
 so the structure is quite simple.
+
+::
+
+  protocol-conformance ::= type protocol module
+
+<protocol-conformance> refers to a type's conformance to a protocol. The named
+module is the one containing the extension or type declaration that declared
+the conformance.
 
 ::
 

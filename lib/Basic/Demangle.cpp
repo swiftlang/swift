@@ -238,6 +238,8 @@ private:
   Substitution demangleDeclarationName(IsProtocol protocol);
 
   Substitution demangleProtocolList();
+  
+  Substitution demangleProtocolConformance();
 
   Substitution demangleList(std::function<Substitution(void)> element);
 
@@ -434,7 +436,7 @@ Demangler::Substitution Demangler::demangleGlobal() {
     if (Mangled.nextIf('o')) {
       Substitution entity = demangleEntity();
       if (entity)
-        return success(DemanglerPrinter() << "witness table Offset for "
+        return success(DemanglerPrinter() << "witness table offset for "
                                           << entity.first());
       return failure();
     }
@@ -445,8 +447,43 @@ Demangler::Substitution Demangler::demangleGlobal() {
       Substitution entity = demangleEntity();
       if (entity)
         return success(DemanglerPrinter() << directness.first()
-                                          << " field Offset for "
+                                          << " field offset for "
                                           << entity.first());
+      return failure();
+    }
+    if (Mangled.nextIf('P')) {
+      Substitution conformance = demangleProtocolConformance();
+      if (conformance)
+        return success(DemanglerPrinter() << "protocol witness table for "
+                                          << conformance.first());
+      return failure();
+    }
+    if (Mangled.nextIf('Z')) {
+      Substitution conformance = demangleProtocolConformance();
+      if (conformance)
+        return success(DemanglerPrinter() << "lazy protocol witness table accessor for "
+                       << conformance.first());
+      return failure();
+    }
+    if (Mangled.nextIf('z')) {
+      Substitution conformance = demangleProtocolConformance();
+      if (conformance)
+        return success(DemanglerPrinter() << "lazy protocol witness table template for "
+                       << conformance.first());
+      return failure();
+    }
+    if (Mangled.nextIf('D')) {
+      Substitution conformance = demangleProtocolConformance();
+      if (conformance)
+        return success(DemanglerPrinter() << "dependent protocol witness table generator for "
+                       << conformance.first());
+      return failure();
+    }
+    if (Mangled.nextIf('d')) {
+      Substitution conformance = demangleProtocolConformance();
+      if (conformance)
+        return success(DemanglerPrinter() << "dependent protocol witness table template for "
+                       << conformance.first());
       return failure();
     }
     return failure();
@@ -456,7 +493,7 @@ Demangler::Substitution Demangler::demangleGlobal() {
       Substitution type = demangleType();
       if (type)
         return success(
-            DemanglerPrinter() << "bridge-to-block std::function for "
+            DemanglerPrinter() << "bridge-to-block function for "
                                << type.first());
       return failure();
     }
@@ -1033,6 +1070,20 @@ Demangler::Substitution Demangler::demangleProtocolList() {
     return success(DemanglerPrinter() << "protocol<" << first.first() << ", "
                                       << list.first() << ">");
   return failure();
+}
+
+Demangler::Substitution Demangler::demangleProtocolConformance() {
+  Substitution type = demangleType();
+  if (!type)
+    return failure();
+  Substitution protocol = demangleProtocolName();
+  if (!protocol)
+    return failure();
+  Substitution module = demangleContext();
+  if (!module)
+    return failure();
+  return success(DemanglerPrinter() << type.first() << " : " << protocol.first()
+                                    << " in " << module.first());
 }
 
 Demangler::Substitution

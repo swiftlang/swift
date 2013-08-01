@@ -17,6 +17,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Basic/Punycode.h"
 #include "llvm/ADT/DenseMap.h"
@@ -767,4 +768,13 @@ void Mangler::mangleEntity(ValueDecl *decl, ExplosionKind explosion,
 
 void Mangler::mangleDirectness(bool isIndirect) {
   Buffer << (isIndirect ? 'i': 'd');
+}
+
+void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
+  // protocol-conformance ::= type protocol module
+  // FIXME: explosion level?
+  mangleType(conformance->getType()->getCanonicalType(),
+             ExplosionKind::Minimal, 0);
+  mangleProtocolName(conformance->getProtocol());
+  mangleDeclContext(conformance->getContainingModule());
 }

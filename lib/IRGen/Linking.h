@@ -54,7 +54,8 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  /// A ValueDecl*, CapturingExpr*, or a TypeBase*, depending on Kind.
+  /// ValueDecl*, CapturingExpr*, SILFunction*, ProtocolConformance*, or
+  /// TypeBase*, depending on Kind.
   void *Pointer;
 
   /// A hand-rolled bitfield with the following layout:
@@ -75,7 +76,7 @@ class LinkEntity {
 
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
-
+    
     // These fields appear in the TypeMetadata kind.
     IsIndirectShift = 8, IsIndirectMask = 0x0100,
     IsPatternShift = 9, IsPatternMask = 0x0200,
@@ -129,10 +130,28 @@ class LinkEntity {
     /// The pointer is a Decl*.
     Other,
 
-    /// A SIL function that has no backing Decl.  The pointer is a SILFunction
-    /// which has a name already set.
+    /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
+    /// A direct protocol witness table. The pointer is a ProtocolConformance*.
+    DirectProtocolWitnessTable,
+    
+    /// A lazy protocol witness accessor function. The pointer is a
+    /// ProtocolConformance*.
+    LazyProtocolWitnessTableAccessor,
+    
+    /// A template for lazy protocol witness table initialization. The pointer
+    /// is a ProtocolConformance*.
+    LazyProtocolWitnessTableTemplate,
+    
+    /// A dependent protocol witness table instantiation function. The pointer
+    /// is a ProtocolConformance*.
+    DependentProtocolWitnessTableGenerator,
+    
+    /// A template for dependent protocol witness table instantiation. The
+    /// pointer is a ProtocolConformance*.
+    DependentProtocolWitnessTableTemplate,
+    
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -175,13 +194,20 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return !isTypeKind(k) && !isCapturingExprKind(k);
+    return !isTypeKind(k) && !isCapturingExprKind(k)
+      && !isProtocolConformanceKind(k);
   }
   static bool isCapturingExprKind(Kind k) {
     return k == Kind::AnonymousFunction;
   }
+  
   static bool isTypeKind(Kind k) {
     return k >= Kind::ValueWitness;
+  }
+  
+  static bool isProtocolConformanceKind(Kind k) {
+    return k >= Kind::DirectProtocolWitnessTable
+      && k <= Kind::DependentProtocolWitnessTableTemplate;
   }
 
   void setForDecl(Kind kind, 
@@ -202,6 +228,13 @@ class LinkEntity {
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
+  }
+  
+  void setForProtocolConformance(Kind kind,
+                                 ProtocolConformance *c) {
+    assert(isProtocolConformanceKind(kind));
+    Pointer = c;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
   void setForType(Kind kind, CanType type) {
@@ -366,6 +399,11 @@ public:
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
+  }
+  
+  ProtocolConformance *getProtocolConformance() const {
+    assert(isProtocolConformanceKind(getKind()));
+    return reinterpret_cast<ProtocolConformance*>(Pointer);
   }
   
   Mangle::ExplosionKind getExplosionKind() const {
