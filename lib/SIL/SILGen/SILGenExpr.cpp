@@ -1332,9 +1332,14 @@ Optional<SILValue> SILGenFunction::emitEpilogBB(SILLocation loc) {
   SILBasicBlock *epilogBB = ReturnDest.getBlock();
   SILValue returnValue;
   
-  bool needsReturn = !epilogBB->bbarg_empty();
-
+  // If the current BB isn't terminated, and we require a return, then we
+  // are not allowed to fall off the end of the function and can't reach here.
+  if (NeedsReturn && B.hasValidInsertionPoint())
+    B.createUnreachable(loc);
+  
   if (epilogBB->pred_empty()) {
+    bool hadArg = !epilogBB->bbarg_empty();
+    
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
     epilogBB->eraseFromParent();
@@ -1343,43 +1348,42 @@ Optional<SILValue> SILGenFunction::emitEpilogBB(SILLocation loc) {
     if (!B.hasValidInsertionPoint())
       return Nothing;
     
-    // If the epilog BB took an argument, then we were expecting to return a
-    // value, and there should have been a return somewhere. We shouldn't
-    // be able to reach here on the current code path.
-    if (needsReturn) {
-      B.createUnreachable(loc);
-      return Nothing;
-    }
+    // We emit the epilog at the current insertion point.
+    assert(!hadArg && "NeedsReturn is false but epilog had argument?!");
+    (void)hadArg;
   } else if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end()
-             && (!B.hasValidInsertionPoint() || needsReturn)) {
+             && !B.hasValidInsertionPoint()) {
     // If the epilog has a single predecessor and there's no current insertion
     // point to fall through from, then we can weld the epilog to that
     // predecessor BB.
+
+    bool needsArg = false;
+    if (!epilogBB->bbarg_empty()) {
+      assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
+      needsArg = true;
+    }
+    
     epilogBB->eraseFromParent();
 
-    // If the epilog BB took an argument, then we were expecting to return a
-    // value, and there should have been a return somewhere. We shouldn't
-    // be able to reach here on the current code path.
-    if (B.hasValidInsertionPoint())
-      B.createUnreachable(loc);
-    
     // Steal the branch argument as the return value if present.
     SILBasicBlock *pred = *epilogBB->pred_begin();
     BranchInst *predBranch = cast<BranchInst>(pred->getTerminator());
-    assert(predBranch->getArgs().size() == (needsReturn ? 1 : 0)
+    assert(predBranch->getArgs().size() == (needsArg ? 1 : 0)
            && "epilog predecessor arguments does not match block params");
-    if (needsReturn)
+    if (needsArg)
       returnValue = predBranch->getArgs()[0];
 
-    // Kill the branch and emit the epilog into the BB.
+    // Kill the branch to the now-dead epilog BB.
     pred->getInsts().erase(predBranch);
+
+    // Emit the epilog into its former predecessor.
     B.setInsertionPoint(pred);
   } else {
+    // Emit the epilog into the epilog bb. Its argument is the return value.
     if (!epilogBB->bbarg_empty()) {
       assert(epilogBB->bbarg_size() == 1 && "epilog should take 0 or 1 args");
       returnValue = epilogBB->bbarg_begin()[0];
     }
-    // Emit the epilog into the epilog bb.
     B.emitBlock(epilogBB);
   }
   

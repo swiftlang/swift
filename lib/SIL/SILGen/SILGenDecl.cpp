@@ -704,7 +704,8 @@ void SILGenFunction::prepareEpilog(Type resultType) {
   
   // If we have a non-null, non-void, non-address-only return type, receive the
   // return value via a BB argument.
-  if (resultType && !resultType->isVoid()) {
+  NeedsReturn = resultType && !resultType->isVoid();
+  if (NeedsReturn) {
     auto &resultTI = getTypeLowering(resultType);
     if (!resultTI.isAddressOnly())
       new (F.getModule()) SILArgument(resultTI.getLoweredType(), epilogBB);

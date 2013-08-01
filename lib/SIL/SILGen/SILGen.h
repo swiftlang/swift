@@ -274,6 +274,8 @@ public:
   
   /// The cleanup depth and epilog BB for "return" instructions.
   JumpDest ReturnDest;
+  /// True if a non-void return is required in this function.
+  bool NeedsReturn;
   
   /// \brief Location information for the return instruction.
   ///
