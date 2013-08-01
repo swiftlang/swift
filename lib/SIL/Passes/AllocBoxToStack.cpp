@@ -204,7 +204,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   ReleaseInst *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
   
   bool isTrivial = ABI->getModule()->Types.
-          getTypeLoweringInfo(ABI->getElementType()).isTrivial();
+          getTypeLowering(ABI->getElementType()).isTrivial();
   
   if (LastRelease == nullptr && !isTrivial) {
     // If we can't tell where the last release is, we don't know where to insert

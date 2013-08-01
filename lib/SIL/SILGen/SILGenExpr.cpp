@@ -75,7 +75,7 @@ namespace {
 } // end anonymous namespace
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  if (getTypeLoweringInfo(v.getType().getSwiftRValueType()).isTrivial()) {
+  if (getTypeLowering(v.getType().getSwiftRValueType()).isTrivial()) {
     return ManagedValue(v, ManagedValue::Unmanaged);
   } else if (v.getType().isAddressOnly(SGM.M)) {
     Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
@@ -414,7 +414,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   v.forwardInto(*this, loc, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-  if (!getTypeLoweringInfo(v.getType().getSwiftType()).isTrivial()) {
+  if (!getTypeLowering(v.getType().getSwiftType()).isTrivial()) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
     valueCleanup = getCleanupsDepth();
   }
@@ -1430,7 +1430,7 @@ void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     if (VarDecl *vd = dyn_cast<VarDecl>(member)) {
       if (vd->isProperty())
         continue;
-      const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
+      const TypeLowering &ti = getTypeLowering(vd->getType());
       if (!ti.isTrivial()) {
         SILValue addr = B.createRefElementAddr(dd, thisValue, vd,
                                           ti.getLoweredType().getAddressType());

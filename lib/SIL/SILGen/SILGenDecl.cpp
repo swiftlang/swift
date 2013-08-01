@@ -562,7 +562,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     // Constants are captured by value.
     assert(!capture->getType()->is<LValueType>() &&
            "capturing byref by value?!");
-    const TypeLoweringInfo &ti = gen.getTypeLoweringInfo(capture->getType());
+    const TypeLowering &ti = gen.getTypeLowering(capture->getType());
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                              gen.F.begin());
     gen.LocalConstants[SILDeclRef(capture)] = value;
@@ -609,7 +609,7 @@ void SILGenFunction::emitProlog(CapturingExpr *ce,
 void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
   // If the return type is address-only, emit the indirect return argument.
-  const TypeLoweringInfo &returnTI = getTypeLoweringInfo(resultType);
+  const TypeLowering &returnTI = getTypeLowering(resultType);
   if (returnTI.isAddressOnly()) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                     F.begin());
@@ -689,7 +689,7 @@ void SILGenFunction::prepareEpilog(Type resultType) {
   // If we have a non-null, non-void, non-address-only return type, receive the
   // return value via a BB argument.
   if (resultType && !resultType->isVoid()) {
-    auto &resultTI = getTypeLoweringInfo(resultType);
+    auto &resultTI = getTypeLowering(resultType);
     if (!resultTI.isAddressOnly())
       new (F.getModule()) SILArgument(resultTI.getLoweredType(), epilogBB);
   }
@@ -972,7 +972,7 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
     // allocation, so load and destroy the value (or destroy it indirectly if
     // it's address-only) then deallocate the variable.
     assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
-    const TypeLoweringInfo &ti = getTypeLoweringInfo(vd->getType());
+    const TypeLowering &ti = getTypeLowering(vd->getType());
     if (!ti.isTrivial())
       B.createDestroyAddr(vd, loc.address);
     B.createDeallocStack(vd, loc.address);

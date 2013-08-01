@@ -653,7 +653,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
   
   // Get the result type.
   Type resultTy = Fn.getType().getFunctionResultType();
-  const TypeLoweringInfo &resultTI = getTypeLoweringInfo(resultTy);
+  const TypeLowering &resultTI = getTypeLowering(resultTy);
   SILType instructionTy = resultTI.getLoweredType();
   
   // Get the callee value.
@@ -989,7 +989,7 @@ namespace {
     assert(substitutions.size() == 1 &&
            "destroy should have a single substitution");
     // The substitution determines the type of the thing we're destroying.
-    auto &ti = gen.getTypeLoweringInfo(substitutions[0].Replacement);
+    auto &ti = gen.getTypeLowering(substitutions[0].Replacement);
     
     // Destroy is a no-op for trivial types.
     if (ti.isTrivial())

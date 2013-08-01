@@ -19,14 +19,14 @@ static void rrLoadableValue(SILBuilder &B, SILLocation loc, SILValue v,
                         void (SILBuilder::*createRR)(SILLocation, SILValue)) {
   auto type = v.getType().getSwiftRValueType();
 
-  // TODO: abstract this into TypeLoweringInfo
+  // TODO: abstract this into TypeLowering
 
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     unsigned i = 0;
     for (auto eltTy : tupleTy.getElementTypes()) {
       auto curIndex = i++;
       auto &eltTI =
-        B.getFunction().getParent()->Types.getTypeLoweringInfo(eltTy);
+        B.getFunction().getParent()->Types.getTypeLowering(eltTy);
       if (eltTI.isTrivial()) continue;
       auto eltVal = B.createTupleExtract(loc, v, curIndex, eltTI.getLoweredType());
       rrLoadableValue(B, loc, eltVal, createRR);
@@ -41,7 +41,7 @@ static void rrLoadableValue(SILBuilder &B, SILLocation loc, SILValue v,
       if (!field || field->isProperty()) continue;
 
       auto &fieldTI = B.getFunction().getParent()->Types
-                                     .getTypeLoweringInfo(field->getType());
+                                     .getTypeLowering(field->getType());
       if (fieldTI.isTrivial()) continue;
       auto fieldVal = B.createStructExtract(loc, v, field,
                                             fieldTI.getLoweredType());
@@ -55,7 +55,7 @@ static void rrLoadableValue(SILBuilder &B, SILLocation loc, SILValue v,
 }
 
 void SILBuilder::emitRetainValueImpl(SILLocation loc, SILValue v,
-                                     const TypeLoweringInfo &ti) {
+                                     const TypeLowering &ti) {
   assert(!v.getType().isAddress() &&
          "emitRetainRValue cannot retain an address");
   if (ti.isTrivial()) return;
@@ -64,7 +64,7 @@ void SILBuilder::emitRetainValueImpl(SILLocation loc, SILValue v,
 }
 
 void SILBuilder::emitReleaseValueImpl(SILLocation loc, SILValue v,
-                                      const TypeLoweringInfo &ti) {
+                                      const TypeLowering &ti) {
   assert(!v.getType().isAddress() &&
          "emitReleaseRValue cannot release an address");
   if (ti.isTrivial()) return;

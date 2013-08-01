@@ -462,46 +462,46 @@ bool SILType::isAddressOnly(CanType type, SILModule &M) {
 
 namespace {
   /// A class for trivial, loadable types.
-  class TrivialTypeLoweringInfo : public TypeLoweringInfo {
+  class TrivialTypeLowering : public TypeLowering {
   public:
-    TrivialTypeLoweringInfo(SILType type)
-      : TypeLoweringInfo(type, IsTrivial, IsNotAddressOnly) {}
+    TrivialTypeLowering(SILType type)
+      : TypeLowering(type, IsTrivial, IsNotAddressOnly) {}
   };
 
   /// A class for non-trivial but loadable types.
-  class ScalarTypeLoweringInfo : public TypeLoweringInfo {
+  class ScalarTypeLowering : public TypeLowering {
   public:
-    ScalarTypeLoweringInfo(SILType type)
-      : TypeLoweringInfo(type, IsNotTrivial, IsNotAddressOnly) {}
+    ScalarTypeLowering(SILType type)
+      : TypeLowering(type, IsNotTrivial, IsNotAddressOnly) {}
   };
 
   /// A class for non-trivial, address-only types.
-  class AddressOnlyTypeLoweringInfo : public TypeLoweringInfo {
+  class AddressOnlyTypeLowering : public TypeLowering {
   public:
-    AddressOnlyTypeLoweringInfo(SILType type)
-      : TypeLoweringInfo(type, IsNotTrivial, IsAddressOnly) {}
+    AddressOnlyTypeLowering(SILType type)
+      : TypeLowering(type, IsNotTrivial, IsAddressOnly) {}
   };
 
-  /// Build the appropriate TypeLoweringInfo subclass for the given type.
+  /// Build the appropriate TypeLowering subclass for the given type.
   class LowerType :
-      public TypeClassifierBase<LowerType, const TypeLoweringInfo *> {
+      public TypeClassifierBase<LowerType, const TypeLowering *> {
     TypeConverter &TC;
   public:
     LowerType(TypeConverter &TC) : TypeClassifierBase(TC.M), TC(TC) {}
 
-    const TypeLoweringInfo *handleTrivial(CanType type) {
+    const TypeLowering *handleTrivial(CanType type) {
       auto silType = SILType::getPrimitiveType(type, false);
-      return new (TC) TrivialTypeLoweringInfo(silType);
+      return new (TC) TrivialTypeLowering(silType);
     }
   
-    const TypeLoweringInfo *handleScalar(CanType type) {
+    const TypeLowering *handleScalar(CanType type) {
       auto silType = SILType::getPrimitiveType(type, false);
-      return new (TC) ScalarTypeLoweringInfo(silType);
+      return new (TC) ScalarTypeLowering(silType);
     }
 
-    const TypeLoweringInfo *handleAddressOnly(CanType type) {
+    const TypeLowering *handleAddressOnly(CanType type) {
       auto silType = SILType::getPrimitiveType(type, true);
-      return new (TC) AddressOnlyTypeLoweringInfo(silType);
+      return new (TC) AddressOnlyTypeLowering(silType);
     }
   };
 }
@@ -512,27 +512,27 @@ TypeConverter::TypeConverter(SILModule &m)
 
 TypeConverter::~TypeConverter() {
   // The bump pointer allocator destructor will deallocate but not destroy all
-  // our TypeLoweringInfos.
+  // our TypeLowerings.
   for (auto &ti : Types) {
     // Destroy only the unique entries.
     CanType srcType = CanType(ti.first.first);
     CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
     if (srcType == mappedType || isa<LValueType>(srcType))
-      ti.second->~TypeLoweringInfo();
+      ti.second->~TypeLowering();
   }
 }
 
-void *TypeLoweringInfo::operator new(size_t size, TypeConverter &tc) {
-  return tc.TypeLoweringInfoBPA.Allocate<TypeLoweringInfo>();
+void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
+  return tc.TypeLoweringBPA.Allocate<TypeLowering>();
 }
   
-const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
+const TypeLowering &
+TypeConverter::getTypeLowering(Type origType, unsigned uncurryLevel) {
   CanType type = origType->getCanonicalType();
   auto key = getTypeKey(type, uncurryLevel);
   auto existing = Types.find(key);
   if (existing != Types.end()) {
-    assert(existing->second && "reentered getTypeLoweringInfo");
+    assert(existing->second && "reentered getTypeLowering");
     return *existing->second;
   }
 
@@ -544,7 +544,7 @@ TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
     SILType loweredType =
       getLoweredType(objectType, uncurryLevel).getAddressType();
 
-    auto *theInfo = new (*this) TrivialTypeLoweringInfo(loweredType);
+    auto *theInfo = new (*this) TrivialTypeLowering(loweredType);
     Types[key] = theInfo;
     return *theInfo;
   }
@@ -558,7 +558,7 @@ TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
     // If the lowering process changed the type, re-check the cache
     // and add a cache entry for the unlowered type.
     if (loweredType != type) {
-      auto &typeInfo = getTypeLoweringInfoForLoweredType(loweredType);
+      auto &typeInfo = getTypeLoweringForLoweredType(loweredType);
       Types[key] = &typeInfo;
       return typeInfo;
     }
@@ -569,16 +569,16 @@ TypeConverter::getTypeLoweringInfo(Type origType, unsigned uncurryLevel) {
   // The Swift type directly corresponds to the lowered type; don't
   // re-check the cache.
   assert(uncurryLevel == 0);
-  return getTypeLoweringInfoForUncachedLoweredType(type);
+  return getTypeLoweringForUncachedLoweredType(type);
 }
 
-const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfo(SILType type) {
-  return getTypeLoweringInfoForLoweredType(type.getSwiftRValueType());
+const TypeLowering &
+TypeConverter::getTypeLowering(SILType type) {
+  return getTypeLoweringForLoweredType(type.getSwiftRValueType());
 }
 
-const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfoForLoweredType(CanType type) {
+const TypeLowering &
+TypeConverter::getTypeLoweringForLoweredType(CanType type) {
   assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
 
   // Re-using uncurry level 0 is reasonable because our uncurrying
@@ -587,16 +587,16 @@ TypeConverter::getTypeLoweringInfoForLoweredType(CanType type) {
   auto key = getTypeKey(type, 0);
   auto existing = Types.find(key);
   if (existing != Types.end()) {
-    assert(existing->second && "reentered getTypeLoweringInfoForLoweredType");
+    assert(existing->second && "reentered getTypeLoweringForLoweredType");
     return *existing->second;
   }
 
-  return getTypeLoweringInfoForUncachedLoweredType(type);
+  return getTypeLoweringForUncachedLoweredType(type);
 }
 
 /// Do type-lowering for a lowered type which is not already in the cache.
-const TypeLoweringInfo &
-TypeConverter::getTypeLoweringInfoForUncachedLoweredType(CanType type) {
+const TypeLowering &
+TypeConverter::getTypeLoweringForUncachedLoweredType(CanType type) {
   auto key = getTypeKey(type, 0);
   assert(!Types.count(key) && "re-entrant or already cached");
   assert(!isa<LValueType>(type) && "didn't lower out l-value type?");
@@ -654,7 +654,7 @@ SILType TypeConverter::getConstantType(SILDeclRef constant) {
   AbstractCC cc = getAbstractCC(constant);
   Type swiftTy = getThinFunctionType(makeConstantType(constant), cc);
   SILType loweredTy
-    = getTypeLoweringInfo(swiftTy, constant.uncurryLevel).getLoweredType();
+    = getTypeLowering(swiftTy, constant.uncurryLevel).getLoweredType();
   DEBUG(llvm::dbgs() << "constant ";
         constant.print(llvm::dbgs());
         llvm::dbgs() << " has type ";

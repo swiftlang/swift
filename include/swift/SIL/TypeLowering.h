@@ -120,8 +120,8 @@ struct ReferenceTypePath {
   llvm::SmallVector<Component, 4> path;
 };
 
-/// TypeLoweringInfo - Extended type information used by SILGen.
-class TypeLoweringInfo {
+/// TypeLowering - Extended type information used by SILGen.
+class TypeLowering {
 public:
   enum IsTrivial_t : bool { IsNotTrivial, IsTrivial };
   enum IsAddressOnly_t : bool { IsNotAddressOnly, IsAddressOnly };
@@ -137,15 +137,15 @@ private:
   };
 
 protected:  
-  TypeLoweringInfo(SILType type, IsTrivial_t isTrivial,
-                   IsAddressOnly_t isAddressOnly)
+  TypeLowering(SILType type, IsTrivial_t isTrivial,
+               IsAddressOnly_t isAddressOnly)
     : LoweredTypeAndFlags(type,
                           (isTrivial ? IsTrivialFlag : 0U) | 
                           (isAddressOnly ? IsAddressOnlyFlag : 0U)) {}
 
 public:
-  TypeLoweringInfo(const TypeLoweringInfo &) = delete;
-  TypeLoweringInfo &operator=(const TypeLoweringInfo &) = delete;
+  TypeLowering(const TypeLowering &) = delete;
+  TypeLowering &operator=(const TypeLowering &) = delete;
 
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile
@@ -172,8 +172,8 @@ public:
   SILType getLoweredType() const {
     return LoweredTypeAndFlags.getPointer();
   }
-  
-  /// Allocate a new TypeLoweringInfo using the TypeConverter's allocator.
+
+  /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc);
   
   void *operator new(size_t) = delete;
@@ -186,11 +186,11 @@ enum class UncurryDirection {
   RightToLeft
 };
 
-/// TypeConverter - helper class for creating and managing TypeLoweringInfos.
+/// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
-  friend class TypeLoweringInfo;
+  friend class TypeLowering;
 
-  llvm::BumpPtrAllocator TypeLoweringInfoBPA;
+  llvm::BumpPtrAllocator TypeLoweringBPA;
 
   enum : unsigned {
     /// There is a unique entry with this uncurry level in the
@@ -204,7 +204,7 @@ class TypeConverter {
     return {t.getPointer(), uncurryLevel};
   }
   
-  llvm::DenseMap<TypeKey, const TypeLoweringInfo *> Types;
+  llvm::DenseMap<TypeKey, const TypeLowering *> Types;
   llvm::DenseMap<SILDeclRef, SILType> constantTypes;
   
   Type makeConstantType(SILDeclRef constant);
@@ -215,8 +215,8 @@ class TypeConverter {
   Optional<CanType> NativeType##Ty;
 #include "swift/SIL/BridgedTypes.def"
 
-  const TypeLoweringInfo &getTypeLoweringInfoForLoweredType(CanType type);
-  const TypeLoweringInfo &getTypeLoweringInfoForUncachedLoweredType(CanType type);
+  const TypeLowering &getTypeLoweringForLoweredType(CanType type);
+  const TypeLowering &getTypeLoweringForUncachedLoweredType(CanType type);
   
 public:
   SILModule &M;
@@ -227,18 +227,18 @@ public:
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
 
-  /// Lowers a Swift type to a SILType, and returns the SIL TypeLoweringInfo
+  /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLoweringInfo &getTypeLoweringInfo(Type t,unsigned uncurryLevel = 0);
+  const TypeLowering &getTypeLowering(Type t,unsigned uncurryLevel = 0);
   
-  /// Returns the SIL TypeLoweringInfo for an already lowered SILType. If the
-  /// SILType is an address, returns the TypeLoweringInfo for the pointed-to
+  /// Returns the SIL TypeLowering for an already lowered SILType. If the
+  /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
-  const TypeLoweringInfo &getTypeLoweringInfo(SILType t);
+  const TypeLowering &getTypeLowering(SILType t);
   
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
+    return getTypeLowering(t, uncurryLevel).getLoweredType();
   }
   
   /// Returns the SIL type of a constant reference.

@@ -92,7 +92,7 @@ public:
   
   /// Get the lowered type for a Swift type.
   SILType getLoweredType(Type t) {
-    return Types.getTypeLoweringInfo(t).getLoweredType();
+    return Types.getTypeLowering(t).getLoweredType();
   }
   
   /// Generate the mangled symbol name for a SILDeclRef.
@@ -356,15 +356,14 @@ public:
   SILFunction &getFunction() { return F; }
   SILBuilder &getBuilder() { return B; }
   
-  const TypeLoweringInfo &getTypeLoweringInfo(Type t,
-                                              unsigned uncurryLevel = 0) {
-    return SGM.Types.getTypeLoweringInfo(t, uncurryLevel);
+  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
+    return SGM.Types.getTypeLowering(t, uncurryLevel);
   }
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLoweringInfo(t, uncurryLevel).getLoweredType();
+    return getTypeLowering(t, uncurryLevel).getLoweredType();
   }
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    const TypeLoweringInfo &ti = getTypeLoweringInfo(t, uncurryLevel);
+    const TypeLowering &ti = getTypeLowering(t, uncurryLevel);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }

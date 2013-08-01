@@ -110,9 +110,9 @@ public:
   /// \brief This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;
   
-  /// Look up the TypeLoweringInfo for a SILType.
-  const Lowering::TypeLoweringInfo &getTypeLoweringInfo(SILType t) {
-    return Types.getTypeLoweringInfo(t);
+  /// Look up the TypeLowering for a SILType.
+  const Lowering::TypeLowering &getTypeLowering(SILType t) {
+    return Types.getTypeLowering(t);
   }
   
   /// Construct a SIL module from a translation unit. The module will be

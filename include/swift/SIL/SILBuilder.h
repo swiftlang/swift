@@ -660,7 +660,7 @@ public:
   /// Emit the instruction sequence needed to destroy (but not deallocate)
   /// a value in memory.
   void emitDestroyAddress(SILLocation Loc, SILValue addr) {
-    auto &ti = F.getModule().getTypeLoweringInfo(addr.getType());
+    auto &ti = F.getModule().getTypeLowering(addr.getType());
     if (ti.isTrivial())
       return;
     if (ti.isAddressOnly())
@@ -672,10 +672,10 @@ public:
   /// Emit the instruction sequence needed to retain a value, which must not
   /// be an address.
   void emitRetainValue(SILLocation Loc, SILValue v) {
-    emitRetainValueImpl(Loc, v, F.getModule().getTypeLoweringInfo(v.getType()));
+    emitRetainValueImpl(Loc, v, F.getModule().getTypeLowering(v.getType()));
   }
   void emitReleaseValue(SILLocation Loc, SILValue v) {
-    emitReleaseValueImpl(Loc, v, F.getModule().getTypeLoweringInfo(v.getType()));
+    emitReleaseValueImpl(Loc, v, F.getModule().getTypeLowering(v.getType()));
   }
   
   //===--------------------------------------------------------------------===//
@@ -710,9 +710,9 @@ private:
   }
   
   void emitRetainValueImpl(SILLocation Loc, SILValue v,
-                           const Lowering::TypeLoweringInfo &ti);
+                           const Lowering::TypeLowering &ti);
   void emitReleaseValueImpl(SILLocation Loc, SILValue v,
-                            const Lowering::TypeLoweringInfo &ti);
+                            const Lowering::TypeLowering &ti);
 };
 
 } // end swift namespace

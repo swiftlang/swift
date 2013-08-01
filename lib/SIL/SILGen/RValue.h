@@ -174,8 +174,8 @@ public:
       // the new.
       assert(!getType().isAddress() &&
              "can't assign loadable type from address");
-      const TypeLoweringInfo &ti
-        = gen.getTypeLoweringInfo(getType().getSwiftRValueType());
+      const TypeLowering &ti
+        = gen.getTypeLowering(getType().getSwiftRValueType());
       
       SILValue old;
       
