@@ -372,7 +372,7 @@ public:
   }
 
   /// \brief Get the debug name for the module.
-  std::string getDebugModuleName() const { return DebugModuleName; }
+  const char *getDebugModuleName() const { return DebugModuleName.c_str(); }
 };
 
 template <>

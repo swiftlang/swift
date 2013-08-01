@@ -142,7 +142,7 @@ Location getDeserializedLoc(Stmt*) { return {}; }
 Location getDeserializedLoc(Decl* D) {
   Location L = {};
   if (auto LM = dyn_cast<LoadedModule>(D->getModuleContext())) {
-    L.Filename = LM->getDebugModuleName().c_str();
+    L.Filename = LM->getDebugModuleName();
     L.Line = 1;
   }
   return L;
