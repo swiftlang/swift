@@ -831,7 +831,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   }
 
   std::unique_ptr<ProtocolConformance> Result(
-    new ProtocolConformance(T, Proto, ExplicitConformance,
+    new ProtocolConformance(T, Proto, ExplicitConformance->getModuleContext(),
                             std::move(Mapping),
                             std::move(TypeWitnesses),
                             std::move(InheritedMapping),
@@ -1069,7 +1069,7 @@ static void suggestExplicitConformance(TypeChecker &tc,
 
   // FIXME: Update the list of conformances? Update the inheritance clause
   // itself?
-  conformance->setConformingDecl(owner);
+  conformance->setContainingModule(owner->getModuleContext());
 }
 
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,

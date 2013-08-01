@@ -30,7 +30,7 @@ class ProtocolDecl;
 class SubstitutableType;
 class TypeAliasDecl;
 class ValueDecl;
-class Decl;
+class Module;
   
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -69,8 +69,9 @@ class ProtocolConformance {
   /// \brief The protocol being conformed to.
   ProtocolDecl *Protocol;
   
-  /// \brief The ExtensionDecl or NominalTypeDecl that declares the conformance.
-  Decl *ConformingDecl;
+  /// \brief The module containing the ExtensionDecl or NominalTypeDecl that
+  /// declared the conformance.
+  Module *ContainingModule;
   
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -91,14 +92,14 @@ class ProtocolConformance {
 public:
   ProtocolConformance(Type conformingType,
                       ProtocolDecl *protocol,
-                      Decl *conformingDecl,
+                      Module *containingModule,
                       WitnessMap &&witnesses,
                       TypeWitnessMap &&typeWitnesses,
                       InheritedConformanceMap &&inheritedConformances,
                       llvm::ArrayRef<ValueDecl *> defaultedDefinitions)
     : ConformingType(conformingType),
       Protocol(protocol),
-      ConformingDecl(conformingDecl),
+      ContainingModule(containingModule),
       Mapping(std::move(witnesses)),
       TypeWitnesses(std::move(typeWitnesses)),
       InheritedMapping(std::move(inheritedConformances))
@@ -113,12 +114,13 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return Protocol; }
   
-  /// Get the declaration that provides the conformance. This can be either the
-  /// original NominalTypeDecl for the type, or an ExtensionDecl.
-  Decl *getConformingDecl() const { return ConformingDecl; }
+  /// Get the module that contains the conforming extension or type declaration.
+  Module *getContainingModule() const { return ContainingModule; }
 
   /// Override the declaration that provides the conformance.
-  void setConformingDecl(Decl *conforming) { ConformingDecl = conforming; }
+  void setContainingModule(Module *containing) {
+    ContainingModule = containing;
+  }
 
   /// Retrieve the type witness for the given associated type.
   const Substitution &getTypeWitness(TypeAliasDecl *assocType) const {

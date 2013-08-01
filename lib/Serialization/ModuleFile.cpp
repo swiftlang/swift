@@ -237,11 +237,11 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     return std::make_pair(cast<ProtocolDecl>(getDecl(protoID)), nullptr);
   }
 
-  DeclID protoID, conformingDeclID;
+  DeclID protoID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
-  ProtocolConformanceLayout::readRecord(scratch, protoID, conformingDeclID,
+  ProtocolConformanceLayout::readRecord(scratch, protoID,
                                         valueCount, typeCount,
                                         inheritedCount, defaultedCount,
                                         rawIDs);
@@ -258,11 +258,6 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   ASTContext &ctx = ModuleContext->Ctx;
 
   auto proto = cast<ProtocolDecl>(getDecl(protoID));
-  // FIXME: Deserialize the conforming decl. This currently asserts out if the
-  // conforming decl is an ExtensionDecl, with "cannot cross-reference this
-  // kind of decl".
-  // auto conformingDecl = getDecl(conformingDeclID);
-  Decl *conformingDecl = nullptr;
 
   WitnessMap witnesses;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
@@ -307,7 +302,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   std::unique_ptr<ProtocolConformance> conformance(
     new ProtocolConformance(conformingType,
                             proto,
-                            conformingDecl,
+                            ModuleContext,
                             std::move(witnesses),
                             std::move(typeWitnesses),
                             std::move(inheritedConformances),
