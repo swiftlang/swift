@@ -162,9 +162,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 
 Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
-             bool InSILMode, bool KeepComments, bool Prime)
+             bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime)
   : SourceMgr(SourceMgr), Diags(Diags), ArtificialEOF(nullptr),
-    InSILMode(InSILMode), KeepComments(KeepComments) {
+    InSILMode(InSILMode), KeepComments(KeepComments),
+    AllowHashbang(AllowHashbang) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
   CurPtr = CurrentPosition;
@@ -195,7 +196,7 @@ tok Lexer::getTokenKind(StringRef Text) {
          "Text string does not fall within lexer's buffer");
   Lexer L(SourceMgr, StringRef(BufferStart, BufferEnd - BufferStart), Diags,
           Text.data(), /*not SIL mode*/ false, isKeepingComments(),
-          /*Prime=*/true);
+          /*AllowHashbang=*/false, /*Prime=*/true);
   Token Result;
   L.lex(Result);
   return Result.getKind();
@@ -248,9 +249,7 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
     .fixItRemove(DiagnosticInfo::Range(NulLoc, NulEndLoc));
 }
 
-/// skipSlashSlashComment - Skip to the end of the line of a // comment.
-void Lexer::skipSlashSlashComment() {
-  assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
+void Lexer::skipToEndOfLine() {
   while (1) {
     switch (*CurPtr++) {
     case '\n':
@@ -273,12 +272,23 @@ void Lexer::skipSlashSlashComment() {
         diagnoseEmbeddedNul(Diags, CurPtr-1);
         break;
       }
-        
-      // Otherwise, we have a // comment at end of file.
+
+      // Otherwise, the last line of the file does not have a newline.
       --CurPtr;
       return;
     }
   }
+}
+
+void Lexer::skipSlashSlashComment() {
+  assert(CurPtr[-1] == '/' && CurPtr[0] == '/' && "Not a // comment");
+  skipToEndOfLine();
+}
+
+void Lexer::skipHashbang() {
+  assert(CurPtr == BufferStart && CurPtr[0] == '#' && CurPtr[1] == '!' &&
+         "Not a hashbang");
+  skipToEndOfLine();
 }
 
 /// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
@@ -1288,6 +1298,12 @@ Restart:
     // # is only a token in SIL mode.
     if (InSILMode)
       return formToken(tok::sil_pound, TokStart);
+    // Allow a hashbang #! line at the beginning of the file.
+    if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
+      CurPtr--;
+      skipHashbang();
+      goto Restart;
+    }
     diagnose(CurPtr-1, diag::lex_invalid_character);
     return formToken(tok::unknown, TokStart);
 
@@ -1373,7 +1389,7 @@ SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
   // KeepComments irrelevant), or the caller lexed comments and KeepComments
   // must be true.
   Lexer L(SM, Buffer->getBuffer(), nullptr, Loc.Value.getPointer(), false,
-          /*KeepComments=*/true, /*Prime=*/true);
+          /*KeepComments=*/true, /*AllowHashbang=*/false, /*Prime=*/true);
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
 }

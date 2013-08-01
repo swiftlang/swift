@@ -68,20 +68,25 @@ class Lexer {
   /// \brief Set to true to return comment tokens, instead of skipping them.
   bool KeepComments = false;
 
+  /// \brief If true, we allow and skip the #! hashbang line at the beginning
+  /// of the buffer.
+  bool AllowHashbang = false;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
   Lexer(llvm::SourceMgr &SourceMgr, llvm::StringRef Buffer,
         DiagnosticEngine *Diags, const char *CurrentPosition,
-        bool InSILMode, bool KeepComments, bool Prime);
+        bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime);
 
   void primeLexer();
 
 public:
   Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
+        bool AllowHashbang = false)
       : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode,
-              KeepComments, /*Prime=*/true) {
+              KeepComments, AllowHashbang, /*Prime=*/true) {
   }
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
@@ -109,7 +114,7 @@ public:
     : Lexer(SourceMgr,
             StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
             Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments(),
-            /*Prime=*/false) {
+            Parent.AllowHashbang, /*Prime=*/false) {
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");
@@ -276,7 +281,14 @@ private:
   void lexImpl();
   void formToken(tok Kind, const char *TokStart);
 
+  void skipToEndOfLine();
+
+  /// Skip to the end of the line of a // comment.
   void skipSlashSlashComment();
+
+  /// Skip a #! hashbang line.
+  void skipHashbang();
+
   void skipSlashStarComment();
   void lexIdentifier();
   void lexDollarIdent();

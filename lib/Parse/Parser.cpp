@@ -33,9 +33,6 @@ using namespace swift;
 
 void DelayedParsingCallbacks::anchor() { }
 
-static StringRef ComputeLexStart(StringRef File, unsigned Offset,
-                                 unsigned EndOffset, bool IsMainModule);
-
 namespace {
   /// To assist debugging parser crashes, tell us the location of the
   /// current token.
@@ -171,12 +168,19 @@ void swift::performDelayedParsing(
 std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments) {
-  // This is mainly to check for "#!" at the beginning.
-  bool IsMainModule = (Offset == 0);
   const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
-  Lexer L(ComputeLexStart(Buffer->getBuffer(),
-                          Offset, EndOffset, IsMainModule),
-          SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
+  StringRef BufferData = Buffer->getBuffer();
+
+  if (EndOffset)
+    BufferData = BufferData.slice(Offset, EndOffset);
+  else if (Offset)
+    BufferData = BufferData.substr(Offset);
+
+  // FIXME: this is not correct -- it does not test for the main module.
+  bool IsMainModule = (Offset == 0);
+
+  Lexer L(BufferData, SM, /*Diags=*/nullptr, /*InSILMode=*/false,
+          KeepComments, /*AllowHashbang=*/IsMainModule);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
@@ -189,24 +193,6 @@ std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
-
-/// ComputeLexStart - Compute the start of lexing; if there's an offset, take
-/// that into account.  If there's a #! line in a main module, ignore it.
-static StringRef ComputeLexStart(StringRef File, unsigned Offset,
-                                 unsigned EndOffset, bool IsMainModule) {
-  if (EndOffset)
-    return File.slice(Offset, EndOffset);
-  else if (Offset)
-    return File.substr(Offset);
-
-  if (IsMainModule && File.startswith("#!")) {
-    StringRef::size_type Pos = File.find_first_of("\n\r");
-    if (Pos != StringRef::npos)
-      return File.substr(Pos);
-  }
-
-  return File;
-}
 
 Parser::Parser(Lexer *Lex, TranslationUnit *TU,
                DiagnosticEngine &Diags, SILParserState *SIL,
@@ -234,11 +220,11 @@ Parser::Parser(Lexer *Lex, TranslationUnit *TU,
 Parser::Parser(unsigned BufferID, TranslationUnit *TU,
                bool IsMainModule, SILParserState *SIL,
                PersistentParserState *PersistentState)
-  : Parser(new Lexer(ComputeLexStart(
-           TU->getASTContext().SourceMgr.getMemoryBuffer(BufferID)->getBuffer(),
-                               0, 0, IsMainModule),
+  : Parser(new Lexer(TU->getASTContext().SourceMgr
+                         .getMemoryBuffer(BufferID)->getBuffer(),
                      TU->getASTContext().SourceMgr, &TU->getASTContext().Diags,
-                     SIL != nullptr),
+                     /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false,
+                     /*AllowHashbang=*/IsMainModule),
            TU, TU->getASTContext().Diags, SIL, PersistentState) {
   this->IsMainModule = IsMainModule;
   auto ParserPos = State->takeParserPosition();
