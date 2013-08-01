@@ -162,10 +162,9 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 
 Lexer::Lexer(SourceManager &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
-             bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime)
+             bool InSILMode, bool KeepComments, bool Prime)
   : SourceMgr(SourceMgr), Diags(Diags), ArtificialEOF(nullptr),
-    InSILMode(InSILMode), KeepComments(KeepComments),
-    AllowHashbang(AllowHashbang) {
+    InSILMode(InSILMode), KeepComments(KeepComments) {
   BufferStart = Buffer.begin();
   BufferEnd = Buffer.end();
   CurPtr = CurrentPosition;
@@ -173,9 +172,9 @@ Lexer::Lexer(SourceManager &SourceMgr, StringRef Buffer,
          "Current position is out-of-range");
 
   llvm::SMLoc StartLoc = getLocForStartOfBuffer().Value;
-  int BufferID = SourceMgr->FindBufferContainingLoc(StartLoc);
-  assert(BufferID != -1 && "StringRef does not point into a valid buffer");
-  if (unsigned(BufferID) == SourceMgr.getCodeCompletionBufferID()) {
+  BufferID = SourceMgr->FindBufferContainingLoc(StartLoc);
+  assert(BufferID != ~0U && "StringRef does not point into a valid buffer");
+  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
     auto OriginalBuffer = SourceMgr->getMemoryBuffer(BufferID);
 
     // The Buffer StringRef might not point at the beginning of the buffer.
@@ -213,7 +212,7 @@ tok Lexer::getTokenKind(StringRef Text) {
          "Text string does not fall within lexer's buffer");
   Lexer L(SourceMgr, StringRef(BufferStart, BufferEnd - BufferStart), Diags,
           Text.data(), /*not SIL mode*/ false, isKeepingComments(),
-          /*AllowHashbang=*/false, /*Prime=*/true);
+          /*Prime=*/true);
   Token Result;
   L.lex(Result);
   return Result.getKind();
@@ -1318,6 +1317,8 @@ Restart:
     // Allow a hashbang #! line at the beginning of the file.
     if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
       CurPtr--;
+      if (BufferID != SourceMgr.getHashbangBufferID())
+        diagnose(CurPtr, diag::lex_hashbang_not_allowed);
       skipHashbang();
       goto Restart;
     }
@@ -1406,7 +1407,7 @@ SourceLoc Lexer::getLocForEndOfToken(SourceManager &SM, SourceLoc Loc) {
   // KeepComments irrelevant), or the caller lexed comments and KeepComments
   // must be true.
   Lexer L(SM, Buffer->getBuffer(), nullptr, Loc.Value.getPointer(), false,
-          /*KeepComments=*/true, /*AllowHashbang=*/false, /*Prime=*/true);
+          /*KeepComments=*/true, /*Prime=*/true);
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
 }

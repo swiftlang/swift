@@ -25,6 +25,9 @@ class SourceManager {
   unsigned CodeCompletionBufferID = ~0U;
   unsigned CodeCompletionOffset;
 
+  /// \brief The buffer ID where a hashbang line #! is allowed.
+  unsigned HashbangBufferID = ~0U;
+
 public:
   SourceManager() {}
 
@@ -53,6 +56,15 @@ public:
   }
 
   SourceLoc getCodeCompletionLoc() const;
+
+  void setHashbangBufferID(unsigned BufferID) {
+    assert(HashbangBufferID == ~0U && "Hashbang buffer ID already set");
+    HashbangBufferID = BufferID;
+  }
+
+  unsigned getHashbangBufferID() const {
+    return HashbangBufferID;
+  }
 };
 
 } // namespace swift

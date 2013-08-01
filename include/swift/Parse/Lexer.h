@@ -33,6 +33,7 @@ namespace swift {
 class Lexer {
   SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
+  unsigned BufferID;
 
   /// Pointer to the first character of the buffer.
   const char *BufferStart;
@@ -65,25 +66,20 @@ class Lexer {
   /// \brief Set to true to return comment tokens, instead of skipping them.
   bool KeepComments = false;
 
-  /// \brief If true, we allow and skip the #! hashbang line at the beginning
-  /// of the buffer.
-  bool AllowHashbang = false;
-
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
   Lexer(SourceManager &SourceMgr, llvm::StringRef Buffer,
         DiagnosticEngine *Diags, const char *CurrentPosition,
-        bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime);
+        bool InSILMode, bool KeepComments, bool Prime);
 
   void primeLexer();
 
 public:
   Lexer(llvm::StringRef Buffer, SourceManager &SourceMgr,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
-        bool AllowHashbang = false)
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
       : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode,
-              KeepComments, AllowHashbang, /*Prime=*/true) {
+              KeepComments, /*Prime=*/true) {
   }
 
   /// \brief Lexer state can be saved/restored to/from objects of this class.
@@ -111,7 +107,7 @@ public:
     : Lexer(SourceMgr,
             StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
             Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments(),
-            Parent.AllowHashbang, /*Prime=*/false) {
+            /*Prime=*/false) {
     assert(BeginState.CurPtr >= Parent.BufferStart &&
            BeginState.CurPtr <= Parent.BufferEnd &&
            "Begin position out of range");

@@ -180,6 +180,9 @@ void swift::CompilerInstance::doIt() {
   assert(BufferIDs.size() == 1 && "This mode only allows one input");
   unsigned BufferID = BufferIDs[0];
 
+  if (Kind == TranslationUnit::Main)
+    SourceMgr.setHashbangBufferID(BufferID);
+
   SILParserState SILContext(TheSILModule.get());
 
   unsigned CurTUElem = 0;

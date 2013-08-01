@@ -164,11 +164,7 @@ std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
   else if (Offset)
     BufferData = BufferData.substr(Offset);
 
-  // FIXME: this is not correct -- it does not test for the main module.
-  bool IsMainModule = (Offset == 0);
-
-  Lexer L(BufferData, SM, /*Diags=*/nullptr, /*InSILMode=*/false,
-          KeepComments, /*AllowHashbang=*/IsMainModule);
+  Lexer L(BufferData, SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
@@ -211,8 +207,7 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
   : Parser(new Lexer(TU->getASTContext().SourceMgr
                          ->getMemoryBuffer(BufferID)->getBuffer(),
                      TU->getASTContext().SourceMgr, &TU->getASTContext().Diags,
-                     /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false,
-                     /*AllowHashbang=*/IsMainModule),
+                     /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false),
            TU, TU->getASTContext().Diags, SIL, PersistentState) {
   this->IsMainModule = IsMainModule;
   auto ParserPos = State->takeParserPosition();
