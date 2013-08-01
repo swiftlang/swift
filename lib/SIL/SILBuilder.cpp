@@ -94,3 +94,13 @@ SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
 
   return v;
 }
+
+BranchInst *SILBuilder::createBranch(SILLocation Loc,
+                                     SILBasicBlock *TargetBlock,
+                                     OperandValueArrayRef Args) {
+  llvm::SmallVector<SILValue, 6> ArgsCopy;
+  for (auto I = Args.begin(), E = Args.end(); I != E; ++I) {
+    ArgsCopy.push_back(*I);
+  }
+  return createBranch(Loc, TargetBlock, ArgsCopy);
+}

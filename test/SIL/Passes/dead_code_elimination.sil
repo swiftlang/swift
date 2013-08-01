@@ -19,8 +19,8 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK: bb1:
 // CHECK-NEXT:  br bb2
 // CHECK: bb2:
-// CHECK-NEXT:  %2 = tuple ()
-// CHECK-NEXT:  return %2 : $()
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
 // CHECK-NEXT: }
 
 sil @test2 : $[thin] () -> () {
@@ -37,8 +37,8 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK-NEXT: bb0:
 // CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb0
-// CHECK-NEXT:  %1 = tuple ()
-// CHECK-NEXT:  return %1 : $()
+// CHECK-NEXT:  tuple ()
+// CHECK-NEXT:  return
 // CHECK-NEXT: }
 
 // func loopWithFalse() -> () {
@@ -76,8 +76,8 @@ bb5:                                              // Preds: bb1
 // CHECK:bb1:                                              // Preds: bb0
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
-// CHECK-NEXT:  %2 = tuple ()                          
-// CHECK-NEXT:  return %2 : $()
+// CHECK-NEXT:  tuple ()                          
+// CHECK-NEXT:  return
 // CHECK-NEXT:}
 
 
@@ -165,3 +165,18 @@ bb2:                                              // Preds: bb1 bb0
   %32 = tuple ()                                
   %33 = return %32 : $()                          // CHECK: return
 }                                                 // CHECK: }
+
+sil @test_cond_branch_args : $[thin] (i1 : Int64, i2 : Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  condbranch %2, bb1(%0 : $Int64), bb2(%1 : $Int64)
+bb1(%3 : $Int64):
+  return %3 : $Int64
+bb2(%4 : $Int64):
+  return %4 : $Int64
+}
+// CHECK: sil @test_cond_branch_args
+// CHECK-NEXT: bb0
+// CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
+// CHECK: bb1(%{{[0-9]+}} : $Int64):                                 
+// CHECK-NEXT:  return

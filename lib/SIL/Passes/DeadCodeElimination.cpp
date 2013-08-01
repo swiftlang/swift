@@ -93,17 +93,17 @@ static void constantFoldTerminator(SILBasicBlock &BB) {
           dyn_cast_or_null<IntegerLiteralInst>(CondI)) {
       SILBuilder B(&BB);
 
-      // Determine which of the successors is unreachable.
-      // TODO: propagate the BB arguments.
+      // Determine which of the successors is unreachable and create a new
+      // terminator that only branches to the reachable sucessor.
       BranchInst *BI = 0;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
         BI = B.createBranch(CBI->getLoc(),
-                            CBI->getFalseBB()/*, CBI->getFalseArgs()*/);
+                            CBI->getFalseBB(), CBI->getFalseArgs());
       } else {
         assert(ConstCond->getValue() == APInt(1, /*value*/ 1, false) &&
                "Our representation of true/false does not match.");
         BI = B.createBranch(CBI->getLoc(),
-                            CBI->getTrueBB()/*, CBI->getTrueArgs()*/);
+                            CBI->getTrueBB(), CBI->getTrueArgs());
       }
 
       // TODO: Produce an unreachable code warning here if the basic block

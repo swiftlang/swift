@@ -653,6 +653,8 @@ public:
     return insertTerminator(BranchInst::create(Loc, TargetBlock, Args, F));
   }
 
+  BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
+                           OperandValueArrayRef Args);
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//
