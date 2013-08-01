@@ -55,12 +55,19 @@ private:
     using type = Stmt;
   };
 
-  llvm::PointerUnion3<Stmt*, Expr*, Decl*> ASTNode;
+  template <class T>
+  struct base_type<T,
+      typename std::enable_if<std::is_base_of<Pattern, T>::value>::type> {
+    using type = Pattern;
+  };
+
+  llvm::PointerUnion4<Stmt*, Expr*, Decl*, Pattern*> ASTNode;
 public:
   SILLocation() {}
   SILLocation(Stmt* S) : ASTNode(S) {}
   SILLocation(Expr* E) : ASTNode(E) {}
   SILLocation(Decl* D) : ASTNode(D) {}
+  SILLocation(Pattern* P) : ASTNode(P) {}
 
   bool isNull() {
     return ASTNode.isNull();
