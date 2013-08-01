@@ -96,11 +96,6 @@ namespace swift {
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true);
 
-  /// Attempt to parse a StringRef as a code completion context expression.
-  /// Returns the parsed expression if successful, or null if an expression
-  /// could not be parsed.
-  Expr *parseCompletionContextExpr(TranslationUnit *TU, StringRef expr);
-
   /// performAutoImport - When a translation unit is first set up, this handles
   /// setting up any auto imports of the standard library.
   void performAutoImport(TranslationUnit *TU);

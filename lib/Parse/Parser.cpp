@@ -186,22 +186,6 @@ std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
   return Tokens;
 }
 
-Expr *swift::parseCompletionContextExpr(TranslationUnit *TU,
-                                        llvm::StringRef expr) {
-  // Set up a DiagnosticEngine to swallow errors.
-  DiagnosticEngine diags(TU->Ctx.SourceMgr);
-  
-  TU->ASTStage = TranslationUnit::Parsing;
-  Parser P(TU, expr, diags, nullptr);
-  // Prime the lexer.
-  P.consumeToken();
-  P.CurDeclContext = TU;
-  
-  Expr *parsed = P.parseExpr(diag::expected_expr).getPtrOrNull();
-  TU->ASTStage = TranslationUnit::Parsed;
-  return parsed;
-}
-  
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
