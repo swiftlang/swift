@@ -830,8 +830,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     defaultedDefinitions.push_back(deduced.first);
   }
 
+  Module *conformingModule = ExplicitConformance
+    ? ExplicitConformance->getModuleContext()
+    : nullptr;
+  
   std::unique_ptr<ProtocolConformance> Result(
-    new ProtocolConformance(T, Proto, ExplicitConformance->getModuleContext(),
+    new ProtocolConformance(T, Proto, conformingModule,
                             std::move(Mapping),
                             std::move(TypeWitnesses),
                             std::move(InheritedMapping),
