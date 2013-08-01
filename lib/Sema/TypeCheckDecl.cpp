@@ -960,6 +960,7 @@ public:
         assert(thisPattern->getType().getPointer() == thisType.getPointer());
       } else {
         thisPattern->setType(thisType);
+        cast<NamedPattern>(thisPattern->getSubPattern())->setType(thisType);
       }
     }
 
