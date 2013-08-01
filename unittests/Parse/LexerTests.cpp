@@ -13,10 +13,10 @@ class LexerTest : public ::testing::Test {
 
 public:
 
-  std::vector<Token> tokenizeAndKeepEOF(llvm::SourceMgr &SM,
-                                        unsigned BufferID) {
-    const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
-    Lexer L(Buffer->getBuffer(), SM, /*Diags=*/nullptr, /*InSILMode=*/false);
+  std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
+    const llvm::MemoryBuffer *Buffer = SourceMgr.getMemoryBuffer(BufferID);
+    Lexer L(Buffer->getBuffer(), SourceMgr, /*Diags=*/nullptr,
+            /*InSILMode=*/false);
     std::vector<Token> Tokens;
     do {
       Tokens.emplace_back();
@@ -34,7 +34,7 @@ public:
 
     std::vector<Token> Toks;
     if (KeepEOF)
-      Toks = tokenizeAndKeepEOF(SourceMgr, BufID);
+      Toks = tokenizeAndKeepEOF(BufID);
     else
       Toks = tokenize(SourceMgr, BufID, 0, 0, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
