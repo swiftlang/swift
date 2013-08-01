@@ -30,6 +30,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/Basic/Module.h"
@@ -891,11 +892,10 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
 
 /// The compiler and execution environment for the REPL.
 class REPLEnvironment {
-  ASTContext &Context;
+  CompilerInstance &CI;
+  TranslationUnit *TU;
   bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
-  Component *Comp;
-  TranslationUnit *TU;
   llvm::SmallPtrSet<TranslationUnit*, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
@@ -915,8 +915,8 @@ class REPLEnvironment {
     bool ShouldRun = swift::appendToREPLTranslationUnit(
         TU, RC, llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>"));
     
-    if (Context.hadError()) {
-      Context.Diags.resetHadAnyError();
+    if (CI.getASTContext().hadError()) {
+      CI.getASTContext().Diags.resetHadAnyError();
       while (TU->Decls.size() > RC.CurTUElem)
         TU->Decls.pop_back();
       
@@ -947,7 +947,7 @@ class REPLEnvironment {
                         RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurTUElem;
     
-    if (Context.hadError())
+    if (CI.getASTContext().hadError())
       return false;
     
     std::string ErrorMessage;
@@ -991,15 +991,12 @@ class REPLEnvironment {
   }
 
 public:
-  REPLEnvironment(ASTContext &Context,
+  REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine)
-    : Context(Context),
+    : CI(CI), TU(CI.getTU()),
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
-      Comp(new (Context.Allocate<Component>(1)) Component()),
-      TU(new (Context) TranslationUnit(Context.getIdentifier("REPL"),
-                                       Comp, Context, TranslationUnit::REPL)),
       RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
@@ -1038,7 +1035,7 @@ public:
         TU, RC,
         llvm::MemoryBuffer::getMemBufferCopy(importstmt,
                                              "<REPL Initialization>"));
-    if (Context.hadError())
+    if (CI.getASTContext().hadError())
       return;
     
     RC.CurTUElem = RC.CurIRGenElem = TU->Decls.size();
@@ -1056,7 +1053,7 @@ public:
   /// Responds to a REPL input. Returns true if the repl should continue,
   /// false if it should quit.
   bool handleREPLInput(REPLInputKind inputKind, llvm::StringRef Line) {
-    Lexer L(Line, Context.SourceMgr, nullptr, false /*not SIL*/);
+    Lexer L(Line, CI.getSourceMgr(), nullptr, false /*not SIL*/);
     switch (inputKind) {
       case REPLInputKind::REPLQuit:
         return false;
@@ -1102,7 +1099,8 @@ public:
             ? PrintOrDump::Print : PrintOrDump::Dump;
           L.lex(Tok);
           L.lex(Tok);
-          UnqualifiedLookup lookup(Context.getIdentifier(Tok.getText()), TU);
+          UnqualifiedLookup lookup(
+              CI.getASTContext().getIdentifier(Tok.getText()), TU);
           for (auto result : lookup.Results) {
             if (result.hasValueDecl()) {
               printOrDumpDecl(result.getValueDecl(), doPrint);
@@ -1166,8 +1164,8 @@ public:
           return result;
 
         // We haven't run replApplicationMain() yet. Look for it.
-        UnqualifiedLookup lookup(Context.getIdentifier("replApplicationMain"),
-                                 TU);
+        UnqualifiedLookup lookup(
+            CI.getASTContext().getIdentifier("replApplicationMain"), TU);
         if (lookup.isSuccess()) {
           // Execute replApplicationMain().
           executeSwiftSource("replApplicationMain()\n", CmdLine);
@@ -1183,7 +1181,7 @@ public:
   /// stdlib if available.
   void exitREPL() {
     /// Invoke replExit() if available.
-    UnqualifiedLookup lookup(Context.getIdentifier("replExit"), TU);
+    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("replExit"), TU);
     if (lookup.isSuccess()) {
       executeSwiftSource("replExit()\n", CmdLine);
     }
@@ -1199,10 +1197,8 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(ASTContext &Context, const ProcessCmdLine &CmdLine) {
-  REPLEnvironment env(Context,
-                      /*ShouldRunREPLApplicationMain=*/false,
-                      CmdLine);
+void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine);
 
   llvm::SmallString<80> Line;
   REPLInputKind inputKind;
@@ -1212,10 +1208,8 @@ void swift::REPL(ASTContext &Context, const ProcessCmdLine &CmdLine) {
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(ASTContext &Context, const ProcessCmdLine &CmdLine) {
-  REPLEnvironment env(Context,
-                      /*ShouldRunREPLApplicationMain=*/true,
-                      CmdLine);
+void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine);
   
   CFMessagePortContext portContext;
   portContext.version = 0;

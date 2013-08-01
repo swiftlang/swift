@@ -20,6 +20,7 @@
 
 namespace swift {
   class ASTContext;
+  class CompilerInstance;
   class TranslationUnit;
   class SILModule;
 
@@ -57,6 +58,6 @@ namespace swift {
                       SILModule *SILMod = nullptr
                       );
   
-  void REPL(ASTContext &Context, const ProcessCmdLine &CmdLine);
-  void REPLRunLoop(ASTContext &Context, const ProcessCmdLine &CmdLine);
+  void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
+  void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
 }

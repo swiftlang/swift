@@ -141,6 +141,9 @@ void swift::CompilerInstance::doIt() {
   if (Kind != TranslationUnit::SIL && !Invocation.getParseOnly())
     performAutoImport(TU);
 
+  if (Kind == TranslationUnit::REPL)
+    return;
+
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB;
   if (Invocation.isCodeCompletion()) {
     DelayedCB.reset(new CodeCompleteDelayedCallbacks(CodeCompleteLoc));
