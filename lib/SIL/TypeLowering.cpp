@@ -19,6 +19,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/Debug.h"
@@ -305,8 +306,8 @@ enum class LoweredTypeKind {
   /// Trivial and loadable.
   Trivial,
 
-  /// Non-trivial but still loadable.
-  Scalar,
+  /// A reference type.
+  Reference,
 
   /// Non-trivial and not loadable.
   AddressOnly
@@ -326,8 +327,8 @@ namespace {
       switch (kind) {
       case LoweredTypeKind::AddressOnly:
         return asDerived().handleAddressOnly(type);
-      case LoweredTypeKind::Scalar:
-        return asDerived().handleScalar(type);
+      case LoweredTypeKind::Reference:
+        return asDerived().handleReference(type);
       case LoweredTypeKind::Trivial:
         return asDerived().handleTrivial(type);
       }
@@ -343,13 +344,13 @@ namespace {
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinOpaquePointer, Trivial)
-    IMPL(BuiltinObjectPointer, Scalar)
-    IMPL(BuiltinObjCPointer, Scalar)
+    IMPL(BuiltinObjectPointer, Reference)
+    IMPL(BuiltinObjCPointer, Reference)
     IMPL(BuiltinVector, Trivial)
-    IMPL(Class, Scalar)
-    IMPL(BoundGenericClass, Scalar)
+    IMPL(Class, Reference)
+    IMPL(BoundGenericClass, Reference)
     IMPL(MetaType, Trivial)
-    IMPL(AnyFunction, Scalar)
+    IMPL(AnyFunction, Reference)
     IMPL(Array, AddressOnly) // who knows?
     IMPL(Module, Trivial)
 
@@ -362,7 +363,7 @@ namespace {
     RetTy visitReferenceStorageType(CanReferenceStorageType type) {
       switch (type->getOwnership()) {
       case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
-      case Ownership::Unowned: return asDerived().handleScalar(type);
+      case Ownership::Unowned: return asDerived().handleReference(type);
       case Ownership::Weak:    return asDerived().handleAddressOnly(type);
       }
       llvm_unreachable("bad ownership kind");
@@ -371,7 +372,7 @@ namespace {
     // These types are address-only unless they're class-constrained.
     template <class T> RetTy visitAbstracted(T type) {
       if (type->requiresClass()) {
-        return asDerived().handleScalar(type);
+        return asDerived().handleReference(type);
       } else {
         return asDerived().handleAddressOnly(type);        
       }
@@ -436,8 +437,8 @@ namespace {
   public:
     TypeClassifier(SILModule &M) : TypeClassifierBase(M) {}
 
-    LoweredTypeKind handleScalar(CanType type) {
-      return LoweredTypeKind::Scalar;
+    LoweredTypeKind handleReference(CanType type) {
+      return LoweredTypeKind::Reference;
     }
     LoweredTypeKind handleTrivial(CanType type) {
       return LoweredTypeKind::Trivial;
@@ -461,18 +462,79 @@ bool SILType::isAddressOnly(CanType type, SILModule &M) {
 }
 
 namespace {
-  /// A class for trivial, loadable types.
-  class TrivialTypeLowering : public TypeLowering {
+  /// A class for loadable types.
+  class LoadableTypeLowering : public TypeLowering {
+  protected:
+    LoadableTypeLowering(SILType type, IsTrivial_t isTrivial)
+      : TypeLowering(type, isTrivial, IsNotAddressOnly) {}
+
   public:
-    TrivialTypeLowering(SILType type)
-      : TypeLowering(type, IsTrivial, IsNotAddressOnly) {}
+    void emitInitializeWithRValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  SILValue addr) const override {
+      B.createStore(loc, value, addr);
+    }
   };
 
-  /// A class for non-trivial but loadable types.
-  class ScalarTypeLowering : public TypeLowering {
+  /// A class for trivial, loadable types.
+  class TrivialTypeLowering : public LoadableTypeLowering {
   public:
-    ScalarTypeLowering(SILType type)
-      : TypeLowering(type, IsNotTrivial, IsNotAddressOnly) {}
+    TrivialTypeLowering(SILType type)
+      : LoadableTypeLowering(type, IsTrivial) {}
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      B.createStore(loc, value, addr);
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      // Trivial
+    }
+  };
+
+  /// A class for reference types, which are all non-trivial but still
+  /// loadable.
+  class ReferenceTypeLowering : public LoadableTypeLowering {
+  public:
+    ReferenceTypeLowering(SILType type)
+      : LoadableTypeLowering(type, IsNotTrivial) {}
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      // FIXME: Use assign instruction here? Or maybe have two
+      // variants of this function, one for canonical, one for
+      // non-canonical.
+      SILValue old = B.createLoad(loc, addr);
+      B.createStore(loc, value, addr);
+      B.emitReleaseValue(loc, old);
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      B.emitReleaseValue(loc, value);
+    }
+  };
+
+  /// A class for function types, which currently require a minor hack
+  /// to a lack of proper conversions in the AST for thin functions
+  /// and CCs.
+  class FunctionTypeLowering : public ReferenceTypeLowering {
+  public:
+    FunctionTypeLowering(SILType type) : ReferenceTypeLowering(type) {}
+
+    void emitInitializeWithRValue(SILBuilder &B, SILLocation loc,
+                                  SILValue value,
+                                  SILValue addr) const override {
+      value = B.emitGeneralizedValue(loc, value);
+      ReferenceTypeLowering::emitInitializeWithRValue(B, loc, value, addr);
+    }
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      value = B.emitGeneralizedValue(loc, value);
+      ReferenceTypeLowering::emitAssignWithRValue(B, loc, value, addr);
+    }
   };
 
   /// A class for non-trivial, address-only types.
@@ -480,6 +542,74 @@ namespace {
   public:
     AddressOnlyTypeLowering(SILType type)
       : TypeLowering(type, IsNotTrivial, IsAddressOnly) {}
+
+  public:
+    void emitInitializeWithRValue(SILBuilder &B,
+                                  SILLocation loc,
+                                  SILValue value,
+                                  SILValue addr) const override {
+      assert(value.getType().isAddress());
+      B.createCopyAddr(loc, value, addr,
+                       /*isTake=*/ true,
+                       /*isInitialize=*/ true);
+    }
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      assert(value.getType().isAddress());
+      B.createCopyAddr(loc, value, addr,
+                       /*isTake*/ true,
+                       /*isInitialize*/ false);
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      B.createDestroyAddr(loc, value);
+    }
+  };
+
+  /// A type lowering for [weak] types.  [weak] types are address-only
+  /// in memory, but their r-value form is scalar.
+  class WeakTypeLowering : public AddressOnlyTypeLowering {
+  public:
+    WeakTypeLowering(SILType type) : AddressOnlyTypeLowering(type) {}
+
+    void emitInitializeWithRValue(SILBuilder &B,
+                                  SILLocation loc,
+                                  SILValue value,
+                                  SILValue addr) const override {
+      // FIXME
+    }
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      // FIXME
+    }
+  };
+
+  /// A type lowering for [unowned] types.
+  class UnownedTypeLowering : public LoadableTypeLowering {
+  public:
+    UnownedTypeLowering(SILType type)
+      : LoadableTypeLowering(type, IsNotTrivial) {}
+
+    void emitInitializeWithRValue(SILBuilder &B,
+                                  SILLocation loc,
+                                  SILValue value,
+                                  SILValue addr) const override {
+      // FIXME
+    }
+
+    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const override {
+      // FIXME
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      // We should never deal with r-values of reference storage type.
+      llvm_unreachable("should not be manipulating unowned r-values");
+    }
   };
 
   /// Build the appropriate TypeLowering subclass for the given type.
@@ -494,14 +624,37 @@ namespace {
       return new (TC) TrivialTypeLowering(silType);
     }
   
-    const TypeLowering *handleScalar(CanType type) {
+    const TypeLowering *handleReference(CanType type) {
       auto silType = SILType::getPrimitiveType(type, false);
-      return new (TC) ScalarTypeLowering(silType);
+      return new (TC) ReferenceTypeLowering(silType);
     }
 
     const TypeLowering *handleAddressOnly(CanType type) {
       auto silType = SILType::getPrimitiveType(type, true);
       return new (TC) AddressOnlyTypeLowering(silType);
+    }
+
+    // This special case can disappear when function type conversions
+    // are fully modelled in the AST.
+    const TypeLowering *visitAnyFunctionType(CanAnyFunctionType type) {
+      // The type should already be SIL-canonical.
+      assert(type == TC.getUncurriedFunctionType(type, 0));
+      auto silType = SILType::getPrimitiveType(type, false);
+      return new (TC) FunctionTypeLowering(silType);
+    }
+
+    /// We have special lowerings for reference storage types.
+    const TypeLowering *visitReferenceStorageType(CanReferenceStorageType type) {
+      switch (type->getOwnership()) {
+      case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
+      case Ownership::Unowned:
+        return new (TC) UnownedTypeLowering(
+                                  SILType::getPrimitiveType(type, false));
+      case Ownership::Weak:
+        return new (TC) WeakTypeLowering(
+                                  SILType::getPrimitiveType(type, true));
+      }
+      llvm_unreachable("bad ownership kind");
     }
   };
 }
@@ -523,7 +676,7 @@ TypeConverter::~TypeConverter() {
 }
 
 void *TypeLowering::operator new(size_t size, TypeConverter &tc) {
-  return tc.TypeLoweringBPA.Allocate<TypeLowering>();
+  return tc.TypeLoweringBPA.Allocate(size, alignof(TypeLowering));
 }
   
 const TypeLowering &

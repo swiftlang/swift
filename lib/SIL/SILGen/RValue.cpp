@@ -439,3 +439,19 @@ RValue::RValue(const RValue &copied, SILGenFunction &gen)
     values.push_back(value.copy(gen));
   }
 }
+
+void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
+                               SILValue address) {
+  if (hasCleanup())
+    forwardCleanup(gen);
+  auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
+  lowering.emitInitializeWithRValue(gen.B, loc, getValue(), address);
+}
+
+void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
+                              SILValue address) {
+  if (hasCleanup())
+    forwardCleanup(gen);
+  auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
+  lowering.emitAssignWithRValue(gen.B, loc, getValue(), address);
+}

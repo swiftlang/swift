@@ -677,6 +677,11 @@ public:
   void emitReleaseValue(SILLocation Loc, SILValue v) {
     emitReleaseValueImpl(Loc, v, F.getModule().getTypeLowering(v.getType()));
   }
+
+  /// Generalize a function value.  This is a hack and probably not
+  /// actually implementable at the SILBuilder level because it may
+  /// require memory management.
+  SILValue emitGeneralizedValue(SILLocation loc, SILValue value);
   
   //===--------------------------------------------------------------------===//
   // Private Helper Methods

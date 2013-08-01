@@ -363,9 +363,7 @@ public:
     return getTypeLowering(t, uncurryLevel).getLoweredType();
   }
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    const TypeLowering &ti = getTypeLowering(t, uncurryLevel);
-    assert(ti.isLoadable() && "unexpected address-only type");
-    return ti.getLoweredType();
+    return SGM.Types.getLoweredLoadableType(t, uncurryLevel);
   }
 
   //===--------------------------------------------------------------------===//
@@ -598,7 +596,6 @@ public:
                              SILValue thisValue,
                              SILDeclRef methodConstant,
                              ArrayRef<Substitution> innerSubstitutions);
-  void emitStore(SILLocation loc, ManagedValue src, SILValue destAddr);
   
   SILValue emitMetatypeOfValue(SILLocation loc, SILValue base);
   
@@ -691,6 +688,9 @@ public:
   
   /// Deallocate an uninitialized local variable.
   void deallocateUninitializedLocalVariable(VarDecl *D);
+
+  /// Enter a cleanup to deallocate a stack variable.
+  CleanupsDepth enterDeallocStackCleanup(SILLocation loc, SILValue address);
   
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);

@@ -22,7 +22,10 @@
 
 namespace swift {
   class ValueDecl;
+  class SILBuilder;
+  class SILLocation;
   class SILModule;
+
 namespace Lowering {
 
 /// Given a function type or polymorphic function type, returns the same type
@@ -147,6 +150,18 @@ public:
   TypeLowering(const TypeLowering &) = delete;
   TypeLowering &operator=(const TypeLowering &) = delete;
 
+  virtual ~TypeLowering() {}
+
+  /// \brief Are r-values of this type passed as arguments indirectly?
+  bool isPassedIndirectly() const {
+    return isAddressOnly();
+  }
+
+  /// \brief Are r-values of this type returned indirectly?
+  bool isReturnedIndirectly() const {
+    return isAddressOnly();
+  }
+
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
@@ -173,11 +188,33 @@ public:
     return LoweredTypeAndFlags.getPointer();
   }
 
+  /// Given a +1 r-value which we are claiming ownership of,
+  /// initialize the given address with it.
+  virtual void emitInitializeWithRValue(SILBuilder &B,
+                                        SILLocation loc,
+                                        SILValue value,
+                                        SILValue addr) const = 0;
+
+  /// Given a +1 r-value which are are claiming ownership of, destroy it.
+  virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value) const = 0;
+
+  /// Given a +1 r-value which we are claiming ownership of,
+  /// assign it into the given address.
+  virtual void emitAssignWithRValue(SILBuilder &B,
+                                    SILLocation loc,
+                                    SILValue value,
+                                    SILValue addr) const = 0;
+
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc);
-  
+
+  // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
+  // The latter is made challenging because the existence of the
+  // virtual destructor requires an accessible 'operator delete'.
   void *operator new(size_t) = delete;
-  void operator delete(void*) = delete;
+protected:
+  void operator delete(void*) {}
 };
   
 /// Argument order of uncurried functions.
@@ -239,6 +276,12 @@ public:
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
     return getTypeLowering(t, uncurryLevel).getLoweredType();
+  }
+
+  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
+    const TypeLowering &ti = getTypeLowering(t, uncurryLevel);
+    assert(ti.isLoadable() && "unexpected address-only type");
+    return ti.getLoweredType();
   }
   
   /// Returns the SIL type of a constant reference.

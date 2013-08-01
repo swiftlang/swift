@@ -163,6 +163,18 @@ public:
 };
 
 /// Cleanup to destroy an initialized variable.
+class DeallocStack : public Cleanup {
+  SILLocation Loc;
+  SILValue Addr;
+public:
+  DeallocStack(SILLocation loc, SILValue addr) : Loc(loc), Addr(addr) {}
+
+  void emit(SILGenFunction &gen) override {
+    gen.B.createDeallocStack(Loc, Addr);
+  }
+};
+
+/// Cleanup to destroy an initialized variable.
 class CleanupLocalVariable : public Cleanup {
   VarDecl *var;
 public:
@@ -247,12 +259,13 @@ public:
   }
 };
   
-/// An initialization for a byref argument.
-class ByrefArgumentInitialization : public Initialization {
+/// Initialize the value by binding the variable address to the
+/// incoming address.
+class AddressBindingInitialization : public Initialization {
   /// The VarDecl for the byref symbol.
   VarDecl *vd;
 public:
-  ByrefArgumentInitialization(VarDecl *vd)
+  AddressBindingInitialization(VarDecl *vd)
     : Initialization(Initialization::Kind::AddressBinding,
                      vd->getTypeOfReference()),
       vd(vd)
@@ -266,7 +279,7 @@ public:
   void bindAddress(SILValue address, SILGenFunction &gen) override {
     // Use the input address as the var's address.
     assert(address.getType().isAddress() &&
-           "binding a non-address to a byref argument?!");
+           "binding a variable to a non-address argument?!");
     gen.VarLocs[vd] = {SILValue(), address};
   }
 
@@ -312,26 +325,30 @@ struct InitializationForPattern
     // If this is a [byref] argument, bind the argument lvalue as our
     // address.
     if (vd->getType()->is<LValueType>())
-      return InitializationPtr(new ByrefArgumentInitialization(vd));
+      return InitializationPtr(new AddressBindingInitialization(vd));
 
     // If this is a global variable, initialize it without allocations or
     // cleanups.
     if (!vd->getDeclContext()->isLocalContext()) {
       SILValue addr = Gen.B.createGlobalAddr(vd, vd,
-                            Gen.getLoweredType(vd->getType()).getAddressType());
+                          Gen.getLoweredType(vd->getType()).getAddressType());
       return InitializationPtr(new GlobalInitialization(addr));
     }
     
     // If this is an address-only function argument with fixed lifetime,
     // we can bind the address we were passed for the variable, and we don't
     // need to initialize it.
-    SILType loweredTy = Gen.getLoweredType(vd->getType());
+    //
+    // Note that the pattern's type should match the type of the
+    // argument, but not necessarily the type of the variable (in the
+    // case of a reference storage type).
     if (ArgumentOrVar == Argument &&
-        loweredTy.isAddressOnly(Gen.F.getModule()) &&
-        vd->hasFixedLifetime()) {
-      return InitializationPtr(new ByrefArgumentInitialization(vd));
+        vd->hasFixedLifetime() &&
+        Gen.getTypeLowering(P->getType()).isPassedIndirectly()) {
+      return InitializationPtr(new AddressBindingInitialization(vd));
     }
     
+    // Otherwise, this is a normal variable initialization.
     return Gen.emitLocalVariableWithCleanup(vd);
   }
   
@@ -376,6 +393,13 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   }
 }
 
+/// Enter a cleanup to deallocate the given location.
+CleanupsDepth SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
+                                                       SILValue temp) {
+  Cleanups.pushCleanup<DeallocStack>(loc, temp);
+  return Cleanups.getCleanupsDepth();
+}
+
 namespace {
 
 /// ArgumentInitVisitor - A visitor for traversing a pattern, creating
@@ -400,36 +424,30 @@ struct ArgumentInitVisitor :
   void storeArgumentInto(Type ty, SILValue arg, SILLocation loc, Initialization *I)
   {
     assert(ty && "no type?!");
-    if (I) {
-      switch (I->kind) {
-      case Initialization::Kind::AddressBinding:
-        I->bindAddress(arg, gen);
-        // If this is an address-only non-byref argument, we take ownership
-        // of the referenced value.
-        if (!ty->is<LValueType>())
-          gen.Cleanups.pushCleanup<CleanupAddressOnlyArgument>(arg);
-        break;
+    if (!I) return;
+    switch (I->kind) {
+    case Initialization::Kind::AddressBinding:
+      I->bindAddress(arg, gen);
+      // If this is an address-only non-byref argument, we take ownership
+      // of the referenced value.
+      if (!ty->is<LValueType>())
+        gen.Cleanups.pushCleanup<CleanupAddressOnlyArgument>(arg);
+      break;
 
-      case Initialization::Kind::SingleBuffer:
-        if (arg.getType().isAddressOnly(gen.F.getModule())) {
-          initB.createCopyAddr(loc, arg, I->getAddress(),
-                               /*isTake=*/ true,
-                               /*isInitialize=*/ true);
-        } else {
-          initB.createStore(loc, arg, I->getAddress());
-        }
-        break;
-      
-      case Initialization::Kind::Ignored:
-        break;
-        
-      case Initialization::Kind::Tuple:
-        llvm_unreachable("tuple initializations should be destructured before "
-                         "reaching here");
-      }
+    case Initialization::Kind::SingleBuffer:
+      gen.getTypeLowering(ty).emitInitializeWithRValue(initB, loc, arg,
+                                                       I->getAddress());
+      break;
 
-      I->finishInitialization(gen);
+    case Initialization::Kind::Ignored:
+      break;
+
+    case Initialization::Kind::Tuple:
+      llvm_unreachable("tuple initializations should be destructured before "
+                       "reaching here");
     }
+
+    I->finishInitialization(gen);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
@@ -495,11 +513,9 @@ struct ArgumentInitVisitor :
     // A value bound to _ is unused and can be immediately released.
     assert(I->kind == Initialization::Kind::Ignored &&
            "any pattern should match a black-hole Initialization");
+    auto &lowering = gen.getTypeLowering(P->getType());
     SILValue arg = makeArgument(P->getType(), f.begin());
-    if (arg.getType().isLoadable(gen.F.getModule()))
-      gen.B.emitReleaseValue(SILLocation(), arg);
-    else
-      gen.B.createDestroyAddr(SILLocation(), arg);
+    lowering.emitDestroyRValue(gen.B, P, arg);
     return arg;
   }
 
@@ -610,7 +626,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
                                 Type resultType) {
   // If the return type is address-only, emit the indirect return argument.
   const TypeLowering &returnTI = getTypeLowering(resultType);
-  if (returnTI.isAddressOnly()) {
+  if (returnTI.isReturnedIndirectly()) {
     IndirectReturnAddress = new (SGM.M) SILArgument(returnTI.getLoweredType(),
                                                     F.begin());
   }
@@ -661,7 +677,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   VarDecl *thisDecl = DD ? DD->getImplicitThisDecl() : nullptr;
   assert((!thisDecl || thisDecl->getType()->hasReferenceSemantics()) &&
          "destructor's implicit this is a value type?!");
-  
+
   SILType thisType = getLoweredLoadableType(CD->getDeclaredTypeInContext());
   assert((!thisDecl || getLoweredLoadableType(thisDecl->getType()) == thisType)
          && "decl type doesn't match destructor's implicit this type");
@@ -677,7 +693,7 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
     // Make a local variable for 'this'.
     emitLocalVariable(thisDecl);
     SILValue thisAddr = VarLocs[thisDecl].address;
-    emitStore(DD, ManagedValue(thisValue, ManagedValue::Unmanaged), thisAddr);
+    B.createStore(DD, thisValue, thisAddr);
     Cleanups.pushCleanup<CleanupDestructorThis>(thisDecl);
   }
   return thisValue;
@@ -1045,18 +1061,19 @@ static void emitObjCReturnValue(SILGenFunction &gen,
 }
 
 /// Take an argument at +0 and bring it to +1.
-static void emitObjCUnconsumedArgument(SILGenFunction &gen,
-                                       SILLocation loc,
-                                       SILValue arg) {
-  // If address-only, copy to raise the ownership count.
+static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           SILValue arg) {
+  // If address-only, make a +1 copy and operate on that.
   if (arg.getType().isAddressOnly(gen.SGM.M)) {
     SILValue tmp = gen.B.createAllocStack(loc, arg.getType());
     gen.B.createCopyAddr(loc, arg, tmp, /*isTake*/false, /*isInit*/ true);
-    gen.B.createDeallocStack(loc, tmp);
-    return;
+    gen.enterDeallocStackCleanup(loc, tmp);
+    return tmp;
   }
   
   gen.B.emitRetainValue(loc, arg);
+  return arg;
 }
 
 /// Reorder arguments from ObjC method order (self-first) to Swift method order
@@ -1070,45 +1087,55 @@ static OwnershipConventions emitObjCThunkArguments(SILGenFunction &gen,
   SILFunctionTypeInfo
     *objcInfo = objcTy.getFunctionTypeInfo(gen.SGM.M),
     *swiftInfo = swiftTy.getFunctionTypeInfo(gen.SGM.M);
+
+  SmallVector<ManagedValue, 8> bridgedArgs;
+  bridgedArgs.reserve(objcInfo->getInputTypes().size());
   
   // Emit the indirect return argument, if any.
-  if (objcInfo->hasIndirectReturn())
-    args.push_back(new (gen.F.getModule())
-                 SILArgument(objcInfo->getIndirectReturnType(), gen.F.begin()));
+  if (objcInfo->hasIndirectReturn()) {
+    auto arg = new (gen.F.getModule())
+                 SILArgument(objcInfo->getIndirectReturnType(), gen.F.begin());
+    bridgedArgs.push_back(ManagedValue(arg, ManagedValue::Unmanaged));
+  }
   
   // Emit the other arguments, taking ownership of arguments if necessary.
   auto ownership = OwnershipConventions::get(gen, thunk, objcTy);
   ArrayRef<SILType> inputs
     = objcInfo->getInputTypesWithoutIndirectReturnType();
+  ManagedValue thisArg = ManagedValue();
+  assert(!inputs.empty());
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILValue arg = new(gen.F.getModule()) SILArgument(inputs[i], gen.F.begin());
-    
-    if (!ownership.isArgumentConsumed(i))
-      emitObjCUnconsumedArgument(gen, thunk.getDecl(), arg);
-      
-    args.push_back(arg);
+
+    // Convert the argument to +1 if necessary.
+    if (!ownership.isArgumentConsumed(i)) {
+      arg = emitObjCUnconsumedArgument(gen, thunk.getDecl(), arg);
+    }
+
+    auto managedArg = gen.emitManagedRValueWithCleanup(arg);
+
+    // Re-order 'this' to the end.
+    if (i == 0) {
+      thisArg = managedArg;
+    } else {
+      bridgedArgs.push_back(managedArg);
+    }
   }
+  bridgedArgs.push_back(thisArg);
 
-  assert(args.size() == objcInfo->getInputTypes().size() &&
+  assert(bridgedArgs.size() == objcInfo->getInputTypes().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(args.size() == swiftInfo->getInputTypes().size() &&
+  assert(bridgedArgs.size() == swiftInfo->getInputTypes().size() &&
          "swift inputs don't match number of arguments?!");
-
-  // Reorder the 'this' argument for the Swift calling convention.
-  size_t thisIndex = objcInfo->hasIndirectReturn() ? 1 : 0;
-  SILValue thisArg = args[thisIndex];
-  args.erase(args.begin() + thisIndex);
-  args.push_back(thisArg);
 
   // Bridge the input types.
   Scope scope(gen.Cleanups);
-  for (unsigned i = 0, size = args.size(); i < size; ++i) {
-    ManagedValue bridged = gen.emitManagedRValueWithCleanup(args[i]);
+  for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     ManagedValue native = gen.emitBridgedToNativeValue(thunk.getDecl(),
-                               bridged,
+                               bridgedArgs[i],
                                AbstractCC::ObjCMethod,
                                swiftInfo->getInputTypes()[i].getSwiftType());
-    args[i] = native.forward(gen);
+    args.push_back(native.forward(gen));
   }
   
   return ownership;
@@ -1208,18 +1235,10 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   SILValue setValue = args[0];
   
   // If the native property is physical, store to it.
+  auto &lowering = getTypeLowering(var->getType());
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
-                                         setValue.getType().getAddressType());
-  if (setValue.getType().isAddressOnly(SGM.M)) {
-    B.createCopyAddr(var, setValue, addr,
-                     /*isTake*/ true,
-                     /*isInitialize*/ false);
-  } else {
-    // FIXME: Use assign instruction here?
-    SILValue old = B.createLoad(var, addr);
-    B.createStore(var, setValue, addr);
-    B.emitReleaseValue(var, old);
-  }
+                                 lowering.getLoweredType().getAddressType());
+  lowering.emitAssignWithRValue(B, setter.getDecl(), setValue, addr);
   
   B.createRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));

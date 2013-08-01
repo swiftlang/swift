@@ -1864,7 +1864,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // cleaned up on a constructor failure unwinding.
   emitLocalVariable(thisDecl);
   SILValue thisLV = VarLocs[thisDecl].address;
-  emitStore(ctor, ManagedValue(thisArg, ManagedValue::Unmanaged), thisLV);
+  B.createStore(ctor, thisArg, thisLV);
   
   // Create a basic block to jump to for the implicit 'this' return.
   // We won't emit the block until after we've emitted the body.
@@ -2129,25 +2129,7 @@ RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitGeneralizedValue(SILLocation loc, SILValue v) {
-  // Thicken thin functions.
-  if (v.getType().is<AnyFunctionType>() &&
-      v.getType().castTo<AnyFunctionType>()->isThin()) {
-    // Thunk functions to the standard "freestanding" calling convention.
-    if (v.getType().getAbstractCC() != AbstractCC::Freestanding) {
-      auto freestandingType = getThinFunctionType(v.getType().getSwiftType(),
-                                                  AbstractCC::Freestanding);
-      SILType freestandingSILType = getLoweredLoadableType(freestandingType, 0);
-      v = B.createConvertCC(loc, v, freestandingSILType);
-    }
-    
-    Type thickTy = getThickFunctionType(v.getType().getSwiftType(),
-                                        AbstractCC::Freestanding);
-    
-    v = B.createThinToThickFunction(loc, v,
-                                    getLoweredLoadableType(thickTy));
-  }
-  
-  return v;
+  return B.emitGeneralizedValue(loc, v);
 }
 
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
@@ -2268,16 +2250,6 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 #include "swift/SIL/BridgedTypes.def"
     return v;
   }
-}
-
-void SILGenFunction::emitStore(SILLocation loc, ManagedValue src,
-                               SILValue destAddr) {
-  SILValue fwdSrc = src.forward(*this);
-  // If we store a function value, we lose its thinness.
-  // FIXME: This should go away when Swift typechecking learns how to handle
-  // thin functions.
-  fwdSrc = emitGeneralizedValue(loc, fwdSrc);  
-  B.createStore(loc, fwdSrc, destAddr);
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {

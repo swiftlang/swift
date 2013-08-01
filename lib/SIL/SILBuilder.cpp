@@ -71,3 +71,26 @@ void SILBuilder::emitReleaseValueImpl(SILLocation loc, SILValue v,
   
   rrLoadableValue(*this, loc, v, &SILBuilder::createRelease);
 }
+
+SILValue SILBuilder::emitGeneralizedValue(SILLocation loc, SILValue v) {
+  // Thicken thin functions.
+  if (v.getType().is<AnyFunctionType>() &&
+      v.getType().castTo<AnyFunctionType>()->isThin()) {
+    // Thunk functions to the standard "freestanding" calling convention.
+    if (v.getType().getAbstractCC() != AbstractCC::Freestanding) {
+      auto freestandingType = getThinFunctionType(v.getType().getSwiftType(),
+                                                  AbstractCC::Freestanding);
+      SILType freestandingSILType =
+        F.getParent()->Types.getLoweredLoadableType(freestandingType, 0);
+      v = createConvertCC(loc, v, freestandingSILType);
+    }
+
+    Type thickTy = getThickFunctionType(v.getType().getSwiftType(),
+                                        AbstractCC::Freestanding);
+
+    v = createThinToThickFunction(loc, v,
+                       F.getParent()->Types.getLoweredLoadableType(thickTy));
+  }
+
+  return v;
+}

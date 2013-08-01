@@ -141,16 +141,7 @@ public:
   /// \param gen - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
-  void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
-    if (getType().isAddressOnly(gen.F.getModule())) {
-      if (hasCleanup())
-        forwardCleanup(gen);
-      gen.B.createCopyAddr(loc, getValue(), address,
-                           /*isTake*/ true,
-                           /*isInitialize*/ true);
-    } else
-      gen.emitStore(loc, *this, address);
-  }
+  void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address);
   
   /// Assign this value into memory, destroying the existing
   /// value at the destination address.
@@ -158,36 +149,7 @@ public:
   /// \param gen - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
-  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address) {
-    if (getType().isAddressOnly(gen.F.getModule())) {
-      if (hasCleanup())
-        forwardCleanup(gen);
-      gen.B.createCopyAddr(loc, getValue(), address,
-                           /*isTake*/ true,
-                           /*isInitialize*/ false);
-    } else {
-      // FIXME: We want to introduce a new high-level 'assign' instruction here
-      // for definitive assignment analysis to canonicalize to an initialization
-      // or assignment.
-      
-      // src is a loadable type; release the old value if necessary and store
-      // the new.
-      assert(!getType().isAddress() &&
-             "can't assign loadable type from address");
-      const TypeLowering &ti
-        = gen.getTypeLowering(getType().getSwiftRValueType());
-      
-      SILValue old;
-      
-      if (!ti.isTrivial())
-        old = gen.B.createLoad(loc, address);
-      
-      gen.emitStore(loc, *this, address);
-      
-      if (old)
-        gen.B.emitReleaseValue(loc, old);
-    }
-  }
+  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address);
   
   explicit operator bool() const {
     return bool(getValue());
