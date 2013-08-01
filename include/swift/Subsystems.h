@@ -23,7 +23,6 @@
 #include <memory>
 
 namespace llvm {
-  class SourceMgr;
   class MemoryBuffer;
   class Module;
   class FunctionPass;
@@ -41,6 +40,7 @@ namespace swift {
   class CodeCompletionCallbacksFactory;
   class PersistentParserState;
   class DelayedParsingCallbacks;
+  class SourceManager;
 
   namespace irgen {
     class Options;
@@ -92,7 +92,7 @@ namespace swift {
                         unsigned CodeCompletionOffset);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
-  std::vector<Token> tokenize(llvm::SourceMgr &SM, unsigned BufferID,
+  std::vector<Token> tokenize(SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true);
 

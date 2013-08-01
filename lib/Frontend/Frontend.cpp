@@ -20,6 +20,7 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -27,7 +28,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
 
@@ -94,8 +94,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     llvm::MemoryBuffer *CodeCompletionBuffer =
         llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
                                              MemBuf->getBufferIdentifier());
-    CodeCompletionBufferID = SourceMgr.AddNewSourceBuffer(CodeCompletionBuffer,
-                                                          llvm::SMLoc());
+    CodeCompletionBufferID = SourceMgr->AddNewSourceBuffer(CodeCompletionBuffer,
+                                                           llvm::SMLoc());
     BufferIDs.push_back(CodeCompletionBufferID);
     CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
         CodeCompletionBuffer->getBufferStart() + CodeCompletePoint.second));
@@ -111,13 +111,13 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       return true;
     }
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
-    BufferIDs.push_back(SourceMgr.AddNewSourceBuffer(InputFile.take(),
-                                                     llvm::SMLoc()));
+    BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(InputFile.take(),
+                                                      llvm::SMLoc()));
   }
 
   for (auto Buf : Invocation.getInputBuffers()) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    BufferIDs.push_back(SourceMgr.AddNewSourceBuffer(
+    BufferIDs.push_back(SourceMgr->AddNewSourceBuffer(
         llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
                                              Buf->getBufferIdentifier()),
                                                      llvm::SMLoc()));

@@ -17,10 +17,10 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h" // bad dependency!
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include <functional>
 using namespace swift;
 
@@ -875,8 +875,8 @@ namespace {
 
     bool isGoodSourceRange(SourceRange SR) {
       return SR.isValid() &&
-             Ctx.SourceMgr.FindBufferContainingLoc(SR.Start.Value) != -1 &&
-             Ctx.SourceMgr.FindBufferContainingLoc(SR.End.Value) != -1;
+             Ctx.SourceMgr->FindBufferContainingLoc(SR.Start.Value) != -1 &&
+             Ctx.SourceMgr->FindBufferContainingLoc(SR.End.Value) != -1;
     }
 
     void checkSourceRanges(FuncExpr *FE) {

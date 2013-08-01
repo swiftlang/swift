@@ -21,20 +21,17 @@
 #include "llvm/ADT/SmallVector.h"
 #include "swift/Basic/SourceLoc.h"
 
-namespace llvm {
-  class SourceMgr;
-}
-
 namespace swift {
   class DiagnosticEngine;
   class Identifier;
   class InFlightDiagnostic;
   class ASTContext;
+  class SourceManager;
   
   template<typename ...T> struct Diag;
 
 class Lexer {
-  llvm::SourceMgr &SourceMgr;
+  SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
 
   /// Pointer to the first character of the buffer.
@@ -75,14 +72,14 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
-  Lexer(llvm::SourceMgr &SourceMgr, llvm::StringRef Buffer,
+  Lexer(SourceManager &SourceMgr, llvm::StringRef Buffer,
         DiagnosticEngine *Diags, const char *CurrentPosition,
         bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime);
 
   void primeLexer();
 
 public:
-  Lexer(llvm::StringRef Buffer, llvm::SourceMgr &SourceMgr,
+  Lexer(llvm::StringRef Buffer, SourceManager &SourceMgr,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
         bool AllowHashbang = false)
       : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode,
@@ -110,7 +107,7 @@ public:
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState,
-        llvm::SourceMgr &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
+        SourceManager &SourceMgr, DiagnosticEngine *Diags, bool InSILMode)
     : Lexer(SourceMgr,
             StringRef(BeginState.CurPtr, Parent.BufferEnd - BeginState.CurPtr),
             Diags, BeginState.CurPtr, InSILMode, Parent.isKeepingComments(),
@@ -203,7 +200,7 @@ public:
   /// resides.
   ///
   /// \param Loc The source location of the beginning of a token.
-  static SourceLoc getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc);
+  static SourceLoc getLocForEndOfToken(SourceManager &SM, SourceLoc Loc);
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier.

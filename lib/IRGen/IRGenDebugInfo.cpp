@@ -18,6 +18,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/IRGen/Options.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -34,7 +35,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/IR/Module.h"
 #include "GenType.h"
 #include "Linking.h"
@@ -87,7 +87,7 @@ StringRef BumpAllocatedString(StringRef S, llvm::BumpPtrAllocator &BP) {
 IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
                                const clang::TargetInfo &TargetInfo,
                                TypeConverter &Types,
-                               llvm::SourceMgr &SM,
+                               SourceManager &SM,
                                llvm::Module &M)
   : Opts(Opts), TargetInfo(TargetInfo), SM(SM), DBuilder(M), Types(Types),
     LastFn(nullptr), LastLoc({}), LastScope(nullptr) {
@@ -150,25 +150,25 @@ Location getDeserializedLoc(Decl* D) {
 
 /// Use the SM to figure out the actual line/column of a SourceLoc.
 template<typename WithLoc>
-Location getStartLoc(llvm::SourceMgr& SM, WithLoc *S) {
+Location getStartLoc(SourceManager &SM, WithLoc *S) {
   Location L = {};
   if (S == nullptr) return L;
 
   SourceLoc Start = S->getStartLoc();
-  int BufferIndex = SM.FindBufferContainingLoc(Start.Value);
+  int BufferIndex = SM->FindBufferContainingLoc(Start.Value);
   if (BufferIndex == -1)
     // This may be a deserialized or clang-imported decl. And modules
     // don't come with SourceLocs right now. Get at least the name of
     // the module.
     return getDeserializedLoc(S);
 
-  L.Filename = SM.getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
-  L.Line = SM.FindLineNumber(Start.Value, BufferIndex);
+  L.Filename = SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
+  L.Line = SM->FindLineNumber(Start.Value, BufferIndex);
   return L;
 }
 
 /// getStartLoc - extract the start location from a SILLocation.
-static Location getStartLoc(llvm::SourceMgr& SM, SILLocation Loc) {
+static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
   if (Expr* E = Loc.getAs<Expr>())
     return getStartLoc(SM, E);
 

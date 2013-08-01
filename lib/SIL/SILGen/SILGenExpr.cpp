@@ -16,6 +16,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Condition.h"
@@ -25,7 +26,6 @@
 #include "RValue.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -2016,22 +2016,22 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File: {
-    int BufferID = Ctx.SourceMgr.FindBufferContainingLoc(Loc);
+    int BufferID = Ctx.SourceMgr->FindBufferContainingLoc(Loc);
     assert(BufferID != -1 && "MagicIdentifierLiteral has invalid location");
     
     StringRef Value =
-      Ctx.SourceMgr.getMemoryBuffer(BufferID)->getBufferIdentifier();
+      Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
     
     return RValue(SGF, ManagedValue(SGF.B.createStringLiteral(E, Ty, Value),
                                     ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Line: {
-    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
+    unsigned Value = Ctx.SourceMgr->getLineAndColumn(Loc).first;
     return RValue(SGF, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
                                     ManagedValue::Unmanaged));
   }
   case MagicIdentifierLiteralExpr::Column: {
-    unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
+    unsigned Value = Ctx.SourceMgr->getLineAndColumn(Loc).second;
     return RValue(SGF, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
                                     ManagedValue::Unmanaged));
   }

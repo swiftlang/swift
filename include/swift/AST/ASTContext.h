@@ -35,7 +35,6 @@
 
 namespace llvm {
   class BumpPtrAllocator;
-  class SourceMgr;
 }
 
 namespace clang {
@@ -65,6 +64,7 @@ namespace swift {
   class UnionElementDecl;
   class ProtocolDecl;
   class SubstitutableType;
+  class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
   class Substitution;
@@ -142,15 +142,15 @@ public:
   
   friend class ConstraintCheckerArenaRAII;
 public:
-  ASTContext(LangOptions &langOpts, llvm::SourceMgr &SourceMgr,
+  ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// \brief The language options used for translation.
   LangOptions &LangOpts;
 
-  /// SourceMgr - The source manager object.
-  llvm::SourceMgr &SourceMgr;
+  /// \brief The source manager object.
+  SourceManager &SourceMgr;
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;

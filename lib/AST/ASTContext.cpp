@@ -21,8 +21,8 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleLoadListener.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include <memory>
@@ -148,11 +148,11 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
     (ASTContext::Implementation::ConstraintSolverArena *)Data);
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, llvm::SourceMgr &sourcemgr,
+ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
                        DiagnosticEngine &Diags)
   : Impl(*new Implementation()),
     LangOpts(langOpts),
-    SourceMgr(sourcemgr),
+    SourceMgr(SourceMgr),
     Diags(Diags),
     TheBuiltinModule(new (*this) BuiltinModule(getIdentifier("Builtin"), *this)),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),

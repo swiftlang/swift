@@ -17,6 +17,7 @@
 
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -25,7 +26,6 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/Host.h"
 
 #include <memory>
@@ -199,7 +199,7 @@ public:
 
 class CompilerInstance {
   CompilerInvocation Invocation;
-  llvm::SourceMgr SourceMgr;
+  SourceManager SourceMgr;
   std::vector<unsigned> BufferIDs;
   unsigned CodeCompletionBufferID = ~0U;
   DiagnosticEngine Diagnostics;
@@ -216,7 +216,7 @@ public:
   CompilerInstance() : Diagnostics(SourceMgr), TU(nullptr) {
   }
 
-  llvm::SourceMgr &getSourceMgr() { return SourceMgr; }
+  SourceManager &getSourceMgr() { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 

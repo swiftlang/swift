@@ -23,7 +23,7 @@ using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() { }
 
-void NullDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM,
+void NullDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                               SourceLoc Loc,
                                               DiagnosticKind Kind,
                                               llvm::StringRef Text,

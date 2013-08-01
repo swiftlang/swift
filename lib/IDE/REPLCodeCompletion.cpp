@@ -18,13 +18,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include <algorithm>
 
 using namespace swift;
@@ -116,7 +116,7 @@ doCodeCompletion(TranslationUnit *TU, StringRef EnteredCode, unsigned *BufferID,
   auto Buffer =
       llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
   *BufferID =
-      TU->getASTContext().SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
+      TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
 
   SourceLoc CodeCompleteLoc = SourceLoc(llvm::SMLoc::getFromPointer(
       Buffer->getBufferStart() + CodeCompletionOffset));
@@ -171,7 +171,7 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
       Prefix = LastToken.getText();
 
       const llvm::MemoryBuffer *Buffer =
-          TU->getASTContext().SourceMgr.getMemoryBuffer(BufferID);
+          TU->getASTContext().SourceMgr->getMemoryBuffer(BufferID);
 
       unsigned Offset =
           LastToken.getLoc().Value.getPointer() - Buffer->getBuffer().begin();

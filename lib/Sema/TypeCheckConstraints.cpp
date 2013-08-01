@@ -32,7 +32,6 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/SourceMgr.h"
 #include <iterator>
 #include <map>
 #include <memory>
@@ -78,7 +77,7 @@ ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
 //===--------------------------------------------------------------------===//
 #pragma mark Constraints
 
-void ConstraintLocator::dump(llvm::SourceMgr *sm) {
+void ConstraintLocator::dump(SourceManager *sm) {
   llvm::raw_ostream &out = llvm::errs();
 
   if (anchor) {
@@ -219,7 +218,7 @@ void ConstraintLocator::dump(llvm::SourceMgr *sm) {
   }
 }
 
-void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
+void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) {
   First->print(Out);
 
   bool skipSecond = false;
@@ -256,7 +255,7 @@ void Constraint::print(llvm::raw_ostream &Out, llvm::SourceMgr *sm) {
   }
 }
 
-void Constraint::dump(llvm::SourceMgr *sm) {
+void Constraint::dump(SourceManager *sm) {
   print(llvm::errs(), sm);
 }
 
@@ -3819,7 +3818,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
 
-void Solution::dump(llvm::SourceMgr *sm) const {
+void Solution::dump(SourceManager *sm) const {
   llvm::raw_ostream &out = llvm::errs();
   out << "Fixed score: " << getFixedScore() << "\n\n";
   out << "Type variables:\n";

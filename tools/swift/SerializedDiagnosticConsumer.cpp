@@ -17,6 +17,7 @@
 #include "SerializedDiagnosticConsumer.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -25,7 +26,6 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 
 using namespace swift;
@@ -145,9 +145,9 @@ public:
     State->OS.reset(0);
   }
 
-  virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, llvm::StringRef Text,
-                                const DiagnosticInfo &Info);
+                                const DiagnosticInfo &Info) override;
 
   /// \brief The version of the diagnostics file.
   enum { Version = 1 };
@@ -177,15 +177,15 @@ private:
 
   /// \brief Add a source location to a record.
   void addLocToRecord(llvm::SMLoc Loc,
-                      llvm::SourceMgr &SM,
+                      SourceManager &SM,
                       StringRef Filename,
                       RecordDataImpl &Record);
 
-  void addRangeToRecord(llvm::SMRange Range, llvm::SourceMgr &SM,
+  void addRangeToRecord(llvm::SMRange Range, SourceManager &SM,
                         StringRef Filename, RecordDataImpl &Record);
 
   /// \brief Emit the message payload of a diagnostic to bitcode.
-  void emitDiagnosticMessage(llvm::SourceMgr &SM, SourceLoc Loc,
+  void emitDiagnosticMessage(SourceManager &SM, SourceLoc Loc,
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
 };
@@ -200,7 +200,7 @@ namespace swift { namespace serialized_diagnostics {
 // FIXME: Copy-pasted from PrintingDiagnosticConsumer.
 // Refactor when more code is wired up.  All of this is just
 // rapid prototyping.
-static llvm::SMRange getRawRange(llvm::SourceMgr &SM,
+static llvm::SMRange getRawRange(SourceManager &SM,
                                  DiagnosticInfo::Range R) {
   SourceLoc End;
   if (R.IsTokenRange)
@@ -214,7 +214,7 @@ static llvm::SMRange getRawRange(llvm::SourceMgr &SM,
 // FIXME: Copy-pasted from PrintingDiagnosticConsumer.
 // Refactor when more code is wired up.  All of this is just
 // rapid prototyping.
-static llvm::SMFixIt getRawFixIt(llvm::SourceMgr &SM,
+static llvm::SMFixIt getRawFixIt(SourceManager &SM,
                                  DiagnosticInfo::FixIt F) {
   // FIXME: It's unfortunate that we have to copy the replacement text.
   return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
@@ -245,7 +245,7 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(StringRef Filename) {
 }
 
 void SerializedDiagnosticConsumer::addLocToRecord(llvm::SMLoc Loc,
-                                                  llvm::SourceMgr &SM,
+                                                  SourceManager &SM,
                                                   StringRef Filename,
                                                   RecordDataImpl &Record)
 {
@@ -259,7 +259,7 @@ void SerializedDiagnosticConsumer::addLocToRecord(llvm::SMLoc Loc,
   }
 
   unsigned line, col;
-  std::tie(line, col) = SM.getLineAndColumn(Loc);
+  std::tie(line, col) = SM->getLineAndColumn(Loc);
 
   Record.push_back(getEmitFile(Filename));
   Record.push_back(line);
@@ -268,7 +268,7 @@ void SerializedDiagnosticConsumer::addLocToRecord(llvm::SMLoc Loc,
 }
 
 void SerializedDiagnosticConsumer::addRangeToRecord(llvm::SMRange Range,
-                                                    llvm::SourceMgr &SM,
+                                                    SourceManager &SM,
                                                     StringRef Filename,
                                                     RecordDataImpl &Record) {
   addLocToRecord(Range.Start, SM, Filename, Record);
@@ -450,7 +450,7 @@ void SerializedDiagnosticConsumer::emitBlockInfoBlock() {
 }
 
 void SerializedDiagnosticConsumer::
-emitDiagnosticMessage(llvm::SourceMgr &SM,
+emitDiagnosticMessage(SourceManager &SM,
                       SourceLoc Loc,
                       DiagnosticKind Kind,
                       StringRef Text,
@@ -472,8 +472,8 @@ emitDiagnosticMessage(llvm::SourceMgr &SM,
 
   // Construct the diagnostic.
   const llvm::SMDiagnostic &D =
-    SM.GetMessage(Loc.Value, SMKind, Text,
-                  ArrayRef<llvm::SMRange>(), ArrayRef<llvm::SMFixIt>());
+    SM->GetMessage(Loc.Value, SMKind, Text,
+                   ArrayRef<llvm::SMRange>(), ArrayRef<llvm::SMFixIt>());
 
   // Emit the diagnostic to bitcode.
   llvm::BitstreamWriter &Stream = State->Stream;
@@ -528,7 +528,7 @@ emitDiagnosticMessage(llvm::SourceMgr &SM,
 }
 
 void
-SerializedDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM,
+SerializedDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
                                                SourceLoc Loc,
                                                DiagnosticKind Kind,
                                                StringRef Text,

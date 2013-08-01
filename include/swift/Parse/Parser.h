@@ -26,7 +26,6 @@
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
-  class SourceMgr;
   template <typename PT1, typename PT2, typename PT3> class PointerUnion3;
 }
 
@@ -37,6 +36,7 @@ namespace swift {
   struct TypeLoc;
   class TupleType;
   class SILParserState;
+  class SourceManager;
   class PersistentParserState;
   class CodeCompletionCallbacks;
   class DelayedParsingCallbacks;
@@ -65,7 +65,7 @@ class Parser {
 public:
   typedef llvm::PointerUnion3<Expr*, Stmt*, Decl*> ExprStmtOrDecl;
 
-  llvm::SourceMgr &SourceMgr;
+  SourceManager &SourceMgr;
   DiagnosticEngine &Diags;
   TranslationUnit *TU;
   Lexer *L;

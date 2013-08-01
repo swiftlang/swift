@@ -1,7 +1,7 @@
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -9,12 +9,12 @@ using namespace llvm;
 
 // The test fixture.
 class LexerTest : public ::testing::Test {
-  SourceMgr SourceMgr;
+  SourceManager SourceMgr;
 
 public:
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
-    const llvm::MemoryBuffer *Buffer = SourceMgr.getMemoryBuffer(BufferID);
+    const llvm::MemoryBuffer *Buffer = SourceMgr->getMemoryBuffer(BufferID);
     Lexer L(Buffer->getBuffer(), SourceMgr, /*Diags=*/nullptr,
             /*InSILMode=*/false);
     std::vector<Token> Tokens;
@@ -30,7 +30,7 @@ public:
                               bool KeepComments,
                               bool KeepEOF = false) {
     MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
-    unsigned BufID = SourceMgr.AddNewSourceBuffer(Buf, llvm::SMLoc());
+    unsigned BufID = SourceMgr->AddNewSourceBuffer(Buf, llvm::SMLoc());
 
     std::vector<Token> Toks;
     if (KeepEOF)

@@ -24,11 +24,8 @@
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
-namespace llvm {
-  class SourceMgr;
-}
-
 namespace swift {
+  class SourceManager;
   
 /// \brief Describes the kind of diagnostic.
 ///
@@ -101,7 +98,7 @@ public:
   /// \param Text The diagnostic text.
   ///
   /// \param Info Extra information associated with the diagnostic.
-  virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, llvm::StringRef Text,
                                 const DiagnosticInfo &Info) = 0;
 };
@@ -109,7 +106,7 @@ public:
 /// \brief DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind, llvm::StringRef Text,
                         const DiagnosticInfo &Info) override;
 };

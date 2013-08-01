@@ -28,11 +28,11 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
 
@@ -42,7 +42,7 @@ bool swift::appendToREPLTranslationUnit(TranslationUnit *TU,
   assert(TU->Kind == TranslationUnit::REPL && "Can't append to a non-REPL TU");
   
   RC.CurBufferID
-    = TU->getASTContext().SourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
+    = TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer, llvm::SMLoc());
   
   bool FoundAnySideEffects = false;
   unsigned CurTUElem = RC.CurTUElem;

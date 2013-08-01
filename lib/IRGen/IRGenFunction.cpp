@@ -15,10 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/IR/Instructions.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "Explosion.h"
 #include "IRGenDebugInfo.h"

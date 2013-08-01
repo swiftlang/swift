@@ -20,12 +20,12 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 
 using namespace swift;
@@ -40,10 +40,10 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
 
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
-  int currentBufferID = ctx.SourceMgr.FindBufferContainingLoc(importLoc.Value);
+  int currentBufferID = ctx.SourceMgr->FindBufferContainingLoc(importLoc.Value);
   if (currentBufferID >= 0) {
     const llvm::MemoryBuffer *importingBuffer
-      = ctx.SourceMgr.getBufferInfo(currentBufferID).Buffer;
+      = ctx.SourceMgr->getBufferInfo(currentBufferID).Buffer;
     StringRef currentDirectory
       = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
     if (!currentDirectory.empty()) {
@@ -96,7 +96,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
                                           false);
 
-  unsigned bufferID = Ctx.SourceMgr.AddNewSourceBuffer(inputFile.take(),
+  unsigned bufferID = Ctx.SourceMgr->AddNewSourceBuffer(inputFile.take(),
                                                        moduleID.second.Value);
 
   // For now, treat all separate modules as unique components.

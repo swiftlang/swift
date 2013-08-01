@@ -63,7 +63,7 @@ typedef struct {
 class IRGenDebugInfo {
   const Options &Opts;
   const clang::TargetInfo &TargetInfo;
-  llvm::SourceMgr &SM;
+  SourceManager &SM;
   llvm::DIBuilder DBuilder;
   TypeConverter &Types;
 
@@ -91,7 +91,7 @@ public:
   IRGenDebugInfo(const Options &Opts,
                  const clang::TargetInfo &TargetInfo,
                  TypeConverter &Types,
-                 llvm::SourceMgr &SM,
+                 SourceManager &SM,
                  llvm::Module &M);
 
   /// Finalize the llvm::DIBuilder owned by this object.

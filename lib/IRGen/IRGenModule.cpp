@@ -27,7 +27,6 @@
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/SourceMgr.h"
 
 #include "GenType.h"
 #include "IRGenModule.h"

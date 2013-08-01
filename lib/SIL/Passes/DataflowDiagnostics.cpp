@@ -20,9 +20,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
 
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
-
 using namespace swift;
 
 namespace {

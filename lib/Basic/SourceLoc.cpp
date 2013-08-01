@@ -11,40 +11,41 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SourceMgr.h"
+
 using namespace swift;
 
-void SourceLoc::print(raw_ostream &OS, const llvm::SourceMgr &SM,
+void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
                       int &LastBuffer) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
   }
-  int BufferIndex = SM.FindBufferContainingLoc(Value);
+  int BufferIndex = SM->FindBufferContainingLoc(Value);
   if (BufferIndex == -1) {
     OS << "<malformed loc>";
     return;
   }
   
   if (BufferIndex != LastBuffer) {
-    OS << SM.getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
+    OS << SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
     LastBuffer = BufferIndex;
   } else {
     OS << "line";
   }
 
-  auto LineAndCol = SM.getLineAndColumn(Value, BufferIndex);
+  auto LineAndCol = SM->getLineAndColumn(Value, BufferIndex);
 
   OS << ':' << LineAndCol.first << ':' << LineAndCol.second;
 }
 
-void SourceLoc::dump(const llvm::SourceMgr &SM) const {
+void SourceLoc::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
 
-void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM,
+void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
                         int &LastBuffer) const {
   OS << '[';
   Start.print(OS, SM, LastBuffer);
@@ -61,7 +62,7 @@ void SourceRange::print(raw_ostream &OS, const llvm::SourceMgr &SM,
      << '"';
 }
 
-void SourceRange::dump(const llvm::SourceMgr &SM) const {
+void SourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
 

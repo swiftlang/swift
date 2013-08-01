@@ -21,8 +21,8 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -322,7 +322,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         // Build a buffer with the pretty-printed declaration.
         auto memBuffer = llvm::MemoryBuffer::getMemBufferCopy(buffer,
                                                               bufferName);
-        SourceMgr.AddNewSourceBuffer(memBuffer, llvm::SMLoc());
+        SourceMgr->AddNewSourceBuffer(memBuffer, llvm::SMLoc());
 
         // Go through all of the pretty-printed entries and record their
         // locations.

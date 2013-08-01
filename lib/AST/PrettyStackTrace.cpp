@@ -19,9 +19,9 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Optional.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 
 using namespace swift;
 
@@ -31,15 +31,15 @@ struct DecomposedLoc {
   unsigned Column;
 };
 
-static Optional<DecomposedLoc> decompose(llvm::SourceMgr &SM, SourceLoc loc) {
+static Optional<DecomposedLoc> decompose(SourceManager &SM, SourceLoc loc) {
   if (!loc.isValid()) return Nothing;
 
-  int bufferIndex = SM.FindBufferContainingLoc(loc.Value);
+  int bufferIndex = SM->FindBufferContainingLoc(loc.Value);
   if (bufferIndex == -1) return Nothing;
 
   DecomposedLoc result;
-  result.Buffer = SM.getBufferInfo(bufferIndex).Buffer;
-  result.Line = SM.FindLineNumber(loc.Value, bufferIndex);
+  result.Buffer = SM->getBufferInfo(bufferIndex).Buffer;
+  result.Line = SM->FindLineNumber(loc.Value, bufferIndex);
 
   const char *lineStart = loc.Value.getPointer();
   while (lineStart != result.Buffer->getBufferStart() &&
@@ -73,9 +73,8 @@ void swift::printSourceLoc(llvm::raw_ostream &out, SourceLoc loc,
 
 static void printSourceRange(llvm::raw_ostream &out, SourceRange range,
                              ASTContext &Context) {
-  llvm::SourceMgr &SM = Context.SourceMgr;
-  Optional<DecomposedLoc> start = decompose(SM, range.Start);
-  Optional<DecomposedLoc> end = decompose(SM, range.End);
+  Optional<DecomposedLoc> start = decompose(Context.SourceMgr, range.Start);
+  Optional<DecomposedLoc> end = decompose(Context.SourceMgr, range.End);
 
   // Use a unified message if both locations are invalid.
   if (!start && !end) {

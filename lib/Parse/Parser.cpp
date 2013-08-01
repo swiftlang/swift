@@ -19,13 +19,13 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 
@@ -81,7 +81,7 @@ private:
     assert(FE);
     assert(FE->getBodyKind() == FuncExpr::BodyKind::Unparsed);
 
-    int BufferID = TU->Ctx.SourceMgr.FindBufferContainingLoc(FD->getLoc().Value);
+    int BufferID = TU->Ctx.SourceMgr->FindBufferContainingLoc(FD->getLoc().Value);
     Parser TheParser(BufferID, TU,
                      TU->Kind == TranslationUnit::Main ||
                      TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
@@ -109,7 +109,7 @@ parseDelayedTopLevelDecl(TranslationUnit *TU,
     return;
 
   int BufferID = TU->Ctx.SourceMgr
-      .FindBufferContainingLoc(ParserState.getDelayedDeclLoc().Value);
+      ->FindBufferContainingLoc(ParserState.getDelayedDeclLoc().Value);
   Parser TheParser(BufferID, TU,
                    TU->Kind == TranslationUnit::Main ||
                    TU->Kind == TranslationUnit::REPL, nullptr, &ParserState);
@@ -142,7 +142,7 @@ bool swift::parseIntoTranslationUnit(TranslationUnit *TU,
 
   bool FoundSideEffects = P.parseTranslationUnit(TU);
 
-  const llvm::MemoryBuffer *Buffer = P.SourceMgr.getMemoryBuffer(BufferID);
+  const llvm::MemoryBuffer *Buffer = P.SourceMgr->getMemoryBuffer(BufferID);
   *Done = P.Tok.getLoc().Value.getPointer() ==
           Buffer->getBuffer().end();
 
@@ -165,10 +165,10 @@ void swift::performDelayedParsing(
                              CodeCompletionOffset);
 }
 
-std::vector<Token> swift::tokenize(llvm::SourceMgr &SM, unsigned BufferID,
+std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments) {
-  const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
+  const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufferID);
   StringRef BufferData = Buffer->getBuffer();
 
   if (EndOffset)
@@ -221,7 +221,7 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
                bool IsMainModule, SILParserState *SIL,
                PersistentParserState *PersistentState)
   : Parser(new Lexer(TU->getASTContext().SourceMgr
-                         .getMemoryBuffer(BufferID)->getBuffer(),
+                         ->getMemoryBuffer(BufferID)->getBuffer(),
                      TU->getASTContext().SourceMgr, &TU->getASTContext().Diags,
                      /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false,
                      /*AllowHashbang=*/IsMainModule),
@@ -229,7 +229,7 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
   this->IsMainModule = IsMainModule;
   auto ParserPos = State->takeParserPosition();
   if (ParserPos.isValid() &&
-      SourceMgr.FindBufferContainingLoc(ParserPos.Loc.Value) == int(BufferID)) {
+      SourceMgr->FindBufferContainingLoc(ParserPos.Loc.Value) == int(BufferID)) {
     auto BeginParserPosition = getParserPosition(ParserPos);
     restoreParserPosition(BeginParserPosition);
   }

@@ -16,13 +16,14 @@
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
 using namespace swift;
 
-static llvm::SMRange getRawRange(llvm::SourceMgr &SM, DiagnosticInfo::Range R) {
+static llvm::SMRange getRawRange(SourceManager &SM, DiagnosticInfo::Range R) {
   SourceLoc End;
   if (R.IsTokenRange)
     End = Lexer::getLocForEndOfToken(SM, R.End);
@@ -32,13 +33,13 @@ static llvm::SMRange getRawRange(llvm::SourceMgr &SM, DiagnosticInfo::Range R) {
   return llvm::SMRange(R.Start.Value, End.Value);
 }
 
-static llvm::SMFixIt getRawFixIt(llvm::SourceMgr &SM, DiagnosticInfo::FixIt F) {
+static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F) {
   // FIXME: It's unfortunate that we have to copy the replacement text.
   return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
 }
 
 void
-PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                              DiagnosticKind Kind, 
                                              llvm::StringRef Text,
                                              const DiagnosticInfo &Info) {
@@ -68,6 +69,6 @@ PrintingDiagnosticConsumer::handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
     FixIts.push_back(getRawFixIt(SM, F));
 
   // Display the diagnostic.
-  SM.PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges, FixIts);
+  SM->PrintMessage(Loc.Value, SMKind, StringRef(Text), Ranges, FixIts);
 }
 

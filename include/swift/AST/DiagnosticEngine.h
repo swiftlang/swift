@@ -31,15 +31,10 @@
 #include <string>
 #include <utility>
 
-namespace llvm {
-  class SourceMgr;
-}
-
 namespace swift {
-  using llvm::ArrayRef;
-  using llvm::StringRef;
   class Decl;
   class DiagnosticEngine;
+  class SourceManager;
   
   enum class PatternKind : uint8_t;
   
@@ -302,7 +297,7 @@ namespace swift {
   class DiagnosticEngine {
     /// \brief The source manager used to interpret source locations and
     /// display diagnostics.
-    llvm::SourceMgr &SourceMgr;
+    SourceManager &SourceMgr;
 
     /// \brief The diagnostic consumer(s) that will be responsible for actually
     /// emitting diagnostics.
@@ -329,7 +324,7 @@ namespace swift {
     friend class InFlightDiagnostic;
     
   public:
-    explicit DiagnosticEngine(llvm::SourceMgr &SourceMgr)
+    explicit DiagnosticEngine(SourceManager &SourceMgr)
       : SourceMgr(SourceMgr), HadAnyError(false), ActiveDiagnostic() {
     }
 

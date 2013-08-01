@@ -25,9 +25,9 @@ namespace swift {
 /// \brief Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  virtual void handleDiagnostic(llvm::SourceMgr &SM, SourceLoc Loc,
+  virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, llvm::StringRef Text,
-                                const DiagnosticInfo &Info);
+                                const DiagnosticInfo &Info) override;
 };
   
 }

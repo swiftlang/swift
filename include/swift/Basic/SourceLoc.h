@@ -20,10 +20,8 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/SMLoc.h"
 
-namespace llvm {
-  class SourceMgr;
-}
 namespace swift {
+  class SourceManager;
 
 /// SourceLoc in swift is just an SMLoc.  We define it as a different type
 /// (instead of as a typedef) just to remove the "getFromPointer" methods and
@@ -53,14 +51,15 @@ public:
   /// as specified by LastBuffer, then we don't print the filename.  If not, we
   /// do print the filename, and then update LastBuffer with the BufferID
   /// printed.
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM,
+  void print(raw_ostream &OS, const SourceManager &SM,
              int &LastBuffer) const;
 
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+  void print(raw_ostream &OS, const SourceManager &SM) const {
     int Tmp = -1;
     print(OS, SM, Tmp);
   }
-  void dump(const llvm::SourceMgr &SM) const;
+
+  void dump(const SourceManager &SM) const;
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
@@ -85,14 +84,15 @@ public:
   /// as specified by LastBuffer, then we don't print the filename.  If not, we
   /// do print the filename, and then update LastBuffer with the BufferID
   /// printed.
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM,
+  void print(raw_ostream &OS, const SourceManager &SM,
              int &LastBuffer) const;
 
-  void print(raw_ostream &OS, const llvm::SourceMgr &SM) const {
+  void print(raw_ostream &OS, const SourceManager &SM) const {
     int Tmp = -1;
     print(OS, SM, Tmp);
   }
-  void dump(const llvm::SourceMgr &SM) const;
+
+  void dump(const SourceManager &SM) const;
 };
 
 } // end namespace swift

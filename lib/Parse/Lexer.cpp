@@ -19,9 +19,9 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -160,7 +160,7 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(llvm::SourceMgr &SourceMgr, StringRef Buffer,
+Lexer::Lexer(SourceManager &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
              bool InSILMode, bool KeepComments, bool AllowHashbang, bool Prime)
   : SourceMgr(SourceMgr), Diags(Diags), ArtificialEOF(nullptr),
@@ -1370,17 +1370,17 @@ Restart:
   }
 }
 
-SourceLoc Lexer::getLocForEndOfToken(llvm::SourceMgr &SM, SourceLoc Loc) {
+SourceLoc Lexer::getLocForEndOfToken(SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
     return Loc;
 
   // Figure out which buffer contains this location.
-  int BufferID = SM.FindBufferContainingLoc(Loc.Value);
+  int BufferID = SM->FindBufferContainingLoc(Loc.Value);
   if (BufferID < 0)
     return SourceLoc();
   
-  const llvm::MemoryBuffer *Buffer = SM.getMemoryBuffer(BufferID);
+  const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufferID);
   if (!Buffer)
     return SourceLoc();
   

@@ -21,7 +21,6 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SourceMgr.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"

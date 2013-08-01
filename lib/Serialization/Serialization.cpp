@@ -15,12 +15,12 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include <array>
 #include <queue>
@@ -512,7 +512,7 @@ void Serializer::writeInputFiles(const TranslationUnit *TU,
   auto &sourceMgr = TU->Ctx.SourceMgr;
   for (auto bufferID : inputFiles) {
     // FIXME: We could really use a real FileManager here.
-    auto buffer = sourceMgr.getMemoryBuffer(bufferID);
+    auto buffer = sourceMgr->getMemoryBuffer(bufferID);
     llvm::SmallString<128> path(buffer->getBufferIdentifier());
 
     llvm::error_code err;

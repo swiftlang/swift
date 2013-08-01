@@ -17,10 +17,10 @@
 #include "swift/AST/Component.h"
 #include "swift/AST/Diagnostics.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/system_error.h"
 
 using namespace swift;
@@ -47,10 +47,10 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   // First, search in the directory corresponding to the import location.
   // FIXME: This screams for a proper FileManager abstraction.
   llvm::SMLoc rawLoc = moduleID.second.Value;
-  int currentBufferID = ctx.SourceMgr.FindBufferContainingLoc(rawLoc);
+  int currentBufferID = ctx.SourceMgr->FindBufferContainingLoc(rawLoc);
   if (currentBufferID >= 0) {
     const llvm::MemoryBuffer *importingBuffer
-      = ctx.SourceMgr.getBufferInfo(currentBufferID).Buffer;
+      = ctx.SourceMgr->getBufferInfo(currentBufferID).Buffer;
     StringRef currentDirectory
       = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
     if (!currentDirectory.empty()) {
@@ -101,7 +101,7 @@ static Module *makeTU(ASTContext &ctx, AccessPathElem moduleID,
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
     // FIXME: include location
     llvm::SMLoc rawLoc = moduleID.second.Value;
-    BufferIDs.push_back(ctx.SourceMgr.AddNewSourceBuffer(InputFile.take(),
+    BufferIDs.push_back(ctx.SourceMgr->AddNewSourceBuffer(InputFile.take(),
                                                          rawLoc));
   }
 

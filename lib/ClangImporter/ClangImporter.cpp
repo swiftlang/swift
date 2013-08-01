@@ -32,7 +32,6 @@
 #include "clang/Basic/Version.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/SourceMgr.h"
 #include <memory>
 #include <cstdlib>
 #include <dlfcn.h>

@@ -17,7 +17,7 @@
 using namespace swift;
 using namespace constraints;
 
-void Failure::dump(llvm::SourceMgr *sm) {
+void Failure::dump(SourceManager *sm) {
 
   llvm::raw_ostream &out = llvm::errs();
   out << "(";
