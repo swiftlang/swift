@@ -237,7 +237,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     if (!isTrivial)
       B2.emitDestroyAddress(ABI->getLoc(), AllocVar);
 
-    B2.createDeallocStack(ABI->getLoc(), AllocVar);
+    B2.createDeallocStack(LastRelease->getLoc(), AllocVar);
   }
   
   // Remove any retain and release instructions.  Since all uses of result #1
