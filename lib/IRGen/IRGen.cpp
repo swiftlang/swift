@@ -116,7 +116,7 @@ void swift::performIRGeneration(Options &Opts, llvm::Module *Module,
 
   // Set the module's string representation.
   const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
-  assert(DataLayout && "target machine didn't set DatLayout?");
+  assert(DataLayout && "target machine didn't set DataLayout?");
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the translation unit.
