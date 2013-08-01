@@ -51,8 +51,8 @@ The stages pertaining to SIL processing in particular are as follows:
 SILGen
 ~~~~~~
 
-SILGen produces *raw SIL* by walking a type-checked Swift AST. The form of SIL
-emitted by SILGen has the following properties:
+SILGen produces *raw SIL* by walking a type-checked Swift AST.
+The form of SIL emitted by SILGen has the following properties:
 
 - Variables are represented by loading and storing mutable memory locations
   instead of being in strict SSA form. This is similar to the initial
@@ -83,9 +83,8 @@ predictable.
   code path and doesn't "fall of the end" of its definition, which is an error.
   It also issues an error when a ``noreturn`` function returns.
 
-If all diagnostic passes succeed, the final result is the *canonical SIL*
-for the program. Performance optimization and native code generation are
-derived from this form, and a module can be built from this (or later) forms.
+If all diagnostic passes succeed, the final result is the
+*canonical SIL* for the program.
 
 TODO:
 
@@ -116,6 +115,8 @@ standard modules must be imported explicitly if used.
 
 Here is an example of a ``.sil`` file::
 
+  sil_stage canonical
+
   import swift
 
   // Define a type used by the SIL function.
@@ -141,6 +142,35 @@ Here is an example of a ``.sil`` file::
     %4 = apply %1(%2, %3) : $(Double, Double) -> Double
     %5 = return %4 : Double
   }
+
+SIL Stage
+~~~~~~~~~
+::
+
+  sil-stage-decl ::= 'sil_stage' sil-stage
+
+  sil-stage ::= 'raw'
+  sil-stage ::= 'canonical'
+
+There are different invariants on SIL depending on what stage of processing
+has been applied to it.
+
+* **Raw SIL** is the form produced by SILGen that has not been run through
+  guaranteed optimizations or diagnostic passes. Raw SIL may not have a
+  fully-constructed SSA graph. It may contain dataflow errors. Some instructions
+  may be represented in non-canonical forms, such as (TODO) ``assign`` and
+  ``destroy_addr`` for non-address-only values. Raw SIL should not be used
+  for native code generation or distribution.
+
+* **Canonical SIL** is SIL as it exists after guaranteed optimizations and
+  diagnostics. Dataflow errors must be eliminated, and certain instructions
+  must be canonicalized to simpler forms. Performance optimization and native
+  code generation are derived from this form, and a module can be distributed
+  containing SIL in this (or later) forms.
+
+SIL files declare the processing stage of the included SIL with one of the
+declarations ``sil_stage raw`` or ``sil_stage canonical`` at top level. Only
+one such declaration may appear in a file.
 
 SIL Types
 ~~~~~~~~~

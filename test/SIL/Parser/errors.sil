@@ -1,5 +1,8 @@
 // RUN: %swift %s -emit-sil -verify
 
+sil_stage canonical
+sil_stage raw // expected-error {{sil_stage declared multiple times}}
+
 import swift
 
 sil @block_errors : $() -> () {
@@ -34,3 +37,5 @@ sil @wrong_type : $() -> () {  // expected-error {{value '$() -> ()' defined wit
 bb0:
   %1 = tuple ()
 }
+
+sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_stage'}}

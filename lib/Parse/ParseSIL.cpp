@@ -31,10 +31,13 @@ namespace swift {
     SILParserTUState() {}
     ~SILParserTUState();
     
-    /// ForwardRefFns - This is all of the forward referenced functions with
+    /// This is all of the forward referenced functions with
     /// the location for where the reference is.
     llvm::DenseMap<Identifier,
                    std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+    
+    /// Did we parse a sil_stage for this module?
+    bool DidParseSILStage = false;
     
     DiagnosticEngine *Diags = nullptr;
   };
@@ -44,6 +47,7 @@ SILParserState::SILParserState(SILModule *M) : M(M) {
   S = M ? new SILParserTUState() : nullptr;
 }
 SILParserState::~SILParserState() {
+  
   delete S;
 }
 
@@ -1817,3 +1821,33 @@ bool Parser::parseDeclSIL() {
   return FunctionState.diagnoseProblems();
 }
 
+///   decl-sil-stage:   [[only in SIL mode]]
+///     'sil_stage' ('raw' | 'canonical')
+bool Parser::parseDeclSILStage() {
+  SourceLoc stageLoc = consumeToken(tok::kw_sil_stage);
+  if (!Tok.is(tok::identifier)) {
+    diagnose(Tok, diag::expected_sil_stage_name);
+    return true;
+  }
+  SILStage stage;
+  if (Tok.isContextualKeyword("raw")) {
+    stage = SILStage::Raw;
+    consumeToken();
+  } else if (Tok.isContextualKeyword("canonical")) {
+    stage = SILStage::Canonical;
+    consumeToken();
+  } else {
+    diagnose(Tok, diag::expected_sil_stage_name);
+    consumeToken();
+    return true;
+  }
+  
+  if (SIL->S->DidParseSILStage) {
+    diagnose(stageLoc, diag::multiple_sil_stage_decls);
+    return false;
+  }
+  
+  SIL->M->setStage(stage);
+  SIL->S->DidParseSILStage = true;
+  return false;
+}

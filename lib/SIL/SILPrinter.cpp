@@ -879,9 +879,19 @@ void SILModule::dump() const {
 
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS) const {
-  OS << "import Builtin\nimport swift\n\n";
+  OS << "sil_stage ";
+  switch (Stage) {
+  case SILStage::Raw:
+    OS << "raw";
+    break;
+  case SILStage::Canonical:
+    OS << "canonical";
+    break;
+  }
+  
+  OS << "\n\nimport Builtin\nimport swift\n\n";
 
-  for (SILFunction const &f : *this)
+  for (const SILFunction &f : *this)
     f.print(OS);
 }
 

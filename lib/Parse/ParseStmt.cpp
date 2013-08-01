@@ -177,7 +177,7 @@ void Parser::parseBraceItems(SmallVectorImpl<ExprStmtOrDecl> &Entries,
 
   bool previousHadSemi = true;
   while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
-         Tok.isNot(tok::kw_sil) &&
+         Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
          !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
     bool NeedParseErrorRecovery = false;
     ExprStmtOrDecl Result;

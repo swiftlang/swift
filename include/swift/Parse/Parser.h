@@ -487,7 +487,7 @@ public:
   // SIL Parsing.
 
   bool parseDeclSIL();
-
+  bool parseDeclSILStage();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

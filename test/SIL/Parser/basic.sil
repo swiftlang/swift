@@ -1,5 +1,7 @@
 // RUN: %swift %s -emit-silgen | FileCheck %s
 
+sil_stage raw // CHECK: sil_stage raw
+
 import Builtin
 import swift
 

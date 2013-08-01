@@ -33,7 +33,8 @@ using namespace swift;
 /// parseTranslationUnit - Main entrypoint for the parser.
 ///   translation-unit:
 ///     stmt-brace-item*
-///     decl-sil    [[only in SIL mode]
+///     decl-sil       [[only in SIL mode]
+///     decl-sil-stage [[only in SIL mode]
 bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   TU->ASTStage = TranslationUnit::Parsing;
 
@@ -60,6 +61,9 @@ bool Parser::parseTranslationUnit(TranslationUnit *TU) {
   if (Tok.is(tok::kw_sil)) {
     assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
     parseDeclSIL();
+  } else if (Tok.is(tok::kw_sil_stage)) {
+    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
+    parseDeclSILStage();
   } else {
     parseBraceItems(Items, true,
                     IsMainModule ? BraceItemListKind::TopLevelCode
