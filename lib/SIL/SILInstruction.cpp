@@ -155,8 +155,8 @@ bool SILInstruction::mayHaveSideEffects() const {
     case ValueKind::RetainInst:
     case ValueKind::RetainAutoreleasedInst:
     case ValueKind::ReleaseInst:
-    case ValueKind::WeakRetainInst:
-    case ValueKind::WeakReleaseInst:
+    case ValueKind::UnownedRetainInst:
+    case ValueKind::UnownedReleaseInst:
     case ValueKind::ApplyInst:
       // FIXME: A lot of function calls should be known to have no side effects.
     case ValueKind::PartialApplyInst:

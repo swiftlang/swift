@@ -663,11 +663,11 @@ public:
   void visitReleaseInst(ReleaseInst *RI) {
     OS << "release " << getIDAndType(RI->getOperand());
   }
-  void visitWeakRetainInst(WeakRetainInst *RI) {
-    OS << "weak_retain " << getIDAndType(RI->getOperand());
+  void visitUnownedRetainInst(UnownedRetainInst *RI) {
+    OS << "unowned_retain " << getIDAndType(RI->getOperand());
   }
-  void visitWeakReleaseInst(WeakReleaseInst *RI) {
-    OS << "weak_release " << getIDAndType(RI->getOperand());
+  void visitUnownedReleaseInst(UnownedReleaseInst *RI) {
+    OS << "unowned_release " << getIDAndType(RI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
     OS << "dealloc_stack " << getIDAndType(DI->getOperand());

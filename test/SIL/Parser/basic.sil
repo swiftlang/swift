@@ -544,12 +544,12 @@ bb0:
 // CHECK: unreachable
 }
 
-sil @test_weak_retain : $[thin] (p : SomeClass) -> () {
-bb0(%0 : $SomeClass):
-// CHECK: weak_retain %0 : $SomeClass
-  %1 = weak_retain %0 : $SomeClass
-// CHECK: weak_release %0 : $SomeClass
-  %2 = weak_release %0 : $SomeClass
+sil @test_unowned_retain : $[thin] (p : [unowned] SomeClass) -> () {
+bb0(%0 : $[unowned] SomeClass):
+// CHECK: unowned_retain %0 : $[unowned] SomeClass
+  %1 = unowned_retain %0 : $[unowned] SomeClass
+// CHECK: unowned_release %0 : $[unowned] SomeClass
+  %2 = unowned_release %0 : $[unowned] SomeClass
   %3 = tuple ()
   %4 = return %3 : $()
 }

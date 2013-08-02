@@ -1379,23 +1379,23 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// WeakRetainInst - Increase the weak reference count of an object.
-class WeakRetainInst : public UnaryInstructionBase<ValueKind::WeakRetainInst,
-                                                   RefCountingInst,
-                                                   /*HAS_RESULT*/ false>
+/// UnownedRetainInst - Increase the unowned reference count of an object.
+class UnownedRetainInst :
+    public UnaryInstructionBase<ValueKind::UnownedRetainInst,
+                                RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
-  WeakRetainInst(SILLocation Loc, SILValue Operand)
+  UnownedRetainInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// WeakReleaseInst - Decrease the weak reference count of an object.
-class WeakReleaseInst : public UnaryInstructionBase<ValueKind::WeakReleaseInst,
-                                                    RefCountingInst,
-                                                    /*HAS_RESULT*/ false>
+/// UnownedReleaseInst - Decrease the unowned reference count of an object.
+class UnownedReleaseInst :
+     public UnaryInstructionBase<ValueKind::UnownedReleaseInst,
+                                 RefCountingInst, /*HAS_RESULT*/ false>
 {
 public:
-  WeakReleaseInst(SILLocation Loc, SILValue Operand)
+  UnownedReleaseInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
 

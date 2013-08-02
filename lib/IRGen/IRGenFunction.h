@@ -166,8 +166,8 @@ public:
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);
-  void emitWeakRetain(llvm::Value *value);
-  void emitWeakRelease(llvm::Value *value);
+  void emitUnownedRetain(llvm::Value *value);
+  void emitUnownedRelease(llvm::Value *value);
   void emitWeakInit(Address addr);
   void emitWeakDestroy(Address addr);
   void emitWeakCopyInit(Address destAddr, Address srcAddr);
@@ -185,8 +185,8 @@ public:
   llvm::Value *emitUnknownRetainCall(llvm::Value *value);
   /// Emit a release of a class instance with unknown retain semantics.
   void emitUnknownRelease(llvm::Value *value);
-  void emitUnknownWeakRetain(llvm::Value *value);
-  void emitUnknownWeakRelease(llvm::Value *value);
+  void emitUnknownUnownedRetain(llvm::Value *value);
+  void emitUnknownUnownedRelease(llvm::Value *value);
   void emitUnknownWeakDestroy(Address addr);
   void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);

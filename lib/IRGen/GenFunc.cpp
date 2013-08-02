@@ -434,14 +434,14 @@ namespace {
       IGF.emitRelease(e.claimNext());
     }
 
-    void weakRetain(IRGenFunction &IGF, Explosion &e) const {
+    void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitWeakRetain(e.claimNext());
+      IGF.emitUnownedRetain(e.claimNext());
     }
 
-    void weakRelease(IRGenFunction &IGF, Explosion &e) const {
+    void unownedRelease(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      IGF.emitWeakRelease(e.claimNext());
+      IGF.emitUnownedRelease(e.claimNext());
     }
     
     void destroy(IRGenFunction &IGF, Address addr) const {

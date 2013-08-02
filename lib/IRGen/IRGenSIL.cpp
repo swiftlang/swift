@@ -530,8 +530,8 @@ public:
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
-  void visitWeakRetainInst(WeakRetainInst *i);
-  void visitWeakReleaseInst(WeakReleaseInst *i);
+  void visitUnownedRetainInst(UnownedRetainInst *i);
+  void visitUnownedReleaseInst(UnownedReleaseInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
 
@@ -1697,19 +1697,27 @@ void IRGenSILFunction::visitRetainAutoreleasedInst(
   emitObjCRetainAutoreleasedReturnValue(*this, value);
 }
 
-void IRGenSILFunction::visitWeakRetainInst(swift::WeakRetainInst *i) {
+/// Given a SILType which is a ReferenceStorageType, return the type
+/// info for the underlying reference type.
+static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
+                                                    SILType silType) {
+  assert(!silType.isAddress());
+  auto type = silType.getSwiftRValueType();
+  type = cast<ReferenceStorageType>(type).getReferentType();
+  return cast<ReferenceTypeInfo>(IGF.getFragileTypeInfo(type));
+}
+
+void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti =
-    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
-  ti.weakRetain(*this, lowered);
+  auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
+  ti.unownedRetain(*this, lowered);
 }
 
 
-void IRGenSILFunction::visitWeakReleaseInst(swift::WeakReleaseInst *i) {
+void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
-  auto &ti =
-    cast<ReferenceTypeInfo>(getFragileTypeInfo(i->getOperand().getType()));
-  ti.weakRelease(*this, lowered);
+  auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
+  ti.unownedRelease(*this, lowered);
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {

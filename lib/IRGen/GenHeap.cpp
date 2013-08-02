@@ -593,11 +593,11 @@ namespace {
     enum { IsScalarPOD = false };
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitWeakRetain(value);
+      IGF.emitUnownedRetain(value);
     }
 
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitWeakRelease(value);
+      IGF.emitUnownedRelease(value);
     }
   };
 
@@ -665,11 +665,11 @@ namespace {
     enum { IsScalarPOD = false };
 
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownWeakRetain(value);
+      IGF.emitUnknownUnownedRetain(value);
     }
 
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownWeakRelease(value);
+      IGF.emitUnknownUnownedRelease(value);
     }
   };
 
@@ -871,15 +871,15 @@ void IRGenFunction::emit##ID(Address dest, Address src) {             \
                          src.getAddress());                           \
 }
 
-REFCOUNT_VALUE(WeakRelease)
-REFCOUNT_VALUE(WeakRetain)
+REFCOUNT_VALUE(UnownedRelease)
+REFCOUNT_VALUE(UnownedRetain)
 REFCOUNT_ADDR(WeakDestroy)
 REFCOUNT_ADDR_ADDR(WeakCopyInit)
 REFCOUNT_ADDR_ADDR(WeakCopyAssign)
 REFCOUNT_ADDR_ADDR(WeakTakeInit)
 REFCOUNT_ADDR_ADDR(WeakTakeAssign)
-REFCOUNT_VALUE(UnknownWeakRelease)
-REFCOUNT_VALUE(UnknownWeakRetain)
+REFCOUNT_VALUE(UnknownUnownedRelease)
+REFCOUNT_VALUE(UnknownUnownedRetain)
 REFCOUNT_ADDR(UnknownWeakDestroy)
 REFCOUNT_ADDR_ADDR(UnknownWeakCopyInit)
 REFCOUNT_ADDR_ADDR(UnknownWeakCopyAssign)

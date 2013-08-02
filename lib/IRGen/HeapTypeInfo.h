@@ -63,19 +63,19 @@ public:
     }
   }
 
-  void emitScalarWeakRelease(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitScalarUnownedRelease(IRGenFunction &IGF, llvm::Value *value) const {
     if (asDerived().hasSwiftRefcount()) {
-      IGF.emitWeakRelease(value);
+      IGF.emitUnownedRelease(value);
     } else {
-      IGF.emitUnknownWeakRelease(value);
+      IGF.emitUnknownUnownedRelease(value);
     }
   }
 
-  void emitScalarWeakRetain(IRGenFunction &IGF, llvm::Value *value) const {
+  void emitScalarUnownedRetain(IRGenFunction &IGF, llvm::Value *value) const {
     if (asDerived().hasSwiftRefcount()) {
-      IGF.emitWeakRetain(value);
+      IGF.emitUnownedRetain(value);
     } else {
-      IGF.emitUnknownWeakRetain(value);
+      IGF.emitUnknownUnownedRetain(value);
     }
   }
 
@@ -89,14 +89,14 @@ public:
     asDerived().emitScalarRelease(IGF, value);
   }
 
-  void weakRetain(IRGenFunction &IGF, Explosion &e) const override {
+  void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarWeakRetain(IGF, value);
+    asDerived().emitScalarUnownedRetain(IGF, value);
   }
 
-  void weakRelease(IRGenFunction &IGF, Explosion &e) const override {
+  void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarWeakRelease(IGF, value);
+    asDerived().emitScalarUnownedRelease(IGF, value);
   }
 
   const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const {

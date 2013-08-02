@@ -77,9 +77,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(RetainInst, RefCountingInst)
     INST(RetainAutoreleasedInst, RefCountingInst)
     INST(ReleaseInst, RefCountingInst)
-    INST(WeakRetainInst, RefCountingInst)
-    INST(WeakReleaseInst, RefCountingInst)
-    VALUE_RANGE(RefCountingInst, RetainInst, WeakReleaseInst)
+    INST(UnownedRetainInst, RefCountingInst)
+    INST(UnownedReleaseInst, RefCountingInst)
+    VALUE_RANGE(RefCountingInst, RetainInst, UnownedReleaseInst)
 
   // Literals
   INST(FunctionRefInst, SILInstruction)

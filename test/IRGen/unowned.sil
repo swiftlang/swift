@@ -9,10 +9,10 @@ protocol [class_protocol] P {
   func explode()
 }
 
-sil @test_weak_rr_class : $[thin] (ref : C) -> () {
-bb0(%0 : $C):
-  %1 = weak_retain %0 : $C
-  %2 = weak_release %0 : $C
+sil @test_weak_rr_class : $[thin] (ref : [unowned] C) -> () {
+bb0(%0 : $[unowned] C):
+  %1 = unowned_retain %0 : $[unowned] C
+  %2 = unowned_release %0 : $[unowned] C
   %3 = tuple ()
   %4 = return %3 : $()
 }
@@ -21,10 +21,10 @@ bb0(%0 : $C):
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_weakRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
 
-sil @test_weak_rr_proto : $[thin] (ref : P) -> () {
-bb0(%0 : $P):
-  %1 = weak_retain %0 : $P
-  %2 = weak_release %0 : $P
+sil @test_weak_rr_proto : $[thin] (ref : [unowned] P) -> () {
+bb0(%0 : $[unowned] P):
+  %1 = unowned_retain %0 : $[unowned] P
+  %2 = unowned_release %0 : $[unowned] P
   %3 = tuple ()
   %4 = return %3 : $()
 }

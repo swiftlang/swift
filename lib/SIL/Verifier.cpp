@@ -60,7 +60,7 @@ public:
   SILVerifier(SILFunction const &F)
     : F(F), Dominance(const_cast<SILFunction*>(&F)) {}
   
-  void _require(bool condition, const char *complaint) {
+  void _require(bool condition, const Twine &complaint) {
     if (condition) return;
 
     llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
@@ -76,6 +76,18 @@ public:
   }
 #define require(condition, complaint) \
   _require(condition, complaint ": " #condition)
+
+  template <class T> typename CanTypeWrapperTraits<T>::type
+  _checkTypeIsRValue(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    _require(!value.getType().isAddress(),
+             valueDescription + " cannot be an address");
+    auto result = dyn_cast<T>(value.getType().getSwiftRValueType());
+    _require(result, valueDescription + " must have type " + typeName);
+    return result;
+  }
+#define checkTypeIsRValue(type, value, valueDescription) \
+  _checkTypeIsRValue<type>(value, valueDescription, #type)
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
@@ -408,17 +420,17 @@ public:
     require(RI->getOperand().getType().hasReferenceSemantics(),
             "Operand of dealloc_ref must be reference type");
   }
-  void checkWeakRetainInst(WeakRetainInst *RI) {
-    require(!RI->getOperand().getType().isAddress(),
-            "Operand of weak_retain must not be address");
-    require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of weak_retain must be reference type");
+  void checkUnownedRetainInst(UnownedRetainInst *RI) {
+    auto type = checkTypeIsRValue(ReferenceStorageType, RI->getOperand(),
+                                  "Operand of unowned_retain");
+    require(type->getOwnership() == Ownership::Unowned,
+            "Operand of unowned_retain must be unowned reference");
   }
-  void checkWeakReleaseInst(WeakReleaseInst *RI) {
-    require(!RI->getOperand().getType().isAddress(),
-            "Operand of weak_release must not be address");
-    require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of weak_release must be reference type");
+  void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
+    auto type = checkTypeIsRValue(ReferenceStorageType, RI->getOperand(),
+                                  "Operand of unowned_release");
+    require(type->getOwnership() == Ownership::Unowned,
+            "Operand of unowned_release must be unowned reference");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(DI->getOperand().getType().isAddress(),

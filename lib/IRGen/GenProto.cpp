@@ -760,11 +760,11 @@ namespace {
       : ScalarExistentialTypeInfoBase(numTables, ty, size, align) {}
 
     void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownWeakRetain(value);
+      IGF.emitUnknownUnownedRetain(value);
     }
 
     void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
-      IGF.emitUnknownWeakRelease(value);
+      IGF.emitUnknownUnownedRelease(value);
     }    
   };
   
@@ -860,16 +860,16 @@ namespace {
       IGF.emitUnknownRelease(e.claimNext());
     }
 
-    void weakRetain(IRGenFunction &IGF, Explosion &e) const override {
+    void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
       e.claim(NumProtocols);
       // The instance is treated as unknown-refcounted.
-      IGF.emitUnknownWeakRetain(e.claimNext());
+      IGF.emitUnknownUnownedRetain(e.claimNext());
     }
 
-    void weakRelease(IRGenFunction &IGF, Explosion &e) const override {
+    void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
       e.claim(NumProtocols);
       // The instance is treated as unknown-refcounted.
-      IGF.emitUnknownWeakRelease(e.claimNext());
+      IGF.emitUnknownUnownedRelease(e.claimNext());
     }
 
     void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {

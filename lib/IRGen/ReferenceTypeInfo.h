@@ -40,11 +40,11 @@ public:
   /// Releases a value.
   virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
-  /// Weakly retains a value.
-  virtual void weakRetain(IRGenFunction &IGF, Explosion &explosion) const = 0;
+  /// Weakly retains a value in the manner of a safe [unowned] reference.
+  virtual void unownedRetain(IRGenFunction &IGF, Explosion &out) const = 0;
 
-  /// Weak releases a value.
-  virtual void weakRelease(IRGenFunction &IGF, Explosion &explosion) const = 0;
+  /// Weakly releases a value in the manner of a safe [unowned] reference.
+  virtual void unownedRelease(IRGenFunction &IGF, Explosion &out) const = 0;
 
   /// Produce the storage information for [weak] storage.
   virtual const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const = 0;

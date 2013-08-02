@@ -99,19 +99,19 @@ FUNCTION(Release,        swift_release,       RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_weakRetain(void *ptr);
-FUNCTION(WeakRetain,     swift_weakRetain,    RuntimeCC,
+FUNCTION(UnownedRetain,  swift_weakRetain, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakRelease(void *ptr);
-FUNCTION(WeakRelease,    swift_weakRelease,   RuntimeCC,
+FUNCTION(UnownedRelease, swift_weakRelease,RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_weakDestroy(void **object);
-FUNCTION(WeakDestroy,   swift_weakDestroy,  RuntimeCC,
+FUNCTION(WeakDestroy,    swift_weakDestroy,   RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
@@ -141,19 +141,19 @@ FUNCTION(WeakTakeAssign, swift_weakTakeAssign,RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_unknownWeakRetain(void *value);
-FUNCTION(UnknownWeakRetain, swift_unknownWeakRetain, RuntimeCC,
+FUNCTION(UnknownUnownedRetain,  swift_unknownWeakRetain,    RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownWeakRelease(void *value);
-FUNCTION(UnknownWeakRelease, swift_unknownWeakRelease, RuntimeCC,
+FUNCTION(UnknownUnownedRelease, swift_unknownWeakRelease,   RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownWeakDestroy(void **object);
-FUNCTION(UnknownWeakDestroy,   swift_unknownWeakDestroy,  RuntimeCC,
+FUNCTION(UnknownWeakDestroy,    swift_unknownWeakDestroy,   RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WeakReferencePtrTy),
          ATTRS(NoUnwind))
