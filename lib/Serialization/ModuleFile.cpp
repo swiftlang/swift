@@ -2132,7 +2132,17 @@ void ModuleFile::getReexportedModules(
 void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                     VisibleDeclConsumer &consumer,
                                     NLKind lookupKind) {
-  // FIXME: Validate against access path.
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  if (!accessPath.empty()) {
+    auto I = TopLevelDecls.find(accessPath.front().first);
+    if (I == TopLevelDecls.end()) return;
+
+    for (auto vd : I->second)
+      consumer.foundDecl(vd);
+    return;
+  }
+
   for (auto &topLevelEntry : TopLevelDecls) {
     for (auto &value : topLevelEntry.second)
       consumer.foundDecl(value);

@@ -141,13 +141,11 @@ TUModuleCache::TUModuleCache(const TranslationUnit &TU) {
 void TUModuleCache::lookupValue(AccessPathTy AccessPath, Identifier Name, 
                                 NLKind LookupKind, TranslationUnit &TU, 
                                 SmallVectorImpl<ValueDecl*> &Result) {
-  // TODO: ImportDecls cannot specified namespaces or individual entities
-  // yet, so everything is just a lookup at the top-level.
-  assert(AccessPath.size() <= 1 && "Don't handle this yet");
+  assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
   // If this import is specific to some named type or decl ("import swift.int")
   // then filter out any lookups that don't match.
-  if (AccessPath.size() == 1 && AccessPath[0].first != Name)
+  if (AccessPath.size() == 1 && AccessPath.front().first != Name)
     return;
   
   auto I = TopLevelValues.find(Name);
@@ -162,12 +160,17 @@ void TUModuleCache::lookupVisibleDecls(AccessPathTy AccessPath,
                                        VisibleDeclConsumer &Consumer,
                                        NLKind LookupKind,
                                        const TranslationUnit &TU) {
-  // TODO: ImportDecls cannot specified namespaces or individual entities
-  // yet, so everything is just a lookup at the top-level.
-  assert(AccessPath.size() <= 1 && "Don't handle this yet");
-  
-  // TODO: If this import is specific to some named type or decl ("import swift.int")
-  // then filter out any lookups that don't match.
+  assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
+
+  if (!AccessPath.empty()) {
+    auto I = TopLevelValues.find(AccessPath.front().first);
+    if (I == TopLevelValues.end()) return;
+
+    for (auto vd : I->second)
+      Consumer.foundDecl(vd);
+    return;
+  }
+
   for (auto &tlv : TopLevelValues) {
     for (ValueDecl *vd : tlv.second)
       Consumer.foundDecl(vd);

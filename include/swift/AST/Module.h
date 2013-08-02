@@ -407,8 +407,6 @@ void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath, F fn) {
   if (thisPath.hasValue()) {
     queue.push_back(ImportedModule(thisPath.getValue(), this));
   } else {
-    // FIXME: The same module with different access paths may have different
-    // re-exports.
     visited.insert(ImportedModule({}, this));
     getReexportedModules(queue);
   }

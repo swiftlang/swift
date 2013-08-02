@@ -394,6 +394,10 @@ void ClangImporter::lookupValue(Module *module,
                                 Identifier name,
                                 NLKind lookupKind,
                                 SmallVectorImpl<ValueDecl*> &results) {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+  if (accessPath.size() == 1 && accessPath.front().first != name)
+    return;
+
   auto &pp = Impl.Instance->getPreprocessor();
   auto &sema = Impl.Instance->getSema();
 
@@ -537,7 +541,6 @@ void ClangImporter::getReexportedModules(
     auto exportWrapper = Impl.getWrapperModule(*this, exportMod,
                                                module->getComponent());
 
-    // FIXME: Include proper access path.
     auto actualExport = exportWrapper->getAdapterModule();
     if (!actualExport || actualExport == topLevelAdapter)
       actualExport = exportWrapper;
@@ -586,7 +589,7 @@ Module *ClangModule::getAdapterModule() const {
   }
 
   if (!adapterModule.getInt()) {
-    // FIXME: Include proper access path.
+    // FIXME: Include proper source location.
     auto adapter = Ctx.getModule(Module::AccessPathTy({Name, SourceLoc()}));
     if (isa<ClangModule>(adapter))
       adapter = nullptr;

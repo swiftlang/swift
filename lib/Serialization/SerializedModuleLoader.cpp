@@ -213,8 +213,11 @@ void SerializedModuleLoader::lookupValue(Module *module,
                                          Module::AccessPathTy accessPath,
                                          Identifier name, NLKind lookupKind,
                                          SmallVectorImpl<ValueDecl*> &results) {
-  // FIXME: handle nested modules.
-  if (!accessPath.empty())
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  // If this import is specific to some named type or decl ("import swift.int")
+  // then filter out any lookups that don't match.
+  if (accessPath.size() == 1 && accessPath.front().first != name)
     return;
 
   ModuleFile *moduleFile = cast<SerializedModule>(module)->File;
