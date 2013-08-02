@@ -199,3 +199,25 @@ bb4(%6 : $Int64):
 // CHECK-NEXT:  br bb2(%{{[0-9]+}} : $Int64)
 // CHECK:      bb2(%{{[0-9]+}} : $Int64):
 // CHECK-NEXT:  return
+
+sil @exit : $[thin, noreturn] () -> () {
+bb0:
+  %1 = tuple ()                                   // user: %2
+  return %1 : $()
+}
+sil @code_removed_after_a_call_to_noreturn : $[thin] (i : Int64, b : Builtin.Int1) -> () {
+bb0(%0 : $Int64, %1 : $Builtin.Int1):
+  %6 = function_ref @exit : $[thin, noreturn] () -> () // ret.exit : () -> ()
+  %7 = apply %6() : $[thin, noreturn] () -> ()
+  condbranch %1, bb1, bb2
+bb1:                                              // Preds: bb0
+  br bb2
+bb2:                                              // Preds: bb1 bb0
+  %20 = tuple ()                                  // user: %21
+  return %20 : $()
+}
+// CHECK: sil @code_removed_after_a_call_to_noreturn
+// CHECK-NEXT: bb0
+// CHECK-NEXT:  function_ref @exit : $[thin, noreturn] () -> () 
+// CHECK-NEXT:  apply
+// CHECK-NEXT:  unreachable

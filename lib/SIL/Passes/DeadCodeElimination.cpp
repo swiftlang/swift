@@ -81,7 +81,7 @@ static bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I) {
   return true;
 }
 
-static void constantFoldTerminator(SILBasicBlock &BB) {
+static bool constantFoldTerminator(SILBasicBlock &BB) {
   TermInst *TI = BB.getTerminator();
 
   // Process conditional branches with constant conditions.
@@ -112,8 +112,61 @@ static void constantFoldTerminator(SILBasicBlock &BB) {
       CBI->eraseFromParent();
       // Note that some of the instructions the terminator was using are now
       // dead. We rely on later stages of the pass to remove them.
+
+      return true;
     }
   }
+  return false;
+}
+
+static bool isCallToNoReturn(const FunctionInst *FI, SILBasicBlock &BB) {
+  SILType Ty = FI->getCallee().getType();
+  SILModule *M= BB.getParent()->getParent();
+  CanType CalleeTy = Ty.getFunctionTypeInfo(*M)->getSwiftType();
+  if (const AnyFunctionType *FT = CalleeTy->getAs<FunctionType>())
+    return FT->isNoReturn();
+
+  assert(false);
+  return false;
+}
+
+static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB) {
+  auto I = BB.begin(), E = BB.end();
+  bool FoundNoReturnCall = false;
+
+  // Does this block conatin a call to a noreturn function?
+  while (I != E) {
+    auto CurrentInst = I;
+    // Move the iterator before we remove instructions to avoid iterator
+    // invalidation issues.
+    ++I;
+
+    // Remove all instructions following the noreturn call.
+    if (FoundNoReturnCall) {
+      CurrentInst->eraseFromParent();
+      NumInstructionsRemoved++;
+      continue;
+    }
+
+    if (ApplyInst *FI = dyn_cast<ApplyInst>(CurrentInst)) {
+      if (isCallToNoReturn(FI, BB)) {
+        FoundNoReturnCall = true;
+        // FIXME: Diagnose unreachable code if the call is followed by anything
+        // but implicit return.
+      }
+    }
+  }
+
+  // Add an unreachable terminator. The terminator has an invalid source
+  // location to signal to the DataflowDiagnostic pass that this code does
+  // not correspond to user code.
+  if (FoundNoReturnCall) {
+    SILBuilder B(&BB);
+    B.createUnreachable(SILLocation());
+    return true;
+  }
+
+  return false;
 }
 
 static bool removeUnreachableBlocks(SILFunction &F) {
@@ -169,7 +222,13 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
     for (auto &BB : Fn) {
       // Simplify the blocks with terminators that rely on constant conditions.
-      constantFoldTerminator(BB);
+      if (constantFoldTerminator(BB))
+        continue;
+
+      // Remove instructions from the basic block after a call to a noreturn
+      // function.
+      if (simplifyBlocksWithCallsToNoReturn(BB))
+        continue;
     }
 
     // Remove unreachable blocks.
