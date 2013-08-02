@@ -159,6 +159,10 @@ void REPLCompletions::populate(TranslationUnit *TU, StringRef EnteredCode) {
                    CompletionCallbacksFactory.get());
 
   std::vector<Token> Tokens = tokenize(TU->getASTContext().SourceMgr, BufferID);
+
+  if (!Tokens.empty() && Tokens.back().is(tok::code_complete))
+    Tokens.pop_back();
+
   if (!Tokens.empty()) {
     Token &LastToken = Tokens.back();
     if (LastToken.is(tok::identifier) || LastToken.isKeyword()) {
