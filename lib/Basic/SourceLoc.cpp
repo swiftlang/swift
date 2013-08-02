@@ -54,7 +54,7 @@ void SourceLoc::dump(const SourceManager &SM) const {
 }
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
-                        int &LastBuffer) const {
+                        int &LastBuffer, bool PrintText) const {
   OS << '[';
   Start.print(OS, SM, LastBuffer);
   OS << " - ";
@@ -64,10 +64,12 @@ void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
   if (Start.isInvalid() || End.isInvalid())
     return;
   
-  OS << " RangeText=\""
-     << StringRef(Start.Value.getPointer(),
-                  End.Value.getPointer() - Start.Value.getPointer()+1)
-     << '"';
+  if (PrintText) {
+    OS << " RangeText=\""
+       << StringRef(Start.Value.getPointer(),
+                    End.Value.getPointer() - Start.Value.getPointer()+1)
+       << '"';
+  }
 }
 
 void SourceRange::dump(const SourceManager &SM) const {

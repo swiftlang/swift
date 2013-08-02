@@ -85,11 +85,12 @@ public:
   /// do print the filename, and then update LastBuffer with the BufferID
   /// printed.
   void print(raw_ostream &OS, const SourceManager &SM,
-             int &LastBuffer) const;
+             int &LastBuffer, bool PrintText = true) const;
 
-  void print(raw_ostream &OS, const SourceManager &SM) const {
+  void print(raw_ostream &OS, const SourceManager &SM,
+             bool PrintText = true) const {
     int Tmp = -1;
-    print(OS, SM, Tmp);
+    print(OS, SM, Tmp, PrintText);
   }
 
   void dump(const SourceManager &SM) const;
