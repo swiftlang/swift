@@ -99,6 +99,18 @@ struct ASTContext::Implementation {
   /// to each protocol.
   llvm::DenseMap<ProtocolDecl *, SmallVector<Decl *, 4>> Conformances;
 
+  /// The list of normal protocol conformances.
+  ///
+  /// Since these conformances are tied explicitly to the source code, semantic
+  /// analysis is responsible for handling the uniquing.
+  llvm::SmallVector<NormalProtocolConformance *, 2> NormalConformances;
+
+  /// The set of specialized protocol conformances.
+  llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
+
+  /// The set of inherited protocol conformances.
+  llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
+
   /// \brief Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// \brief The allocator used for all allocations within this arena.
@@ -180,10 +192,13 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
 }
 
 ASTContext::~ASTContext() {
-  delete &Impl;
+  // Tear down protocol conformances.
+  for (auto conformance : Impl.NormalConformances)
+    conformance->~NormalProtocolConformance();
+  for (auto &conformance : Impl.SpecializedConformances)
+    conformance.~SpecializedProtocolConformance();
 
-  for (auto &entry : ConformsTo)
-    delete const_cast<ProtocolConformance*>(entry.second.getPointer());
+  delete &Impl;
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
@@ -327,6 +342,64 @@ ArrayRef<Decl *> ASTContext::getTypesThatConformTo(ProtocolDecl *protocol) {
   if (known == Impl.Conformances.end())
     return { };
   return known->second;
+}
+
+NormalProtocolConformance *
+ASTContext::getConformance(Type conformingType,
+                           ProtocolDecl *protocol,
+                           Module *containingModule,
+                           WitnessMap &&witnesses,
+                           TypeWitnessMap &&typeWitnesses,
+                           InheritedConformanceMap &&inheritedConformances,
+                           llvm::ArrayRef<ValueDecl *> defaultedDefinitions) {
+  auto result
+    = new (*this) NormalProtocolConformance(conformingType, protocol,
+                                            containingModule,
+                                            std::move(witnesses),
+                                            std::move(typeWitnesses),
+                                            std::move(inheritedConformances),
+                                            defaultedDefinitions);
+  Impl.NormalConformances.push_back(result);
+  return result;
+}
+
+SpecializedProtocolConformance *
+ASTContext::getSpecializedConformance(Type type,
+                                      ProtocolConformance *generic,
+                                      ArrayRef<Substitution> substitutions,
+                                      TypeWitnessMap &&typeWitnesses) {
+  llvm::FoldingSetNodeID id;
+  SpecializedProtocolConformance::Profile(id, type, generic);
+
+  // Did we already record the specialized conformance?
+  void *insertPos;
+  if (auto result
+        = Impl.SpecializedConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new specialized conformance.
+  auto result
+    = new (*this) SpecializedProtocolConformance(type, generic, substitutions,
+                                                 std::move(typeWitnesses));
+  Impl.SpecializedConformances.InsertNode(result, insertPos);
+  return result;
+}
+
+InheritedProtocolConformance *
+ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
+  llvm::FoldingSetNodeID id;
+  InheritedProtocolConformance::Profile(id, type, inherited);
+
+  // Did we already record the specialized conformance?
+  void *insertPos;
+  if (auto result
+        = Impl.InheritedConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new specialized conformance.
+  auto result = new (*this) InheritedProtocolConformance(type, inherited);
+  Impl.InheritedConformances.InsertNode(result, insertPos);
+  return result;
 }
 
 //===----------------------------------------------------------------------===//

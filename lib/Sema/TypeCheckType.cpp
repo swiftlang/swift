@@ -801,6 +801,8 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     if (!AT->hasImplementationType()) {
       buildArraySliceType(*this, AT, SourceLoc());
     }
+    if (validateTypeSimple(AT->getImplementationType()))
+      return true;
     break;
   }
 

@@ -209,24 +209,132 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     return Nothing;
 
   unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch);
-  if (kind != PROTOCOL_CONFORMANCE && kind != NO_CONFORMANCE)
-    return Nothing;
-
-  lastRecordOffset.reset();
-  if (kind == NO_CONFORMANCE) {
+  switch (kind) {
+  case NO_CONFORMANCE: {
+    lastRecordOffset.reset();
     DeclID protoID;
     NoConformanceLayout::readRecord(scratch, protoID);
     return std::make_pair(cast<ProtocolDecl>(getDecl(protoID)), nullptr);
   }
 
+  case NORMAL_PROTOCOL_CONFORMANCE:
+    // Handled below.
+    break;
+
+  case SPECIALIZED_PROTOCOL_CONFORMANCE: {
+    lastRecordOffset.reset();
+
+    DeclID protoID;
+    DeclID nominalID;
+    IdentifierID moduleOrTypeID;
+    unsigned numTypeWitnesses;
+    unsigned numSubstitutions;
+    ArrayRef<uint64_t> rawIDs;
+    SpecializedProtocolConformanceLayout::readRecord(scratch, protoID,
+                                                     nominalID,
+                                                     moduleOrTypeID,
+                                                     numTypeWitnesses,
+                                                     numSubstitutions,
+                                                     rawIDs);
+
+    ASTContext &ctx = ModuleContext->Ctx;
+
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+
+    // Read the substitutions.
+    SmallVector<Substitution, 4> substitutions;
+    while (numSubstitutions--) {
+      auto sub = maybeReadSubstitution();
+      assert(sub.hasValue() && "Missing substitution?");
+      substitutions.push_back(*sub);
+    }
+
+    // Read the type witnesses.
+    ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+    TypeWitnessMap typeWitnesses;
+    while (numTypeWitnesses--) {
+      // FIXME: We don't actually want to allocate an archetype here; we just
+      // want to get an access path within the protocol.
+      auto first = cast<TypeAliasDecl>(getDecl(*rawIDIter++));
+      auto second = maybeReadSubstitution();
+      assert(second.hasValue());
+      typeWitnesses[first] = *second;
+    }
+    assert(rawIDIter <= rawIDs.end() && "read too much");
+
+    // Reset the offset RAII to the end of the trailing records.
+    lastRecordOffset.reset();
+
+    ProtocolConformance *genericConformance = nullptr;
+
+    if (nominalID) {
+      // Dig out the protocol conformance within the nominal declaration.
+      auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+      Module *owningModule;
+      if (moduleOrTypeID == 0)
+        owningModule = ModuleContext;
+      else
+        owningModule = getModule(getIdentifier(moduleOrTypeID-1));
+      (void)owningModule; // FIXME: Currently only used for checking.
+
+      for (unsigned i = 0, n = nominal->getProtocols().size(); i != n; ++i) {
+        if (nominal->getProtocols()[i] == proto) {
+          genericConformance = nominal->getConformances()[i];
+          // FIXME: Eventually, filter by owning module.
+          assert(nominal->getModuleContext() == owningModule);
+          break;
+        }
+      }
+
+      if (!genericConformance) {
+        for (auto ext : nominal->getExtensions()) {
+          for (unsigned i = 0, n = ext->getProtocols().size(); i != n; ++i) {
+            if (ext->getProtocols()[i] == proto) {
+              genericConformance = ext->getConformances()[i];
+              // FIXME: Eventually, filter by owning module.
+              assert(ext->getModuleContext() == owningModule);
+              break;
+            }
+          }
+
+          if (genericConformance)
+            break;
+        }
+      }
+    } else {
+      // The generic conformance is in the following record.
+      genericConformance
+        = maybeReadConformance(getType(moduleOrTypeID))->second;
+    }
+
+    assert(genericConformance && "Missing generic conformance?");
+    return { proto,
+             ctx.getSpecializedConformance(conformingType,
+                                           genericConformance,
+                                           substitutions,
+                                           std::move(typeWitnesses)) };
+  }
+
+  case INHERITED_PROTOCOL_CONFORMANCE: {
+    // FIXME: Does this even make sense?
+    llvm_unreachable("Not implemented");
+  }
+
+  // Not a protocol conformance.
+  default:
+    return Nothing;
+  }
+
+  lastRecordOffset.reset();
+
   DeclID protoID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
   ArrayRef<uint64_t> rawIDs;
 
-  ProtocolConformanceLayout::readRecord(scratch, protoID,
-                                        valueCount, typeCount,
-                                        inheritedCount, defaultedCount,
-                                        rawIDs);
+  NormalProtocolConformanceLayout::readRecord(scratch, protoID,
+                                              valueCount, typeCount,
+                                              inheritedCount, defaultedCount,
+                                              rawIDs);
 
   InheritedConformanceMap inheritedConformances;
 
@@ -281,72 +389,29 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
-  std::unique_ptr<ProtocolConformance> conformance(
-    new ProtocolConformance(conformingType,
-                            proto,
-                            ModuleContext,
-                            std::move(witnesses),
-                            std::move(typeWitnesses),
-                            std::move(inheritedConformances),
-                            defaultedDefinitions));
-  return std::make_pair(proto, conformance.release());
+  return { proto,
+           ctx.getConformance(conformingType, proto, ModuleContext,
+                              std::move(witnesses),
+                              std::move(typeWitnesses),
+                              std::move(inheritedConformances),
+                              defaultedDefinitions) };
 }
 
-/// Uniques a single protocol conformance and any inherited conformances, and
-/// records the conformances in the ASTContext.
-///
-/// If a conformance has already been recorded, the given record \p conformance
-/// will be deleted.
-///
-/// \returns The canonical conformance for this (\p decl, \p canTy) pair.
-///
-/// \sa processConformances
+/// Applies protocol conformances to a decl.
 template <typename T>
-ProtocolConformance *processConformance(ASTContext &ctx, T decl, CanType canTy,
-                                        ProtocolDecl *proto,
-                                        ProtocolConformance *conformance) {
-  if (!conformance)
-    return nullptr;
-
-  for (auto &inherited : conformance->getInheritedConformances()) {
-    inherited.second = processConformance(ctx, decl, canTy, inherited.first,
-                                          inherited.second);
-  }
-
-  auto &conformanceRecord = ctx.ConformsTo[{canTy, proto}];
-
-  if (conformanceRecord.getPointer() &&
-      conformanceRecord.getPointer() != conformance) {
-    delete conformance;
-    conformance = conformanceRecord.getPointer();
-    // Only explicit conformances ever get serialized.
-    conformanceRecord.setInt(true);
-  } else {
-    // Only explicit conformances ever get serialized.
-    conformanceRecord.setPointer(conformance);
-    conformanceRecord.setInt(true);
-  }
-
-  if (decl)
-    ctx.recordConformance(proto, decl);
-
-  return conformance;
-}
-
-/// Uniques and applies protocol conformances to a decl, as well as recording
-/// the conformances in the ASTContext.
-template <typename T>
-void processConformances(ASTContext &ctx, T *decl, CanType canTy,
+void processConformances(ASTContext &ctx, T *decl,
                          ArrayRef<ConformancePair> conformances) {
   SmallVector<ProtocolDecl *, 16> protoBuf;
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   for (auto conformancePair : conformances) {
     auto proto = conformancePair.first;
     auto conformance = conformancePair.second;
-    conformance = processConformance(ctx, decl, canTy, proto, conformance);
 
     protoBuf.push_back(proto);
     conformanceBuf.push_back(conformance);
+
+    if (conformance && decl)
+      ctx.recordConformance(proto, decl);
   }
 
   decl->setProtocols(ctx.AllocateCopy(protoBuf));
@@ -379,17 +444,13 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution() {
   auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
-  CanType canReplTy = replacementTy->getCanonicalType();
   ASTContext &ctx = ModuleContext->Ctx;
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   while (numConformances--) {
     auto conformancePair = maybeReadConformance(replacementTy);
     assert(conformancePair.hasValue() && "Missing conformance");
-    auto conformance = processConformance(ctx, nullptr, canReplTy,
-                                          conformancePair->first,
-                                          conformancePair->second);
-    conformanceBuf.push_back(conformance);
+    conformanceBuf.push_back(conformancePair->second);
   }
 
   lastRecordOffset.reset();
@@ -672,12 +733,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       alias->setSuperclass(getType(superclassTypeID));
     }
 
-    CanType canBaseTy = underlyingType.getType()->getCanonicalType();
-
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(underlyingType.getType()))
       conformances.push_back(*conformance);
-    processConformances(ctx, alias, canBaseTy, conformances);
+    processConformances(ctx, alias, conformances);
 
     break;
   }
@@ -715,7 +774,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
-    processConformances(ctx, theStruct, canTy, conformances);
+    processConformances(ctx, theStruct, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read struct members");
@@ -1046,7 +1105,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
-    processConformances(ctx, theClass, canTy, conformances);
+    processConformances(ctx, theClass, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read class members");
@@ -1092,7 +1151,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(canTy))
       conformances.push_back(*conformance);
-    processConformances(ctx, theUnion, canTy, conformances);
+    processConformances(ctx, theUnion, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read union members");
@@ -1203,7 +1262,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     SmallVector<ConformancePair, 16> conformances;
     while (auto conformance = maybeReadConformance(canBaseTy))
       conformances.push_back(*conformance);
-    processConformances(ctx, extension, canBaseTy, conformances);
+    processConformances(ctx, extension, conformances);
 
     auto members = readMembers();
     assert(members.hasValue() && "could not read extension members");
@@ -1716,9 +1775,11 @@ Type ModuleFile::getType(TypeID TID) {
   case decls_block::BOUND_GENERIC_TYPE: {
     DeclID declID;
     TypeID parentID;
+    unsigned numSubstitutions;
     ArrayRef<uint64_t> rawArgumentIDs;
 
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
+                                                    numSubstitutions,
                                                     rawArgumentIDs);
     SmallVector<Type, 8> genericArgs;
     for (TypeID type : rawArgumentIDs)
@@ -1736,9 +1797,9 @@ Type ModuleFile::getType(TypeID TID) {
       break;
 
     SmallVector<Substitution, 8> substitutions;
-    while (auto sub = maybeReadSubstitution())
-      substitutions.push_back(sub.getValue());
-
+    while (numSubstitutions--) {
+      substitutions.push_back(*maybeReadSubstitution());
+    }
     boundTy->setSubstitutions(ctx.AllocateCopy(substitutions));
     break;
   }

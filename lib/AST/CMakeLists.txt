@@ -15,6 +15,7 @@ add_swift_library(swiftAST
   NameLookup.cpp
   Pattern.cpp
   PrettyStackTrace.cpp
+  ProtocolConformance.cpp
   Stmt.cpp
   Type.cpp
   TypeRepr.cpp

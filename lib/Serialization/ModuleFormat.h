@@ -270,8 +270,10 @@ namespace decls_block {
     GENERIC_PARAM,
     GENERIC_REQUIREMENT,
 
-    NO_CONFORMANCE = 252,
-    PROTOCOL_CONFORMANCE = 253,
+    NO_CONFORMANCE = 250,
+    NORMAL_PROTOCOL_CONFORMANCE = 251,
+    SPECIALIZED_PROTOCOL_CONFORMANCE = 252,
+    INHERITED_PROTOCOL_CONFORMANCE = 253,
     DECL_CONTEXT = 254,
     XREF = 255
   };
@@ -362,6 +364,7 @@ namespace decls_block {
     BOUND_GENERIC_TYPE,
     DeclIDField, // generic decl
     TypeIDField, // parent
+    BCVBR<6>,    // # of substitutions
     BCArray<TypeIDField> // generic arguments
     // The substitutions trail this record.
   >;
@@ -646,8 +649,8 @@ namespace decls_block {
     DeclIDField  // the protocol
   >;
 
-  using ProtocolConformanceLayout = BCRecordLayout<
-    PROTOCOL_CONFORMANCE,
+  using NormalProtocolConformanceLayout = BCRecordLayout<
+    NORMAL_PROTOCOL_CONFORMANCE,
     DeclIDField, // the protocol
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
@@ -658,6 +661,27 @@ namespace decls_block {
     // then type declarations, then defaulted definitions.
     // The inherited conformances trail the record, followed by substitution
     // records for the values and then types.
+  >;
+
+  using SpecializedProtocolConformanceLayout = BCRecordLayout<
+    SPECIALIZED_PROTOCOL_CONFORMANCE,
+    DeclIDField,         // the protocol
+    DeclIDField,         // the nominal type decl for the normal conformance,
+                         // or zero to indicate that the generic conformance
+                         // is in the following record
+    IdentifierIDField,   // the module in which the normal conformance occurs,
+                         // or the conforming type for the generic conformance
+                         // record that follows
+    BCVBR<5>,            // type mapping count
+    BCVBR<5>,            // # of substitutions for the conformance
+    BCArray<DeclIDField> // the type witnesses
+    // followed by substitution records for the conformance, then the
+    // substitution records for the type witnesses
+  >;
+
+  using InheritedProtocolConformanceLayout = BCRecordLayout<
+    INHERITED_PROTOCOL_CONFORMANCE,
+    DeclIDField // the protocol
   >;
 
   using DeclContextLayout = BCRecordLayout<

@@ -393,6 +393,43 @@ public:
   /// conform to the given protocol.
   ArrayRef<Decl *> getTypesThatConformTo(ProtocolDecl *protocol);
 
+  /// \brief Produce a "normal" conformance for a nominal type.
+  NormalProtocolConformance *
+  getConformance(Type conformingType,
+                 ProtocolDecl *protocol,
+                 Module *containingModule,
+                 WitnessMap &&witnesses,
+                 TypeWitnessMap &&typeWitnesses,
+                 InheritedConformanceMap &&inheritedConformances,
+                 llvm::ArrayRef<ValueDecl *> defaultedDefinitions);
+
+  /// \brief Produce a specialized conformance, which takes a generic
+  /// conformance and substitutes
+  ///
+  /// \param type The type for which we are retrieving the conformance.
+  ///
+  /// \param generic The generic conformance.
+  ///
+  /// \param substitutions The set of substitutions required to produce the
+  /// specialized conformance from the generic conformance.
+  ///
+  /// \param typeWitnesses The set of type witnesses used by the specialized
+  /// conformance.
+  SpecializedProtocolConformance *
+  getSpecializedConformance(Type type,
+                            ProtocolConformance *generic,
+                            ArrayRef<Substitution> substitutions,
+                            TypeWitnessMap &&typeWitnesses);
+
+  /// \brief Produce an inherited conformance, for subclasses of a type
+  /// that already conforms to a protocol.
+  ///
+  /// \param type The type for which we are retrieving the conformance.
+  ///
+  /// \param inherited The inherited conformance.
+  InheritedProtocolConformance *
+  getInheritedConformance(Type type, ProtocolConformance *inherited);
+
 private:
   friend class Decl;
   ClangNode getClangNode(Decl *decl);

@@ -190,6 +190,10 @@ namespace {
     /// Writes a list of generic substitutions.
     void writeSubstitutions(ArrayRef<Substitution> substitutions);
 
+    /// Writes a protocol conformance.
+    void writeConformance(const ProtocolDecl *protocol,
+                          const ProtocolConformance *conformance);
+
     /// Writes a list of protocol conformances.
     void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                            ArrayRef<ProtocolConformance *> conformances);
@@ -464,7 +468,9 @@ void Serializer::writeBlockInfoBlock() {
   RECORD(decls_block, GENERIC_REQUIREMENT);
 
   RECORD(decls_block, NO_CONFORMANCE);
-  RECORD(decls_block, PROTOCOL_CONFORMANCE);
+  RECORD(decls_block, NORMAL_PROTOCOL_CONFORMANCE);
+  RECORD(decls_block, SPECIALIZED_PROTOCOL_CONFORMANCE);
+  RECORD(decls_block, INHERITED_PROTOCOL_CONFORMANCE);
   RECORD(decls_block, DECL_CONTEXT);
   RECORD(decls_block, XREF);
 
@@ -702,18 +708,20 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
 }
 
 void
-Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
-                              ArrayRef<ProtocolConformance *> conformances) {
+Serializer::writeConformance(const ProtocolDecl *protocol,
+                             const ProtocolConformance *conformance) {
   using namespace decls_block;
 
-  for_each(protocols, conformances,
-           [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
-    if (!conf) {
-      unsigned abbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
-      NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addDeclRef(proto));
-      return;
-    }
+  if (!conformance) {
+    unsigned abbrCode = DeclTypeAbbrCodes[NoConformanceLayout::Code];
+    NoConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                    addDeclRef(protocol));
+    return;
+  }
+
+  switch (conformance->getKind()) {
+  case ProtocolConformanceKind::Normal: {
+    auto conf = cast<NormalProtocolConformance>(conformance);
 
     SmallVector<DeclID, 16> data;
     unsigned numValueWitnesses = 0;
@@ -737,14 +745,15 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
     }
 
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
-    unsigned abbrCode = DeclTypeAbbrCodes[ProtocolConformanceLayout::Code];
-    ProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          addDeclRef(proto),
-                                          numValueWitnesses,
-                                          numTypeWitnesses,
-                                          numInheritedConformances,
-                                          numDefaultedDefinitions,
-                                          data);
+    unsigned abbrCode
+      = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
+    NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                addDeclRef(protocol),
+                                                numValueWitnesses,
+                                                numTypeWitnesses,
+                                                numInheritedConformances,
+                                                numDefaultedDefinitions,
+                                                data);
 
     // FIXME: Unfortunate to have to copy these.
     SmallVector<ProtocolDecl *, 8> inheritedProtos;
@@ -758,6 +767,76 @@ Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
       writeSubstitutions(valueMapping.second.Substitutions);
     for (auto typeMapping : conf->getTypeWitnesses())
       writeSubstitutions(typeMapping.second);
+    break;
+  }
+
+  case ProtocolConformanceKind::Specialized: {
+    auto conf = cast<SpecializedProtocolConformance>(conformance);
+    SmallVector<DeclID, 16> data;
+    unsigned numTypeWitnesses = 0;
+    for (auto typeMapping : conf->getTypeWitnesses()) {
+      data.push_back(addDeclRef(typeMapping.first));
+      // The substitution record is serialized later.
+      ++numTypeWitnesses;
+    }
+    auto substitutions = conf->getGenericSubstitutions();
+    unsigned abbrCode
+      = DeclTypeAbbrCodes[SpecializedProtocolConformanceLayout::Code];
+    DeclID nominalID;
+    IdentifierID moduleOrTypeID;
+
+    bool appendGenericConformance
+      = !isa<NormalProtocolConformance>(conf->getGenericConformance());
+    if (appendGenericConformance) {
+      // Set nominalID to 0 to indicate that the generic conformance will
+      // follow. Encode the type in moduleOrTypeID.
+      nominalID = 0;
+      moduleOrTypeID = addTypeRef(conf->getGenericConformance()->getType());
+    } else {
+      nominalID
+        = addDeclRef(conf->getGenericConformance()->getType()->getAnyNominal());
+      assert(nominalID && "Missing nominal type for specialized conformance");
+
+      // Use '0' to mean 'this module', and add 1 to any other module reference.
+      if (conf->getContainingModule() == TU)
+        moduleOrTypeID = 0;
+      else
+        moduleOrTypeID = addModuleRef(conf->getContainingModule()) + 1;
+    }
+
+    SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
+                                                     abbrCode,
+                                                     addDeclRef(protocol),
+                                                     nominalID,
+                                                     moduleOrTypeID,
+                                                     numTypeWitnesses,
+                                                     substitutions.size(),
+                                                     data);
+    writeSubstitutions(substitutions);
+    for (auto typeMapping : conf->getTypeWitnesses())
+      writeSubstitutions(typeMapping.second);
+
+    if (appendGenericConformance) {
+      writeConformance(protocol, conf->getGenericConformance());
+    }
+    break;
+  }
+
+  case ProtocolConformanceKind::Inherited: {
+    // FIXME: inherited conformance might not make sense?
+    llvm_unreachable("Not implemented");
+  }
+  }
+}
+
+void
+Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
+                              ArrayRef<ProtocolConformance *> conformances) {
+  using namespace decls_block;
+
+  for_each(protocols, conformances,
+           [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
+    writeConformance(proto, conf);
   });
 }
 
@@ -1548,14 +1627,19 @@ bool Serializer::writeType(Type ty) {
     for (auto next : generic->getGenericArgs())
       genericArgIDs.push_back(addTypeRef(next));
 
+    // Get the substitutions.
+    ArrayRef<Substitution> substitutions;
+    if (generic->hasSubstitutions())
+      substitutions = generic->getSubstitutions();
+
     unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
     BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addDeclRef(generic->getDecl()),
                                        addTypeRef(generic->getParent()),
+                                       substitutions.size(),
                                        genericArgIDs);
 
-    if (generic->hasSubstitutions())
-      writeSubstitutions(generic->getSubstitutions());
+    writeSubstitutions(substitutions);
 
     return true;
   }
@@ -1619,7 +1703,9 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<GenericRequirementLayout>();
 
     registerDeclTypeAbbr<NoConformanceLayout>();
-    registerDeclTypeAbbr<ProtocolConformanceLayout>();
+    registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
+    registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
+    registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
     registerDeclTypeAbbr<XRefLayout>();
   }
