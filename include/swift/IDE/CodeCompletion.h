@@ -134,7 +134,7 @@ public:
       IsAnnotation = 1;
     }
 
-public:
+  public:
     ChunkKind getKind() const {
       return ChunkKind(Kind);
     }
