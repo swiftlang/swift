@@ -655,14 +655,24 @@ public:
     if (!Done) {
       lookupVisibleDecls(*this, ExprType, CurrDeclContext);
     }
-    // Add the special qualified keyword 'metatype' so that, for example,
-    // 'Int.metatype' can be completed.
-    // Use the canonical type as a type annotation because looking at the
-    // '.metatype' in the IDE is a way to understand what type the expression
-    // has.
-    addKeyword(
-        "metatype",
-        MetaTypeType::get(ExprType, SwiftContext)->getCanonicalType());
+    {
+      // Add the special qualified keyword 'metatype' so that, for example,
+      // 'Int.metatype' can be completed.
+      Type Annotation = ExprType;
+
+      // First, unwrap the outer LValue.  LValueness of the expr is unrelated
+      // to the LValueness of the metatype.
+      if (auto *LVT = dyn_cast<LValueType>(Annotation.getPointer())) {
+        Annotation = LVT->getObjectType();
+      }
+
+      Annotation = MetaTypeType::get(Annotation, SwiftContext);
+
+      // Use the canonical type as a type annotation because looking at the
+      // '.metatype' in the IDE is a way to understand what type the expression
+      // has.
+      addKeyword("metatype", Annotation->getCanonicalType());
+    }
   }
 
   void getCompletionsInDeclContext(SourceLoc Loc) {
