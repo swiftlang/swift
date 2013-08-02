@@ -314,6 +314,16 @@ public:
                     BridgeToBlockInst(Loc, Op, Ty));
   }
 
+  UnownedToRefInst *createUnownedToRef(SILLocation loc,
+                                       SILValue op, SILType ty) {
+    return insert(new (F.getModule()) UnownedToRefInst(loc, op, ty));
+  }
+
+  RefToUnownedInst *createRefToUnowned(SILLocation loc,
+                                       SILValue op, SILType ty) {
+    return insert(new (F.getModule()) RefToUnownedInst(loc, op, ty));
+  }
+
   ArchetypeRefToSuperInst *createArchetypeRefToSuper(SILLocation Loc,
                                                      SILValue Archetype,
                                                      SILType BaseTy) {

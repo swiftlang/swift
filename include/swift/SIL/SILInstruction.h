@@ -768,6 +768,30 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// RefToUnownedInst - Given a value of a reference type,
+/// convert it to an unowned reference.
+///
+/// This does nothing at runtime; it just changes the formal type.
+class RefToUnownedInst
+  : public UnaryInstructionBase<ValueKind::RefToUnownedInst, ConversionInst>
+{
+public:
+  RefToUnownedInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// UnownedToRefInst - Given a value of an [unowned] type,
+/// convert it to the underlying reference type.
+///
+/// This does nothing at runtime; it just changes the formal type.
+class UnownedToRefInst
+  : public UnaryInstructionBase<ValueKind::UnownedToRefInst, ConversionInst>
+{
+public:
+  UnownedToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
 class ThinToThickFunctionInst

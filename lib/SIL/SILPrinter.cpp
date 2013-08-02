@@ -476,6 +476,12 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "raw_pointer_to_ref");
   }
+  void visitRefToUnownedInst(RefToUnownedInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_unowned");
+  }
+  void visitUnownedToRefInst(UnownedToRefInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unowned_to_ref");
+  }
   void visitConvertCCInst(ConvertCCInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_cc");
   }

@@ -78,16 +78,16 @@ public:
   _require(condition, complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
-  _checkTypeIsRValue(SILValue value, const Twine &valueDescription,
-                     const char *typeName) {
+  _requireTypeIsRValue(SILValue value, const Twine &valueDescription,
+                       const char *typeName) {
     _require(!value.getType().isAddress(),
              valueDescription + " cannot be an address");
     auto result = dyn_cast<T>(value.getType().getSwiftRValueType());
     _require(result, valueDescription + " must have type " + typeName);
     return result;
   }
-#define checkTypeIsRValue(type, value, valueDescription) \
-  _checkTypeIsRValue<type>(value, valueDescription, #type)
+#define requireTypeIsRValue(type, value, valueDescription) \
+  _requireTypeIsRValue<type>(value, valueDescription, #type)
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
@@ -421,14 +421,14 @@ public:
             "Operand of dealloc_ref must be reference type");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    auto type = checkTypeIsRValue(ReferenceStorageType, RI->getOperand(),
-                                  "Operand of unowned_retain");
+    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
+                                    "Operand of unowned_retain");
     require(type->getOwnership() == Ownership::Unowned,
             "Operand of unowned_retain must be unowned reference");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    auto type = checkTypeIsRValue(ReferenceStorageType, RI->getOperand(),
-                                  "Operand of unowned_release");
+    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
+                                    "Operand of unowned_release");
     require(type->getOwnership() == Ownership::Unowned,
             "Operand of unowned_release must be unowned reference");
   }
@@ -895,6 +895,37 @@ public:
     } else {
       llvm_unreachable("invalid AnyFunctionType?!");
     }    
+  }
+
+  void checkRefToUnownedInst(RefToUnownedInst *I) {
+    require(!I->getOperand().getType().isAddress(),
+            "Operand of ref_to_unowned cannot be address");
+    auto operandType = I->getOperand().getType().getSwiftRValueType();
+    auto resultType = requireTypeIsRValue(ReferenceStorageType, I,
+                                          "Result of ref_to_unowned");
+    require(operandType.hasReferenceSemantics(),
+            "Operand of ref_to_unowned must have reference semantics");
+    require(resultType.getReferentType() == operandType,
+            "Result of ref_to_unowned does not have the "
+            "operand's type as its referent type");
+    require(resultType->getOwnership() == Ownership::Unowned,
+            "Result of ref_to_unowned must be [unowned]");
+  }
+
+  void checkUnownedToRefInst(UnownedToRefInst *I) {
+    auto operandType = requireTypeIsRValue(ReferenceStorageType,
+                                           I->getOperand(),
+                                           "Operand of unowned_to_ref");
+    require(!I->getType().isAddress(),
+            "Result of unowned_to_ref cannot be address");
+    auto resultType = I->getType().getSwiftRValueType();
+    require(resultType.hasReferenceSemantics(),
+            "Result of unowned_to_ref must have reference semantics");
+    require(operandType.getReferentType() == resultType,
+            "Operand of unowned_to_ref does not have the "
+            "operand's type as its referent type");
+    require(operandType->getOwnership() == Ownership::Unowned,
+            "Operand of unowned_to_ref must be [unowned]");
   }
   
   void checkUpcastInst(UpcastInst *UI) {

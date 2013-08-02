@@ -549,6 +549,8 @@ public:
   void visitObjectPointerToRefInst(ObjectPointerToRefInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
+  void visitRefToUnownedInst(RefToUnownedInst *i);
+  void visitUnownedToRefInst(UnownedToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitConvertCCInst(ConvertCCInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
@@ -1858,6 +1860,18 @@ void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0),
                       destType);
+}
+
+void IRGenSILFunction::visitUnownedToRefInst(swift::UnownedToRefInst *i) {
+  // This instruction is specified to be a no-op.
+  Explosion temp = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(SILValue(i, 0), temp);
+}
+
+void IRGenSILFunction::visitRefToUnownedInst(swift::RefToUnownedInst *i) {
+  // This instruction is specified to be a no-op.
+  Explosion temp = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(SILValue(i, 0), temp);
 }
 
 void IRGenSILFunction::visitThinToThickFunctionInst(

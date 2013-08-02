@@ -544,14 +544,18 @@ bb0:
 // CHECK: unreachable
 }
 
-sil @test_unowned_retain : $[thin] (p : [unowned] SomeClass) -> () {
-bb0(%0 : $[unowned] SomeClass):
-// CHECK: unowned_retain %0 : $[unowned] SomeClass
-  %1 = unowned_retain %0 : $[unowned] SomeClass
-// CHECK: unowned_release %0 : $[unowned] SomeClass
-  %2 = unowned_release %0 : $[unowned] SomeClass
-  %3 = tuple ()
-  %4 = return %3 : $()
+sil @test_unowned_retain : $[thin] (p : SomeClass) -> () {
+bb0(%0 : $SomeClass):
+  %1 = ref_to_unowned %0 : $SomeClass to $[unowned] SomeClass
+// CHECK: ref_to_unowned %0 : $SomeClass to $[unowned] SomeClass
+  %2 = unowned_retain %1 : $[unowned] SomeClass
+// CHECK: unowned_retain %1 : $[unowned] SomeClass
+  %3 = unowned_release %1 : $[unowned] SomeClass
+// CHECK: unowned_release %1 : $[unowned] SomeClass
+  %4 = unowned_to_ref %1 : $[unowned] SomeClass to $SomeClass
+// CHECK: unowned_to_ref %1 : $[unowned] SomeClass to $SomeClass
+  %5 = tuple ()
+  %6 = return %5 : $()
 }
 
 // CHECK: sil @test_basic_block_arguments

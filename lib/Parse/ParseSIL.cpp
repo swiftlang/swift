@@ -818,6 +818,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
+    .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("release", ValueKind::ReleaseInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
@@ -838,6 +839,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("upcast_existential_ref", ValueKind::UpcastExistentialRefInst)
     .Case("unowned_retain", ValueKind::UnownedRetainInst)
     .Case("unowned_release", ValueKind::UnownedReleaseInst)
+    .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
     .Default(ValueKind::SILArgument);
 
   if (Opcode != ValueKind::SILArgument) {
@@ -1081,6 +1083,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ObjectPointerToRefInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
+  case ValueKind::RefToUnownedInst:
+  case ValueKind::UnownedToRefInst:
   case ValueKind::ConvertCCInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::BridgeToBlockInst:
@@ -1128,6 +1132,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::RawPointerToRefInst:
       ResultVal = B.createRawPointerToRef(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::RefToUnownedInst:
+      ResultVal = B.createRefToUnowned(SILLocation(), Val, Ty);
+      break;
+    case ValueKind::UnownedToRefInst:
+      ResultVal = B.createUnownedToRef(SILLocation(), Val, Ty);
       break;
     case ValueKind::ConvertCCInst:
       ResultVal = B.createConvertCC(SILLocation(), Val, Ty);
