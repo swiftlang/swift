@@ -147,8 +147,10 @@ public:
       return IsAnnotation;
     }
 
+    bool hasText() const { return chunkHasText(getKind()); }
+
     StringRef getText() const {
-      assert(chunkHasText(getKind()));
+      assert(hasText());
       return Text;
     }
 
