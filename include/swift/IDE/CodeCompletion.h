@@ -207,6 +207,8 @@ private:
   }
 
 public:
+  ResultKind getKind() const { return Kind; }
+
   const CodeCompletionString *getCompletionString() const {
     return CompletionString;
   }
