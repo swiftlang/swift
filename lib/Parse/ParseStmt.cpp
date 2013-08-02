@@ -147,6 +147,10 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition) {
   SourceLoc EndLoc = Tok.getLoc();
   State->delayTopLevelCodeDecl(nullptr, { BeginLoc, EndLoc },
                                BeginParserPosition.PreviousLoc);
+
+  // Skip the rest of the file to prevent the parser from constructing the AST
+  // for it.  Forward references are not allowed at the top level.
+  skipUntil(tok::eof, /*StopAtCodeComplete=*/false);
 }
 
 ///   brace-item:
