@@ -60,96 +60,118 @@ static bool isWildcardPattern(const Pattern *p) {
 static bool isBindingPattern(const Pattern *p) {
   return p && isa<NamedPattern>(p->getSemanticsProvidingPattern());
 }
-  
-/// Emit a conditional branch testing if a value matches the top-level node
-/// of this pattern.
-/// On the true branch, destructure the value. On return, the insertion point
-/// is inside the true branch. The false branch is returned.
+
+/// Typedef for the vector of basic blocks and destructured values produced by
+/// emitDispatchAndDestructure.
+using DispatchedPatternVector
+  = std::vector<std::pair<SILBasicBlock*, std::vector<SILValue>>>;
+
+/// Emit a conditional branch testing if a value matches one of the given
+/// pattern nodes.
+/// In the case branch for each pattern, destructure the value.
+/// On return, the insertion point is inside the true branch. The false branch
+/// is returned.
 ///
-/// If the pattern node is irrefutable, this performs an unconditional branch
-/// and returns null.
-static SILBasicBlock *emitBranchAndDestructure(SILGenFunction &gen,
-                                      const Pattern *p,
-                                      SILValue v,
-                                      SmallVectorImpl<SILValue> &destructured) {
-  p = p->getSemanticsProvidingPattern();
-  
-  switch (p->getKind()) {
-  case PatternKind::Any:
-  case PatternKind::Named:
-  case PatternKind::Expr:
-    llvm_unreachable("wildcards shouldn't get here");
+/// If the set of pattern nodes form a signature for the type, that is, they
+/// match every possible value of the type, this returns null. Otherwise, this
+/// returns the "default" basic block for the dispatch that will be branched to
+/// if no patterns match.
+static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
+                                          ArrayRef<const Pattern *> patterns,
+                                          SILValue v,
+                                          DispatchedPatternVector &dispatches) {
+  for (const Pattern *p : patterns) {
+    p = p->getSemanticsProvidingPattern();
+    std::vector<SILValue> destructured;
+    
+    switch (p->getKind()) {
+    case PatternKind::Any:
+    case PatternKind::Named:
+    case PatternKind::Expr:
+      llvm_unreachable("wildcards shouldn't get here");
 
-  case PatternKind::Tuple: {
-    auto *tp = cast<TuplePattern>(p);
+    case PatternKind::Tuple: {
+      // Tuples are irrefutable; destructure without branching.
+      auto *tp = cast<TuplePattern>(p);
+      assert(patterns.size() == 1 && "pattern orthogonal to tuple?!");
       
-    // Tuples are irrefutable; destructure without branching.
-    auto tupleTy = tp->getType()->castTo<TupleType>();
-    auto tupleSILTy = gen.getLoweredType(tupleTy);
-    if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
-      for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-        SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
-        SILValue member = gen.B.createTupleElementAddr(SILLocation(),
-                                             v, i, fieldTy.getAddressType());
-        if (!fieldTy.isAddressOnly(gen.F.getModule()))
-          member = gen.B.createLoad(SILLocation(), member);
-        destructured.push_back(member);
+      auto tupleTy = tp->getType()->castTo<TupleType>();
+      auto tupleSILTy = gen.getLoweredType(tupleTy);
+      if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
+        for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
+          SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
+          SILValue member = gen.B.createTupleElementAddr(SILLocation(),
+                                               v, i, fieldTy.getAddressType());
+          if (!fieldTy.isAddressOnly(gen.F.getModule()))
+            member = gen.B.createLoad(SILLocation(), member);
+          destructured.push_back(member);
+        }
+      } else {
+        for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
+          auto fieldType = tupleTy->getElementType(i);
+          SILType fieldTy = gen.getLoweredLoadableType(fieldType);
+          SILValue member = gen.B.createTupleExtract(SILLocation(),
+                                                     v, i, fieldTy);
+          destructured.push_back(member);
+        }
       }
-    } else {
-      for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-        auto fieldType = tupleTy->getElementType(i);
-        SILType fieldTy = gen.getLoweredLoadableType(fieldType);
-        SILValue member = gen.B.createTupleExtract(SILLocation(),
-                                                   v, i, fieldTy);
-        destructured.push_back(member);
-      }
+      
+      dispatches.emplace_back(gen.B.getInsertionBB(), std::move(destructured));
+      gen.B.clearInsertionPoint();
+      return nullptr;
     }
-    return nullptr;
-  }
+        
+    case PatternKind::Isa: {
+      auto *ip = cast<IsaPattern>(p);
       
-  case PatternKind::Isa: {
-    auto *ip = cast<IsaPattern>(p);
-    
-    // Perform a conditional cast and branch on whether it succeeded.
-    SILValue cast = gen.emitCheckedCast(SILLocation(),
-                                      ManagedValue(v, ManagedValue::Unmanaged),
-                                      ip->getType(),
-                                      ip->getCastTypeLoc().getType(),
-                                      ip->getCastKind(),
-                                      CheckedCastMode::Conditional,
-                                      /*useCastValue*/ false);
-    SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast,
-                    SILType::getBuiltinIntegerType(1, gen.F.getASTContext()));
-    
-    // On the true branch, we can use the cast value.
-    // If the cast result is loadable and we cast a value address, load it.
-    if (cast.getType().isAddress()
-        && !cast.getType().isAddressOnly(gen.F.getModule()))
-      cast = gen.B.createLoad(SILLocation(), cast);
-    destructured.push_back(cast);
-    
-    // Emit the branch.
-    SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-    SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
-    
-    gen.B.createCondBranch(SILLocation(), didMatch,
-                           trueBB, falseBB);
-    
-    // Continue codegen into the true block, and return the false block.
-    gen.B.emitBlock(trueBB);
-    return falseBB;
-
-  }
+      // Perform a conditional cast and branch on whether it succeeded.
+      SILValue cast = gen.emitCheckedCast(SILLocation(),
+                                        ManagedValue(v, ManagedValue::Unmanaged),
+                                        ip->getType(),
+                                        ip->getCastTypeLoc().getType(),
+                                        ip->getCastKind(),
+                                        CheckedCastMode::Conditional,
+                                        /*useCastValue*/ false);
+      SILValue didMatch = gen.B.createIsNonnull(SILLocation(), cast,
+                      SILType::getBuiltinIntegerType(1, gen.F.getASTContext()));
       
-  case PatternKind::NominalType:
-  case PatternKind::UnionElement:
-    llvm_unreachable("not implemented");
+      // On the true branch, we can use the cast value.
+      // If the cast result is loadable and we cast a value address, load it.
+      if (cast.getType().isAddress()
+          && !cast.getType().isAddressOnly(gen.F.getModule()))
+        cast = gen.B.createLoad(SILLocation(), cast);
+      destructured.push_back(cast);
       
-  case PatternKind::Paren:
-  case PatternKind::Typed:
-  case PatternKind::Var:
-    llvm_unreachable("pattern node is never semantic");
+      // Emit the branch.
+      SILBasicBlock *trueBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      SILBasicBlock *falseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      
+      gen.B.createCondBranch(SILLocation(), didMatch,
+                             trueBB, falseBB);
+      
+      // Code matching the pattern goes into the "true" block.
+      dispatches.emplace_back(trueBB, std::move(destructured));
+      
+      // Dispatch continues on the "false" block.
+      gen.B.emitBlock(falseBB);
+      continue;
+    }
+        
+    case PatternKind::NominalType:
+    case PatternKind::UnionElement:
+      llvm_unreachable("not implemented");
+        
+    case PatternKind::Paren:
+    case PatternKind::Typed:
+    case PatternKind::Var:
+      llvm_unreachable("pattern node is never semantic");
+    }
   }
+  
+  // The current block is now the "default" block.
+  SILBasicBlock *defaultBB = gen.B.getInsertionBB();
+  gen.B.clearInsertionPoint();
+  return defaultBB;
 }
 
 /// Return the number of columns a destructured pattern constructor produces.
@@ -285,8 +307,7 @@ void destructurePattern(SILGenFunction &gen,
 
 /// True if two pattern nodes are orthogonal, that is, they never both match
 /// the same value.
-bool arePatternsOrthogonal(const Pattern *a,
-                           const Pattern *b) {
+bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
   // Wildcards are never orthogonal.
   if (!a) return false;
   if (!b) return false;
@@ -372,42 +393,6 @@ bool arePatternsOrthogonal(const Pattern *a,
   case PatternKind::Var:
     llvm_unreachable("not semantic");
   }
-}
-
-/// True if a set of pattern nodes forms a signature for the type they match.
-static bool
-patternsFormSignature(ArrayRef<const Pattern*> set) {
-  if (set.empty())
-    return false;
-  
-  for (const Pattern *p : set) {
-    p = p->getSemanticsProvidingPattern();
-    switch (p->getKind()) {
-    // Tuple and non-union nominal type patterns trivially form a signature.
-    case PatternKind::Tuple:
-    case PatternKind::NominalType:
-      return true;
-      
-    // 'is' constructors never affect signature-ness; there can always be
-    // new types we don't know about.
-    case PatternKind::Isa:
-      continue;
-      
-    case PatternKind::Any:
-    case PatternKind::Named:
-    case PatternKind::Expr:
-      llvm_unreachable("shouldn't have specialized on a wildcard");
-        
-    case PatternKind::UnionElement:
-      llvm_unreachable("not implemented");
-        
-    case PatternKind::Paren:
-    case PatternKind::Var:
-    case PatternKind::Typed:
-      llvm_unreachable("not semantic");
-    }
-  }
-  return false;
 }
 
 namespace {
@@ -823,8 +808,10 @@ public:
     return const_cast<ClauseMatrix&>(*this)[row];
   }
   
-  /// Specialize this matrix's first column on a constructor, and emit a branch
-  /// conditional on the constructor matching the current value. Given an n-ary
+  /// Specialize this matrix's first column on a constructor, and emit
+  /// variable bindings for the leaf pattern nodes exposed by specialization.
+  ///
+  /// Given an n-ary
   /// constructor form c(x1...xn), this performs the following row-wise
   /// transformation to create a new matrix:
   ///
@@ -839,35 +826,25 @@ public:
   ///
   /// The first skipRows rows are removed prior to the transformation.
   /// We treat ExprPatterns as wildcards with a guard.
-  ///
-  /// Returns a pair of the
-  /// specialized clause matrix and the false branch for the constructor test.
-  /// If the constructor is irrefutable, as for a tuple, struct, class, or
-  /// singleton union, the branch block will be null.
-  std::pair<ClauseMatrix, SILBasicBlock /*nullable*/ *>
-  emitSpecializedBranch(SILGenFunction &gen,
-                        const Pattern *specializer, unsigned skipRows,
-                        CleanupsDepth specDepth, SILBasicBlock *specCont) const{
+  ClauseMatrix
+  emitSpecialization(SILGenFunction &gen,
+                     const Pattern *specializer, unsigned skipRows,
+                     ArrayRef<SILValue> specOccurrences,
+                     CleanupsDepth specDepth, SILBasicBlock *specCont) const {
     assert(columnCount >= 1 && "can't specialize a matrix with no columns");
     assert(skipRows < rowCount && "can't skip more rows than we have");
     
-    // Test and destructure the first column's occurrence.
-    SmallVector<SILValue, 4> newOccurrences;
-    SILBasicBlock *falseBB = emitBranchAndDestructure(gen, specializer,
-                                                      getOccurrences()[0],
-                                                      newOccurrences);
-    // Forward the remaining columns' occurrences.
+    unsigned specializedWidth = getDestructuredWidth(specializer);
+    assert(specOccurrences.size() == specializedWidth &&
+           "new occurrences don't match pattern for specialization");
+    
+    // Gather the new occurrences with those of the remaining columns.
+    SmallVector<SILValue, 4> newOccurrences(specOccurrences.begin(),
+                                            specOccurrences.end());
     std::copy(getOccurrences().begin() + 1, getOccurrences().end(),
               std::back_inserter(newOccurrences));
-    
-    // Build the specialized clause matrix.
-    std::pair<ClauseMatrix, SILBasicBlock*> result{
-      ClauseMatrix{newOccurrences, rowCount},
-      falseBB
-    };
-    ClauseMatrix &specialized = result.first;
-    
-    unsigned specializedWidth = getDestructuredWidth(specializer);
+
+    ClauseMatrix specialized{newOccurrences, rowCount - skipRows};
     
     for (unsigned r = skipRows; r < rowCount; ++r) {
       auto row = (*this)[r];
@@ -925,7 +902,7 @@ public:
       if (!specialized[r].getCleanupsDepth().isValid())
         specialized[r].setCleanupsDepth(gen.Cleanups.getCleanupsDepth());
     
-    return result;
+    return specialized;
   }
   
   /// Emit pattern variable bindings, if any, to the value in a column of the
@@ -1123,8 +1100,10 @@ recur:
   // heuristics and specialize on that column. For now we just do naive
   // left-to-right specialization.
   SmallVector<const Pattern *, 4> specialized;
+  SmallVector<unsigned, 4> specializedRows;
   unsigned skipRows = r;
   
+  // FIXME: O(rows * orthogonal patterns). Linear scan in this loop is lame.
   auto isOrthogonalToSpecialized = [&](const Pattern *p) -> bool {
     for (auto s : specialized)
       if (!arePatternsOrthogonal(p, s))
@@ -1132,28 +1111,57 @@ recur:
     return true;
   };
 
+  // Derive a set of orthogonal pattern nodes to specialize on.
   for (; r < rows; ++r) {
     const Pattern *p = clauses[r][0];
     if (isWildcardPattern(p))
       continue;
     // If we've seen a constructor non-orthogonal to this one, skip it.
+    // FIXME: O(n^2). Linear search here is lame.
     if (!isOrthogonalToSpecialized(p))
       continue;
     
     specialized.push_back(p);
-    
-    SILBasicBlock *nextBB;
+    specializedRows.push_back(r);
+  }
 
+  // If we have no specializations, recur into the default matrix immediately.
+  if (specialized.empty()) {
+    clauses.reduceToDefault(skipRows);
+    goto recur;
+  }
+  
+  // Emit the dispatch table.
+  DispatchedPatternVector dispatches;
+
+  SILBasicBlock *defaultBB
+    = emitDispatchAndDestructure(gen, specialized, clauses.getOccurrences()[0],
+                                 dispatches);
+  assert(dispatches.size() == specialized.size() &&
+         "dispatch table doesn't match pattern set");
+  
+  // Emit each specialized branch.
+  for (size_t i = 0, e = specialized.size(); i < e; ++i) {
+    const Pattern *pat = specialized[i];
+    unsigned row = specializedRows[i];
+    SILBasicBlock *bodyBB = dispatches[i].first;
+    ArrayRef<SILValue> bodyOccurrences = dispatches[i].second;
+    
+    assert(!gen.B.hasValidInsertionPoint() && "dispatch did not close bb");
+    gen.B.emitBlock(bodyBB);
+    
     // Create a nested scope and cont bb to clean up var bindings exposed by
     // specializing the matrix.
-    SILBasicBlock *innerContBB = new(gen.F.getModule()) SILBasicBlock(&gen.F);
+    SILBasicBlock *innerContBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+    
     {
       Scope patternVarScope(gen.Cleanups);
-    
-      auto specialization = clauses.emitSpecializedBranch(gen, p, r,
-                                  gen.Cleanups.getCleanupsDepth(), innerContBB);
-      ClauseMatrix &submatrix = specialization.first;
-      nextBB = specialization.second;
+      
+      ClauseMatrix submatrix = clauses.emitSpecialization(gen, pat, row,
+                                              bodyOccurrences,
+                                              gen.Cleanups.getCleanupsDepth(),
+                                              innerContBB);
+
       // Emit the submatrix into the true branch of the specialization.
       emitDecisionTree(gen, stmt, std::move(submatrix), caseMap, innerContBB);
       assert(!gen.B.hasValidInsertionPoint()
@@ -1174,21 +1182,17 @@ recur:
     // Chain the inner continuation to the outer.
     if (gen.B.hasValidInsertionPoint())
       gen.B.createBranch(SILLocation(), contBB);
-    
-    // Continue dispatch on the false branch, if any.
-    if (nextBB)
-      gen.B.emitBlock(nextBB);
   }
-  
-  // If the set of specialized constructors form a signature for the type (i.e.,
-  // they're exhaustive), then we're done.
-  if (patternsFormSignature(specialized)) {
-    // FIXME: Kill this BB.
-    gen.B.createUnreachable(stmt);
+
+  // If the dispatch was exhaustive, then emitDispatchAndDestructure returns
+  // null, and we're done.
+  if (!defaultBB)
     return;
-  }
   
   // Otherwise, recur into the default matrix.
+  assert(!gen.B.hasValidInsertionPoint() && "specialization did not close bb");
+  
+  gen.B.emitBlock(defaultBB);
   clauses.reduceToDefault(skipRows);
   goto recur;
 }
