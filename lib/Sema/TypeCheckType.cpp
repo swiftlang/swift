@@ -626,6 +626,14 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       attrs.cc = Nothing;
     }
 
+    // In SIL translation units *only*, permit [weak] and [unowned] to
+    // apply directly to types.
+    if (attrs.hasOwnership() && TU.Kind == TranslationUnit::SIL &&
+        Ty->hasReferenceSemantics()) {
+      Ty = ReferenceStorageType::get(Ty, attrs.getOwnership(), Context);
+      attrs.clearOwnership();
+    }
+
     // FIXME: this is lame.
     if (!attrs.empty())
       diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
