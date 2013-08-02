@@ -13,9 +13,9 @@
 #include <string>
 
 using namespace swift;
-using namespace code_completion;
+using namespace ide;
 
-std::string swift::code_completion::removeCodeCompletionTokens(
+std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {
   assert(TokenName.size() >= 1);
 
@@ -772,7 +772,7 @@ public:
 } // end unnamed namespace
 
 CodeCompletionCallbacksFactory *
-swift::code_completion::makeCodeCompletionCallbacksFactory(
+swift::ide::makeCodeCompletionCallbacksFactory(
     CodeCompletionContext &CompletionContext,
     CodeCompletionConsumer &Consumer) {
   return new CodeCompletionCallbacksFactoryImpl(CompletionContext, Consumer);

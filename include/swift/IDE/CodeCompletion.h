@@ -27,7 +27,7 @@ namespace swift {
 class CodeCompletionCallbacksFactory;
 class Decl;
 
-namespace code_completion {
+namespace ide {
 
 class CodeCompletionContext;
 class CodeCompletionResultBuilder;
@@ -389,7 +389,7 @@ CodeCompletionCallbacksFactory *
 makeCodeCompletionCallbacksFactory(CodeCompletionContext &CompletionContext,
                                    CodeCompletionConsumer &Consumer);
 
-} // namespace code_completion
+} // namespace ide
 } // namespace swift
 
 #endif // SWIFT_IDE_CODE_COMPLETION_H

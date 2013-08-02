@@ -28,7 +28,7 @@
 #include <algorithm>
 
 using namespace swift;
-using namespace code_completion;
+using namespace ide;
 
 std::string toInsertableString(CodeCompletionResult *Result) {
   std::string Str;
@@ -93,7 +93,7 @@ REPLCompletions::REPLCompletions() : State(CompletionState::Invalid) {
   // Cerate a factory for code completion callbacks that will feed the
   // Consumer.
   CompletionCallbacksFactory.reset(
-      code_completion::makeCodeCompletionCallbacksFactory(CompletionContext,
+      ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                           *Consumer.get()));
 }
 

@@ -2,7 +2,7 @@
 #include "gtest/gtest.h"
 
 using namespace swift;
-using namespace code_completion;
+using namespace ide;
 
 static std::string replaceAtWithNull(const std::string &S) {
   std::string Result = S;

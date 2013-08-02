@@ -27,9 +27,9 @@
 namespace swift {
   class TranslationUnit;
 
-namespace code_completion {
+namespace ide {
   class CodeCompletionResult;
-} // namespace code_completion
+}
 
 /// State of a completion operation.
 enum class CompletionState {
@@ -54,8 +54,8 @@ class REPLCompletions {
   friend class REPLCodeCompletionConsumer;
   CompletionState State;
 
-  code_completion::CodeCompletionContext CompletionContext;
-  std::unique_ptr<code_completion::CodeCompletionConsumer> Consumer;
+  ide::CodeCompletionContext CompletionContext;
+  std::unique_ptr<ide::CodeCompletionConsumer> Consumer;
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory;
 
   std::vector<StringRef> CompletionStrings;
