@@ -40,8 +40,6 @@ public:
 
   void setCodeCompletionPoint(unsigned BufferID, unsigned Offset) {
     assert(BufferID != ~0U && "Buffer should be valid");
-    assert(CodeCompletionBufferID == ~0U &&
-           "Code completion point already set");
 
     CodeCompletionBufferID = BufferID;
     CodeCompletionOffset = Offset;
