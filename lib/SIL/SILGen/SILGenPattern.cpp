@@ -19,6 +19,7 @@
 #include "swift/AST/Diagnostics.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -80,49 +81,59 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                           ArrayRef<const Pattern *> patterns,
                                           SILValue v,
                                           DispatchedPatternVector &dispatches) {
-  for (const Pattern *p : patterns) {
-    p = p->getSemanticsProvidingPattern();
-    std::vector<SILValue> destructured;
-    
-    switch (p->getKind()) {
-    case PatternKind::Any:
-    case PatternKind::Named:
-    case PatternKind::Expr:
-      llvm_unreachable("wildcards shouldn't get here");
+  assert(!patterns.empty() && "no patterns to dispatch on?!");
+  
+  PatternKind kind = patterns[0]->getSemanticsProvidingPattern()->getKind();
+  CanType type = patterns[0]->getType()->getCanonicalType();
+  
+  switch (kind) {
+  case PatternKind::Any:
+  case PatternKind::Named:
+  case PatternKind::Expr:
+    llvm_unreachable("wildcards shouldn't get here");
 
-    case PatternKind::Tuple: {
-      // Tuples are irrefutable; destructure without branching.
-      auto *tp = cast<TuplePattern>(p);
-      assert(patterns.size() == 1 && "pattern orthogonal to tuple?!");
-      
-      auto tupleTy = tp->getType()->castTo<TupleType>();
-      auto tupleSILTy = gen.getLoweredType(tupleTy);
-      if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
-        for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-          SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
-          SILValue member = gen.B.createTupleElementAddr(SILLocation(),
-                                               v, i, fieldTy.getAddressType());
-          if (!fieldTy.isAddressOnly(gen.F.getModule()))
-            member = gen.B.createLoad(SILLocation(), member);
-          destructured.push_back(member);
-        }
-      } else {
-        for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
-          auto fieldType = tupleTy->getElementType(i);
-          SILType fieldTy = gen.getLoweredLoadableType(fieldType);
-          SILValue member = gen.B.createTupleExtract(SILLocation(),
-                                                     v, i, fieldTy);
-          destructured.push_back(member);
-        }
+  case PatternKind::Tuple: {
+    // Tuples are irrefutable; destructure without branching.
+    assert(patterns.size() == 1 && "pattern orthogonal to tuple?!");
+    auto *tp = cast<TuplePattern>(patterns[0]);
+
+    std::vector<SILValue> destructured;
+
+    auto tupleTy = tp->getType()->castTo<TupleType>();
+    auto tupleSILTy = gen.getLoweredType(tupleTy);
+    if (tupleSILTy.isAddressOnly(gen.F.getModule())) {
+      for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
+        SILType fieldTy = gen.getLoweredType(tupleTy->getElementType(i));
+        SILValue member = gen.B.createTupleElementAddr(SILLocation(),
+                                             v, i, fieldTy.getAddressType());
+        if (!fieldTy.isAddressOnly(gen.F.getModule()))
+          member = gen.B.createLoad(SILLocation(), member);
+        destructured.push_back(member);
       }
-      
-      dispatches.emplace_back(gen.B.getInsertionBB(), std::move(destructured));
-      gen.B.clearInsertionPoint();
-      return nullptr;
+    } else {
+      for (unsigned i = 0, e = tupleTy->getFields().size(); i < e; ++i) {
+        auto fieldType = tupleTy->getElementType(i);
+        SILType fieldTy = gen.getLoweredLoadableType(fieldType);
+        SILValue member = gen.B.createTupleExtract(SILLocation(),
+                                                   v, i, fieldTy);
+        destructured.push_back(member);
+      }
     }
-        
-    case PatternKind::Isa: {
+    
+    dispatches.emplace_back(gen.B.getInsertionBB(), std::move(destructured));
+    gen.B.clearInsertionPoint();
+    return nullptr;
+  }
+      
+  case PatternKind::Isa: {
+    /// Emit all the 'is' checks.
+    ///
+    /// FIXME: We may at some point need to deal with heterogeneous pattern node
+    /// sets (e.g., a 't is U' pattern with a 'T(...)' pattern).
+    for (const Pattern *p : patterns) {
       auto *ip = cast<IsaPattern>(p);
+
+      std::vector<SILValue> destructured;
       
       // Perform a conditional cast and branch on whether it succeeded.
       SILValue cast = gen.emitCheckedCast(SILLocation(),
@@ -154,24 +165,76 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
       // Dispatch continues on the "false" block.
       gen.B.emitBlock(falseBB);
-      continue;
     }
-        
-    case PatternKind::NominalType:
-    case PatternKind::UnionElement:
-      llvm_unreachable("not implemented");
-        
-    case PatternKind::Paren:
-    case PatternKind::Typed:
-    case PatternKind::Var:
-      llvm_unreachable("pattern node is never semantic");
-    }
+
+    // The current block is now the "default" block.
+    SILBasicBlock *defaultBB = gen.B.getInsertionBB();
+    gen.B.clearInsertionPoint();
+    return defaultBB;
   }
-  
-  // The current block is now the "default" block.
-  SILBasicBlock *defaultBB = gen.B.getInsertionBB();
-  gen.B.clearInsertionPoint();
-  return defaultBB;
+      
+  case PatternKind::UnionElement: {
+    /// We'll want to know if we matched every case of the union to see if we
+    /// need a default block.
+    ///
+    /// FIXME: If the union is resilient, then we always need a default block.
+    llvm::DenseSet<UnionElementDecl*> unmatchedCases;
+    type->getUnionOrBoundGenericUnion()->getAllElements(unmatchedCases);
+    
+    SmallVector<std::pair<UnionElementDecl*, SILBasicBlock*>, 4> caseBBs;
+    
+    SILValue voidValue;
+    
+    for (const Pattern *p : patterns) {
+      auto *up = cast<UnionElementPattern>(p);
+      UnionElementDecl *elt = up->getElementDecl();
+      
+      assert(unmatchedCases.count(elt)
+             && "specializing same union case twice?!");
+      unmatchedCases.erase(elt);
+      
+      SILBasicBlock *caseBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+      
+      // Create a BB argument to receive the union case data if it has any.
+      SILValue eltValue;
+      if (elt->hasArgumentType() &&
+          !elt->getArgumentType()->isVoid()) {
+        // FIXME: Address-only unions.
+        SILType argTy = gen.getLoweredLoadableType(elt->getArgumentType());
+        eltValue = new (gen.F.getModule()) SILArgument(argTy, caseBB);
+      } else {
+        // If the element pattern for a void oneof element has a subpattern, it
+        // will bind to a void value.
+        if (!voidValue)
+          voidValue = gen.emitEmptyTuple(SILLocation());
+        eltValue = voidValue;
+      }
+      
+      caseBBs.push_back({elt, caseBB});
+      dispatches.emplace_back(caseBB, std::vector<SILValue>(1, eltValue));
+    }
+    
+    SILBasicBlock *defaultBB = nullptr;
+    
+    // If we didn't cover every case, then we need a default block.
+    if (!unmatchedCases.empty())
+      defaultBB = new (gen.F.getModule()) SILBasicBlock(&gen.F);
+    
+    // Emit the switch instruction.
+    gen.B.createSwitchUnion(SILLocation(), v, defaultBB, caseBBs);
+    
+    // Return the default BB.
+    return defaultBB;
+  }
+      
+  case PatternKind::NominalType:
+    llvm_unreachable("not implemented");
+    
+  case PatternKind::Paren:
+  case PatternKind::Typed:
+  case PatternKind::Var:
+    llvm_unreachable("pattern node is never semantic");
+  }
 }
 
 /// Return the number of columns a destructured pattern constructor produces.
@@ -190,9 +253,13 @@ unsigned getDestructuredWidth(const Pattern *specializer) {
   // 'is' patterns destructure to the pattern as the cast type.
   case PatternKind::Isa:
     return 1;
-      
-  case PatternKind::NominalType:
+  
   case PatternKind::UnionElement:
+    // The pattern destructures to a single tuple value. Even if the element has
+    // no argument, we still model its value as having empty tuple type.
+    return 1;
+
+  case PatternKind::NominalType:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -294,7 +361,19 @@ void destructurePattern(SILGenFunction &gen,
     return;
   }
       
-  case PatternKind::UnionElement:
+  case PatternKind::UnionElement: {
+    auto *up = cast<UnionElementPattern>(p);
+    
+    // If the union case has a value, but the pattern does not specify a
+    // subpattern, then treat it like a wildcard.
+    if (!up->hasSubPattern())
+      destructured.push_back(nullptr);
+    else
+      destructured.push_back(up->getSubPattern());
+    
+    return;
+  }
+      
   case PatternKind::NominalType:
     llvm_unreachable("not implemented");
       
@@ -384,8 +463,19 @@ bool arePatternsOrthogonal(const Pattern *a, const Pattern *b) {
     return false;
   }
       
+  case PatternKind::UnionElement: {
+    auto *ua = cast<UnionElementPattern>(a);
+    
+    // UnionElements are orthogonal to different UnionElements, but not to other
+    // patterns that match the whole type.
+    auto *ub = dyn_cast<UnionElementPattern>(b);
+    if (!ub)
+      return false;
+    
+    return ua->getElementDecl() != ub->getElementDecl();
+  }
+      
   case PatternKind::NominalType:
-  case PatternKind::UnionElement:
     llvm_unreachable("not implemented");
       
   case PatternKind::Paren:
@@ -789,8 +879,9 @@ public:
   /// Remove a row from the matrix.
   void removeRow(unsigned r) {
     assert(r < rowCount && "removeRow out of bounds");
-    memmove(getMutableRowPrefix(r), getMutableRowPrefix(r+1),
-            getRowStride() * (rowCount - (r+1)));
+    if (r + 1 < rowCount)
+      memmove(getMutableRowPrefix(r), getMutableRowPrefix(r+1),
+              getRowStride() * (rowCount - (r+1)));
     --rowCount;
   }
   

@@ -667,6 +667,14 @@ public:
 
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock,
                            OperandValueArrayRef Args);
+  
+  SwitchUnionInst *createSwitchUnion(SILLocation Loc, SILValue Operand,
+         SILBasicBlock *DefaultBB,
+         ArrayRef<std::pair<UnionElementDecl*, SILBasicBlock*>> CaseBBs) {
+    return insertTerminator(SwitchUnionInst::create(Loc, Operand, DefaultBB,
+                                                    CaseBBs, F));
+  }
+         
   //===--------------------------------------------------------------------===//
   // Memory management helpers
   //===--------------------------------------------------------------------===//

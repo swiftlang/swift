@@ -1167,18 +1167,12 @@ public:
     // we're never guaranteed to be exhaustive.
     llvm::DenseSet<UnionElementDecl*> unswitchedElts;
     
-    UnionDecl *oofDecl
+    UnionDecl *uDecl
       = SOI->getOperand().getType().getSwiftRValueType()
         ->getUnionOrBoundGenericUnion();
+    require(uDecl, "switch_union operand is not a union");
     
-    require(oofDecl, "switch_union operand is not a union");
-    
-    for (auto *member : oofDecl->getMembers()) {
-      auto *elt = dyn_cast<UnionElementDecl>(member);
-      if (!elt)
-        continue;
-      unswitchedElts.insert(elt);
-    }
+    uDecl->getAllElements(unswitchedElts);
     
     // Verify the set of unions we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
@@ -1186,7 +1180,7 @@ public:
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
       
-      require(elt->getDeclContext() != oofDecl,
+      require(elt->getDeclContext() == uDecl,
               "switch_union dispatches on union element that is not part of "
               "its type");
       require(unswitchedElts.count(elt),

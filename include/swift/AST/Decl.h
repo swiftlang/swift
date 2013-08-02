@@ -27,6 +27,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include <cstddef>
@@ -1297,7 +1298,10 @@ public:
   bool isEnum() const { return Enum; }
 
   UnionElementDecl *getElement(Identifier Name) const;
-
+  
+  /// Insert all of the 'case' element declarations into a DenseSet.
+  void getAllElements(llvm::DenseSet<UnionElementDecl*> &elements) const;
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Union;
