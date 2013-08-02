@@ -1504,8 +1504,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     SILValue SrcLVal = getLocalValue(SrcLName, DestLVal.getType());
-    ResultVal = B.createCopyAddr(SILLocation(), SrcLVal, DestLVal, IsTake,
-                                IsInit);
+    ResultVal = B.createCopyAddr(SILLocation(), SrcLVal, DestLVal,
+                                 IsTake_t(IsTake),
+                                 IsInitialization_t(IsInit));
     break;
   }
   case ValueKind::UpcastExistentialInst: {
@@ -1525,7 +1526,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     ResultVal = B.createUpcastExistential(SILLocation(), Val, DestVal,
-                                          IsTake);
+                                          IsTake_t(IsTake));
     break;
   }
   case ValueKind::InitializeVarInst: {

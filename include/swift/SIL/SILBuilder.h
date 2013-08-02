@@ -229,13 +229,13 @@ public:
                     InitializeVarInst(Loc, DestLValue, canDefaultConstruct));
   }
 
-  CopyAddrInst *createCopyAddr(SILLocation Loc,
-                               SILValue SrcLValue, SILValue DestLValue,
-                               bool isTake,
-                               bool isInitialize) {
+  CopyAddrInst *createCopyAddr(SILLocation loc,
+                               SILValue srcLValue, SILValue destLValue,
+                               IsTake_t isTake,
+                               IsInitialization_t isInitialize) {
     return insert(new (F.getModule())
-                    CopyAddrInst(Loc, SrcLValue, DestLValue,
-                                   isTake, isInitialize));
+                    CopyAddrInst(loc, srcLValue, destLValue,
+                                 isTake, isInitialize));
   }
   
   SpecializeInst *createSpecialize(SILLocation Loc, SILValue Operand,
@@ -510,7 +510,7 @@ public:
   UpcastExistentialInst *createUpcastExistential(SILLocation Loc,
                                  SILValue SrcExistential,
                                  SILValue DestExistential,
-                                 bool isTakeOfSrc) {
+                                 IsTake_t isTakeOfSrc) {
     return insert(new (F.getModule())
                     UpcastExistentialInst(Loc,
                                           SrcExistential,

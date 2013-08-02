@@ -84,7 +84,7 @@ public:
     if (getType().isAddressOnly(gen.SGM.M)) {
       SILValue buf = gen.emitTemporaryAllocation(SILLocation(), getType());
       gen.B.createCopyAddr(SILLocation(), getValue(), buf,
-                           /*isTake*/ false, /*isInitialize*/ true);
+                           IsNotTake, IsInitialization);
       return gen.emitManagedRValueWithCleanup(buf);
     }
     gen.B.emitRetainValue(SILLocation(), getValue());
@@ -96,7 +96,7 @@ public:
   void copyInto(SILGenFunction &gen, SILValue dest) {
     if (getType().isAddressOnly(gen.SGM.M)) {
       gen.B.createCopyAddr(SILLocation(), getValue(), dest,
-                           /*isTake*/ false, /*isInitialize*/ true);
+                           IsNotTake, IsInitialization);
       return;
     }
     gen.B.emitRetainValue(SILLocation(), getValue());

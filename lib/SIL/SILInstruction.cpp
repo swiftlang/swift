@@ -402,9 +402,10 @@ StoreInst::StoreInst(SILLocation Loc, SILValue Src, SILValue Dest)
 
 
 CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLValue,
-                           bool IsTakeOfSrc, bool IsInitializationOfDest)
+                           IsTake_t isTakeOfSrc,
+                           IsInitialization_t isInitializationOfDest)
   : SILInstruction(ValueKind::CopyAddrInst, Loc),
-    IsTakeOfSrc(IsTakeOfSrc), IsInitializationOfDest(IsInitializationOfDest),
+    IsTakeOfSrc(isTakeOfSrc), IsInitializationOfDest(isInitializationOfDest),
     Operands(this, SrcLValue, DestLValue)
 {
 }
@@ -476,7 +477,7 @@ ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
                                  SILValue SrcExistential,
                                  SILValue DestExistential,
-                                 bool isTakeOfSrc)
+                                 IsTake_t isTakeOfSrc)
   : SILInstruction(ValueKind::UpcastExistentialInst, Loc),
     IsTakeOfSrc(isTakeOfSrc),
     Operands(this, SrcExistential, DestExistential)

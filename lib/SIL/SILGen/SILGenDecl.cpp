@@ -1068,7 +1068,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
   // If address-only, make a +1 copy and operate on that.
   if (arg.getType().isAddressOnly(gen.SGM.M)) {
     SILValue tmp = gen.B.createAllocStack(loc, arg.getType());
-    gen.B.createCopyAddr(loc, arg, tmp, /*isTake*/false, /*isInit*/ true);
+    gen.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     gen.enterDeallocStackCleanup(loc, tmp);
     return tmp;
   }
@@ -1198,8 +1198,7 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
            && "any address-only type should appear Unretained to ObjC");
     
     // "Take" because we return at +0.
-    B.createCopyAddr(var, addr, indirectReturn,
-                     /*isTake*/ true, /*isInitialize*/ true);
+    B.createCopyAddr(var, addr, indirectReturn, IsTake, IsInitialization);
     B.createRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;

@@ -587,7 +587,7 @@ public:
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
   
   ManagedValue emitLoad(SILLocation loc, SILValue addr, SGFContext C,
-                        bool isTake);
+                        IsTake_t isTake);
   
   void emitAssignToLValue(SILLocation loc, RValue &&src,
                           LValue const &dest);

@@ -93,7 +93,7 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
 
   if (valueCleanup.isValid())
     gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
-  return gen.emitLoad(loc, address, SGFContext(), /*isTake*/ true);
+  return gen.emitLoad(loc, address, SGFContext(), IsTake);
 }
 
 WritebackScope::~WritebackScope() {

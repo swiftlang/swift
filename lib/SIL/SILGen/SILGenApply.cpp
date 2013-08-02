@@ -948,7 +948,7 @@ namespace {
                                             ArrayRef<Substitution> substitutions,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext C,
-                                            bool isTake) {
+                                            IsTake_t isTake) {
     assert(substitutions.size() == 1 && "load should have single substitution");
     assert(args.size() == 1 && "load should have a single argument");
     
@@ -966,8 +966,7 @@ namespace {
                                       ArrayRef<Substitution> substitutions,
                                       ArrayRef<ManagedValue> args,
                                       SGFContext C) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C,
-                                 /*isTake*/ false);
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C, IsNotTake);
   }
 
   static ManagedValue emitBuiltinMove(SILGenFunction &gen,
@@ -975,8 +974,7 @@ namespace {
                                       ArrayRef<Substitution> substitutions,
                                       ArrayRef<ManagedValue> args,
                                       SGFContext C) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C,
-                                 /*isTake*/ true);
+    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C, IsTake);
   }
 
   /// Specialized emitter for Builtin.destroy.

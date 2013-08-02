@@ -549,17 +549,13 @@ namespace {
                                   SILValue value,
                                   SILValue addr) const override {
       assert(value.getType().isAddress());
-      B.createCopyAddr(loc, value, addr,
-                       /*isTake=*/ true,
-                       /*isInitialize=*/ true);
+      B.createCopyAddr(loc, value, addr, IsTake, IsInitialization);
     }
 
     void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
                               SILValue value, SILValue addr) const override {
       assert(value.getType().isAddress());
-      B.createCopyAddr(loc, value, addr,
-                       /*isTake*/ true,
-                       /*isInitialize*/ false);
+      B.createCopyAddr(loc, value, addr, IsTake, IsNotInitialization);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,

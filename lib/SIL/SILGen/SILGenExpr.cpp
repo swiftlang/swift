@@ -338,13 +338,12 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       SILValue addr,
                                       SGFContext C,
-                                      bool isTake) {
+                                      IsTake_t isTake) {
   if (addr.getType().isAddressOnly(SGM.M)) {
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, addr.getType(), C);
     B.createCopyAddr(loc, addr, copy,
-                     isTake,
-                     /*isInitialize*/ true);
+                     isTake, IsInitialization);
     
     return emitManagedRValueWithCleanup(copy);
   }
@@ -537,8 +536,10 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     ManagedValue subExistential
       = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen);
 
+    IsTake_t isTake = IsTake_t(subExistential.hasCleanup());
+
     gen.B.createUpcastExistential(E, subExistential.getValue(), existential,
-                                  /*isTake=*/subExistential.hasCleanup());
+                                  isTake);
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.
@@ -1672,8 +1673,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
            "address-only non-heap this should have been allocated in-place");
     // We have to do a non-take copy because someone else may be using the box.
     B.createCopyAddr(ctor, thisLV, IndirectReturnAddress,
-                     /*isTake=*/ false,
-                     /*isInit=*/ true);
+                     IsNotTake, IsInitialization);
     B.createRelease(ctor, thisBox);
     B.createReturn(ctor, emitEmptyTuple(ctor));
     return;

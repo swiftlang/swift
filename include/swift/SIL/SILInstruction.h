@@ -575,6 +575,9 @@ public:
   bool canDefaultConstruct() const { return CanDefaultConstruct; }
 };
 
+enum IsTake_t { IsNotTake, IsTake };
+enum IsInitialization_t { IsNotInitialization, IsInitialization };
+
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
 ///   %1 = load %src
@@ -602,12 +605,14 @@ class CopyAddrInst : public SILInstruction {
   
 public:
   CopyAddrInst(SILLocation Loc, SILValue Src, SILValue Dest,
-               bool IsTakeOfSrc, bool IsInitializationOfDest);
+               IsTake_t isTakeOfSrc, IsInitialization_t isInitializationOfDest);
   
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
-  bool isTakeOfSrc() const { return IsTakeOfSrc; }
-  bool isInitializationOfDest() const { return IsInitializationOfDest; }
+  IsTake_t isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
+  IsInitialization_t isInitializationOfDest() const {
+    return IsInitialization_t(IsInitializationOfDest);
+  }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
@@ -1335,14 +1340,14 @@ public:
   UpcastExistentialInst(SILLocation Loc,
                         SILValue SrcExistential,
                         SILValue DestExistential,
-                        bool isTakeOfSrc);
+                        IsTake_t isTakeOfSrc);
   
   SILValue getSrcExistential() const { return Operands[SrcExistential].get(); }
   SILValue getDestExistential() const { return Operands[DestExistential].get();}
 
   /// True if the destination can take ownership of the concrete value from the
   /// source.
-  bool isTakeOfSrc() const { return IsTakeOfSrc; }
+  bool isTakeOfSrc() const { return IsTake_t(IsTakeOfSrc); }
   
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
 
