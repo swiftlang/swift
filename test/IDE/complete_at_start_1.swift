@@ -1,10 +1,8 @@
 #^A^#
 
 // Make sure we can code complete at the beginning of the file.
-// Disabled per rdar://14585108
-// FIXME: %swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
-// Run it anyway, to ensure that we at least don't crash.
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=A
+// rdar://14585108
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
 // A: Begin completions
 // A-DAG: SwiftDecl: true[#Bool#]{{$}}
 // A-DAG: SwiftDecl: false[#Bool#]{{$}}
