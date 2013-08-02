@@ -158,7 +158,7 @@ You can download and install it using the command line:
           ~/Downloads
         sudo darwinup install ~/Downloads/$package_basename
 
-where \$USER is your Open Directory username.
+where \$OD_USER is your Open Directory username.
 
 We recommend uninstalling any previous Swift packages you have installed
 before installing this package. Uninstall as follows:
