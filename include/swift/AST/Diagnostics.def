@@ -915,6 +915,8 @@ ERROR(constraint_assign_type_check_fail,sema,none,
 
 ERROR(sema_no_import,sema_nb,none,
       "no such module '%0'", (StringRef))
+ERROR(sema_no_import_submodule,sema_nb,none,
+      "no such module", ())
 ERROR(sema_opening_import,sema_nb,none,
       "opening import file '%0.swift': %1", (StringRef, StringRef))
 ERROR(invalid_declaration_imported,sema_nb,none,

@@ -113,9 +113,13 @@ void NameBinder::addImport(ImportDecl *ID,
 
   Module *M = getModule(ID->getModulePath());
   if (M == 0) {
-    // FIXME: print entire path.
-    diagnose(ID->getLoc(), diag::sema_no_import,
-             ID->getModulePath().front().first.str());
+    // FIXME: print entire path regardless.
+    if (ID->getModulePath().size() == 1) {
+      diagnose(ID->getLoc(), diag::sema_no_import,
+               ID->getModulePath().front().first.str());
+    } else {
+      diagnose(ID->getLoc(), diag::sema_no_import_submodule);
+    }
     return;
   }
 
