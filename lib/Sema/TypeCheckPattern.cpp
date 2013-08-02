@@ -682,7 +682,6 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
       break;
     }
     
-    // TODO: Resolve the cast kind.
     IP->setType(type);
     return false;
   }
@@ -708,8 +707,10 @@ bool TypeChecker::coerceToType(Pattern *P, DeclContext *dc, Type type,
       Type elementType = OP->getElementDecl()->getArgumentType();
       if (!elementType)
         elementType = TupleType::getEmpty(Context);
-      return coerceToType(OP->getSubPattern(), dc, elementType);
+      if (coerceToType(OP->getSubPattern(), dc, elementType))
+        return true;
     }
+    OP->setType(type);
     return false;
   }
       
