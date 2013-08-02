@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -514,30 +515,31 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
   }
 
   // Scrape through all of the imports looking for additional results.
-  // FIXME: Implement DAG-based shadowing rules.
-  M.forAllVisibleModules(Nothing, [&](const Module::ImportedModule &ImpEntry) {
-    // FIXME: Only searching Clang modules once.
-    if (ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
-      if (searchedClangModule)
-        return true;
+  M.forAllVisibleModules(Nothing,
+                         makeStackLambda(
+    [&](const Module::ImportedModule &ImpEntry) {
+      // FIXME: Only searching Clang modules once.
+      if (ImpEntry.first.empty() &&
+          ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
+        if (searchedClangModule)
+          return;
 
-      searchedClangModule = true;
-    }
+        searchedClangModule = true;
+      }
 
-    SmallVector<ValueDecl*, 8> ImportedModuleResults;
-    ImpEntry.second->lookupValue(ImpEntry.first, Name,
-                                 NLKind::UnqualifiedLookup,
-                                 ImportedModuleResults);
-    for (ValueDecl *VD : ImportedModuleResults) {
-      if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
-          !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
-        Results.push_back(Result::getModuleMember(VD));
-        CurModuleTypes.insert(VD->getType()->getCanonicalType());
+      SmallVector<ValueDecl*, 8> ImportedModuleResults;
+      ImpEntry.second->lookupValue(ImpEntry.first, Name,
+                                   NLKind::UnqualifiedLookup,
+                                   ImportedModuleResults);
+      for (ValueDecl *VD : ImportedModuleResults) {
+        if ((!IsTypeLookup || isa<TypeDecl>(VD)) &&
+            !CurModuleTypes.count(VD->getType()->getCanonicalType())) {
+          Results.push_back(Result::getModuleMember(VD));
+          CurModuleTypes.insert(VD->getType()->getCanonicalType());
+        }
       }
     }
-
-    return true;
-  });
+  ));
 
   // If we've found something, we're done.
   if (!Results.empty())
@@ -549,13 +551,16 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     return;
   }
 
-  M.forAllVisibleModules(Nothing, [&](const Module::ImportedModule &ImpEntry){
-    if (ImpEntry.second->Name == Name) {
-      Results.push_back(Result::getModuleName(ImpEntry.second));
-      return false;
+  M.forAllVisibleModules(Nothing,
+                         makeStackLambda(
+    [&](const Module::ImportedModule &ImpEntry) -> bool {
+      if (ImpEntry.second->Name == Name) {
+        Results.push_back(Result::getModuleName(ImpEntry.second));
+        return false;
+      }
+      return true;
     }
-    return true;
-  });
+  ));
 
   auto last = std::unique(Results.begin(), Results.end(),
               [](const Result &LHS, const Result &RHS) {

@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 
@@ -501,20 +502,21 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
   auto &mutableM = const_cast<Module&>(M);
   mutableM.forAllVisibleModules(Module::AccessPathTy(),
-                                [&](const Module::ImportedModule &import) {
-    // FIXME: Only searching Clang modules once.
-    if (import.second->getContextKind() == DeclContextKind::ClangModule) {
-      if (searchedClangModule)
-        return true;
+                                makeStackLambda(
+    [&](const Module::ImportedModule &import) {
+      // FIXME: Only searching Clang modules once.
+      if (import.first.empty() &&
+          import.second->getContextKind() == DeclContextKind::ClangModule) {
+        if (searchedClangModule)
+          return;
 
-      searchedClangModule = true;
+        searchedClangModule = true;
+      }
+
+      import.second->lookupVisibleDecls(import.first, Consumer,
+                                        NLKind::UnqualifiedLookup);
     }
-
-    import.second->lookupVisibleDecls(import.first, Consumer,
-                                      NLKind::UnqualifiedLookup);
-
-    return true;
-  });
+  ));
 }
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer, Type BaseTy,

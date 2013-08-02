@@ -28,24 +28,6 @@ static constexpr const auto AF_DontPopBlockAtEnd =
 
 using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
 
-/// Declares a member \c type that is a std::function compatible with the given
-/// callable type.
-///
-/// \tparam T A callable type, such as a lambda.
-template <typename T>
-struct as_function : public as_function<decltype(&T::operator())> {};
-
-template <typename L, typename R, typename... Args>
-struct as_function<R(L::*)(Args...) const> {
-  using type = std::function<R(Args...)>;
-};
-
-/// Returns a std::function that can call a void-returning, single-argument
-/// lambda without copying it.
-template <typename L>
-static typename as_function<L>::type makeStackLambda(const L &theLambda) {
-  return std::cref(theLambda);
-}
 
 static ModuleStatus
 validateControlBlock(llvm::BitstreamCursor &cursor,

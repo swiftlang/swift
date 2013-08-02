@@ -203,9 +203,17 @@ public:
   ///                           results, with the given access path.
   /// \param fn A callback of type bool(ImportedModule). Return \c false to
   ///           abort iteration.
-  template <typename F>
   void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
-                            F fn);
+                            std::function<bool(ImportedModule)> fn);
+
+  void forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+                            std::function<void(ImportedModule)> fn) {
+    forAllVisibleModules(topLevelAccessPath,
+                         [=](const ImportedModule &import) -> bool {
+      fn(import);
+      return true;
+    });
+  }
 
   static bool classof(const DeclContext *DC) {
     return DC->isModuleContext();
@@ -386,42 +394,6 @@ LoadedModule::lookupOperator<PostfixOperatorDecl>(Identifier name);
 template <>
 InfixOperatorDecl *
 LoadedModule::lookupOperator<InfixOperatorDecl>(Identifier name);
-
-template <typename F>
-void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath, F fn) {
-  class OrderImportedModules {
-  public:
-    bool operator()(const ImportedModule &lhs, const ImportedModule &rhs) {
-      if (lhs.second != rhs.second)
-        return std::less<const Module *>()(lhs.second, rhs.second);
-      if (lhs.first.data() != rhs.first.data())
-        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
-                                                   rhs.first.begin());
-      return lhs.first.size() < rhs.first.size();
-    }
-  };
-
-  llvm::SmallSet<ImportedModule, 32, OrderImportedModules> visited;
-  SmallVector<ImportedModule, 32> queue;
-
-  if (thisPath.hasValue()) {
-    queue.push_back(ImportedModule(thisPath.getValue(), this));
-  } else {
-    visited.insert(ImportedModule({}, this));
-    getReexportedModules(queue);
-  }
-
-  while (!queue.empty()) {
-    auto next = queue.pop_back_val();
-    if (!visited.insert(next))
-      continue;
-
-    if (!fn(next))
-      break;
-    next.second->getReexportedModules(queue);
-  }
-}
-
 
 } // end namespace swift
 

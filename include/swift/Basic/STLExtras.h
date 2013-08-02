@@ -17,6 +17,7 @@
 #ifndef SWIFT_BASIC_INTERLEAVE_H
 #define SWIFT_BASIC_INTERLEAVE_H
 
+#include <functional>
 #include <cassert>
 
 namespace swift {
@@ -74,6 +75,29 @@ inline void for_each(const Container1 &c1, const Container2 &c2,
 }
 
 /// @}
+
+/// @{
+
+/// Declares a member \c type that is a std::function compatible with the given
+/// callable type.
+///
+/// \tparam T A callable type, such as a lambda.
+template <typename T>
+struct as_function : public as_function<decltype(&T::operator())> {};
+
+template <typename L, typename R, typename... Args>
+struct as_function<R(L::*)(Args...) const> {
+  using type = std::function<R(Args...)>;
+};
+
+/// @}
+
+/// Returns a std::function that can call a lambda without copying it.
+template <typename L>
+static typename as_function<L>::type makeStackLambda(const L &theLambda) {
+  return std::cref(theLambda);
+}
+
 
 } // end namespace swift
 

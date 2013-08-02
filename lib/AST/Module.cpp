@@ -330,6 +330,78 @@ Module::getReexportedModules(SmallVectorImpl<ImportedModule> &modules) const {
   return cast<LoadedModule>(this)->getReexportedModules(modules);
 }
 
+namespace {
+  /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
+  class OrderImportedModules {
+    using ImportedModule = Module::ImportedModule;
+    using AccessPathTy = Module::AccessPathTy;
+  public:
+    bool operator()(const ImportedModule &lhs, const ImportedModule &rhs) {
+      if (lhs.second != rhs.second)
+        return std::less<const Module *>()(lhs.second, rhs.second);
+      if (lhs.first.data() != rhs.first.data())
+        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
+                                                   rhs.first.begin());
+      return lhs.first.size() < rhs.first.size();
+    }
+  };
+}
+
+/// Returns true if the two access paths contain the same chain of identifiers.
+///
+/// Source locations are ignored here.
+static bool isSameAccessPath(Module::AccessPathTy lhs,
+                             Module::AccessPathTy rhs) {
+  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  if (lhs.size() != rhs.size())
+    return false;
+  auto iters = std::mismatch(lhs.begin(), lhs.end(), rhs.begin(),
+                             [](const AccessPathElem &lElem,
+                                const AccessPathElem &rElem) {
+    return lElem.first == rElem.first;
+  });
+  return iters.first == lhs.end();
+}
+
+void Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
+                                  std::function<bool(ImportedModule)> fn) {
+  llvm::SmallSet<ImportedModule, 32, OrderImportedModules> visited;
+  SmallVector<ImportedModule, 32> queue;
+
+  AccessPathTy overridingPath;
+  if (thisPath.hasValue()) {
+    overridingPath = thisPath.getValue();
+    queue.push_back(ImportedModule(overridingPath, this));
+  } else {
+    visited.insert(ImportedModule({}, this));
+    getReexportedModules(queue);
+  }
+
+  while (!queue.empty()) {
+    auto next = queue.pop_back_val();
+
+    // Filter any whole-module imports, and skip specific-decl imports if the
+    // import path doesn't match exactly.
+    if (next.first.empty())
+      next.first = overridingPath;
+    else if (!overridingPath.empty() &&
+             !isSameAccessPath(next.first, overridingPath)) {
+      // If we ever allow importing non-top-level decls, it's possible the rule
+      // above isn't what we want.
+      assert(next.first.size() == 1 && "import of non-top-level decl");
+      continue;
+    }
+
+    if (!visited.insert(next))
+      continue;
+
+    if (!fn(next))
+      break;
+    next.second->getReexportedModules(queue);
+  }
+}
+
+
 //===----------------------------------------------------------------------===//
 // TranslationUnit Implementation
 //===----------------------------------------------------------------------===//

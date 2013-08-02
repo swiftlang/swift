@@ -107,10 +107,6 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
 
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
-  // FIXME: Handle importing specific decls.
-  if (ID->getImportKind() != ImportKind::Module)
-    return;
-
   Module *M = getModule(ID->getModulePath());
   if (M == 0) {
     // FIXME: print entire path regardless.
@@ -126,7 +122,6 @@ void NameBinder::addImport(ImportDecl *ID,
   // Pick up all transitively-imported modules.
   M->forAllVisibleModules(ID->getDeclPath(), [&](const ImportedModule &import) {
     Result.push_back(import);
-    return true;
   });
 }
 
