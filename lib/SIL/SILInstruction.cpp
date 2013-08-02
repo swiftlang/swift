@@ -491,16 +491,12 @@ UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
 
 
 TermInst::SuccessorListTy TermInst::getSuccessors() {
-  assert(isa<TermInst>(this) && "Only TermInsts are allowed");
-  if (auto I = dyn_cast<UnreachableInst>(this))
-    return I->getSuccessors();
-  if (auto I = dyn_cast<ReturnInst>(this))
-    return I->getSuccessors();
-  if (auto I = dyn_cast<AutoreleaseReturnInst>(this))
-    return I->getSuccessors();
-  if (auto I = dyn_cast<CondBranchInst>(this))
-    return I->getSuccessors();
-  return cast<BranchInst>(this)->getSuccessors();
+  #define TERMINATOR(TYPE, PARENT, EFFECT) \
+    if (auto I = dyn_cast<TYPE>(this)) \
+      return I->getSuccessors();
+  #include "swift/SIL/SILNodes.def"
+  
+  llvm_unreachable("not a terminator?!");
 }
 
 BranchInst::BranchInst(SILLocation Loc,

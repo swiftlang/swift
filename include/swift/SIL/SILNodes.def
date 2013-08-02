@@ -15,19 +15,28 @@
 //===----------------------------------------------------------------------===//
 
 /// VALUE(Id, Parent)
-///   The expression enumerator value is an ValueKind.  The node's class name is
+///   The expression enumerator value is a ValueKind.  The node's class name is
 ///   Id, and the name of its base class (in the SILValue hierarchy) is Parent.
 #ifndef VALUE
 #define VALUE(Id, Parent)
 #endif
 
 /// INST(Id, Parent, MemBehavior)
-///   The expression enumerator value is an ValueKind.  The node's class name is
+///   The expression enumerator value is a ValueKind.  The node's class name is
 ///   Id, and the name of its base class (in the SILInstruction hierarchy) is
 ///   Parent. MemBehavior is an enum value that reflects the memory behavior of
 ///   the instruction.
 #ifndef INST
 #define INST(Id, Parent, MemBehavior) VALUE(Id, Parent)
+#endif
+
+/// TERMINATOR(Id, Parent, MemBehavior)
+///   Expands for terminator instructions. The expression enumerator value is
+///   a ValueKind.  The node's class name is Id, and the name of its base class
+///   (in the SILInstruction hierarchy) is Parent. MemBehavior is an enum value
+///   that reflects the memory behavior of the instruction.
+#ifndef TERMINATOR
+#define TERMINATOR(Id, Parent, MemBehavior) INST(Id, Parent, MemBehavior)
 #endif
 
 /// An abstract instruction is an abstract base class in the hierarchy;
@@ -164,18 +173,19 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Terminators
   ABSTRACT_VALUE(TermInst, SILInstruction)
-    INST(UnreachableInst, TermInst, None)
-    INST(ReturnInst, TermInst, None)
-    INST(AutoreleaseReturnInst, TermInst, None)
-    INST(BranchInst, TermInst, None)
-    INST(CondBranchInst, TermInst, None)
-    INST(SwitchIntInst, TermInst, None)
-    INST(SwitchUnionInst, TermInst, None)
+    TERMINATOR(UnreachableInst, TermInst, None)
+    TERMINATOR(ReturnInst, TermInst, None)
+    TERMINATOR(AutoreleaseReturnInst, TermInst, None)
+    TERMINATOR(BranchInst, TermInst, None)
+    TERMINATOR(CondBranchInst, TermInst, None)
+    TERMINATOR(SwitchIntInst, TermInst, None)
+    TERMINATOR(SwitchUnionInst, TermInst, None)
     VALUE_RANGE(TermInst, UnreachableInst, SwitchUnionInst)
 
-  VALUE_RANGE(SILInstruction, AllocStackInst, CondBranchInst)
+  VALUE_RANGE(SILInstruction, AllocStackInst, SwitchUnionInst)
 
 #undef VALUE_RANGE
 #undef ABSTRACT_VALUE
+#undef TERMINATOR
 #undef INST
 #undef VALUE
