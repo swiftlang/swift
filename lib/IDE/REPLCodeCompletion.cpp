@@ -94,7 +94,7 @@ REPLCompletions::REPLCompletions() : State(CompletionState::Invalid) {
   // Consumer.
   CompletionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                                          *Consumer.get()));
+                                              *Consumer.get()));
 }
 
 static void
