@@ -16,6 +16,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -266,9 +267,12 @@ namespace {
       if (KindString)
         OS << " kind=" << KindString;
 
-      OS << " '" << ID->getAccessPath()[0].first;
-      for (unsigned i = 1, e = ID->getAccessPath().size(); i != e; ++i)
-        OS << "." << ID->getAccessPath()[i].first;
+      OS << " ";
+      interleave(ID->getFullAccessPath(),
+                 [&](const ImportDecl::AccessPathElement &Elem) {
+                   OS << Elem.first;
+                 },
+                 [&] { OS << '.'; });
       OS << "')";
     }
 

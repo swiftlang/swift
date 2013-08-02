@@ -422,7 +422,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   {
     llvm::raw_string_ostream OS(Printed);
     bool first = true;
-    for (auto elt : D->getAccessPath()) {
+    for (auto elt : D->getModulePath()) {
       if (first) {
         first = false;
       } else {

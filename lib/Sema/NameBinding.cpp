@@ -111,29 +111,16 @@ void NameBinder::addImport(ImportDecl *ID,
   if (ID->getImportKind() != ImportKind::Module)
     return;
 
-  ArrayRef<ImportDecl::AccessPathElement> Path = ID->getAccessPath();
-
-  // FIXME: This is a hack to allow /either/ Clang submodules /or/ importing
-  // declarations from within Swift translation units...but not both. We may
-  // need to design this carefully: what does "Foundation.NSString" refer to?
-  auto importPath = Path;
-  if (!Context.getClangModuleLoader())
-    importPath = importPath.slice(0, 1);
-
-  Module *M = getModule(importPath);
+  Module *M = getModule(ID->getModulePath());
   if (M == 0) {
-    diagnose(Path[0].second, diag::sema_no_import, Path[0].first.str());
-    return;
-  }
-  
-  // FIXME: Validate the access path against the module.  Reject things like
-  // import swift.aslkdfja
-  if (Path.size() > 2) {
-    diagnose(Path[2].second, diag::invalid_declaration_imported);
+    // FIXME: print entire path.
+    diagnose(ID->getLoc(), diag::sema_no_import,
+             ID->getModulePath().front().first.str());
     return;
   }
 
-  M->forAllVisibleModules(Path.slice(1), [&](const ImportedModule &import) {
+  // Pick up all transitively-imported modules.
+  M->forAllVisibleModules(ID->getDeclPath(), [&](const ImportedModule &import) {
     Result.push_back(import);
     return true;
   });

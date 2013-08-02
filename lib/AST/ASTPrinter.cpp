@@ -361,17 +361,11 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
     break;
   }
   recordDeclLoc(decl);
-  bool first = true;
-  for (auto elt : decl->getAccessPath()) {
-    if (first) {
-      first = false;
-    } else {
-      OS << '.';
-    }
-
-    OS << elt.first.str();
-  }
-  OS << "";
+  interleave(decl->getFullAccessPath(),
+             [&](const ImportDecl::AccessPathElement &Elem) {
+               OS << Elem.first;
+             },
+             [&] { OS << '.'; });
 }
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {

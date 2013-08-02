@@ -249,6 +249,8 @@ GenericParamList::create(const ASTContext &Context,
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                ArrayRef<AccessPathElement> Path) {
+  assert(!Path.empty());
+  assert(Kind == ImportKind::Module || Path.size() > 1);
   void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
                               Path.size() * sizeof(AccessPathElement),
                               alignof(ImportDecl));
@@ -261,7 +263,7 @@ ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
     NumPathElements(Path.size()) {
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");
-  memcpy(getPathBuffer(), Path.data(), Path.size() * sizeof(AccessPathElement));
+  std::uninitialized_copy(Path.begin(), Path.end(), getPathBuffer());
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {

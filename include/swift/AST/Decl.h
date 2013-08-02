@@ -685,8 +685,21 @@ public:
                             SourceLoc ImportLoc, ImportKind Kind,
                             ArrayRef<AccessPathElement> Path);
 
-  ArrayRef<AccessPathElement> getAccessPath() const {
+  ArrayRef<AccessPathElement> getFullAccessPath() const {
     return ArrayRef<AccessPathElement>(getPathBuffer(), NumPathElements);
+  }
+
+  ArrayRef<AccessPathElement> getModulePath() const {
+    auto result = getFullAccessPath();
+    if (getImportKind() != ImportKind::Module)
+      result = result.slice(0, result.size()-1);
+    return result;
+  }
+
+  ArrayRef<AccessPathElement> getDeclPath() const {
+    if (getImportKind() == ImportKind::Module)
+      return {};
+    return getFullAccessPath().back();
   }
 
   ImportKind getImportKind() const {
@@ -694,9 +707,9 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLoc() const { return ImportLoc; }
+  SourceLoc getLoc() const { return getFullAccessPath().front().second; }
   SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getAccessPath().back().second);
+    return SourceRange(ImportLoc, getFullAccessPath().back().second);
   }
 
   static bool classof(const Decl *D) {
