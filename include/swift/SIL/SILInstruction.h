@@ -43,6 +43,16 @@ class Substitution;
 class ValueDecl;
 class VarDecl;
 
+enum class SILInstructionMemoryBehavior {
+  None,
+  /// \brief The instruction may have side effects not captured solely by its
+  ///        users.
+  MayHaveSideEffects,
+  /// \brief The istruction may write to memory.
+  MayWrite,
+  MayWriteAndHaveSideEffects
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -99,6 +109,8 @@ public:
   ArrayRef<Operand> getAllOperands() const;
 
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
+
+  SILInstructionMemoryBehavior getMemoryBehavior() const;
 
   /// \brief Returns true if the instruction may have side effects.
   ///

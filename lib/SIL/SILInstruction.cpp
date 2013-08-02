@@ -123,7 +123,7 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT) \
+#define INST(CLASS, PARENT, MEMBEHAVIOR) \
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
                         ArrayRef<Operand>() const);                     \
@@ -143,28 +143,23 @@ unsigned Operand::getOperandNumber() const {
   return this - &cast<SILInstruction>(getUser())->getAllOperands()[0];
 }
 
-bool SILInstruction::mayHaveSideEffects() const {
+SILInstructionMemoryBehavior SILInstruction::getMemoryBehavior() const {
   switch (getKind()) {
-    default: return false;
-    case ValueKind::DeallocStackInst:
-    case ValueKind::DeallocRefInst:
-    case ValueKind::StoreInst:
-    case ValueKind::InitializeVarInst:
-    case ValueKind::CopyAddrInst:
-    case ValueKind::DestroyAddrInst:
-    case ValueKind::RetainInst:
-    case ValueKind::RetainAutoreleasedInst:
-    case ValueKind::ReleaseInst:
-    case ValueKind::UnownedRetainInst:
-    case ValueKind::UnownedReleaseInst:
-    case ValueKind::ApplyInst:
-      // FIXME: A lot of function calls should be known to have no side effects.
-    case ValueKind::PartialApplyInst:
-    case ValueKind::InitExistentialInst:
-    case ValueKind::UpcastExistentialInst:
-    case ValueKind::DeinitExistentialInst:
-      return true;
+#define INST(CLASS, PARENT, MEMBEHAVIOR) \
+  case ValueKind::CLASS: return SILInstructionMemoryBehavior::MEMBEHAVIOR;
+#include "swift/SIL/SILNodes.def"
+  case ValueKind::SILArgument:
+    llvm_unreachable("Non-instructions are unreachable.");
   }
+  llvm_unreachable("We've just exhausted the switch.");
+}
+
+bool SILInstruction::mayHaveSideEffects() const {
+  SILInstructionMemoryBehavior B = getMemoryBehavior();
+  if (B == SILInstructionMemoryBehavior::MayWrite ||
+      B == SILInstructionMemoryBehavior::MayHaveSideEffects ||
+      B == SILInstructionMemoryBehavior::MayWriteAndHaveSideEffects)
+    return true;
   return false;
 }
 
