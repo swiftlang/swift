@@ -145,12 +145,6 @@ static bool removeUnreachableBlocks(SILFunction &F) {
     if (Reachable.count(BB))
       continue;
 
-    // TODO: We would need to specially handle the args for the blocks that
-    // are going to stay around.
-    // for (auto SI = BB->succ_begin(), SE = BB->succ_end(); SI != SE; ++SI)
-    //   if (Reachable.count(*SI))
-    //     (*SI)->removePredecessor(BB);
-
     // Drop references to other blocks.
     BB->getTerminator()->eraseFromParent();
   }

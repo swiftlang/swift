@@ -166,7 +166,7 @@ bb2:                                              // Preds: bb1 bb0
   %33 = return %32 : $()                          // CHECK: return
 }                                                 // CHECK: }
 
-sil @test_cond_branch_args : $[thin] (i1 : Int64, i2 : Int64) -> Int64 {
+sil @testCondBranchBBArgs : $[thin] (i1 : Int64, i2 : Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
   %2 = integer_literal $Builtin.Int1, 0
   condbranch %2, bb1(%0 : $Int64), bb2(%1 : $Int64)
@@ -175,8 +175,27 @@ bb1(%3 : $Int64):
 bb2(%4 : $Int64):
   return %4 : $Int64
 }
-// CHECK: sil @test_cond_branch_args
+// CHECK: sil @testCondBranchBBArgs
 // CHECK-NEXT: bb0
 // CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
 // CHECK: bb1(%{{[0-9]+}} : $Int64):                                 
+// CHECK-NEXT:  return
+
+sil @removePredecessorWithBBArgs : $[thin] (i1: Int64, i2 :Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+ %2 = integer_literal $Builtin.Int1, 0
+ %3 = condbranch %2, bb2(%0 : $Int64), bb3(%1 : $Int64)
+bb2(%4 : $Int64): 
+ br bb4(%4 : $Int64)
+bb3(%5 : $Int64):
+  br bb4(%5 : $Int64)
+bb4(%6 : $Int64):
+  return %6 : $Int64
+}
+// CHECK: @removePredecessorWithBBArgs
+// CHECK-NEXT: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $Int64):
+// CHECK-NEXT:  br bb1(%{{[0-9]+}} : $Int64)
+// CHECK:      bb1(%{{[0-9]+}} : $Int64):
+// CHECK-NEXT:  br bb2(%{{[0-9]+}} : $Int64)
+// CHECK:      bb2(%{{[0-9]+}} : $Int64):
 // CHECK-NEXT:  return
