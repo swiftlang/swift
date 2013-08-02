@@ -545,6 +545,17 @@ public:
       addTypeAnnotation(Builder, TypeAnnotation);
   }
 
+  void addKeyword(StringRef Name, StringRef TypeAnnotation) {
+    CodeCompletionResultBuilder Builder(
+        CompletionContext,
+        CodeCompletionResult::ResultKind::Keyword);
+    if (needDot())
+      Builder.addDot();
+    Builder.addTextChunk(Name);
+    if (!TypeAnnotation.empty())
+      Builder.addTypeAnnotation(TypeAnnotation);
+  }
+
   // Implement swift::VisibleDeclConsumer
   void foundDecl(ValueDecl *D) override {
     switch (Kind) {
@@ -678,6 +689,13 @@ public:
   void getCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::DeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, Loc);
+
+    // FIXME: The pedantically correct way to find the type is to resolve the
+    // swift.StringLiteralType type.
+    addKeyword("__FILE__", "String");
+    // Same: swift.IntegerLiteralType.
+    addKeyword("__LINE__", "Int");
+    addKeyword("__COLUMN__", "Int");
 
     if (!CompletionContext.haveClangResults())
       if (auto Importer = SwiftContext.getClangModuleLoader())
