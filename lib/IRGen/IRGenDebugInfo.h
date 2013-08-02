@@ -31,6 +31,8 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 
+#include <set>
+
 namespace llvm {
   class DIBuilder;
 }
@@ -68,9 +70,14 @@ class IRGenDebugInfo {
   TypeConverter &Types;
 
   // Various caches.
-  llvm::DenseMap<SILDebugScope *, llvm::DIDescriptor> ScopeCache;
+  llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<DebugTypeInfo, llvm::WeakVH> DITypeCache;
+  std::map<std::string, llvm::WeakVH> DINameSpaceCache;
+
+  // Subprograms need their scope to be RAUW'd when we work through
+  // the list of imports.
+  std::map<StringRef, llvm::WeakVH> Functions;
 
   // These are used by getArgNo.
   SILFunction *LastFn;
@@ -186,6 +193,11 @@ private:
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope);
   unsigned getArgNo(SILFunction *Fn, SILArgument *Arg);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
+  llvm::DIScope getOrCreateNamespace(llvm::DIScope Namespace,
+                                     std::string MangledName,
+                                     llvm::DIFile File, unsigned Line = 0);
+  llvm::DIScope getNamespace(StringRef MangledName);
+
 };
 
 } // irgen

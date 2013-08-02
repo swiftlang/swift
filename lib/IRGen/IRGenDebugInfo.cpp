@@ -24,6 +24,8 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/Mangle.h"
+#include "swift/Basic/Punycode.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Config/config.h"
 #include "llvm/DebugInfo.h"
@@ -42,12 +44,14 @@
 using namespace swift;
 using namespace irgen;
 
-//===--- BEGIN "TO BE FIXED IN A SWIFT FORK OF LLVM" ---===//
 
+
+//===--- BEGIN "TO BE FIXED IN A SWIFT BRANCH OF LLVM" ---===//
+//
 // DWARF constants.
-
-// DW_LANG_Haskell+1 = 0x19 is the first unused language value in
-// DWARF 5.  We can't use it, because LLVM asserts that there are no
+//
+// The first unused language value in DWARF v5 is DW_LANG_Haskell+1 =
+// 0x19.  We can't use it, because LLVM asserts that there are no
 // languages >DW_LANG_Python=0x14.  Wouldn't it would be much more
 // appropriate to use a constant in DW_LANG_lo_user..DW_LANG_hi_user
 // anyway, you may ask? Well, CompileUnit::constructTypeDIE() will
@@ -57,11 +61,13 @@ using namespace irgen;
 // accidental conflicts for now.
 static const unsigned DW_LANG_Swift = 0xf;
 static const unsigned DW_LANG_ObjC = llvm::dwarf::DW_LANG_ObjC; // For symmetry.
-
+//
 // Reuse some existing tag so the verifier doesn't complain.
 static const unsigned DW_TAG_meta_type = llvm::dwarf::DW_TAG_restrict_type;
+//
+//===--------- END "TO BE FIXED IN A SWIFT BRANCH OF LLVM" --------===//
 
-//===--- END "TO BE FIXED IN A SWIFT FORK OF LLVM" ---===//
+
 
 /// Strdup a raw char array using the bump pointer.
 static
@@ -133,6 +139,15 @@ IRGenDebugInfo::IRGenDebugInfo(const Options &Opts,
 
 void IRGenDebugInfo::finalize() {
   assert(LocationStack.empty() && "Mismatch of pushLoc() and popLoc().");
+
+  // The default for a function is to be in the file-level scope.
+  for (auto FVH: Functions) {
+    auto F = llvm::DISubprogram(cast<llvm::MDNode>(FVH.second));
+    auto Scope = F.getContext();
+    if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
+      Scope->replaceAllUsesWith(MainFile);
+  }
+
   DBuilder.finalize();
 }
 
@@ -221,7 +236,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   // Try to find it in the cache first.
   auto CachedScope = ScopeCache.find(DS);
   if (CachedScope != ScopeCache.end()) {
-    return CachedScope->second;
+    return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
   }
 
   Location L = getStartLoc(SM, DS->Loc);
@@ -234,7 +249,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
 
   // Cache it.
-  ScopeCache[DS] = DScope;
+  ScopeCache[DS] = llvm::WeakVH(DScope);
   return DScope;
 }
 
@@ -277,7 +292,7 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
     DBuilder.createFile(File, BumpAllocatedString(Path, DebugInfoNames));
 
   // Cache it.
-  DIFileCache[Filename] = F;
+  DIFileCache[Filename] = llvm::WeakVH(F);
   return F;
 }
 
@@ -374,7 +389,10 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
   assert(Fn);
   auto LinkageName = Fn->getName();
   auto File = getOrCreateFile(L.Filename);
-  auto Scope = TheCU;
+  // This placeholder scope gets RAUW'd when the namespaces are
+  // created after we are finished with the entire translation unit.
+  auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
+                                          LinkageName, MainFile, MainFile, 0);
   auto Line = L.Line;
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
@@ -414,27 +432,95 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
                             DIFnTy, IsLocalToUnit, IsDefinition,
                             /*ScopeLine =*/Line,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
-  ScopeCache[DS] = SP;
+  ScopeCache[DS] = llvm::WeakVH(SP);
+  Functions[LinkageName] = llvm::WeakVH(SP);
+}
+
+static bool isNonAscii(StringRef str) {
+  for (unsigned char c : str) {
+    if (c >= 0x80)
+      return true;
+  }
+  return false;
+}
+
+// Mangle a single non-operator identifier.
+static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
+  // If the identifier contains non-ASCII character, we mangle with an initial
+  // X and Punycode the identifier string.
+  llvm::SmallString<32> PunycodeBuf;
+  if (isNonAscii(Id)) {
+    OS << 'X';
+    Punycode::encodePunycode(Id, PunycodeBuf);
+    Id = PunycodeBuf;
+  }
+  OS << Id.size() << Id;
+  OS.flush();
+  return;
 }
 
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
-  std::string Printed;
+  // Imports are visited after SILFunctions.
+  llvm::DIScope Namespace = MainFile;
+  std::string Printed, Mangled("_T");
   {
-    llvm::raw_string_ostream OS(Printed);
+    llvm::raw_string_ostream MS(Mangled), PS(Printed);
     bool first = true;
     for (auto elt : D->getModulePath()) {
-      if (first) {
-        first = false;
-      } else {
-        OS << '.';
-      }
-      OS << elt.first.str();
+      if (first) first = false;
+      else PS << '.';
+      auto Component = elt.first.str();
+      PS << Component;
+
+      // We model each component of the access path as a namespace.
+      mangleIdent(MS, Component);
+      Namespace = getOrCreateNamespace(Namespace, Component, MainFile, 1);
     }
   }
+
+  // Create the imported module.
   StringRef Name = BumpAllocatedString(Printed, DebugInfoNames);
   Location L = getStartLoc(SM, D);
-  auto Namespace = DBuilder.createNameSpace(MainFile, Name, MainFile, L.Line);
-  DBuilder.createImportedModule(MainFile, Namespace, L.Line, Name);
+  auto Import = DBuilder.createImportedModule(TheCU,
+                                              llvm::DINameSpace(Namespace),
+                                              L.Line, Name);
+
+  // Add all functions that belong to this namespace to it.
+  //
+  // TODO: Since we have the mangled names anyway, this part is purely
+  // cosmetic and we may consider removing it.
+  for (auto F = Functions.lower_bound(Mangled); F != Functions.end(); ++F) {
+    if (Mangled != F->first.substr(0, Mangled.length()))
+      break;
+
+    auto SP = llvm::DISubprogram(cast<llvm::MDNode>(F->second));
+    // RAUW the context of the function with the namespace.
+    auto Scope = SP.getContext();
+    if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
+      Scope->replaceAllUsesWith(Namespace);
+
+    auto ImportedDecl =
+      DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, L.Line);
+    SP->replaceAllUsesWith(ImportedDecl);
+  }
+}
+
+/// Return a cached namespace for a mangled access path or create a new one.
+llvm::DIScope IRGenDebugInfo::getOrCreateNamespace(llvm::DIScope Namespace,
+                                                   std::string MangledName,
+                                                   llvm::DIFile File,
+                                                   unsigned Line) {
+   // Look in the cache first.
+  auto CachedNS = DINameSpaceCache.find(MangledName);
+
+  if (CachedNS != DINameSpaceCache.end())
+    // Verify that the information still exists.
+    if (llvm::Value *Val = CachedNS->second)
+      return llvm::DINameSpace(cast<llvm::MDNode>(Val));
+
+  auto NS = DBuilder.createNameSpace(Namespace, MangledName, MainFile, Line);
+  DINameSpaceCache[MangledName] = llvm::WeakVH(NS);
+  return NS;
 }
 
 
@@ -838,6 +924,6 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
   llvm::DIType DITy = createType(Ty, Scope, getFile(Scope));
   DITy.Verify();
 
-  DITypeCache[Ty] = DITy;
+  DITypeCache[Ty] = llvm::WeakVH(DITy);
   return DITy;
 }
