@@ -308,6 +308,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return nullptr;
     }
+    if (E->getBodyResultTypeLoc().getTypeRepr())
+      if (doIt(E->getBodyResultTypeLoc().getTypeRepr()))
+        return nullptr;
     if (!E->getBody())
       return E;
     if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(E->getBody()))) {
@@ -318,6 +321,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitPipeClosureExpr(PipeClosureExpr *expr) {
+    if (Pattern *Pat = doIt(expr->getParams()))
+      expr->setParams(Pat);
+    else
+      return nullptr;
+
     // Handle single-expression closures.
     if (expr->hasSingleExpressionBody()) {
       if (Expr *body = doIt(expr->getSingleExpressionBody())) {
@@ -335,7 +343,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
-  Expr *visitImplicitClosureExpr(ImplicitClosureExpr *E) {
+  Expr *visitClosureExpr(ClosureExpr *E) {
+    if (Pattern *Pat = doIt(E->getPattern()))
+      E->setPattern(Pat);
+    else
+      return nullptr;
+
     if (Expr *E2 = doIt(E->getBody())) {
       E->setBody(E2);
       return E;
@@ -827,6 +840,10 @@ public:
       return false;
 
     if (PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(D)) {      
+      if (Pattern *Pat = doIt(PBD->getPattern()))
+        PBD->setPattern(Pat);
+      else
+        return nullptr;
       if (Expr *Init = PBD->getInit()) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);

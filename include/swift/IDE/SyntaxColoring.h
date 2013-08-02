@@ -29,7 +29,8 @@ enum class SyntaxColor {
   String,
   Character,
   CommentLine,
-  CommentBlock
+  CommentBlock,
+  TypeId
 };
 
 struct SyntaxNode {
@@ -59,10 +60,11 @@ public:
 class SyntaxColoringContext {
   struct Implementation;
   Implementation &Impl;
+  TranslationUnit &TU;
 
 public:
   SyntaxColoringContext(SourceManager &SM, unsigned BufferID,
-                        TranslationUnit *TU);
+                        TranslationUnit &TU);
   ~SyntaxColoringContext();
 
   bool walk(SyntaxColorWalker &Walker);
