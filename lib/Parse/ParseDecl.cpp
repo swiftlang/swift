@@ -638,8 +638,12 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
         return true;
     } while (consumeIf(tok::period));
 
-    Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
-                                       Kind, ImportPath));
+    if (Kind != ImportKind::Module && ImportPath.size() == 1) {
+      diagnose(ImportPath.front().second, diag::decl_expected_module_name);
+    } else {
+      Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
+                                         Kind, ImportPath));
+    }
   } while (consumeIf(tok::comma));
 
   return false;
