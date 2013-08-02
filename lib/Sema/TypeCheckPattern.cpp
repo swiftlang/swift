@@ -154,7 +154,7 @@ public:
       lookup = TC.lookupMemberType(td->getDeclaredType(), ude->getName());
     } else if (Module *m = curScope.dyn_cast<Module*>()) {
       // Look into the module.
-      lookup = TC.lookupMemberType(m, ude->getName());
+      lookup = TC.lookupMemberType(ModuleType::get(m), ude->getName());
     } else
       llvm_unreachable("invalid curType");
     

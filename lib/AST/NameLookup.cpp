@@ -754,8 +754,38 @@ bool Module::lookupQualified(Type type,
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
-    moduleTy->getModule()->lookupValue(Module::AccessPathTy(), name,
-                                       NLKind::QualifiedLookup, decls);
+    Module *module = moduleTy->getModule();
+    module->lookupValue(Module::AccessPathTy(), name,
+                        NLKind::QualifiedLookup, decls);
+
+    // Prefer decls from the module itself, rather than imported modules.
+    if (!decls.empty())
+      return true;
+
+    // Track whether we've already searched the Clang modules.
+    // FIXME: This is a weird hack. We either need to filter within the
+    // Clang module importer, or we need to change how this works.
+    bool searchedClangModule =
+      module->getContextKind() == DeclContextKind::ClangModule;
+
+    module->forAllVisibleModules(Nothing,
+                                 makeStackLambda(
+      [&](const Module::ImportedModule &ImpEntry) {
+        // FIXME: Only searching Clang modules once.
+        if (ImpEntry.first.empty() &&
+            ImpEntry.second->getContextKind() == DeclContextKind::ClangModule) {
+          if (searchedClangModule)
+            return;
+
+          searchedClangModule = true;
+        }
+
+        // FIXME: Is the re-exported lookup really unqualified? We do want it
+        // to ignore the Builtin module, but no one should be re-exporting that.
+        ImpEntry.second->lookupValue(ImpEntry.first, name,
+                                     NLKind::UnqualifiedLookup, decls);
+      }
+    ));
     return !decls.empty();
   }
 

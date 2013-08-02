@@ -609,19 +609,6 @@ public:
   ///
   /// \returns The result of name lookup.
   LookupTypeResult lookupMemberType(Type type, Identifier name);
-  
-  /// \brief Look up a member type within the given module.
-  ///
-  /// This looks for members types directly within the module. It finds types
-  /// that would be found by qualified reference (such as swift.Int) and not
-  /// types that are imports.
-  ///
-  /// \param module The module in which to look for a member type.
-  ///
-  /// \param name The name of the type to look for.
-  ///
-  /// \returns The result of name lookup.
-  LookupTypeResult lookupMemberType(Module *module, Identifier name);
 
   /// \brief Look up the constructors of the given type.
   ///

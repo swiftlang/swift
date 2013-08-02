@@ -252,26 +252,6 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
               unbound->getDecl()->getName());
 }
 
-/// \brief Find a type member as a qualified member of a module.
-LookupTypeResult TypeChecker::lookupMemberType(Module *module, Identifier name){
-  LookupTypeResult result;
-  SmallVector<ValueDecl*, 4> decls;
-  // FIXME: The use of AccessPathTy() is weird here.
-  module->lookupValue(Module::AccessPathTy(), name,
-                      NLKind::QualifiedLookup, decls);
-  
-  for (auto decl : decls) {
-    // Only consider type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl)
-      continue;
-    
-    auto type = typeDecl->getDeclaredType();
-    result.addResult({typeDecl, type});
-  }
-  return result;
-}
-
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
@@ -450,8 +430,8 @@ resolveIdentTypeComponent(TypeChecker &TC,
 
       // Lookup into a module.
       auto module = parent.get<Module *>();
-      LookupTypeResult foundModuleTypes = TC.lookupMemberType(module,
-                                                          comp.getIdentifier());
+      LookupTypeResult foundModuleTypes =
+        TC.lookupMemberType(ModuleType::get(module), comp.getIdentifier());
 
       // If we didn't find a type, complain.
       if (!foundModuleTypes) {
