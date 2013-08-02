@@ -56,13 +56,20 @@ public:
   ///
   /// \param searchPaths Additional paths to search for user modules.
   ///
+  /// \param overrideResourceDir If nonempty, the path to use to locate the
+  /// resources for Clang.  This should at least have an include/ subdirectory
+  /// containing Clang's built-in headers.  The default (empty) argument causes
+  /// this function to assume the common case, where the current executable is
+  /// in the bin/ directory of a regular Swift build tree.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   LLVM_ATTRIBUTE_WEAK
   static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
                                StringRef targetTriple,
                                StringRef moduleCachePath,
-                               ArrayRef<std::string> searchPaths = {});
+                               ArrayRef<std::string> searchPaths = {},
+                               StringRef overrideResourceDir = StringRef());
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

@@ -81,7 +81,8 @@ ClangImporter::~ClangImporter() {
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef targetTriple,
                                      StringRef moduleCachePath,
-                                     ArrayRef<std::string> searchPaths) {
+                                     ArrayRef<std::string> searchPaths,
+                                     StringRef overrideResourceDir) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
 
   // Create a Clang diagnostics engine.
@@ -139,19 +140,24 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     return nullptr;
   }
 
-  llvm::SmallString<128> resourceDir(swiftPath);
-
-  // We now have the swift executable/library path. Adjust it to refer to our
-  // copy of the Clang headers under lib/swift/clang.
-
-  llvm::sys::path::remove_filename(resourceDir);
-  llvm::sys::path::remove_filename(resourceDir);
-  llvm::sys::path::append(resourceDir, "lib", "swift",
-                          "clang", CLANG_VERSION_STRING);
-
-  // Set the Clang resource directory to the path we computed.
-  invocationArgStrs.push_back("-resource-dir");
-  invocationArgStrs.push_back(resourceDir.str());
+  if (overrideResourceDir.empty()) {
+    llvm::SmallString<128> resourceDir(swiftPath);
+  
+    // We now have the swift executable/library path. Adjust it to refer to our
+    // copy of the Clang headers under lib/swift/clang.
+  
+    llvm::sys::path::remove_filename(resourceDir);
+    llvm::sys::path::remove_filename(resourceDir);
+    llvm::sys::path::append(resourceDir, "lib", "swift",
+                            "clang", CLANG_VERSION_STRING);
+  
+    // Set the Clang resource directory to the path we computed.
+    invocationArgStrs.push_back("-resource-dir");
+    invocationArgStrs.push_back(resourceDir.str());
+  } else {
+    invocationArgStrs.push_back("-resource-dir");
+    invocationArgStrs.push_back(overrideResourceDir);
+  }
 
   std::vector<const char *> invocationArgs;
   for (auto &argStr : invocationArgStrs)
