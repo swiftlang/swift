@@ -34,17 +34,20 @@ protected:
     : FixedTypeInfo(type, size, align, IsNotPOD, STIK_Reference) {}
 
 public:
-  /// Retains a value.
+  /// Strongly retains a value.
   virtual void retain(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
-  /// Releases a value.
+  /// Strongly releases a value.
   virtual void release(IRGenFunction &IGF, Explosion &explosion) const = 0;
 
+  /// Strongly retains a value that has come from a safe [unowned] reference.
+  virtual void retainUnowned(IRGenFunction &IGF, Explosion &in) const = 0;
+
   /// Weakly retains a value in the manner of a safe [unowned] reference.
-  virtual void unownedRetain(IRGenFunction &IGF, Explosion &out) const = 0;
+  virtual void unownedRetain(IRGenFunction &IGF, Explosion &in) const = 0;
 
   /// Weakly releases a value in the manner of a safe [unowned] reference.
-  virtual void unownedRelease(IRGenFunction &IGF, Explosion &out) const = 0;
+  virtual void unownedRelease(IRGenFunction &IGF, Explosion &in) const = 0;
 
   /// Produce the storage information for [weak] storage.
   virtual const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const = 0;

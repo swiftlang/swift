@@ -166,6 +166,7 @@ public:
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);
+  void emitRetainUnowned(llvm::Value *value);
   void emitUnownedRetain(llvm::Value *value);
   void emitUnownedRelease(llvm::Value *value);
   void emitWeakInit(Address addr);
@@ -187,6 +188,7 @@ public:
   void emitUnknownRelease(llvm::Value *value);
   void emitUnknownUnownedRetain(llvm::Value *value);
   void emitUnknownUnownedRelease(llvm::Value *value);
+  void emitUnknownRetainUnowned(llvm::Value *value);
   void emitUnknownWeakDestroy(Address addr);
   void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
   void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);

@@ -814,16 +814,36 @@ namespace {
     UnownedTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsNotTrivial) {}
 
+    SILType getSemanticType() const {
+      auto refType =
+        cast<ReferenceStorageType>(getLoweredType().getSwiftRValueType());
+      return SILType::getPrimitiveType(refType.getReferentType());
+    }
+
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
                            SILValue value, SILValue addr,
                            IsInitialization_t isInit) const override {
-      // FIXME
+      // Remember the current value.
+      SILValue oldValue;
+      if (!isInit) oldValue = B.createLoad(loc, addr);
+
+      // Convert the new value to [unowned] type, unowned_retain it,
+      // and release the old +1 value.
+      auto unownedValue = B.createRefToUnowned(loc, value, getLoweredType());
+      B.createUnownedRetain(loc, unownedValue);
+      B.createStore(loc, unownedValue, addr);
+      B.createRelease(loc, value);
+
+      // If we have an old value, release it.
+      if (!isInit) B.createUnownedRelease(loc, oldValue);
     }
 
     SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
                               SILValue addr, IsTake_t isTake) const override {
-      // FIXME
-      return SILValue();
+      auto unownedValue = B.createLoad(loc, addr);
+      B.createRetainUnowned(loc, unownedValue);
+      if (isTake) B.createUnownedRelease(loc, unownedValue);
+      return B.createUnownedToRef(loc, unownedValue, getSemanticType());
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
@@ -1330,4 +1350,40 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
 #include "swift/SIL/BridgedTypes.def"
     return t;
   }
+}
+
+SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
+                                                 Type lvalueType) {
+  // The l-value type is the result of applying substitutions to
+  // value->getTypeOfReference().  Essentially, we want to apply those
+  // same substitutions to value->getType().
+
+  // Canonicalize and lower the l-value's object type.
+  CanType substType =
+    cast<LValueType>(lvalueType->getCanonicalType()).getObjectType();
+  SILType silSubstType = getLoweredType(substType).getAddressType();
+  substType = silSubstType.getSwiftRValueType();
+
+  // Fast path: if the unsubstituted type from the variable equals the
+  // substituted type from the l-value, there's nothing to do.
+  CanType valueType = value->getType()->getCanonicalType();
+  if (valueType == substType)
+    return silSubstType;
+
+  // Type substitution preserves structural type structure, and
+  // getTypeOfReference() only adjusts the outermost structural types.
+  // So, basically, we just need to undo the changes made by
+  // getTypeOfReference and then reapply them on the substituted type.
+
+  // The only really significant manipulation there is with [weak] and
+  // [unowned].
+  if (auto refType = dyn_cast<ReferenceStorageType>(valueType)) {
+    // TODO: strip Optional<> off of [weak] types.
+    substType = CanType(ReferenceStorageType::get(substType,
+                                                  refType->getOwnership(),
+                                                  Context));
+    return SILType::getPrimitiveType(substType, /*isAddress*/ true);
+  }
+
+  return silSubstType;
 }

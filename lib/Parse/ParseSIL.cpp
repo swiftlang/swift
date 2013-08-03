@@ -829,6 +829,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("release", ValueKind::ReleaseInst)
     .Case("retain", ValueKind::RetainInst)
     .Case("retain_autoreleased", ValueKind::RetainAutoreleasedInst)
+    .Case("retain_unowned", ValueKind::RetainUnownedInst)
     .Case("return", ValueKind::ReturnInst)
     .Case("store", ValueKind::StoreInst)
     .Case("string_literal", ValueKind::StringLiteralInst)
@@ -1081,6 +1082,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AutoreleaseReturnInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createAutoreleaseReturn(SILLocation(), Val);
+    break;
+  case ValueKind::RetainUnownedInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createRetainUnowned(SILLocation(), Val);
     break;
   case ValueKind::UnownedRetainInst:
     if (parseTypedValueRef(Val)) return true;

@@ -589,6 +589,10 @@ public:
   createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
   }
+  RetainUnownedInst *createRetainUnowned(SILLocation Loc,
+                                         SILValue Operand) {
+    return insert(new (F.getModule()) RetainUnownedInst(Loc, Operand));
+  }
   UnownedRetainInst *createUnownedRetain(SILLocation Loc,
                                          SILValue Operand) {
     return insert(new (F.getModule()) UnownedRetainInst(Loc, Operand));

@@ -366,17 +366,18 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       SILValue addr,
                                       SGFContext C,
                                       IsTake_t isTake) {
-  auto &lowering = getTypeLowering(addr.getType());
-  if (lowering.isAddressOnly()) {
+  auto &addrTL = getTypeLowering(addr.getType());
+  auto &semanticTL = addrTL.getSemanticTypeLowering(SGM.Types);
+  if (addrTL.isAddressOnly()) {
     // Copy the address-only value.
-    SILValue copy = getBufferForExprResult(loc, addr.getType(), C);
-    lowering.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);
-    return emitManagedRValueWithCleanup(copy, lowering);
+    SILValue copy = getBufferForExprResult(loc, semanticTL.getLoweredType(), C);
+    addrTL.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);
+    return emitManagedRValueWithCleanup(copy, semanticTL);
   }
   
   // Load the loadable value, and retain it if we aren't taking it.
-  SILValue loadedV = lowering.emitSemanticLoad(B, loc, addr, isTake);
-  return emitManagedRValueWithCleanup(loadedV, lowering);
+  SILValue loadedV = addrTL.emitSemanticLoad(B, loc, addr, isTake);
+  return emitManagedRValueWithCleanup(loadedV, semanticTL);
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -1607,13 +1608,12 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
     for (size_t i = 0, size = elements.size(); i < size; ++i) {
       assert(memberIndex < decl->getMembers().size() &&
              "not enough physical struct members for value constructor?!");
-      SILType argTy = gen.getLoweredType(elements[i].getType());
-
       // Store each argument in the corresponding element of 'this'.
       auto *field = cast<VarDecl>(decl->getMembers()[memberIndex]);
+      auto &fieldTL = gen.getTypeLowering(field->getType());
       SILValue slot = gen.B.createStructElementAddr(ctor, resultSlot,
                                                     cast<VarDecl>(field),
-                                                    argTy.getAddressType());
+                                    fieldTL.getLoweredType().getAddressType());
       InitializationPtr init(new ImplicitValueInitialization(slot,
                                                          elements[i].getType()));
       std::move(elements[i]).forwardInto(gen, init.get());

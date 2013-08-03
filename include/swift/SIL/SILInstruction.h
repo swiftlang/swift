@@ -1420,6 +1420,19 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
+/// RetainUnownedInst - Increase the strong reference count of an
+/// object and assert that it has not been deallocated.
+///
+/// The operand must be an [unowned] type.
+class RetainUnownedInst :
+    public UnaryInstructionBase<ValueKind::RetainUnownedInst,
+                                RefCountingInst, /*HAS_RESULT*/ false>
+{
+public:
+  RetainUnownedInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
+};
+
 /// UnownedRetainInst - Increase the unowned reference count of an object.
 class UnownedRetainInst :
     public UnaryInstructionBase<ValueKind::UnownedRetainInst,

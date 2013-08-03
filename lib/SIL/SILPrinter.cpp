@@ -670,6 +670,9 @@ public:
   void visitReleaseInst(ReleaseInst *RI) {
     OS << "release " << getIDAndType(RI->getOperand());
   }
+  void visitRetainUnownedInst(RetainUnownedInst *RI) {
+    OS << "retain_unowned " << getIDAndType(RI->getOperand());
+  }
   void visitUnownedRetainInst(UnownedRetainInst *RI) {
     OS << "unowned_retain " << getIDAndType(RI->getOperand());
   }

@@ -420,6 +420,12 @@ public:
     require(RI->getOperand().getType().hasReferenceSemantics(),
             "Operand of dealloc_ref must be reference type");
   }
+  void checkRetainUnownedInst(RetainUnownedInst *RI) {
+    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
+                                    "Operand of retain_unowned");
+    require(type->getOwnership() == Ownership::Unowned,
+            "Operand of retain_unowned must be unowned reference");
+  }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
     auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
                                     "Operand of unowned_retain");

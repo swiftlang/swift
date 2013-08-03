@@ -434,6 +434,11 @@ namespace {
       IGF.emitRelease(e.claimNext());
     }
 
+    void retainUnowned(IRGenFunction &IGF, Explosion &e) const {
+      e.claimNext();
+      IGF.emitRetainUnowned(e.claimNext());
+    }
+    
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
       IGF.emitUnownedRetain(e.claimNext());

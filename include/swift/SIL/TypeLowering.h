@@ -197,7 +197,7 @@ public:
     // If you change this, change getSemanticTypeLowering() too.
     auto storageType = getLoweredType().getSwiftRValueType();
     if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-      return SILType::getPrimitiveType(refType, /*isAddress*/ false);
+      return SILType::getPrimitiveType(refType.getReferentType());
     return getLoweredType();
   }
   
@@ -412,6 +412,13 @@ public:
   /// Map an AST-level type to the corresponding foreign representation type we
   /// implicitly convert to for a given calling convention.
   Type getLoweredBridgedType(Type t, AbstractCC cc);
+
+  /// Given a referenced value and the substituted formal type of a
+  /// resulting l-value expression, produce the substituted formal
+  /// type of the storage of the value.
+  ///
+  /// \return - always an address type
+  SILType getSubstitutedStorageType(ValueDecl *value, Type lvalueType);
   
   /// Known types for bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
@@ -425,7 +432,7 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
   // If you change this, change getSemanticType() too.
   auto storageType = getLoweredType().getSwiftRValueType();
   if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-    return TC.getTypeLowering(refType);
+    return TC.getTypeLowering(refType.getReferentType());
   return *this;
 }
   

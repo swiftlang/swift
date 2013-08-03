@@ -256,6 +256,10 @@ extern "C" void swift_weakRetain(HeapObject *value);
 /// Decrement the weak retain count.
 extern "C" void swift_weakRelease(HeapObject *value);
 
+/// Increment the strong retain count of an object which may have been
+/// deallocated.
+extern "C" void swift_retainUnowned(HeapObject *value);
+
 /// A weak reference value object.  This is ABI.
 struct WeakReference {
   HeapObject *Value;
@@ -301,6 +305,10 @@ extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 extern "C" HeapObject *swift_weakTryRetain(WeakReference *object);
 
 #if SWIFT_OBJC_INTEROP
+
+/// Increment the strong retain count of an object which may have been
+/// deallocated and which might not be a native Swift object.
+extern "C" void swift_unknownRetainUnowned(void *value);
 
 /// Increment the weak-reference count of an object that might not be
 /// a native Swift object.

@@ -860,6 +860,12 @@ namespace {
       IGF.emitUnknownRelease(e.claimNext());
     }
 
+    void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
+      e.claim(NumProtocols);
+      // The instance is treated as unknown-refcounted.
+      IGF.emitUnknownRetainUnowned(e.claimNext());
+    }
+
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
       e.claim(NumProtocols);
       // The instance is treated as unknown-refcounted.

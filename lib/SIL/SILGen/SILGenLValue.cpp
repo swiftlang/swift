@@ -223,7 +223,7 @@ namespace {
       : field(field), type(type) {}
     
     SILValue offset(SILGenFunction &gen, SILLocation loc,
-                 SILValue base) const override {
+                    SILValue base) const override {
       assert(base && "invalid value for element base");
       SILType baseType = base.getType();
       (void)baseType;
@@ -447,17 +447,19 @@ LValue emitAnyMemberRefExpr(SILGenLValue &sgl,
                             ArrayRef<Substitution> substitutions) {
   LValue lv = sgl.visitRec(e->getBase());
   ValueDecl *decl = e->getDecl();
-  SILType baseTy = gen.getLoweredType(e->getBase()->getType()->getRValueType());
+  CanType baseTy = e->getBase()->getType()->getCanonicalType();
 
   // If this is a physical field, access with a fragile element reference.
   if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
     if (!var->isProperty()) {
-      if (baseTy.hasReferenceSemantics()) {
-        lv.add<RefElementComponent>(var,
-                                    gen.getLoweredType(e->getType()));
+      // Find the substituted storage type.
+      SILType varStorageType =
+        gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+      if (!isa<LValueType>(baseTy)) {
+        assert(baseTy.hasReferenceSemantics());
+        lv.add<RefElementComponent>(var, varStorageType);
       } else {
-        lv.add<StructElementComponent>(var,
-                                       gen.getLoweredType(e->getType()));
+        lv.add<StructElementComponent>(var, varStorageType);
       }
       return ::std::move(lv);
     }

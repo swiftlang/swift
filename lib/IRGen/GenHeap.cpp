@@ -871,6 +871,7 @@ void IRGenFunction::emit##ID(Address dest, Address src) {             \
                          src.getAddress());                           \
 }
 
+REFCOUNT_VALUE(RetainUnowned)
 REFCOUNT_VALUE(UnownedRelease)
 REFCOUNT_VALUE(UnownedRetain)
 REFCOUNT_ADDR(WeakDestroy)
@@ -878,6 +879,7 @@ REFCOUNT_ADDR_ADDR(WeakCopyInit)
 REFCOUNT_ADDR_ADDR(WeakCopyAssign)
 REFCOUNT_ADDR_ADDR(WeakTakeInit)
 REFCOUNT_ADDR_ADDR(WeakTakeAssign)
+REFCOUNT_VALUE(UnknownRetainUnowned)
 REFCOUNT_VALUE(UnknownUnownedRelease)
 REFCOUNT_VALUE(UnknownUnownedRetain)
 REFCOUNT_ADDR(UnknownWeakDestroy)

@@ -63,6 +63,14 @@ public:
     }
   }
 
+  void emitScalarRetainUnowned(IRGenFunction &IGF, llvm::Value *value) const {
+    if (asDerived().hasSwiftRefcount()) {
+      IGF.emitRetainUnowned(value);
+    } else {
+      IGF.emitUnknownRetainUnowned(value);
+    }
+  }
+
   void emitScalarUnownedRelease(IRGenFunction &IGF, llvm::Value *value) const {
     if (asDerived().hasSwiftRefcount()) {
       IGF.emitUnownedRelease(value);
@@ -87,6 +95,11 @@ public:
   void release(IRGenFunction &IGF, Explosion &e) const override {
     llvm::Value *value = e.claimNext();
     asDerived().emitScalarRelease(IGF, value);
+  }
+
+  void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
+    llvm::Value *value = e.claimNext();
+    asDerived().emitScalarRetainUnowned(IGF, value);
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {

@@ -530,6 +530,7 @@ public:
   void visitRetainInst(RetainInst *i);
   void visitReleaseInst(ReleaseInst *i);
   void visitRetainAutoreleasedInst(RetainAutoreleasedInst *i);
+  void visitRetainUnownedInst(RetainUnownedInst *i);
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
@@ -1707,6 +1708,12 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   auto type = silType.getSwiftRValueType();
   type = cast<ReferenceStorageType>(type).getReferentType();
   return cast<ReferenceTypeInfo>(IGF.getFragileTypeInfo(type));
+}
+
+void IRGenSILFunction::visitRetainUnownedInst(swift::RetainUnownedInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  auto &ti = getReferentTypeInfo(*this, i->getOperand().getType());
+  ti.retainUnowned(*this, lowered);
 }
 
 void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {

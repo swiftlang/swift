@@ -16,11 +16,13 @@
 
 #include "swift/Runtime/Alloc.h"
 #include "swift/Runtime/Metadata.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 // We'll include this and do per-thread clean up once we actually have threads
 //#include <System/pthread_machdep.h>
+#include "Private.h"
+#include <cassert>
 #include <cstring>
+#include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
 
@@ -200,6 +202,17 @@ void swift::swift_release(HeapObject *object) {
   }
 }
 #endif
+
+void swift::swift_retainUnowned(HeapObject *object) {
+  if (!object) return;
+  assert((object->weakRefCount & WRC_MASK) &&
+         "object is not currently weakly retained");
+
+  // FIXME: this test should be atomic with the retain
+  if (object->refCount & RC_DEALLOCATING_BIT)
+    _swift_abortRetainUnowned(object);
+  swift_retain(object);
+}
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_slow(HeapObject *object) {
@@ -484,4 +497,9 @@ HeapObject *swift::swift_weakTryRetain(WeakReference *ref) {
     return nullptr;
   }
   return swift_tryRetain(object);
+}
+
+void swift::_swift_abortRetainUnowned(const void *object) {
+  fprintf(stderr, "attempting to retain deallocated object at %p", object);
+  abort();
 }
