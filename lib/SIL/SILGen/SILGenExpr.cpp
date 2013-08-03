@@ -1410,7 +1410,7 @@ void SILGenFunction::emitEpilog(SILLocation loc) {
     returnValue = emitEmptyTuple(loc);
   
   // FIXME: Use the function body as the loc if ReturnLoc hasn't been set.
-  B.createReturn(ReturnLoc, returnValue);
+  B.createReturn(ReturnLoc, returnValue)->setDebugScope(F.getDebugScope());
 }
 
 void SILGenFunction::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
