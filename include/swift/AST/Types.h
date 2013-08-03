@@ -334,23 +334,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
 
-/// BuiltinOpaquePointerType - The builtin opaque pointer type.  This
-/// pointer is completely unmanaged and is equivalent to %swift.opaque* in LLVM
-/// IR. This is distinct from RawPointer to provide a thin layer of type
-/// checking against using arbitrary raw pointers as generic parameters.
-class BuiltinOpaquePointerType : public BuiltinType {
-  friend class ASTContext;
-  BuiltinOpaquePointerType(const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinOpaquePointer, C) {}
-public:
-  void print(raw_ostream &OS) const;
-  
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BuiltinOpaquePointer;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinOpaquePointerType, BuiltinType);
-
 /// BuiltinObjectPointerType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.

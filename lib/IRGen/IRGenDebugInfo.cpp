@@ -753,10 +753,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     return DBuilder.createObjectPointerType(PTy);
   }
 
-  case TypeKind::BuiltinOpaquePointer:
-    Name = getMangledName(Ty.CanTy);
-    return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
-
   case TypeKind::BuiltinRawPointer:
     Name = getMangledName(Ty.CanTy);
     return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);

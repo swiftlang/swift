@@ -343,7 +343,6 @@ namespace {
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
-    IMPL(BuiltinOpaquePointer, Trivial)
     IMPL(BuiltinObjectPointer, Reference)
     IMPL(BuiltinObjCPointer, Reference)
     IMPL(BuiltinVector, Trivial)

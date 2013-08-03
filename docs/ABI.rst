@@ -92,7 +92,6 @@ types where the metadata itself has unknown layout.)
   type ::= 'BO'                              // Builtin.ObjCPointer
   type ::= 'Bo'                              // Builtin.ObjectPointer
   type ::= 'Bp'                              // Builtin.RawPointer
-  type ::= 'Bu'                              // Builtin.OpaquePointer
   type ::= 'Bv' natural type                 // Builtin.Vec<n>x<type>
   type ::= nominal-type
   type ::= 'b' type type                     // objc block function type

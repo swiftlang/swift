@@ -428,7 +428,6 @@ void Mangler::mangleDeclType(ValueDecl *decl, ExplosionKind explosion,
 /// <type> ::= BO                    # Builtin.ObjCPointer
 /// <type> ::= Bo                    # Builtin.ObjectPointer
 /// <type> ::= Bp                    # Builtin.RawPointer
-/// <type> ::= Bu                    # Builtin.OpaquePointer
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
 /// <type> ::= F <type> <type>       # function type
@@ -477,9 +476,6 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return;
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";
-    return;
-  case TypeKind::BuiltinOpaquePointer:
-    Buffer << "Bu";
     return;
   case TypeKind::BuiltinObjectPointer:
     Buffer << "Bo";

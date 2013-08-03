@@ -1397,7 +1397,6 @@ bool Serializer::writeType(Type ty) {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:

@@ -175,8 +175,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SourceManager &SourceMgr,
                          BuiltinObjCPointerType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)
                         BuiltinRawPointerType(*this)),
-    TheOpaquePointerType(new (*this, AllocationArena::Permanent)
-                         BuiltinOpaquePointerType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)

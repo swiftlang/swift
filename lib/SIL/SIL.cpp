@@ -222,11 +222,6 @@ SILType SILType::getRawPointerType(const ASTContext &C) {
                  /*isAddress=*/false);
 }
 
-SILType SILType::getOpaquePointerType(const ASTContext &C) {
-  return SILType(CanType(C.TheOpaquePointerType),
-                 /*isAddress=*/false);
-}
-
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
                                        const ASTContext &C) {
   return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),

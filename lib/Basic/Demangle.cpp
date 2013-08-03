@@ -898,10 +898,6 @@ Demangler::Substitution Demangler::demangleType() {
       return success("Builtin.ObjectPointer");
     if (c == 'p')
       return success("Builtin.RawPointer");
-    if (c == 'u')
-      return success("Builtin.OpaquePointer");
-    if (c == 'p')
-      return success("Builtin.RawPointer");
     return failure();
   }
   if (c == 'b') {

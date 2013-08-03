@@ -185,8 +185,6 @@ public:
   static SILType getObjCPointerType(const ASTContext &C);
   /// Get the RawPointer type as a SILType.
   static SILType getRawPointerType(const ASTContext &C);
-  /// Get the OpaquePointer type as a SILType.
-  static SILType getOpaquePointerType(const ASTContext &C);
   /// Get a builtin integer type as a SILType.
   static SILType getBuiltinIntegerType(unsigned bitWidth, const ASTContext &C);
   /// Get a builtin floating-point type as a SILType.

@@ -319,7 +319,6 @@ public:
   const Type TheObjectPointerType; /// Builtin.ObjectPointer
   const Type TheObjCPointerType; /// Builtin.ObjCPointer
   const Type TheRawPointerType;  /// Builtin.RawPointer
-  const Type TheOpaquePointerType;  /// Builtin.OpaquePointer
   
   const Type TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
   const Type TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point

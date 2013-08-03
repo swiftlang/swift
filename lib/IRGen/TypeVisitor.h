@@ -36,7 +36,6 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   TYPE(BoundGenericStruct)
   TYPE(BuiltinFloat)
   TYPE(BuiltinInteger)
-  TYPE(BuiltinOpaquePointer)
   TYPE(BuiltinRawPointer)
   TYPE(BuiltinVector)
   TYPE(LValue)
@@ -94,7 +93,6 @@ public:
     case TypeKind::BuiltinInteger:
     case TypeKind::BuiltinObjectPointer:
     case TypeKind::BuiltinObjCPointer:
-    case TypeKind::BuiltinOpaquePointer:
     case TypeKind::BuiltinRawPointer:
     case TypeKind::BuiltinVector:
     case TypeKind::Class:

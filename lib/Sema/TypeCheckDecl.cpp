@@ -1338,7 +1338,6 @@ bool TypeChecker::isDefaultInitializable(Type ty, Expr **initializer) {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
     // Built-in types are default-initializable.

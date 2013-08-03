@@ -98,7 +98,6 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Tuple:
   case TypeKind::Union:
@@ -237,7 +236,6 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -312,7 +310,6 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -336,7 +333,6 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
@@ -484,7 +480,6 @@ static Type getStrippedType(const ASTContext &context, Type type,
   switch (type->getKind()) {
   case TypeKind::Error: 
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinInteger:
@@ -1379,10 +1374,6 @@ void TypeBase::print(raw_ostream &OS) const {
 
 void BuiltinRawPointerType::print(raw_ostream &OS) const {
   OS << "Builtin.RawPointer";
-}
-
-void BuiltinOpaquePointerType::print(raw_ostream &OS) const {
-  OS << "Builtin.OpaquePointer";
 }
 
 void BuiltinObjectPointerType::print(raw_ostream &OS) const {

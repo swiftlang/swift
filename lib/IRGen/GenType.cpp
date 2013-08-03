@@ -338,8 +338,6 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
   switch (ty->getKind()) {
   case TypeKind::BuiltinRawPointer:
     return { IGM.Int8PtrTy, IGM.getPointerSize(), IGM.getPointerAlignment() };
-  case TypeKind::BuiltinOpaquePointer:
-    return { IGM.OpaquePtrTy, IGM.getPointerSize(), IGM.getPointerAlignment() };
   case TypeKind::BuiltinFloat:
     switch (cast<BuiltinFloatType>(ty)->getFPKind()) {
     case BuiltinFloatType::IEEE16:
@@ -410,7 +408,6 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
   case TypeKind::BuiltinObjCPointer:
     return convertBuiltinObjCPointer();
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinOpaquePointer:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinVector: {
