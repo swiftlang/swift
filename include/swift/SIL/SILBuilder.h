@@ -474,9 +474,10 @@ public:
   }
   
   ProjectExistentialInst *createProjectExistential(SILLocation Loc,
-                                                   SILValue Operand) {
+                                                   SILValue Operand,
+                                                   SILType ThisTy) {
     return insert(new (F.getModule())
-                    ProjectExistentialInst(Loc, Operand, F));
+                    ProjectExistentialInst(Loc, Operand, ThisTy));
   }
   
   ProjectExistentialRefInst *createProjectExistentialRef(SILLocation Loc,

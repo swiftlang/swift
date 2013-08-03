@@ -599,6 +599,16 @@ public:
     }
   }
   
+  bool isThisArchetype(CanType t) {
+    ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
+    if (!archetype)
+      return false;
+    if (archetype->getName().str() != "This")
+      return false;
+    // FIXME: Walk back to the protocol for verification?
+    return true;
+  }
+
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
     AnyFunctionType *methodType = EMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
@@ -618,8 +628,11 @@ public:
                 "result must be a method of objc pointer");
         
       } else {
-        require(getMethodThisType(methodType)->isEqual(
-                               operandType.getASTContext().TheOpaquePointerType),
+        CanType thisType = getMethodThisType(methodType);
+        require(isa<LValueType>(thisType),
+                "protocol_method result must take its this parameter byref");
+        CanType thisObjType = thisType->getRValueType()->getCanonicalType();
+        require(isThisArchetype(thisObjType),
                 "result must be a method of opaque pointer");
       }
     } else {
@@ -683,10 +696,15 @@ public:
     SILType operandType = PEI->getOperand().getType();
     require(operandType.isAddress(),
             "project_existential must be applied to address");
-    require(operandType.isExistentialType(),
+    
+    SmallVector<ProtocolDecl*, 4> protocols;
+    require(operandType.getSwiftRValueType()->isExistentialType(protocols),
             "project_existential must be applied to address of existential");
-    require(PEI->getType() == SILType::getOpaquePointerType(F.getASTContext()),
-            "project_existential_ref result must be an OpaquePointer");
+    require(PEI->getType().isAddress(),
+            "project_existential result must be an address");
+    
+    require(isThisArchetype(PEI->getType().getSwiftRValueType()),
+            "project_existential result must be This archetype of a protocol");
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {

@@ -1043,10 +1043,24 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILFunctionRef(B, ResultVal))
       return true;
     break;
-  case ValueKind::ProjectExistentialInst:
-    if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createProjectExistential(SILLocation(), Val);
+  case ValueKind::ProjectExistentialInst: {
+    SILType Ty;
+    Identifier ToToken;
+    SourceLoc ToLoc;
+    
+    if (parseTypedValueRef(Val) ||
+        P.parseIdentifier(ToToken,ToLoc,diag::expected_tok_in_sil_instr,"to") ||
+        parseSILType(Ty))
+      return true;
+    
+    if (ToToken.str() != "to") {
+      P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
+    ResultVal = B.createProjectExistential(SILLocation(), Val, Ty);
     break;
+  }
   case ValueKind::ProjectExistentialRefInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createProjectExistentialRef(SILLocation(), Val);

@@ -461,9 +461,8 @@ ModuleInst::ModuleInst(SILLocation Loc, SILType ModuleType)
 
 ProjectExistentialInst::ProjectExistentialInst(SILLocation Loc,
                                                SILValue Operand,
-                                               SILFunction &F)
-  : UnaryInstructionBase(Loc, Operand,
-                   SILType::getOpaquePointerType(F.getASTContext()))
+                                               SILType ThisTy)
+  : UnaryInstructionBase(Loc, Operand, ThisTy)
 {}
 
 ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,

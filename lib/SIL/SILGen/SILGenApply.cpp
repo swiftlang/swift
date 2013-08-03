@@ -146,7 +146,7 @@ private:
                                        SILDeclRef methodName,
                                        Type memberType) {
     // 'this' for instance methods is projected out of the existential container
-    // as an OpaquePointer or ObjCPointer.
+    // as an ObjCPointer or as the address of its This archetype.
     // 'this' for existential metatypes is the metatype itself.
     Type thisTy;
     bool isThin;
@@ -155,7 +155,12 @@ private:
         thisTy = memberType->getASTContext().TheObjCPointerType;
         isThin = true;
       } else {
-        thisTy = memberType->getASTContext().TheOpaquePointerType;
+        Type protoThisTy
+          = cast<ProtocolDecl>(methodName.getDecl()->getDeclContext())
+              ->getThis()->getUnderlyingType();
+        thisTy = LValueType::get(protoThisTy,
+                                 LValueType::Qual::DefaultForByrefThis,
+                                 protoThisTy->getASTContext());
         isThin = false;
       }
     } else {
@@ -528,6 +533,11 @@ public:
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential = gen.emitRValue(e->getBase()).getAsSingleValue(gen);
     
+    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
+    assert(fd && "existential properties not yet supported");
+
+    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
+
     if (e->getDecl()->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets consumed
       // (or not) when the call is applied to it (or isn't).
@@ -537,7 +547,11 @@ public:
                                                          existential.getValue());
         proj = ManagedValue(val, existential.getCleanup());
       } else {
-        SILValue val = gen.B.createProjectExistential(e, existential.getValue());
+        SILType protoThisTy
+          = gen.getLoweredType(proto->getThis()->getUnderlyingType());
+        assert(protoThisTy.isAddress() && "This should be address-only");
+        SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
+                                                      protoThisTy);
         proj = ManagedValue(val, ManagedValue::Unmanaged);
       }
 
@@ -548,11 +562,8 @@ public:
       setThisParam(RValue(gen, existential), e);
     }
 
-    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
-    assert(fd && "existential properties not yet supported");
-    
     // Method calls through ObjC protocols require ObjC dispatch.
-    bool isObjC = cast<ProtocolDecl>(fd->getDeclContext())->isObjC();
+    bool isObjC = proto->isObjC();
     
     setCallee(Callee::forProtocol(gen, existential.getValue(),
                                   SILDeclRef(fd).asObjC(isObjC),

@@ -2093,9 +2093,8 @@ void IRGenSILFunction::visitProjectExistentialInst(
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
   Address object = emitOpaqueExistentialProjection(*this, base, baseTy);
-  Explosion lowered(ExplosionKind::Maximal);
-  lowered.add(object.getAddress());
-  setLoweredExplosion(SILValue(i, 0), lowered);
+  
+  setLoweredAddress(SILValue(i, 0), object);
 }
 
 void IRGenSILFunction::visitProjectExistentialRefInst(

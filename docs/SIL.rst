@@ -1337,7 +1337,8 @@ protocol_method
   // #P.method!1 must be a reference to a method of one of the protocols of P
   //
   // If %0 is an address-only protocol address, then the "this" argument of
-  //   the method type $[thin] U -> V must be Builtin.OpaquePointer
+  //   the method type $[thin] U -> V must be $*P.This for #P.method's protocol
+  //   of P
   // If %0 is a class protocol value, then the "this" argument of
   //   the method type $[thin] U -> V must be Builtin.ObjCPointer
   // If %0 is a protocol metatype, then the "this" argument of
@@ -1350,8 +1351,8 @@ be projected out of the same existential container as the ``protocol_method``
 operand:
 
 - If the operand is the address of an address-only protocol type, then the
-  "this" argument of the method is of type ``Builtin.OpaquePointer``, and
-  can be projected using the ``project_existential`` instruction.
+  "this" argument of the method is of type ``$*P.This``, the ``This`` archetype
+  of the method's protocol.
 - If the operand is a value of a class protocol type, then the "this"
   argument of the method is of type ``Builtin.ObjCPointer``, and can be
   projected using the ``project_existential_ref`` instruction.
@@ -1777,14 +1778,16 @@ project_existential
 ```````````````````
 ::
 
-  sil-instruction ::= 'project_existential' sil-operand
+  sil-instruction ::= 'project_existential' sil-operand 'to' sil-type
 
-  %1 = project_existential %0 : $*P
+  %1 = project_existential %0 : $*P to $*P.This
   // %0 must be of a $*P type for non-class protocol or protocol composition
   //   type P
-  // %1 will be of type $Builtin.OpaquePointer
+  // $*P.This must be the address-of-This type for one of the protocols %0
+  //   conforms to
+  // %1 will be of type $*P.This
 
-Obtains an ``OpaquePointer`` pointing to the concrete value referenced by the
+Obtains the address of the concrete value inside the
 existential container referenced by ``%0``. This pointer can be passed to
 protocol instance methods obtained by ``protocol_method`` from the same
 existential container. A method call on a protocol-type value in Swift::
@@ -1805,7 +1808,7 @@ compiles to this SIL sequence::
   %one_two_three = integer_literal $Int, 123
   apply %bar(%one_two_three, %foo_p) : $(Int, Builtin.OpaquePointer) -> ()
 
-It is undefined behavior for the ``OpaquePointer`` value to be passed as the
+It is undefined behavior for the address to be passed as the
 "this" argument to a method value obtained by ``protocol_method`` from
 a different existential container. It is also undefined behavior if the
 ``OpaquePointer`` value is dereferenced, cast, or passed to a method after
