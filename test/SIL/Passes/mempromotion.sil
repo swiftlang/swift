@@ -142,3 +142,24 @@ bb0(%0 : $SomeClass):
 // CHECK: return
 }
 
+protocol LogicValue {
+  func getLogicValue() -> Bool
+}
+
+// CHECK-LABEL: @protocols
+sil @protocols : $[thin] ((v : LogicValue), Bool.metatype) -> Bool {
+bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
+  %2 = alloc_box $LogicValue
+// CHECK:  %2 = alloc_stack $LogicValue
+  copy_addr [take] %0 to [initialization] %2#1 : $*LogicValue
+  %6 = project_existential %2#1 : $*LogicValue to $*LogicValue.This
+  %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : $[cc(method)] ((), [byref] LogicValue.This) -> Bool
+  %8 = apply %7(%6) : $[cc(method)] ((), [byref] LogicValue.This) -> Bool
+  release %2#0 : $Builtin.ObjectPointer
+// CHECK:  destroy_addr %2 : $*LogicValue
+// CHECK-NEXT:  dealloc_stack %2 : $*LogicValue
+// CHECK-NEXT:  return
+  return %8 : $Bool
+}
+
+

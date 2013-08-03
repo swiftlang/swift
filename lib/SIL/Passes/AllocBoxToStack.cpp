@@ -141,6 +141,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
         isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
         isa<InitializeVarInst>(User) ||
+        isa<ProtocolMethodInst>(User) ||
         (isa<StoreInst>(User) && UI->getOperandNumber() == 1)) {
       Users.push_back(User);
       continue;
