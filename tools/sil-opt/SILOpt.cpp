@@ -94,6 +94,10 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
   CI.doIt();
+  
+  // If parsing produced an error, don't run any passes.
+  if (CI.getASTContext().hadError())
+    return 1;
 
   for (auto Pass : Passes) {
     switch (Pass) {
