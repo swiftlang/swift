@@ -4,6 +4,7 @@ sil_stage raw // CHECK: sil_stage raw
 
 import Builtin
 import swift
+import Foundation
 
 // Linkage types.
 
@@ -586,3 +587,73 @@ bb2(%2 : $Int64):
   return %2 : $Int64
 }
 
+class Bas : NSObject {
+  var strRealProp : String
+}
+
+// Generated from
+// class Bas : NSObject {
+//   var strRealProp : String
+//   constructor() {
+//     super.constructor()
+//   }
+// }
+// CHECK: sil @test_autorelease_return
+sil @test_autorelease_return : $[cc(objc_method), thin] (Bas, ()) -> NSString {
+bb0(%0 : $Bas):
+  retain %0 : $Bas
+  %2 = ref_element_addr %0 : $Bas, #strRealProp
+  %3 = load %2 : $*String
+  release %0 : $Bas
+  %5 = struct_extract %3 : $String, #str_value
+  %6 = struct_extract %5 : $StringByteData, #owner
+  retain %6 : $Builtin.ObjectPointer
+  %8 = function_ref @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
+  %9 = alloc_stack $String
+  store %3 to %9 : $*String
+  %11 = apply %8(%9) : $[thin] (string : [byref] String) -> NSString
+  dealloc_stack %9 : $*String
+  %13 = struct_extract %3 : $String, #str_value
+  %14 = struct_extract %13 : $StringByteData, #owner
+  release %14 : $Builtin.ObjectPointer
+  // CHECK: autorelease_return %11 : $NSString
+  autorelease_return %11 : $NSString
+}
+sil @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
+
+// CHECK: sil @test_super_method
+sil @test_super_method : $[cc(method), thin] ((), Bas) -> Bas {
+bb0(%0 : $Bas):
+  %1 = tuple ()
+  %2 = alloc_box $Bas
+  store %0 to %2#1 : $*Bas
+  %4 = function_ref @_TSSCfMSSFT_SS : $[thin] ((), String.metatype) -> String
+  %5 = metatype $String.metatype
+  %6 = apply %4(%5) : $[thin] ((), String.metatype) -> String
+  %7 = load %2#1 : $*Bas
+  retain %7 : $Bas
+  %9 = ref_element_addr %7 : $Bas, #strRealProp
+  %10 = load %9 : $*String
+  store %6 to %9 : $*String
+  %12 = struct_extract %10 : $String, #str_value
+  %13 = struct_extract %12 : $StringByteData, #owner
+  release %13 : $Builtin.ObjectPointer
+  release %7 : $Bas
+  %16 = load %2#1 : $*Bas
+  retain %16 : $Bas
+  %18 = upcast %16 : $Bas to $NSObject
+  // CHECK: super_method [volatile] %16 : $Bas, #NSObject.constructor!initializer.1.objc :
+  %19 = super_method [volatile] %16 : $Bas, #NSObject.constructor!initializer.1.objc : $[cc(objc_method), thin] (NSObject, ()) -> NSObject
+  %20 = apply %19(%18) : $[cc(objc_method), thin] (NSObject, ()) -> NSObject
+  retain_autoreleased %20 : $NSObject
+  %22 = downcast unconditional %20 : $NSObject to $Bas
+  %23 = load %2#1 : $*Bas
+  store %22 to %2#1 : $*Bas
+  release %23 : $Bas
+  release %16 : $Bas
+  %27 = load %2#1 : $*Bas
+  retain %27 : $Bas
+  release %2#0 : $Builtin.ObjectPointer
+  return %27 : $Bas
+}
+sil @_TSSCfMSSFT_SS : $[thin] ((), String.metatype) -> String

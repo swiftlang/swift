@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILArgument.h"
@@ -618,13 +619,18 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
 
   // Look up ValueDecl from FullName.
   ValueDecl *VD;
-  llvm::SmallVector<ValueDecl*, 4> CurModuleResults;
-  // Perform a module level lookup on the first component of the fully-qualified
-  // name.
-  P.TU->lookupValue(Module::AccessPathTy(), FullName[0],
-                    NLKind::UnqualifiedLookup, CurModuleResults);
-  assert(CurModuleResults.size() == 1);
-  VD = CurModuleResults[0];
+  {
+    // Use UnqualifiedLookup to look through all of the imports.
+    // We have to lie and say we're done with parsing to make this happen.
+    assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+           "Unexpected stage during parsing!");
+    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+                                                      TranslationUnit::Parsed);
+    UnqualifiedLookup DeclLookup(FullName[0], P.TU);
+    assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1 &&
+           DeclLookup.Results.back().hasValueDecl());
+    VD = DeclLookup.Results.back().getValueDecl();
+  }
   for (unsigned I = 1, E = FullName.size(); I < E; I++) {
     // Look up members of VD for FullName[i].
     SmallVector<ValueDecl *, 4> Lookup;
@@ -779,6 +785,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
     .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
     .Case("apply", ValueKind::ApplyInst)
+    .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
     .Case("builtin_zero", ValueKind::BuiltinZeroInst)
@@ -828,6 +835,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("struct", ValueKind::StructInst)
     .Case("struct_element_addr", ValueKind::StructElementAddrInst)
     .Case("struct_extract", ValueKind::StructExtractInst)
+    .Case("super_method", ValueKind::SuperMethodInst)
     .Case("super_to_archetype_ref", ValueKind::SuperToArchetypeRefInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
@@ -1055,6 +1063,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RetainAutoreleasedInst:
     if (parseTypedValueRef(Val)) return true;
     ResultVal = B.createRetainAutoreleased(SILLocation(), Val);
+    break;
+  case ValueKind::AutoreleaseReturnInst:
+    if (parseTypedValueRef(Val)) return true;
+    ResultVal = B.createAutoreleaseReturn(SILLocation(), Val);
     break;
   case ValueKind::UnownedRetainInst:
     if (parseTypedValueRef(Val)) return true;
@@ -1425,7 +1437,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createUnreachable(SILLocation());
     break;
     
-  case ValueKind::ProtocolMethodInst: {
+  case ValueKind::ProtocolMethodInst:
+  case ValueKind::ClassMethodInst:
+  case ValueKind::SuperMethodInst: {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, P, "volatile"))
       return true;
@@ -1439,26 +1453,21 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseSILType(MethodTy, TyLoc)
        )
       return true;
-    ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy,
-                                       IsVolatile);
-    break;
-  }
-  case ValueKind::ClassMethodInst: {
-    bool IsVolatile = false;
-    if (parseSILOptional(IsVolatile, P, "volatile"))
-      return true;
-    SILDeclRef Member;
-    SILType MethodTy;
-    SourceLoc TyLoc;
-    if (parseTypedValueRef(Val) ||
-        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(Member) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(MethodTy, TyLoc)
-       )
-      return true;
-    ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy,
-                                    IsVolatile);
+    switch (Opcode) {
+    default: assert(0 && "Out of sync with parent switch");
+    case ValueKind::ProtocolMethodInst:
+      ResultVal = B.createProtocolMethod(SILLocation(), Val, Member, MethodTy,
+                                         IsVolatile);
+      break;
+    case ValueKind::ClassMethodInst:
+      ResultVal = B.createClassMethod(SILLocation(), Val, Member, MethodTy,
+                                      IsVolatile);
+      break;
+    case ValueKind::SuperMethodInst:
+      ResultVal = B.createSuperMethod(SILLocation(), Val, Member, MethodTy,
+                                      IsVolatile);
+      break;
+    }
     break;
   }
   case ValueKind::ArchetypeMethodInst: {
