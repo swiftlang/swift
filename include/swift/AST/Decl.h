@@ -60,6 +60,7 @@ namespace swift {
   class TypeAliasDecl;
   class Stmt;
   class ValueDecl;
+  class VarDecl;
 
   typedef llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> ClangNode;
   
@@ -1238,6 +1239,70 @@ public:
   /// overridden declarations been removed.
   ArrayRef<ValueDecl *> lookupDirect(Identifier name);
 
+  /// A class for iterating the known "physical" fields of a structure.
+  class FieldRange {
+  public:
+    class iterator {
+      /// The remaining declarations.  We need both ends here so that
+      /// operator++ knows when to stop.
+      ///
+      /// Invariant: either this is empty or its first element is a
+      /// physical field.
+      ArrayRef<Decl*> Remaining;
+
+      friend class FieldRange;
+      iterator(ArrayRef<Decl*> remaining) : Remaining(remaining) {}
+      inline void skipNonFields(); // at end of file
+
+    public:
+      inline VarDecl *operator*() const; // at end of file
+      iterator &operator++() {
+        assert(!Remaining.empty() && "incrementing empty iterator!");
+        Remaining = Remaining.slice(1);
+        skipNonFields();
+        return *this;
+      }
+      iterator operator++(int _) {
+        iterator old = *this;
+        ++*this;
+        return old;
+      }
+      friend bool operator==(iterator lhs, iterator rhs) {
+        assert(lhs.Remaining.end() == rhs.Remaining.end() &&
+               "comparing iterators from different sources?");
+        return lhs.Remaining.begin() == rhs.Remaining.begin();
+      }
+      friend bool operator!=(iterator lhs, iterator rhs) {
+        return !(lhs == rhs);
+      }
+    };
+
+  private:
+    /// Our iterator is actually a pretty reasonable representation of
+    /// the range itself.
+    iterator Members;
+
+    friend class NominalTypeDecl;
+    FieldRange(ArrayRef<Decl*> allMembers) : Members(allMembers) {
+      // Establish the iterator's invariant.
+      Members.skipNonFields();
+    }
+
+  public:
+    bool empty() const { return Members.Remaining.empty(); }
+
+    iterator begin() const { return Members; }
+    iterator end() const {
+      // For the benefit of operator==, construct a range whose
+      // begin() is the end of the members array.
+      auto endRange = Members.Remaining.slice(Members.Remaining.size());
+      return iterator(endRange);
+    }
+  };
+
+  /// Return a collection of the physical fields of this type.
+  FieldRange getPhysicalFields() const { return FieldRange(getMembers()); }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&
@@ -2186,6 +2251,20 @@ inline bool ValueDecl::isSettable() const {
     return sd->isSettable();
   } else
     return false;
+}
+
+inline void NominalTypeDecl::FieldRange::iterator::skipNonFields() {
+  while (!Remaining.empty()) {
+    if (auto var = dyn_cast<VarDecl>(Remaining.front()))
+      if (!var->isProperty())
+        return;
+    Remaining = Remaining.slice(1);
+  }
+}
+
+inline VarDecl *NominalTypeDecl::FieldRange::iterator::operator*() const {
+  assert(!Remaining.empty() && "dereferencing empty iterator!");
+  return cast<VarDecl>(Remaining.front());
 }
 
 // FIXME: Fix up the AST representation of ConstructorDecls and DestructorDecls
