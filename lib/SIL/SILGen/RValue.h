@@ -78,28 +78,34 @@ public:
   
   /// Emit a copy of this value with independent ownership.
   ManagedValue copy(SILGenFunction &gen) {
-    if (!cleanup.isValid())
+    if (!cleanup.isValid()) {
+      assert(gen.getTypeLowering(getType()).isTrivial());
       return *this;
+    }
     
-    if (getType().isAddressOnly(gen.SGM.M)) {
+    auto &lowering = gen.getTypeLowering(getType());
+    assert(!lowering.isTrivial() && "trivial value has cleanup?");
+
+    if (lowering.isAddressOnly()) {
       SILValue buf = gen.emitTemporaryAllocation(SILLocation(), getType());
       gen.B.createCopyAddr(SILLocation(), getValue(), buf,
                            IsNotTake, IsInitialization);
-      return gen.emitManagedRValueWithCleanup(buf);
+      return gen.emitManagedRValueWithCleanup(buf, lowering);
     }
-    gen.B.emitRetainValue(SILLocation(), getValue());
-    return gen.emitManagedRValueWithCleanup(getValue());
+    lowering.emitRetain(gen.B, SILLocation(), getValue());
+    return gen.emitManagedRValueWithCleanup(getValue(), lowering);
   }
   
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
   void copyInto(SILGenFunction &gen, SILValue dest) {
-    if (getType().isAddressOnly(gen.SGM.M)) {
+    auto &lowering = gen.getTypeLowering(getType());
+    if (lowering.isAddressOnly()) {
       gen.B.createCopyAddr(SILLocation(), getValue(), dest,
                            IsNotTake, IsInitialization);
       return;
     }
-    gen.B.emitRetainValue(SILLocation(), getValue());
+    lowering.emitRetain(gen.B, SILLocation(), getValue());
     gen.B.createStore(SILLocation(), getValue(), dest);
   }
   

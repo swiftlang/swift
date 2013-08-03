@@ -181,30 +181,96 @@ public:
   bool isTrivial() const {
     return LoweredTypeAndFlags.getInt() & IsTrivialFlag;
   }
-  
+
   /// getLoweredType - Get the type used to represent values of the Swift type
   /// in SIL.
   SILType getLoweredType() const {
     return LoweredTypeAndFlags.getPointer();
   }
 
-  /// Given a +1 r-value which we are claiming ownership of,
-  /// initialize the given address with it.
-  virtual void emitInitializeWithRValue(SILBuilder &B,
-                                        SILLocation loc,
-                                        SILValue value,
-                                        SILValue addr) const = 0;
+  /// Return the semantic type.
+  ///
+  /// The semantic type is what a type pretends to be during
+  /// type-checking: that is, the type that getTypeOfRValue would
+  /// return on a variable of this type.
+  SILType getSemanticType() const {
+    // If you change this, change getSemanticTypeLowering() too.
+    auto storageType = getLoweredType().getSwiftRValueType();
+    if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
+      return SILType::getPrimitiveType(refType, /*isAddress*/ false);
+    return getLoweredType();
+  }
+  
+  /// Return the lowering for the semantic type.
+  inline const TypeLowering &getSemanticTypeLowering(TypeConverter &TC) const;
+
+  /// Given a +1 value of the semantic type which we are claiming
+  /// ownership of, put it into the given address with either
+  /// initialization or assignment semantics.
+  virtual void emitSemanticStore(SILBuilder &B,
+                                 SILLocation loc,
+                                 SILValue value,
+                                 SILValue addr,
+                                 IsInitialization_t isInit) const = 0;
+  void emitSemanticInitialize(SILBuilder &B, SILLocation loc,
+                              SILValue value, SILValue addr) const {
+    emitSemanticStore(B, loc, value, addr, IsInitialization);
+  }
+  void emitSemanticAssign(SILBuilder &B, SILLocation loc,
+                          SILValue value, SILValue addr) const {
+    emitSemanticStore(B, loc, value, addr, IsNotInitialization);
+  }
+
+  /// Given an address, emit operations to destroy it.
+  ///
+  /// This produces canonicalized SIL.
+  virtual void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                                  SILValue value) const = 0;
+
+  /// Produce a +1 semantic value loaded from the given address.  This
+  /// type must be loadable.
+  ///
+  /// For [unowned] types, the result will be of the referent type.
+  virtual SILValue emitSemanticLoad(SILBuilder &B,
+                                    SILLocation loc,
+                                    SILValue addr,
+                                    IsTake_t isTake) const = 0;
+
+  /// Copy a semantic value from the given address into the given
+  /// uninitialized result.  The type need not be loadable.
+  virtual void emitSemanticLoadInto(SILBuilder &B,
+                                    SILLocation loc,
+                                    SILValue src,
+                                    SILValue dest,
+                                    IsTake_t isTake,
+                                    IsInitialization_t isInit) const = 0;
 
   /// Given a +1 r-value which are are claiming ownership of, destroy it.
+  ///
+  /// Note that an r-value might be an address.
   virtual void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                                  SILValue value) const = 0;
 
-  /// Given a +1 r-value which we are claiming ownership of,
-  /// assign it into the given address.
-  virtual void emitAssignWithRValue(SILBuilder &B,
-                                    SILLocation loc,
-                                    SILValue value,
-                                    SILValue addr) const = 0;
+  /// Given a primitively loaded value of this type (which must be
+  /// loadable), +1 it.
+  ///
+  /// This should be used for duplicating a value from place to place
+  /// with exactly the same semantics.  For example, it performs an
+  /// unowned_release on a value of [unknown] type.  It is therefore
+  /// not necessarily the right thing to do on a semantic load.
+  virtual void emitRetain(SILBuilder &B, SILLocation loc,
+                          SILValue value) const = 0;
+
+  /// Given a primitively loaded value of this type (which must be
+  /// loadable), -1 it.
+  ///
+  /// This should be used when dropping a value which has been copied
+  /// from place to place with exactly the same semantics.  For
+  /// example, it performs an unowned_release on a value of [unknown]
+  /// type.  It is therefore not necessarily the right thing to do on
+  /// a semantic load.
+  virtual void emitRelease(SILBuilder &B, SILLocation loc,
+                           SILValue value) const = 0;
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
   void *operator new(size_t size, TypeConverter &tc);
@@ -263,6 +329,21 @@ public:
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
+
+  /// Is the given declaration resilient from the current context?
+  bool isResilient(Decl *D) {
+    // FIXME
+    return false;
+  }
+
+  /// Is the given declaration resilient in any theoretical component,
+  /// possibly one compiled in the past?  This can lead to some
+  /// sub-optimal decisions sometimes, but it has the merit of being
+  /// guaranteed stable.
+  bool isAnywhereResilient(Decl *D) {
+    // FIXME
+    return false;
+  }
 
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
@@ -338,6 +419,15 @@ public:
   CanType get##NativeType##Type();
 #include "swift/SIL/BridgedTypes.def"
 };
+
+inline const TypeLowering &
+TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
+  // If you change this, change getSemanticType() too.
+  auto storageType = getLoweredType().getSwiftRValueType();
+  if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
+    return TC.getTypeLowering(refType);
+  return *this;
+}
   
 } // namespace Lowering
 } // namespace swift

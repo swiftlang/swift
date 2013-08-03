@@ -599,9 +599,8 @@ public:
     Expr *arg = apply->getArg();
     ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen);
     if (super.isLValue()) {
-      super = gen.emitManagedRValueWithCleanup(
-                                       gen.B.createLoad(arg, super.getValue()));
-      gen.B.emitRetainValue(arg, super.getValue());
+      auto superValue = gen.B.createLoad(arg, super.getValue());
+      super = gen.emitManagedRetain(arg, superValue);
     }
     
     // The callee for a super call has to be either a method or constructor.
@@ -704,7 +703,7 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     /// Do we need to copy here if the return value is Unretained?
     assert(Ownership.getReturn() == OwnershipConventions::Return::Retained
            && "address-only result with non-Retained ownership not implemented");
-    bridgedResult = emitManagedRValueWithCleanup(indirectReturn);
+    bridgedResult = emitManagedRValueWithCleanup(indirectReturn, resultTI);
   } else {
     switch (Ownership.getReturn()) {
     case OwnershipConventions::Return::Retained:
@@ -718,13 +717,13 @@ ManagedValue SILGenFunction::emitApply(SILLocation Loc,
     
     case OwnershipConventions::Return::Unretained:
       // Unretained. Retain the value.
-      B.emitRetainValue(Loc, result);
+      resultTI.emitRetain(B, Loc, result);
       break;
     }
   
     bridgedResult = resultTy->is<LValueType>()
       ? ManagedValue(result, ManagedValue::LValue)
-      : emitManagedRValueWithCleanup(result);
+      : emitManagedRValueWithCleanup(result, resultTI);
   }
   
   // Convert the result to a native value.
@@ -1157,14 +1156,15 @@ namespace {
     
     // The substitution determines the destination type.
     // FIXME: Archetype destination type?
-    SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
+    auto &destLowering = gen.getTypeLowering(substitutions[0].Replacement);
+    assert(destLowering.isLoadable());
+    SILType destType = destLowering.getLoweredType();
 
     // Take the raw pointer argument and cast it to the destination type.
     SILValue result = gen.B.createRawPointerToRef(loc, args[0].getUnmanagedValue(),
                                                   destType);
     // The result has ownership semantics, so retain it with a cleanup.
-    gen.B.emitRetainValue(loc, result);
-    return gen.emitManagedRValueWithCleanup(result);
+    return gen.emitManagedRetain(loc, result, destLowering);
   }
 
   /// Specialized emitter for Builtin.addressof.
@@ -1317,8 +1317,7 @@ Callee emitSpecializedPropertyFunctionRef(SILGenFunction &gen,
   // FIXME: Can local properties ever be generic?
   if (gen.LocalConstants.count(constant)) {
     SILValue v = gen.LocalConstants[constant];
-    gen.B.emitRetainValue(loc, v);
-    return Callee::forIndirect(gen.emitManagedRValueWithCleanup(v));
+    return Callee::forIndirect(gen.emitManagedRetain(loc, v));
   }
   
   // Get the accessor function. The type will be a polymorphic function if

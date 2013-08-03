@@ -367,6 +367,9 @@ public:
   SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
     return SGM.Types.getLoweredLoadableType(t, uncurryLevel);
   }
+  const TypeLowering &getTypeLowering(SILType type) {
+    return SGM.Types.getTypeLowering(type);
+  }
 
   //===--------------------------------------------------------------------===//
   // Entry points for codegen
@@ -583,8 +586,14 @@ public:
                        RValue &&optionalThisValue,
                        RValue &&optionalSubscripts,
                        RValue &&value);
+
+  ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
+  ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
+                                 const TypeLowering &lowering);
   
   ManagedValue emitManagedRValueWithCleanup(SILValue v);
+  ManagedValue emitManagedRValueWithCleanup(SILValue v,
+                                            const TypeLowering &lowering);
   
   ManagedValue emitLoad(SILLocation loc, SILValue addr, SGFContext C,
                         IsTake_t isTake);

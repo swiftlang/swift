@@ -60,24 +60,25 @@ public:
       // Destructure address-only types by addressing the individual members.
       for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
         CanType fieldCanTy = t.getElementType(i);
-        SILType fieldTy = gen.getLoweredType(fieldCanTy);
+        auto &fieldTI = gen.getTypeLowering(fieldCanTy);
+        SILType fieldTy = fieldTI.getLoweredType();
         SILValue member = gen.B.createTupleElementAddr(SILLocation(),
                                                      v, i,
                                                      fieldTy.getAddressType());
-        if (!fieldTy.isAddressOnly(gen.F.getModule())
-            && !isa<LValueType>(fieldCanTy))
+        assert(fieldTI.getSemanticType() == fieldTy);
+        if (fieldTI.isLoadable() && !isa<LValueType>(fieldCanTy))
           member = gen.B.createLoad(SILLocation(), member);
-        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
+        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member, fieldTI));
       }
     } else {
       // Extract the elements from loadable tuples.
       for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
         CanType fieldCanTy = t.getElementType(i);
-        SILType fieldTy = gen.getLoweredLoadableType(fieldCanTy);
-        SILValue member = gen.B.createTupleExtract(SILLocation(),
-                                                   v, i,
-                                                   fieldTy);
-        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member));
+        auto &fieldTI = gen.getTypeLowering(fieldCanTy);
+        assert(fieldTI.isLoadable());
+        SILValue member = gen.B.createTupleExtract(SILLocation(), v, i,
+                                                   fieldTI.getLoweredType());
+        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member, fieldTI));
       }
     }
   }
@@ -445,7 +446,7 @@ void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
   if (hasCleanup())
     forwardCleanup(gen);
   auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
-  lowering.emitInitializeWithRValue(gen.B, loc, getValue(), address);
+  lowering.emitSemanticInitialize(gen.B, loc, getValue(), address);
 }
 
 void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
@@ -453,5 +454,5 @@ void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
   if (hasCleanup())
     forwardCleanup(gen);
   auto &lowering = gen.getTypeLowering(address.getType().getSwiftRValueType());
-  lowering.emitAssignWithRValue(gen.B, loc, getValue(), address);
+  lowering.emitSemanticAssign(gen.B, loc, getValue(), address);
 }

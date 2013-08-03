@@ -680,25 +680,18 @@ public:
   // Memory management helpers
   //===--------------------------------------------------------------------===//
   
-  /// Emit the instruction sequence needed to destroy (but not deallocate)
-  /// a value in memory.
-  void emitDestroyAddress(SILLocation Loc, SILValue addr) {
-    auto &ti = F.getModule().getTypeLowering(addr.getType());
-    if (ti.isTrivial())
-      return;
-    if (ti.isAddressOnly())
-      return (void)createDestroyAddr(Loc, addr);
-    SILValue v = createLoad(Loc, addr);
-    emitReleaseValueImpl(Loc, v, ti);
+  /// Convenience function for calling emitRetain on the type lowering
+  /// for the non-address value.
+  void emitRetainValue(SILLocation loc, SILValue v) {
+    assert(!v.getType().isAddress());
+    F.getModule().getTypeLowering(v.getType()).emitRetain(*this, loc, v);
   }
-  
-  /// Emit the instruction sequence needed to retain a value, which must not
-  /// be an address.
-  void emitRetainValue(SILLocation Loc, SILValue v) {
-    emitRetainValueImpl(Loc, v, F.getModule().getTypeLowering(v.getType()));
-  }
-  void emitReleaseValue(SILLocation Loc, SILValue v) {
-    emitReleaseValueImpl(Loc, v, F.getModule().getTypeLowering(v.getType()));
+
+  /// Convenience function for calling emitRelease on the type
+  /// lowering for the non-address value.
+  void emitReleaseValue(SILLocation loc, SILValue v) {
+    assert(!v.getType().isAddress());
+    F.getModule().getTypeLowering(v.getType()).emitRelease(*this, loc, v);
   }
 
   /// Generalize a function value.  This is a hack and probably not
@@ -736,11 +729,6 @@ private:
 
     BB->getInsts().insert(InsertPt, TheInst);
   }
-  
-  void emitRetainValueImpl(SILLocation Loc, SILValue v,
-                           const Lowering::TypeLowering &ti);
-  void emitReleaseValueImpl(SILLocation Loc, SILValue v,
-                            const Lowering::TypeLowering &ti);
 };
 
 } // end swift namespace

@@ -202,11 +202,9 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
   ReleaseInst *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
-  
-  bool isTrivial = ABI->getModule()->Types.
-          getTypeLowering(ABI->getElementType()).isTrivial();
-  
-  if (LastRelease == nullptr && !isTrivial) {
+
+  auto &lowering = ABI->getModule()->Types.getTypeLowering(ABI->getElementType());
+  if (LastRelease == nullptr && !lowering.isTrivial()) {
     // If we can't tell where the last release is, we don't know where to insert
     // the destroy_addr for this box.
     DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
@@ -234,8 +232,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   if (LastRelease) {
     SILBuilder B2(LastRelease);
 
-    if (!isTrivial)
-      B2.emitDestroyAddress(ABI->getLoc(), AllocVar);
+    if (!lowering.isTrivial())
+      lowering.emitDestroyAddress(B2, ABI->getLoc(), AllocVar);
 
     B2.createDeallocStack(LastRelease->getLoc(), AllocVar);
   }

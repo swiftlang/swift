@@ -309,6 +309,9 @@ enum class LoweredTypeKind {
   /// A reference type.
   Reference,
 
+  /// An aggregate type that contains references (potentially recursively).
+  AggWithReference,
+
   /// Non-trivial and not loadable.
   AddressOnly
 };
@@ -316,28 +319,27 @@ enum class LoweredTypeKind {
 static LoweredTypeKind classifyType(CanType type, SILModule &M);
 
 namespace {
+  /// A CRTP helper class for doing things that depends on type
+  /// classification.
   template <class Impl, class RetTy>
   class TypeClassifierBase : public CanTypeVisitor<Impl, RetTy> {
     SILModule &M;
-    Impl &asDerived() { return *static_cast<Impl*>(this); }
+    Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
     TypeClassifierBase(SILModule &M) : M(M) {}
+
   public:
-    RetTy handle(CanType type, LoweredTypeKind kind) {
-      switch (kind) {
-      case LoweredTypeKind::AddressOnly:
-        return asDerived().handleAddressOnly(type);
-      case LoweredTypeKind::Reference:
-        return asDerived().handleReference(type);
-      case LoweredTypeKind::Trivial:
-        return asDerived().handleTrivial(type);
-      }
-      llvm_unreachable("bad type lowering kind");
-    }
+    // The subclass should implement:
+    //   RetTy handleAddressOnly(CanType);
+    //   RetTy handleReference(CanType);
+    //   RetTy handleTrivial(CanType);
+    // In addition, if it does not override visitTupleType
+    // and visitAnyStructType, it should also implement:
+    //   RetTy handleAggWithReference(CanType);
 
 #define IMPL(TYPE, LOWERING)                            \
     RetTy visit##TYPE##Type(Can##TYPE##Type type) {     \
-      return asDerived().handle##LOWERING(type);        \
+      return asImpl().handle##LOWERING(type);        \
     }
 
     IMPL(BuiltinInteger, Trivial)
@@ -362,8 +364,8 @@ namespace {
     RetTy visitReferenceStorageType(CanReferenceStorageType type) {
       switch (type->getOwnership()) {
       case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
-      case Ownership::Unowned: return asDerived().handleReference(type);
-      case Ownership::Weak:    return asDerived().handleAddressOnly(type);
+      case Ownership::Unowned: return asImpl().handleReference(type);
+      case Ownership::Weak:    return asImpl().handleAddressOnly(type);
       }
       llvm_unreachable("bad ownership kind");
     }
@@ -371,9 +373,9 @@ namespace {
     // These types are address-only unless they're class-constrained.
     template <class T> RetTy visitAbstracted(T type) {
       if (type->requiresClass()) {
-        return asDerived().handleReference(type);
+        return asImpl().handleReference(type);
       } else {
-        return asDerived().handleAddressOnly(type);        
+        return asImpl().handleAddressOnly(type);        
       }
     }
     RetTy visitArchetypeType(CanArchetypeType type) {
@@ -388,46 +390,55 @@ namespace {
 
     // Unions depend on their enumerators.
     RetTy visitUnionType(CanUnionType type) {
-      return asDerived().visitAnyUnionType(type, type->getDecl());
+      return asImpl().visitAnyUnionType(type, type->getDecl());
     }
     RetTy visitBoundGenericUnionType(CanBoundGenericUnionType type) {
-      return asDerived().visitAnyUnionType(type, type->getDecl());
+      return asImpl().visitAnyUnionType(type, type->getDecl());
     }
     RetTy visitAnyUnionType(CanType type, UnionDecl *D) {
       // FIXME
-      return asDerived().handleTrivial(type);
+      return asImpl().handleTrivial(type);
     }
 
     // Structs depend on their physical fields.
     RetTy visitStructType(CanStructType type) {
-      return asDerived().visitAnyStructType(type, type->getDecl());
+      return asImpl().visitAnyStructType(type, type->getDecl());
     }
     RetTy visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return asDerived().visitAnyStructType(type, type->getDecl());
+      return asImpl().visitAnyStructType(type, type->getDecl());
     }
-    RetTy visitAnyStructType(CanType type, StructDecl *D) {
-      // FIXME: if this struct is resilient to anybody, it needs to be
-      // AddressOnly.
-      auto structKind = LoweredTypeKind::Trivial;
-      for (Decl *member : D->getMembers()) {
-        VarDecl *field = dyn_cast<VarDecl>(member);
-        if (!field || field->isProperty()) continue;
 
-        CanType fieldType = field->getType()->getCanonicalType();
-        auto fieldKind = classifyType(fieldType, M);
-        structKind = std::max(structKind, fieldKind);
-      }
-      return asDerived().handle(type, structKind);
+    RetTy visitAnyStructType(CanType type, StructDecl *D) {
+      // Consult the type lowering.  This means we implicitly get
+      // caching, but that type lowering needs to override this case.
+      auto &lowering = M.Types.getTypeLowering(type);
+      if (lowering.isAddressOnly())
+        return asImpl().handleAddressOnly(type);
+      if (lowering.isTrivial())
+        return asImpl().handleTrivial(type);
+      return asImpl().handleAggWithReference(type);
     }
 
     // Tuples depend on their elements.
     RetTy visitTupleType(CanTupleType type) {
-      auto tupleKind = LoweredTypeKind::Trivial;
+      bool hasReference = false;
       for (auto eltType : type.getElementTypes()) {
-        auto eltKind = classifyType(eltType, M);
-        tupleKind = std::max(tupleKind, eltKind);
+        switch (classifyType(eltType, M)) {
+        case LoweredTypeKind::Trivial:
+          continue;
+        case LoweredTypeKind::AddressOnly:
+          return LoweredTypeKind::AddressOnly;
+        case LoweredTypeKind::Reference:
+        case LoweredTypeKind::AggWithReference:
+          hasReference = true;
+          continue;
+        }
+        llvm_unreachable("bad type classification");
       }
-      return asDerived().handle(type, tupleKind);
+
+      if (hasReference)
+        return asImpl().handleAggWithReference(type);
+      return asImpl().handleTrivial(type);
     }
   };
 
@@ -439,6 +450,9 @@ namespace {
     LoweredTypeKind handleReference(CanType type) {
       return LoweredTypeKind::Reference;
     }
+    LoweredTypeKind handleAggWithReference(CanType type) {
+      return LoweredTypeKind::AggWithReference;
+    }
     LoweredTypeKind handleTrivial(CanType type) {
       return LoweredTypeKind::Trivial;
     }
@@ -449,7 +463,6 @@ namespace {
 }
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M) {
-  // FIXME: caching?
   return TypeClassifier(M).visit(type);
 }
 
@@ -468,10 +481,19 @@ namespace {
       : TypeLowering(type, isTrivial, IsNotAddressOnly) {}
 
   public:
-    void emitInitializeWithRValue(SILBuilder &B, SILLocation loc,
-                                  SILValue value,
-                                  SILValue addr) const override {
-      B.createStore(loc, value, addr);
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      SILValue value = B.createLoad(loc, addr);
+      emitRelease(B, loc, value);
+    }
+
+    void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
+                              SILValue src, SILValue dest, IsTake_t isTake,
+                              IsInitialization_t isInit) const override {
+      SILValue value = emitSemanticLoad(B, loc, src, isTake);
+      auto &semanticLowering =
+        getSemanticTypeLowering(B.getFunction().getParent()->Types);
+      semanticLowering.emitSemanticStore(B, loc, value, dest, isInit);
     }
   };
 
@@ -481,14 +503,177 @@ namespace {
     TrivialTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsTrivial) {}
 
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       B.createStore(loc, value, addr);
+    }
+
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      return B.createLoad(loc, addr);
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      // Trivial
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       // Trivial
+    }
+
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue value) const override {
+      // Trivial
+    }
+
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue value) const override {
+      // Trivial
+    }
+  };
+
+  /// A CRTP helper class for loadable but non-trivial aggregate types.
+  template <class Impl, class IndexType>
+  class LoadableAggTypeLowering : public LoadableTypeLowering {
+  public:
+    /// A non-trivial child of this aggregate type.
+    class NonTrivialChild {
+      /// The index of this child, used to project it out.
+      IndexType Index;
+
+      /// The aggregate's type lowering.
+      const TypeLowering *Lowering;
+    public:
+      NonTrivialChild(IndexType index, const TypeLowering &lowering)
+        : Index(index), Lowering(&lowering) {}
+      const TypeLowering &getLowering() const { return *Lowering; }
+      IndexType getIndex() const { return Index; }
+    };
+
+  private:
+    const Impl &asImpl() const { return static_cast<const Impl&>(*this); }
+    Impl &asImpl() { return static_cast<Impl&>(*this); }
+
+    /// The number of non-trivial children of this aggregate.
+    /// The data follows the instance data.
+    unsigned NumNonTrivial;
+
+  protected:
+    LoadableAggTypeLowering(SILType type, ArrayRef<NonTrivialChild> nonTrivial)
+        : LoadableTypeLowering(type, IsNotTrivial),
+          NumNonTrivial(nonTrivial.size()) {
+      memcpy(reinterpret_cast<NonTrivialChild*>(&asImpl()+1),
+             nonTrivial.data(),
+             NumNonTrivial * sizeof(NonTrivialChild));
+    }
+
+  public:
+    static const Impl *create(TypeConverter &TC, CanType type,
+                              ArrayRef<NonTrivialChild> nonTrivial) {
+      size_t bufferSize =
+        sizeof(Impl) + sizeof(NonTrivialChild) * nonTrivial.size();
+      void *buffer = operator new(bufferSize, TC);
+      auto silType = SILType::getPrimitiveType(type, false);
+      return ::new(buffer) Impl(silType, nonTrivial);
+    }
+
+    ArrayRef<NonTrivialChild> getNonTrivialChildren() const {
+      auto buffer = reinterpret_cast<const NonTrivialChild*>(&asImpl() + 1);
+      return ArrayRef<NonTrivialChild>(buffer, NumNonTrivial);
+    }
+
+    template <class T>
+    void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
+                                SILValue aggValue,
+                                const T &operation) const {
+      for (auto &child : getNonTrivialChildren()) {
+        auto &childLowering = child.getLowering();
+        auto childIndex = child.getIndex();
+        auto childValue = asImpl().emitRValueProject(B, loc, aggValue,
+                                                   childIndex, childLowering);
+        operation(B, loc, childIndex, childValue, childLowering);
+      }
+    }
+
+    typedef void (TypeLowering::*SimpleOperationTy)(SILBuilder &B,
+                                                    SILLocation loc,
+                                                    SILValue value) const;
+    void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
+                                SILValue aggValue,
+                                SimpleOperationTy operation) const {
+      forEachNonTrivialChild(B, loc, aggValue,
+        [operation](SILBuilder &B, SILLocation loc, IndexType index,
+                     SILValue childValue, const TypeLowering &childLowering) {
+          (childLowering.*operation)(B, loc, childValue);
+        });
+    }
+
+
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue newValue, SILValue addr,
+                           IsInitialization_t isInit) const override {
+      SILValue oldValue;
+      if (!isInit) oldValue = B.createLoad(loc, addr);
+      B.createStore(loc, newValue, addr);
+      if (!isInit) asImpl().Impl::emitRelease(B, loc, oldValue);
+    }
+
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      SILValue value = B.createLoad(loc, addr);
+      if (!isTake) asImpl().Impl::emitRetain(B, loc, value);
+      return value;
+    }
+
+    void emitDestroyRValue(SILBuilder &B, SILLocation loc,
+                           SILValue aggValue) const override {
+      forEachNonTrivialChild(B, loc, aggValue,
+                             &TypeLowering::emitDestroyRValue);
+    }
+
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue aggValue) const override {
+      forEachNonTrivialChild(B, loc, aggValue, &TypeLowering::emitRetain);
+    }
+
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue aggValue) const override {
+      forEachNonTrivialChild(B, loc, aggValue, &TypeLowering::emitRelease);
+    }
+  };
+
+  /// A lowering for loadable but non-trivial tuple types.
+  class LoadableTupleTypeLowering
+      : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
+  public:
+    LoadableTupleTypeLowering(SILType type,
+                              ArrayRef<NonTrivialChild> nonTrivial)
+      : LoadableAggTypeLowering(type, nonTrivial) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue tupleValue, unsigned index,
+                               const TypeLowering &eltLowering) const {
+      return B.createTupleExtract(loc, tupleValue, index,
+                                  eltLowering.getLoweredType());
+    }
+  };
+
+  /// A lowering for loadable but non-trivial struct types.
+  class LoadableStructTypeLowering
+      : public LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl*> {
+  public:
+    LoadableStructTypeLowering(SILType type,
+                               ArrayRef<NonTrivialChild> nonTrivial)
+      : LoadableAggTypeLowering(type, nonTrivial) {}
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue structValue, VarDecl *field,
+                               const TypeLowering &fieldLowering) const {
+      return B.createStructExtract(loc, structValue, field,
+                                   fieldLowering.getLoweredType());
     }
   };
 
@@ -499,19 +684,38 @@ namespace {
     ReferenceTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsNotTrivial) {}
 
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       // FIXME: Use assign instruction here? Or maybe have two
       // variants of this function, one for canonical, one for
       // non-canonical.
-      SILValue old = B.createLoad(loc, addr);
+      SILValue old;
+      if (!isInit) old = B.createLoad(loc, addr);
       B.createStore(loc, value, addr);
-      B.emitReleaseValue(loc, old);
+      if (!isInit) B.createRelease(loc, old);
+    }
+
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      SILValue value = B.createLoad(loc, addr);
+      if (!isTake) B.createRetain(loc, value);
+      return value;
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      B.emitReleaseValue(loc, value);
+      B.createRelease(loc, value);
+    }
+
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue value) const override {
+      B.createRetain(loc, value);
+    }
+
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue value) const override {
+      B.createRelease(loc, value);
     }
   };
 
@@ -522,17 +726,11 @@ namespace {
   public:
     FunctionTypeLowering(SILType type) : ReferenceTypeLowering(type) {}
 
-    void emitInitializeWithRValue(SILBuilder &B, SILLocation loc,
-                                  SILValue value,
-                                  SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       value = B.emitGeneralizedValue(loc, value);
-      ReferenceTypeLowering::emitInitializeWithRValue(B, loc, value, addr);
-    }
-
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
-      value = B.emitGeneralizedValue(loc, value);
-      ReferenceTypeLowering::emitAssignWithRValue(B, loc, value, addr);
+      ReferenceTypeLowering::emitSemanticStore(B, loc, value, addr, isInit);
     }
   };
 
@@ -543,23 +741,44 @@ namespace {
       : TypeLowering(type, IsNotTrivial, IsAddressOnly) {}
 
   public:
-    void emitInitializeWithRValue(SILBuilder &B,
-                                  SILLocation loc,
-                                  SILValue value,
-                                  SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       assert(value.getType().isAddress());
-      B.createCopyAddr(loc, value, addr, IsTake, IsInitialization);
+      B.createCopyAddr(loc, value, addr, IsTake, isInit);
     }
 
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
-      assert(value.getType().isAddress());
-      B.createCopyAddr(loc, value, addr, IsTake, IsNotInitialization);
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      llvm_unreachable("type is not loadable");
+    }
+
+    void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
+                              SILValue src, SILValue dest,
+                              IsTake_t isTake,
+                              IsInitialization_t isInit) const override {
+      assert(src.getType().isAddress());
+      B.createCopyAddr(loc, src, dest, isTake, isInit);
+    }
+
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      B.createDestroyAddr(loc, addr);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       B.createDestroyAddr(loc, value);
+    }
+
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
+    }
+
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue value) const override {
+      llvm_unreachable("type is not loadable!");
     }
   };
 
@@ -569,15 +788,22 @@ namespace {
   public:
     WeakTypeLowering(SILType type) : AddressOnlyTypeLowering(type) {}
 
-    void emitInitializeWithRValue(SILBuilder &B,
-                                  SILLocation loc,
-                                  SILValue value,
-                                  SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       // FIXME
     }
 
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
+      // FIXME
+      return SILValue();
+    }
+
+    void emitSemanticLoadInto(SILBuilder &B, SILLocation loc,
+                              SILValue src, SILValue dest,
+                              IsTake_t isTake,
+                              IsInitialization_t isInit) const override {
       // FIXME
     }
   };
@@ -588,22 +814,32 @@ namespace {
     UnownedTypeLowering(SILType type)
       : LoadableTypeLowering(type, IsNotTrivial) {}
 
-    void emitInitializeWithRValue(SILBuilder &B,
-                                  SILLocation loc,
-                                  SILValue value,
-                                  SILValue addr) const override {
+    void emitSemanticStore(SILBuilder &B, SILLocation loc,
+                           SILValue value, SILValue addr,
+                           IsInitialization_t isInit) const override {
       // FIXME
     }
 
-    void emitAssignWithRValue(SILBuilder &B, SILLocation loc,
-                              SILValue value, SILValue addr) const override {
+    SILValue emitSemanticLoad(SILBuilder &B, SILLocation loc,
+                              SILValue addr, IsTake_t isTake) const override {
       // FIXME
+      return SILValue();
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       // We should never deal with r-values of reference storage type.
       llvm_unreachable("should not be manipulating unowned r-values");
+    }
+
+    void emitRetain(SILBuilder &B, SILLocation loc,
+                    SILValue value) const override {
+      B.createUnownedRetain(loc, value);
+    }
+
+    void emitRelease(SILBuilder &B, SILLocation loc,
+                     SILValue value) const override {
+      B.createUnownedRelease(loc, value);
     }
   };
 
@@ -650,6 +886,50 @@ namespace {
                                   SILType::getPrimitiveType(type, true));
       }
       llvm_unreachable("bad ownership kind");
+    }
+
+    const TypeLowering *visitTupleType(CanTupleType tupleType) {
+      typedef LoadableTupleTypeLowering::NonTrivialChild NonTrivialChild;
+      SmallVector<NonTrivialChild, 8> nonTrivialElts;
+
+      unsigned i = 0;
+      for (auto eltType : tupleType.getElementTypes()) {
+        auto &lowering = TC.getTypeLowering(eltType);
+        if (lowering.isAddressOnly())
+          return handleAddressOnly(tupleType);
+        if (!lowering.isTrivial()) {
+          nonTrivialElts.push_back(NonTrivialChild(i, lowering));
+        }
+        ++i;
+      }
+
+      if (nonTrivialElts.empty())
+        return handleTrivial(tupleType);
+      return LoadableTupleTypeLowering::create(TC, tupleType, nonTrivialElts);
+    }
+
+    const TypeLowering *visitAnyStructType(CanType structType, StructDecl *D) {
+      typedef LoadableStructTypeLowering::NonTrivialChild NonTrivialChild;
+      SmallVector<NonTrivialChild, 8> nonTrivialFields;
+
+      // For consistency, if it's anywhere resilient, we need to 
+      if (TC.isAnywhereResilient(D))
+        return handleAddressOnly(structType);
+
+      for (auto field : D->getPhysicalFields()) {
+        auto fieldType = field->getType()->getCanonicalType();
+        auto &lowering = TC.getTypeLowering(fieldType);
+        if (lowering.isAddressOnly())
+          return handleAddressOnly(structType);
+        if (!lowering.isTrivial()) {
+          nonTrivialFields.push_back(NonTrivialChild(field, lowering));
+        }
+      }
+
+      if (nonTrivialFields.empty())
+        return handleTrivial(structType);
+      return LoadableStructTypeLowering::create(TC, structType,
+                                                nonTrivialFields);
     }
   };
 }

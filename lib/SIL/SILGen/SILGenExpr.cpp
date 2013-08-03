@@ -33,12 +33,14 @@ using namespace Lowering;
 
 namespace {
   class CleanupRValue : public Cleanup {
-    SILValue rv;
+    const TypeLowering &Lowering;
+    SILValue Value;
   public:
-    CleanupRValue(SILValue rv) : rv(rv) {}
+    CleanupRValue(const TypeLowering &lowering, SILValue value)
+      : Lowering(lowering), Value(value) {}
     
     void emit(SILGenFunction &gen) override {
-      gen.B.emitReleaseValue(SILLocation(), rv);
+      Lowering.emitDestroyRValue(gen.B, SILLocation(), Value);
     }
   };
   
@@ -53,13 +55,14 @@ namespace {
   };
   
   class CleanupMaterializedValue : public Cleanup {
-    SILValue address;
+    const TypeLowering &Lowering;
+    SILValue Address;
   public:
-    CleanupMaterializedValue(SILValue address) : address(address) {}
+    CleanupMaterializedValue(const TypeLowering &lowering, SILValue address)
+      : Lowering(lowering), Address(address) {}
     
     void emit(SILGenFunction &gen) override {
-      SILValue tmpValue = gen.B.createLoad(SILLocation(), address);
-      gen.B.emitReleaseValue(SILLocation(), tmpValue);
+      Lowering.emitDestroyAddress(gen.B, SILLocation(), Address);
     }
   };
   
@@ -74,14 +77,39 @@ namespace {
   };
 } // end anonymous namespace
 
-ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  if (getTypeLowering(v.getType().getSwiftRValueType()).isTrivial()) {
+ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
+                                               SILValue v) {
+  auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
+  return emitManagedRetain(loc, v, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
+                                               SILValue v,
+                                               const TypeLowering &lowering) {
+  assert(lowering.getLoweredType() == v.getType());
+  if (lowering.isTrivial())
     return ManagedValue(v, ManagedValue::Unmanaged);
-  } else if (v.getType().isAddressOnly(SGM.M)) {
+  assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
+
+  lowering.emitRetain(B, loc, v);
+  return emitManagedRValueWithCleanup(v, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
+  auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
+  return emitManagedRValueWithCleanup(v, lowering);
+}
+
+ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
+                                               const TypeLowering &lowering) {
+  assert(lowering.getLoweredType() == v.getType());
+  if (lowering.isTrivial()) {
+    return ManagedValue(v, ManagedValue::Unmanaged);
+  } else if (lowering.isAddressOnly()) {
     Cleanups.pushCleanup<CleanupMaterializedAddressOnlyValue>(v);
     return ManagedValue(v, getCleanupsDepth());
   } else {
-    Cleanups.pushCleanup<CleanupRValue>(v);
+    Cleanups.pushCleanup<CleanupRValue>(lowering, v);
     return ManagedValue(v, getCleanupsDepth());
   }
 }
@@ -218,8 +246,7 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
   // If this is a reference to a local constant, grab it.
   if (LocalConstants.count(constant)) {
     SILValue v = LocalConstants[constant];
-    B.emitRetainValue(loc, v);
-    return emitManagedRValueWithCleanup(v);
+    return emitManagedRetain(loc, v);
   }
   
   // Otherwise, use a global FunctionRefInst.
@@ -339,20 +366,17 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
                                       SILValue addr,
                                       SGFContext C,
                                       IsTake_t isTake) {
-  if (addr.getType().isAddressOnly(SGM.M)) {
+  auto &lowering = getTypeLowering(addr.getType());
+  if (lowering.isAddressOnly()) {
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, addr.getType(), C);
-    B.createCopyAddr(loc, addr, copy,
-                     isTake, IsInitialization);
-    
-    return emitManagedRValueWithCleanup(copy);
+    lowering.emitSemanticLoadInto(B, loc, addr, copy, isTake, IsInitialization);
+    return emitManagedRValueWithCleanup(copy, lowering);
   }
   
   // Load the loadable value, and retain it if we aren't taking it.
-  SILValue loadedV = B.createLoad(loc, addr);
-  if (!isTake)
-    B.emitRetainValue(loc, loadedV);
-  return emitManagedRValueWithCleanup(loadedV);
+  SILValue loadedV = lowering.emitSemanticLoad(B, loc, addr, isTake);
+  return emitManagedRValueWithCleanup(loadedV, lowering);
 }
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
@@ -400,12 +424,12 @@ SILValue SILGenFunction::getBufferForExprResult(
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   assert(!v.isLValue() && "materializing an lvalue?!");
   // Address-only values are already materialized.
-  if (v.getType().isAddressOnly(SGM.M)) {
+  if (v.getType().isAddress()) {
+    assert(v.getType().isAddressOnly(SGM.M) && "can't materialize an l-value");
     return Materialize{v.getValue(), v.getCleanup()};
   }
-  
-  assert(!v.getType().isAddress() &&
-         "can't materialize a reference");
+
+  auto &lowering = getTypeLowering(v.getType().getSwiftType());
   
   // We don't use getBufferForExprResult here because the result of a
   // MaterializeExpr is *not* the value, but an lvalue reference to the value.
@@ -413,8 +437,8 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
   v.forwardInto(*this, loc, tmpMem);
   
   CleanupsDepth valueCleanup = CleanupsDepth::invalid();
-  if (!getTypeLowering(v.getType().getSwiftType()).isTrivial()) {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
+  if (!lowering.isTrivial()) {
+    Cleanups.pushCleanup<CleanupMaterializedValue>(lowering, tmpMem);
     valueCleanup = getCleanupsDepth();
   }
   
@@ -1622,7 +1646,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   
   // Get the 'this' decl and type.
   VarDecl *thisDecl = ctor->getImplicitThisDecl();
-  SILType thisTy = getLoweredType(thisDecl->getType());
+  auto &lowering = getTypeLowering(thisDecl->getType());
+  SILType thisTy = lowering.getLoweredType();
   assert(!thisTy.hasReferenceSemantics() && "can't emit a ref type ctor here");
   assert(!ctor->getAllocThisExpr() && "alloc_this expr for value type?!");
 
@@ -1665,7 +1690,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   }
   
   // If 'this' is address-only, copy 'this' into the indirect return slot.
-  if (thisTy.isAddressOnly(SGM.M)) {
+  if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&
            "no indirect return for address-only ctor?!");
     SILValue thisBox = VarLocs[thisDecl].box;
@@ -1683,7 +1708,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILValue thisValue = B.createLoad(ctor, thisLV);
   if (SILValue thisBox = VarLocs[thisDecl].box) {
     // We have to do a retain because someone else may be using the box.
-    B.emitRetainValue(ctor, thisValue);
+    lowering.emitRetain(B, ctor, thisValue);
+
+    // Release the box.
     B.createRelease(ctor, thisBox);
   } else {
     // We can just take ownership from the stack slot and consider it

@@ -435,8 +435,8 @@ struct ArgumentInitVisitor :
       break;
 
     case Initialization::Kind::SingleBuffer:
-      gen.getTypeLowering(ty).emitInitializeWithRValue(initB, loc, arg,
-                                                       I->getAddress());
+      gen.getTypeLowering(ty).emitSemanticInitialize(initB, loc, arg,
+                                                     I->getAddress());
       break;
 
     case Initialization::Kind::Ignored:
@@ -1065,15 +1065,16 @@ static void emitObjCReturnValue(SILGenFunction &gen,
 static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
                                            SILLocation loc,
                                            SILValue arg) {
+  auto &lowering = gen.getTypeLowering(arg.getType());
   // If address-only, make a +1 copy and operate on that.
-  if (arg.getType().isAddressOnly(gen.SGM.M)) {
+  if (lowering.isAddressOnly()) {
     SILValue tmp = gen.B.createAllocStack(loc, arg.getType());
     gen.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
     gen.enterDeallocStackCleanup(loc, tmp);
     return tmp;
   }
   
-  gen.B.emitRetainValue(loc, arg);
+  lowering.emitRetain(gen.B, loc, arg);
   return arg;
 }
 
@@ -1190,26 +1191,28 @@ void SILGenFunction::emitObjCPropertyGetter(SILDeclRef getter) {
     assert(args.size() == 1 && "wrong number of arguments for getter");
     thisValue = args[0];
   }
-  
+
+  auto &fieldLowering = getTypeLowering(var->getType());
+
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
-                                         swiftResultTy.getAddressType());
+                             fieldLowering.getLoweredType().getAddressType());
   if (indirectReturn) {
     assert(ownership.getReturn() == OwnershipConventions::Return::Unretained
            && "any address-only type should appear Unretained to ObjC");
-    
-    // "Take" because we return at +0.
-    B.createCopyAddr(var, addr, indirectReturn, IsTake, IsInitialization);
+    // This is basically returning +1, but there's no obvious
+    // alternative, and there really isn't an ObjC convention for
+    // transferring ownership in aggregates.
+    fieldLowering.emitSemanticLoadInto(B, var, addr, indirectReturn,
+                                       IsNotTake, IsInitialization);
     B.createRelease(getter.getDecl(), thisValue);
     B.createReturn(var, emitEmptyTuple(var));
     return;
   }
 
   // Bridge the result.
-  SILValue result = B.createLoad(var, addr);
-  B.createRelease(getter.getDecl(), thisValue);
-  
-  B.emitRetainValue(getter.getDecl(), result);
-  return emitObjCReturnValue(*this, getter.getDecl(), result, objcResultTy,
+  SILValue result = fieldLowering.emitSemanticLoad(B, var, addr, IsNotTake);
+  B.createRelease(var, thisValue);
+  return emitObjCReturnValue(*this, var, result, objcResultTy,
                              ownership);
 }
 
@@ -1235,10 +1238,10 @@ void SILGenFunction::emitObjCPropertySetter(SILDeclRef setter) {
   SILValue setValue = args[0];
   
   // If the native property is physical, store to it.
-  auto &lowering = getTypeLowering(var->getType());
+  auto &varTI = getTypeLowering(var->getType());
   SILValue addr = B.createRefElementAddr(var, thisValue, var,
-                                 lowering.getLoweredType().getAddressType());
-  lowering.emitAssignWithRValue(B, setter.getDecl(), setValue, addr);
+                                 varTI.getLoweredType().getAddressType());
+  varTI.emitSemanticAssign(B, setter.getDecl(), setValue, addr);
   
   B.createRelease(setter.getDecl(), thisValue);
   B.createReturn(var, emitEmptyTuple(var));
