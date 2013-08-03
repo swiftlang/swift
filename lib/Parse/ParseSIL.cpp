@@ -1084,11 +1084,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   case ValueKind::UnownedRetainInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedRetainInst(SILLocation(), Val);
+    ResultVal = B.createUnownedRetain(SILLocation(), Val);
     break;
   case ValueKind::UnownedReleaseInst:
     if (parseTypedValueRef(Val)) return true;
-    ResultVal = B.createUnownedReleaseInst(SILLocation(), Val);
+    ResultVal = B.createUnownedRelease(SILLocation(), Val);
     break;
   case ValueKind::DestroyAddrInst:
     if (parseTypedValueRef(Val)) return true;

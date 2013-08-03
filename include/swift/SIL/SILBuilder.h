@@ -589,12 +589,12 @@ public:
   createRetainAutoreleased(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) RetainAutoreleasedInst(Loc, Operand));
   }
-  UnownedRetainInst *createUnownedRetainInst(SILLocation Loc,
-                                             SILValue Operand) {
+  UnownedRetainInst *createUnownedRetain(SILLocation Loc,
+                                         SILValue Operand) {
     return insert(new (F.getModule()) UnownedRetainInst(Loc, Operand));
   }
-  UnownedReleaseInst *createUnownedReleaseInst(SILLocation Loc,
-                                               SILValue Operand) {
+  UnownedReleaseInst *createUnownedRelease(SILLocation Loc,
+                                           SILValue Operand) {
     return insert(new (F.getModule()) UnownedReleaseInst(Loc, Operand));
   }
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
