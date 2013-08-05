@@ -1308,7 +1308,7 @@ Restart:
     if (InSILMode)
       return formToken(tok::sil_at_sign, TokStart);
     diagnose(CurPtr-1, diag::lex_invalid_character);
-    return formToken(tok::unknown, TokStart);
+    goto Restart;
 
   case '#':
     // # is only a token in SIL mode.
@@ -1323,7 +1323,7 @@ Restart:
       goto Restart;
     }
     diagnose(CurPtr-1, diag::lex_invalid_character);
-    return formToken(tok::unknown, TokStart);
+    goto Restart;
 
   // Operator characters.
   case '/':
