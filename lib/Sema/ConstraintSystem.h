@@ -2134,7 +2134,7 @@ private:
   /// \param protocol The protocol to which the type should conform.
   /// \param locator Locator describing where this constraint occurred.
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
-                                            ConstraintLocator *locator);
+                                            ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);

@@ -1733,10 +1733,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     SmallVector<ProtocolDecl *, 4> protocols;
 
     if (type2->isExistentialType(protocols)) {
-      auto fullLocator = getConstraintLocator(locator);
       bool addedConstraint = false;
       for (auto proto : protocols) {
-        switch (simplifyConformsToConstraint(type1, proto, fullLocator)) {
+        switch (simplifyConformsToConstraint(type1, proto, locator)) {
         case SolutionKind::Solved:
         case SolutionKind::TriviallySolved:
           break;
@@ -2051,10 +2050,10 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyConformsToConstraint(Type type,
-                                               ProtocolDecl *protocol,
-                                               ConstraintLocator *locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
+                                 Type type,
+                                 ProtocolDecl *protocol,
+                                 ConstraintLocatorBuilder locator) {
   // Dig out the fixed type to which this type refers.
   while (true) {
     TypeVariableType *typeVar;
@@ -2078,7 +2077,8 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
   if (TC.conformsToProtocol(type, protocol))
     return SolutionKind::TriviallySolved;
 
-  recordFailure(locator, Failure::DoesNotConformToProtocol, type,
+  recordFailure(getConstraintLocator(locator),
+                Failure::DoesNotConformToProtocol, type,
                 protocol->getDeclaredType());
   return SolutionKind::Error;
 }
