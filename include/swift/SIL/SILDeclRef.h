@@ -221,8 +221,8 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
   }
-  static swift::SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0, false, 0);
+  static SILDeclRef getTombstoneKey() {
+    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, 0, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
