@@ -1259,40 +1259,35 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::AllocStackInst:
-  case ValueKind::AllocRefInst: {
+  case ValueKind::AllocRefInst:
+  case ValueKind::MetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty))
       return true;
     
     if (Opcode == ValueKind::AllocStackInst)
       ResultVal = B.createAllocStack(SILLocation(), Ty);
-    else {
-      assert(Opcode == ValueKind::AllocRefInst);
+    else if (Opcode == ValueKind::AllocRefInst) {
       ResultVal = B.createAllocRef(SILLocation(), Ty);
+    } else {
+      assert(Opcode == ValueKind::MetatypeInst);
+      ResultVal = B.createMetatype(SILLocation(), Ty);
     }
     break;
   }
-  case ValueKind::DeallocRefInst: {
+  case ValueKind::DeallocRefInst:
+  case ValueKind::DeallocStackInst:
     if (parseTypedValueRef(Val))
       return true;
 
-    ResultVal = B.createDeallocRef(SILLocation(), Val);
+    if (Opcode == ValueKind::DeallocRefInst)
+      ResultVal = B.createDeallocRef(SILLocation(), Val);
+    else {
+      assert(Opcode == ValueKind::DeallocStackInst);
+      ResultVal = B.createDeallocStack(SILLocation(), Val);
+    }
+
     break;
-  }
-  case ValueKind::DeallocStackInst: {
-    if (parseTypedValueRef(Val))
-      return true;
-    
-    ResultVal = B.createDeallocStack(SILLocation(), Val);
-    break;
-  }
-  case ValueKind::MetatypeInst: {
-    SILType Ty;
-    if (parseSILType(Ty))
-      return true;
-    ResultVal = B.createMetatype(SILLocation(), Ty);
-    break;
-  }
   case ValueKind::ArchetypeMetatypeInst:
   case ValueKind::ClassMetatypeInst:
   case ValueKind::ProtocolMetatypeInst: {
