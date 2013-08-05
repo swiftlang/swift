@@ -413,7 +413,12 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
   bool IsOptimized = Opts.OptLevel > 0;
   unsigned Flags = 0;
 
-  if (Name.empty())
+  // Mark everything that is not visible from the source code (i.e.,
+  // does not have a Swift name) as artificial, so the debugger can
+  // ignore it. We make an exception for top_level_code, which albeit
+  // it does not have a Swift name, it does appear prominently in the
+  // source code.
+  if (Name.empty() && LinkageName != "top_level_code")
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
   if (FnTy && FnTy->isBlock())
