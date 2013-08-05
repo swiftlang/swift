@@ -796,6 +796,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
+    .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
     .Case("downcast", ValueKind::DowncastInst)
@@ -1269,6 +1270,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       assert(Opcode == ValueKind::AllocRefInst);
       ResultVal = B.createAllocRef(SILLocation(), Ty);
     }
+    break;
+  }
+  case ValueKind::DeallocRefInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+
+    ResultVal = B.createDeallocRef(SILLocation(), Val);
     break;
   }
   case ValueKind::DeallocStackInst: {
