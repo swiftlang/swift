@@ -3152,28 +3152,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
       return true;
     }
 
-    // FIXME: Dumping constraints by default due to crummy diagnostics.
-    if (getLangOpts().DebugConstraintSolver || true) {
-      log << "---Solved constraints---\n";
-      cs.dump();
-
-      if (!viable.empty()) {
-        unsigned idx = 0;
-        for (auto &solution : viable) {
-          log << "---Solution #" << ++idx << "---\n";
-          solution.dump(&Context.SourceMgr);
-        }
-      }
-
-      if (viable.size() == 0)
-        log << "No solution found.\n";
-      else if (viable.size() == 1)
-        log << "Unique solution found.\n";
-      else {
-        log << "Found " << viable.size() << " potential solutions.\n";
-      }
-    }
-
     // FIXME: Crappy diagnostic.
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
@@ -3245,28 +3223,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
       return true;
-    }
-
-    // FIXME: Dumping constraints by default due to crummy diagnostics.
-    if (getLangOpts().DebugConstraintSolver || true) {
-      log << "---Solved constraints---\n";
-      cs.dump();
-
-      if (!viable.empty()) {
-        unsigned idx = 0;
-        for (auto &solution : viable) {
-          log << "---Solution #" << ++idx << "---\n";
-          solution.dump(&Context.SourceMgr);
-        }
-      }
-
-      if (viable.size() == 0)
-        log << "No solution found.\n";
-      else if (viable.size() == 1)
-        log << "Unique solution found.\n";
-      else {
-        log << "Found " << viable.size() << " potential solutions.\n";
-      }
     }
 
     // FIXME: Crappy diagnostic.
@@ -3398,28 +3354,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       return true;
     }
 
-    // FIXME: Dumping constraints by default due to crummy diagnostics.
-    if (getLangOpts().DebugConstraintSolver || true) {
-      log << "---Solved constraints---\n";
-      cs.dump();
-
-      if (!viable.empty()) {
-        unsigned idx = 0;
-        for (auto &solution : viable) {
-          log << "---Solution #" << ++idx << "---\n";
-          solution.dump(&Context.SourceMgr);
-        }
-      }
-
-      if (viable.size() == 0)
-        log << "No solution found.\n";
-      else if (viable.size() == 1)
-        log << "Unique solution found.\n";
-      else {
-        log << "Found " << viable.size() << " potential solutions.\n";
-      }
-    }
-
     // FIXME: Crappy diagnostic.
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
@@ -3523,28 +3457,6 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
       return true;
-    }
-
-    // FIXME: Dumping constraints by default due to crummy diagnostics.
-    if (getLangOpts().DebugConstraintSolver || true) {
-      log << "---Solved constraints---\n";
-      cs.dump();
-
-      if (!viable.empty()) {
-        unsigned idx = 0;
-        for (auto &solution : viable) {
-          log << "---Solution #" << ++idx << "---\n";
-          solution.dump(&Context.SourceMgr);
-        }
-      }
-
-      if (viable.size() == 0)
-        log << "No solution found.\n";
-      else if (viable.size() == 1)
-        log << "Unique solution found.\n";
-      else {
-        log << "Found " << viable.size() << " potential solutions.\n";
-      }
     }
 
     // FIXME: Crappy diagnostic.
@@ -3753,28 +3665,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
       return true;
-    }
-
-    // FIXME: Dumping constraints by default due to crummy diagnostics.
-    if (getLangOpts().DebugConstraintSolver || true) {
-      log << "---Solved constraints---\n";
-      cs.dump();
-
-      if (!viable.empty()) {
-        unsigned idx = 0;
-        for (auto &solution : viable) {
-          log << "---Solution #" << ++idx << "---\n";
-          solution.dump(&Context.SourceMgr);
-        }
-      }
-
-      if (viable.size() == 0)
-        log << "No solution found.\n";
-      else if (viable.size() == 1)
-        log << "Unique solution found.\n";
-      else {
-        log << "Found " << viable.size() << " potential solutions.\n";
-      }
     }
 
     // FIXME: Crappy diagnostic.
