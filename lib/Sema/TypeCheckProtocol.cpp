@@ -247,8 +247,7 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     witnessResultType->getUnlabeledType(tc.Context),
-                     reqResultType->getUnlabeledType(tc.Context));
+                     witnessResultType, reqResultType);
     // FIXME: Check whether this has already failed.
 
     // Parameter types and kinds must match. Start by decomposing the input
@@ -259,16 +258,14 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
     // If the number of parameters doesn't match, we're done.
     if (reqParams.size() != witnessParams.size())
-      return RequirementMatch(witness, MatchKind::TypeConflict,
-                              witnessType->getUnlabeledType(tc.Context));
+      return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
     // Match each of the parameters.
     for (unsigned i = 0, n = reqParams.size(); i != n; ++i) {
       // Variadic bits must match.
       // FIXME: Specialize the match failure kind
       if (reqParams[i].isVararg() != witnessParams[i].isVararg())
-        return RequirementMatch(witness, MatchKind::TypeConflict,
-                                witnessType->getUnlabeledType(tc.Context));
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
 
       // Check the parameter names.
       if (reqParams[i].getName() != witnessParams[i].getName()) {
@@ -286,24 +283,22 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 
       // Check whether the parameter types match.
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       witnessParams[i].getType()->getUnlabeledType(tc.Context),
-                       reqParams[i].getType()->getUnlabeledType(tc.Context));
+                       witnessParams[i].getType(), reqParams[i].getType());
       // FIXME: Check whether this failed.
 
       // FIXME: Consider default arguments here?
     }
   } else {
-    // Simple case: remove labels and add the constraint.
+    // Simple case: add the constraint.
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     openWitnessType->getUnlabeledType(tc.Context),
-                     reqType->getUnlabeledType(tc.Context));
+                     openWitnessType, reqType);
   }
 
   // Try to solve the system.
   SmallVector<constraints::Solution, 1> solutions;
   if (cs.solve(solutions, /*allowFreeTypeVariables=*/true)) {
     return RequirementMatch(witness, MatchKind::TypeConflict,
-                            witnessType->getUnlabeledType(tc.Context));
+                            witnessType);
   }
   auto &solution = solutions.front();
   
