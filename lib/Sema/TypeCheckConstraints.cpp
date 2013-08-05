@@ -285,18 +285,9 @@ ConstraintSystem::~ConstraintSystem() { }
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
   for (auto tv : TypeVariables) {
-    // We only care about the representatives.
-    if (getRepresentative(tv) != tv)
-      continue;
-
-    if (auto fixed = getFixedType(tv)) {
-      if (simplifyType(fixed)->hasTypeVariable())
-        return false;
-
-      continue;
+    if (!tv->getImpl().hasRepresentativeOrFixed()) {
+      return true;
     }
-    
-    return true;
   }
   
   return false;

@@ -106,6 +106,23 @@ public:
     return reinterpret_cast<TypeVariableType *>(this) - 1;
   }
 
+  /// \brief Retrieve the type variable associated with this implementation.
+  const TypeVariableType *getTypeVariable() const {
+    return reinterpret_cast<const TypeVariableType *>(this) - 1;
+  }
+
+  /// \brief Check whether this type variable either has a representative that
+  /// is not itself or has a fixed type binding.
+  bool hasRepresentativeOrFixed() const {
+    // If we have a fixed type, we're done.
+    if (!ParentOrFixed.is<TypeVariableType *>())
+      return true;
+
+    // Check whether the representatative is different from our own type
+    // variable.
+    return ParentOrFixed.get<TypeVariableType *>() != getTypeVariable();
+  }
+
   /// \brief Record the current type-variable binding.
   void recordBinding(constraints::SavedTypeVariableBindings &record) {
     record.push_back(constraints::SavedTypeVariableBinding(getTypeVariable()));
