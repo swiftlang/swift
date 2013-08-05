@@ -1277,7 +1277,6 @@ static Type getFixedTypeRecursive(ConstraintSystem &cs,
   typeVar = desugar->getAs<TypeVariableType>();
   if (typeVar) {
     if (auto fixed = getFixedTypeRecursiveHelper(cs, typeVar)) {
-      fixed = cs.simplifyType(fixed);
       type = fixed;
       typeVar = nullptr;
     }
@@ -2075,26 +2074,19 @@ ConstraintSystem::simplifyConformsToConstraint(Type type,
                                                ProtocolDecl *protocol,
                                                ConstraintLocator *locator) {
   // Dig out the fixed type to which this type refers.
-  // FIXME: Could use getFixedTypeRecursive here, but we don't want to
-  // simplify in the last step. It's unnecessary.
   while (true) {
-    // Look through lvalues.
+    TypeVariableType *typeVar;
+    type = getFixedTypeRecursive(*this, type, typeVar);
+
+    // If we hit a type variable without a fixed type, we can't
+    // solve this yet.
+    if (typeVar)
+      return SolutionKind::Unsolved;
+
     auto rvalueType = type->getRValueType();
     if (rvalueType.getPointer() != type.getPointer()) {
       type = rvalueType;
       continue;
-    }
-
-    // Look through type variables.
-    if (auto typeVar = type->getAs<TypeVariableType>()) {
-      if (auto fixed = getFixedType(typeVar)) {
-        type = fixed;
-        continue;
-      }
-
-      // If we hit a type variable without a fixed type, we can't
-      // solve this yet.
-      return SolutionKind::Unsolved;
     }
 
     break;
