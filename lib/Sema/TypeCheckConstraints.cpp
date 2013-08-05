@@ -1270,7 +1270,7 @@ static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
 }
 
 /// \brief Retrieve the fixed type for this type variable, looking through a
-/// chain of type variables to get at the undlying type.
+/// chain of type variables to get at the underlying type.
 static Type getFixedTypeRecursive(ConstraintSystem &cs,
                                   Type type, TypeVariableType *&typeVar) {
   auto desugar = type->getDesugaredType();
@@ -2074,20 +2074,33 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConformsToConstraint(Type type,
                                                ProtocolDecl *protocol,
                                                ConstraintLocator *locator) {
-  // If the type still contains a type variable, we can't solve this constraint
-  // now.
-  // FIXME: Eventually, we'll be able to check if an arbitrary nominal type
-  // conforms to the protocol. However, we can't do so yet.
-  type = simplifyType(type)->getRValueType();
-  if (type->hasTypeVariable())
-    return SolutionKind::Unsolved;
+  // Dig out the fixed type to which this type refers.
+  // FIXME: Could use getFixedTypeRecursive here, but we don't want to
+  // simplify in the last step. It's unnecessary.
+  while (true) {
+    // Look through lvalues.
+    auto rvalueType = type->getRValueType();
+    if (rvalueType.getPointer() != type.getPointer()) {
+      type = rvalueType;
+      continue;
+    }
 
-  TypeLoc typeLoc = TypeLoc::withoutLoc(type);
-  if (TC.validateType(typeLoc, /*allowUnboundGenerics=*/true)) {
-    // FIXME: record failure.
-    return SolutionKind::Error;
+    // Look through type variables.
+    if (auto typeVar = type->getAs<TypeVariableType>()) {
+      if (auto fixed = getFixedType(typeVar)) {
+        type = fixed;
+        continue;
+      }
+
+      // If we hit a type variable without a fixed type, we can't
+      // solve this yet.
+      return SolutionKind::Unsolved;
+    }
+
+    break;
   }
 
+  // Check whether this type conforms to the protocol.
   if (TC.conformsToProtocol(type, protocol))
     return SolutionKind::TriviallySolved;
 

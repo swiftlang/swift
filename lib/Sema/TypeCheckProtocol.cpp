@@ -1345,6 +1345,12 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
     // If we did not find explicit conformance, we're done.
     if (!ExplicitConformance) {
+      // If the type has a type variable, there's nothing to record. Just
+      // report failure.
+      if (T->hasTypeVariable()) {
+        return false;
+      }
+
       // Cache the failure
       Context.ConformsTo[Key] = ConformanceEntry(nullptr, false);
 
@@ -1375,9 +1381,16 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       return false;
     }
 
-    // We found explicit conformance. Compute and record the conformance below.
+    // We found explicit conformance.
     assert(!isa<ProtocolDecl>(ExplicitConformance) &&
            "Cannot get a protocol here");
+
+    // If we don't need to compute the conformance, we're done.
+    if (!Conformance) {
+      return true;
+    }
+
+    // Compute the actual conformance below.
 
     // If the nominal type in which we found the conformance is not the same
     // as the type we asked for, it's an inherited type.
