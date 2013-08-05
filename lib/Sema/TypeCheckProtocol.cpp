@@ -683,6 +683,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     unsigned numViable = 0;
     unsigned bestIdx = 0;
     for (auto witness : witnesses) {
+      // Don't match anything in a protocol.
+      // FIXME: When default implementations come along, we can try to match
+      // these when they're default implementations coming from another
+      // (unrelated) protocol.
+      if (isa<ProtocolDecl>(witness->getDeclContext())) {
+        continue;
+      }
+
       auto match = matchWitness(TC, Proto, Requirement, reqType, T, witness,
                                 unresolvedAssocTypes);
       if (match.isViable()) {
