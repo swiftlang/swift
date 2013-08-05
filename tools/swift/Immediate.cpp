@@ -259,7 +259,6 @@ static bool IRGenImportedModules(TranslationUnit *TU,
 
     // FIXME: Need to check whether this is actually safe in general.
     llvm::Module SubModule(SubTU->Name.str(), Module.getContext());
-    performCaptureAnalysis(SubTU);
     llvm::OwningPtr<SILModule> SILMod(performSILGeneration(SubTU));
     performIRGeneration(Options, &SubModule, SubTU, SILMod.get());
 
@@ -938,7 +937,6 @@ class REPLEnvironment {
     
     // IRGen the current line(s).
     llvm::Module LineModule("REPLLine", LLVMContext);
-    performCaptureAnalysis(TU, RC.CurIRGenElem);
     
     llvm::OwningPtr<SILModule> sil(performSILGeneration(TU, RC.CurIRGenElem));
     
