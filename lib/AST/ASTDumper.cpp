@@ -341,7 +341,6 @@ namespace {
       OS << '\'';
 
       if (VD->hasFixedLifetime()) OS << " hasFixedLifetime=true";
-      if (VD->isNeverUsedAsLValue()) OS << " neverUsedAsLValue=true";
     }
 
     void visitTranslationUnit(const TranslationUnit *TU) {

@@ -30,7 +30,6 @@ static void VisitValueDecl(ValueDecl *VD) {
   if (VD->needsCapture()) {
     // We assume that these flags are correct unless
     // we show otherwise in walkToExprPre.
-    VD->setNeverUsedAsLValue(true);
     VD->setHasFixedLifetime(true);
   }
 }
@@ -113,8 +112,6 @@ class CaptureAnalysisVisitor : public ASTWalker {
       for (Expr *Elem : TE->getElements())
         analyzeAssignmentLHS(Elem);
     } else if (ValueDecl *D = FindValueDecl(E)) {
-      if (D->getDeclContext()->isLocalContext())
-        D->setNeverUsedAsLValue(false);
     } else {
       E->walk(*this);
     }
@@ -136,17 +133,11 @@ class CaptureAnalysisVisitor : public ASTWalker {
       // FIXME: Doesn't handle implicit address-of operations. We need
       // an AST for that case.
       if (ValueDecl *D = FindValueDecl(AOE->getSubExpr())) {
-        if (D->getDeclContext()->isLocalContext())
-          D->setNeverUsedAsLValue(false);
         return { false, E };
       }
     } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
       // We can't reason about the decl referred to by a general DeclRefExpr.
       // We may have implicitly taken it's address.
-      ValueDecl *D = DRE->getDecl();
-      if (D->getDeclContext()->isLocalContext()) {
-        D->setNeverUsedAsLValue(false);
-      }
     } else if (CapturingExpr *CE = dyn_cast<CapturingExpr>(E)) {
       // Initialize flags for the function arguments.
       if (FuncExpr *FE = dyn_cast<FuncExpr>(CE)) {

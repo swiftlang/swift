@@ -101,10 +101,6 @@ class alignas(8) Decl {
     // The following flags are not necessarily meaningful for all
     // kinds of value-declarations.
 
-    // NeverUsedAsLValue - Whether this decl is ever used as an lvalue 
-    // (i.e. used in a context where it could be modified).
-    unsigned NeverUsedAsLValue : 1;
-
     // HasFixedLifetime - Whether the lifetime of this decl matches its
     // scope (i.e. the decl isn't captured, so it can be allocated as part of
     // the stack frame.)
@@ -935,7 +931,6 @@ class ValueDecl : public Decl {
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
     : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false), Ty(ty) {
-    ValueDeclBits.NeverUsedAsLValue = false;
     ValueDeclBits.HasFixedLifetime = false;
   }
 
@@ -1002,17 +997,9 @@ public:
   void setHasFixedLifetime(bool flag) {
     ValueDeclBits.HasFixedLifetime = flag;
   }
-  void setNeverUsedAsLValue(bool flag) {
-    ValueDeclBits.NeverUsedAsLValue = flag;
-  }
-
   bool hasFixedLifetime() const {
     return ValueDeclBits.HasFixedLifetime;
   }
-  bool isNeverUsedAsLValue() const {
-    return ValueDeclBits.NeverUsedAsLValue;
-  }
-
   /// isInstanceMember - Determine whether this value is an instance member
   /// of a union or protocol.
   bool isInstanceMember() const;
