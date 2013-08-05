@@ -194,6 +194,13 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
+  /// Read the underlying conformance for a specialized or inherited
+  /// protocol conformance.
+  ProtocolConformance *
+  readUnderlyingConformance(ProtocolDecl *proto,
+                            serialization::DeclID nominalID,
+                            serialization::IdentifierID moduleOrTypeID);
+
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///
   /// The conformance will be newly-created; it's likely that it already exists

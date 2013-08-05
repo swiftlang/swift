@@ -666,10 +666,10 @@ namespace decls_block {
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
     DeclIDField,         // the protocol
-    DeclIDField,         // the nominal type decl for the normal conformance,
+    DeclIDField,         // the nominal type decl for the generic conformance,
                          // or zero to indicate that the generic conformance
                          // is in the following record
-    IdentifierIDField,   // the module in which the normal conformance occurs,
+    IdentifierIDField,   // the module in which the generic conformance occurs,
                          // or the conforming type for the generic conformance
                          // record that follows
     BCVBR<5>,            // type mapping count
@@ -681,7 +681,13 @@ namespace decls_block {
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
-    DeclIDField // the protocol
+    DeclIDField,       // the protocol
+    DeclIDField,       // the nominal type decl for the inherited conformance,
+                       // or zero to indicate that the inherited conformance
+                       // is in the following record
+    IdentifierIDField  // the module in which the inherited conformance occurs,
+                       // or the conforming type for the inherited conformance
+                       // record that follows
   >;
 
   using DeclContextLayout = BCRecordLayout<

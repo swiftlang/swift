@@ -198,6 +198,47 @@ Pattern *ModuleFile::maybeReadPattern() {
   }
 }
 
+ProtocolConformance *
+ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
+                                      DeclID nominalID,
+                                      IdentifierID moduleOrTypeID) {
+  if (!nominalID) {
+    // The underlying conformance is in the following record.
+    return maybeReadConformance(getType(moduleOrTypeID))->second;
+  }
+
+  // Dig out the protocol conformance within the nominal declaration.
+  auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+  Module *owningModule;
+  if (moduleOrTypeID == 0)
+    owningModule = ModuleContext;
+  else
+    owningModule = getModule(getIdentifier(moduleOrTypeID-1));
+  (void)owningModule; // FIXME: Currently only used for checking.
+
+  // Search protocols
+  for (unsigned i = 0, n = nominal->getProtocols().size(); i != n; ++i) {
+    if (nominal->getProtocols()[i] == proto) {
+      // FIXME: Eventually, filter by owning module.
+      assert(nominal->getModuleContext() == owningModule);
+      return nominal->getConformances()[i];
+    }
+  }
+
+  // Search extensions.
+  for (auto ext : nominal->getExtensions()) {
+    for (unsigned i = 0, n = ext->getProtocols().size(); i != n; ++i) {
+      if (ext->getProtocols()[i] == proto) {
+        // FIXME: Eventually, filter by owning module.
+        assert(ext->getModuleContext() == owningModule);
+        return ext->getConformances()[i];
+      }
+    }
+  }
+
+  llvm_unreachable("Unable to find underlying conformance");
+}
+
 Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   using namespace decls_block;
 
@@ -222,8 +263,6 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     break;
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
-    lastRecordOffset.reset();
-
     DeclID protoID;
     DeclID nominalID;
     IdentifierID moduleOrTypeID;
@@ -262,50 +301,11 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     }
     assert(rawIDIter <= rawIDs.end() && "read too much");
 
+    ProtocolConformance *genericConformance
+      = readUnderlyingConformance(proto, nominalID, moduleOrTypeID);
+
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
-
-    ProtocolConformance *genericConformance = nullptr;
-
-    if (nominalID) {
-      // Dig out the protocol conformance within the nominal declaration.
-      auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
-      Module *owningModule;
-      if (moduleOrTypeID == 0)
-        owningModule = ModuleContext;
-      else
-        owningModule = getModule(getIdentifier(moduleOrTypeID-1));
-      (void)owningModule; // FIXME: Currently only used for checking.
-
-      for (unsigned i = 0, n = nominal->getProtocols().size(); i != n; ++i) {
-        if (nominal->getProtocols()[i] == proto) {
-          genericConformance = nominal->getConformances()[i];
-          // FIXME: Eventually, filter by owning module.
-          assert(nominal->getModuleContext() == owningModule);
-          break;
-        }
-      }
-
-      if (!genericConformance) {
-        for (auto ext : nominal->getExtensions()) {
-          for (unsigned i = 0, n = ext->getProtocols().size(); i != n; ++i) {
-            if (ext->getProtocols()[i] == proto) {
-              genericConformance = ext->getConformances()[i];
-              // FIXME: Eventually, filter by owning module.
-              assert(ext->getModuleContext() == owningModule);
-              break;
-            }
-          }
-
-          if (genericConformance)
-            break;
-        }
-      }
-    } else {
-      // The generic conformance is in the following record.
-      genericConformance
-        = maybeReadConformance(getType(moduleOrTypeID))->second;
-    }
 
     assert(genericConformance && "Missing generic conformance?");
     return { proto,
@@ -316,10 +316,28 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
   }
 
   case INHERITED_PROTOCOL_CONFORMANCE: {
-    // FIXME: Does this even make sense?
-    llvm_unreachable("Not implemented");
-  }
+    DeclID protoID;
+    DeclID nominalID;
+    IdentifierID moduleOrTypeID;
+    InheritedProtocolConformanceLayout::readRecord(scratch, protoID,
+                                                   nominalID,
+                                                   moduleOrTypeID);
 
+    ASTContext &ctx = ModuleContext->Ctx;
+
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+
+    ProtocolConformance *inheritedConformance
+      = readUnderlyingConformance(proto, nominalID, moduleOrTypeID);
+
+    // Reset the offset RAII to the end of the trailing records.
+    lastRecordOffset.reset();
+    assert(inheritedConformance && "Missing generic conformance?");
+    return { proto,
+             ctx.getInheritedConformance(conformingType,
+                                         inheritedConformance) };
+  }
+      
   // Not a protocol conformance.
   default:
     return Nothing;

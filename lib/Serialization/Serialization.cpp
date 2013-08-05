@@ -190,6 +190,23 @@ namespace {
     /// Writes a list of generic substitutions.
     void writeSubstitutions(ArrayRef<Substitution> substitutions);
 
+    /// Encode the underlying conformance of a generic or specialized
+    /// conformance.
+    ///
+    /// \param conformance The conformance we're encoding.
+    ///
+    /// \param nominalID Will be set to the "nominal ID" value to be stored
+    /// in the parent record.
+    ///
+    /// \param moduleOrTypeID Will be set to the "module or type ID" value to
+    /// be stored in the parent record.
+    ///
+    /// \returns true if the underlying conformance will need to be written
+    /// out as its own record following the parent record.
+    bool encodeUnderlyingConformance(const ProtocolConformance *conformance,
+                                     DeclID &nominalID,
+                                     IdentifierID &moduleOrTypeID);
+
     /// Writes a protocol conformance.
     void writeConformance(const ProtocolDecl *protocol,
                           const ProtocolConformance *conformance);
@@ -707,6 +724,30 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   return true;
 }
 
+bool
+Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
+                                        DeclID &nominalID,
+                                        IdentifierID &moduleOrTypeID) {
+  bool append = !isa<NormalProtocolConformance>(conformance);
+  if (append) {
+    // Set nominalID to 0 to indicate that the generic conformance will
+    // follow. Encode the type in moduleOrTypeID.
+    nominalID = 0;
+    moduleOrTypeID = addTypeRef(conformance->getType());
+  } else {
+    nominalID = addDeclRef(conformance->getType()->getAnyNominal());
+    assert(nominalID && "Missing nominal type for specialized conformance");
+
+    // Use '0' to mean 'this module', and add 1 to any other module reference.
+    if (conformance->getContainingModule() == TU)
+      moduleOrTypeID = 0;
+    else
+      moduleOrTypeID = addModuleRef(conformance->getContainingModule()) + 1;
+  }
+
+  return append;
+}
+
 void
 Serializer::writeConformance(const ProtocolDecl *protocol,
                              const ProtocolConformance *conformance) {
@@ -786,23 +827,8 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     IdentifierID moduleOrTypeID;
 
     bool appendGenericConformance
-      = !isa<NormalProtocolConformance>(conf->getGenericConformance());
-    if (appendGenericConformance) {
-      // Set nominalID to 0 to indicate that the generic conformance will
-      // follow. Encode the type in moduleOrTypeID.
-      nominalID = 0;
-      moduleOrTypeID = addTypeRef(conf->getGenericConformance()->getType());
-    } else {
-      nominalID
-        = addDeclRef(conf->getGenericConformance()->getType()->getAnyNominal());
-      assert(nominalID && "Missing nominal type for specialized conformance");
-
-      // Use '0' to mean 'this module', and add 1 to any other module reference.
-      if (conf->getContainingModule() == TU)
-        moduleOrTypeID = 0;
-      else
-        moduleOrTypeID = addModuleRef(conf->getContainingModule()) + 1;
-    }
+      = encodeUnderlyingConformance(conf->getGenericConformance(),
+                                    nominalID, moduleOrTypeID);
 
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
@@ -823,8 +849,25 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
   }
 
   case ProtocolConformanceKind::Inherited: {
-    // FIXME: inherited conformance might not make sense?
-    llvm_unreachable("Not implemented");
+    auto conf = cast<InheritedProtocolConformance>(conformance);
+    unsigned abbrCode
+      = DeclTypeAbbrCodes[InheritedProtocolConformanceLayout::Code];
+    DeclID nominalID;
+    IdentifierID moduleOrTypeID;
+
+    bool appendInheritedConformance
+      = encodeUnderlyingConformance(conf->getInheritedConformance(),
+                                    nominalID, moduleOrTypeID);
+
+    InheritedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
+                                                   abbrCode,
+                                                   addDeclRef(protocol),
+                                                   nominalID,
+                                                   moduleOrTypeID);
+    if (appendInheritedConformance) {
+      writeConformance(protocol, conf->getInheritedConformance());
+    }
+    break;
   }
   }
 }
