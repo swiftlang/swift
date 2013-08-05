@@ -314,9 +314,16 @@ void DiagnosticEngine::flushActiveDiagnostic() {
             bufferName += ext->getExtendedType().getString();
           }
 
+          // Don't print bodies if we're looking at a top-level decl.
+          PrintOptions options;
+          if (ActiveDiagnosticDecl->getDeclContext()->isModuleContext())
+            options = PrintOptions();
+          else
+            options = PrintOptions::printEverything();
+
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
-          ppDecl->print(out, PrintOptions::printEverything(), &entries);
+          ppDecl->print(out, options, &entries);
         }
 
         // Build a buffer with the pretty-printed declaration.
