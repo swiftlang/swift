@@ -35,10 +35,11 @@ enum class SyntaxColor {
 
 struct SyntaxNode {
   SyntaxColor Kind;
-  SourceRange Range;
+  SourceLoc Loc;
+  unsigned Length;
 
-  SyntaxNode(SyntaxColor Kind, SourceRange Range)
-    : Kind(Kind), Range(Range) { }
+  SyntaxNode(SyntaxColor Kind, SourceLoc Loc, unsigned Len)
+    : Kind(Kind), Loc(Loc), Length(Len) { }
 };
 
 class SyntaxColorWalker {
