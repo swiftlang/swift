@@ -52,7 +52,7 @@ namespace {
   class StructTypeInfo : // FIXME: FixedTypeInfo as the base class is a lie.
     public SequentialTypeInfo<StructTypeInfo, FixedTypeInfo, StructFieldInfo> {
   public:
-    StructTypeInfo(unsigned numFields, llvm::Type *T, Size size, Alignment align,
+    StructTypeInfo(unsigned numFields, llvm::Type *T, Size size,Alignment align,
                    IsPOD_t isPOD)
       : SequentialTypeInfo(numFields, T, size, align, isPOD) {
     }
