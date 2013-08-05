@@ -104,6 +104,116 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   return Context.getModule(modulePath);
 }
 
+/// Gets the import kind that is most appropriate for \p VD.
+///
+/// Note that this will never return \c Type; an imported typealias will use
+/// the more specific kind from its underlying type.
+static ImportKind getBestImportKind(const ValueDecl *VD) {
+  switch (VD->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::PatternBinding:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    llvm_unreachable("not a ValueDecl");
+
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::UnionElement:
+  case DeclKind::Subscript:
+    llvm_unreachable("not a top-level ValueDecl");
+
+  case DeclKind::Protocol:
+    return ImportKind::Protocol;
+
+  case DeclKind::Class:
+    return ImportKind::Class;
+  case DeclKind::Union:
+    return ImportKind::Union;
+  case DeclKind::Struct:
+    return ImportKind::Struct;
+
+  case DeclKind::TypeAlias: {
+    Type underlyingTy = cast<TypeAliasDecl>(VD)->getUnderlyingType();
+    return getBestImportKind(underlyingTy->getAnyNominal());
+  }
+
+  case DeclKind::Func:
+    return ImportKind::Func;
+
+  case DeclKind::Var:
+    return ImportKind::Var;
+  }
+}
+
+/// Returns the most appropriate import kind for the given list of decls.
+///
+/// If the list is non-homogenous, or if there is more than one decl that cannot
+/// be overloaded, returns Nothing.
+Optional<ImportKind> findBestImportKind(ArrayRef<ValueDecl *> decls) {
+  assert(!decls.empty());
+  ImportKind firstKind = getBestImportKind(decls.front());
+
+  // Only functions can be overloaded.
+  if (decls.size() == 1)
+    return firstKind;
+  if (firstKind != ImportKind::Func)
+    return Nothing;
+
+  for (auto next : decls.slice(1)) {
+    if (getBestImportKind(next) != firstKind)
+      return Nothing;
+  }
+
+  return firstKind;
+}
+
+/// Returns true if a decl with the given \p actual kind can legally be
+/// imported via the given \p expected kind.
+static bool isCompatibleImportKind(ImportKind expected, ImportKind actual) {
+  if (expected == actual)
+    return true;
+  if (expected != ImportKind::Type)
+    return false;
+
+  switch (actual) {
+  case ImportKind::Module:
+    llvm_unreachable("module imports do not bring in decls");
+  case ImportKind::Type:
+    llvm_unreachable("individual decls cannot have abstract import kind");
+  case ImportKind::Struct:
+  case ImportKind::Class:
+  case ImportKind::Union:
+    return true;
+  case ImportKind::Protocol:
+  case ImportKind::Var:
+  case ImportKind::Func:
+    return false;
+  }
+}
+
+static const char *getImportKindString(ImportKind kind) {
+  switch (kind) {
+  case ImportKind::Module:
+    llvm_unreachable("module imports do not bring in decls");
+  case ImportKind::Type:
+    return "typealias";
+  case ImportKind::Struct:
+    return "struct";
+  case ImportKind::Class:
+    return "class";
+  case ImportKind::Union:
+    return "union";
+  case ImportKind::Protocol:
+    return "protocol";
+  case ImportKind::Var:
+    return "var";
+  case ImportKind::Func:
+    return "func";
+  }
+}
 
 void NameBinder::addImport(ImportDecl *ID, 
                            SmallVectorImpl<ImportedModule> &Result) {
@@ -123,6 +233,43 @@ void NameBinder::addImport(ImportDecl *ID,
   M->forAllVisibleModules(ID->getDeclPath(), [&](const ImportedModule &import) {
     Result.push_back(import);
   });
+
+  // If we're importing a specific decl, validate the import kind.
+  if (ID->getImportKind() != ImportKind::Module) {
+    auto declPath = ID->getDeclPath();
+
+    assert(declPath.size() == 1 && "can't handle sub-decl imports");
+    SmallVector<ValueDecl *, 8> decls;
+    M->lookupQualified(ModuleType::get(M), declPath.front().first,
+                       NL_QualifiedDefault, decls);
+
+    if (decls.empty()) {
+      diagnose(ID->getLoc(), diag::no_decl_in_module)
+        .highlight(SourceRange(declPath.front().second,
+                               declPath.back().second));
+      return;
+    }
+
+    Optional<ImportKind> actualKind = findBestImportKind(decls);
+    if (!actualKind.hasValue()) {
+      // FIXME: print entire module name?
+      // FIXME: show the decls?
+      diagnose(ID->getLoc(), diag::ambiguous_decl_in_module,
+               declPath.front().first, M->Name);
+    } else if (!isCompatibleImportKind(ID->getImportKind(), *actualKind)) {
+      auto diag = diagnose(ID->getLoc(), diag::imported_decl_is_wrong_kind,
+                           declPath.front().first,
+                           getImportKindString(ID->getImportKind()),
+                           static_cast<unsigned>(*actualKind));
+      if (ID->isFromSingleImport()) {
+        diag.fixItReplace(SourceRange(ID->getKindLoc()),
+                          getImportKindString(*actualKind));
+      } else {
+        diag.highlight(SourceRange(declPath.front().second,
+                                   declPath.back().second));
+      }
+    }
+  }
 }
 
 /// performAutoImport - When a translation unit is first set up, this handles

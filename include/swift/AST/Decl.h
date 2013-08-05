@@ -160,8 +160,9 @@ class alignas(8) Decl {
     unsigned : NumDeclBits;
 
     unsigned ImportKind : 3;
+    unsigned FromSingleImport : 1;
   };
-  enum { NumImportDeclBits = NumDeclBits + 3 };
+  enum { NumImportDeclBits = NumDeclBits + 4 };
   static_assert(NumImportDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -636,8 +637,11 @@ public:
 };
 
 /// Describes what kind of name is being imported.
+///
+/// If the enumerators here are changed, make sure to update all diagnostics
+/// using ImportKind as a select index.
 enum class ImportKind : uint8_t {
-  Module,
+  Module = 0,
   Type,
   Struct,
   Class,
@@ -656,6 +660,7 @@ public:
 
 private:
   SourceLoc ImportLoc;
+  SourceLoc KindLoc;
 
   /// The number of elements in this path.
   unsigned NumPathElements;
@@ -668,11 +673,12 @@ private:
   }
   
   ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-             ArrayRef<AccessPathElement> Path);
+             SourceLoc KindLoc, ArrayRef<AccessPathElement> Path);
 
 public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
+                            SourceLoc KindLoc,
                             ArrayRef<AccessPathElement> Path);
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
@@ -692,6 +698,20 @@ public:
     return getFullAccessPath().back();
   }
 
+  /// Returns true if this import was imported alone, i.e. not in a list.
+  ///
+  /// \code
+  ///   import swift  // yes
+  ///   import Foundation, AppKit  // no
+  /// \endcode
+  bool isFromSingleImport() const {
+    return ImportDeclBits.FromSingleImport;
+  }
+
+  void setFromSingleImport() {
+    ImportDeclBits.FromSingleImport = true;
+  }
+
   ImportKind getImportKind() const {
     return static_cast<ImportKind>(ImportDeclBits.ImportKind);
   }
@@ -701,6 +721,7 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(ImportLoc, getFullAccessPath().back().second);
   }
+  SourceLoc getKindLoc() const { return KindLoc; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Import;

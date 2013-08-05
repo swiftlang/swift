@@ -248,18 +248,19 @@ GenericParamList::create(const ASTContext &Context,
 
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
+                               SourceLoc KindLoc,
                                ArrayRef<AccessPathElement> Path) {
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
   void *buffer = Ctx.Allocate(sizeof(ImportDecl) +
                               Path.size() * sizeof(AccessPathElement),
                               alignof(ImportDecl));
-  return new (buffer) ImportDecl(DC, ImportLoc, Kind, Path);
+  return new (buffer) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
 }
 
 ImportDecl::ImportDecl(DeclContext *DC, SourceLoc ImportLoc, ImportKind K,
-                       ArrayRef<AccessPathElement> Path)
-  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc),
+                       SourceLoc KindLoc, ArrayRef<AccessPathElement> Path)
+  : Decl(DeclKind::Import, DC), ImportLoc(ImportLoc), KindLoc(KindLoc),
     NumPathElements(Path.size()) {
   ImportDeclBits.ImportKind = static_cast<unsigned>(K);
   assert(getImportKind() == K && "not enough bits for ImportKind");

@@ -599,6 +599,7 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
   }
 
   ImportKind Kind = ImportKind::Module;
+  SourceLoc KindLoc;
   if (Tok.isKeyword()) {
     switch (Tok.getKind()) {
     case tok::kw_typealias:
@@ -626,9 +627,11 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
       diagnose(Tok, diag::expected_identifier_in_decl, "import");
       return true;
     }
-    consumeToken();
+    KindLoc = consumeToken();
   }
 
+  unsigned Count = 0;
+  bool HadInvalid = false;
   do {
     SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
     do {
@@ -640,11 +643,16 @@ bool Parser::parseDeclImport(unsigned Flags, SmallVectorImpl<Decl*> &Decls) {
 
     if (Kind != ImportKind::Module && ImportPath.size() == 1) {
       diagnose(ImportPath.front().second, diag::decl_expected_module_name);
+      HadInvalid = true;
     } else {
       Decls.push_back(ImportDecl::create(Context, CurDeclContext, ImportLoc,
-                                         Kind, ImportPath));
+                                         Kind, KindLoc, ImportPath));
     }
+    ++Count;
   } while (consumeIf(tok::comma));
+
+  if (Count == 1 && !HadInvalid)
+    cast<ImportDecl>(Decls.back())->setFromSingleImport();
 
   return false;
 }

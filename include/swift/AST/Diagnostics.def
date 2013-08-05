@@ -919,8 +919,6 @@ ERROR(sema_no_import_submodule,sema_nb,none,
       "no such module", ())
 ERROR(sema_opening_import,sema_nb,none,
       "opening import file '%0.swift': %1", (StringRef, StringRef))
-ERROR(invalid_declaration_imported,sema_nb,none,
-      "invalid declaration referenced in import", ())
 
 ERROR(serialization_malformed_module,sema,none,
       "malformed module file", ())
@@ -963,6 +961,15 @@ ERROR(use_non_type_value,sema_nb,none,
       "%0 is not a type", (Identifier))
 NOTE(use_non_type_value_prev,sema_nb,none,
      "%0 declared here", (Identifier))
+
+ERROR(no_decl_in_module,sema_nb,none,
+      "no such decl in module", ())
+ERROR(imported_decl_is_wrong_kind,sema_nb,none,
+      "%0 was imported as '%1', but is a "
+      "%select{**MODULE**|type|struct|class|union|protocol|variable|function}2",
+      (Identifier, StringRef, /*ImportKind*/ unsigned))
+ERROR(ambiguous_decl_in_module,sema_nb,none,
+      "ambiguous name %0 in module %1", (Identifier, Identifier))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,sema_nb,none,
