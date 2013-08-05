@@ -35,6 +35,9 @@ bb0:                                  // CHECK: bb0:
   br bb1                              // CHECK:   br bb1
 bb1:
   %b = alloc_box $Int64               // CHECK:   %2 = alloc_box $Int64
+  %c = integer_literal $Builtin.Int64, 1
+  // CHECK: alloc_array $String, %{{.*}} : $Builtin.Int64
+  %d = alloc_array $String, %c : $Builtin.Int64
   return %0 : $()                     // CHECK:   return %0 : $()
 }
 
