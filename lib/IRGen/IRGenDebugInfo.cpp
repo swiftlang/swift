@@ -410,6 +410,8 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
   auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
                                           LinkageName, MainFile, MainFile, 0);
   auto Line = L.Line;
+  // This is the source line used for the function prologue.
+  unsigned ScopeLine = 0;
 
   AnyFunctionType* FnTy = getFunctionType(SILTy);
   auto Params = createParameterTypes(SILMod, SILTy, Fn->getFunctionType(),
@@ -451,7 +453,7 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
   llvm::DISubprogram SP =
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
                             DIFnTy, IsLocalToUnit, IsDefinition,
-                            /*ScopeLine =*/Line,
+                            ScopeLine,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = llvm::WeakVH(SP);
   Functions[LinkageName] = llvm::WeakVH(SP);
