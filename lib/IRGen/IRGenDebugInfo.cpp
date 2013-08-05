@@ -186,17 +186,28 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
 
 /// getStartLoc - extract the start location from a SILLocation.
 static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
-  if (Expr* E = Loc.getAs<Expr>())
+  if (Expr* E = Loc.getAs<Expr>()) return getStartLoc(SM, E);
+  if (Stmt* S = Loc.getAs<Stmt>()) return getStartLoc(SM, S);
+  if (Decl* D = Loc.getAs<Decl>()) return getStartLoc(SM, D);
+  if (Pattern* P = Loc.getAs<Pattern>()) return getStartLoc(SM, P);
+
+  Location None = {};
+  return None;
+}
+
+/// getStartLocForLinetable - extract the start location from a SILLocation.
+static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
+  if (Expr* E = Loc.getAs<Expr>()) {
+    // Implicit closures should not show up in the line table. Note
+    // that the closure function still has a valid DW_AT_decl_line.
+    if (E->getKind() == ExprKind::ImplicitClosure)
+      return {};
     return getStartLoc(SM, E);
+  }
 
-  if (Stmt* S = Loc.getAs<Stmt>())
-    return getStartLoc(SM, S);
-
-  if (Decl* D = Loc.getAs<Decl>())
-    return getStartLoc(SM, D);
-
-  if (Pattern* P = Loc.getAs<Pattern>())
-    return getStartLoc(SM, P);
+  if (Stmt* S = Loc.getAs<Stmt>()) return getStartLoc(SM, S);
+  if (Decl* D = Loc.getAs<Decl>()) return getStartLoc(SM, D);
+  if (Pattern* P = Loc.getAs<Pattern>()) return getStartLoc(SM, P);
 
   Location None = {};
   return None;
@@ -205,7 +216,7 @@ static Location getStartLoc(SourceManager &SM, SILLocation Loc) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    SILLocation Loc) {
-  Location L = getStartLoc(SM, Loc);
+  Location L = getStartLocForLinetable(SM, Loc);
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
