@@ -244,7 +244,7 @@ void NameBinder::addImport(ImportDecl *ID,
                        NL_QualifiedDefault, decls);
 
     if (decls.empty()) {
-      diagnose(ID->getLoc(), diag::no_decl_in_module)
+      diagnose(ID, diag::no_decl_in_module)
         .highlight(SourceRange(declPath.front().second,
                                declPath.back().second));
       return;
@@ -253,11 +253,13 @@ void NameBinder::addImport(ImportDecl *ID,
     Optional<ImportKind> actualKind = findBestImportKind(decls);
     if (!actualKind.hasValue()) {
       // FIXME: print entire module name?
-      // FIXME: show the decls?
-      diagnose(ID->getLoc(), diag::ambiguous_decl_in_module,
+      diagnose(ID, diag::ambiguous_decl_in_module,
                declPath.front().first, M->Name);
+      for (auto next : decls)
+        diagnose(next, diag::found_candidate);
+
     } else if (!isCompatibleImportKind(ID->getImportKind(), *actualKind)) {
-      auto diag = diagnose(ID->getLoc(), diag::imported_decl_is_wrong_kind,
+      auto diag = diagnose(ID, diag::imported_decl_is_wrong_kind,
                            declPath.front().first,
                            getImportKindString(ID->getImportKind()),
                            static_cast<unsigned>(*actualKind));
@@ -268,6 +270,11 @@ void NameBinder::addImport(ImportDecl *ID,
         diag.highlight(SourceRange(declPath.front().second,
                                    declPath.back().second));
       }
+      diag.flush();
+
+      if (decls.size() == 1)
+        diagnose(decls.front(), diag::decl_declared_here,
+                 decls.front()->getName());
     }
   }
 }
