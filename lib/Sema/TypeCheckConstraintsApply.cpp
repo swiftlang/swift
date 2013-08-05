@@ -1707,62 +1707,17 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
   if (!locator->getAnchor() || !locator->getPath().empty())
     return nullptr;
 
-  // Find the declaration to which the anchor refers. This feels less general
-  // than it should be.
-  auto anchor = locator->getAnchor();
+  if (auto resolved
+        = resolveLocatorToDecl(cs, locator,
+            [&](ConstraintLocator *locator) -> Optional<OverloadChoice> {
+              auto known = solution.overloadChoices.find(locator);
+              if (known == solution.overloadChoices.end()) {
+                return Nothing;
+              }
 
-  // Unwrap any specializations, constructor calls, implicit conversions, and
-  // '.'s.
-  // FIXME: This is brittle.
-  do {
-    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
-      anchor = specialize->getSubExpr();
-      continue;
-    }
-
-    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
-      anchor = implicit->getSubExpr();
-      continue;
-    }
-
-    if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
-      anchor = constructor->getFn();
-      continue;
-    }
-
-    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
-      anchor = dotSyntax->getRHS();
-      continue;
-    }
-
-    if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(anchor)) {
-      anchor = dotSyntax->getFn();
-      continue;
-    }
-
-    break;
-  } while (true);
-
-  // Simple case: direct reference to a declaration.
-  if (auto dre = dyn_cast<DeclRefExpr>(anchor)) {
-    return dre->getDecl();
-  }
-  if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
-    return mre->getDecl();
-  }
-
-  // Overloaded and unresolved cases: find the resolved overload.
-  if (isa<OverloadedDeclRefExpr>(anchor) ||
-      isa<OverloadedMemberRefExpr>(anchor) ||
-      isa<UnresolvedDeclRefExpr>(anchor) ||
-      isa<UnresolvedMemberExpr>(anchor)) {
-    auto anchorLocator = cs.getConstraintLocator(anchor, { });
-    auto known = solution.overloadChoices.find(anchorLocator);
-    if (known != solution.overloadChoices.end()) {
-      auto &choice = known->second.first;
-      if (choice.getKind() == OverloadChoiceKind::Decl)
-        return choice.getDecl();
-    }
+              return known->second.first;
+            })) {
+    return resolved.getDecl();
   }
 
   return nullptr;

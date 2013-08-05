@@ -1076,6 +1076,15 @@ ERROR(downcast_from_archetype_to_unrelated,sema_tcc,none,
       (Type, Type))
 ERROR(pattern_in_expr,sema_tcc,none,
       "%0 cannot appear in an expression", (PatternKind))
+NOTE(note_call_to_operator,sema_tcc,none,
+     "in call to operator %0", (Identifier))
+NOTE(note_call_to_func,sema_tcc,none,
+     "in call to function %0", (Identifier))
+NOTE(note_call_to_constructor,sema_tcc,none,
+     "in call to constructor", ())
+NOTE(note_init_parameter,sema_tcc,none,
+     "in initialization of parameter %0", (Identifier))
+
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

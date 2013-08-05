@@ -261,9 +261,9 @@ void Constraint::dump(SourceManager *sm) {
 
 // Only allow allocation of resolved overload set list items using the
 // allocator in ASTContext.
-void *
-ConstraintSystem::ResolvedOverloadSetListItem::
-operator new(size_t bytes, ConstraintSystem &cs, unsigned alignment) {
+void *ResolvedOverloadSetListItem::operator new(size_t bytes,
+                                                ConstraintSystem &cs,
+                                                unsigned alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 

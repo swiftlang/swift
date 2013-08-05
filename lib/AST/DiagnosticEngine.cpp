@@ -268,6 +268,15 @@ void DiagnosticEngine::flushActiveDiagnostic() {
           // declaration (not a module).
           Decl *ppDecl = ActiveDiagnosticDecl;
           auto dc = ActiveDiagnosticDecl->getDeclContext();
+
+          // FIXME: Horrible, horrible hackaround. We're not getting a
+          // DeclContext everywhere we should.
+          if (!dc) {
+            // Reset the active diagnostic.
+            ActiveDiagnostic.reset();
+            return;
+          }
+
           while (!dc->isModuleContext()) {
             switch (dc->getContextKind()) {
             case DeclContextKind::BuiltinModule:

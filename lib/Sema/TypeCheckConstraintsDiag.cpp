@@ -101,12 +101,23 @@ void Failure::dump(SourceManager *sm) {
 }
 
 
-ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
-                                                ConstraintLocator *locator,
-                                                SourceRange &range1,
-                                                SourceRange &range2) {
+ConstraintLocator *
+constraints::simplifyLocator(ConstraintSystem &cs,
+                             ConstraintLocator *locator,
+                             SourceRange &range1,
+                             SourceRange &range2,
+                             ConstraintLocator **targetLocator) {
+  // Clear out the target locator result.
+  if (targetLocator)
+    *targetLocator = nullptr;
+
   range1 = SourceRange();
   range2 = SourceRange();
+
+  // The path to be tacked on to the target locator to identify the specific
+  // target.
+  Expr *targetAnchor = nullptr;
+  llvm::SmallVector<LocatorPathElt, 4> targetPath;
 
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
@@ -115,6 +126,10 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
     case ConstraintLocator::ApplyArgument:
       // Extract application argument.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        // The target anchor is the function being called.
+        targetAnchor = applyExpr->getFn();
+        targetPath.push_back(path[0]);
+
         anchor = applyExpr->getArg();
         path = path.slice(1);
         continue;
@@ -124,6 +139,10 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        // No additional target locator information.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
         anchor = applyExpr->getFn();
         path = path.slice(1);
         continue;
@@ -140,6 +159,11 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
     case ConstraintLocator::TupleElement:
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
+        // Append this extraction to the target locator path.
+        if (targetAnchor) {
+          targetPath.push_back(path[0]);
+        }
+
         anchor = tupleExpr->getElement(path[0].getValue());
         path = path.slice(1);
         continue;
@@ -148,6 +172,10 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
 
     case ConstraintLocator::MemberRefBase:
       if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(anchor)) {
+        // No additional target locator information.
+        targetAnchor = nullptr;
+        targetPath.clear();
+
         range1 = dotExpr->getNameLoc();
         anchor = dotExpr->getBase();
         path = path.slice(1);
@@ -157,6 +185,11 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
 
     case ConstraintLocator::InterpolationArgument:
       if (auto interp = dyn_cast<InterpolatedStringLiteralExpr>(anchor)) {
+        // No additional target locator information.
+        // FIXME: Dig out the constructor we're trying to call?
+        targetAnchor = nullptr;
+        targetPath.clear();
+
         anchor = interp->getSegments()[path[0].getValue()];
         path = path.slice(1);
         continue;
@@ -170,6 +203,15 @@ ConstraintLocator *constraints::simplifyLocator(ConstraintSystem &cs,
 
     // If we get here, we couldn't simplify the path further.
     break;
+  }
+
+  // If we have a target anchor, build and simplify the target locator.
+  if (targetLocator && targetAnchor) {
+    SourceRange targetRange1, targetRange2;
+    *targetLocator = simplifyLocator(cs,
+                                     cs.getConstraintLocator(targetAnchor,
+                                                             targetPath),
+                                     targetRange1, targetRange2);
   }
 
   if (anchor == locator->getAnchor() &&
@@ -198,6 +240,210 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
   return locator->getAnchor();
 }
 
+/// Retrieve the argument pattern for the given declaration.
+///
+static Pattern *getParameterPattern(ValueDecl *decl) {
+  if (auto func = dyn_cast<FuncDecl>(decl))
+    return func->getBody()->getArgParamPatterns()[0];
+  if (auto constructor = dyn_cast<ConstructorDecl>(decl))
+    return constructor->getArguments();
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+    return subscript->getIndices();
+
+  // FIXME: Variables of function type?
+  return nullptr;
+}
+
+ResolvedLocator constraints::resolveLocatorToDecl(
+                  ConstraintSystem &cs,
+                  ConstraintLocator *locator,
+                  std::function<Optional<OverloadChoice>(ConstraintLocator *)>
+                    findOvlChoice) {
+  assert(locator && "Null locator");
+  if (!locator->getAnchor())
+    return ResolvedLocator();
+
+  ValueDecl *decl = nullptr;
+  auto anchor = locator->getAnchor();
+  // Unwrap any specializations, constructor calls, implicit conversions, and
+  // '.'s.
+  // FIXME: This is brittle.
+  do {
+    if (auto specialize = dyn_cast<UnresolvedSpecializeExpr>(anchor)) {
+      anchor = specialize->getSubExpr();
+      continue;
+    }
+
+    if (auto implicit = dyn_cast<ImplicitConversionExpr>(anchor)) {
+      anchor = implicit->getSubExpr();
+      continue;
+    }
+
+    if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
+      anchor = constructor->getFn();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxBaseIgnoredExpr>(anchor)) {
+      anchor = dotSyntax->getRHS();
+      continue;
+    }
+
+    if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(anchor)) {
+      anchor = dotSyntax->getFn();
+      continue;
+    }
+
+    break;
+  } while (true);
+
+  if (auto dre = dyn_cast<DeclRefExpr>(anchor)) {
+    // Simple case: direct reference to a declaration.
+    decl = dre->getDecl();
+  } else if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
+    // Simple case: direct reference to a declaration.
+    decl = mre->getDecl();
+  } else if (isa<OverloadedDeclRefExpr>(anchor) ||
+             isa<OverloadedMemberRefExpr>(anchor) ||
+             isa<UnresolvedDeclRefExpr>(anchor) ||
+             isa<UnresolvedMemberExpr>(anchor)) {
+    // Overloaded and unresolved cases: find the resolved overload.
+    auto anchorLocator = cs.getConstraintLocator(anchor, { });
+    if (auto choice = findOvlChoice(anchorLocator)) {
+      if (choice->getKind() == OverloadChoiceKind::Decl)
+        decl = choice->getDecl();
+    }
+  }
+
+  // If we didn't find the declaration, we're out of luck.
+  if (!decl)
+    return ResolvedLocator();
+
+  // Use the declaration and the path to produce a more specific result.
+  // FIXME: This is an egregious hack. We'd be far better off
+  // FIXME: Perform deeper path resolution?
+  auto path = locator->getPath();
+  Pattern *parameterPattern = nullptr;
+  bool impliesFullPattern = false;
+  while (!path.empty()) {
+    switch (path[0].getKind()) {
+    case ConstraintLocator::ApplyArgument:
+      // If we're calling into something that has parameters, dig into the
+      // actual parameter pattern.
+      parameterPattern = getParameterPattern(decl);
+      if (!parameterPattern)
+        break;
+
+      impliesFullPattern = true;
+      path = path.slice(1);
+      continue;
+
+    case ConstraintLocator::TupleElement:
+    case ConstraintLocator::NamedTupleElement:
+      if (parameterPattern) {
+        unsigned index = path[0].getValue();
+        if (auto tuple = dyn_cast<TuplePattern>(
+                           parameterPattern->getSemanticsProvidingPattern())) {
+          parameterPattern = tuple->getFields()[index].getPattern();
+          impliesFullPattern = false;
+          path = path.slice(1);
+          continue;
+        }
+        parameterPattern = nullptr;
+      }
+      break;
+
+    case ConstraintLocator::ScalarToTuple:
+      continue;
+
+    default:
+      break;
+    }
+
+    break;
+  }
+
+  // If we have a parameter pattern that refers to a parameter, grab it.
+  if (parameterPattern) {
+    parameterPattern = parameterPattern->getSemanticsProvidingPattern();
+    if (impliesFullPattern) {
+      if (auto tuple = dyn_cast<TuplePattern>(parameterPattern)) {
+        if (tuple->getFields().size() == 1) {
+          parameterPattern = tuple->getFields()[0].getPattern();
+          parameterPattern = parameterPattern->getSemanticsProvidingPattern();
+        }
+      }
+    }
+
+    if (auto named = dyn_cast<NamedPattern>(parameterPattern)) {
+      return ResolvedLocator(named->getDecl());
+    }
+  }
+
+  // Otherwise, do the best we can with the declaration we found.
+  if (auto func = dyn_cast<FuncDecl>(decl))
+    return ResolvedLocator(func);
+  if (auto constructor = dyn_cast<ConstructorDecl>(decl))
+    return ResolvedLocator(constructor);
+
+  // FIXME: Deal with the other interesting cases here, e.g.,
+  // subscript declarations.
+  return ResolvedLocator();
+}
+
+/// Emit a note referring to the target of a diagnostic, e.g., the function
+/// or parameter being used.
+static void noteTargetOfDiagnostic(ConstraintSystem &cs,
+                                   const Failure &failure,
+                                   ConstraintLocator *targetLocator) {
+  // If there's no anchor, there's nothing we can do.
+  if (!targetLocator->getAnchor())
+    return;
+
+  // Try to resolve the locator to a particular declaration.
+  auto resolved
+    = resolveLocatorToDecl(cs, targetLocator,
+        [&](ConstraintLocator *locator) -> Optional<OverloadChoice> {
+          for (auto resolved = failure.getResolvedOverloadSets();
+               resolved; resolved = resolved->Previous) {
+            if (resolved->Set->getLocator() == locator)
+              return resolved->Set->getChoices()[resolved->ChoiceIndex];
+          }
+
+          return Nothing;
+        });
+
+  // We couldn't resolve the locator to a declaration, so we're done.
+  if (!resolved)
+    return;
+
+  switch (resolved.getKind()) {
+  case ResolvedLocatorKind::Unresolved:
+    // Can't emit any diagnostic here.
+    return;
+
+  case ResolvedLocatorKind::Function: {
+    auto name = resolved.getDecl()->getName();
+    cs.getTypeChecker().diagnose(resolved.getDecl(),
+                                 name.isOperator()? diag::note_call_to_operator
+                                                  : diag::note_call_to_func,
+                                 resolved.getDecl()->getName());
+    return;
+  }
+
+  case ResolvedLocatorKind::Constructor:
+    // FIXME: Specialize for implicitly-generated constructors.
+    cs.getTypeChecker().diagnose(resolved.getDecl(),
+                                 diag::note_call_to_constructor);
+    return;
+
+  case ResolvedLocatorKind::Parameter:
+    cs.getTypeChecker().diagnose(resolved.getDecl(), diag::note_init_parameter,
+                                 resolved.getDecl()->getName());
+    return;
+  }
+}
+
 /// \brief Emit a diagnostic for the given failure.
 ///
 /// \param cs The constraint system in which the diagnostic was generated.
@@ -212,7 +458,9 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
 
   SourceRange range1, range2;
 
-  auto locator = simplifyLocator(cs, failure.getLocator(), range1, range2);
+  ConstraintLocator *targetLocator;
+  auto locator = simplifyLocator(cs, failure.getLocator(), range1, range2,
+                                 &targetLocator);
   auto &tc = cs.getTypeChecker();
 
   auto anchor = locator->getAnchor();
@@ -246,6 +494,8 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
                 failure.getFirstType(),
                 failure.getSecondType())
       .highlight(range1).highlight(range2);
+    if (targetLocator)
+      noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
 
   case Failure::DoesNotHaveMember:
@@ -263,6 +513,8 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
                             ->getDecl(),
                           nullptr,
                           loc);
+    if (targetLocator)
+      noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
 
   default:

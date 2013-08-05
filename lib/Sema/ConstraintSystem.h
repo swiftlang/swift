@@ -29,6 +29,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
+#include <functional>
 
 namespace swift {
 
@@ -739,6 +740,8 @@ public:
   }
 };
 
+struct ResolvedOverloadSetListItem;
+
 /// \brief Describes a failure.
 class Failure : public llvm::FoldingSetNode {
 public:
@@ -788,8 +791,11 @@ private:
   /// \brief A value, if used.
   unsigned value : 32;
 
-  /// \brief Describes the location of this failure.
+  /// Describes the location of this failure.
   ConstraintLocator *locator;
+
+  /// The resolved overload sets that led to this failure.
+  ResolvedOverloadSetListItem *resolvedOverloadSets;
 
   /// \brief The first type.
   Type first;
@@ -808,6 +814,11 @@ public:
   /// \brief Retrieve the failure locator.
   ConstraintLocator *getLocator() const {
     return locator;
+  }
+
+  /// Retrieve the resolved overload sets active when this failure occurred.
+  ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
+    return resolvedOverloadSets;
   }
 
   /// \brief Retrieve the first type.
@@ -844,13 +855,15 @@ public:
     case TypesNotSubtypes:
     case TypesNotTrivialSubtypes:
     case DoesNotConformToProtocol:
-      return Profile(id, locator, kind, getFirstType(), getSecondType());
+      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
+                     getSecondType());
 
     case DoesNotHaveMember:
-      return Profile(id, locator, kind, getFirstType(), getName());
+      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
+                     getName());
 
     case IsNotArchetype:
-      return Profile(id, locator, kind, getFirstType());
+      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType());
     }
   }
 
@@ -861,51 +874,66 @@ private:
   friend class ConstraintSystem;
 
   /// \brief Construct a failure involving one type.
-  Failure(ConstraintLocator *locator, FailureKind kind, Type type)
-    : kind(kind), value(0), locator(locator), first(type)
+  Failure(ConstraintLocator *locator, FailureKind kind,
+          ResolvedOverloadSetListItem *resolvedOverloadSets,
+          Type type)
+    : kind(kind), value(0), locator(locator),
+      resolvedOverloadSets(resolvedOverloadSets), first(type)
   {
     second.type = nullptr;
   }
 
   /// \brief Construct a failure involving two types and an optional value.
   Failure(ConstraintLocator *locator, FailureKind kind,
+          ResolvedOverloadSetListItem *resolvedOverloadSets,
           Type type1, Type type2, unsigned value = 0)
-    : kind(kind), value(value), locator(locator), first(type1)
+    : kind(kind), value(value), locator(locator),
+      resolvedOverloadSets(resolvedOverloadSets), first(type1)
   {
     second.type = type2.getPointer();
   }
 
   /// \brief Construct a failure involving a type and a name.
   Failure(ConstraintLocator *locator, FailureKind kind,
+          ResolvedOverloadSetListItem *resolvedOverloadSets,
           Type type, Identifier name)
-  : kind(kind), value(0), locator(locator), first(type)
+    : kind(kind), value(0), locator(locator),
+      resolvedOverloadSets(resolvedOverloadSets), first(type)
   {
     second.name = name.getAsOpaquePointer();
   }
 
   /// \brief Profile a failure involving one type.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
-                      FailureKind kind, Type type) {
+                      FailureKind kind,
+                      ResolvedOverloadSetListItem *resolvedOverloadSets,
+                      Type type) {
     id.AddPointer(locator);
     id.AddInteger(kind);
+    id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type.getPointer());
   }
 
   /// \brief Profile a failure involving two types.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
-                      FailureKind kind, Type type1, Type type2) {
+                      FailureKind kind,
+                      ResolvedOverloadSetListItem *resolvedOverloadSets,
+                      Type type1, Type type2) {
     id.AddPointer(locator);
     id.AddInteger(kind);
+    id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type1.getPointer());
     id.AddPointer(type2.getPointer());
   }
 
   /// \brief Profile a failure involving two types and a value.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
-                      FailureKind kind, Type type1, Type type2,
-                      unsigned value) {
+                      FailureKind kind,
+                      ResolvedOverloadSetListItem *resolvedOverloadSets,
+                      Type type1, Type type2, unsigned value) {
     id.AddPointer(locator);
     id.AddInteger(kind);
+    id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type1.getPointer());
     id.AddPointer(type2.getPointer());
     id.AddInteger(value);
@@ -913,9 +941,12 @@ private:
 
   /// \brief Profile a failure involving a type and a name.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
-                      FailureKind kind, Type type, Identifier name) {
+                      FailureKind kind,
+                      ResolvedOverloadSetListItem *resolvedOverloadSets,
+                      Type type, Identifier name) {
     id.AddPointer(locator);
     id.AddInteger(kind);
+    id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type.getPointer());
     id.AddPointer(name.getAsOpaquePointer());
   }
@@ -1422,6 +1453,32 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
+/// Describes one resolved overload set within the list of overload sets
+/// resolved by the solver.
+struct ResolvedOverloadSetListItem {
+  /// The previously resolved overload set in the list.
+  ResolvedOverloadSetListItem *Previous;
+
+  /// The overload set resolved by this item.
+  OverloadSet *Set;
+
+  /// The index of the choice to which the overload set was resolved.
+  unsigned ChoiceIndex;
+
+  /// The type of the referenced choice.
+  Type ImpliedType;
+
+  // Make vanilla new/delete illegal for overload set items.
+  void *operator new(size_t Bytes) = delete;
+  void operator delete(void *Data) = delete;
+
+  // Only allow allocation of list items using the allocator in the
+  // constraint system.
+  void *operator new(size_t bytes, ConstraintSystem &cs,
+                     unsigned alignment
+                       = alignof(ResolvedOverloadSetListItem));
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1466,32 +1523,6 @@ private:
   /// to make any sense of this data. Also, it probably belongs within
   /// SolverState.
   llvm::FoldingSet<Failure> failures;
-
-  /// Describes one resolved overload set within the list of overload sets
-  /// resolved by the solver.
-  struct ResolvedOverloadSetListItem {
-    /// The previously resolved overload set in the list.
-    ResolvedOverloadSetListItem *Previous;
-
-    /// The overload set resolved by this item.
-    OverloadSet *Set;
-
-    /// The index of the choice to which the overload set was resolved.
-    unsigned ChoiceIndex;
-
-    /// The type of the referenced choice.
-    Type ImpliedType;
-
-    // Make vanilla new/delete illegal for overload set items.
-    void *operator new(size_t Bytes) = delete;
-    void operator delete(void *Data) = delete;
-
-    // Only allow allocation of list items using the allocator in the
-    // constraint system.
-    void *operator new(size_t bytes, ConstraintSystem &cs,
-                       unsigned alignment
-                         = alignof(ResolvedOverloadSetListItem));
-  };
 
   /// \brief The overload sets that have been resolved along the current path.
   ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
@@ -1681,6 +1712,7 @@ private:
     // If there is no solver state, this failure is unavoidable.
     if (!solverState) {
       auto failure = Failure::create(getAllocator(), locator, kind,
+                                     resolvedOverloadSets,
                                      std::forward<Args>(args)...);
 
       // Debug output.
@@ -1695,12 +1727,13 @@ private:
 
     // Check whether we've recorded this failure already.
     llvm::FoldingSetNodeID id;
-    Failure::Profile(id, locator, kind, args...);
+    Failure::Profile(id, locator, kind, resolvedOverloadSets, args...);
     void *insertPos = nullptr;
     auto failure = failures.FindNodeOrInsertPos(id, insertPos);
     if (!failure) {
       // Allocate a new failure and record it.
-      failure = Failure::create(getAllocator(), locator, kind, args...);
+      failure = Failure::create(getAllocator(), locator, kind,
+                                resolvedOverloadSets, args...);
       failures.InsertNode(failure, insertPos);
     }
 
@@ -2250,15 +2283,94 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
 ///
+/// This routine can also find the corresponding "target" locator, which
+/// typically provides the other end of a relational constraint. For example,
+/// if the primary locator refers to a function argument, the target locator
+/// will be set to refer to the corresponding function parameter.
+///
 /// \param cs The constraint system in which the locator will be simplified.
+///
 /// \param locator The locator to simplify.
+///
 /// \param range1 Will be populated with an "interesting" range.
+///
 /// \param range2 Will be populated with a second "interesting" range.
+///
+/// \param targetLocator If non-null, will be set to a locator that describes
+/// the target of the input locator.
+///
 /// \return the simplified locator.
 ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
                                    SourceRange &range1,
-                                   SourceRange &range2);
+                                   SourceRange &range2,
+                                   ConstraintLocator **targetLocator = nullptr);
+
+/// Describes the kind of entity to which a locator was resolved.
+enum class ResolvedLocatorKind : uint8_t {
+  /// The locator could not be resolved.
+  Unresolved,
+  /// The locator refers to a function.
+  Function,
+  /// The locator refers to a constructor.
+  Constructor,
+  /// The locator refers to a parameter of a function.
+  Parameter
+};
+
+/// The entity to which a locator resolved.
+class ResolvedLocator {
+  ResolvedLocatorKind kind;
+  ValueDecl *decl;
+
+public:
+  ResolvedLocator() : kind(ResolvedLocatorKind::Unresolved) { }
+
+  ResolvedLocator(FuncDecl *func)
+    : kind(ResolvedLocatorKind::Function), decl(func)
+  {
+  }
+
+  ResolvedLocator(ConstructorDecl *constructor)
+    : kind(ResolvedLocatorKind::Constructor), decl(constructor)
+  {
+  }
+
+  ResolvedLocator(VarDecl *param)
+    : kind(ResolvedLocatorKind::Parameter), decl(param)
+  {
+  }
+  
+
+  /// Determine the kind of entity to which the locator resolved.
+  ResolvedLocatorKind getKind() const { return kind; }
+
+  /// Retrieve the declaration to which the locator resolved.
+  ValueDecl *getDecl() const { return decl; }
+
+  explicit operator bool() const {
+    return getKind() != ResolvedLocatorKind::Unresolved;
+  }
+};
+
+/// Resolve a locator to the specific declaration it references, if possible.
+///
+/// \param cs The constraint system in which the locator will be resolved.
+///
+/// \param locator The locator to resolve.
+///
+/// \param findOvlChoice A function that searches for the overload choice
+/// associated with the given locator, or an empty optional if there is no such
+/// overload.
+///
+/// \returns the entity to which the locator resolved.
+///
+/// FIXME: It would be more natural to express the result as a locator.
+ResolvedLocator resolveLocatorToDecl(
+                  ConstraintSystem &cs,
+                  ConstraintLocator *locator,
+                  std::function<Optional<OverloadChoice>(ConstraintLocator *)>
+                    findOvlChoice);
 
 } // end namespace constraints
 
