@@ -334,20 +334,7 @@ struct InitializationForPattern
                           Gen.getLoweredType(vd->getType()).getAddressType());
       return InitializationPtr(new GlobalInitialization(addr));
     }
-    
-    // If this is an address-only function argument with fixed lifetime,
-    // we can bind the address we were passed for the variable, and we don't
-    // need to initialize it.
-    //
-    // Note that the pattern's type should match the type of the
-    // argument, but not necessarily the type of the variable (in the
-    // case of a reference storage type).
-    if (ArgumentOrVar == Argument &&
-        vd->hasFixedLifetime() &&
-        Gen.getTypeLowering(P->getType()).isPassedIndirectly()) {
-      return InitializationPtr(new AddressBindingInitialization(vd));
-    }
-    
+
     // Otherwise, this is a normal variable initialization.
     return Gen.emitLocalVariableWithCleanup(vd);
   }
@@ -685,11 +672,6 @@ SILValue SILGenFunction::emitDestructorProlog(ClassDecl *CD,
   SILValue thisValue = new (SGM.M) SILArgument(thisType, F.begin());
   
   if (DD) {
-    // 'this' has a fixed lifetime no matter what capture analysis says.
-    // It'll die as soon as we return.
-    // FIXME: We should enforce this somewhere.
-    thisDecl->setHasFixedLifetime(true);
-    
     // Make a local variable for 'this'.
     emitLocalVariable(thisDecl);
     SILValue thisAddr = VarLocs[thisDecl].address;
@@ -950,22 +932,16 @@ void SILGenFunction::emitLocalVariable(VarDecl *vd) {
 
   SILType lType = getLoweredType(vd->getType());
 
-  if (vd->hasFixedLifetime()) {
-    // If the variable has a fixed lifetime, allocate it on the stack.
-    SILValue addr = B.createAllocStack(vd, lType);
-    VarLocs[vd] = {SILValue(), addr};
-  } else {
-    // If the variable has its lifetime extended by a closure, heap-allocate it
-    // using a box.
+  // The variable may have its lifetime extended by a closure, heap-allocate it
+  // using a box.
 
-    AllocBoxInst *allocBox = B.createAllocBox(vd, lType);
-    auto box = SILValue(allocBox, 0);
-    auto addr = SILValue(allocBox, 1);
+  AllocBoxInst *allocBox = B.createAllocBox(vd, lType);
+  auto box = SILValue(allocBox, 0);
+  auto addr = SILValue(allocBox, 1);
   
-    /// Remember that this is the memory location that we're emitting the
-    /// decl to.
-    VarLocs[vd] = {box, addr};
-  }
+  /// Remember that this is the memory location that we're emitting the
+  /// decl to.
+  VarLocs[vd] = {box, addr};
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.
@@ -984,21 +960,10 @@ void SILGenFunction::destroyLocalVariable(VarDecl *vd) {
   
   auto &loc = VarLocs[vd];
   
-  if (vd->hasFixedLifetime()) {
-    // For a stack variable, we're responsible for both the value and the
-    // allocation, so load and destroy the value (or destroy it indirectly if
-    // it's address-only) then deallocate the variable.
-    assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
-    const TypeLowering &ti = getTypeLowering(vd->getType());
-    if (!ti.isTrivial())
-      B.createDestroyAddr(vd, loc.address);
-    B.createDeallocStack(vd, loc.address);
-  } else {
-    // For a heap variable, the box is responsible for the value. We just need
-    // to give up our retain count on it.
-    assert(loc.box && "captured var should have been given a box");
-    B.createRelease(vd, loc.box);
-  }
+  // For a heap variable, the box is responsible for the value. We just need
+  // to give up our retain count on it.
+  assert(loc.box && "captured var should have been given a box");
+  B.createRelease(vd, loc.box);
 }
 
 void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
@@ -1010,14 +975,8 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
   assert(VarLocs.count(vd) && "var decl wasn't emitted?!");
 
   auto &loc = VarLocs[vd];
-  
-  if (vd->hasFixedLifetime()) {
-    assert(!loc.box && "fixed-lifetime var shouldn't have been given a box");
-    B.createDeallocStack(vd, loc.address);
-  } else {
-    assert(loc.box && "captured var should have been given a box");
-    B.createDeallocRef(vd, loc.box);
-  }
+  assert(loc.box && "captured var should have been given a box");
+  B.createDeallocRef(vd, loc.box);
 }
 
 //===----------------------------------------------------------------------===//

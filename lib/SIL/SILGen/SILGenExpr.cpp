@@ -1654,15 +1654,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Emit a local variable for 'this'.
   // FIXME: The (potentially partially initialized) variable would need to be
   // cleaned up on an error unwind.
-  
-  // If we don't need to heap-allocate the local 'this' and we're returning
-  // indirectly, we can emplace 'this' in the return slot.
-  bool canConstructInPlace
-    = thisDecl->hasFixedLifetime() && IndirectReturnAddress.isValid();
-  if (canConstructInPlace)
-    VarLocs[thisDecl] = {SILValue(), IndirectReturnAddress};
-  else
-    emitLocalVariable(thisDecl);
+  emitLocalVariable(thisDecl);
 
   SILValue thisLV = VarLocs[thisDecl].address;
   
@@ -1683,12 +1675,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   if (!emitEpilogBB(ctor))
     return;
 
-  // If we constructed in-place, we're done.
-  if (canConstructInPlace) {
-    B.createReturn(ctor, emitEmptyTuple(ctor));
-    return;
-  }
-  
   // If 'this' is address-only, copy 'this' into the indirect return slot.
   if (lowering.isAddressOnly()) {
     assert(IndirectReturnAddress &&

@@ -293,9 +293,6 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (capture->getTypeOfReference()->is<LValueType>()) {
     // FIXME: Not-used-as-lvalue captures can be captured by value.
 
-    // If the capture has a fixed lifetime, we can pass it simply by reference.
-    if (capture->hasFixedLifetime())
-      return CaptureKind::Byref;
     // Otherwise, we need to pass a box.
     return CaptureKind::Box;
   }
@@ -1207,8 +1204,7 @@ Type TypeConverter::getFunctionTypeWithCaptures(AnyFunctionType *funcType,
       break;
     case CaptureKind::Byref: {
       // Capture the address.
-      assert((capture->getType()->is<LValueType>() ||
-              capture->hasFixedLifetime()) &&
+      assert(capture->getType()->is<LValueType>() &&
              "byref capture not an lvalue or fixed-lifetime var?!");
       Type objectType
         = capture->getType()->getRValueType();

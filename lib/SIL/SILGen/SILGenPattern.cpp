@@ -1012,10 +1012,6 @@ public:
     VarDecl *emittedVar = nullptr;
     
     auto emitVar = [&](VarDecl *vd) {
-      // FIXME: Pessimize all variable bindings to be allocated in boxes.
-      // The old capture analysis pass will be dying soon anyway.
-      vd->setHasFixedLifetime(false);
-      
       // If we already emitted a variable from another row, alias that variable.
       if (emittedVar) {
         gen.VarLocs[vd] = gen.VarLocs[emittedVar];

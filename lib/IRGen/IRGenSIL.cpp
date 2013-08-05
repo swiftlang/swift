@@ -1765,7 +1765,7 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
-  llvm_unreachable("not implemented");
+  //llvm_unreachable("not implemented");
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {

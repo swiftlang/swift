@@ -97,16 +97,8 @@ class alignas(8) Decl {
   class ValueDeclBitfields {
     friend class ValueDecl;
     unsigned : NumDeclBits;
-
-    // The following flags are not necessarily meaningful for all
-    // kinds of value-declarations.
-
-    // HasFixedLifetime - Whether the lifetime of this decl matches its
-    // scope (i.e. the decl isn't captured, so it can be allocated as part of
-    // the stack frame.)
-    unsigned HasFixedLifetime : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits + 2 };
+  enum { NumValueDeclBits = NumDeclBits };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitFields {
@@ -931,7 +923,6 @@ class ValueDecl : public Decl {
 protected:
   ValueDecl(DeclKind K, DeclContext *DC, Identifier name, Type ty)
     : Decl(K, DC), Name(name), AttrsAndIsObjC(&EmptyAttrs, false), Ty(ty) {
-    ValueDeclBits.HasFixedLifetime = false;
   }
 
 public:
@@ -994,12 +985,6 @@ public:
   /// null to indicate that there is no base).
   bool isSettableOnBase(Type baseType) const;
   
-  void setHasFixedLifetime(bool flag) {
-    ValueDeclBits.HasFixedLifetime = flag;
-  }
-  bool hasFixedLifetime() const {
-    return ValueDeclBits.HasFixedLifetime;
-  }
   /// isInstanceMember - Determine whether this value is an instance member
   /// of a union or protocol.
   bool isInstanceMember() const;

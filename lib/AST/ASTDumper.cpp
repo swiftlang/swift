@@ -339,8 +339,6 @@ namespace {
       else
         OS << "<null type>";
       OS << '\'';
-
-      if (VD->hasFixedLifetime()) OS << " hasFixedLifetime=true";
     }
 
     void visitTranslationUnit(const TranslationUnit *TU) {
