@@ -198,8 +198,8 @@ private:
   /// protocol conformance.
   ProtocolConformance *
   readUnderlyingConformance(ProtocolDecl *proto,
-                            serialization::DeclID nominalID,
-                            serialization::IdentifierID moduleOrTypeID);
+                            serialization::DeclID typeID,
+                            serialization::IdentifierID moduleID);
 
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///

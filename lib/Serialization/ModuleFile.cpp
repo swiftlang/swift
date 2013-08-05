@@ -200,20 +200,20 @@ Pattern *ModuleFile::maybeReadPattern() {
 
 ProtocolConformance *
 ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
-                                      DeclID nominalID,
-                                      IdentifierID moduleOrTypeID) {
-  if (!nominalID) {
+                                      DeclID typeID,
+                                      IdentifierID moduleID) {
+  if (!moduleID) {
     // The underlying conformance is in the following record.
-    return maybeReadConformance(getType(moduleOrTypeID))->second;
+    return maybeReadConformance(getType(typeID))->second;
   }
 
   // Dig out the protocol conformance within the nominal declaration.
-  auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+  auto nominal = cast<NominalTypeDecl>(getDecl(typeID));
   Module *owningModule;
-  if (moduleOrTypeID == 0)
+  if (moduleID == 1)
     owningModule = ModuleContext;
   else
-    owningModule = getModule(getIdentifier(moduleOrTypeID-1));
+    owningModule = getModule(getIdentifier(moduleID-2));
   (void)owningModule; // FIXME: Currently only used for checking.
 
   // Search protocols
@@ -264,14 +264,14 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
-    DeclID nominalID;
-    IdentifierID moduleOrTypeID;
+    DeclID typeID;
+    IdentifierID moduleID;
     unsigned numTypeWitnesses;
     unsigned numSubstitutions;
     ArrayRef<uint64_t> rawIDs;
     SpecializedProtocolConformanceLayout::readRecord(scratch, protoID,
-                                                     nominalID,
-                                                     moduleOrTypeID,
+                                                     typeID,
+                                                     moduleID,
                                                      numTypeWitnesses,
                                                      numSubstitutions,
                                                      rawIDs);
@@ -302,7 +302,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
     assert(rawIDIter <= rawIDs.end() && "read too much");
 
     ProtocolConformance *genericConformance
-      = readUnderlyingConformance(proto, nominalID, moduleOrTypeID);
+      = readUnderlyingConformance(proto, typeID, moduleID);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
@@ -317,18 +317,18 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType){
 
   case INHERITED_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
-    DeclID nominalID;
-    IdentifierID moduleOrTypeID;
+    DeclID typeID;
+    IdentifierID moduleID;
     InheritedProtocolConformanceLayout::readRecord(scratch, protoID,
-                                                   nominalID,
-                                                   moduleOrTypeID);
+                                                   typeID,
+                                                   moduleID);
 
     ASTContext &ctx = ModuleContext->Ctx;
 
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
     ProtocolConformance *inheritedConformance
-      = readUnderlyingConformance(proto, nominalID, moduleOrTypeID);
+      = readUnderlyingConformance(proto, typeID, moduleID);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
