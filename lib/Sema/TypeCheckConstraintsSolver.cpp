@@ -62,10 +62,11 @@ Solution ConstraintSystem::finalize() {
   }
 
   // For each of the overload sets, get its overload choice.
-  for (auto resolved : ResolvedOverloads) {
-    solution.overloadChoices[resolved.first->getLocator()]
-      = { resolved.first->getChoices()[resolved.second.first],
-          resolved.second.second };
+  for (auto resolved = resolvedOverloadSets;
+       resolved; resolved = resolved->Previous) {
+    solution.overloadChoices[resolved->Set->getLocator()]
+      = { resolved->Set->getChoices()[resolved->ChoiceIndex],
+          resolved->ImpliedType };
   }
 
   return std::move(solution);
@@ -359,7 +360,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 {
   ++cs.solverState->depth;
 
-  numResolvedOverloadSets = cs.solverState->resolvedOverloadSets.size();
+  resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numUnresolvedOverloadSets = cs.UnresolvedOverloadSets.size();
   numGeneratedOverloadSets = cs.solverState->generatedOverloadSets.size();
@@ -371,14 +372,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 ConstraintSystem::SolverScope::~SolverScope() {
   --cs.solverState->depth;
 
-  // Remove resolved overloads from the shared constraint system state.
-  // FIXME: In the long run, we shouldn't need this.
-  for (unsigned i = numResolvedOverloadSets,
-                n = cs.solverState->resolvedOverloadSets.size();
-       i != n; ++i) {
-    cs.ResolvedOverloads.erase(cs.solverState->resolvedOverloadSets[i]);
-  }
-
   // Remove generated overloads from the shared constraint system state.
   // FIXME: In the long run, we shouldn't need this.
   for (unsigned i = numGeneratedOverloadSets,
@@ -388,7 +381,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   }
 
   // Erase the end of various lists.
-  truncate(cs.solverState->resolvedOverloadSets, numResolvedOverloadSets);
+  cs.resolvedOverloadSets = resolvedOverloadSets;
   truncate(cs.TypeVariables, numTypeVariables);
   truncate(cs.UnresolvedOverloadSets, numUnresolvedOverloadSets);
   truncate(cs.solverState->generatedOverloadSets, numGeneratedOverloadSets);

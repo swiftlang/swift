@@ -299,7 +299,7 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
-  // Find the locators which have the largest numbers of
+  // Find the locators which have the largest numbers of distinct overloads.
   SmallVector<unsigned, 2> mostDistinctOverloads;
   unsigned maxDistinctOverloads = 0;
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {

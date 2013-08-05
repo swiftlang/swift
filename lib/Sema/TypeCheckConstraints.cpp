@@ -259,6 +259,14 @@ void Constraint::dump(SourceManager *sm) {
   print(llvm::errs(), sm);
 }
 
+// Only allow allocation of resolved overload set list items using the
+// allocator in ASTContext.
+void *
+ConstraintSystem::ResolvedOverloadSetListItem::
+operator new(size_t bytes, ConstraintSystem &cs, unsigned alignment) {
+  return cs.getAllocator().Allocate(bytes, alignment);
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -895,19 +903,6 @@ ConstraintSystem::getGeneratedOverloadSet(ConstraintLocator *locator) {
     return known->second;
 
   return nullptr;
-}
-
-/// \brief Find the overload choice that was assumed by this constraint
-/// system (or one of its parents), along with the type it was given.
-Optional<std::pair<OverloadChoice, Type>>
-ConstraintSystem::getSelectedOverloadFromSet(OverloadSet *ovl) {
-  auto known = ResolvedOverloads.find(ovl);
-  if (known != ResolvedOverloads.end()) {
-    return std::make_pair(ovl->getChoices()[known->second.first],
-                          known->second.second);
-  }
-
-  return Nothing;
 }
 
 //===--------------------------------------------------------------------===//
@@ -1915,16 +1910,14 @@ void ConstraintSystem::resolveOverload(OverloadSet *ovl, unsigned idx) {
   addConstraint(ConstraintKind::Bind, ovl->getBoundType(), refType);
 
   // Note that we have resolved this overload.
-  ResolvedOverloads[ovl] = std::make_pair(idx, refType);
-  if (solverState) {
-    solverState->resolvedOverloadSets.push_back(ovl);
-
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      llvm::errs().indent(solverState->depth * 2)
-        << "(overload set #" << ovl->getID() << " choice #" << idx << ": "
-        << ovl->getBoundType()->getString() << " := "
-        << refType->getString() << ")\n";
-    }
+  resolvedOverloadSets
+    = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets, ovl, idx,
+                                              refType};
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    llvm::errs().indent(solverState? solverState->depth * 2 : 2)
+      << "(overload set #" << ovl->getID() << " choice #" << idx << ": "
+      << ovl->getBoundType()->getString() << " := "
+      << refType->getString() << ")\n";
   }
 }
 
@@ -3756,45 +3749,6 @@ void Solution::dump(SourceManager *sm) const {
 void ConstraintSystem::dump() {
   llvm::raw_ostream &out = llvm::errs();
 
-  if (!ResolvedOverloads.empty()) {
-    out << "Resolved overloads:\n";
-
-    // Otherwise, report the resolved overloads.
-    assert(!ResolvedOverloads.empty());
-    for (auto ovl : ResolvedOverloads) {
-      auto &choice = ovl.first->getChoices()[ovl.second.first];
-      out << "  selected overload set #" << ovl.first->getID()
-          << " choice #" << ovl.second.first << " for ";
-      switch (choice.getKind()) {
-      case OverloadChoiceKind::Decl:
-        if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
-        out << choice.getDecl()->getName().str() << ": "
-          << ovl.first->getBoundType()->getString() << " == "
-          << ovl.second.second->getString() << "\n";
-        break;
-
-      case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString() << "\n";
-        break;
-
-      case OverloadChoiceKind::FunctionReturningBaseType:
-        out << "function returning base type "
-            << choice.getBaseType()->getString() << "\n";
-        break;
-      case OverloadChoiceKind::IdentityFunction:
-        out << "identity " << choice.getBaseType()->getString() << " -> "
-            << choice.getBaseType()->getString() << "\n";
-        break;
-      case OverloadChoiceKind::TupleIndex:
-        out << "tuple " << choice.getBaseType()->getString() << " index "
-            << choice.getTupleIndex() << "\n";
-        break;
-      }
-    }
-    out << "\n";
-  }
-
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);
@@ -3823,6 +3777,45 @@ void ConstraintSystem::dump() {
   for (auto constraint : SolvedConstraints) {
     out.indent(2);
     constraint->print(out, &getTypeChecker().Context.SourceMgr);
+    out << "\n";
+  }
+
+  if (resolvedOverloadSets) {
+    out << "Resolved overloads:\n";
+
+    // Otherwise, report the resolved overloads.
+    for (auto resolved = resolvedOverloadSets;
+         resolved; resolved = resolved->Previous) {
+      auto &choice = resolved->Set->getChoices()[resolved->ChoiceIndex];
+      out << "  selected overload set #" << resolved->Set->getID()
+          << " choice #" << resolved->ChoiceIndex << " for ";
+      switch (choice.getKind()) {
+        case OverloadChoiceKind::Decl:
+          if (choice.getBaseType())
+            out << choice.getBaseType()->getString() << ".";
+          out << choice.getDecl()->getName().str() << ": "
+            << resolved->Set->getBoundType()->getString() << " == "
+            << resolved->ImpliedType->getString() << "\n";
+          break;
+
+        case OverloadChoiceKind::BaseType:
+          out << "base type " << choice.getBaseType()->getString() << "\n";
+          break;
+
+        case OverloadChoiceKind::FunctionReturningBaseType:
+          out << "function returning base type "
+              << choice.getBaseType()->getString() << "\n";
+          break;
+        case OverloadChoiceKind::IdentityFunction:
+          out << "identity " << choice.getBaseType()->getString() << " -> "
+              << choice.getBaseType()->getString() << "\n";
+          break;
+        case OverloadChoiceKind::TupleIndex:
+          out << "tuple " << choice.getBaseType()->getString() << " index "
+              << choice.getTupleIndex() << "\n";
+          break;
+      }
+    }
     out << "\n";
   }
 
