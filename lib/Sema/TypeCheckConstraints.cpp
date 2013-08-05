@@ -1742,36 +1742,34 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // For a subtyping relation involving two existential types, or a conversion
   // from any type, check whether the first type conforms to each of the
   // protocols in the second type.
-  if (concrete &&
-      (kind >= TypeMatchKind::Conversion ||
-       (kind == TypeMatchKind::Subtype && type1->isExistentialType()))) {
+  if (kind >= TypeMatchKind::Conversion ||
+       (kind == TypeMatchKind::Subtype && type1->isExistentialType())) {
     SmallVector<ProtocolDecl *, 4> protocols;
 
     if (type2->isExistentialType(protocols)) {
-      // Substitute all type variables in the first type
-      auto substType1 = simplifyType(type1);
-      if (substType1->hasTypeVariable()) {
-        // If type variables remain, we can't solve this now.
-        // FIXME: In many cases, we *can* solve this now, because a generic
-        // type will unconditionally conform to the named protocols.
-        return SolutionKind::Unsolved;
-      }
-
+      auto fullLocator = getConstraintLocator(locator);
+      bool addedConstraint = false;
       for (auto proto : protocols) {
-        if (!TC.conformsToProtocol(substType1, proto)) {
-          // Record this failure.
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(locator),
-                          Failure::DoesNotConformToProtocol, type1,
-                          proto->getDeclaredType());
-          }
+        switch (simplifyConformsToConstraint(type1, proto, fullLocator)) {
+        case SolutionKind::Solved:
+        case SolutionKind::TriviallySolved:
+          break;
 
+        case SolutionKind::Unsolved:
+          // Add the constraint.
+          addConstraint(ConstraintKind::ConformsTo, type1,
+                        proto->getDeclaredType());
+          addedConstraint = true;
+          break;
+
+        case SolutionKind::Error:
           return SolutionKind::Error;
         }
       }
 
       trivial = false;
-      return SolutionKind::TriviallySolved;
+      return addedConstraint? SolutionKind::Solved
+                            : SolutionKind::TriviallySolved;
     }
   }
   
