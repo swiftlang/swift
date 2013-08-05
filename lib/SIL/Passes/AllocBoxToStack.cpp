@@ -42,13 +42,13 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
 //===----------------------------------------------------------------------===//
 
 
-/// getLastRelease - Determine if there is a single ReleaseInst that
-/// post-dominates all of the uses of the specified AllocBox.  If so, return it.
-/// If not, return null.
-static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
-                                   SmallVectorImpl<SILInstruction*> &Users,
-                                   SmallVectorImpl<ReleaseInst*> &Releases,
-                                   llvm::OwningPtr<PostDominanceInfo> &PDI) {
+/// getLastRelease - Determine if there is a single ReleaseInst or
+/// DeallocRefInst that post-dominates all of the uses of the specified
+/// AllocBox.  If so, return it.  If not, return null.
+static SILInstruction *getLastRelease(AllocBoxInst *ABI,
+                                      SmallVectorImpl<SILInstruction*> &Users,
+                                    SmallVectorImpl<SILInstruction*> &Releases,
+                                      llvm::OwningPtr<PostDominanceInfo> &PDI) {
   // If there are no releases, then the box is leaked.  Don't transform it. This
   // can only happen in hand-written SIL code, not compiler generated code.
   if (Releases.empty())
@@ -71,10 +71,10 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
   // want to do multiple scans of the block (which could be large) just keep
   // track of whether there are multiple releases in the ultimate block we find.
   bool MultipleReleasesInBlock = false;
-  ReleaseInst *LastRelease = Releases[0];
+  SILInstruction *LastRelease = Releases[0];
   
   for (unsigned i = 1, e = Releases.size(); i != e; ++i) {
-    ReleaseInst *RI = Releases[i];
+    SILInstruction *RI = Releases[i];
     
     // If this release is in the same block as our candidate, keep track of the
     // multiple release nature of that block, but don't try to determine an
@@ -132,7 +132,7 @@ static ReleaseInst *getLastRelease(AllocBoxInst *ABI,
 /// alloc_box, validating that they don't allow the ABI to escape.
 static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
                               SmallVectorImpl<SILInstruction*> &Users,
-                              SmallVectorImpl<ReleaseInst*> &Releases) {
+                              SmallVectorImpl<SILInstruction*> &Releases) {
   for (auto UI : V->getUses()) {
     auto *User = cast<SILInstruction>(UI->getUser());
     
@@ -149,8 +149,8 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     
     // Release doesn't either, but we want to keep track of where this value
     // gets released.
-    if (auto *RI = dyn_cast<ReleaseInst>(User)) {
-      Releases.push_back(cast<ReleaseInst>(RI));
+    if (isa<ReleaseInst>(User) || isa<DeallocRefInst>(User)) {
+      Releases.push_back(User);
       Users.push_back(User);
       continue;
     }
@@ -189,7 +189,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
 static bool optimizeAllocBox(AllocBoxInst *ABI,
                              llvm::OwningPtr<PostDominanceInfo> &PDI) {
   SmallVector<SILInstruction*, 32> Users;
-  SmallVector<ReleaseInst*, 4> Releases;
+  SmallVector<SILInstruction*, 4> Releases;
   
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
@@ -202,7 +202,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // should work for us, because we don't expect code duplication that can
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
-  ReleaseInst *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
+  SILInstruction *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
 
   auto &lowering = ABI->getModule()->Types.getTypeLowering(ABI->getElementType());
   if (LastRelease == nullptr && !lowering.isTrivial()) {
@@ -233,7 +233,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   if (LastRelease) {
     SILBuilder B2(LastRelease);
 
-    if (!lowering.isTrivial())
+    if (!lowering.isTrivial() && !isa<DeallocRefInst>(LastRelease))
       lowering.emitDestroyAddress(B2, ABI->getLoc(), AllocVar);
 
     B2.createDeallocStack(LastRelease->getLoc(), AllocVar);
@@ -244,7 +244,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // pointer).
   while (!ABI->use_empty()) {
     auto *User = cast<SILInstruction>((*ABI->use_begin())->getUser());
-    assert(isa<ReleaseInst>(User) || isa<RetainInst>(User));
+    assert(isa<ReleaseInst>(User) || isa<RetainInst>(User) ||
+           isa<DeallocRefInst>(User));
     
     User->eraseFromParent();
   }
