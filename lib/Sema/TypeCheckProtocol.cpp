@@ -634,6 +634,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   // Check that T provides all of the required func/variable/subscript members.
   SmallVector<std::pair<TypeAliasDecl *, Type>, 4> deducedAssocTypes;
+  bool invalid = false;
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
     if (!Requirement)
@@ -677,6 +678,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     SmallVector<RequirementMatch, 4> matches;
     unsigned numViable = 0;
     unsigned bestIdx = 0;
+    bool invalidWitness = false;
     for (auto witness : witnesses) {
       // Don't match anything in a protocol.
       // FIXME: When default implementations come along, we can try to match
@@ -691,6 +693,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
       if (match.isViable()) {
         ++numViable;
         bestIdx = matches.size();
+      } else if (match.Kind == MatchKind::WitnessInvalid) {
+        invalidWitness = true;
       }
 
       matches.push_back(std::move(match));
@@ -783,6 +787,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     if (ComplainLoc.isInvalid())
       return nullptr;
 
+    // If there was an invalid witness that might have worked, just
+    // suppress the diagnostic entirely. This stops the diagnostic cascade.
+    // FIXME: We could do something crazy, like try to fix up the witness.
+    if (invalidWitness) {
+      invalid = true;
+      continue;
+    }
+
     // Complain that this type does not conform to this protocol.
     if (!Complained) {
       TC.diagnose(ComplainLoc, diag::type_does_not_conform,
@@ -805,7 +817,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
     // FIXME: Suggest a new declaration that does match?
   }
   
-  if (Complained)
+  if (Complained || invalid)
     return nullptr;
 
   // If any associated types were left unresolved, diagnose them.

@@ -902,6 +902,7 @@ public:
 
     if (badType) {
       FE->setType(ErrorType::get(TC.Context));
+      FD->setInvalid();
       return;
     }
 
