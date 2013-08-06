@@ -213,6 +213,15 @@ static Location getStartLocForLinetable(SourceManager &SM, SILLocation Loc) {
   return None;
 }
 
+/// Determine whether this debug scope belongs to a pipe closure.
+static bool isPipeClosure(SILDebugScope *DS) {
+  if (DS)
+    if (Expr* E = DS->Loc.getAs<Expr>())
+      if (E->getKind() == ExprKind::PipeClosure)
+        return true;
+  return false;
+}
+
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    SILLocation Loc) {
@@ -428,10 +437,10 @@ void IRGenDebugInfo::createFunction(SILModule &SILMod, SILDebugScope *DS,
 
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
-  // ignore it. We make an exception for top_level_code, which albeit
-  // it does not have a Swift name, it does appear prominently in the
-  // source code.
-  if (Name.empty() && LinkageName != "top_level_code")
+  // ignore it. Explicit closures are exempt from this rule. We also
+  // make an exception for top_level_code, which albeit it does not
+  // have a Swift name, it does appear prominently in the source code.
+  if (Name.empty() && LinkageName != "top_level_code" && !isPipeClosure(DS))
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
   if (FnTy && FnTy->isBlock())
