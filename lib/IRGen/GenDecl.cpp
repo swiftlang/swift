@@ -752,7 +752,8 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
 llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                llvm::Type *storageType,
                                                DebugTypeInfo DebugType,
-                                               SILLocation DebugLoc) {
+                                               SILLocation DebugLoc,
+                                               StringRef DebugName) {
   llvm::GlobalValue *existing = IGM.Module.getNamedGlobal(getName());
   if (existing) {
     if (isa<llvm::GlobalVariable>(existing) &&
@@ -774,11 +775,10 @@ llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
   var->setVisibility(getVisibility());
 
   if (IGM.DebugInfo)
-    IGM.DebugInfo->emitGlobalVariableDeclaration(var,
-                                                 getName(),
-                                                 getName(),
-                                                 DebugType,
-                                                 DebugLoc);
+    IGM.DebugInfo->
+      emitGlobalVariableDeclaration(var,
+                                    DebugName.empty() ? getName() : DebugName,
+                                    getName(), DebugType, DebugLoc);
 
   return var;
 }
@@ -899,7 +899,8 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, entity);
   DebugTypeInfo DbgTy(var->getType()->getCanonicalType(), type);
-  auto addr = link.createVariable(*this, type.StorageType, DbgTy, var);
+  auto addr = link.createVariable(*this, type.StorageType,
+                                  DbgTy, var, var->getName().str());
   // Ask the type to give us an Address.
   Address result = type.getAddressForPointer(addr);
 
