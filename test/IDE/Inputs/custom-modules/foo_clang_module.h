@@ -29,6 +29,19 @@ int fooFunc3(int a, float b, double c, int *d);
 
 int redeclaredInMultipleModulesFunc1(int a);
 
+@interface FooClass {
+  int fooIntIvar;
+}
+
+@property int fooProperty;
+
+- (void) fooInstanceFunc0;
+- (void) fooInstanceFunc1:(int)a;
+- (void) fooInstanceFunc2:(int)a withB:(int)b;
+
++ (void) fooClassFunc0;
+@end
+
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1
 #define FOO_MACRO_3 (-1)
