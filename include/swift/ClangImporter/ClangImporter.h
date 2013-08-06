@@ -54,7 +54,10 @@ public:
   ///
   /// \param moduleCachePath The module cache path.
   ///
-  /// \param searchPaths Additional paths to search for user modules.
+  /// \param importSearchPaths Additional paths to search for user modules.
+  ///
+  /// \param frameworkSearchPaths Additional paths to search for user
+  /// frameworks.
   ///
   /// \param overrideResourceDir If nonempty, the path to use to locate the
   /// resources for Clang.  This should at least have an include/ subdirectory
