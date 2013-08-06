@@ -2574,26 +2574,40 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc,
   if (decl1->getKind() != decl2->getKind())
     return false;
 
-  // Only consider function declarations from here on.
-  // FIXME: Subscripts and VarDecls should work as well.
-  if (!isa<FuncDecl>(decl1))
-    return false;
+  Type type1;
+  Type type2;
 
-  auto func1 = cast<FuncDecl>(decl1);
-  auto func2 = cast<FuncDecl>(decl2);
+  if (auto func1 = dyn_cast<FuncDecl>(decl1)) {
+    auto func2 = cast<FuncDecl>(decl2);
+    type1 = func1->getType();
+    type2 = func2->getType();
 
-  // Skip the 'this' parameter.
-  // FIXME: Might not actually be what we want to do. Think about this more.
-  auto type1 = func1->getType();
-  auto type2 = func2->getType();
-  if (func1->getDeclContext()->isTypeContext() &&
-      func2->getDeclContext()->isTypeContext()) {
+    // Skip the 'this' parameter.
+    // FIXME: Might not actually be what we want to do. Think about this more.
+    if (func1->getDeclContext()->isTypeContext())
+      type1 = type1->castTo<AnyFunctionType>()->getResult();
+    if (func2->getDeclContext()->isTypeContext())
+      type2 = type2->castTo<AnyFunctionType>()->getResult();
+  } else if (auto constructor1 = dyn_cast<ConstructorDecl>(decl1)) {
+    auto constructor2 = cast<ConstructorDecl>(decl2);
+    type1 = constructor1->getType();
+    type2 = constructor2->getType();
+
+    // Skip the 'this' parameter.
+    // FIXME: Might not actually be what we want to do. Think about this more.
     type1 = type1->castTo<AnyFunctionType>()->getResult();
     type2 = type2->castTo<AnyFunctionType>()->getResult();
+  } else if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
+    auto subscript2 = cast<SubscriptDecl>(decl2);
+    type1 = subscript1->getType();
+    type2 = subscript2->getType();
+  } else {
+    // FIXME: Deal with variables, types, etc.
+    return false;
   }
 
   // If one is polymorphic and the other is not, prefer the monomorphic result.
-  // FIXME: Isn't this a special case of the subtype check below.
+  // FIXME: Isn't this a special case of the subtype check below?
   bool poly1 = type1->is<PolymorphicFunctionType>();
   bool poly2 = type2->is<PolymorphicFunctionType>();
   if (poly1 != poly2) {
