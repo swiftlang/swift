@@ -688,6 +688,10 @@ public:
   void visitDeallocRefInst(DeallocRefInst *DI) {
     OS << "dealloc_ref " << getIDAndType(DI->getOperand());
   }
+  void visitDeallocBoxInst(DeallocBoxInst *DI) {
+    OS << "dealloc_box " << DI->getElementType() << ", "
+       << getIDAndType(DI->getOperand());
+  }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     OS << "destroy_addr " << getIDAndType(DI->getOperand());
   }

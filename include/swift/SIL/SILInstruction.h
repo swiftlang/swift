@@ -1463,8 +1463,12 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
   
-/// DeallocRefInst - Deallocate memory allocated for a box or reference type
-/// instance. This does not destroy the referenced instance; it must either be
+/// DeallocRefInst - Deallocate memory allocated for a reference type
+/// instance, as might have been created by an AllocRefInst. It is
+/// undefined behavior if the type of the operand does not match the
+/// most derived type of the allocated instance.
+///
+/// This does not destroy the referenced instance; it must either be
 /// uninitialized or have been manually destroyed.
 class DeallocRefInst : public UnaryInstructionBase<ValueKind::DeallocRefInst,
                                                    SILInstruction,
@@ -1475,11 +1479,29 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// DestroyAddrInst - Destroy the value at a memory location and deallocate the
-/// memory. This is similar to:
+/// DeallocBoxInst - Deallocate memory allocated for a boxed value,
+/// as might have been created by an AllocBoxInst. It is undefined
+/// behavior if the type of the boxed type does not match the
+/// type of the boxed type of the allocated box.
+///
+/// This does not destroy the boxed value instance; it must either be
+/// uninitialized or have been manually destroyed.
+class DeallocBoxInst : public UnaryInstructionBase<ValueKind::DeallocBoxInst,
+                                                   SILInstruction,
+                                                   /*HAS_RESULT*/ false>
+{
+  SILType ElementType;
+public:
+  DeallocBoxInst(SILLocation loc, SILType elementType, SILValue operand)
+    : UnaryInstructionBase(loc, operand), ElementType(elementType) {}
+
+  SILType getElementType() const { return ElementType; }
+};
+
+/// DestroyAddrInst - Destroy the value at a memory location according to
+/// its SIL type. This is similar to:
 ///   %1 = load %operand
 ///   release %1
-///   dealloc %operand
 /// but a destroy instruction can be used for types that cannot be loaded,
 /// such as resilient value types.
 class DestroyAddrInst : public UnaryInstructionBase<ValueKind::DestroyAddrInst,

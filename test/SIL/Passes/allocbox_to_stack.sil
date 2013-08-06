@@ -166,10 +166,10 @@ bb0(%0 : $*LogicValue, %1 : $Bool.metatype):
 // Generics test, which is address-only.
 class Generic<T> {}
 
-// CHECK-LABEL: sil @dealloc_ref
-sil @dealloc_ref : $[thin] <T> () -> () {
+// CHECK-LABEL: sil @dealloc_box
+sil @dealloc_box : $[thin] <T> () -> () {
   %1 = alloc_box $Generic<T>
-  dealloc_ref %1#0 : $Builtin.ObjectPointer
+  dealloc_box $Generic<T>, %1#0 : $Builtin.ObjectPointer
   // CHECK: %0 = alloc_stack $Generic<T>
   // CHECK-NEXT: dealloc_stack %0
 

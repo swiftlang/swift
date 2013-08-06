@@ -976,7 +976,7 @@ void SILGenFunction::deallocateUninitializedLocalVariable(VarDecl *vd) {
 
   auto &loc = VarLocs[vd];
   assert(loc.box && "captured var should have been given a box");
-  B.createDeallocRef(vd, loc.box);
+  B.createDeallocBox(vd, loc.address.getType().getObjectType(), loc.box);
 }
 
 //===----------------------------------------------------------------------===//

@@ -445,8 +445,16 @@ public:
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(!DI->getOperand().getType().isAddress(),
             "Operand of dealloc_ref must not be address");
-    require(DI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of dealloc_ref must be reference type");
+    require(DI->getOperand().getType().getClassOrBoundGenericClass(),
+            "Operand of dealloc_ref must be of class type");
+  }
+  void checkDeallocBoxInst(DeallocBoxInst *DI) {
+    require(!DI->getElementType().isAddress(),
+            "Element type of dealloc_box must not be address");
+    require(!DI->getOperand().getType().isAddress(),
+            "Operand of dealloc_box must not be address");
+    require(DI->getOperand().getType().is<BuiltinObjectPointerType>(),
+            "Operand of dealloc_box must be of Builtin.ObjectPointer type");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand().getType().isAddress(),

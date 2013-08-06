@@ -607,6 +607,10 @@ public:
   DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocRefInst(loc, operand));
   }
+  DeallocBoxInst *createDeallocBox(SILLocation loc, SILType eltType,
+                                   SILValue operand) {
+    return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));
+  }
   DestroyAddrInst *createDestroyAddr(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) DestroyAddrInst(Loc, Operand));
   }

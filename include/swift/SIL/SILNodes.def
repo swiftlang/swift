@@ -70,6 +70,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(AllocArrayInst, SILInstruction, None)
   INST(DeallocStackInst, SILInstruction, MayHaveSideEffects)
   INST(DeallocRefInst, SILInstruction, MayHaveSideEffects)
+  INST(DeallocBoxInst, SILInstruction, MayHaveSideEffects)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, None)

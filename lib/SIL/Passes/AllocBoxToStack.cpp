@@ -43,7 +43,7 @@ static bool isByRefOrIndirectReturn(SILInstruction *Apply,
 
 
 /// getLastRelease - Determine if there is a single ReleaseInst or
-/// DeallocRefInst that post-dominates all of the uses of the specified
+/// DeallocBoxInst that post-dominates all of the uses of the specified
 /// AllocBox.  If so, return it.  If not, return null.
 static SILInstruction *getLastRelease(AllocBoxInst *ABI,
                                       SmallVectorImpl<SILInstruction*> &Users,
@@ -149,7 +149,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, ValueBase *V,
     
     // Release doesn't either, but we want to keep track of where this value
     // gets released.
-    if (isa<ReleaseInst>(User) || isa<DeallocRefInst>(User)) {
+    if (isa<ReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
       Releases.push_back(User);
       Users.push_back(User);
       continue;
@@ -233,7 +233,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   if (LastRelease) {
     SILBuilder B2(LastRelease);
 
-    if (!lowering.isTrivial() && !isa<DeallocRefInst>(LastRelease))
+    if (!lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
       lowering.emitDestroyAddress(B2, ABI->getLoc(), AllocVar);
 
     B2.createDeallocStack(LastRelease->getLoc(), AllocVar);
@@ -245,7 +245,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   while (!ABI->use_empty()) {
     auto *User = cast<SILInstruction>((*ABI->use_begin())->getUser());
     assert(isa<ReleaseInst>(User) || isa<RetainInst>(User) ||
-           isa<DeallocRefInst>(User));
+           isa<DeallocBoxInst>(User));
     
     User->eraseFromParent();
   }

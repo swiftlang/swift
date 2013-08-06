@@ -534,6 +534,7 @@ public:
   void visitUnownedRetainInst(UnownedRetainInst *i);
   void visitUnownedReleaseInst(UnownedReleaseInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
+  void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
 
   void visitInitializeVarInst(InitializeVarInst *i);
@@ -1765,6 +1766,10 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
+  //llvm_unreachable("not implemented");
+}
+
+void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   //llvm_unreachable("not implemented");
 }
 

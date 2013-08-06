@@ -677,3 +677,21 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   release %2#0 : $Builtin.ObjectPointer
   return %10 : $Builtin.Int1
 }
+
+// CHECK: sil @test_dealloc_ref
+sil @test_dealloc_ref : $[thin] () -> () {
+bb0:
+  %0 = alloc_ref $Class1
+  dealloc_ref %0 : $Class1
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK: sil @test_dealloc_box
+sil @test_dealloc_box : $[thin] () -> () {
+bb0:
+  %0 = alloc_box $Class1
+  dealloc_box $Class1, %0#0 : $Builtin.ObjectPointer
+  %2 = tuple ()
+  return %2 : $()
+}

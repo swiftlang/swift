@@ -822,6 +822,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("convert_cc", ValueKind::ConvertCCInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
+    .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
@@ -1325,6 +1326,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
 
     break;
+  case ValueKind::DeallocBoxInst:
   case ValueKind::ArchetypeMetatypeInst:
   case ValueKind::ClassMetatypeInst:
   case ValueKind::ProtocolMetatypeInst: {
@@ -1343,6 +1345,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::ProtocolMetatypeInst:
       ResultVal = B.createProtocolMetatype(SILLocation(), Ty, Val);
+      break;
+    case ValueKind::DeallocBoxInst:
+      ResultVal = B.createDeallocBox(SILLocation(), Ty, Val);
       break;
     }
     break;
