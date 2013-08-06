@@ -1883,13 +1883,42 @@ public:
   }
 };
 
+/// \brief The type of the local allocation required to store a value
+/// of the given type.
+///
+/// This type does not appear in the AST; it is an implementation
+/// detail of SIL and IR-generation.
+class LocalStorageType : public TypeBase {
+  Type Value;
+  friend class ASTContext;
+
+  LocalStorageType(Type valueType, const ASTContext *C)
+    : TypeBase(TypeKind::LocalStorage, C, false), Value(valueType) {}
+
+public:
+  static LocalStorageType *get(Type valueType, const ASTContext &C);
+
+  void print(raw_ostream &out) const;
+
+  /// \brief Retrieve the value type stored.
+  Type getValueType() const { return Value; }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::LocalStorage;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(LocalStorageType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getValueType)
+END_CAN_TYPE_WRAPPER(LocalStorageType, Type)
+
 /// \brief The storage type of a variable with non-standard reference
 /// ownership semantics, like a [weak] or [unowned] variable.
 ///
 /// The referent type always satisfies allowsOwnership().
 ///
-/// This type currently does not appear in the AST, but it is
-/// extremely useful in SIL and IR-generation.
+/// This type may appear in the AST only as the type of a variable;
+/// getTypeOfReference then strips it.  However, it is extremely
+/// useful in SIL and IR-generation.
 class ReferenceStorageType : public TypeBase {
   ReferenceStorageType(Type referent, Ownership ownership, const ASTContext *C)
     : TypeBase(TypeKind::ReferenceStorage, C, false),

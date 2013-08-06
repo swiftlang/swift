@@ -505,6 +505,12 @@ void Mangler::mangleType(CanType type, ExplosionKind explosion,
     return mangleType(cast<LValueType>(type).getObjectType(),
                       ExplosionKind::Minimal, 0);
 
+  case TypeKind::LocalStorage:
+    Buffer << "Xl";
+    mangleType(cast<LocalStorageType>(type).getValueType(),
+               ExplosionKind::Minimal, 0);
+    return;
+
   case TypeKind::ReferenceStorage: {
     auto ref = cast<ReferenceStorageType>(type);
     Buffer << 'X';

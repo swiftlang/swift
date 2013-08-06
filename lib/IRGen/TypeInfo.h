@@ -41,6 +41,7 @@ namespace Mangle {
 
 namespace irgen {
   class Address;
+  class ContainedAddress;
   class IRGenFunction;
   class IRGenModule;
   class Explosion;
@@ -178,8 +179,8 @@ public:
   virtual unsigned getExplosionSize(Mangle::ExplosionKind kind) const = 0;
 
   /// Allocate a variable of this type on the stack.
-  virtual Address allocateStack(IRGenFunction &IGF,
-                                const llvm::Twine &name) const = 0;
+  virtual ContainedAddress allocateStack(IRGenFunction &IGF,
+                                         const llvm::Twine &name) const = 0;
 
   /// Allocate a box of this type on the heap.
   virtual OwnedAddress allocateBox(IRGenFunction &IGF,

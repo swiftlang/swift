@@ -1390,8 +1390,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Error:
       return SolutionKind::Error;
 
+    case TypeKind::LocalStorage:
     case TypeKind::ReferenceStorage:
-      llvm_unreachable("reference storage type in typechecker");
+      llvm_unreachable("storage type in typechecker");
 
     case TypeKind::TypeVariable:
     case TypeKind::Archetype:
@@ -1968,8 +1969,9 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::Error:
     return SolutionKind::Error;
 
+  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
-    llvm_unreachable("reference storage type in typechecker");
+    llvm_unreachable("storage type in typechecker");
 
   case TypeKind::TypeVariable:
     return SolutionKind::Unsolved;

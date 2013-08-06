@@ -614,6 +614,15 @@ Type TypeChecker::resolveType(TypeRepr *TyR, bool allowUnboundGenerics) {
       attrs.clearOwnership();
     }
 
+    // In SIL translation units, permit [local_storage] to apply to
+    // types.  Also, it's important that this be applied after [weak]
+    // and [unowned].
+    if (attrs.isLocalStorage()) {
+      assert(TU.Kind == TranslationUnit::SIL);
+      Ty = LocalStorageType::get(Ty, Context);
+      attrs.LocalStorage = false;
+    }
+
     // FIXME: this is lame.
     if (!attrs.empty())
       diagnose(attrs.LSquareLoc, diag::attribute_does_not_apply_to_type);
@@ -747,8 +756,9 @@ bool TypeChecker::validateTypeSimple(Type InTy) {
     // Nothing to validate.
     return false;
 
+  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
-    llvm_unreachable("reference storage type in typechecker");
+    llvm_unreachable("storage type in typechecker");
 
   case TypeKind::Substituted:
     return validateTypeSimple(cast<SubstitutedType>(T)->getReplacementType());
@@ -897,8 +907,9 @@ Type TypeChecker::transformType(Type type,
     return type;
   }
 
+  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
-    llvm_unreachable("reference storage type in typechecker");
+    llvm_unreachable("storage type in typechecker");
 
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(base);

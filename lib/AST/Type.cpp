@@ -99,6 +99,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
+  case TypeKind::LocalStorage:
   case TypeKind::Tuple:
   case TypeKind::Union:
   case TypeKind::Struct:
@@ -237,6 +238,7 @@ bool TypeBase::isSpecialized() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
+  case TypeKind::LocalStorage:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -311,6 +313,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
+  case TypeKind::LocalStorage:
   case TypeKind::Module:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
@@ -336,6 +339,7 @@ static void gatherTypeVariables(Type wrappedTy,
   case TypeKind::BuiltinObjectPointer:
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinVector:
+  case TypeKind::LocalStorage:
   case TypeKind::NameAlias:
   case TypeKind::Module:
   case TypeKind::Protocol:
@@ -497,6 +501,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericUnion:
   case TypeKind::BoundGenericStruct:
+  case TypeKind::LocalStorage:
   case TypeKind::TypeVariable:
   case TypeKind::ReferenceStorage:
     return type;
@@ -810,6 +815,13 @@ CanType TypeBase::getCanonicalType() {
     Result = TupleType::get(CanElts, C)->castTo<TupleType>();
     break;
   }
+
+  case TypeKind::LocalStorage: {
+    auto storage = cast<LocalStorageType>(this);
+    Type valueType = storage->getValueType()->getCanonicalType();
+    Result = LocalStorageType::get(valueType, valueType->getASTContext());
+    break;
+  }
     
   case TypeKind::ReferenceStorage: {
     auto ref = cast<ReferenceStorageType>(this);
@@ -915,6 +927,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Union:
   case TypeKind::Struct:
   case TypeKind::Class:
+  case TypeKind::LocalStorage:
   case TypeKind::ReferenceStorage:
     // None of these types have sugar at the outer level.
     return this;
@@ -1085,6 +1098,11 @@ bool TypeBase::isSpelledLike(Type other) {
     auto rMe = cast<ReferenceStorageType>(me);
     auto rThem = cast<ReferenceStorageType>(them);
     return rMe->getReferentType()->isSpelledLike(rThem->getReferentType());
+  }
+  case TypeKind::LocalStorage: {
+    auto rMe = cast<LocalStorageType>(me);
+    auto rThem = cast<LocalStorageType>(them);
+    return rMe->getValueType()->isSpelledLike(rThem->getValueType());
   }
   }
 
@@ -1413,6 +1431,11 @@ void BuiltinVectorType::print(raw_ostream &OS) const {
   }
 
   OS << "Builtin.Vec" << numElements << "x" << underlyingStr;
+}
+
+void LocalStorageType::print(raw_ostream &OS) const {
+  OS << "[local_storage] ";
+  getValueType()->print(OS);
 }
 
 void ErrorType::print(raw_ostream &OS) const {

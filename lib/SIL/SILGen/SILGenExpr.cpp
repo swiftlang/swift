@@ -44,16 +44,6 @@ namespace {
     }
   };
   
-  class CleanupTemporaryAllocation : public Cleanup {
-    SILValue alloc;
-  public:
-    CleanupTemporaryAllocation(SILValue alloc) : alloc(alloc) {}
-    
-    void emit(SILGenFunction &gen) override {
-      gen.B.createDeallocStack(SILLocation(), alloc);
-    }
-  };
-  
   class CleanupMaterializedValue : public Cleanup {
     const TypeLowering &Lowering;
     SILValue Address;
@@ -387,9 +377,10 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
-  SILValue tmpMem = B.createAllocStack(loc, ty);
-  Cleanups.pushCleanup<CleanupTemporaryAllocation>(tmpMem);
-  return tmpMem;
+  ty = ty.getObjectType();
+  auto alloc = B.createAllocStack(loc, ty);
+  enterDeallocStackCleanup(loc, alloc->getContainerResult());
+  return alloc->getAddressResult();
 }
 
 SILValue SILGenFunction::getBufferForExprResult(
@@ -419,7 +410,7 @@ SILValue SILGenFunction::getBufferForExprResult(
   
   // If we couldn't emit into an Initialization, emit into a temporary
   // allocation.
-  return emitTemporaryAllocation(loc, ty);
+  return emitTemporaryAllocation(loc, ty.getObjectType());
 }
 
 Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
@@ -1553,9 +1544,11 @@ static void emitImplicitValueDefaultConstructor(SILGenFunction &gen,
     gen.B.createInitializeVar(ctor, resultSlot, /*canDefaultConstruct*/ false);
     gen.B.createReturn(ctor, gen.emitEmptyTuple(ctor));
   } else {
-    SILValue addr = gen.B.createAllocStack(ctor, thisTy);
-    gen.B.createInitializeVar(ctor, addr, /*canDefaultConstruct*/ false);
-    SILValue result = gen.B.createLoad(ctor, addr);
+    auto alloc = gen.B.createAllocStack(ctor, thisTy);
+    gen.B.createInitializeVar(ctor, alloc->getAddressResult(),
+                              /*canDefaultConstruct*/ false);
+    SILValue result = gen.B.createLoad(ctor, alloc->getAddressResult());
+    gen.B.createDeallocStack(ctor, alloc->getContainerResult());
     gen.B.createReturn(ctor, result);
   }
 }
@@ -1692,17 +1685,15 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Otherwise, load and return the final 'this' value.
   SILValue thisValue = B.createLoad(ctor, thisLV);
-  if (SILValue thisBox = VarLocs[thisDecl].box) {
-    // We have to do a retain because someone else may be using the box.
-    lowering.emitRetain(B, ctor, thisValue);
+  SILValue thisBox = VarLocs[thisDecl].box;
+  assert(thisBox);
 
-    // Release the box.
-    B.createRelease(ctor, thisBox);
-  } else {
-    // We can just take ownership from the stack slot and consider it
-    // deinitialized.
-    B.createDeallocStack(ctor, thisLV);
-  }
+  // We have to do a retain because someone else may be using the box.
+  lowering.emitRetain(B, ctor, thisValue);
+
+  // Release the box.
+  B.createRelease(ctor, thisBox);
+
   B.createReturn(ctor, thisValue);
 }
 
@@ -1896,15 +1887,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Load and return the final 'this'.
   SILValue thisValue = B.createLoad(ctor, thisLV);
-  if (SILValue thisBox = VarLocs[thisDecl].box) {
-    // We have to do a retain because someone else may be using the box.
-    B.emitRetainValue(ctor, thisValue);
-    B.createRelease(ctor, thisBox);
-  } else {
-    // We can just take ownership from the stack slot and consider it
-    // deinitialized.
-    B.createDeallocStack(ctor, thisLV);
-  }
+  SILValue thisBox = VarLocs[thisDecl].box;
+  assert(thisBox);
+
+  // We have to do a retain because someone else may be using the box.
+  B.emitRetainValue(ctor, thisValue);
+  B.createRelease(ctor, thisBox);
+
   B.createReturn(ctor, thisValue);
 }
 

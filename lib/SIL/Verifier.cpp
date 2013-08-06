@@ -151,7 +151,14 @@ public:
   }
 
   void checkAllocStackInst(AllocStackInst *AI) {
-    require(AI->getType().isAddress(), "alloc_var must return address");
+    auto containerStorageType =
+      requireTypeIsRValue(LocalStorageType, AI->getContainerResult(),
+                          "first result of alloc_stack");
+    require(AI->getAddressResult().getType().isAddress(),
+            "second result of alloc_stack must be an address type");
+    require(containerStorageType.getValueType()
+              == AI->getElementType().getSwiftRValueType(),
+            "container storage must be for allocated type");
   }
   
   void checkAllocRefInst(AllocRefInst *AI) {
@@ -439,8 +446,8 @@ public:
             "Operand of unowned_release must be unowned reference");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    require(DI->getOperand().getType().isAddress(),
-            "Operand of dealloc_var must be address");
+    requireTypeIsRValue(LocalStorageType, DI->getOperand(),
+                        "Operand of dealloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
     require(!DI->getOperand().getType().isAddress(),
@@ -986,7 +993,6 @@ public:
   void checkDowncastInst(DowncastInst *DI) {
     require(DI->getType() != DI->getOperand().getType(),
             "can't downcast to same type");
-
     require(DI->getOperand().getType().getSwiftType()
               ->getClassOrBoundGenericClass(),
             "downcast operand must be a class type");

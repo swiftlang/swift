@@ -358,6 +358,10 @@ namespace {
       llvm_unreachable("shouldn't get an l-value type here");
     }
 
+    RetTy visitLocalStorageType(CanLocalStorageType type) {
+      llvm_unreachable("first-class local storage?");
+    }
+
     RetTy visitReferenceStorageType(CanReferenceStorageType type) {
       switch (type->getOwnership()) {
       case Ownership::Strong:  llvm_unreachable("explicit strong ownership");

@@ -1313,18 +1313,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
-  case ValueKind::DeallocRefInst:
   case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocRefInst:
     if (parseTypedValueRef(Val))
       return true;
-
-    if (Opcode == ValueKind::DeallocRefInst)
-      ResultVal = B.createDeallocRef(SILLocation(), Val);
-    else {
-      assert(Opcode == ValueKind::DeallocStackInst);
+    if (Opcode == ValueKind::DeallocStackInst) {
       ResultVal = B.createDeallocStack(SILLocation(), Val);
+    } else {
+      assert(Opcode == ValueKind::DeallocRefInst);
+      ResultVal = B.createDeallocRef(SILLocation(), Val);
     }
-
     break;
   case ValueKind::DeallocBoxInst:
   case ValueKind::ArchetypeMetatypeInst:

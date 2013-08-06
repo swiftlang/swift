@@ -58,8 +58,8 @@ public:
     return OwnedAddress(getAddressForPointer(address), box);
   }
 
-  Address allocateStack(IRGenFunction &IGF,
-                        const llvm::Twine &name) const override {
+  ContainedAddress allocateStack(IRGenFunction &IGF,
+                                 const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
     Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                       getFixedBufferAlignment(IGF.IGM),
@@ -71,7 +71,7 @@ public:
       emitAllocateBufferCall(IGF, metadata, buffer);
     address = IGF.Builder.CreateBitCast(address,
                                         getStorageType()->getPointerTo());
-    return getAddressForPointer(address);
+    return { getAddressForPointer(address), buffer.getAddress() };
   }
 
   /// Perform a "take-initialization" from the given object.  A

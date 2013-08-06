@@ -223,10 +223,10 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
   SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
-  auto *AllocVar = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
+  auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
    
-  // Replace all uses of the pointer operand with the spiffy new AllocVar.
-  SILValue(ABI, 1).replaceAllUsesWith(AllocVar);
+  // Replace all uses of the pointer operand with the spiffy new AllocStack.
+  SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());
   
   // If we found a 'last release', insert a dealloc_stack instruction and a
   // destroy_addr if its type is non-trivial.
@@ -234,9 +234,9 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     SILBuilder B2(LastRelease);
 
     if (!lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
-      lowering.emitDestroyAddress(B2, ABI->getLoc(), AllocVar);
+      lowering.emitDestroyAddress(B2, ABI->getLoc(), ASI->getAddressResult());
 
-    B2.createDeallocStack(LastRelease->getLoc(), AllocVar);
+    B2.createDeallocStack(LastRelease->getLoc(), ASI->getContainerResult());
   }
   
   // Remove any retain and release instructions.  Since all uses of result #1

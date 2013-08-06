@@ -418,6 +418,9 @@ TypeCacheEntry TypeConverter::convertType(CanType canTy) {
     return createPrimitive(llvmTy, size, align);
   }
 
+  case TypeKind::LocalStorage:
+    llvm_unreachable("cannot directly manipulate values of local storage type");
+
   case TypeKind::Archetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
   case TypeKind::BoundGenericClass:

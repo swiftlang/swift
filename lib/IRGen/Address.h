@@ -47,8 +47,8 @@ public:
   }
 };
 
-/// An address in memory together with the (possibly null) object
-/// which owns it.
+/// An address in memory together with the (possibly null) heap
+/// allocation which owns it.
 class OwnedAddress {
   Address Addr;
   llvm::Value *Owner;
@@ -65,6 +65,34 @@ public:
 
   Address getUnownedAddress() const {
     assert(getOwner() == nullptr);
+    return getAddress();
+  }
+
+  operator Address() const { return getAddress(); }
+
+  bool isValid() const { return Addr.isValid(); }
+};
+
+/// An address in memory together with the local allocation which owns it.
+class ContainedAddress {
+  /// The address of an object of type T.
+  Address Addr;
+
+  /// A value of type [local_storage] T.
+  llvm::Value *Container;
+
+public:
+  ContainedAddress() : Container(nullptr) {}
+  ContainedAddress(Address address, llvm::Value *container)
+    : Addr(address), Container(container) {}
+
+  llvm::Value *getAddressPointer() const { return Addr.getAddress(); }
+  Alignment getAlignment() const { return Addr.getAlignment(); }
+  Address getAddress() const { return Addr; }
+  llvm::Value *getContainer() const { return Container; }
+
+  Address getUnownedAddress() const {
+    assert(getContainer() == nullptr);
     return getAddress();
   }
 

@@ -401,6 +401,12 @@ public:
     assert(!v.getType().isAddress() && "explosion for address value?!");
     setLoweredValue(v, LoweredValue(e));
   }
+
+  void setLoweredSingleValue(SILValue v, llvm::Value *scalar) {
+    Explosion e(ExplosionKind::Maximal);
+    e.add(scalar);
+    setLoweredExplosion(v, e);
+  }
   
   /// Create a new StaticFunction corresponding to the given SIL value.
   void setLoweredStaticFunction(SILValue v,
@@ -1732,7 +1738,6 @@ void IRGenSILFunction::visitUnownedReleaseInst(swift::UnownedReleaseInst *i) {
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
-  SILValue v(i, 0);
 
   // Derive name from SIL location.
   VarDecl *Decl = i->getDecl();
@@ -1743,15 +1748,16 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 # endif
     "";
 
-  Address addr = type.allocateStack(*this, dbgname);
+  auto addr = type.allocateStack(*this, dbgname);
   if (IGM.DebugInfo && Decl)
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
-                                                addr.getAddress(),
+                                                addr.getAddressPointer(),
                                                 DebugTypeInfo(*Decl, type),
                                                 Decl->getName().str(),
                                                 i);
 
-  setLoweredAddress(v, addr);
+  setLoweredSingleValue(i->getContainerResult(), addr.getContainer());
+  setLoweredAddress(i->getAddressResult(), addr.getAddress());
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {

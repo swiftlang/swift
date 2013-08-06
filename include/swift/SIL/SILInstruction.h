@@ -186,12 +186,13 @@ public:
   VarDecl *getDecl() const;
   
   /// getElementType - Get the type of the allocated memory (as opposed to the
-  /// type of the instruction itself, which will be an address type).
+  /// (second) type of the instruction itself, which will be an address type).
   SILType getElementType() const {
-    return getType().getObjectType();
+    return getType(1).getObjectType();
   }
 
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  SILValue getContainerResult() const { return SILValue(this, 0); }
+  SILValue getAddressResult() const { return SILValue(this, 1); }
 
   ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
 
@@ -1449,8 +1450,8 @@ class DeallocStackInst
                                 /*HAS_RESULT*/ false>
 {
 public:
-  DeallocStackInst(SILLocation Loc, SILValue Operand)
-    : UnaryInstructionBase(Loc, Operand) {}
+  DeallocStackInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
 };
   
 /// DeallocRefInst - Deallocate memory allocated for a reference type

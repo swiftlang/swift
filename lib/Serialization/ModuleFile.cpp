@@ -1671,6 +1671,14 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::LOCAL_STORAGE_TYPE: {
+    TypeID valueTypeID;
+    decls_block::LocalStorageTypeLayout::readRecord(scratch, valueTypeID);
+
+    typeOrOffset = LocalStorageType::get(getType(valueTypeID), ctx);
+    break;
+  }
+
   case decls_block::REFERENCE_STORAGE_TYPE: {
     uint8_t rawOwnership;
     TypeID referentTypeID;

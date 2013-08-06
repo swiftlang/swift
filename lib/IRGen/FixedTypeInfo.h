@@ -46,8 +46,8 @@ public:
   /// Whether this type is known to be empty.
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
-  Address allocateStack(IRGenFunction &IGF,
-                        const llvm::Twine &name) const override;
+  ContainedAddress allocateStack(IRGenFunction &IGF,
+                                 const llvm::Twine &name) const override;
   OwnedAddress allocateBox(IRGenFunction &IGF,
                            const llvm::Twine &name) const override;
 

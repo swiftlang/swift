@@ -177,6 +177,18 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     return false;
   }
 
+  // SIL's 'local_storage' type attribute.
+  case AttrName::local_storage: {
+    if (Attributes.isLocalStorage())
+      diagnose(Tok, diag::duplicate_attribute, Tok.getText());
+    else if (!isInSILMode())
+      diagnose(Tok, diag::only_allowed_in_sil, Tok.getText());
+
+    consumeToken(tok::identifier);
+    Attributes.LocalStorage = true;
+    return false;
+  }
+
   // Resilience attributes.
   case AttrName::resilient:
   case AttrName::fragile:

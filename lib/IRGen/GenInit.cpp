@@ -51,17 +51,19 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   return addr;
 }
 
-Address FixedTypeInfo::allocateStack(IRGenFunction &IGF,
-                                     const Twine &name) const {
+ContainedAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF,
+                                              const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
-  if (isKnownEmpty()) return getUndefAddress();
+  if (isKnownEmpty()) {
+    auto addr = getUndefAddress();
+    return { addr, addr.getAddress() };
+  }
 
-  Address rawAddr =
+  Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   // TODO: lifetime intrinsics?
 
-  OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
-  return addr;
+  return { alloca, alloca.getAddress() };
 }
 
 /// Allocate an object with fixed layout.

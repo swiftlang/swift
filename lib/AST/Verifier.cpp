@@ -1033,6 +1033,10 @@ namespace {
         return checkBoundGenericTypes(
                                cast<MetaTypeType>(typePtr)->getInstanceType());
 
+      case TypeKind::LocalStorage:
+        return checkBoundGenericTypes(
+                              cast<LocalStorageType>(typePtr)->getValueType());
+
       case TypeKind::ReferenceStorage:
         return checkBoundGenericTypes(
                        cast<ReferenceStorageType>(typePtr)->getReferentType());

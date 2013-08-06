@@ -106,6 +106,9 @@ types where the metadata itself has unknown layout.)
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
   type ::= 'U' generics '_' type             // generic type
+  type ::= 'Xl' type                         // [local_storage] type
+  type ::= 'Xo' type                         // [unowned] type
+  type ::= 'Xw' type                         // [weak] type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution
   nominal-type ::= nominal-type-kind declaration-name

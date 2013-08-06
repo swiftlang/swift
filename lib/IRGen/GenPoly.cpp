@@ -356,6 +356,9 @@ struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
   bool visitReferenceStorageType(CanReferenceStorageType type) {
     return visit(type.getReferentType());
   }
+  bool visitLocalStorageType(CanLocalStorageType type) {
+    return visit(type.getValueType());
+  }
 
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
   bool visitClassDecl(ClassDecl *decl) { return false; }
@@ -435,7 +438,8 @@ namespace {
     }
 
     void initIntoTemporary(const TypeInfo &substTI) {
-      auto addr = substTI.allocateStack(IGF, "substitution.temp");
+      // FIXME: this temporary has to get cleaned up!
+      auto addr = substTI.allocateStack(IGF, "substitution.temp").getAddress();
 
       // Initialize into it.
       substTI.initialize(IGF, In, addr);

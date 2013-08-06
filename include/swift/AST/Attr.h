@@ -157,6 +157,7 @@ public:
   bool ClassProtocol = false;
   bool Weak = false;
   bool Unowned = false;
+  bool LocalStorage = false;
   Optional<AbstractCC> cc = Nothing;
   
   DeclAttributes() {}
@@ -179,6 +180,7 @@ public:
   bool isIBOutlet() const { return IBOutlet; }
   bool isIBAction() const { return IBAction; }
   bool isClassProtocol() const { return ClassProtocol; }
+  bool isLocalStorage() const { return LocalStorage; }
   bool isWeak() const { return Weak; }
   bool isUnowned() const { return Unowned; }
   bool hasOwnership() const { return Weak || Unowned; }
@@ -195,7 +197,8 @@ public:
            !isAutoClosure() && !isThin() && !isNoReturn() && !isAssignment() &&
            !isConversion() && !isForceInline() && !isPostfix() && !isPrefix() &&
            !isObjC() && !isObjCBlock() && !isIBOutlet() && !isIBAction() &&
-           !isClassProtocol() && !hasCC() && !hasOwnership() && AsmName.empty();
+           !isClassProtocol() && !hasCC() && !hasOwnership() &&
+           !isLocalStorage() && AsmName.empty();
   }
 
   void clearOwnership() {

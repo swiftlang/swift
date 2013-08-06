@@ -167,8 +167,23 @@ bool SILInstruction::mayHaveSideEffects() const {
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
+// alloc_stack always returns two results: Builtin.RawPointer & LValue[EltTy]
+static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
+  const ASTContext &Ctx = F.getModule().getASTContext();
+
+  auto eltContainerTy =
+    CanType(LocalStorageType::get(eltTy.getSwiftRValueType(), Ctx));
+  SILType resTys[] = {
+    SILType::getPrimitiveType(eltContainerTy, false),
+    eltTy.getAddressType()
+  };
+
+  return F.getModule().getSILTypeList(resTys);
+}
+
 AllocStackInst::AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : SILInstruction(ValueKind::AllocStackInst, loc, elementType.getAddressType()) {
+  : SILInstruction(ValueKind::AllocStackInst, loc,
+                   getAllocStackType(elementType, F)) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -184,7 +199,7 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
 
 // Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
 static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
-  const ASTContext &Ctx = EltTy.getASTContext();
+  const ASTContext &Ctx = F.getModule().getASTContext();
 
   SILType ResTys[] = {
     SILType::getObjectPointerType(Ctx),

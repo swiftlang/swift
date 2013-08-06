@@ -383,6 +383,9 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
 /// Enter a cleanup to deallocate the given location.
 CleanupsDepth SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
                                                        SILValue temp) {
+  assert(!temp.getType().isAddress() &&
+         temp.getType().is<LocalStorageType>() &&
+         "must deallocate container operand, not address operand!");
   Cleanups.pushCleanup<DeallocStack>(loc, temp);
   return Cleanups.getCleanupsDepth();
 }
@@ -1027,9 +1030,8 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &gen,
   auto &lowering = gen.getTypeLowering(arg.getType());
   // If address-only, make a +1 copy and operate on that.
   if (lowering.isAddressOnly()) {
-    SILValue tmp = gen.B.createAllocStack(loc, arg.getType());
+    auto tmp = gen.emitTemporaryAllocation(loc, arg.getType().getObjectType());
     gen.B.createCopyAddr(loc, arg, tmp, IsNotTake, IsInitialization);
-    gen.enterDeallocStackCleanup(loc, tmp);
     return tmp;
   }
   

@@ -1640,6 +1640,15 @@ bool Serializer::writeType(Type ty) {
     return true;
   }
 
+  case TypeKind::LocalStorage: {
+    auto locTy = cast<LocalStorageType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[LocalStorageTypeLayout::Code];
+    LocalStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addTypeRef(locTy->getValueType()));
+    return true;
+  }
+
   case TypeKind::ReferenceStorage: {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
