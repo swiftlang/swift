@@ -637,7 +637,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   bool invalid = false;
   for (auto Member : Proto->getMembers()) {
     auto Requirement = dyn_cast<ValueDecl>(Member);
-    if (!Requirement)
+    if (!Requirement || Requirement->isInvalid())
       continue;
 
     // Associated type requirements handled above.
