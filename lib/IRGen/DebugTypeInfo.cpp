@@ -55,28 +55,26 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
     AlignmentInBytes(Align.getValue()) {
 }
 
+static bool typesEqual(Type A, Type B) {
+  if (A.getPointer() == B.getPointer())
+    return true;
+
+  // nullptr.
+  if (A.isNull() || B.isNull())
+    return false;
+
+  // Tombstone.
+  auto Tombstone =
+    llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
+  if ((A.getPointer() == Tombstone) || (B.getPointer() == Tombstone))
+    return false;
+
+  // Pointers are safe, do the real comparison.
+  return A->isSpelledLike(B.getPointer());
+}
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  bool TypesEqual;
-  if (Ty.getPointer() == T.Ty.getPointer())
-    TypesEqual = true;
-  else {
-    // nullptr.
-    if (Ty.isNull() || T.Ty.isNull())
-      TypesEqual = false;
-
-    // Tombstone.
-    auto Tombstone =
-      llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
-    if ((Ty.getPointer() == Tombstone) || (T.Ty.getPointer() == Tombstone))
-      TypesEqual = false;
-
-    // Pointers are safe, do the real comparison.
-    if (TypesEqual)
-      TypesEqual = Ty->isSpelledLike(T.Ty.getPointer());
-  }
-
-  return TypesEqual
+  return typesEqual(Ty, T.Ty)
     && SizeInBytes == T.SizeInBytes
     && AlignmentInBytes == T.AlignmentInBytes;
 }
