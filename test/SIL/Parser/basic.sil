@@ -66,22 +66,22 @@ sil @named_tuple : $() -> (x : Builtin.Int64, Builtin.Int64) {
 sil @return_int : $[thin] (a : Int64) -> Int64 { // CHECK: $[thin] (a : Int64) -> Int64 {
 bb0(%0 : $Int64):                          // CHECK: bb0(%0 : $Int64):
   %1 = alloc_stack $Int64                  // CHECK: alloc_stack $Int64
-  store %0 to %1 : $*Int64                 // CHECK: store %0 to %1 : $*Int64
-  %3 = load %1 : $*Int64                   // CHECK: load {{.*}} : $*Int64
-  dealloc_stack %1 : $*Int64               // CHECK: dealloc_stack {{.*}} : $*Int64
+  store %0 to %1#1 : $*Int64               // CHECK: store %0 to %1#1 : $*Int64
+  %3 = load %1#1 : $*Int64                 // CHECK: load {{.*}} : $*Int64
+  dealloc_stack %1#0 : $[local_storage] Int64 // CHECK: dealloc_stack {{.*}} : $[local_storage] Int64
   return %3 : $Int64                       // CHECK: return {{.*}} : $Int64
 }
 
 sil @call_fn_pointer : $[thin] (a : () -> Int64) -> Int64 {
 bb0(%0 : $() -> Int64):
   %1 = alloc_stack $() -> Int64            // CHECK: alloc_stack $() -> Int64
-  store %0 to %1 : $*() -> Int64           // CHECK: store %0 to %1 : $*() -> Int64
-  %3 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
+  store %0 to %1#1 : $*() -> Int64         // CHECK: store %0 to %1#1 : $*() -> Int64
+  %3 = load %1#1 : $*() -> Int64             // CHECK: load %1#1 : $*() -> Int64
   retain %3 : $() -> Int64                 // CHECK: retain %3 : $() -> Int64
   %5 = apply %3() : $() -> Int64           // CHECK: apply %3() : $() -> Int64
-  %6 = load %1 : $*() -> Int64             // CHECK: load %1 : $*() -> Int64
+  %6 = load %1#1 : $*() -> Int64             // CHECK: load %1#1 : $*() -> Int64
   release %3 : $() -> Int64                // CHECK: release {{.*}} : $() -> Int64
-  dealloc_stack %1 : $*() -> Int64         // CHECK: dealloc_stack %1 : $*() -> Int64
+  dealloc_stack %1#0 : $[local_storage] () -> Int64 // CHECK: dealloc_stack %1#0 : $[local_storage] () -> Int64
   return %5 : $Int64                       // CHECK: return %5 : $Int64
 }
 
@@ -116,11 +116,11 @@ bb0(%0 : $Bool):
   // CHECK: alloc_stack $Bool
   %1 = alloc_stack $Bool
   // CHECK: store
-  %2 = store %0 to %1 : $*Bool
+  %2 = store %0 to %1#1 : $*Bool
   // CHECK: function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
   %3 = function_ref @_TSb13getLogicValuefRSbFT_Bi1_ : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
   // CHECK: apply
-  %4 = apply %3(%1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
+  %4 = apply %3(%1#1) : $[cc(method), thin] ((), [byref] Bool) -> Builtin.Int1
   // CHECK: condbranch
   %5 = condbranch %4, bb1, bb2
 
@@ -135,7 +135,7 @@ bb1:
   // CHECK: apply
   %9 = apply %6(%8, %7) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
-  %10 = dealloc_stack %1 : $*Bool
+  %10 = dealloc_stack %1#0 : $[local_storage] Bool
   // CHECK: return
   %11 = return %9 : $Int64
 
@@ -150,7 +150,7 @@ bb2:
   // CHECK: apply
   %15 = apply %12(%14, %13) : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
   // CHECK: dealloc_stack
-  %16 = dealloc_stack %1 : $*Bool
+  %16 = dealloc_stack %1#0 : $[local_storage] Bool
   // CHECK: return
   %17 = return %15 : $Int64
 }
@@ -234,12 +234,12 @@ bb0(%0 : $*T):
   // CHECK: archetype_method $*T, #Runcible.associated_method!1
   %4 = archetype_method $*T, #Runcible.associated_method!1 : $[cc(method)] ((), [byref] T) -> T.U.metatype
   %5 = apply %4(%0) : $[cc(method)] ((), [byref] T) -> T.U.metatype
-  %6 = store %5 to %3 : $*T.U.metatype
+  %6 = store %5 to %3#1 : $*T.U.metatype
   %7 = metatype $T.metatype
   // CHECK: archetype_method [volatile] $*T, #Runcible.static_method!1
   %8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $((), T.metatype) -> ()
   %9 = apply %8(%7) : $((), T.metatype) -> ()
-  %10 = dealloc_stack %3 : $*T.U.metatype
+  %10 = dealloc_stack %3#0 : $[local_storage] T.U.metatype
   %11 = tuple ()
   %12 = destroy_addr %0 : $*T
   %13 = return %11 : $()
@@ -257,14 +257,14 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: alloc_stack
   %4 = alloc_stack $protocol<Bendable, Runcible>
   // CHECK: copy_addr {{.*}} to [initialization] {{.*}} : $*protocol<Bendable, Runcible>
-  %5 = copy_addr %2#1 to [initialization] %4 : $*protocol<Bendable, Runcible>
+  %5 = copy_addr %2#1 to [initialization] %4#1 : $*protocol<Bendable, Runcible>
   // CHECK: upcast_existential [take] {{.*}} : $*protocol<Bendable, Runcible> to {{.*}} : $*Runcible
-  %6 = upcast_existential [take] %4 : $*protocol<Bendable, Runcible> to %0 : $*Runcible
+  %6 = upcast_existential [take] %4#1 : $*protocol<Bendable, Runcible> to %0 : $*Runcible
   %7 = tuple ()
   // CHECK: destroy_addr
-  %8 = destroy_addr %4 : $*protocol<Bendable, Runcible>
+  %8 = destroy_addr %4#1 : $*protocol<Bendable, Runcible>
   // CHECK: dealloc_stack
-  %9 = dealloc_stack %4 : $*protocol<Bendable, Runcible>
+  %9 = dealloc_stack %4#0 : $[local_storage] protocol<Bendable, Runcible>
   // CHECK: release
   %10 = release %2#0 : $Builtin.ObjectPointer
   // CHECK: return
@@ -300,8 +300,8 @@ sil @_TV4todo3ValCfMS0_FT_S0_ : $[thin] ((), Val.metatype) -> Val {
 bb0(%0 : $Val.metatype):
   %1 = alloc_stack $Val // CHECK: alloc_stack
   // CHECK: initialize_var [no_default_construct] {{%.*}} : $*Val
-  %2 = initialize_var [no_default_construct] %1 : $*Val
-  %3 = load %1 : $*Val
+  %2 = initialize_var [no_default_construct] %1#1 : $*Val
+  %3 = load %1#1 : $*Val
   %4 = return %3 : $Val
 }
 
@@ -428,7 +428,7 @@ bb0:
   // CHECK: float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %4 = float_literal $Builtin.FPIEEE64, 0x3FFAB4ACADAB4AAA
   %5 = apply %2(%4, %3) : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
-  %6 = store %5 to %1 : $*Float64
+  %6 = store %5 to %1#1 : $*Float64
   %7 = alloc_stack $String                 // CHECK: alloc_stack $String
   %8 = function_ref @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
   %9 = metatype $String.metatype
@@ -438,13 +438,13 @@ bb0:
   %12 = tuple_extract %10 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 1
   %13 = tuple_extract %10 : $(Builtin.RawPointer, Builtin.Int64, Builtin.Int1), 2
   %14 = apply %8(%11, %12, %13, %9) : $[thin] ((value : Builtin.RawPointer, byteSize : Builtin.Int64, isASCII : Builtin.Int1), String.metatype) -> String
-  %15 = store %14 to %7 : $*String
-  %16 = load %7 : $*String                        // CHECK: load {{%.*}} : $*String
+  %15 = store %14 to %7#1 : $*String
+  %16 = load %7#1 : $*String                        // CHECK: load {{%.*}} : $*String
   %17 = struct_extract %16 : $String, #str_value  // CHECK: struct_extract
   %18 = struct_extract %17 : $StringByteData, #owner // CHECK: struct_extract
   %19 = release %18 : $Builtin.ObjectPointer
-  %20 = dealloc_stack %7 : $*String
-  %21 = dealloc_stack %1 : $*Float64
+  %20 = dealloc_stack %7#0 : $[local_storage] String
+  %21 = dealloc_stack %1#0 : $[local_storage] Float64
   %22 = tuple ()
   %23 = return %22 : $()
 }
@@ -517,12 +517,12 @@ bb0(%0 : $*T):
   %2 = copy_addr [take] %0 to [initialization] %1#1 : $*T
   %3 = metatype $T.metatype                       // CHECK: metatype
   %5 = alloc_stack $T                               // CHECK: alloc_stack
-  %6 = copy_addr %1#1 to [initialization] %5 : $*T
+  %6 = copy_addr %1#1 to [initialization] %5#1 : $*T
   // CHECK: archetype_metatype $T.metatype, {{%.*}} : $*T
-  %7 = archetype_metatype $T.metatype, %5 : $*T
+  %7 = archetype_metatype $T.metatype, %5#1 : $*T
   %8 = tuple (%3 : $T.metatype, %7 : $T.metatype) // CHECK: tuple
-  %9 = destroy_addr %5 : $*T
-  %10 = dealloc_stack %5 : $*T
+  %9 = destroy_addr %5#1 : $*T
+  %10 = dealloc_stack %5#0 : $[local_storage] T
   %11 = release %1#0 : $Builtin.ObjectPointer
   %12 = return %8 : $(T.metatype, T.metatype)
 }
@@ -532,11 +532,11 @@ bb0(%0 : $*SomeProtocol):
   %1 = alloc_box $SomeProtocol                    // CHECK: alloc_box
   %2 = copy_addr [take] %0 to [initialization] %1#1 : $*SomeProtocol
   %4 = alloc_stack $SomeProtocol                    // CHECK: alloc_stack
-  %5 = copy_addr %1#1 to [initialization] %4 : $*SomeProtocol
+  %5 = copy_addr %1#1 to [initialization] %4#1 : $*SomeProtocol
   // CHECK: protocol_metatype $SomeProtocol.metatype, {{%.*}} : $*SomeProtocol
-  %6 = protocol_metatype $SomeProtocol.metatype, %4 : $*SomeProtocol
-  %7 = destroy_addr %4 : $*SomeProtocol
-  %8 = dealloc_stack %4 : $*SomeProtocol
+  %6 = protocol_metatype $SomeProtocol.metatype, %4#1 : $*SomeProtocol
+  %7 = destroy_addr %4#1 : $*SomeProtocol
+  %8 = dealloc_stack %4#0 : $[local_storage] SomeProtocol
   %9 = release %1#0 : $Builtin.ObjectPointer
   %10 = return %6 : $SomeProtocol.metatype
 }
@@ -613,9 +613,9 @@ bb0(%0 : $Bas):
   retain %6 : $Builtin.ObjectPointer
   %8 = function_ref @swift_StringToNSString : $[thin] (string : [byref] String) -> NSString
   %9 = alloc_stack $String
-  store %3 to %9 : $*String
-  %11 = apply %8(%9) : $[thin] (string : [byref] String) -> NSString
-  dealloc_stack %9 : $*String
+  store %3 to %9#1 : $*String
+  %11 = apply %8(%9#1) : $[thin] (string : [byref] String) -> NSString
+  dealloc_stack %9#0 : $[local_storage] String
   %13 = struct_extract %3 : $String, #str_value
   %14 = struct_extract %13 : $StringByteData, #owner
   release %14 : $Builtin.ObjectPointer
