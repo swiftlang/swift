@@ -31,50 +31,6 @@ struct SyntaxColoringContext::Implementation {
   std::vector<SyntaxNode> TokenNodes;
 };
 
-/// \brief Tokenizes a string literal, taking into account string interpolation.
-static std::vector<Token>
-getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
-                    ASTContext &Ctx) {
-  assert(Tok.is(tok::string_literal));
-  llvm::SmallVector<Lexer::StringSegment, 4> Segments;
-  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
-  std::vector<Token> Toks;
-  for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
-    Lexer::StringSegment &Seg = Segments[i];
-    bool isFirst = i == 0;
-    bool isLast = i == e-1;
-    if (Seg.Kind == Lexer::StringSegment::Literal) {
-      SourceLoc Loc = Seg.Loc;
-      unsigned Len = Seg.Length;
-      if (isFirst) {
-        // Include the quote.
-        Loc = Loc.getAdvancedLoc(-1);
-        ++Len;
-      }
-      if (isLast) {
-        // Include the quote.
-        ++Len;
-      }
-      StringRef Text(Loc.Value.getPointer(), Len);
-      Token NewTok;
-      NewTok.setToken(tok::string_literal, Text);
-      Toks.push_back(NewTok);
-
-    } else {
-      const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufID);
-      unsigned Offset = Seg.Loc.Value.getPointer() -
-                        Buffer->getBufferStart();
-      unsigned EndOffset = Offset + Seg.Length;
-      std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
-                                                     EndOffset,
-                                                     /*KeepComments=*/true);
-      Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
-    }
-  }
-
-  return Toks;
-}
-
 SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
                                              unsigned BufferID,
                                              TranslationUnit &TU)
@@ -82,19 +38,8 @@ SyntaxColoringContext::SyntaxColoringContext(SourceManager &SM,
     TU(TU) {
   std::vector<Token> Tokens = swift::tokenize(SM, BufferID, /*Offset=*/0,
                                               /*EndOffset=*/0,
-                                              /*KeepComments=*/true);
-  // Handle string interpolation.
-  for (unsigned i = 0; i != Tokens.size(); ++i) {
-    Token Tok = Tokens[i];
-    if (Tok.is(tok::string_literal)) {
-      std::vector<Token> NewToks = getStringPartTokens(Tok, SM,BufferID,TU.Ctx);
-      assert(!NewToks.empty());
-      Tokens[i] = NewToks[0];
-      Tokens.insert(Tokens.begin()+i+1, NewToks.begin()+1, NewToks.end());
-      i += NewToks.size()-1;
-    }
-  }
-
+                                              /*KeepComments=*/true,
+                                           /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   for (auto &Tok : Tokens) {
     SyntaxColor Kind;

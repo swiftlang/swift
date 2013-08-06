@@ -92,7 +92,8 @@ namespace swift {
   /// \brief Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
-                              bool KeepComments = true);
+                              bool KeepComments = true,
+                              bool TokenizeInterpolatedString = true);
 
   /// performAutoImport - When a translation unit is first set up, this handles
   /// setting up any auto imports of the standard library.

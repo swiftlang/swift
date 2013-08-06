@@ -153,15 +153,61 @@ void swift::performDelayedParsing(
     parseDelayedTopLevelDecl(TU, PersistentState, CodeCompletionFactory);
 }
 
+/// \brief Tokenizes a string literal, taking into account string interpolation.
+void getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
+                         std::vector<Token> &Toks) {
+  assert(Tok.is(tok::string_literal));
+  llvm::SmallVector<Lexer::StringSegment, 4> Segments;
+  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
+  for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
+    Lexer::StringSegment &Seg = Segments[i];
+    bool isFirst = i == 0;
+    bool isLast = i == e-1;
+    if (Seg.Kind == Lexer::StringSegment::Literal) {
+      SourceLoc Loc = Seg.Loc;
+      unsigned Len = Seg.Length;
+      if (isFirst) {
+        // Include the quote.
+        Loc = Loc.getAdvancedLoc(-1);
+        ++Len;
+      }
+      if (isLast) {
+        // Include the quote.
+        ++Len;
+      }
+      StringRef Text(Loc.Value.getPointer(), Len);
+      Token NewTok;
+      NewTok.setToken(tok::string_literal, Text);
+      Toks.push_back(NewTok);
+
+    } else {
+      const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufID);
+      unsigned Offset = Seg.Loc.Value.getPointer() -
+                        Buffer->getBufferStart();
+      unsigned EndOffset = Offset + Seg.Length;
+      std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
+                                                     EndOffset,
+                                                     /*KeepComments=*/true);
+      Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
+    }
+  }
+}
+
 std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
-                                   bool KeepComments) {
+                                   bool KeepComments,
+                                   bool TokenizeInterpolatedString) {
   Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
           Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
     L.lex(Tokens.back());
+    if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
+      Token StrTok = Tokens.back();
+      Tokens.pop_back();
+      getStringPartTokens(StrTok, SM, BufferID, Tokens);
+    }
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.
   return Tokens;
