@@ -180,7 +180,7 @@ Location getStartLoc(SourceManager &SM, WithLoc *S) {
     return getDeserializedLoc(S);
 
   L.Filename = SM->getMemoryBuffer((unsigned)BufferIndex)->getBufferIdentifier();
-  L.Line = SM->FindLineNumber(Start.Value, BufferIndex);
+  std::tie(L.Line, L.Col) = SM->getLineAndColumn(Start.Value, BufferIndex);
   return L;
 }
 
