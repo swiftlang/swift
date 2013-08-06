@@ -1060,10 +1060,10 @@ public:
       case REPLInputKind::REPLDirective: {
         auto Buffer =
             llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
-        TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer,
-                                                          llvm::SMLoc());
-        Lexer L(Buffer->getBuffer(), CI.getSourceMgr(), nullptr,
-                false /*not SIL*/);
+        unsigned BufferID =
+            TU->getASTContext().SourceMgr->AddNewSourceBuffer(Buffer,
+                                                              llvm::SMLoc());
+        Lexer L(CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
         Token Tok;
         L.lex(Tok);
         assert(Tok.is(tok::colon));

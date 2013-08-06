@@ -76,12 +76,6 @@ class Lexer {
   void primeLexer();
 
 public:
-  Lexer(llvm::StringRef Buffer, SourceManager &SourceMgr,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
-      : Lexer(SourceMgr, Buffer, Diags, Buffer.begin(), InSILMode,
-              KeepComments, /*Prime=*/true) {
-  }
-
   Lexer(SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
         unsigned Offset = 0, unsigned EndOffset = 0);

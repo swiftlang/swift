@@ -14,9 +14,7 @@ class LexerTest : public ::testing::Test {
 public:
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
-    const llvm::MemoryBuffer *Buffer = SourceMgr->getMemoryBuffer(BufferID);
-    Lexer L(Buffer->getBuffer(), SourceMgr, /*Diags=*/nullptr,
-            /*InSILMode=*/false);
+    Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
     std::vector<Token> Tokens;
     do {
       Tokens.emplace_back();

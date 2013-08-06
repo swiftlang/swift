@@ -243,9 +243,8 @@ Parser::Parser(Lexer *Lex, TranslationUnit *TU,
 Parser::Parser(unsigned BufferID, TranslationUnit *TU,
                bool IsMainModule, SILParserState *SIL,
                PersistentParserState *PersistentState)
-  : Parser(new Lexer(TU->getASTContext().SourceMgr
-                         ->getMemoryBuffer(BufferID)->getBuffer(),
-                     TU->getASTContext().SourceMgr, &TU->getASTContext().Diags,
+  : Parser(new Lexer(TU->getASTContext().SourceMgr, BufferID,
+                     &TU->getASTContext().Diags,
                      /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false),
            TU, TU->getASTContext().Diags, SIL, PersistentState) {
   this->IsMainModule = IsMainModule;
