@@ -168,7 +168,7 @@ bool SILInstruction::mayHaveSideEffects() const {
 //===----------------------------------------------------------------------===//
 
 AllocStackInst::AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : AllocInst(ValueKind::AllocStackInst, loc, elementType.getAddressType()) {
+  : SILInstruction(ValueKind::AllocStackInst, loc, elementType.getAddressType()) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -178,7 +178,7 @@ VarDecl *AllocStackInst::getDecl() const {
 }
 
 AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : AllocInst(ValueKind::AllocRefInst, loc, elementType) {
+  : SILInstruction(ValueKind::AllocRefInst, loc, elementType) {
 }
 
 

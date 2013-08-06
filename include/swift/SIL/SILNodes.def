@@ -62,10 +62,8 @@ VALUE(SILArgument, ValueBase)
 
 ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Allocation and Deallocation
-  ABSTRACT_VALUE(AllocInst, SILInstruction)
-    INST(AllocStackInst, AllocInst, None)
-    INST(AllocRefInst, AllocInst, None)
-    VALUE_RANGE(AllocInst, AllocStackInst, AllocRefInst)
+  INST(AllocStackInst, SILInstruction, None)
+  INST(AllocRefInst, SILInstruction, None)
   INST(AllocBoxInst, SILInstruction, None)
   INST(AllocArrayInst, SILInstruction, None)
   INST(DeallocStackInst, SILInstruction, MayHaveSideEffects)

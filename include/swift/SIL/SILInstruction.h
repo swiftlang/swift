@@ -175,27 +175,9 @@ public:
   }
 };
   
-/// AllocInst - This is the abstract base class common among all the memory
-/// allocation mechanisms.
-class AllocInst : public SILInstruction {
-protected:
-  AllocInst(ValueKind Kind, SILLocation Loc, SILType Ty)
-    : SILInstruction(Kind, Loc, Ty) {}
-public:
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() >= ValueKind::First_AllocInst &&
-           V->getKind() <= ValueKind::Last_AllocInst;
-  }
-};
-
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
-class AllocStackInst : public AllocInst {
+class AllocStackInst : public SILInstruction {
 public:
   AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F);
 
@@ -209,6 +191,10 @@ public:
     return getType().getObjectType();
   }
 
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocStackInst;
   }
@@ -217,9 +203,13 @@ public:
 /// AllocRefInst - This represents the primitive allocation of an instance
 /// of a reference type. Aside from the reference count, the instance is
 /// returned uninitialized.
-class AllocRefInst : public AllocInst {
+class AllocRefInst : public SILInstruction {
 public:
   AllocRefInst(SILLocation loc, SILType type, SILFunction &F);
+
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  ArrayRef<Operand> getAllOperands() const { return ArrayRef<Operand>(); }
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
