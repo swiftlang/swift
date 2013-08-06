@@ -154,6 +154,17 @@ public:
   }
 };
 
+/// Describes the result of comparing two entities, of which one may be better
+/// or worse than the other, or they are unordered.
+enum class Comparison {
+  /// Neither entity is better than the other.
+  Unordered,
+  /// The first entity is better than the second.
+  Better,
+  /// The first entity is worse than the second.
+  Worse
+};
+
 class TypeChecker : public ASTMutationListener {
 public:
   TranslationUnit &TU;
@@ -627,6 +638,14 @@ public:
   /// Routines that perform overload resolution or provide diagnostics related
   /// to overload resolution.
   /// @{
+
+  /// Compare two declarations to determine whether one is more specialized
+  /// than the other.
+  ///
+  /// A declaration is more specialized than another declaration if its type
+  /// is a subtype of the other declaration's type (ignoring the 'this'
+  /// parameter of function declarations) and if
+  Comparison compareDeclarations(ValueDecl *decl1, ValueDecl *decl2);
 
   /// \brief Encode the provided substitutions in the form used by
   /// SpecializeExpr (and another other AST nodes that require specialization).

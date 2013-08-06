@@ -2567,7 +2567,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 /// the second declaration.
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
-static bool isDeclAsSpecializedAs(ConstraintSystem &cs,
+static bool isDeclAsSpecializedAs(TypeChecker &tc,
                                   Decl *decl1, Decl *decl2) {
   // If the kinds are different, there's nothing we can do.
   // FIXME: This is wrong for type declarations.
@@ -2609,12 +2609,21 @@ static bool isDeclAsSpecializedAs(ConstraintSystem &cs,
   // subtypes of the second.
   auto funcTy1 = type1->castTo<FunctionType>();
   auto funcTy2 = type2->castTo<FunctionType>();
-  auto &tc = cs.getTypeChecker();
   auto &context = tc.Context;
   return tc.isSubtypeOf(funcTy1->getInput(), funcTy2->getInput()) ||
         (funcTy1->getInput()->getUnlabeledType(context)->isEqual(
            funcTy2->getInput()->getUnlabeledType(context)) &&
           tc.isSubtypeOf(funcTy1->getResult(), funcTy2->getResult()));
+}
+
+Comparison TypeChecker::compareDeclarations(ValueDecl *decl1, ValueDecl *decl2){
+  bool decl1Better = isDeclAsSpecializedAs(*this, decl1, decl2);
+  bool decl2Better = isDeclAsSpecializedAs(*this, decl2, decl1);
+
+  if (decl1Better == decl2Better)
+    return Comparison::Unordered;
+
+  return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -2662,6 +2671,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
 
     // The kinds of overload choice match, but the contents don't.
+    auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
       break;
@@ -2673,9 +2683,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
-      if (isDeclAsSpecializedAs(cs, choice1.getDecl(), choice2.getDecl()))
+      if (isDeclAsSpecializedAs(tc, choice1.getDecl(), choice2.getDecl()))
         ++score1;
-      if (isDeclAsSpecializedAs(cs, choice2.getDecl(), choice1.getDecl()))
+      if (isDeclAsSpecializedAs(tc, choice2.getDecl(), choice1.getDecl()))
         ++score2;
       break;
     }
@@ -2691,6 +2701,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     type1 = stripInitializers(cs.getTypeChecker(), type1);
     type2 = stripInitializers(cs.getTypeChecker(), type2);
 
+    
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))
       continue;

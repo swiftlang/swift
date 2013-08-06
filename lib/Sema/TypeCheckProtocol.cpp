@@ -356,16 +356,26 @@ matchWitness(TypeChecker &tc, ProtocolDecl *protocol,
 }
 
 /// \brief Determine whether one requirement match is better than the other.
-static bool isBetterMatch(const RequirementMatch &match1,
+static bool isBetterMatch(TypeChecker &tc, const RequirementMatch &match1,
                           const RequirementMatch &match2) {
+  // Check whether one declaration is better than the other.
+  switch (tc.compareDeclarations(match1.Witness, match2.Witness)) {
+  case Comparison::Better:
+    return true;
+
+  case Comparison::Worse:
+    return false;
+
+  case Comparison::Unordered:
+    break;
+  }
+
   // Earlier match kinds are better. This prefers exact matches over matches
   // that require renaming, for example.
   if (match1.Kind != match2.Kind)
     return static_cast<unsigned>(match1.Kind)
              < static_cast<unsigned>(match2.Kind);
 
-  // FIXME: Should use the same "at least as specialized as" rules as overload
-  // resolution.
   return false;
 }
 
@@ -715,7 +725,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
         // Find the best match.
         bestIdx = 0;
         for (unsigned i = 1, n = matches.size(); i != n; ++i) {
-          if (isBetterMatch(matches[i], matches[bestIdx]))
+          if (isBetterMatch(TC, matches[i], matches[bestIdx]))
             bestIdx = i;
         }
 
@@ -724,7 +734,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
           if (i == bestIdx)
             continue;
 
-          if (!isBetterMatch(matches[bestIdx], matches[i])) {
+          if (!isBetterMatch(TC, matches[bestIdx], matches[i])) {
             isReallyBest = false;
             break;
           }
