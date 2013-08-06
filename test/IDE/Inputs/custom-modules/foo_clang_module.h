@@ -42,6 +42,8 @@ int redeclaredInMultipleModulesFunc1(int a);
 + (void) fooClassFunc0;
 @end
 
+@class BarForwardDeclaredClass;
+
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1
 #define FOO_MACRO_3 (-1)

@@ -320,7 +320,14 @@ ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
 
 ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
     const clang::Decl *D) {
-  clang::Module *M = D->getCanonicalDecl()->getOwningModule();
+  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
+    // Put the Objective-C class into the module that contains the @interface
+    // definition, not just @class forward declaration.
+    D = OID->getDefinition();
+  else
+    D = D->getCanonicalDecl();
+
+  clang::Module *M = D->getOwningModule();
   if (!M)
     return nullptr;
   // Get the parent module because currently we don't represent submodules with
