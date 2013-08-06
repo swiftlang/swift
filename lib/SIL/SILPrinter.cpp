@@ -72,6 +72,8 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     return;
   switch (Context->getContextKind()) {
   case DeclContextKind::BuiltinModule:
+    Buffer << cast<BuiltinModule>(Context)->Name << ".";
+    return;
   case DeclContextKind::ClangModule:
   case DeclContextKind::TranslationUnit:
   case DeclContextKind::SerializedModule:
@@ -138,44 +140,45 @@ void SILDeclRef::print(raw_ostream &OS) const {
   } else {
     OS << "<anonymous function>";
   }
-  OS << "!";
   switch (kind) {
   case SILDeclRef::Kind::Func:
     break;
   case SILDeclRef::Kind::Getter:
-    OS << "getter";
+    OS << "!getter";
     break;
   case SILDeclRef::Kind::Setter:
-    OS << "setter";
+    OS << "!setter";
     break;
   case SILDeclRef::Kind::Allocator:
-    OS << "allocator";
+    OS << "!allocator";
     break;
   case SILDeclRef::Kind::Initializer:
-    OS << "initializer";
+    OS << "!initializer";
     break;
   case SILDeclRef::Kind::UnionElement:
-    OS << "unionelt";
+    OS << "!unionelt";
     break;
   case SILDeclRef::Kind::Destroyer:
-    OS << "destroyer";
+    OS << "!destroyer";
     break;
   case SILDeclRef::Kind::GlobalAccessor:
-    OS << "globalaccessor";
+    OS << "!globalaccessor";
     break;
   case SILDeclRef::Kind::DefaultArgGenerator:
-    OS << "defaultarg" << "." << defaultArgIndex;
+    OS << "!defaultarg" << "." << defaultArgIndex;
     break;
   }
   if (uncurryLevel != 0) {
     if (kind != SILDeclRef::Kind::Func)
-      OS << ".";
-    OS << uncurryLevel;
+      OS << "." << uncurryLevel;
+    else
+      OS << "!" << uncurryLevel;
   }
   if (isObjC) {
     if (uncurryLevel != 0 || kind != SILDeclRef::Kind::Func)
-      OS << ".";
-    OS << "objc";
+      OS << ".objc";
+    else
+      OS << "!objc";
   }
 }
 
@@ -370,7 +373,7 @@ public:
   }
   
   void visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
-    OS << "builtin_function_ref #" << BFI->getFunction()->getName()
+    OS << "builtin_function_ref " << SILDeclRef(BFI->getFunction())
        << " : " << BFI->getType();
   }
   

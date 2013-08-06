@@ -530,6 +530,34 @@ bool SILParser::performTypeLocChecking(TypeLoc &T) {
   return swift::performTypeLocChecking(P.TU, T);
 }
 
+/// Find the top-level ValueDecl or Module given a name.
+static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
+             Identifier Name) {
+  // Use UnqualifiedLookup to look through all of the imports.
+  // We have to lie and say we're done with parsing to make this happen.
+  assert(P.TU->ASTStage == TranslationUnit::Parsing &&
+         "Unexpected stage during parsing!");
+  llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
+                                                    TranslationUnit::Parsed);
+  UnqualifiedLookup DeclLookup(Name, P.TU);
+  assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
+  if (DeclLookup.Results.back().Kind == UnqualifiedLookupResult::ModuleName) {
+    Module *Mod = DeclLookup.Results.back().getNamedModule();
+    return Mod;
+  }
+  assert(DeclLookup.Results.back().hasValueDecl());
+  ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
+  return VD;
+}
+
+/// Find the ValueDecl given a type and a member name.
+static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
+  SmallVector<ValueDecl *, 4> Lookup;
+  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, Lookup);
+  assert(Lookup.size() == 1);
+  return Lookup[0];
+}
+
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
@@ -593,17 +621,20 @@ bool SILParser::parseSILType(SILType &Result) {
   return false;
 }
 
-/// sil-constant:
-///   '#' sil-dotted-path sil-constant-kind-and-uncurry-level?
-/// sil-dotted-path:
-///   identifier ('.' identifier)*
-/// sil-constant-kind-and-uncurry-level:
-///   '!' sil-constant-kind ('.' sil-constant-uncurry-level)? ('.objc')?
-///   '!' sil-constant-uncurry-level ('.objc')?
-///   '!objc'
-/// sil-constant-kind:
-///   'func' | 'getter' | 'setter' | 'allocator' | 'initializer' | 'unionelt' \
-///   | 'destroyer' | 'globalaccessor'
+///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
+///                      ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-lang
+///  sil-decl-subref-part ::= 'getter'
+///  sil-decl-subref-part ::= 'setter'
+///  sil-decl-subref-part ::= 'allocator'
+///  sil-decl-subref-part ::= 'initializer'
+///  sil-decl-subref-part ::= 'unionelt'
+///  sil-decl-subref-part ::= 'destroyer'
+///  sil-decl-subref-part ::= 'globalaccessor'
+///  sil-decl-uncurry-level ::= [0-9]+
+///  sil-decl-lang ::= 'objc'
 bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
     return true;
@@ -617,27 +648,20 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
     FullName.push_back(Id);
   } while (P.consumeIf(tok::period));
 
-  // Look up ValueDecl from FullName.
+  // Look up ValueDecl from a dotted path.
   ValueDecl *VD;
-  {
-    // Use UnqualifiedLookup to look through all of the imports.
-    // We have to lie and say we're done with parsing to make this happen.
-    assert(P.TU->ASTStage == TranslationUnit::Parsing &&
-           "Unexpected stage during parsing!");
-    llvm::SaveAndRestore<Module::ASTStage_t> ASTStage(P.TU->ASTStage,
-                                                      TranslationUnit::Parsed);
-    UnqualifiedLookup DeclLookup(FullName[0], P.TU);
-    assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1 &&
-           DeclLookup.Results.back().hasValueDecl());
-    VD = DeclLookup.Results.back().getValueDecl();
-  }
-  for (unsigned I = 1, E = FullName.size(); I < E; I++) {
-    // Look up members of VD for FullName[i].
-    SmallVector<ValueDecl *, 4> Lookup;
-    P.TU->lookupQualified(VD->getType(), FullName[I], NL_QualifiedDefault,
-                          Lookup);
-    assert(Lookup.size() == 1);
-    VD = Lookup[0];
+  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, FullName[0]);
+  if (Res.is<Module*>()) {
+    assert(FullName.size() > 1 &&
+           "A single module is not a full path to SILDeclRef");
+    auto Mod = Res.get<Module*>();
+    VD = lookupMember(P, ModuleType::get(Mod), FullName[1]);
+    for (unsigned I = 2, E = FullName.size(); I < E; I++)
+      VD = lookupMember(P, VD->getType(), FullName[I]);
+  } else {
+    VD = Res.get<ValueDecl*>();
+    for (unsigned I = 1, E = FullName.size(); I < E; I++)
+      VD = lookupMember(P, VD->getType(), FullName[I]);
   }
 
   // Initialize Kind, uncurryLevel and IsObjC.
@@ -789,6 +813,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
     .Case("br", ValueKind::BranchInst)
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
+    .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst)
     .Case("builtin_zero", ValueKind::BuiltinZeroInst)
     .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
@@ -859,15 +884,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
   }
   P.diagnose(OpcodeLoc, diag::expected_sil_instr_opcode);
   return true;
-}
-
-/// Find the ValueDecl given a member name and a type.
-static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
-  SmallVector<ValueDecl *, 4> Lookup;
-  P.TU->lookupQualified(Ty, Name, NL_QualifiedDefault, Lookup);
-  assert(Lookup.size() == 1);
-  ValueDecl *VD = Lookup[0];
-  return VD;
 }
 
 /// Use performTypeLocChecking to get the type for Bool. Another option
@@ -1055,6 +1071,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseSILFunctionRef(B, ResultVal))
       return true;
     break;
+  case ValueKind::BuiltinFunctionRefInst: {
+    SILType Ty;
+    SILDeclRef FuncRef;
+    if (parseSILDeclRef(FuncRef) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(Ty))
+      return true;
+    ResultVal = B.createBuiltinFunctionRef(SILLocation(),
+                      cast<FuncDecl>(FuncRef.getDecl()), Ty);
+    break;
+  }
   case ValueKind::ProjectExistentialInst: {
     SILType Ty;
     Identifier ToToken;
