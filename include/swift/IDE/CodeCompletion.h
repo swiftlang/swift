@@ -20,12 +20,14 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
+#include <functional>
 #include <string>
 #include <vector>
 
 namespace swift {
 class CodeCompletionCallbacksFactory;
 class Decl;
+class ClangModule;
 
 namespace ide {
 
@@ -230,6 +232,7 @@ class CodeCompletionResultBuilder {
   const Decl *AssociatedDecl;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
+  bool HasLeadingDot = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -282,6 +285,11 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::RightBracket, "]");
   }
 
+  void addLeadingDot() {
+    HasLeadingDot = true;
+    addDot();
+  }
+
   void addDot() {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Dot, ".");
   }
@@ -325,20 +333,36 @@ public:
 };
 
 class CodeCompletionContext {
+public:
+  struct ClangCacheImpl;
+
+private:
   friend class CodeCompletionResultBuilder;
   llvm::BumpPtrAllocator Allocator;
 
-  /// \brief Cached unqualified Clang completion results.
+  /// \brief Per-module code completion result cache.
   ///
   /// These results persist between multiple code completion requests.
-  std::vector<CodeCompletionResult *> ClangCompletionResults;
+  std::unique_ptr<ClangCacheImpl> ClangResultCache;
 
   /// \brief A set of current completion results, not yet delivered to the
   /// consumer.
   std::vector<CodeCompletionResult *> CurrentCompletionResults;
-  bool IncludeClangResults = false;
+
+  enum class ResultDestination {
+    CurrentSet,
+    ClangCache
+  };
+
+  /// \brief Determines where the newly added results will go.
+  ResultDestination CurrentDestination = ResultDestination::CurrentSet;
+
+  void addResult(CodeCompletionResult *R, bool HasLeadingDot);
 
 public:
+  CodeCompletionContext();
+  ~CodeCompletionContext();
+
   /// \brief Allocate a string owned by the code completion context.
   StringRef copyString(StringRef String);
 
@@ -353,16 +377,21 @@ public:
   /// \brief Clean the cache of Clang completion results.
   void clearClangCache();
 
-  /// \brief Return true if we have already cached Clang completion results.
-  bool haveClangResults() {
-    return !ClangCompletionResults.empty();
-  }
+  /// \brief Set a function to refill code compltetion cache.
+  ///
+  /// \param RefillCache function that when called should generate code
+  /// completion results for all Clang modules.
+  void setCacheClangResults(
+      std::function<void(bool NeedLeadingDot)> RefillCache);
 
   /// \brief If called, the current set of completion results will include
-  /// unqualified Clang completion results.
-  void includeUnqualifiedClangResults() {
-    IncludeClangResults = true;
-  }
+  /// unqualified Clang completion results without a leading dot.
+  void includeUnqualifiedClangResults();
+
+  /// \brief If called, the current set of completion results will include
+  /// Clang completion results from a specified module.
+  void includeQualifiedClangResults(const ClangModule *Module,
+                                    bool NeedLeadingDot);
 };
 
 /// \brief An abstract base class for consumers of code completion results.

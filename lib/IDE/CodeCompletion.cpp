@@ -2,14 +2,20 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ModuleLoadListener.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Subsystems.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "clang/Basic/Module.h"
 #include <algorithm>
+#include <functional>
 #include <string>
 
 using namespace swift;
@@ -135,13 +141,110 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 }
 
 void CodeCompletionResultBuilder::finishResult() {
-  auto *Result = takeResult();
-  if (Kind == CodeCompletionResult::ResultKind::Declaration &&
-      AssociatedDecl->hasClangNode())
-    Context.ClangCompletionResults.push_back(Result);
-  else
-    Context.CurrentCompletionResults.push_back(Result);
+  Context.addResult(takeResult(), HasLeadingDot);
 }
+
+namespace swift {
+namespace ide {
+struct CodeCompletionContext::ClangCacheImpl {
+  CodeCompletionContext &CompletionContext;
+
+  /// Per-module completion result cache for results with a leading dot.
+  llvm::DenseMap<const ClangModule *, std::vector<CodeCompletionResult *>>
+      CacheWithDot;
+
+  /// Per-module completion result cache for results without a leading dot.
+  llvm::DenseMap<const ClangModule *, std::vector<CodeCompletionResult *>>
+      CacheWithoutDot;
+
+  /// A function that can generate results for the cache.
+  std::function<void(bool NeedLeadingDot)> RefillCache;
+
+  struct RequestedResultsTy {
+    const ClangModule *Module;
+    bool NeedLeadingDot;
+  };
+
+  /// Describes the results requested for current completion.
+  Optional<RequestedResultsTy> RequestedResults = Nothing;
+
+  ClangCacheImpl(CodeCompletionContext &CompletionContext)
+      : CompletionContext(CompletionContext) {}
+
+  void clear() {
+    CacheWithDot.clear();
+    CacheWithoutDot.clear();
+  }
+
+  void ensureCached() {
+  if (!RequestedResults)
+    return;
+
+    bool NeedDot = RequestedResults->NeedLeadingDot;
+    if ((NeedDot && CacheWithDot.empty()) ||
+        (!NeedDot && CacheWithoutDot.empty())) {
+      llvm::SaveAndRestore<ResultDestination> ChangeDestination(
+          CompletionContext.CurrentDestination, ResultDestination::ClangCache);
+
+      RefillCache(NeedDot);
+    }
+  }
+
+  void requestUnqualifiedResults() {
+    RequestedResults = RequestedResultsTy{nullptr, false};
+  }
+
+  void requestQualifiedResults(const ClangModule *Module,
+                               bool NeedLeadingDot) {
+    assert(Module && "should specify a non-null Module");
+    RequestedResults = RequestedResultsTy{Module, NeedLeadingDot};
+  }
+
+  void addResult(CodeCompletionResult *R, bool HasLeadingDot);
+  void takeResults();
+};
+} // namespace ide
+} // namespace swift
+
+void CodeCompletionContext::ClangCacheImpl::addResult(CodeCompletionResult *R,
+                                                      bool HasLeadingDot) {
+  const ClangModule *Module = nullptr;
+  if (auto *D = R->getAssociatedDecl())
+    Module = cast<ClangModule>(D->getModuleContext());
+  auto &Cache = HasLeadingDot ? CacheWithDot : CacheWithoutDot;
+  Cache[Module].push_back(R);
+}
+
+void CodeCompletionContext::ClangCacheImpl::takeResults() {
+  if (!RequestedResults)
+    return;
+
+  ensureCached();
+
+  std::vector<CodeCompletionResult *> &Results =
+      CompletionContext.CurrentCompletionResults;
+  // Add Clang results from the cache.
+  auto *Module = RequestedResults->Module;
+  auto &Cache = RequestedResults->NeedLeadingDot ? CacheWithDot :
+                                                   CacheWithoutDot;
+  for (auto KV : Cache) {
+    // Include results from this module if:
+    // * no particular module was requested, or
+    // * this module was specifically requested, or
+    // * this module is re-exported from the requested module.
+    if (!Module || Module == KV.first ||
+        Module->getClangModule()->isModuleVisible(KV.first->getClangModule()))
+      for (auto R : KV.second)
+        Results.push_back(R);
+  }
+
+  RequestedResults = Nothing;
+}
+
+CodeCompletionContext::CodeCompletionContext()
+    : ClangResultCache(new ClangCacheImpl(*this)) {}
+
+CodeCompletionContext::~CodeCompletionContext() {}
 
 StringRef CodeCompletionContext::copyString(StringRef String) {
   char *Mem = Allocator.Allocate<char>(String.size());
@@ -149,18 +252,8 @@ StringRef CodeCompletionContext::copyString(StringRef String) {
   return StringRef(Mem, String.size());
 }
 
-void CodeCompletionContext::clearClangCache() {
-  ClangCompletionResults.clear();
-}
-
 MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
-  if (IncludeClangResults) {
-    CurrentCompletionResults.reserve(CurrentCompletionResults.size() +
-                                     ClangCompletionResults.size());
-    // Add Clang results from the cache.
-    for (auto R : ClangCompletionResults)
-      CurrentCompletionResults.push_back(R);
-  }
+  ClangResultCache->takeResults();
 
   // Copy pointers to the results.
   const size_t Count = CurrentCompletionResults.size();
@@ -169,7 +262,6 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   std::copy(CurrentCompletionResults.begin(), CurrentCompletionResults.end(),
             Results);
   CurrentCompletionResults.clear();
-  IncludeClangResults = false;
   return MutableArrayRef<CodeCompletionResult *>(Results, Count);
 }
 
@@ -199,12 +291,44 @@ StringRef getFirstTextChunk(CodeCompletionResult *R) {
 }
 } // unnamed namespace
 
+void CodeCompletionContext::addResult(CodeCompletionResult *R,
+                                      bool HasLeadingDot) {
+  switch (CurrentDestination) {
+  case ResultDestination::CurrentSet:
+    CurrentCompletionResults.push_back(R);
+    return;
+
+  case ResultDestination::ClangCache:
+    ClangResultCache->addResult(R, HasLeadingDot);
+    return;
+  }
+}
+
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
             [](CodeCompletionResult * LHS, CodeCompletionResult * RHS) {
     return getFirstTextChunk(LHS).compare_lower(getFirstTextChunk(RHS)) < 0;
   });
+}
+
+void CodeCompletionContext::clearClangCache() {
+  ClangResultCache->clear();
+}
+
+void CodeCompletionContext::setCacheClangResults(
+    std::function<void(bool NeedLeadingDot)> RefillCache) {
+  ClangResultCache->RefillCache = RefillCache;
+}
+
+void CodeCompletionContext::includeUnqualifiedClangResults() {
+  ClangResultCache->requestUnqualifiedResults();
+}
+
+void
+CodeCompletionContext::includeQualifiedClangResults(const ClangModule *Module,
+                                                    bool NeedLeadingDot) {
+  ClangResultCache->requestQualifiedResults(Module, NeedLeadingDot);
 }
 
 namespace {
@@ -292,6 +416,7 @@ class CompletionLookup : swift::VisibleDeclConsumer
   LookupKind Kind;
   Type ExprType;
   bool HaveDot = false;
+  bool NeedLeadingDot = false;
   bool IsSuperRefExpr = false;
 
   /// \brief True if we are code completing inside a static method.
@@ -301,7 +426,7 @@ class CompletionLookup : swift::VisibleDeclConsumer
   const DeclContext *CurrMethodDC = nullptr;
 
   bool needDot() const {
-    return Kind == LookupKind::ValueExpr && !HaveDot;
+    return NeedLeadingDot;
   }
 
 public:
@@ -327,6 +452,12 @@ public:
         }
       }
     }
+
+    CompletionContext.setCacheClangResults([&](bool NeedLeadingDot) {
+      llvm::SaveAndRestore<bool> S(this->NeedLeadingDot, NeedLeadingDot);
+      if (auto Importer = SwiftContext.getClangModuleLoader())
+        static_cast<ClangImporter &>(*Importer).lookupVisibleDecls(*this);
+    });
   }
 
   void setHaveDot() {
@@ -359,7 +490,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(VD);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     addTypeAnnotation(Builder, VD->getType());
   }
@@ -435,7 +566,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(FD);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     Builder.addLeftParen();
     auto *FE = FD->getBody();
@@ -511,7 +642,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(NTD);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder,
                       MetaTypeType::get(NTD->getDeclaredType(), SwiftContext));
@@ -523,7 +654,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration);
     Builder.setAssociatedDecl(TAD);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(TAD->getName().str());
     Type TypeAnnotation;
     if (TAD->hasUnderlyingType())
@@ -539,7 +670,7 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::Keyword);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.isNull())
       addTypeAnnotation(Builder, TypeAnnotation);
@@ -550,7 +681,7 @@ public:
         CompletionContext,
         CodeCompletionResult::ResultKind::Keyword);
     if (needDot())
-      Builder.addDot();
+      Builder.addLeadingDot();
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
@@ -651,6 +782,7 @@ public:
 
   void getValueExprCompletions(Type ExprType) {
     Kind = LookupKind::ValueExpr;
+    NeedLeadingDot = !HaveDot;
     this->ExprType = ExprType;
     bool Done = false;
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
@@ -660,6 +792,12 @@ public:
     if (auto LVT = ExprType->getAs<LValueType>()) {
       if (auto AFT = LVT->getObjectType()->getAs<AnyFunctionType>()) {
         addSwiftFunctionCall(AFT);
+        Done = true;
+      }
+    }
+    if (auto MT = ExprType->getAs<ModuleType>()) {
+      if (auto *M = dyn_cast<ClangModule>(MT->getModule())) {
+        CompletionContext.includeQualifiedClangResults(M, needDot());
         Done = true;
       }
     }
@@ -696,10 +834,6 @@ public:
     // Same: swift.IntegerLiteralType.
     addKeyword("__LINE__", "Int");
     addKeyword("__COLUMN__", "Int");
-
-    if (!CompletionContext.haveClangResults())
-      if (auto Importer = SwiftContext.getClangModuleLoader())
-        static_cast<ClangImporter&>(*Importer).lookupVisibleDecls(*this);
 
     CompletionContext.includeUnqualifiedClangResults();
   }

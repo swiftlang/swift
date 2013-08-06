@@ -1,1 +1,2 @@
 module FooClangModule { header "foo_clang_module.h" }
+module BarClangModule { header "bar_clang_module.h" }
