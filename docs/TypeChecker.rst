@@ -105,14 +105,6 @@ the Swift type system:
   String`` is satisfiable because ``String`` has a constructor that
   accepts an ``Int``.
 
-**Literal**
-  A literal constraint requires that the constrained type conform to
-  the (informal) protocol required to type a particular literal and
-  create an instance of the constrained type. There are literal
-  constraint flavors for each kind of literal, e.g., integer literal
-  constraints, floating literal constraints, character literal
-  constraints,  and string literal constraints.
-
 **Member**
   A member constraint ``X[.name] == Y`` specifies that the first type
   (``X``) have a member (or an overloaded set of members) with the
@@ -122,6 +114,10 @@ the Swift type system:
   context, and type member constraints, which refer to the member in a
   type context (and therefore can only refer to types).
 
+**Conformance**
+  A conformance constraint ``X conforms to Y`` specifies that the
+  first type (''X'') must conform to the protocol ``Y``.
+
 **Archetype**
   An archetype constraint requires that the constrained type be bound
   to an archetype. This is a very specific kind of constraint that is
@@ -129,8 +125,10 @@ the Swift type system:
 
 **ApplicableFunction**
   An applicable function requires that both types are function types 
-  with the same input and output types. Note, that it does not require 
-  the type attributes to match.
+  with the same input and output types. It is used when the function
+  type on the left-hand side is being split into its input and output
+  types for function application purposes. Note, that it does not
+  require the type attributes to match.
 
 Constraint Generation
 ``````````````````````````
@@ -167,8 +165,8 @@ and types generated from the primary expression kinds are:
   for a fresh type variable ``T0``. In addition, the expression
   generates the value member constraint ``T(a).b == T0``.  Member
   references may end up resolving to a member of a nominal type or an
-  element of a element; in the latter case, the name (``b``) may
-  either be an identifier or a positional argument (e.g., ``$1``).
+  element of a tuple; in the latter case, the name (``b``) may
+  either be an identifier or a positional argument (e.g., ``1``).
 
   Note that resolution of the member constraint can refer to a set of
   overloaded declarations; this is described further in the
@@ -240,28 +238,22 @@ and types generated from the primary expression kinds are:
   of the constraint system; it will be type-checked once the function
   expression has been given a concrete type.
 
-**Explicit closures**
-  An explicit closure ``{ body }`` is assigned a function type based
-  on the (implied) parameters and the type of the body. Each
-  positional parameter (``$1``, ``$2``, ..., ``$N``) is assigned a fresh type
-  variable (call them ``T1``, ``T2``, ..., ``TN``). Then, constraint
-  generation considers the body. The explicit closure is is given the
-  type ``(T1, T2, ..., TN) -> T(body)``. 
+**Closures**
+  A closure is assigned a function type based on the parameters and
+  return type. When a parameter has no specified type or is positional
+  (``$1``, ``$2``, etc.), it is assigned a fresh type variable to
+  capture the type. Similarly, if the return type is omitted, it is
+  assigned a fresh type variable.
 
-  Note that, in contrast to the function expressions, the body of an
-  explicit closure is considered as part of the same type-checking
-  problem as the explicit closure itself. This decision corresponds to
-  the higher-level decision to only perform type inference at the
-  expression level, because the body of an explicit closure is always
-  a single expression, while the body of a function expression is a
-  compound statement.
+  When the body of the closure is a single expression, that expression
+  participates in the type checking of its enclosing expression
+  directly. Otherwise, the body of the closure is separately
+  type-checked once the type checking of its context has computed a
+  complete function type.
 
-**Object allocation**
-  An object allocation ``new A(b)`` or ``new A[c]`` is assigned the
-  type ``A`` or ``A[]``, respectively. For the single allocation case,
-  the construction constraint ``T(b) <C A`` requires an ``A``
-  constructor that accepts ``b``. For the multiple allocation case,
-  the type checker (separately) checks that ``T(c)`` is an array bound
+**Array allocation**
+  An array allocation ``new A[s]`` is assigned the type ``A[]``. The
+  type checker (separately) checks that ``T(s)`` is an array bound
   type.
 
 **Address of**
@@ -332,7 +324,7 @@ the resolution of the actual member.
 Polymorphic Types
 ''''''''''''''''''''''''''''''''''''''''''''''
 
-The Swift language includes "generics", a system of constrained
+The Swift language includes generics, a system of constrained
 parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
@@ -342,16 +334,16 @@ e.g.,::
     return x
   }
 
-Here, ``T`` is effectively a type variable that can be replaced with
+Here, ``T`` is a generic parameter that can be replaced with
 any concrete type, so long as that type conforms to the protocol
 ``Comparable``. The type of ``min`` is (internally) written as ``<T : Comparable> (x :
 T, y : T) -> T``, which can be read as "for all ``T``, where ``T``
 conforms to ``Comparable``, the type of the function is ``(x : T, y : T)
 -> T``. Different uses of the ``min`` function may have different
-bindings for the type variable ``T``.
+bindings for the generic parameter``T``.
 
 When the constraint generator encounters a reference to a generic
-function, it immediately replaces each of the type variables within
+function, it immediately replaces each of the generic parameters within
 the function type with a fresh type variable, introduces constraints
 on that type variable to match the constraints listed in the generic
 function, and produces a monomorphic function type based on the
@@ -377,16 +369,17 @@ solver. For example, consider the following generic dictionary type::
     // ...
   }
 
-When the constraint solver encounters the expression ``new
-Dictionary``, it opens up the type ``Dictionary``---which has not been
-provided with any specific generic arguments---to the type
+When the constraint solver encounters the expression ``
+Dictionary()``, it opens up the type ``Dictionary``---which has not
+been provided with any specific generic arguments---to the type
 ``Dictionary<T0, T1>``, for fresh type variables ``T0`` and ``T1``,
-and introduces the constraint ``T0 < Hashable``. This allows the
-actual key and value types of the dictionary to be determined by the
-context of the expression. As noted above for first-class polymorphic
-functions, this immediate opening is valid because an unbound generic
-type, i.e., one that does not have specified generic arguments, cannot
-be used except where the generic arguments can be inferred.
+and introduces the constraint ``T0 conforms to Hashable``. This allows
+the actual key and value types of the dictionary to be determined by
+the context of the expression. As noted above for first-class
+polymorphic functions, this immediate opening is valid because an
+unbound generic type, i.e., one that does not have specified generic
+arguments, cannot be used except where the generic arguments can be
+inferred.
 
 Constraint Solving
 -----------------------------
@@ -398,7 +391,7 @@ selecting one of the overloads.
 
 Solving the constraint systems generated by the Swift language can, in
 the worst case, require exponential time. Even the class
-Hindley-Milner type inference algorithm requires exponential type, and
+Hindley-Milner type inference algorithm requires exponential time, and
 the Swift type system introduces additional complications, especially
 overload resolution. However, the problem size for any particular
 expression is still fairly small, and the constraint solver can employ
@@ -438,12 +431,12 @@ Relational Constraints
 ''''''''''''''''''''''''''''''''''''''''''''''''
 
 Relational constraints describe a relationship between two types. This
-category covers the equality, subtyping, conversion, and construction
-constraints, and provides the most common simplifications. The
-simplification of relationship constraints proceeds by comparing the
-structure of the two types and applying the typing rules of the Swift
-language to generate additional constraints. For example, if the
-constraint is a conversion constraint::
+category covers the equality, subtyping, and conversion constraints,
+and provides the most common simplifications. The simplification of
+relationship constraints proceeds by comparing the structure of the
+two types and applying the typing rules of the Swift language to
+generate additional constraints. For example, if the constraint is a
+conversion constraint::
 
   A -> B <c C -> D
 
@@ -488,53 +481,45 @@ value constraint, on the other hand, can refer to either a type or a
 value, and ``C`` is the type of a reference to that entity. For a
 reference to a type, ``C`` will be a metatype of the declared type.
 
-Derived Systems
-````````````````````
-The constraint generation process produces a single constraint system
-consisting of a number of constraints. The simplification process then
-breaks these constraints down into simpler constraints that 
 
 Strategies
 ```````````````````````````````
 The basic approach to constraint solving is to simplify the
 constraints until they can no longer be simplified, then produce (and
 check) educated guesses about which declaration from an overload set
-should be selected and what concrete type should be bound to a given
+should be selected or what concrete type should be bound to a given
 type variable. Each guess is tested as an assumption, possibly with
 other guesses, until the solver either arrives at a solution or
 concludes that the guess was incorrect.
 
-Within the implementation, each guess is modeled as a "derived"
-constraint system. A derived constraint system inherits all of the
-constraints, overload selections, and type variable bindings of the
-parent constraint system from which it was derived, then adds one more
-guess. As such, the solution space explored by the solver can be
-viewed as a tree, where the top-most constraint system, which has no
-parent, is the constraint system generated directly from the
+Within the implementation, each guess is modeled as an assumption
+within a new solver scope. The solver scope inherits all of the
+constraints, overload selections, and type variable bindings of its
+parent solver scope, then adds one more guess. As such, the solution
+space explored by the solver can be viewed as a tree, where the
+top-most node is the constraint system generated directly from the
 expression. The leaves of the tree are either solutions to the
 type-checking problem (where all constraints have been simplified
-away) or represent sets of assumptions that do not lead to a
-solution.
+away) or represent sets of assumptions that do not lead to a solution.
 
 The following sections describe the techniques used by the solver to
 produce derived constraint systems that explore the solution space.
 
 Overload Selection
 '''''''''''''''''''''''''''''''''''''''''''''''''''''
-Overload selection is the simplest way to create derived constraint
-systems. For an overload set that introduced a disjunction constraint 
+Overload selection is the simplest way to make an assumption. For an
+overload set that introduced a disjunction constraint 
 ``T0 := A1 or T0 := A2 or ... or T0 := AN`` into the constraint
-system, one derived constraint system is created for each term in the
-disjunction, corresponding to the selected overload. Each derived
-constraint system then binds the type variable ``T0`` and explores
+system, each term in the disjunction will be visited separately. Each
+solver state binds the type variable ``T0`` and explores
 whether the selected overload leads to a suitable solution.
 
 Type Variable Bindings
 '''''''''''''''''''''''''''''''''''''''''''''''''''''
-A second way in which the solver creates derived constraint systems is
-to guess at the concrete type to which a given type variable should be
-bound. That type binding is then introduced in a new, derived
-constraint system to determine if the binding is feasible.
+A second way in which the solver makes assumptions is to guess at the
+concrete type to which a given type variable should be bound. That
+type binding is then introduced in a new, derived constraint system to
+determine if the binding is feasible.
 
 The solver does not conjure concrete type bindings from nothing, nor
 does it perform an exhaustive search. Rather, it uses the constraints
@@ -588,9 +573,10 @@ can be converted [#]_.
 
 Default Literal Types
 ..........................................
-If a type variable is bound by a literal constraint, e.g., "``T0``  is
-an integer literal", then the constraint solver will guess that the
-type variable can be bound to the default literal type. For example,
+If a type variable is bound by a conformance constraint to one of the
+literal protocols, "``T0`` conforms to ``IntegerLiteralConvertible``",
+then the constraint solver will guess that the type variable can be
+bound to the default literal type for that protocol. For example,
 ``T0`` would get the default integer literal type ``Int``, allowing
 one to type-check expressions with too little type information to
 determine the types of these literals, e.g., ``-1``.
@@ -602,36 +588,38 @@ possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
 solver can then compare the solutions to to determine whether one of
 the solutions is better than all of the others. To do so, it compares
-the concrete type variable bindings and selected overloads from each
-pair of solutions:
+the concrete type variable bindings and selected overloads from the
+solutions using a scoring system. The score of a solution comes in two
+parts: a fixed score and a relative score.
 
-- If two type variables have different concrete type bindings in the
-  two solutions, the two type variables are compared. If the concrete
-  type bound in the first solution is convertible to the concrete type
-  bound in the second solution, then the binding in the first solution
-  is more specific than the binding in the second solution.
+The fixed score for a solution depends entirely on the fitness of the
+solution itself. There are two sources of scores:
 
-  If neither concrete type is convertible to the other, and there is a
-  literal constraint on the type variable, then the binding in the
-  first solution is more specific if the bound type is the same as the
-  default literal type for that literal constraint (and the binding in
-  the second solution is not). This rule therefore prefers the use of
-  the default literal types over other types, and ends up breaking
-  ambiguities in cases where there are several literals.
+- If a type variable that is the subject of a conformance constraint
+  to a literal protocol is bound to the default literal type for that
+  protocol, the solution earns +1.
 
-- If two overload sets have different selected overloads in the two
-  soluions, the overloads are compared [#]_. If the type of the
-  overload picked in the first solution is convertible to the type of
-  the overload picked in the second solution, then the overload
-  selection in the first solution is more specific than the binding in
-  the second solution.
+- For each user-defined conversion required by the solution, the
+  solution earns -2.
 
-If any type variable bindings or overload selections in one solution
-are more specific than their corresponding binding or select in
-another solution, and no type variable binding or overload selection
-is less specific, then the first solution is more specific. The best
-solution is the solution that is more specific than all other
-solutions.
+To determine whether one solution is better than another, the scores
+of the two systems are compared. Each solution starts with its fixed
+score, which is modified by the relative score based on comparing the
+two systems:
+
+- If a type variable has different concrete type bindings in the
+  two solutions, the bindings are compared. If the concrete
+  type bound in one of the solutions is convertible to the type bound
+  to the other solution, the first solution earns +1.
+
+- If an overload set has different selected overloads in the two
+  soluions, the overloads are compared. If the type of the
+  overload picked in one solution is a subtype of the type of
+  the overload picked in the other solution, then first solution earns
+  +1.
+
+The solution with the greater composite score is considered to be
+better than the other solution.
 
 Solution Application
 -------------------------
@@ -659,17 +647,157 @@ node based on the kind of expression:
 
 *Literals*
   Literals are converted to the appropriate literal type, which
-  typically involves introducing calls to ``convertFromXXXLiteral``
-  functions.
+  typically involves introducing calls to the witnesses for the
+  appropriate literal protocols.
 
-*Function expressions*
-  Since the function expression has acquired a complete function type,
-  the body of the function expression is type-checked with that
-  complete function type. (This operation can be delayed).
+*Closures*
+  Since the closure has acquired a complete function type,
+  the body of the closure is type-checked with that
+  complete function type.
 
 The solution application step cannot fail, because every potential
 failure is modeled as a constraint in the constraint system. If any
 failures do occur at this step, it is a bug in the type checker.
+
+Locators
+```````````
+During constraint generation and solving, numerous constraints are
+created, broken apart, and solved. During constraint application as
+well as during diagnostics emission, it is important to track the
+relationship between the constraints and the actual expressions from
+which they originally came. For example, consider the following type
+checking problem::
+
+  struct X {
+    // user-defined conversions
+    func [conversion] __conversion () -> String { /* ... */ }
+    func [conversion] __conversion () -> Int { /* ... */ }
+  }
+
+  func f(i : Int, s : String) { }
+
+  var x : X
+  f(10.5, x)
+
+This constraint system generates the constraints "``T(f)`` ==Fn ``T0
+-> T1``" (for fresh variables ``T0`` and ``T1``), "``(T2, X)`` <c
+``T0``" (for fresh variable ``T2``) and "``T2 conforms to
+``FloatLiteralConvertible``". As part of the solution, after ``T0`` is
+replaced with ``(i : Int, s : String)``, the second of
+these constraints is broken down into "``T2 <c ``Int``" and "``X`` <c
+``String``". These two constraints are interesting for different
+reasons: the first will fail, because ``Int`` does not conform to
+``FloatLiteralConvertible``. The second will succeed by selecting one
+of the (overloaded) conversion functions.
+
+In both of these cases, we need to map the actual constraint of
+interest back to the expressions they refer to. In the first case, we
+want to report not only that the failure occurred because ``Int`` is
+not ``FloatLiteralConvertible``, but we also want to point out where
+the ``Int`` type actually came from, i.e., in the parameter. In the
+second case, we want to determine which of the overloaded conversion
+functions was selected to perform the conversion, so that conversion
+function can be called by constraint application if all else succeeds.
+
+*Locators* address both issues by tracking the location and derivation
+of constraints. Each locator is anchored at a specific expression,
+i.e., the function application ``f(10.5, x)``, and contains a path of
+zero or more derivation steps from that anchor. For example, the
+"``T(f)`` ==Fn ``T0 -> T1``" constraint has a locator that is
+anchored at the function application and a path with the "apply
+function" derivation step, meaning that this is the function being
+applied. Similarly, the "``(T2, X)`` <c ``T0`` constraint has a
+locator anchored at the function application and a path with the
+"apply argument" derivation step, meaning that this is the argument
+to the function.
+
+When constraints are simplified, the resulting constraints have
+locators with longer paths. For example, when a conversion constraint between two
+tuples is simplified conversion constraints between the corresponding
+tuple elements, the resulting locators refer to specific elements. For
+example, the ``T2 <c Int`` constraint will be anchored at the function
+application (still), and have two derivation steps in its path: the
+"apply function" derivation step from its parent constraint followed
+by the "tuple element 0" constraint that refers to this specific tuple
+element. Similarly, the ``X <c String`` constraint will have the same
+locator, but with "tuple element 1" rather than "tuple element 0". The
+``ConstraintLocator`` type in the constraint solver has a number of
+different derivation step kinds (called "path elements" in the source)
+that describe the various ways in which larger constraints can be
+broken down into smaller ones.
+
+Overload Choices
+'''''''''''''''''''''''''''''
+Whenever the solver creates a new overload set, that overload set is
+associated with a particular locator. Continuing the example from the
+parent section, the solver will create an overload set containing the
+two user-defined conversions. This overload set is created while
+simplifying the constraint ``X <c String``, so it uses the locator
+from that constraint extended by a "conversion member" derivation
+step. The complete locator for this overload set is, therefore::
+
+  function application -> apply argument -> tuple element #1 -> conversion member
+
+When the solver selects a particular overload from the overload set,
+it records the selected overload based on the locator of the overload
+set. When it comes time to perform constraint application, the locator
+is recreated based on context (as the bottom-up traversal walks the
+expressions to rewrite them with their final types) and used to find
+the appropriate conversion to call. The same mechanism is used to
+select the appropriate overload when an expression refers directly to
+an overloaded function. Additionally, when comparing two solutions to
+the same constraint system, overload sets present in both solutions
+can be found by comparing the locators for each of the overload
+choices made in each solution. Naturally, all of these operations
+require locators to be uniqued, which occurs in the constraint system
+itself.
+
+Simplifying Locators
+'''''''''''''''''''''''''''''
+Locators provide the derivation of location information that follows
+the path of the solver, and can be used to query and recover the
+important decisions made by the solver. However, the locators
+determined by the solver may not directly refer to the most specific
+expression for the purposes of identifying the corresponding source
+location. For example, the failed constraint "``Int`` conforms to
+``FloatLiteralConvertible``" can most specifically by centered on the
+floating-point literal ``10.5``, but its locator is::
+
+  function application -> apply argument -> tuple element #0
+
+The process of locator simplification maps a locator to its most
+specific expression. Essentially, it starts at the anchor of the
+locator (in this case, the application ``f(10.5, x)``) and then walks
+the path, matching derivation steps to subexpressions. The "function
+application" derivation step extracts the argument (``(10.5,
+x)``). Then, the "tuple element #0" derivation extracts the tuple
+element 0 subexpression, ``10.5``, at which point we have traversed
+the entire path and now have the most specific expression for
+source-location purposes.
+
+Simplification does not always exhaust the complete path. For example,
+consider a slight modification to our example, so that the argument to
+``f`` is provided by another call, we get a different result
+entirely::
+
+  func f(i : Int, s : String) { }
+  func g() -> (f : Float, x : X) { }
+
+  f(g())
+
+Here, the failing constraint is ``Float <c Int``, with the same
+locator::
+
+  function application -> apply argument -> tuple element #0
+
+When we simplify this locator, we start with ``f(g())``. The "apply
+argument" derivation step takes us to the argument expression
+``g()``. Here, however, there is no subexpression for the first tuple
+element of ``g()``, because it's simple part of the tuple returned
+from ``g``. At this point, simplification ceases, and creates the
+simplified locator::
+
+  function application of g -> tuple element #0
 
 Performance
 -----------------
