@@ -1215,7 +1215,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     Type substResultType = getCallee().getSubstResultType();
     const TypeInfo &substResultTI = IGF.getFragileTypeInfo(substResultType);
 
-    Address temp = substResultTI.allocate(IGF, NotOnHeap, "call.aggresult");
+    Address temp = substResultTI.allocateStack(IGF, "call.aggresult");
     emitToMemory(temp, substResultTI);
  
     // If the subst result is passed as an aggregate, don't uselessly
@@ -1409,11 +1409,11 @@ void CallEmission::externalizeArgument(Explosion &out, Explosion &in,
                      CanType ty) {
   TypeInfo const &ti = IGF.getFragileTypeInfo(ty);
   if (requiresExternalByvalArgument(IGF.IGM, ty)) {
-    OwnedAddress addr = ti.allocate(IGF, NotOnHeap, "byval-temporary");
-    ti.initialize(IGF, in, addr.getAddress());
+    Address addr = ti.allocateStack(IGF, "byval-temporary");
+    ti.initialize(IGF, in, addr);
      
     newByvals.push_back({out.size(), addr.getAlignment()});
-    out.add(addr.getAddress().getAddress());
+    out.add(addr.getAddress());
   } else {
     ti.reexplode(IGF, in, out);
   }

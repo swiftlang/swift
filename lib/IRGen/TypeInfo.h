@@ -177,9 +177,13 @@ public:
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize(Mangle::ExplosionKind kind) const = 0;
 
-  /// Allocate a variable of this type.
-  virtual OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
+  /// Allocate a variable of this type on the stack.
+  virtual Address allocateStack(IRGenFunction &IGF,
                                 const llvm::Twine &name) const = 0;
+
+  /// Allocate a box of this type on the heap.
+  virtual OwnedAddress allocateBox(IRGenFunction &IGF,
+                                   const llvm::Twine &name) const = 0;
 
   /// Load an explosion of values from an address.
   virtual void load(IRGenFunction &IGF, Address addr,

@@ -48,17 +48,18 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
-                        const llvm::Twine &name) const override {
-    if (onHeap) {
-      // Allocate a new object using the allocBox runtime call.
-      llvm::Value *metadata = asImpl().getMetadataRef(IGF);
-      llvm::Value *box, *address;
-      IGF.emitAllocBoxCall(metadata, box, address);
-      address = IGF.Builder.CreateBitCast(address, StorageType->getPointerTo());
-      return OwnedAddress(getAddressForPointer(address), box);
-    }
+  OwnedAddress allocateBox(IRGenFunction &IGF,
+                           const llvm::Twine &name) const override {
+    // Allocate a new object using the allocBox runtime call.
+    llvm::Value *metadata = asImpl().getMetadataRef(IGF);
+    llvm::Value *box, *address;
+    IGF.emitAllocBoxCall(metadata, box, address);
+    address = IGF.Builder.CreateBitCast(address, StorageType->getPointerTo());
+    return OwnedAddress(getAddressForPointer(address), box);
+  }
 
+  Address allocateStack(IRGenFunction &IGF,
+                        const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
     Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
                                       getFixedBufferAlignment(IGF.IGM),
@@ -70,7 +71,7 @@ public:
       emitAllocateBufferCall(IGF, metadata, buffer);
     address = IGF.Builder.CreateBitCast(address,
                                         getStorageType()->getPointerTo());
-    return OwnedAddress(getAddressForPointer(address), IGF.IGM.RefCountedNull);
+    return getAddressForPointer(address);
   }
 
   /// Perform a "take-initialization" from the given object.  A

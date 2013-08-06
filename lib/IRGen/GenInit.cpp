@@ -51,29 +51,25 @@ Address IRGenModule::emitGlobalVariable(VarDecl *var,
   return addr;
 }
 
-/// Create an allocation for an empty object.
-static OwnedAddress createEmptyAlloca(IRGenModule &IGM, const TypeInfo &type) {
-  return OwnedAddress(type.getUndefAddress(), IGM.RefCountedNull);
-}
-
-
-/// Allocate an object with fixed layout.
-OwnedAddress FixedTypeInfo::allocate(IRGenFunction &IGF, OnHeap_t onHeap,
+Address FixedTypeInfo::allocateStack(IRGenFunction &IGF,
                                      const Twine &name) const {
   // If the type is known to be empty, don't actually allocate anything.
+  if (isKnownEmpty()) return getUndefAddress();
+
+  Address rawAddr =
+    IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
+  // TODO: lifetime intrinsics?
+
+  OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
+  return addr;
+}
+
+/// Allocate an object with fixed layout.
+OwnedAddress FixedTypeInfo::allocateBox(IRGenFunction &IGF,
+                                        const Twine &name) const {
+  // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty())
-    return createEmptyAlloca(IGF.IGM, *this);
-
-  // If the object does not need to be allocated on the heap,
-  // allocate it on the stack.
-  if (!onHeap) {
-    Address rawAddr =
-      IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-    // TODO: lifetime intrinsics?
-
-    OwnedAddress addr(rawAddr, IGF.IGM.RefCountedNull);
-    return addr;
-  }
+    return OwnedAddress(getUndefAddress(), IGF.IGM.RefCountedNull);
 
   // Lay out the type as a heap object.
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, this);

@@ -1743,15 +1743,15 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 # endif
     "";
 
-  OwnedAddress addr = type.allocate(*this, NotOnHeap, dbgname);
+  Address addr = type.allocateStack(*this, dbgname);
   if (IGM.DebugInfo && Decl)
     IGM.DebugInfo->emitStackVariableDeclaration(Builder,
-                                                addr.getAddressPointer(),
+                                                addr.getAddress(),
                                                 DebugTypeInfo(*Decl, type),
                                                 Decl->getName().str(),
                                                 i);
 
-  setLoweredAddress(v, addr.getAddress());
+  setLoweredAddress(v, addr);
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
@@ -1773,14 +1773,18 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   //llvm_unreachable("not implemented");
 }
 
+static StringRef getNameForLoc(SILLocation loc) {
+  if (auto decl = loc.getAs<ValueDecl>())
+    return decl->getName().str();
+  return "";
+}
+
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   SILValue boxValue(i, 0);
   SILValue ptrValue(i, 1);
   const TypeInfo &type = getFragileTypeInfo(i->getElementType());
-  OwnedAddress addr = type.allocate(*this,
-                                    OnHeap,
-                                    // FIXME: derive name from SIL location
-                                    "");
+
+  OwnedAddress addr = type.allocateBox(*this, getNameForLoc(i->getLoc()));
   
   Explosion box(ExplosionKind::Maximal);
   box.add(addr.getOwner());

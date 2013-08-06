@@ -435,8 +435,7 @@ namespace {
     }
 
     void initIntoTemporary(const TypeInfo &substTI) {
-      auto addr = substTI.allocate(IGF, NotOnHeap,
-                                   "substitution.temp").getAddress();
+      auto addr = substTI.allocateStack(IGF, "substitution.temp");
 
       // Initialize into it.
       substTI.initialize(IGF, In, addr);

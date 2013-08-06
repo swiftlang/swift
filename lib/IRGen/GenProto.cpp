@@ -505,12 +505,6 @@ namespace {
       return path.apply(IGF, originTable);
     }
 
-    using FixedTypeInfo::allocate;
-    Address allocate(IRGenFunction &IGF,
-                     const Twine &name = "protocol.temporary") const {
-      return IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-    }
-
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {
       auto objPtrTy = dest.getAddress()->getType();
       auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
@@ -984,33 +978,6 @@ namespace {
       void *buffer = operator new(sizeof(OpaqueArchetypeTypeInfo)
                                   + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer) OpaqueArchetypeTypeInfo(archetype, type, protocols);
-    }
-
-    /// Create an uninitialized archetype object.
-    OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
-                          const llvm::Twine &name) const {
-      if (onHeap) {
-        // Allocate a new object using the allocBox runtime call.
-        llvm::Value *metadata = getMetadataRef(IGF);
-        llvm::Value *box, *address;
-        IGF.emitAllocBoxCall(metadata, box, address);
-        Address rawAddr(address, Alignment(1));
-        
-        return OwnedAddress(rawAddr, box);
-      }
-
-      // Make a fixed-size buffer.
-      Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
-                                        getFixedBufferAlignment(IGF.IGM),
-                                        name);
-
-      // Allocate an object of the appropriate type within it.
-      llvm::Value *metadata = getMetadataRef(IGF);
-      Address allocated(emitAllocateBufferCall(IGF, metadata, buffer),
-                        Alignment(1));
-      OwnedAddress ownedAddr(allocated, IGF.IGM.RefCountedNull);
-
-      return ownedAddr;
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src) const {

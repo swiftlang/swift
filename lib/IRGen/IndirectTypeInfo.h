@@ -30,7 +30,11 @@ namespace irgen {
 /// implementing a type which is always passed indirectly.
 ///
 /// Subclasses must implement the following operations:
-///   allocate, assignWithCopy, initializeWithCopy, destroy
+///   allocateStack
+///   allocateBox
+///   assignWithCopy
+///   initializeWithCopy
+///   destroy
 template <class Derived, class Base>
 class IndirectTypeInfo : public Base {
 protected:
@@ -51,8 +55,8 @@ public:
 
   void load(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary.
-    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
-                                                 "temporary.forLoad");
+    Address dest =
+      asDerived().Derived::allocateStack(IGF, "temporary.forLoad");
 
     // Initialize it with a copy of the source.
     asDerived().Derived::initializeWithCopy(IGF, dest, src);
@@ -62,8 +66,8 @@ public:
 
   void loadAsTake(IRGenFunction &IGF, Address src, Explosion &out) const {
     // Create a temporary and memcpy into it.
-    Address dest = asDerived().Derived::allocate(IGF, NotOnHeap,
-                                                 "temporary.forLoad");
+    Address dest =
+      asDerived().Derived::allocateStack(IGF, "temporary.forLoad");
 
     // Initialize it with a take of the source.
     asDerived().Derived::initializeWithTake(IGF, dest, src);

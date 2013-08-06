@@ -46,8 +46,10 @@ public:
   /// Whether this type is known to be empty.
   bool isKnownEmpty() const { return StorageSize.isZero(); }
 
-  OwnedAddress allocate(IRGenFunction &IGF, OnHeap_t onHeap,
+  Address allocateStack(IRGenFunction &IGF,
                         const llvm::Twine &name) const override;
+  OwnedAddress allocateBox(IRGenFunction &IGF,
+                           const llvm::Twine &name) const override;
 
   // We can give these reasonable default implementations.
 
