@@ -160,6 +160,21 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
+Lexer::Lexer(SourceManager &SourceMgr, unsigned BufferID,
+             DiagnosticEngine *Diags, bool InSILMode, bool KeepComments,
+             unsigned Offset, unsigned EndOffset)
+    : Lexer(SourceMgr, SourceMgr->getMemoryBuffer(BufferID)->getBuffer(),
+            Diags,
+            SourceMgr->getMemoryBuffer(BufferID)->getBufferStart()+Offset,
+            InSILMode, KeepComments, /*Prime=*/false) {
+  if (EndOffset != 0) {
+    ArtificialEOF = BufferStart + EndOffset;
+    assert(ArtificialEOF > CurPtr && ArtificialEOF <= BufferEnd);
+  }
+
+  primeLexer();
+}
+
 Lexer::Lexer(SourceManager &SourceMgr, StringRef Buffer,
              DiagnosticEngine *Diags, const char *CurrentPosition,
              bool InSILMode, bool KeepComments, bool Prime)
@@ -1158,7 +1173,7 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       Segments.push_back(
           StringSegment::getExpr(
               StringRef(BytesPtr, End-BytesPtr-1),
-              SourceRange(getSourceLoc(BytesPtr), getSourceLoc(End))));
+              SourceRange(getSourceLoc(BytesPtr), getSourceLoc(End-1))));
       
       // Reset the input bytes to the string that remains to be consumed.
       Bytes = StringRef(End, Bytes.end() - End);
@@ -1292,10 +1307,6 @@ Restart:
   case '}': return formToken(tok::r_brace,  TokStart);
   case ']': return formToken(tok::r_square, TokStart);
   case ')':
-    // When lexing an interpolated string literal, the buffer will terminate
-    // with a ')'.
-    if (CurPtr-1 == BufferEnd)
-      return formToken(tok::eof, TokStart);
     return formToken(tok::r_paren,  TokStart);
 
   case ',': return formToken(tok::comma,    TokStart);

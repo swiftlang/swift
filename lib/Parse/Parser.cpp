@@ -156,15 +156,8 @@ void swift::performDelayedParsing(
 std::vector<Token> swift::tokenize(SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments) {
-  const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufferID);
-  StringRef BufferData = Buffer->getBuffer();
-
-  if (EndOffset)
-    BufferData = BufferData.slice(Offset, EndOffset);
-  else if (Offset)
-    BufferData = BufferData.substr(Offset);
-
-  Lexer L(BufferData, SM, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments);
+  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
+          Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();

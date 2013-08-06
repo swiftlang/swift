@@ -82,10 +82,21 @@ public:
               KeepComments, /*Prime=*/true) {
   }
 
+  Lexer(SourceManager &SourceMgr, unsigned BufferID,
+        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false,
+        unsigned Offset = 0, unsigned EndOffset = 0);
+
   /// \brief Lexer state can be saved/restored to/from objects of this class.
   class State {
   public:
     State(): CurPtr(nullptr) {}
+
+    State advance(unsigned Len) const {
+      assert(isValid());
+      State NewState;
+      NewState.CurPtr = CurPtr + Len;
+      return NewState;
+    }
 
   private:
     explicit State(const char *CurPtr): CurPtr(CurPtr) {}

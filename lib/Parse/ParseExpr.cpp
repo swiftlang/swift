@@ -957,7 +957,11 @@ Expr *Parser::parseExprStringLiteral() {
         
     case Lexer::StringSegment::Expr: {
       // Create a temporary lexer that lexes from the body of the string.
-      Lexer LocalLex(Segment.Data, SourceMgr, &Diags, nullptr /*not SIL*/);
+      Lexer::State BeginState =
+          L->getStateForBeginningOfTokenLoc(Segment.Range.Start);
+      Lexer::State EndState = BeginState.advance(Segment.Data.size());
+      Lexer LocalLex(*L, BeginState, EndState,
+                     SourceMgr, &Diags, nullptr /*not SIL*/);
       
       // Temporarily swap out the parser's current lexer with our new one.
       llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
