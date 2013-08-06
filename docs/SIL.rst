@@ -823,7 +823,7 @@ The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
 count of zero destroys the contained value as if by ``destroy_addr``.
 Releasing a box is undefined behavior if the box's value is uninitialized.
-To deallocate a box whose value has not been initialized, ``dealloc_ref``
+To deallocate a box whose value has not been initialized, ``dealloc_box``
 should be used.
 
 alloc_array
@@ -848,7 +848,7 @@ uninitialized. The box owns the contained array of values, and releasing it
 to a retain count of zero destroys all of the contained values as if by
 ``destroy_addr``. Releasing the array is thus invalid unless all of the array's
 value have been uninitialized. To deallocate a box
-whose value has not been initialized, ``dealloc_ref`` should be used.
+whose value has not been initialized, ``dealloc_box`` should be used.
 
 dealloc_stack
 `````````````
@@ -864,6 +864,23 @@ must be uninitialized or destroyed prior to being deallocated. This instruction
 marks the end of the lifetime for the value created by the corresponding
 ``alloc_stack`` instruction.
 
+dealloc_box
+```````````
+::
+
+  sil-instruction ::= 'dealloc_box' sil-type ',' sil-operand
+
+  dealloc_box $Int, %0 : $Builtin.ObjectPointer
+
+Deallocates a box, bypassing the reference counting mechanism. The box
+variable must have a retain count of one. The boxed type must match the
+type passed to the corresponding ``alloc_box`` exactly, or else
+undefined behavior results.
+
+This does not destroy the boxed value. The contents of the
+value must have been fully uninitialized or destroyed before
+``dealloc_box`` is applied.
+
 dealloc_ref
 ```````````
 ::
@@ -871,12 +888,15 @@ dealloc_ref
   sil-instruction ::= 'dealloc_ref' sil-operand
 
   dealloc_ref %0 : $T
-  // %0 must be of a box or reference type
+  // $T must be a class type
 
-Deallocates a box or reference type instance, bypassing the reference counting
-mechanism. The box must have a retain count of one. This does not
-destroy the reference type instance or the values inside the box. The contents
-of the heap object must have been fully uninitialized or destroyed before
+Deallocates a class type instance, bypassing the reference counting
+mechanism. The instance must have a retain count of one. The type of
+the operand must match the allocated type exactly, or else undefined
+behavior results.
+
+This does not destroy the reference type instance. The contents of the
+heap object must have been fully uninitialized or destroyed before
 ``dealloc_ref`` is applied.
 
 Accessing Memory
