@@ -1543,6 +1543,7 @@ ERROR(bridging_function_not_correct_type,sil_gen,none,
 ERROR(invalid_sil_builtin,sil_gen,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))
+ERROR(non_exhaustive_switch,sil_gen,none, "switch must be exhaustive", ())
 
 //==============================================================================
 // SIL Analysis Diagnostics
