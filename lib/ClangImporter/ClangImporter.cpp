@@ -312,6 +312,20 @@ ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
   return result;
 }
 
+ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
+    const clang::Decl *D) {
+  clang::Module *M = D->getOwningModule();
+  if (!M)
+    return nullptr;
+  // Get the parent module because currently we don't represent submodules with
+  // ClangModule.
+  // FIXME: this is just a workaround until we can import submodules.
+  M = M->getTopLevelModule();
+
+  return getWrapperModule(
+      static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader()), M,
+      nullptr);
+}
 
 #pragma mark Source locations
 clang::SourceLocation
@@ -479,6 +493,7 @@ class ImportingVisibleDeclConsumer : public clang::VisibleDeclConsumer {
   ClangImporter &TheClangImporter;
   ClangImporter::Implementation &Impl;
   swift::VisibleDeclConsumer &NextConsumer;
+  const Module *ModuleFilter = nullptr;
 
 public:
   ImportingVisibleDeclConsumer(ClangImporter &TheClangImporter,
@@ -487,10 +502,17 @@ public:
       : TheClangImporter(TheClangImporter), Impl(Impl),
         NextConsumer(NextConsumer) {}
 
+  void filterByModule(const Module *M) {
+    ModuleFilter = M;
+  }
+
   void FoundDecl(clang::NamedDecl *ND, clang::NamedDecl *Hiding,
                  clang::DeclContext *Ctx,
                  bool InBaseClass) override {
     if (ND->getName().empty())
+      return;
+
+    if (ND->isModulePrivate())
       return;
 
     SmallVector<ValueDecl *, 4> Results;
@@ -500,7 +522,8 @@ public:
                                  NLKind::UnqualifiedLookup,
                                  Results);
     for (auto *VD : Results)
-      NextConsumer.foundDecl(VD);
+      if (!ModuleFilter || VD->getModuleContext() == ModuleFilter)
+        NextConsumer.foundDecl(VD);
   }
 };
 } // unnamed namespace
@@ -508,6 +531,16 @@ public:
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
   ImportingVisibleDeclConsumer ImportingConsumer(
       const_cast<ClangImporter &>(*this), Impl, Consumer);
+  lookupVisibleDecls(ImportingConsumer);
+}
+
+void ClangImporter::lookupVisibleDecls(const Module *M,
+                                       Module::AccessPathTy AccessPath,
+                                       VisibleDeclConsumer &Consumer,
+                                       NLKind LookupKind) {
+  ImportingVisibleDeclConsumer ImportingConsumer(
+      const_cast<ClangImporter &>(*this), Impl, Consumer);
+  ImportingConsumer.filterByModule(M);
   lookupVisibleDecls(ImportingConsumer);
 }
 

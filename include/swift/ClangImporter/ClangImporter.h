@@ -117,7 +117,6 @@ public:
   /// \param consumer The VisibleDeclConsumer that will be fed decls as they
   ///   are found.
   void lookupVisibleDecls(clang::VisibleDeclConsumer &consumer) const;
-  using ModuleLoader::lookupVisibleDecls;
 
   /// \brief Look for visible declarations in the Clang translation unit and
   /// import them as Swift decls.
@@ -125,6 +124,11 @@ public:
   /// \param Consumer The VisibleDeclConsumer that will be fed decls as they
   /// are found and imported.
   void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
+
+  void lookupVisibleDecls(const Module *M,
+                          Module::AccessPathTy AccessPath,
+                          VisibleDeclConsumer &Consumer,
+                          NLKind LookupKind) override;
 
   /// \brief Load extensions to the given nominal type.
   ///

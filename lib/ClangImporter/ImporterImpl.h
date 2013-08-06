@@ -243,6 +243,10 @@ public:
     return Instance->getASTContext();
   }
 
+  /// \brief Retrieve the imported ClangModule that should contain the given
+  /// Clang decl.
+  ClangModule *getClangModuleForDecl(const clang::Decl *D);
+
   /// \brief Import the given Swift identifier into Clang.
   clang::DeclarationName importName(Identifier name);
   
@@ -292,6 +296,13 @@ public:
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
   DeclContext *importDeclContext(const clang::DeclContext *dc);
+
+  /// \brief Import the declaration context of a given Clang declaration into
+  /// Swift.
+  ///
+  /// \returns The imported declaration context, or null if it could not
+  /// be converted.
+  DeclContext *importDeclContextOf(const clang::Decl *D);
 
   /// \brief Create a new named constant with the given value.
   ///

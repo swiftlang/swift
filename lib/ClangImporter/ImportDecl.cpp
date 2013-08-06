@@ -244,7 +244,7 @@ namespace {
       if (Name.empty())
         return nullptr;
 
-      auto DC = Impl.importDeclContext(Decl->getDeclContext());
+      auto DC = Impl.importDeclContextOf(Decl);
       if (!DC)
         return nullptr;
 
@@ -402,7 +402,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -532,7 +532,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -686,7 +686,7 @@ namespace {
       case EnumKind::Union: {
         // The enumeration was mapped to a Swift union. Create an element of
         // that union.
-        auto dc = Impl.importDeclContext(decl->getDeclContext());
+        auto dc = Impl.importDeclContextOf(decl);
         if (!dc)
           return nullptr;
 
@@ -741,7 +741,7 @@ namespace {
       if (!type)
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -763,7 +763,7 @@ namespace {
         return nullptr;
       }
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -817,7 +817,7 @@ namespace {
       if (!type)
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -858,7 +858,7 @@ namespace {
       if (!type)
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -900,7 +900,7 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -1946,7 +1946,7 @@ namespace {
       if (!objcClass)
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -2025,7 +2025,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -2129,7 +2129,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -2254,7 +2254,7 @@ namespace {
       if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
         return nullptr;
 
-      auto dc = Impl.importDeclContext(decl->getDeclContext());
+      auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
@@ -2483,6 +2483,16 @@ ClangImporter::Implementation::importDeclContext(const clang::DeclContext *dc) {
   if (auto destructor = dyn_cast<DestructorDecl>(swiftDecl))
     return destructor;
   return nullptr;
+}
+
+DeclContext *
+ClangImporter::Implementation::importDeclContextOf(const clang::Decl *D) {
+  const clang::DeclContext *DC = D->getDeclContext();
+  if (DC->isTranslationUnit())
+    if (auto *M = getClangModuleForDecl(D))
+      return M;
+
+  return importDeclContext(DC);
 }
 
 ValueDecl *
