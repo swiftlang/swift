@@ -398,7 +398,7 @@ public:
   
   /// Create a new Explosion corresponding to the given SIL value.
   void setLoweredExplosion(SILValue v, Explosion &e) {
-    assert(!v.getType().isAddress() && "explosion for address value?!");
+    assert(v.getType().isObject() && "explosion for address value?!");
     setLoweredValue(v, LoweredValue(e));
   }
 
@@ -413,7 +413,7 @@ public:
                                 llvm::Function *f,
                                 AbstractCC cc,
                                 ExplosionKind explosionLevel) {
-    assert(!v.getType().isAddress() && "function for address value?!");
+    assert(v.getType().isObject() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
     setLoweredValue(v, StaticFunction{f, cc, explosionLevel});
@@ -421,7 +421,7 @@ public:
   
   void setLoweredObjCMethod(SILValue v, SILDeclRef method,
                             SILType superSearchType = SILType()) {
-    assert(!v.getType().isAddress() && "function for address value?!");
+    assert(v.getType().isObject() && "function for address value?!");
     assert(v.getType().is<AnyFunctionType>() &&
            "function for non-function value?!");
     setLoweredValue(v, ObjCMethod{method, superSearchType});
@@ -755,7 +755,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     // If the SIL parameter isn't passed indirectly, we need to map it
     // to an explosion.  Fortunately, in this case we have a guarantee
     // that it's passed directly in IR.
-    if (!param->getType().isAddress()) {
+    if (param->getType().isObject()) {
       Explosion paramValues(IGF.CurExplosionLevel);
       paramTI.reexplode(IGF, allParamValues, paramValues);
       IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
@@ -1711,7 +1711,7 @@ void IRGenSILFunction::visitRetainAutoreleasedInst(
 /// info for the underlying reference type.
 static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
                                                     SILType silType) {
-  assert(!silType.isAddress());
+  assert(silType.isObject());
   auto type = silType.getSwiftRValueType();
   type = cast<ReferenceStorageType>(type).getReferentType();
   return cast<ReferenceTypeInfo>(IGF.getFragileTypeInfo(type));

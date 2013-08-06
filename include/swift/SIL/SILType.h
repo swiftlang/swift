@@ -36,6 +36,16 @@ namespace Lowering {
   
 namespace swift {
 
+/// The value category.
+enum class SILValueCategory {
+  /// An object is a value of the type.
+  Object,
+
+  /// An address is a pointer to an allocated variable of the type
+  /// (possibly uninitialized).
+  Address
+};
+
 /// SILType - A Swift type that has been lowered to a SIL representation type.
 /// In addition to the Swift type system, SIL adds "address" types that can
 /// reference any Swift type (but cannot take the address of an address). *T
@@ -43,17 +53,18 @@ namespace swift {
 ///
 class SILType {
 public:
-  // The bool value of the PointerIntPair is the "isAddress" bit.
-  using ValueType = llvm::PointerIntPair<TypeBase *, 1, bool>;
+  /// The unsigned is a SILValueCategory.
+  using ValueType = llvm::PointerIntPair<TypeBase *, 1, unsigned>;
 private:
   ValueType value;
 
   /// Private constructor. SILTypes are normally vended by
   /// TypeConverter::getLoweredType().
-  SILType(CanType ty, bool isAddress) : value(ty.getPointer(), isAddress) {
+  SILType(CanType ty, SILValueCategory category)
+      : value(ty.getPointer(), unsigned(category)) {
     if (!ty) return;
 
-    assert(!ty->is<LValueType>() &&
+    assert(!isa<LValueType>(ty) &&
            "LValueTypes should be eliminated by SIL lowering");
   }
   
@@ -67,23 +78,37 @@ public:
   
   /// getPrimitiveType - Form a SILType for a primitive type that does not
   /// require any special handling (i.e., not a function or aggregate type).
-  static SILType getPrimitiveType(CanType T, bool isAddress = false) {
-    return SILType(T, isAddress);
+  static SILType getPrimitiveType(CanType T, SILValueCategory category) {
+    return SILType(T, category);
+  }
+
+  /// getPrimitiveType - Form a SILType for a primitive type that does not
+  /// require any special handling (i.e., not a function or aggregate type).
+  static SILType getPrimitiveObjectType(CanType T) {
+    return SILType(T, SILValueCategory::Object);
+  }
+
+  /// getPrimitiveType - Form a SILType for a primitive type that does not
+  /// require any special handling (i.e., not a function or aggregate type).
+  static SILType getPrimitiveAddressType(CanType T) {
+    return SILType(T, SILValueCategory::Address);
   }
 
   bool isNull() const { return bool(value.getPointer()); }
   explicit operator bool() const { return bool(value.getPointer()); }
+
+  SILValueCategory getCategory() const { return SILValueCategory(value.getInt()); }
   
   /// Gets the address type referencing this type, or the type itself if it is
   /// already an address type.
   SILType getAddressType() const {
-    return {{value.getPointer(), true}};
+    return SILType(getSwiftRValueType(), SILValueCategory::Address);
   }
 
   /// Gets the type referenced by an address type, or the type itself if it is
   /// not an address type. Invalid for address-only types.
   SILType getObjectType() const {
-    return {{value.getPointer(), false}};
+    return SILType(getSwiftRValueType(), SILValueCategory::Object);
   }
   
   /// Returns the Swift type referenced by this SIL type.
@@ -109,8 +134,7 @@ public:
   /// Returns the Swift return type of a function type.
   /// The SILType must refer to a function type.
   CanType getFunctionResultType() const {
-    auto *fty = castTo<AnyFunctionType>();
-    return CanType(fty->getResult());
+    return castTo<AnyFunctionType>().getResult();
   }
   
   /// Returns the AbstractCC of a function type.
@@ -122,11 +146,15 @@ public:
   /// Cast the Swift type referenced by this SIL type, or return null if the
   /// cast fails.
   template<typename TYPE>
-  TYPE *getAs() const { return dyn_cast<TYPE>(getSwiftRValueType()); }
+  typename CanTypeWrapperTraits<TYPE>::type
+  getAs() const { return dyn_cast<TYPE>(getSwiftRValueType()); }
+
   /// Cast the Swift type referenced by this SIL type, which must be of the
   /// specified subtype.
   template<typename TYPE>
-  TYPE *castTo() const { return cast<TYPE>(getSwiftRValueType()); }
+  typename CanTypeWrapperTraits<TYPE>::type
+  castTo() const { return cast<TYPE>(getSwiftRValueType()); }
+
   /// Returns true if the Swift type referenced by this SIL type is of the
   /// specified subtype.
   template<typename TYPE>
@@ -139,7 +167,10 @@ public:
   }
   
   /// True if the type is an address type.
-  bool isAddress() const { return value.getInt(); }
+  bool isAddress() const { return getCategory() == SILValueCategory::Address; }
+
+  /// True if the type is an object type.
+  bool isObject() const { return getCategory() == SILValueCategory::Object; }
 
   /// isAddressOnly - True if the type, or the referenced type of an address
   /// type, is address-only.  For example, it could be a resilient struct or
@@ -159,7 +190,7 @@ public:
 
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
-    return getSwiftRValueType()->hasReferenceSemantics();
+    return getSwiftRValueType().hasReferenceSemantics();
   }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {

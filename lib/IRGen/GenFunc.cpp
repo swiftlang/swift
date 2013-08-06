@@ -692,7 +692,7 @@ llvm::FunctionType *
 IRGenModule::getFunctionType(SILType type, ExplosionKind explosionKind,
                              ExtraData extraData,
                              llvm::AttributeSet &attrs) {
-  assert(!type.isAddress());
+  assert(type.isObject());
   assert(type.is<AnyFunctionType>());
   return getFunctionType(type.getAbstractCC(), type.getSwiftType(),
                          explosionKind, 0,

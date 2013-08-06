@@ -1215,7 +1215,7 @@ ManagedValue SILGenFunction::emitClosureForCapturingExpr(SILLocation loc,
   // contexts, so getFunctionTypeWithCaptures is unable to find contextual
   // generic parameters for them. The getAs null check here should be
   // unnecessary.
-  auto *pft = SGM.getConstantType(constant).getAs<PolymorphicFunctionType>();
+  auto pft = SGM.getConstantType(constant).getAs<PolymorphicFunctionType>();
   
   if (pft && !forwardSubs.empty()) {
     auto Info = FunctionType::ExtInfo()
@@ -2051,7 +2051,7 @@ RValue RValueEmitter::visitRebindThisInConstructorExpr(
   ManagedValue newThis = visit(E->getSubExpr()).getAsSingleValue(SGF);
   if (!newThis.getType().getSwiftRValueType()
         ->isEqual(E->getThis()->getType())) {
-    assert(!newThis.getType().isAddress() &&
+    assert(newThis.getType().isObject() &&
            newThis.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
     CleanupsDepth newThisCleanup = newThis.getCleanup();

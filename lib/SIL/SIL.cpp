@@ -208,24 +208,20 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
 }
 
 SILType SILType::getObjectPointerType(const ASTContext &C) {
-  return SILType(CanType(C.TheObjectPointerType),
-                 /*isAddress=*/ false);
+  return SILType(CanType(C.TheObjectPointerType), SILValueCategory::Object);
 }
 
 SILType SILType::getObjCPointerType(const ASTContext &C) {
-  return SILType(CanType(C.TheObjCPointerType),
-                 /*isAddress=*/ false);
+  return getPrimitiveObjectType(CanType(C.TheObjCPointerType));
 }
 
 SILType SILType::getRawPointerType(const ASTContext &C) {
-  return SILType(CanType(C.TheRawPointerType),
-                 /*isAddress=*/false);
+  return getPrimitiveObjectType(CanType(C.TheRawPointerType));
 }
 
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
                                        const ASTContext &C) {
-  return SILType(CanType(BuiltinIntegerType::get(bitWidth, C)),
-                 /*isAddress=*/false);
+  return getPrimitiveObjectType(CanType(BuiltinIntegerType::get(bitWidth, C)));
 }
 
 SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
@@ -251,5 +247,5 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
     ty = C.ThePPC128Type;
     break;
   }
-  return SILType(CanType(ty), /*isAddress=*/false);
+  return getPrimitiveObjectType(CanType(ty));
 }

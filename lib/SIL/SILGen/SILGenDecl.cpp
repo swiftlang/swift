@@ -109,7 +109,7 @@ namespace {
 }
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
-  if (auto *outerPFT = F.getLoweredType().getAs<PolymorphicFunctionType>()) {
+  if (auto outerPFT = F.getLoweredType().getAs<PolymorphicFunctionType>()) {
     return buildForwardingSubstitutions(&outerPFT->getGenericParams());
   }
   return {};
@@ -383,7 +383,7 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
 /// Enter a cleanup to deallocate the given location.
 CleanupsDepth SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
                                                        SILValue temp) {
-  assert(!temp.getType().isAddress() &&
+  assert(temp.getType().isObject() &&
          temp.getType().is<LocalStorageType>() &&
          "must deallocate container operand, not address operand!");
   Cleanups.pushCleanup<DeallocStack>(loc, temp);

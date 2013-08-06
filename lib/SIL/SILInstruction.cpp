@@ -174,7 +174,7 @@ static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
   auto eltContainerTy =
     CanType(LocalStorageType::get(eltTy.getSwiftRValueType(), Ctx));
   SILType resTys[] = {
-    SILType::getPrimitiveType(eltContainerTy, false),
+    SILType::getPrimitiveObjectType(eltContainerTy),
     eltTy.getAddressType()
   };
 
@@ -303,7 +303,7 @@ IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,
 IntegerLiteralInst *
 IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
                            SILFunction &B) {
-  auto *intTy = Ty.castTo<BuiltinIntegerType>();
+  auto intTy = Ty.castTo<BuiltinIntegerType>();
   assert(intTy->getBitWidth() == Value.getBitWidth() &&
          "IntegerLiteralInst APInt value's bit width doesn't match type");
   
@@ -315,7 +315,7 @@ IntegerLiteralInst::create(SILLocation Loc, SILType Ty, const APInt &Value,
 IntegerLiteralInst *
 IntegerLiteralInst::create(SILLocation Loc, SILType Ty,
                            intmax_t Value, SILFunction &B) {
-  auto *intTy = Ty.castTo<BuiltinIntegerType>();
+  auto intTy = Ty.castTo<BuiltinIntegerType>();
   return create(Loc, Ty,
                 APInt(intTy->getBitWidth(), Value), B);
 }
@@ -357,7 +357,7 @@ FloatLiteralInst::FloatLiteralInst(SILLocation Loc, SILType Ty,
 FloatLiteralInst *
 FloatLiteralInst::create(SILLocation Loc, SILType Ty, const APFloat &Value,
                          SILFunction &B) {
-  auto *floatTy = Ty.castTo<BuiltinFloatType>();
+  auto floatTy = Ty.castTo<BuiltinFloatType>();
   assert(&floatTy->getAPFloatSemantics() == &Value.getSemantics() &&
          "FloatLiteralInst value's APFloat semantics do not match type");
   

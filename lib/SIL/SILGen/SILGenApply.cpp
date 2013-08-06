@@ -117,8 +117,8 @@ private:
   static const enum class ForProtocol_t {} ForProtocol{};
 
   static ArchetypeType *getArchetypeType(SILType t) {
-    if (auto *metatype = t.getAs<MetaTypeType>())
-      return metatype->getInstanceType()->castTo<ArchetypeType>();
+    if (auto metatype = t.getAs<MetaTypeType>())
+      return cast<ArchetypeType>(metatype.getInstanceType());
     else
       return t.castTo<ArchetypeType>();
   }

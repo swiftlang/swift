@@ -374,7 +374,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
                                    SILValue base) {
   assert(!base ||
          base.getType().isAddress() ||
-         base.getType().getSwiftRValueType()->hasReferenceSemantics());
+         base.getType().hasReferenceSemantics());
 
   SILValue addr;
   if (component.isPhysical()) {
@@ -386,7 +386,7 @@ static SILValue drillIntoComponent(SILGenFunction &SGF,
   }
 
   assert(addr.getType().isAddress() ||
-         addr.getType().getSwiftRValueType()->hasReferenceSemantics());
+         addr.getType().hasReferenceSemantics());
   return addr;
 }
 

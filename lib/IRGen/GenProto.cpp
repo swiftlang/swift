@@ -3565,7 +3565,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   
   
   // If the source type is an archetype, look at what's locally bound.
-  if (auto *archetype = srcType.getAs<ArchetypeType>()) {
+  if (auto archetype = srcType.getAs<ArchetypeType>()) {
     auto &archTI = getArchetypeInfo(IGF, archetype);
     
     for (unsigned i = 0, e = protocols.size(); i < e; ++i) {

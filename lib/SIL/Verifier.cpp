@@ -78,16 +78,22 @@ public:
   _require(condition, complaint ": " #condition)
 
   template <class T> typename CanTypeWrapperTraits<T>::type
-  _requireTypeIsRValue(SILValue value, const Twine &valueDescription,
-                       const char *typeName) {
-    _require(!value.getType().isAddress(),
-             valueDescription + " cannot be an address");
+  _requireObjectType(SILValue value, const Twine &valueDescription,
+                     const char *typeName) {
+    _require(value.getType().isObject(),
+             valueDescription + " must be an object");
     auto result = dyn_cast<T>(value.getType().getSwiftRValueType());
     _require(result, valueDescription + " must have type " + typeName);
     return result;
   }
-#define requireTypeIsRValue(type, value, valueDescription) \
-  _requireTypeIsRValue<type>(value, valueDescription, #type)
+#define requireObjectType(type, value, valueDescription) \
+  _requireObjectType<type>(value, valueDescription, #type)
+
+  void requireReferenceValue(SILValue value, const Twine &valueDescription) {
+    require(value.getType().isObject(), valueDescription + " must be an object");
+    require(value.getType().hasReferenceSemantics(),
+            valueDescription + " must have reference semantics");
+  }
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
@@ -152,8 +158,8 @@ public:
 
   void checkAllocStackInst(AllocStackInst *AI) {
     auto containerStorageType =
-      requireTypeIsRValue(LocalStorageType, AI->getContainerResult(),
-                          "first result of alloc_stack");
+      requireObjectType(LocalStorageType, AI->getContainerResult(),
+                        "first result of alloc_stack");
     require(AI->getAddressResult().getType().isAddress(),
             "second result of alloc_stack must be an address type");
     require(containerStorageType.getValueType()
@@ -162,8 +168,7 @@ public:
   }
   
   void checkAllocRefInst(AllocRefInst *AI) {
-    require(AI->getType().hasReferenceSemantics() && !AI->getType().isAddress(),
-            "alloc_ref must return reference type value");
+    requireReferenceValue(AI, "Result of alloc_ref");
   }
   
   void checkApplyInst(ApplyInst *AI) {
@@ -173,7 +178,7 @@ public:
     DEBUG(llvm::dbgs() << "callee type: ";
           AI->getCallee().getType().print(llvm::dbgs());
           llvm::dbgs() << '\n');
-    require(!calleeTy.isAddress(), "callee of apply cannot be an address");
+    require(calleeTy.isObject(), "callee of apply must be a value");
     require(calleeTy.is<FunctionType>(),
             "callee of apply must have concrete function type");
     SILFunctionTypeInfo *ti = calleeTy.getFunctionTypeInfo(F.getModule());
@@ -216,11 +221,11 @@ public:
   
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     SILType calleeTy = PAI->getCallee().getType();
-    require(!calleeTy.isAddress(), "callee of closure cannot be an address");
+    require(calleeTy.isObject(), "callee of closure must be an object");
     require(calleeTy.is<FunctionType>(),
             "callee of closure must have concrete function type");
     SILType appliedTy = PAI->getType();
-    require(!appliedTy.isAddress(), "result of closure cannot be an address");
+    require(appliedTy.isObject(), "result of closure must be an object");
     require(appliedTy.is<FunctionType>(),
             "result of closure must have concrete function type");
     // FIXME: A "curry" with no arguments could remain thin.
@@ -291,7 +296,7 @@ public:
             "invalid integer literal type");
   }
   void checkLoadInst(LoadInst *LI) {
-    require(!LI->getType().isAddress(), "Can't load an address");
+    require(LI->getType().isObject(), "Result of load must be an object");
     require(LI->getOperand().getType().isAddress(),
             "Load operand must be an address");
     require(LI->getOperand().getType().getObjectType() == LI->getType(),
@@ -299,7 +304,7 @@ public:
   }
 
   void checkStoreInst(StoreInst *SI) {
-    require(!SI->getSrc().getType().isAddress(),
+    require(SI->getSrc().getType().isObject(),
             "Can't store from an address source");
     require(SI->getDest().getType().isAddress(),
             "Must store to an address dest");
@@ -340,24 +345,21 @@ public:
     require(SI->getType().is<StructType>()
             || SI->getType().is<BoundGenericStructType>(),
             "StructInst should return a struct");
-    require(!SI->getType().isAddress(),
-            "StructInst cannot produce an address");
+    require(SI->getType().isObject(),
+            "StructInst must produce an object");
     
     // FIXME: Verify element count and types.
   }
 
   void checkTupleInst(TupleInst *TI) {
-    require(TI->getType().is<TupleType>(), "TupleInst should return a tuple");
-    require(!TI->getType().isAddress(),
-            "TupleInst cannot produce an address");
-    TupleType *ResTy = TI->getType().castTo<TupleType>();
+    CanTupleType ResTy = requireObjectType(TupleType, TI, "Result of tuple");
 
     require(TI->getElements().size() == ResTy->getFields().size(),
             "Tuple field count mismatch!");
     
     for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
       require(TI->getElements()[i].getType().getSwiftType()
-               ->isEqual(ResTy->getElementType(i)),
+               ->isEqual(ResTy.getElementType(i)),
               "Tuple element arguments do not match tuple type!");
     }
   }
@@ -407,61 +409,50 @@ public:
   }
   
   void checkRetainInst(RetainInst *RI) {
-    require(!RI->getOperand().getType().isAddress(),
-            "Operand of retain must not be address");
-    require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of retain must be reference type");
+    requireReferenceValue(RI->getOperand(), "Operand of retain");
   }
   void checkRetainAutoreleasedInst(RetainAutoreleasedInst *RI) {
-    require(!RI->getOperand().getType().isAddress(),
-            "Operand of retain_autoreleased must not be address");
-    require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of retain_autoreleased must be reference type");
+    requireReferenceValue(RI->getOperand(), "Operand of retain_autoreleased");
     require(isa<ApplyInst>(RI->getOperand()),
             "Operand of retain_autoreleased must be the return value of "
             "an apply instruction");
   }
   void checkReleaseInst(ReleaseInst *RI) {
-    require(!RI->getOperand().getType().isAddress(),
-            "Operand of release must not be address");
-    require(RI->getOperand().getType().hasReferenceSemantics(),
-            "Operand of dealloc_ref must be reference type");
+    requireReferenceValue(RI->getOperand(), "Operand of release");
   }
   void checkRetainUnownedInst(RetainUnownedInst *RI) {
-    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
-                                    "Operand of retain_unowned");
+    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
+                                  "Operand of retain_unowned");
     require(type->getOwnership() == Ownership::Unowned,
             "Operand of retain_unowned must be unowned reference");
   }
   void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
-                                    "Operand of unowned_retain");
+    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
+                                  "Operand of unowned_retain");
     require(type->getOwnership() == Ownership::Unowned,
             "Operand of unowned_retain must be unowned reference");
   }
   void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    auto type = requireTypeIsRValue(ReferenceStorageType, RI->getOperand(),
-                                    "Operand of unowned_release");
+    auto type = requireObjectType(ReferenceStorageType, RI->getOperand(),
+                                  "Operand of unowned_release");
     require(type->getOwnership() == Ownership::Unowned,
             "Operand of unowned_release must be unowned reference");
   }
   void checkDeallocStackInst(DeallocStackInst *DI) {
-    requireTypeIsRValue(LocalStorageType, DI->getOperand(),
-                        "Operand of dealloc_stack");
+    requireObjectType(LocalStorageType, DI->getOperand(),
+                      "Operand of dealloc_stack");
   }
   void checkDeallocRefInst(DeallocRefInst *DI) {
-    require(!DI->getOperand().getType().isAddress(),
-            "Operand of dealloc_ref must not be address");
+    require(DI->getOperand().getType().isObject(),
+            "Operand of dealloc_ref must be object");
     require(DI->getOperand().getType().getClassOrBoundGenericClass(),
             "Operand of dealloc_ref must be of class type");
   }
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
-    require(!DI->getElementType().isAddress(),
-            "Element type of dealloc_box must not be address");
-    require(!DI->getOperand().getType().isAddress(),
-            "Operand of dealloc_box must not be address");
-    require(DI->getOperand().getType().is<BuiltinObjectPointerType>(),
-            "Operand of dealloc_box must be of Builtin.ObjectPointer type");
+    require(DI->getElementType().isObject(),
+            "Element type of dealloc_box must be an object type");
+    requireObjectType(BuiltinObjectPointerType, DI->getOperand(),
+                      "Operand of dealloc_box");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand().getType().isAddress(),
@@ -486,27 +477,23 @@ public:
   }
   
   void checkTupleExtractInst(TupleExtractInst *EI) {
-    SILType operandTy = EI->getOperand().getType();
-    require(!operandTy.isAddress(),
-            "cannot tuple_extract from address");
-    require(!EI->getType(0).isAddress(),
-            "result of tuple_extract cannot be address");
-    require(operandTy.is<TupleType>(),
-            "must tuple_extract from tuple");
+    CanTupleType operandTy = requireObjectType(TupleType, EI->getOperand(),
+                                               "Operand of tuple_extract");
+    require(EI->getType().isObject(),
+            "result of tuple_extract must be object");
     
-    ArrayRef<TupleTypeElt> fields = operandTy.castTo<TupleType>()->getFields();
-    require(EI->getFieldNo() < fields.size(),
+    require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for element_addr instruction");
     require(EI->getType().getSwiftRValueType()
-            == CanType(fields[EI->getFieldNo()].getType()),
+            == operandTy.getElementType(EI->getFieldNo()),
             "type of tuple_element_addr does not match type of element");
   }
 
   void checkStructExtractInst(StructExtractInst *EI) {
     SILType operandTy = EI->getOperand().getType();
-    require(!operandTy.isAddress(),
+    require(operandTy.isObject(),
             "cannot struct_extract from address");
-    require(!EI->getType(0).isAddress(),
+    require(EI->getType().isObject(),
             "result of struct_extract cannot be address");
     require(operandTy.is<StructType>()
             || operandTy.is<BoundGenericStructType>(),
@@ -554,11 +541,7 @@ public:
   }
 
   void checkRefElementAddrInst(RefElementAddrInst *EI) {
-    SILType operandTy = EI->getOperand().getType();
-    require(!operandTy.isAddress(),
-            "must derive ref_element_addr from non-address");
-    require(operandTy.hasReferenceSemantics(),
-            "must derive ref_element_addr from reference type");
+    requireReferenceValue(EI->getOperand(), "Operand of ref_element_addr");
     require(EI->getType(0).isAddress(),
             "result of ref_element_addr must be lvalue");
     require(!EI->getField()->isProperty(),
@@ -657,7 +640,7 @@ public:
                 "result must be a method of opaque pointer");
       }
     } else {
-      require(!operandType.isAddress(),
+      require(operandType.isObject(),
               "static protocol_method cannot apply to an address");
       require(operandType.is<MetaTypeType>(),
               "static protocol_method must apply to an existential metatype");
@@ -679,7 +662,7 @@ public:
   }
   
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
+    auto methodType = CMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
     require(methodType->isThin(),
@@ -692,7 +675,7 @@ public:
   }
   
   void checkSuperMethodInst(SuperMethodInst *CMI) {
-    auto *methodType = CMI->getType(0).getAs<AnyFunctionType>();
+    auto methodType = CMI->getType(0).getAs<AnyFunctionType>();
     require(methodType,
             "result method must be of a function type");
     require(methodType->isThin(),
@@ -729,7 +712,7 @@ public:
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
-    require(!PEI->getOperand().getType().isAddress(),
+    require(PEI->getOperand().getType().isObject(),
             "project_existential_ref operand must not be address");
     require(PEI->getOperand().getType().isClassExistentialType(),
             "project_existential_ref operand must be class existential");
@@ -756,7 +739,7 @@ public:
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().isClassExistentialType(),
             "init_existential_ref result must be a class existential type");
-    require(!IEI->getType().isAddress(),
+    require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
   }
   
@@ -778,11 +761,11 @@ public:
   void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
     require(UEI->getOperand().getType() != UEI->getType(),
             "can't upcast_existential_ref to same type");
-    require(!UEI->getOperand().getType().isAddress(),
+    require(UEI->getOperand().getType().isObject(),
             "upcast_existential_ref operand must not be an address");
     require(UEI->getOperand().getType().isClassExistentialType(),
             "upcast_existential_ref operand must be class existential");
-    require(!UEI->getType().isAddress(),
+    require(UEI->getType().isObject(),
             "upcast_existential_ref result must not be an address");
     require(UEI->getType().isClassExistentialType(),
             "upcast_existential_ref result must be class existential");
@@ -804,7 +787,7 @@ public:
     require(archetype, "archetype_ref_to_super operand must be archetype");
     require(archetype->requiresClass(),
             "archetype_ref_to_super operand must be class archetype");
-    require(ASI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+    require(ASI->getType().getClassOrBoundGenericClass(),
             "archetype_ref_to_super must convert to a class type");
   }
   
@@ -823,22 +806,22 @@ public:
     SILType operandTy = BBI->getOperand().getType();
     SILType resultTy = BBI->getType();
     
-    require(!operandTy.isAddress(),
+    require(operandTy.isObject(),
             "bridge_to_block operand cannot be an address");
-    require(!resultTy.isAddress(),
+    require(resultTy.isObject(),
             "bridge_to_block result cannot be an address");
     require(operandTy.is<FunctionType>(),
             "bridge_to_block operand must be a function type");
     require(resultTy.is<FunctionType>(),
             "bridge_to_block result must be a function type");
     
-    auto *operandFTy = BBI->getOperand().getType().castTo<FunctionType>();
-    auto *resultFTy = BBI->getType().castTo<FunctionType>();
+    auto operandFTy = BBI->getOperand().getType().castTo<FunctionType>();
+    auto resultFTy = BBI->getType().castTo<FunctionType>();
     
-    require(CanType(operandFTy->getInput()) == CanType(resultFTy->getInput()),
+    require(operandFTy.getInput() == resultFTy.getInput(),
             "bridge_to_block operand and result types must differ only in "
             "[objc_block]-ness");
-    require(CanType(operandFTy->getResult()) == CanType(resultFTy->getResult()),
+    require(operandFTy.getResult() == resultFTy.getResult(),
             "bridge_to_block operand and result types must differ only in "
             "[objc_block]-ness");
     require(operandFTy->isAutoClosure() == resultFTy->isAutoClosure(),
@@ -853,14 +836,10 @@ public:
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
-    require(!TTFI->getOperand().getType().isAddress(),
-            "thin_to_thick_function operand cannot be an address");
-    require(!TTFI->getType().isAddress(),
-            "thin_to_thick_function result cannot be an address");
-    require(TTFI->getOperand().getType().is<AnyFunctionType>(),
-            "thin_to_thick_function operand must be a function");
-    require(TTFI->getType().is<AnyFunctionType>(),
-            "thin_to_thick_function result must be a function");
+    requireObjectType(AnyFunctionType, TTFI->getOperand(),
+                      "thin_to_thick_function operand");
+    requireObjectType(AnyFunctionType, TTFI,
+                      "thin_to_thick_function result");
     if (auto opFTy = dyn_cast<FunctionType>(
                                  TTFI->getOperand().getType().getSwiftType())) {
       auto resFTy = dyn_cast<FunctionType>(TTFI->getType().getSwiftType());
@@ -896,14 +875,8 @@ public:
   }
   
   void checkConvertCCInst(ConvertCCInst *CCI) {
-    require(!CCI->getOperand().getType().isAddress(),
-            "convert_cc operand cannot be an address");
-    require(!CCI->getType().isAddress(),
-            "convert_cc result cannot be an address");
-    require(CCI->getOperand().getType().is<AnyFunctionType>(),
-            "convert_cc operand must be a function");
-    require(CCI->getType().is<AnyFunctionType>(),
-            "convert_cc result must be a function");
+    requireObjectType(AnyFunctionType, CCI->getOperand(), "convert_cc operand");
+    requireObjectType(AnyFunctionType, CCI, "convert_cc result");
     if (auto opFTy = dyn_cast<FunctionType>(
                                  CCI->getOperand().getType().getSwiftType())) {
       auto resFTy = dyn_cast<FunctionType>(CCI->getType().getSwiftType());
@@ -937,13 +910,10 @@ public:
   }
 
   void checkRefToUnownedInst(RefToUnownedInst *I) {
-    require(!I->getOperand().getType().isAddress(),
-            "Operand of ref_to_unowned cannot be address");
+    requireReferenceValue(I->getOperand(), "Operand of ref_to_unowned");
     auto operandType = I->getOperand().getType().getSwiftRValueType();
-    auto resultType = requireTypeIsRValue(ReferenceStorageType, I,
-                                          "Result of ref_to_unowned");
-    require(operandType.hasReferenceSemantics(),
-            "Operand of ref_to_unowned must have reference semantics");
+    auto resultType = requireObjectType(ReferenceStorageType, I,
+                                        "Result of ref_to_unowned");
     require(resultType.getReferentType() == operandType,
             "Result of ref_to_unowned does not have the "
             "operand's type as its referent type");
@@ -952,14 +922,11 @@ public:
   }
 
   void checkUnownedToRefInst(UnownedToRefInst *I) {
-    auto operandType = requireTypeIsRValue(ReferenceStorageType,
-                                           I->getOperand(),
-                                           "Operand of unowned_to_ref");
-    require(!I->getType().isAddress(),
-            "Result of unowned_to_ref cannot be address");
+    auto operandType = requireObjectType(ReferenceStorageType,
+                                         I->getOperand(),
+                                         "Operand of unowned_to_ref");
+    requireReferenceValue(I, "Result of unowned_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
-    require(resultType.hasReferenceSemantics(),
-            "Result of unowned_to_ref must have reference semantics");
     require(operandType.getReferentType() == resultType,
             "Operand of unowned_to_ref does not have the "
             "operand's type as its referent type");
@@ -1028,14 +995,14 @@ public:
   }
   
   void checkDowncastArchetypeRefInst(DowncastArchetypeRefInst *DARI) {
-    require(!DARI->getOperand().getType().isAddress(),
+    require(DARI->getOperand().getType().isObject(),
             "downcast_archetype_ref operand must not be an address");
     ArchetypeType *archetype = DARI->getOperand().getType().getAs<ArchetypeType>();
     require(archetype, "downcast_archetype_ref operand must be an archetype");
     require(archetype->requiresClass(),
             "downcast_archetype_ref operand must be a class archetype");
     
-    require(!DARI->getType().isAddress(),
+    require(DARI->getType().isObject(),
             "downcast_archetype_ref result must not be an address");
     require(DARI->getType().getSwiftType()->mayHaveSuperclass(),
             "downcast_archetype_ref result must be a class type "
@@ -1056,12 +1023,12 @@ public:
   }
   
   void checkDowncastExistentialRefInst(DowncastExistentialRefInst *DERI) {
-    require(!DERI->getOperand().getType().isAddress(),
+    require(DERI->getOperand().getType().isObject(),
             "downcast_existential_ref operand must not be an address");
     require(DERI->getOperand().getType().isClassExistentialType(),
             "downcast_existential_ref operand must be a class existential");
     
-    require(!DERI->getType().isAddress(),
+    require(DERI->getType().isObject(),
             "downcast_existential_ref result must not be an address");
     require(DERI->getType().getSwiftType()->mayHaveSuperclass(),
             "downcast_existential_ref result must be a class type "
@@ -1110,13 +1077,13 @@ public:
   }
   
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
-    require(!ICI->getOperand().getType().isAddress(),
+    require(ICI->getOperand().getType().isObject(),
             "conversion operand cannot be an address");
-    require(!ICI->getType().isAddress(),
+    require(ICI->getType().isObject(),
             "conversion result cannot be an address");
     
-    auto *opFTy = ICI->getOperand().getType().getAs<AnyFunctionType>();
-    auto *resFTy = ICI->getType().getAs<AnyFunctionType>();
+    auto opFTy = ICI->getOperand().getType().getAs<AnyFunctionType>();
+    auto resFTy = ICI->getType().getAs<AnyFunctionType>();
 
     require(opFTy, "convert_function operand must be a function");
     require(resFTy, "convert_function result must be a function");
@@ -1168,7 +1135,7 @@ public:
           instResultType.dump(););
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
-    require(!instResultType.isAddress(),
+    require(instResultType.isObject(),
             "autoreleased return value cannot be an address");
     require(instResultType.hasReferenceSemantics(),
             "autoreleased return value must be a reference type");

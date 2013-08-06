@@ -577,7 +577,7 @@ namespace {
       size_t bufferSize =
         sizeof(Impl) + sizeof(NonTrivialChild) * nonTrivial.size();
       void *buffer = operator new(bufferSize, TC);
-      auto silType = SILType::getPrimitiveType(type, false);
+      auto silType = SILType::getPrimitiveObjectType(type);
       return ::new(buffer) Impl(silType, nonTrivial);
     }
 
@@ -818,7 +818,7 @@ namespace {
     SILType getSemanticType() const {
       auto refType =
         cast<ReferenceStorageType>(getLoweredType().getSwiftRValueType());
-      return SILType::getPrimitiveType(refType.getReferentType());
+      return SILType::getPrimitiveObjectType(refType.getReferentType());
     }
 
     void emitSemanticStore(SILBuilder &B, SILLocation loc,
@@ -872,17 +872,17 @@ namespace {
     LowerType(TypeConverter &TC) : TypeClassifierBase(TC.M), TC(TC) {}
 
     const TypeLowering *handleTrivial(CanType type) {
-      auto silType = SILType::getPrimitiveType(type, false);
+      auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) TrivialTypeLowering(silType);
     }
   
     const TypeLowering *handleReference(CanType type) {
-      auto silType = SILType::getPrimitiveType(type, false);
+      auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) ReferenceTypeLowering(silType);
     }
 
     const TypeLowering *handleAddressOnly(CanType type) {
-      auto silType = SILType::getPrimitiveType(type, true);
+      auto silType = SILType::getPrimitiveAddressType(type);
       return new (TC) AddressOnlyTypeLowering(silType);
     }
 
@@ -891,7 +891,7 @@ namespace {
     const TypeLowering *visitAnyFunctionType(CanAnyFunctionType type) {
       // The type should already be SIL-canonical.
       assert(type == TC.getUncurriedFunctionType(type, 0));
-      auto silType = SILType::getPrimitiveType(type, false);
+      auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) FunctionTypeLowering(silType);
     }
 
@@ -901,10 +901,10 @@ namespace {
       case Ownership::Strong:  llvm_unreachable("explicit strong ownership");
       case Ownership::Unowned:
         return new (TC) UnownedTypeLowering(
-                                  SILType::getPrimitiveType(type, false));
+                                  SILType::getPrimitiveObjectType(type));
       case Ownership::Weak:
         return new (TC) WeakTypeLowering(
-                                  SILType::getPrimitiveType(type, true));
+                                  SILType::getPrimitiveAddressType(type));
       }
       llvm_unreachable("bad ownership kind");
     }
@@ -1382,7 +1382,7 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
     substType = CanType(ReferenceStorageType::get(substType,
                                                   refType->getOwnership(),
                                                   Context));
-    return SILType::getPrimitiveType(substType, /*isAddress*/ true);
+    return SILType::getPrimitiveType(substType, SILValueCategory::Address);
   }
 
   return silSubstType;

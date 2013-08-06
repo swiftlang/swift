@@ -194,12 +194,19 @@ std::string SILType::getAsString() const {
   return OS.str();
 }
 
+static void print(raw_ostream &OS, SILValueCategory category) {
+  switch (category) {
+  case SILValueCategory::Object: return;
+  case SILValueCategory::Address: OS << '*'; return;
+  }
+  llvm_unreachable("bad value category!");
+}
       
 void SILType::print(raw_ostream &OS) const {
   OS << '$';
 
-  if (isAddress())
-    OS << '*';
+  // Potentially add a leading sigil for the value category.
+  ::print(OS, getCategory());
 
   // Print other types as their Swift representation.
   getSwiftRValueType().print(OS);

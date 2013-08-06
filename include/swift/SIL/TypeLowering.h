@@ -197,7 +197,8 @@ public:
     // If you change this, change getSemanticTypeLowering() too.
     auto storageType = getLoweredType().getSwiftRValueType();
     if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
-      return SILType::getPrimitiveType(refType.getReferentType());
+      return SILType::getPrimitiveType(refType.getReferentType(),
+                                       SILValueCategory::Object);
     return getLoweredType();
   }
   

@@ -566,9 +566,9 @@ bool SILParser::parseSILType(SILType &Result) {
     return true;
 
   // If we have a '*', then this is an address type.
-  bool isAddress = false;
+  SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText() == "*") {
-    isAddress = true;
+    category = SILValueCategory::Address;
     P.consumeToken();
   }
 
@@ -617,7 +617,7 @@ bool SILParser::parseSILType(SILType &Result) {
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
-                                     isAddress);
+                                     category);
   return false;
 }
 
@@ -995,7 +995,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
-    auto *intTy = Ty.getAs<BuiltinIntegerType>();
+    auto intTy = Ty.getAs<BuiltinIntegerType>();
     if (!intTy) {
       P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
       return true;
@@ -1025,7 +1025,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     
-    auto *floatTy = Ty.getAs<BuiltinFloatType>();
+    auto floatTy = Ty.getAs<BuiltinFloatType>();
     if (!floatTy) {
       P.diagnose(P.Tok, diag::sil_float_literal_not_float_type);
       return true;
@@ -1375,7 +1375,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                diag::expected_tok_in_sil_instr,")");
       
       auto Ty = TupleType::get(TypeElts, P.Context);
-      auto Ty2 = SILType::getPrimitiveType(Ty->getCanonicalType(), false);
+      auto Ty2 = SILType::getPrimitiveObjectType(Ty->getCanonicalType());
       ResultVal = B.createTuple(SILLocation(), Ty2, OpList);
       break;
     }
@@ -1402,7 +1402,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         }
         Type EltTy = TT->getFields()[TypeElts.size()].getType();
         if (parseValueRef(Val,
-                          SILType::getPrimitiveType(EltTy->getCanonicalType())))
+                 SILType::getPrimitiveObjectType(EltTy->getCanonicalType())))
           return true;
         OpList.push_back(Val);
         TypeElts.push_back(Val.getType().getSwiftRValueType());
@@ -1438,15 +1438,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     P.consumeToken(tok::integer_literal);
 
-    auto ResultTy = SILType::getPrimitiveType(
-                      TT->getFields()[Field].getType()->getCanonicalType(),
-                      Opcode == ValueKind::TupleElementAddrInst);
+    auto ResultTy = TT->getFields()[Field].getType()->getCanonicalType();
     if (Opcode == ValueKind::TupleElementAddrInst)
       ResultVal = B.createTupleElementAddr(SILLocation(), Val, Field,
-                                           ResultTy);
+                                  SILType::getPrimitiveAddressType(ResultTy));
     else
       ResultVal = B.createTupleExtract(SILLocation(), Val, Field,
-                                       ResultTy).getDef();
+                          SILType::getPrimitiveObjectType(ResultTy)).getDef();
     break;
   }
   case ValueKind::ReturnInst: {
@@ -1644,14 +1642,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    auto ResultTy = SILType::getPrimitiveType(
-                      Field->getType()->getCanonicalType(),
-                      Opcode == ValueKind::StructElementAddrInst);
+
+    // FIXME: substitution means this needs to be explicit.
+    auto ResultTy = Field->getType()->getCanonicalType();
     if (Opcode == ValueKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(SILLocation(), Val, Field,
-                                            ResultTy);
+                                 SILType::getPrimitiveAddressType(ResultTy));
     else
-      ResultVal = B.createStructExtract(SILLocation(), Val, Field, ResultTy);
+      ResultVal = B.createStructExtract(SILLocation(), Val, Field,
+                                  SILType::getPrimitiveObjectType(ResultTy));
     break;
   }
   case ValueKind::BuiltinZeroInst: {
@@ -1676,8 +1675,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    auto ResultTy = SILType::getPrimitiveType(
-                      Field->getType()->getCanonicalType(), true);
+    auto ResultTy = SILType::getPrimitiveAddressType(
+                                       Field->getType()->getCanonicalType());
     ResultVal = B.createRefElementAddr(SILLocation(), Val, Field,
                                        ResultTy).getDef();
     break;
@@ -1686,8 +1685,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SourceLoc Loc;
     if (parseTypedValueRef(Val, Loc))
       return true;
-    auto BoolTy = SILType::getPrimitiveType(
-                    lookupBoolType(Loc)->getCanonicalType());
+    auto BoolTy = SILType::getPrimitiveObjectType(
+                                    lookupBoolType(Loc)->getCanonicalType());
     ResultVal = B.createIsNonnull(SILLocation(), Val, BoolTy);
     break;
   }

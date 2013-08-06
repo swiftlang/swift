@@ -179,8 +179,8 @@ namespace {
     SILValue offset(SILGenFunction &gen, SILLocation loc, SILValue base)
       const override
     {
-      assert(!base.getType().isAddress() &&
-             "base for ref element component can't be an address");
+      assert(base.getType().isObject() &&
+             "base for ref element component must be an object");
       assert(base.getType().hasReferenceSemantics() &&
              "base for ref element component must be a reference type");
       return gen.B.createRefElementAddr(loc, base, field, type);
