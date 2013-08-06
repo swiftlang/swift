@@ -136,8 +136,6 @@ public:
   Parser(unsigned BufferID, TranslationUnit *TU,
          bool IsMainModule, SILParserState *SIL,
          PersistentParserState *PersistentState = nullptr);
-  Parser(TranslationUnit *TU, llvm::StringRef fragment, DiagnosticEngine &Diags,
-         SILParserState *SIL);
   ~Parser();
 
   bool isInSILMode() const { return SIL != nullptr; }

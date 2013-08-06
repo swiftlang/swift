@@ -211,13 +211,6 @@ Parser::Parser(unsigned BufferID, TranslationUnit *TU,
   }
 }
 
-Parser::Parser(TranslationUnit *TU,
-               llvm::StringRef fragment, DiagnosticEngine &Diags,
-               SILParserState *SIL)
-  : Parser(new Lexer(fragment, SourceMgr, &Diags, SIL != nullptr),
-           TU, Diags, SIL, /*PersistentState=*/nullptr) {
-}
-
 Parser::~Parser() {
   delete L;
 }
