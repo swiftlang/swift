@@ -68,7 +68,8 @@ public:
   static ClangImporter *create(ASTContext &ctx, StringRef sdkroot,
                                StringRef targetTriple,
                                StringRef moduleCachePath,
-                               ArrayRef<std::string> searchPaths = {},
+                               ArrayRef<std::string> importSearchPaths = {},
+                               ArrayRef<std::string> frameworkSearchPaths = {},
                                StringRef overrideResourceDir = StringRef());
 
   ClangImporter(const ClangImporter &) = delete;

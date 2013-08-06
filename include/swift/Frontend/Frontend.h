@@ -40,6 +40,7 @@ class CompilerInvocation {
   std::string TargetTriple;
   std::string ClangModuleCachePath;
   std::vector<std::string> ImportSearchPaths;
+  std::vector<std::string> FrameworkSearchPaths;
   std::string MainExecutablePath;
   std::string SDKPath;
 
@@ -92,6 +93,14 @@ public:
 
   std::vector<std::string> getImportSearchPaths() const {
     return ImportSearchPaths;
+  }
+
+  void setFrameworkSearchPaths(const std::vector<std::string> &Paths) {
+    FrameworkSearchPaths = Paths;
+  }
+
+  std::vector<std::string> getFrameworkSearchPaths() const {
+    return FrameworkSearchPaths;
   }
 
   void setMainExecutablePath(const std::string &Path) {

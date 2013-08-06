@@ -71,6 +71,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                      Invocation.getTargetTriple(),
                      Invocation.getClangModuleCachePath(),
                      Invocation.getImportSearchPaths(),
+                     Invocation.getFrameworkSearchPaths(),
                      StringRef());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);

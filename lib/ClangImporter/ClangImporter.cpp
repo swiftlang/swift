@@ -81,7 +81,8 @@ ClangImporter::~ClangImporter() {
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
                                      StringRef targetTriple,
                                      StringRef moduleCachePath,
-                                     ArrayRef<std::string> searchPaths,
+                                     ArrayRef<std::string> importSearchPaths,
+                                     ArrayRef<std::string> frameworkSearchPaths,
                                      StringRef overrideResourceDir) {
   std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
 
@@ -108,8 +109,13 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef sdkroot,
     "swift.m"
   };
 
-  for (auto path : searchPaths) {
+  for (auto path : importSearchPaths) {
     invocationArgStrs.push_back("-I");
+    invocationArgStrs.push_back(path);
+  }
+
+  for (auto path : frameworkSearchPaths) {
+    invocationArgStrs.push_back("-F");
     invocationArgStrs.push_back(path);
   }
 
