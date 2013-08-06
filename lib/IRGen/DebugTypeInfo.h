@@ -35,16 +35,16 @@ namespace swift {
     /// decide on what type of debug info we want to emit for types.
     class DebugTypeInfo {
     public:
-      CanType CanTy;
+      Type Ty;
       uint64_t SizeInBytes;
       uint64_t AlignmentInBytes;
 
       DebugTypeInfo()
-        : CanTy(),  SizeInBytes(0), AlignmentInBytes(0) {
+        : Ty(),  SizeInBytes(0), AlignmentInBytes(0) {
       }
-      DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align);
-      DebugTypeInfo(CanType CTy, Size Size, Alignment Align);
-      DebugTypeInfo(CanType CTy, const TypeInfo &Info);
+      DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align);
+      DebugTypeInfo(Type Ty, Size Size, Alignment Align);
+      DebugTypeInfo(Type Ty, const TypeInfo &Info);
       DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info);
       DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align);
 
@@ -63,11 +63,11 @@ namespace llvm {
       return swift::irgen::DebugTypeInfo();
     }
     static swift::irgen::DebugTypeInfo getTombstoneKey() {
-      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::CanType>
+      return swift::irgen::DebugTypeInfo(llvm::DenseMapInfo<swift::Type>
                                          ::getTombstoneKey(), 0, 0);
     }
     static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
-      return DenseMapInfo<swift::CanType>::getHashValue(Val.CanTy);
+      return DenseMapInfo<swift::CanType>::getHashValue(Val.Ty);
     }
     static bool isEqual(swift::irgen::DebugTypeInfo LHS,
                         swift::irgen::DebugTypeInfo RHS) {

@@ -178,7 +178,7 @@ public:
 private:
   llvm::DIType createType(DebugTypeInfo Ty, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
-  llvm::DIType getOrCreateType(DebugTypeInfo Ty, llvm::DIDescriptor Scope);
+  llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);

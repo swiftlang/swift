@@ -732,7 +732,7 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
 /// The final goal, once we forked LLVM, is to emit something like a
 /// DW_TAG_APPLE_ast_ref_type (an external reference) instead of a
 /// local reference to the type.
-llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
+llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                         llvm::DIDescriptor Scope,
                                         llvm::DIFile File) {
   StringRef Name;
@@ -742,14 +742,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   // emitting the storage size of the struct, but it may be necessary
   // to emit the (target!) size of the underlying basic type.
   unsigned SizeOfByte = TargetInfo.getCharWidth();
-  uint64_t SizeInBits = Ty.SizeInBytes * SizeOfByte;
-  uint64_t AlignInBits = Ty.AlignmentInBytes * SizeOfByte;
+  uint64_t SizeInBits = DbgTy.SizeInBytes * SizeOfByte;
+  uint64_t AlignInBits = DbgTy.AlignmentInBytes * SizeOfByte;
   unsigned Encoding = 0;
   unsigned Flags = 0;
 
-  TypeBase* BaseTy = Ty.CanTy.getPointer();
+  TypeBase* BaseTy = DbgTy.Ty.getPointer();
   if (!BaseTy) {
-    DEBUG(llvm::dbgs() << "Type without TypeBase: "; Ty.CanTy.dump();
+    DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
     Name = "<null>";
     return DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
@@ -780,13 +780,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
   }
 
   case TypeKind::BuiltinObjectPointer: {
-    Name = getMangledName(Ty.CanTy);
+    Name = getMangledName(DbgTy.Ty->getCanonicalType());
     auto PTy = DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinRawPointer:
-    Name = getMangledName(Ty.CanTy);
+    Name = getMangledName(DbgTy.Ty->getCanonicalType());
     return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits, Name);
 
   // Even builtin swift types usually come boxed in a struct.
@@ -794,7 +794,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto StructTy = BaseTy->castTo<StructType>();
     if (auto Decl = StructTy->getDecl()) {
       Location L = getStartLoc(SM, Decl);
-      Name = getMangledName(Ty.CanTy);
+      Name = getMangledName(DbgTy.Ty->getCanonicalType());
       return DBuilder.createStructType(Scope, Name,
                                        getOrCreateFile(L.Filename), L.Line,
                                        SizeInBits, AlignInBits, Flags,
@@ -802,7 +802,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        llvm::DIArray(), // Elements
                                        DW_LANG_Swift);
     }
-    DEBUG(llvm::dbgs() << "Struct without Decl: "; Ty.CanTy.dump();
+    DEBUG(llvm::dbgs() << "Struct without Decl: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
     break;
   }
@@ -813,7 +813,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // used to differentiate them from C++ and ObjC classes.
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto Decl = ClassTy->getDecl()) {
-      Name = getMangledName(Ty.CanTy);
+      Name = getMangledName(DbgTy.Ty->getCanonicalType());
       Location L = getStartLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
@@ -824,13 +824,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        llvm::DIArray(), // Elements
                                        RuntimeLang);
     }
-    DEBUG(llvm::dbgs() << "Class without Decl: "; Ty.CanTy.dump();
+    DEBUG(llvm::dbgs() << "Class without Decl: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
     break;
   }
 
   case TypeKind::Protocol: {
-    Name = getMangledName(Ty.CanTy);
+    Name = getMangledName(DbgTy.Ty->getCanonicalType());
     break;
   }
 
@@ -847,7 +847,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        DW_LANG_Swift);
     }
     DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
-          Ty.CanTy.dump(); llvm::dbgs() << "\n");
+          DbgTy.Ty.dump(); llvm::dbgs() << "\n");
     break;
   }
 
@@ -866,7 +866,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
                                        RuntimeLang);
     }
     DEBUG(llvm::dbgs() << "Bound Generic class without Decl: ";
-          Ty.CanTy.dump(); llvm::dbgs() << "\n");
+          DbgTy.Ty.dump(); llvm::dbgs() << "\n");
     break;
   }
 
@@ -878,7 +878,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     // them.
     Name = "<tuple>";
     // We could use the mangled Name instead of emitting the typ, but no:
-    // FIXME: getMangledName(Ty.CanTy) crashes if one of the elements
+    // FIXME: getMangledName(DbgTy.CanTy) crashes if one of the elements
     // is an ArcheType.
     return DBuilder.createStructType(Scope, Name,
                                      File, 0,
@@ -894,12 +894,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     auto CanTy = LValueTy->getObjectType()->getCanonicalType();
     return getOrCreateType(DebugTypeInfo(CanTy, SizeInBits, AlignInBits), Scope);
   }
+
   case TypeKind::Archetype: {
     // FIXME
     auto Archetype = BaseTy->castTo<ArchetypeType>();
     Name = Archetype->getName().str();
     break;
   }
+
   case TypeKind::MetaType: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
     auto Metatype = BaseTy->castTo<MetaTypeType>();
@@ -909,6 +911,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     return DBuilder.createQualifiedType(DW_TAG_meta_type,
                                         getOrCreateType(InstanceDTI, Scope));
   }
+
   case TypeKind::Function: {
     // FIXME: auto Function = BaseTy->castTo<AnyFunctionType>();
     // FIXME: handle parameters.
@@ -916,12 +919,37 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
   case TypeKind::Union: {
-    Name = getMangledName(Ty.CanTy);
+    Name = getMangledName(DbgTy.Ty->getCanonicalType());
     break;
   }
 
+  // Sugared types.
+
+  case TypeKind::NameAlias: {
+    // We cannot use BaseTy->castTo<>(), because it will use the desugared type!
+    auto NameAliasTy = cast<NameAliasType>(BaseTy);
+    if (auto Decl = NameAliasTy->getDecl()) {
+      Name = Decl->getName().str();
+      Location L = getStartLoc(SM, Decl);
+      auto CanTy = NameAliasTy->getDesugaredType();
+      auto CanDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
+      return DBuilder.createTypedef(getOrCreateType(CanDTI, Scope), Name,
+                                    getOrCreateFile(L.Filename), L.Line, Scope);
+    }
+    DEBUG(llvm::dbgs() << "Name alias without Decl: ";
+          DbgTy.Ty.dump(); llvm::dbgs() << "\n");
+    break;
+  }
+
+  case TypeKind::ArraySlice: {
+    auto ArraySliceTy = cast<ArraySliceType>(BaseTy);
+    auto CanTy = ArraySliceTy->getDesugaredType();
+    auto CanDTI = DebugTypeInfo(CanTy, SizeInBits, AlignInBits);
+    return getOrCreateType(CanDTI, Scope);
+  }
+
   default:
-    DEBUG(llvm::dbgs() << "Unhandled type: "; Ty.CanTy.dump();
+    DEBUG(llvm::dbgs() << "Unhandled type: "; DbgTy.Ty.dump();
           llvm::dbgs() << "\n");
     Name = "<unknown>";
   }
@@ -930,15 +958,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo Ty,
 
 /// Get the DIType corresponding to this DebugTypeInfo from the cache,
 /// or build a fresh DIType otherwise.
-llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
+llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy,
                                              llvm::DIDescriptor Scope) {
   // Is this an empty type?
-  if (Ty.CanTy.isNull())
+  if (DbgTy.Ty.isNull())
     // We use the empty type as an index into DenseMap.
-    return createType(Ty, Scope, getFile(Scope));
+    return createType(DbgTy, Scope, getFile(Scope));
 
   // Look in the cache first.
-  auto CachedType = DITypeCache.find(Ty);
+  auto CachedType = DITypeCache.find(DbgTy);
 
   if (CachedType != DITypeCache.end()) {
     // Verify that the information still exists.
@@ -949,9 +977,9 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo Ty,
     }
   }
 
-  llvm::DIType DITy = createType(Ty, Scope, getFile(Scope));
+  llvm::DIType DITy = createType(DbgTy, Scope, getFile(Scope));
   DITy.Verify();
 
-  DITypeCache[Ty] = llvm::WeakVH(DITy);
+  DITypeCache[DbgTy] = llvm::WeakVH(DITy);
   return DITy;
 }

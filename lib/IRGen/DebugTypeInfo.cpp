@@ -22,16 +22,16 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(CanType CTy, uint64_t Size, uint64_t Align)
-  : CanTy(CTy), SizeInBytes(Size), AlignmentInBytes(Align) {
+DebugTypeInfo::DebugTypeInfo(Type Ty, uint64_t Size, uint64_t Align)
+  : Ty(Ty), SizeInBytes(Size), AlignmentInBytes(Align) {
 }
 
-DebugTypeInfo::DebugTypeInfo(CanType CTy, Size Size, Alignment Align)
-  : CanTy(CTy), SizeInBytes(Size.getValue()), AlignmentInBytes(Align.getValue()) {
+DebugTypeInfo::DebugTypeInfo(Type Ty, Size Size, Alignment Align)
+  : Ty(Ty), SizeInBytes(Size.getValue()), AlignmentInBytes(Align.getValue()) {
 }
 
-DebugTypeInfo::DebugTypeInfo(CanType CTy, const TypeInfo &Info)
-  : CanTy(CTy) {
+DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info)
+  : Ty(Ty) {
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     SizeInBytes = FixTy.getFixedSize().getValue();
@@ -40,7 +40,7 @@ DebugTypeInfo::DebugTypeInfo(CanType CTy, const TypeInfo &Info)
 }
 
 DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
-  : CanTy(Decl.getType()->getCanonicalType()) {
+  : Ty(Decl.getType()) {
   // Same as above.
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
@@ -50,14 +50,33 @@ DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, const TypeInfo &Info)
 }
 
 DebugTypeInfo::DebugTypeInfo(const ValueDecl &Decl, Size Size, Alignment Align)
-  : CanTy(Decl.getType()->getCanonicalType()),
+  : Ty(Decl.getType()),
     SizeInBytes(Size.getValue()),
     AlignmentInBytes(Align.getValue()) {
 }
 
 
 bool DebugTypeInfo::operator==(DebugTypeInfo T) const {
-  return CanTy == T.CanTy
+  bool TypesEqual;
+  if (Ty.getPointer() == T.Ty.getPointer())
+    TypesEqual = true;
+  else {
+    // nullptr.
+    if (Ty.isNull() || T.Ty.isNull())
+      TypesEqual = false;
+
+    // Tombstone.
+    auto Tombstone =
+      llvm::DenseMapInfo<swift::Type>::getTombstoneKey().getPointer();
+    if ((Ty.getPointer() == Tombstone) || (T.Ty.getPointer() == Tombstone))
+      TypesEqual = false;
+
+    // Pointers are safe, do the real comparison.
+    if (TypesEqual)
+      TypesEqual = Ty->isSpelledLike(T.Ty.getPointer());
+  }
+
+  return TypesEqual
     && SizeInBytes == T.SizeInBytes
     && AlignmentInBytes == T.AlignmentInBytes;
 }

@@ -898,7 +898,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var) {
 
   // Okay, we need to rebuild it.
   LinkInfo link = LinkInfo::get(*this, entity);
-  DebugTypeInfo DbgTy(var->getType()->getCanonicalType(), type);
+  DebugTypeInfo DbgTy(var->getType(), type);
   auto addr = link.createVariable(*this, type.StorageType,
                                   DbgTy, var, var->getName().str());
   // Ask the type to give us an Address.
