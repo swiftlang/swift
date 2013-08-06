@@ -115,7 +115,8 @@ public:                                                             \
     return static_cast<TYPE*>(Type::getPointer());                  \
   }                                                                 \
   TYPE *operator->() const { return getPointer(); }                 \
-  operator TYPE *() const { return getPointer(); }
+  operator TYPE *() const { return getPointer(); }                  \
+  operator bool() const { return getPointer() != nullptr; }         \
 
 #define PROXY_CAN_TYPE_SIMPLE_GETTER(METHOD)                        \
   CanType METHOD() { return CanType(getPointer()->METHOD()); }
