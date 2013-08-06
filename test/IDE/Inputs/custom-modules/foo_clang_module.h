@@ -27,6 +27,8 @@ int fooFunc1(int a);
 int fooFunc1AnonymousParam(int);
 int fooFunc3(int a, float b, double c, int *d);
 
+int redeclaredInMultipleModulesFunc1(int a);
+
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1
 #define FOO_MACRO_3 (-1)

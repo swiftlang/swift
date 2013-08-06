@@ -320,7 +320,7 @@ ClangImporter::Implementation::getWrapperModule(ClangImporter &importer,
 
 ClangModule *ClangImporter::Implementation::getClangModuleForDecl(
     const clang::Decl *D) {
-  clang::Module *M = D->getOwningModule();
+  clang::Module *M = D->getCanonicalDecl()->getOwningModule();
   if (!M)
     return nullptr;
   // Get the parent module because currently we don't represent submodules with
