@@ -213,35 +213,50 @@ public:
   /// StringSegment - A segment of a (potentially interpolated) string.
   struct StringSegment {
     enum : char { Literal, Expr } Kind;
-    /// String data (not quoted).  It might not point into the original source
-    /// buffer.
-    StringRef Data;
-    SourceRange Range;
+    // Loc+Length for the segment inside the string literal, without quotes.
+    SourceLoc Loc;
+    unsigned Length;
     
-    static StringSegment getLiteral(StringRef Str, SourceRange Range) {
+    static StringSegment getLiteral(SourceLoc Loc, unsigned Length) {
       StringSegment Result;
       Result.Kind = Literal;
-      Result.Data = Str;
-      Result.Range = Range;
+      Result.Loc = Loc;
+      Result.Length = Length;
       return Result;
     }
     
-    static StringSegment getExpr(StringRef Str, SourceRange Range) {
+    static StringSegment getExpr(SourceLoc Loc, unsigned Length) {
       StringSegment Result;
       Result.Kind = Expr;
-      Result.Data = Str;
-      Result.Range = Range;
+      Result.Loc = Loc;
+      Result.Length = Length;
       return Result;
     }
   };
   
-  /// getEncodedStringLiteral - Given a string literal token, compute the bytes
-  /// that the actual string literal should codegen to along with any
-  /// sequences that represent interpolated expressions.
-  /// If a copy needs to be made, it will be allocated out of the ASTContext
-  /// allocator.
-  void getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
-                               llvm::SmallVectorImpl<StringSegment> &Segments);
+  /// \brief Compute the bytes that the actual string literal should codegen to.
+  /// If a copy needs to be made, it will be allocated out of the provided
+  /// Buffer.
+  static StringRef getEncodedStringSegment(StringRef Str,
+                                           llvm::SmallVectorImpl<char> &Buffer);
+  static StringRef getEncodedStringSegment(StringSegment Segment,
+                                           llvm::SmallVectorImpl<char> &Buffer){
+    return getEncodedStringSegment(StringRef(Segment.Loc.Value.getPointer(),
+                                             Segment.Length),
+                                   Buffer);
+  }
+
+  /// \brief Given a string literal token, separate it into string/expr segments
+  /// of a potentially interpolated string.
+  static void getStringLiteralSegments(const Token &Str,
+                                llvm::SmallVectorImpl<StringSegment> &Segments,
+                                DiagnosticEngine *Diags);
+
+  void getStringLiteralSegments(const Token &Str,
+                                llvm::SmallVectorImpl<StringSegment> &Segments){
+    return getStringLiteralSegments(Str, Segments, Diags);
+  }
+
   /// getEncodedCharacterLiteral - Return the UTF32 codepoint for the specified
   /// character literal.
   uint32_t getEncodedCharacterLiteral(const Token &Str); 

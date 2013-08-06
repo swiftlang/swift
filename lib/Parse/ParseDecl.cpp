@@ -426,12 +426,13 @@ bool Parser::parseAttribute(DeclAttributes &Attributes) {
     }
 
     llvm::SmallVector<Lexer::StringSegment, 1> Segments;
-    L->getEncodedStringLiteral(Tok, Context, Segments);
+    L->getStringLiteralSegments(Tok, Segments);
     if (Segments.size() != 1 ||
         Segments.front().Kind == Lexer::StringSegment::Expr) {
       diagnose(TokLoc, diag::asmname_interpolated_string);
     } else {
-      Attributes.AsmName = Segments.front().Data;
+      Attributes.AsmName = StringRef(Segments.front().Loc.Value.getPointer(),
+                                     Segments.front().Length);
     }
     consumeToken(tok::string_literal);
     return false;

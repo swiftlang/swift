@@ -1020,7 +1020,8 @@ uint32_t Lexer::getEncodedCharacterLiteral(const Token &Str) {
 /// On success, the returned pointer will point to a ')'.  On failure, it will
 /// point to something else.  This basically just does brace matching.
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
-                                                     Lexer *L) {
+                                                     const char *EndPtr,
+                                                     DiagnosticEngine *Diags) {
   SourceLoc InterpStart = Lexer::getSourceLoc(CurPtr-1);
   unsigned ParenCount = 1;
   while (true) {
@@ -1043,14 +1044,18 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
     // String literals cannot be used in interpolated string literals.
     case '"':
-      L->diagnose(CurPtr - 1, diag::lex_unexpected_quote_string_interpolation)
-        .highlight(Diagnostic::Range(InterpStart,
-                                     Lexer::getSourceLoc(CurPtr-1)));
+      if (Diags)
+        Diags->diagnose(Lexer::getSourceLoc(CurPtr - 1),
+                        diag::lex_unexpected_quote_string_interpolation)
+          .highlight(Diagnostic::Range(InterpStart,
+                                       Lexer::getSourceLoc(CurPtr-1)));
       return CurPtr-1;
     case 0:
       // If we hit EOF, we fail.
-      if (CurPtr-1 == L->getBufferEnd()) {
-        L->diagnose(CurPtr-1, diag::lex_unterminated_string);
+      if (CurPtr-1 == EndPtr) {
+        if (Diags)
+          Diags->diagnose(Lexer::getSourceLoc(CurPtr-1),
+                          diag::lex_unterminated_string);
         return CurPtr-1;
       }
       continue;
@@ -1083,7 +1088,9 @@ void Lexer::lexStringLiteral() {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
-      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr, this);
+      const char *EndPtr = skipToEndOfInterpolatedExpression(CurPtr,
+                                                             getBufferEnd(),
+                                                             Diags);
       
       if (*EndPtr == ')') {
         // Successfully scanned the body of the expression literal.
@@ -1113,24 +1120,17 @@ void Lexer::lexStringLiteral() {
   }
 }
 
-/// getEncodedStringLiteral - Given a string literal token, return the bytes
-/// that the actual string literal should codegen to.  If a copy needs to be
-/// made, it will be allocated out of the ASTContext allocator.
-void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
-              llvm::SmallVectorImpl<StringSegment> &Segments) {
-  // Get the bytes behind the string literal, dropping the double quotes.
-  StringRef Bytes = Str.getText().drop_front().drop_back();
-  llvm::SmallString<64> TempString;
-
+StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
+                                      llvm::SmallVectorImpl<char> &TempString) {
+  TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because
   // we know that there is a terminating " character.  Use BytesPtr to avoid a
   // range check subscripting on the StringRef.
   const char *BytesPtr = Bytes.begin();
-  SourceLoc BeginLoc = getSourceLoc(BytesPtr);
   while (BytesPtr != Bytes.end()) {
     char CurChar = *BytesPtr++;
     if (CurChar != '\\') {
-      TempString += CurChar;
+      TempString.push_back(CurChar);
       continue;
     }
     
@@ -1142,45 +1142,18 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
       continue;   // Invalid escape, ignore it.
           
       // Simple single-character escapes.
-    case '0': TempString += '\0'; continue;
-    case 'n': TempString += '\n'; continue;
-    case 'r': TempString += '\r'; continue;
-    case 't': TempString += '\t'; continue;
-    case '"': TempString += '"'; continue;
-    case '\'': TempString += '\''; continue;
-    case '\\': TempString += '\\'; continue;
+    case '0': TempString.push_back('\0'); continue;
+    case 'n': TempString.push_back('\n'); continue;
+    case 'r': TempString.push_back('\r'); continue;
+    case 't': TempString.push_back('\t'); continue;
+    case '"': TempString.push_back('"'); continue;
+    case '\'': TempString.push_back('\''); continue;
+    case '\\': TempString.push_back('\\'); continue;
       
         
     // String interpolation.
-    case '(': {
-      // Flush the current string.
-      if (!TempString.empty()) {
-        SourceLoc EndLoc = getSourceLoc(BytesPtr);
-        Segments.push_back(
-            StringSegment::getLiteral(
-                Ctx.AllocateCopy(StringRef(TempString)),
-                SourceRange(BeginLoc, EndLoc)));
-        TempString.clear();
-      }
-      
-      // Find the closing ')'.
-      const char *End = skipToEndOfInterpolatedExpression(BytesPtr, this);
-      assert(*End == ')' && "invalid string literal interpolations should"
-             " not be returned as string literals");
-      ++End;
-      
-      // Add an expression segment.
-      Segments.push_back(
-          StringSegment::getExpr(
-              StringRef(BytesPtr, End-BytesPtr-1),
-              SourceRange(getSourceLoc(BytesPtr), getSourceLoc(End-1))));
-      
-      // Reset the input bytes to the string that remains to be consumed.
-      Bytes = StringRef(End, Bytes.end() - End);
-      BytesPtr = End;
-      BeginLoc = getSourceLoc(BytesPtr);
-      continue;
-    }
+    case '(':
+      llvm_unreachable("string contained interpolated segments");
         
       // Unicode escapes of various lengths.
     case 'x':  //  \x HEX HEX
@@ -1211,24 +1184,73 @@ void Lexer::getEncodedStringLiteral(const Token &Str, ASTContext &Ctx,
     }
     
     if (CharValue < 0x80) 
-      TempString += (char)CharValue;
+      TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);
   }
   
-  // If we didn't escape or reprocess anything, then we don't need to reallocate
-  // a copy of the string, just point to the lexer's version.  We know that this
+  // If we didn't escape or reprocess anything, then we don't need to use the
+  // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
   // forms (in a valid string).
-  if (Segments.empty() && TempString.size() == Bytes.size())
+  if (TempString.size() == Bytes.size()) {
+    TempString.clear();
+    return Bytes;
+  }
+  return StringRef(TempString.begin(), TempString.size());
+}
+
+void Lexer::getStringLiteralSegments(const Token &Str,
+              llvm::SmallVectorImpl<StringSegment> &Segments,
+              DiagnosticEngine *Diags) {
+  assert(Str.is(tok::string_literal));
+  // Get the bytes behind the string literal, dropping the double quotes.
+  StringRef Bytes = Str.getText().drop_front().drop_back();
+
+  // Note that it is always safe to read one over the end of "Bytes" because
+  // we know that there is a terminating " character.  Use BytesPtr to avoid a
+  // range check subscripting on the StringRef.
+  const char *SegmentStartPtr = Bytes.begin();
+  const char *BytesPtr = SegmentStartPtr;
+  // FIXME: Use SSE to scan for '\'.
+  while (BytesPtr != Bytes.end()) {
+    char CurChar = *BytesPtr++;
+    if (CurChar != '\\')
+      continue;
+
+    if (*BytesPtr++ != '(')
+      continue;
+
+    // String interpolation.
+
+    // Push the current segment.
+    if (BytesPtr-SegmentStartPtr > 2) {
+      Segments.push_back(
+          StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
+                                    BytesPtr-SegmentStartPtr-2));
+    }
+
+    // Find the closing ')'.
+    const char *End = skipToEndOfInterpolatedExpression(BytesPtr,
+                                                        Str.getText().end(),
+                                                        Diags);
+    assert(*End == ')' && "invalid string literal interpolations should"
+           " not be returned as string literals");
+    ++End;
+
+    // Add an expression segment.
     Segments.push_back(
-        StringSegment::getLiteral(Bytes,
-        SourceRange(BeginLoc, getSourceLoc(Bytes.end()))));
-  else if (Segments.empty() || !TempString.empty()) {
+        StringSegment::getExpr(getSourceLoc(BytesPtr-1), End-BytesPtr+1));
+
+    // Reset the beginning of the segment to the string that remains to be
+    // consumed.
+    SegmentStartPtr = BytesPtr = End;
+  }
+
+  if (Segments.empty() || SegmentStartPtr < Bytes.end()) {
     Segments.push_back(
-        StringSegment::getLiteral(
-            Ctx.AllocateCopy(StringRef(TempString)),
-            SourceRange(BeginLoc, getSourceLoc(Bytes.end()))));
+        StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
+                                  Bytes.end()-SegmentStartPtr));
   }
 }
 

@@ -36,38 +36,35 @@ static std::vector<Token>
 getStringPartTokens(const Token &Tok, SourceManager &SM, int BufID,
                     ASTContext &Ctx) {
   assert(Tok.is(tok::string_literal));
-  Lexer Lex(Tok.getText(), SM, /*Diags=*/nullptr, /*InSILMode=*/false,
-            /*KeepComments=*/true);
   llvm::SmallVector<Lexer::StringSegment, 4> Segments;
-  Lex.getEncodedStringLiteral(Tok, Ctx, Segments);
+  Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
   std::vector<Token> Toks;
   for (unsigned i = 0, e = Segments.size(); i != e; ++i) {
     Lexer::StringSegment &Seg = Segments[i];
     bool isFirst = i == 0;
     bool isLast = i == e-1;
     if (Seg.Kind == Lexer::StringSegment::Literal) {
-      SourceRange Range = Seg.Range;
-      unsigned Len = Seg.Data.size();
+      SourceLoc Loc = Seg.Loc;
+      unsigned Len = Seg.Length;
       if (isFirst) {
         // Include the quote.
-        Range.Start = Range.Start.getAdvancedLoc(-1);
+        Loc = Loc.getAdvancedLoc(-1);
         ++Len;
       }
       if (isLast) {
         // Include the quote.
-        Range.End = Range.End.getAdvancedLoc(1);
         ++Len;
       }
-      StringRef Text(Range.Start.Value.getPointer(), Len);
+      StringRef Text(Loc.Value.getPointer(), Len);
       Token NewTok;
       NewTok.setToken(tok::string_literal, Text);
       Toks.push_back(NewTok);
 
     } else {
       const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufID);
-      unsigned Offset = Seg.Range.Start.Value.getPointer() -
+      unsigned Offset = Seg.Loc.Value.getPointer() -
                         Buffer->getBufferStart();
-      unsigned EndOffset = Offset + Seg.Data.size();
+      unsigned EndOffset = Offset + Seg.Length;
       std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
                                                      EndOffset,
                                                      /*KeepComments=*/true);

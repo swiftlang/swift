@@ -931,35 +931,57 @@ NullablePtr<Expr> Parser::parseExprPostfix(Diag<> ID) {
   return Result;
 }
 
+static StringLiteralExpr *
+createStringLiteralExprFromSegment(ASTContext &Ctx,
+                                   Lexer::StringSegment &Segment,
+                                   SourceLoc TokenLoc) {
+  assert(Segment.Kind == Lexer::StringSegment::Literal);
+  // FIXME: Consider lazily encoding the string when needed.
+  llvm::SmallString<256> Buf;
+  StringRef EncodedStr = Lexer::getEncodedStringSegment(Segment, Buf);
+  if (!Buf.empty()) {
+    assert(EncodedStr.begin() == Buf.begin() &&
+           "Returned string is not from buffer?");
+    EncodedStr = Ctx.AllocateCopy(EncodedStr);
+  }
+  return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc);
+}
+
 ///   expr-literal:
 ///     string_literal
 Expr *Parser::parseExprStringLiteral() {
   llvm::SmallVector<Lexer::StringSegment, 1> Segments;
-  L->getEncodedStringLiteral(Tok, Context, Segments);
+  L->getStringLiteralSegments(Tok, Segments);
   SourceLoc Loc = consumeToken();
     
   // The simple case: just a single literal segment.
   if (Segments.size() == 1 &&
-      Segments.front().Kind == Lexer::StringSegment::Literal)
-    return new (Context) StringLiteralExpr(Segments.front().Data, Loc);
+      Segments.front().Kind == Lexer::StringSegment::Literal) {
+    return createStringLiteralExprFromSegment(Context, Segments.front(), Loc);
+  }
     
-  // We are going to mess with Tok to do reparsing for interpolated literals,
-  // don't lose our 'next' token.
-  llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SmallVector<Expr*, 4> Exprs;
   for (auto Segment : Segments) {
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
       Exprs.push_back(
-          new (Context) StringLiteralExpr(Segment.Data, Segment.Range));
+          createStringLiteralExprFromSegment(Context, Segment, Loc));
       break;
     }
         
     case Lexer::StringSegment::Expr: {
+      // We are going to mess with Tok to do reparsing for interpolated literals,
+      // don't lose our 'next' token.
+      llvm::SaveAndRestore<Token> SavedTok(Tok);
+
       // Create a temporary lexer that lexes from the body of the string.
       Lexer::State BeginState =
-          L->getStateForBeginningOfTokenLoc(Segment.Range.Start);
-      Lexer::State EndState = BeginState.advance(Segment.Data.size());
+          L->getStateForBeginningOfTokenLoc(Segment.Loc);
+      // We need to set the EOF at r_paren, to prevent the Lexer from eagerly
+      // trying to lex the token beyond it. Parser::parseList() does a special
+      // check for a tok::EOF that is spelled with a ')'.
+      // FIXME: This seems like a hack, there must be a better way..
+      Lexer::State EndState = BeginState.advance(Segment.Length-1);
       Lexer LocalLex(*L, BeginState, EndState,
                      SourceMgr, &Diags, nullptr /*not SIL*/);
       
@@ -967,9 +989,8 @@ Expr *Parser::parseExprStringLiteral() {
       llvm::SaveAndRestore<Lexer*> T(L, &LocalLex);
       
       // Prime the new lexer with a '(' as the first token.
-      assert(Segment.Data.data()[-1] == '(' &&
-             "Didn't get an lparen before interpolated expression");
-      Tok.setToken(tok::l_paren, StringRef(Segment.Data.data()-1, 1));
+      consumeToken();
+      assert(Tok.is(tok::l_paren));
       
       NullablePtr<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       if (E.isNonNull()) {
