@@ -69,16 +69,17 @@ public:
     return LHS.Value.getPointer() < RHS.Value.getPointer();
   }
 
-  /// Returns true if range \c R contains the location \c Loc.
-  bool rangeContainsLoc(SourceRange R, SourceLoc Loc) const {
+  /// Returns true if range \c R contains the location \c Loc.  The location
+  /// \c Loc should point at the beginning of the token.
+  bool rangeContainsTokenLoc(SourceRange R, SourceLoc Loc) const {
     return Loc == R.Start || Loc == R.End ||
            (isBeforeInBuffer(R.Start, Loc) && isBeforeInBuffer(Loc, R.End));
   }
 
   /// Returns true if range \c Enclosing contains the range \c Inner.
   bool rangeContains(SourceRange Enclosing, SourceRange Inner) const {
-    return rangeContainsLoc(Enclosing, Inner.Start) &&
-           rangeContainsLoc(Enclosing, Inner.End);
+    return rangeContainsTokenLoc(Enclosing, Inner.Start) &&
+           rangeContainsTokenLoc(Enclosing, Inner.End);
   }
 };
 

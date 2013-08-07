@@ -278,7 +278,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
   bool IntersectsRange(SourceRange R) {
-    return SM.rangeContainsLoc(R, Loc);
+    return SM.rangeContainsTokenLoc(R, Loc);
   }
 
   void checkValueDecl(ValueDecl *D) {
