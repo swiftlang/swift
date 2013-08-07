@@ -39,13 +39,15 @@ static unsigned getNumElements(CanType T, SILModule *M) {
     return NumElements;
   }
 
-  if (StructType *ST = T->getAs<StructType>()) {
-    // If the struct is resilient, we can't get to its fields.
-    if (SILType::isAddressOnly(T, *M))
-      return 1;
+  if (T->is<StructType>() || T->is<BoundGenericStructType>()) {
+    StructDecl *SD;
+    if (auto *ST = T->getAs<StructType>())
+      SD = ST->getDecl();
+    else
+      SD = T->castTo<BoundGenericStructType>()->getDecl();
 
     unsigned NumElements = 0;
-    for (auto *D : ST->getDecl()->getMembers())
+    for (auto *D : SD->getMembers())
       if (auto *VD = dyn_cast<VarDecl>(D))
         NumElements += getNumElements(VD->getType()->getCanonicalType(), M);
     return NumElements;
@@ -368,6 +370,30 @@ static void collectAllocationUses(SILValue Pointer,
       }
 
       collectAllocationUses(SILValue(TEAI, 0), Uses, NewBaseElt);
+      continue;
+    }
+
+    // struct_element P, #field indexes into the current element.  Recursively
+    // process its uses with the adjusted element number.
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
+      VarDecl *Field = SEAI->getField();
+      CanType StructTy = Pointer.getType().getSwiftRValueType();
+
+      StructDecl *SD;
+      if (auto *ST = StructTy->getAs<StructType>())
+        SD = ST->getDecl();
+      else
+        SD = StructTy->castTo<BoundGenericStructType>()->getDecl();
+
+      unsigned NewBaseElt = BaseElt;
+      for (auto *D : SD->getMembers()) {
+        if (D == Field) break;
+        if (auto *VD = dyn_cast<VarDecl>(D))
+          NewBaseElt += getNumElements(VD->getType()->getCanonicalType(),
+                                       SEAI->getModule());
+      }
+
+      collectAllocationUses(SILValue(SEAI, 0), Uses, NewBaseElt);
       continue;
     }
 
